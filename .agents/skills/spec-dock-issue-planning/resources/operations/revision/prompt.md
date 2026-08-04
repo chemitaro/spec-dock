@@ -1,0 +1,1 @@
+Complete replacement semantic revision using the prior Candidate, exact formal Review evidence, selected P0/P1 findings, and preserved assumptions while keeping Issue, parent, repository, branch, and source HEAD unchanged.

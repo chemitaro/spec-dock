@@ -346,10 +346,11 @@ def test_reviewer_prompt_is_read_only_defect_only_and_denies_authority(tmp_path:
         upstream="origin/feature/issue",
         remote_head="a" * 40,
     ).prompt.lower()
+    assert "fresh" in prompt
     assert "read-only" in prompt
     assert "defect-only" in prompt
-    assert "patch" in prompt
-    assert "zip" in prompt
+    assert "patch" not in prompt
+    assert "review" in prompt
 
 
 def test_synthesize_prompt_scans_complete_dynamic_identity_block(tmp_path: Path) -> None:
@@ -374,19 +375,19 @@ def test_synthesize_prompt_scans_complete_dynamic_identity_block(tmp_path: Path)
 
 def test_planner_prompt_contains_exact_zip_and_connector_contract(tmp_path: Path) -> None:
     _write_context_files(tmp_path)
-    prompt = issue_planning_prompt.synthesize_issue_planning_prompt(
+    synthesized = issue_planning_prompt.synthesize_issue_planning_prompt(
         role="planner",
         context=_context(),
         repo_root=tmp_path,
         upstream="origin/feature/issue",
         remote_head="a" * 40,
-    ).prompt
+    )
+    prompt = synthesized.prompt
     assert "@GitHub" in prompt
     assert "owner/repo" in prompt
     assert "feature/issue" in prompt
     assert "a" * 40 in prompt
     assert "repository access failed" in prompt
-    assert "default branch" in prompt
     assert "iss-00003-issue-planning-documents.zip" in prompt
     assert "iss-00003-issue-planning-documents" in prompt
     for filename in (
@@ -398,23 +399,20 @@ def test_planner_prompt_contains_exact_zip_and_connector_contract(tmp_path: Path
         assert prompt.count(filename) >= 1
     assert "SPECDOCK-ISSUE-PLANNING-RESPONSE-V1" not in prompt
     assert "SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1" not in prompt
-    assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
+    diagram_contract = "Include at least four valid PlantUML fences"
+    assert "13 nonempty distinct H2 headings with exact labels and no split or merge" not in prompt
+    assert diagram_contract not in prompt
+    resource_root = issue_planning_prompt._provider_resource_root()
+    instructions = (
+        resource_root / "operations" / "planning" / "attachments" / "instructions.md"
+    ).read_text(encoding="utf-8")
+    assert "13 nonempty distinct H2 headings with exact labels and no split or merge" in instructions
+    assert diagram_contract in instructions
     for heading in ONBOARDING_HEADING_CONTRACT:
-        assert prompt.count(heading) == 1
-    diagram_contract = (
-        "4+ valid `plantuml` fences: system context/responsibility boundary/planning sequence/implementation roadmap."
+        assert instructions.count(heading) == 1
+    assert synthesized.attachment_paths == (
+        resource_root / "operations" / "planning" / "attachments",
     )
-    assert prompt.count(diagram_contract) == 1
-    assert (
-        "4+ valid `plantuml` fences: system-context/responsibility-boundary/planning-sequence/implementation-roadmap."
-    ) not in prompt
-    for diagram_role in (
-        "system context",
-        "responsibility boundary",
-        "planning sequence",
-        "implementation roadmap",
-    ):
-        assert diagram_role in prompt
 
 
 def test_review_prompt_classifies_exact_targets_and_formal_evidence() -> None:
@@ -442,8 +440,10 @@ def test_review_prompt_classifies_exact_targets_and_formal_evidence() -> None:
         ),
     )
     assert synthesized.exact_attachments[0].content == candidate
-    assert "review-target" in synthesized.prompt
-    assert hashlib.sha256(candidate).hexdigest() in synthesized.prompt
+    assert "review-target" not in synthesized.prompt
+    assert "target-candidate.zip" not in synthesized.prompt
+    assert hashlib.sha256(candidate).hexdigest() not in synthesized.prompt
+    assert "reviewed_identity_sha256" in synthesized.prompt
 
 
 def test_semantic_revision_prompt_is_self_contained_without_session_locator() -> None:
@@ -478,25 +478,25 @@ def test_semantic_revision_prompt_is_self_contained_without_session_locator() ->
     assert "session_locator" not in synthesized.prompt
     assert synthesized.role == "semantic_revision"
     assert "complete replacement" in synthesized.prompt.lower()
-    assert "patch" in synthesized.prompt.lower()
+    assert "patch" not in synthesized.prompt.lower()
 
 
 def test_role_fragments_leave_shared_boundary_to_transport() -> None:
     resource_root = issue_planning_prompt._provider_resource_root()
-    role_fragments = tuple(
-        (resource_root / name).read_text(encoding="utf-8")
-        for name in ("planner-prompt.md", "reviewer-prompt.md", "revision-prompt.md")
-    )
-    transport = (resource_root / "transport-output-contract.md").read_text(encoding="utf-8")
-
-    for fragment in role_fragments:
-        assert "Do not mutate the repository" not in fragment
-        assert "Human decision" not in fragment
-        assert "Return exactly one downloadable ZIP" not in fragment
-        assert "Return exactly one JSON object" not in fragment
-    assert transport.count("ChatGPT does not approve or adopt planning") == 1
-    assert transport.count("Return only the formal output") == 1
-    assert "session or conversation identifiers" in transport
+    assert not (resource_root / "transport-output-contract.md").exists()
+    for operation in ("planning", "review", "revision"):
+        operation_root = resource_root / "operations" / operation
+        prompt = (operation_root / "prompt.md").read_text(encoding="utf-8")
+        instructions = (operation_root / "attachments" / "instructions.md").read_text(encoding="utf-8")
+        assert prompt.strip()
+        assert "Do not mutate the repository" not in prompt
+        assert "Human decision" not in prompt
+        assert "Return exactly one downloadable ZIP" not in prompt
+        assert "Return exactly one JSON object" not in prompt
+        assert "ChatGPT does not approve or adopt planning" not in prompt
+        if operation in {"planning", "revision"}:
+            assert "13 nonempty distinct H2 headings with exact labels and no split or merge" in instructions
+            assert "Include at least four valid PlantUML fences" in instructions
 
 
 def test_reviewer_prompt_has_one_attachment_authority() -> None:
@@ -573,23 +573,23 @@ def test_semantic_revision_companion_contract_is_self_contained() -> None:
     )
     prompt = synthesized.prompt
     assert "as Planner" not in prompt
-    assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
+    assert "13 nonempty distinct H2 headings with exact labels and no split or merge" not in prompt
     for heading in ONBOARDING_HEADING_CONTRACT:
-        assert prompt.count(heading) == 1
-    diagram_contract = (
-        "4+ valid `plantuml` fences: system context/responsibility boundary/planning sequence/implementation roadmap."
-    )
-    assert prompt.count(diagram_contract) == 1
+        assert heading not in prompt
+    diagram_contract = "Include at least four valid PlantUML fences"
+    assert diagram_contract not in prompt
     assert (
         "4+ valid `plantuml` fences: system-context/responsibility-boundary/planning-sequence/implementation-roadmap."
     ) not in prompt
-    for diagram_role in (
-        "system context",
-        "responsibility boundary",
-        "planning sequence",
-        "implementation roadmap",
-    ):
-        assert diagram_role in prompt
+    instructions = (
+        issue_planning_prompt._provider_resource_root()
+        / "operations"
+        / "revision"
+        / "attachments"
+        / "instructions.md"
+    ).read_text(encoding="utf-8")
+    assert "13 nonempty distinct H2 headings with exact labels and no split or merge" in instructions
+    assert diagram_contract in instructions
 
 
 def test_prompt_tuning_fixed_scenario_character_budgets(tmp_path: Path) -> None:
@@ -669,8 +669,10 @@ def test_prompt_tuning_fixed_scenario_character_budgets(tmp_path: Path) -> None:
         (revision, 3_385),
     ):
         assert len(synthesized.prompt) <= budget
-        assert synthesized.prompt.count("# Formal output and authority boundary") == 1
+        assert synthesized.prompt.count("# SpecDock Issue Planning Operation") == 1
         assert synthesized.prompt.count("## Hard failure") == 1
+        assert synthesized.prompt.count("## Attached instructions") == 1
+        assert "13 nonempty distinct H2 headings with exact labels and no split or merge" not in synthesized.prompt
 
 
 def test_installed_runtime_resolves_managed_issue_planning_resources(
@@ -683,15 +685,257 @@ def test_installed_runtime_resolves_managed_issue_planning_resources(
     application_file.parent.mkdir(parents=True)
     application_file.write_text("# installed runtime fixture\n", encoding="utf-8")
     resource_root = tmp_path / ".agents" / "skills" / "spec-dock-issue-planning" / "resources"
-    resource_root.mkdir(parents=True)
-    for name in (
-        "planner-prompt.md",
-        "reviewer-prompt.md",
-        "revision-prompt.md",
-        "transport-output-contract.md",
-    ):
-        (resource_root / name).write_text(name, encoding="utf-8")
+    for operation in ("planning", "review", "revision"):
+        operation_root = resource_root / "operations" / operation
+        (operation_root / "attachments").mkdir(parents=True)
+        (operation_root / "prompt.md").write_text(operation, encoding="utf-8")
 
     monkeypatch.setattr(issue_planning_prompt, "__file__", str(application_file))
 
     assert issue_planning_prompt._provider_resource_root() == resource_root
+
+
+def test_operation_resources_resolve_all_closed_operations(tmp_path: Path) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+
+    resolved = {
+        role: issue_planning_prompt._resolve_operation_resources(
+            role,
+            resource_root=resource_root,
+        )
+        for role in ("planner", "reviewer", "semantic_revision")
+    }
+
+    assert {item.operation for item in resolved.values()} == {"planning", "review", "revision"}
+    assert resolved["planner"].prompt == "Create a planning package."
+    assert resolved["reviewer"].prompt == "Perform a fresh, read-only, defect-only review."
+    assert resolved["semantic_revision"].prompt == "Complete replacement semantic revision."
+    assert all(item.attachments_dir.name == "attachments" for item in resolved.values())
+    assert all(item.attachments_dir.is_dir() for item in resolved.values())
+
+
+@pytest.mark.parametrize("missing", ["operation", "prompt", "attachments"])
+def test_missing_operation_resource_fails_closed(tmp_path: Path, missing: str) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    operation_root = resource_root / "operations" / "planning"
+    missing_path = {
+        "operation": operation_root,
+        "prompt": operation_root / "prompt.md",
+        "attachments": operation_root / "attachments",
+    }[missing]
+    if missing == "operation":
+        (operation_root / "prompt.md").unlink()
+        (operation_root / "attachments" / "instructions.md").unlink()
+        (operation_root / "attachments").rmdir()
+        operation_root.rmdir()
+    elif missing == "attachments":
+        (missing_path / "instructions.md").unlink()
+        missing_path.rmdir()
+    else:
+        missing_path.unlink()
+
+    with pytest.raises(ValueError, match="managed Issue Planning operation resources are incomplete"):
+        issue_planning_prompt._resolve_operation_resources(
+            "planner",
+            resource_root=resource_root,
+        )
+
+
+def test_unknown_operation_is_rejected_without_resource_read_or_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    reads: list[Path] = []
+    original_read_text = Path.read_text
+
+    def record_read(path: Path, *args: object, **kwargs: object) -> str:
+        reads.append(path)
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", record_read)
+    with pytest.raises(ValueError, match="unknown issue planning operation"):
+        issue_planning_prompt._resolve_operation_resources(
+            "unknown",
+            resource_root=resource_root,
+        )
+
+    assert reads == []
+
+
+def test_operation_attachment_directory_is_opaque(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    _write_context_files(tmp_path)
+
+    def reject_child_enumeration(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("operation attachments must remain opaque")
+
+    monkeypatch.setattr(Path, "iterdir", reject_child_enumeration)
+    monkeypatch.setattr(Path, "glob", reject_child_enumeration)
+    monkeypatch.setattr(Path, "rglob", reject_child_enumeration)
+    monkeypatch.setattr(issue_planning_prompt.os, "walk", reject_child_enumeration)
+
+    synthesized = issue_planning_prompt.synthesize_issue_planning_prompt(
+        role="planner",
+        context=_context(),
+        repo_root=tmp_path,
+        upstream="origin/feature/issue",
+        remote_head="a" * 40,
+        resource_root=resource_root,
+    )
+
+    assert synthesized.attachment_paths == (resource_root / "operations" / "planning" / "attachments",)
+    assert "instructions.md" not in synthesized.prompt
+
+
+@pytest.mark.parametrize("role", ["planner", "reviewer", "semantic_revision"])
+def test_minimal_body_is_deterministic_and_excludes_input_inventory(
+    tmp_path: Path,
+    role: str,
+) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    _write_context_files(tmp_path)
+    attachment = issue_planning_prompt.PlanningPromptAttachment
+
+    def render() -> issue_planning_prompt.SynthesizedPlanningPrompt:
+        if role == "planner":
+            return issue_planning_prompt.synthesize_issue_planning_prompt(
+                role=role,
+                context=_context(),
+                repo_root=tmp_path,
+                upstream="origin/feature/issue",
+                remote_head="a" * 40,
+                resource_root=resource_root,
+            )
+        return issue_planning_prompt.synthesize_planning_evidence_prompt(
+            role=role,
+            source_head="a" * 40,
+            repository="owner/repo",
+            branch="feature/issue",
+            exact_attachments=(
+                attachment(
+                    name="target-candidate.zip",
+                    classification="review-target",
+                    source_label="candidate.zip",
+                    content=b"candidate",
+                ),
+            ),
+            instructions=("selected finding F-1: p1", "preserve assumption: boundary")
+            if role == "semantic_revision"
+            else (),
+            resource_root=resource_root,
+            output_expectation=(
+                issue_planning_prompt.authoring_output_expectation(
+                    "iss-00003",
+                    "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
+                )
+                if role == "semantic_revision"
+                else None
+            ),
+        )
+
+    first = render()
+    second = render()
+
+    expected_sections = [
+        "# SpecDock Issue Planning Operation",
+        "## Operation",
+        "## Purpose",
+        "## Exact source identity",
+        "## Operation context",
+        "## GitHub connector gate",
+        "## Hard failure",
+        "## Human authority",
+    ]
+    if role == "semantic_revision":
+        expected_sections.append("## Revision scope")
+    expected_sections.extend(("## Expected output", "## Attached instructions"))
+    assert all(first.prompt.index(section) < first.prompt.index(expected_sections[index + 1]) for index, section in enumerate(expected_sections[:-1]))
+    assert first.prompt == second.prompt
+    assert first.prompt.endswith("\n")
+    assert not first.prompt.endswith("\n\n")
+    assert "## Exact attachment index" not in first.prompt
+    assert "classification=" not in first.prompt
+    assert "source_label=" not in first.prompt
+    assert "sha256=" not in first.prompt
+    assert "target-candidate.zip" not in first.prompt
+    assert "13 nonempty distinct H2s" not in first.prompt
+    assert "4+ valid `plantuml` fences" not in first.prompt
+    if role == "reviewer":
+        assert "fresh" in first.prompt
+        assert "read-only" in first.prompt
+        assert "defect-only" in first.prompt
+    if role == "semantic_revision":
+        assert "selected finding F-1: p1" in first.prompt
+        assert "preserve assumption: boundary" in first.prompt
+
+
+def test_tc_s02_001_attachment_child_change_needs_no_registry_change(tmp_path: Path) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    _write_context_files(tmp_path)
+    kwargs = {
+        "role": "planner",
+        "context": _context(),
+        "repo_root": tmp_path,
+        "upstream": "origin/feature/issue",
+        "remote_head": "a" * 40,
+        "resource_root": resource_root,
+    }
+    baseline = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
+    attachments_dir = resource_root / "operations" / "planning" / "attachments"
+    (attachments_dir / "new-detail.md").write_text("new detail\n", encoding="utf-8")
+    changed = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
+
+    assert changed.prompt == baseline.prompt
+    assert changed.attachment_paths == baseline.attachment_paths
+
+
+def test_tc_s02_001_prompt_change_changes_only_corresponding_body(
+    tmp_path: Path,
+) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    _write_context_files(tmp_path)
+    kwargs = {
+        "role": "planner",
+        "context": _context(),
+        "repo_root": tmp_path,
+        "upstream": "origin/feature/issue",
+        "remote_head": "a" * 40,
+        "resource_root": resource_root,
+    }
+    baseline = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
+    prompt_path = resource_root / "operations" / "planning" / "prompt.md"
+    prompt_path.write_text("Updated planning purpose.\n", encoding="utf-8")
+    changed = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
+
+    assert changed.prompt != baseline.prompt
+    assert changed.prompt == baseline.prompt.replace(
+        "Create a planning package.",
+        "Updated planning purpose.",
+    )
+    assert changed.attachment_paths == baseline.attachment_paths
+
+
+def _write_nested_operation_resources(root: Path) -> Path:
+    prompts = {
+        "planning": "Create a planning package.",
+        "review": "Perform a fresh, read-only, defect-only review.",
+        "revision": "Complete replacement semantic revision.",
+    }
+    details = {
+        "planning": "13 nonempty distinct H2s; 4+ valid `plantuml` fences.",
+        "review": "Use closed JSON findings and reviewed identity digest rules.",
+        "revision": "Apply selected P0/P1 findings and preserve assumptions.",
+    }
+    for operation, prompt in prompts.items():
+        operation_root = root / "operations" / operation
+        (operation_root / "attachments").mkdir(parents=True, exist_ok=True)
+        (operation_root / "prompt.md").write_text(prompt + "\n", encoding="utf-8")
+        (operation_root / "attachments" / "instructions.md").write_text(
+            details[operation] + "\n",
+            encoding="utf-8",
+        )
+    return root
