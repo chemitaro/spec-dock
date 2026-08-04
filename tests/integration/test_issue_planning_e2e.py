@@ -202,6 +202,11 @@ def guide(issue_id: str, epic_id: str, initiative_id: str) -> bytes:
 
 
 home = Path(os.environ["ORACLE_HOME_DIR"])
+repository_root = Path.cwd()
+if not (repository_root / "spec-dock/initiatives").is_dir():
+    candidate_root = home.parent / "target"
+    if (candidate_root / "spec-dock/initiatives").is_dir():
+        repository_root = candidate_root
 home.mkdir(parents=True, exist_ok=True)
 argv = sys.argv[1:]
 record = {
@@ -292,7 +297,7 @@ if expectation["kind"] == "authoring_zip":
     issue_id = logical.removesuffix("-issue-planning-documents.zip")
     issue_meta_path = next(
         path
-        for path in (Path.cwd() / "spec-dock/initiatives").rglob(".meta.json")
+        for path in (repository_root / "spec-dock/initiatives").rglob(".meta.json")
         if json.loads(path.read_text(encoding="utf-8")).get("id") == issue_id
     )
     issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
@@ -434,6 +439,7 @@ def _assert_oracle_submission(
 ) -> None:
     prompt_records = [record for record in records if "--prompt" in record["argv"]]
     assert len(prompt_records) == 1
+    assert prompt_records[0]["cwd"] == str(target)
     assert executable.is_file() and os.access(executable, os.X_OK)
     assert all(record["argv"][0] == str(executable) for record in records)
     assert all("--write-output" not in record["argv"] for record in records)
@@ -528,7 +534,9 @@ def _invoke(
             "--format",
             "json",
         ],
-        cwd=target,
+        # Keep the caller outside the repository so the fake Oracle's recorded
+        # cwd proves that the runtime passed the exact repository root explicitly.
+        cwd=target.parent,
         env=env,
         check=False,
         capture_output=True,

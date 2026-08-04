@@ -1291,9 +1291,12 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
 ) -> None:
     executable = _fake_executable(tmp_path)
     calls: list[list[str]] = []
+    submit_cwds: list[Path | None] = []
 
     def fake_run(argv, **kwargs):
         calls.append(list(argv))
+        if "--prompt" in argv:
+            submit_cwds.append(kwargs.get("cwd"))
         if argv[1:] == ["--version"]:
             return _completed(argv, stdout=b"0.16.1\n")
         if argv[1:] == ["--help"]:
@@ -1304,11 +1307,14 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
         return _completed(argv)
 
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
-    paths = (tmp_path / "attachments", tmp_path / "candidate.zip", tmp_path / "source.md")
+    paths = (tmp_path / "attachments", tmp_path / "candidate.zip", Path("source.md"))
     input_root = paths[0]
+    relative_input_aliases = (Path("source.md"),)
+    absolute_input_aliases = tuple(tmp_path / path for path in relative_input_aliases)
+    protected_input_paths = set(paths) | set(absolute_input_aliases)
 
     def rejects_input_mutation(path: Path) -> bool:
-        return path in paths or path.is_relative_to(input_root)
+        return path in protected_input_paths or path.is_relative_to(input_root)
 
     original_mkdir = Path.mkdir
     original_write_bytes = Path.write_bytes
@@ -1531,6 +1537,7 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
     submit = next(argv for argv in calls if "--prompt" in argv)
     assert [Path(submit[index + 1]) for index, value in enumerate(submit) if value == "--file"] == list(paths)
     assert len([value for value in submit if value == "--file"]) == len(paths)
+    assert submit_cwds == [tmp_path]
     assert not any("prompt-pack" in str(path) for path in tmp_path.iterdir())
     assert input_archive_calls == 0
     assert input_copy_calls == 0
