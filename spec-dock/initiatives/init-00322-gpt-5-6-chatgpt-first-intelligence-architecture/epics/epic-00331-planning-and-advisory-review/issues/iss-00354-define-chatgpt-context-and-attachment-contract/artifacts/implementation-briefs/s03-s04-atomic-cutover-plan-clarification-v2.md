@@ -34,6 +34,26 @@ Review resource は、存在しない `reviewed-identity.json` と `reviewed-ide
 
 S03 は path-only application contract/callers、S04 は repeated direct `--file` transport を担当し、`cl-s03-path-input` と `cl-s04-direct-transport` は同一 resulting HEAD でのみ close する。
 
+## 必須 focused verification
+
+次のコマンドを同じ resulting HEAD で実行し、両 closure の必須証跡として `report.md` に記録する。`tests/integration/test_issue_planning_e2e.py` は full-chain の旧 generated-pack consumer を同じ atomic change-set で更新したことを検証するため、省略してはならない。
+
+```bash
+uv run pytest \
+  tests/unit/application/test_issue_planning_prompt.py \
+  tests/unit/application/test_issue_planning.py \
+  tests/unit/infra/test_issue_planning_chatgpt.py \
+  tests/integration/test_issue_planning_chatgpt_transport.py \
+  tests/integration/test_issue_planning_e2e.py -q
+```
+
+```bash
+rg -n "_write_transport_pack|reviewed-identity\\.(json|sha256)|exact_attachments|SynthesizedPlanningPrompt\\.attachments" \
+  src tests .agents spec-dock
+```
+
+search gate は廃止対象の production/generated-pack symbols が0件であることを確認し、resource projection parity はprovider sync後に別途確認する。domain contractのread-only回帰は既存の `tests/unit/domain/test_issue_planning_contracts.py` を実行するが、同ファイルは変更しない。
+
 ## 実装前ゲート
 
 1. v2 addendum と修正済み `plan.md` / `report.md` を新しい exact HEAD で fresh defect-only Red Team review に渡す。
