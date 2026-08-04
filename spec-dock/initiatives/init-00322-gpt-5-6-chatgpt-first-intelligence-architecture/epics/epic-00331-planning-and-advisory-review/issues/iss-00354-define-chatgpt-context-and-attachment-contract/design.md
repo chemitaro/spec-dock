@@ -1,639 +1,665 @@
 ---
 種別: 設計書（Issue）
 ID: "iss-00354"
-タイトル: "Define ChatGPT Context and Attachment Contract"
-状態: "approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-08-03"
+タイトル: "ChatGPT Context and Attachment Contract"
+状態: "draft"
+作成者: "ChatGPT Blue Team authoring planner"
+最終更新: "2026-08-04"
 依存: ["requirement.md"]
 親: ["epic-00331", "init-00322"]
 ---
 
+# iss-00354 ChatGPT Context and Attachment Contract 設計書
 
-# iss-00354 Define ChatGPT Context and Attachment Contract — Issue 設計書（Standard）
+> **Candidate / evidence-only**  
+> 本設計は `CAND-ISS-00354-20260803T172642Z` の Blue Team 案であり、canonical design、review PASS、実装承認ではない。
 
-この文書は、Issue要件を実装計画へ落とす前に、この Issue 固有の **設計差分、責任配置、境界、契約、失敗時の扱い、検証上の含意** を定義する。
+## 1. 設計の目的
 
-この文書は実装手順書ではない。実装順序、TDDサイクル、具体的なテストケース一覧、変更ファイルの詳細な作業順は `plan.md` で扱う。
+既存 Issue Planning runtime の強い output / authority boundary を維持したまま、ChatGPT input を次へ変更する。
 
----
+- 長い合成 prompt + generated prompt pack
+- から
+- minimal body + direct attachment paths
 
-## 0. 文書の位置づけ
+入力 directory は SpecDock が materialize しない。詳細 instruction は provider-owned attachment directory へ
+置き、directory path を direct Oracle に渡す。Candidate / Review / Revision の dynamic evidence は original
+path のまま追加する。
 
-### この文書が定義すること
+同時に、Blue authoring thread の継続と Candidate ごとの fresh Red thread を provider-owned direct Oracle
+adapter 内で表現する。ただし exact Oracle capability を実装前に確認し、unsupported interface を推測しない。
 
-- この Issue 固有の設計差分
-- 要件をどの責任・境界・契約で成立させるか
-- 上位設計から継承する制約
-- 変更しない既存設計
-- 主要な振る舞いの意味論
-- 主要な失敗・例外・互換性の扱い
-- 実装計画で検証すべき設計保証
-- TDDや実装中に判断してよい内部設計の自由度
-- 人間が設計構造を理解するための任意のPlantUML図
+## 2. 設計原則
 
-### この文書が定義しないこと
+1. **Input と output の safety boundary を分離する。**  
+   Option C は input attachment directory に適用する。output ZIP / JSON、Candidate identity、Human binding の
+   検証は維持する。
+2. **Directory を data として扱わない。**  
+   application は directory 内 entry を読まず、path を transport へ渡すだけとする。
+3. **Provider-owned resources を正本とする。**  
+   `src/spec_dock/assets/...` を編集し、installed / dogfood projection を同期する。
+4. **No fallback.**  
+   default branch、personal wrapper、API、alternate backend、automatic conversion を用いない。
+5. **Blue と Red を分離する。**  
+   Blue continuity は authoring convenience、Red fresh は review independence であり、一つの session policy に
+   統合しない。
+6. **Existing lifecycle を増分変更する。**  
+   `planning create` / `review planning` / `planning revise` / `planning apply` と output parser を作り直さない。
+7. **Capability gap は停止条件である。**  
+   unsupported Oracle behavior を temporary wrapper で埋めない。
 
-- Red-Green-Refactorの具体的な順序
-- 各TDDサイクルの期待結果（Expected） Red
-- 具体的なテスト関数名
-- ファイルごとの編集順序
-- privateメソッド、ヘルパー、内部リファクタリングの詳細
-- 実装後の最終的なクラス構造の完全固定
+## 3. 現行アーキテクチャ
 
-### 設計コミットメント
-
-| タグ | 意味 | 変更条件 |
+| Layer / file | 現行責務 | Issue #354 での扱い |
 |---|---|---|
-| `[N]` | 実装が必ず従う設計契約 | 設計書の更新が必要 |
-| `[P]` | 現時点の有力な設計仮説 | 意味論を維持すればTDD中に変更可能 |
-| `[I]` | 理解のための例示 | 実装を拘束しない |
-| `[O]` | 未解決事項 | 指定された段階までに解決する |
-| `[E]` | この Issue の判断範囲外 | 上位文書（Epic・Initiative・ADR）へ昇格する |
+| `application/issue_planning_prompt.py` | source file safe-read、content scan、role resource連結、attachment index / SHA | input materialization を除去し minimal body / path contract へ置換 |
+| `application/issue_planning.py` | preflight、context manifest、planning / review / revision orchestration、postflight | lifecycle 維持。old input checks / manifest matching を削除 |
+| `domain/issue_planning_contracts.py` | typed identity、Candidate / Review / Human contracts | identity / output contracts 維持。operation input / thread policy を追加または分離 |
+| `infra/issue_planning_chatgpt.py` | direct Oracle、managed Chrome、temporary prompt pack、session recovery、typed output | direct Oracle / output取得維持。temporary input pack を direct path argv へ置換 |
+| `commands/issue_planning.py` | CLI parse、`--context-manifest` | directory-oriented attachment option へ hard cutover |
+| operation resources | planner / reviewer / revision / transport text | minimal prompt template と per-operation attachments へ再配置 |
+| tests | old input safetyと成熟した lifecycle/outputを混在固定 | old input contract testsを置換し、output/lifecycle regressionsを保持 |
+| docs / skills | context manifest、reference-only attachments、input manifest safety | Option A/Cへ更新。output evidence laneは維持 |
 
----
+現行 provider / dogfood runtime file は同一 SHA で投影されている。変更は両面の parity を壊さない。
 
-## 1. 等級 Standard（Standard Grade）確認
+## 4. Target architecture
 
-### 1.1 Standardとして扱う理由
-
-- 理由:
-  - ...
-- 主な変更対象:
-  - ...
-- 主なリスク:
-  - ...
-- 想定される検証:
-  - ...
-
-### 1.2 Standardの前提
-
-- [ ] 公開API、公開CLI contract、外部Event Schemaを変更しない
-- [ ] 既存workspace layoutの破壊的変更を行わない
-- [ ] migrationまたは永続データ変換を伴わない
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential の高リスク領域を扱わない
-- [ ] 切り戻し（rollback）困難な変更を行わない
-- [ ] 複数EpicまたはInitiativeにまたがる設計判断を含まない
-- [ ] この Issue 固有の局所的な振る舞い・template・docs・内部実装差分である
-
-### 1.3 引き上げガード（Escalation Guard）
-
-`strict` へ引き上げる条件:
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] ワークスペース scaffold結果の互換性に影響する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要になる
-- [ ] 複数Issueが依存する設計判断を含む
-
-`critical` へ引き上げる条件:
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] データ損失または破壊的変更のリスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutの移行を伴う
-- [ ] rollback不能またはforward-only migrationになる
-
----
-
-## 2. 設計意図
-
-### 2.1 解決したい設計問題
-
-- 問題:
-  - ...
-- 現状の制約:
-  - ...
-- 要件上必要な変化:
-  - ...
-
-### 2.2 採用する設計方針
-
-- `[N]` ...
-- `[N]` ...
-- `[P]` ...
-
-### 2.3 採用しない方針
-
-| 方針 | 採用しない理由 | 備考 |
-|---|---|---|
-| ... | ... | ... |
-
----
-
-## 3. 正本・根拠（Normative Sources）
-
-| 種別 | パス・識別子（Path / ID） | 関連箇所 | このIssueへの意味 |
-|---|---|---|---|
-| 課題要件（Issue Requirement） | `requirement.md` | `AC-...` / `BH-...` / `CON-...` | ... |
-| エピック設計（Epic Design） | ... | ... | ... |
-| イニシアチブ設計（Initiative Design） | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 現行文書（Current docs） | ... | ... | ... |
-| 既存コードパターン（Existing code pattern） | ... | ... | ... |
-| 既存テスト（Existing tests） | ... | ... | ... |
-| 作業成果物・調査（Artifact / research） | ... | ... | ... |
-
-正本の優先順位: ADR / architecture rule → Initiative design → Epic design → Issue requirement → Issue design → Issue plan → artifacts / draft。
-
----
-
-## 4. 要件から設計への追跡（Requirement-to-Design Traceability）
-
-| 要件識別子（Requirement ID） | 内容の要約 | 設計識別子（Design ID） | 設計上の扱い | 備考 |
-|---|---|---|---|---|
-| AC-001 | ... | DES-001 | ... | ... |
-| AC-002 | ... | DES-002 | ... | ... |
-| BH-001 | ... | DES-003 | ... | ... |
-| CON-001 | ... | DES-004 | ... | ... |
-| REQ-XXX | 必要に応じて要件・振る舞い・制約を連番で追加する。`XXX` は実IDへ置換するか削除する。 | DES-... | ... | ... |
-
----
-
-## 5. 継承制約と変更禁止領域
-
-### 5.1 上位から継承する制約
-
-- `[N]` ...
-- `[N]` ...
-
-### 5.2 このIssueで変更しないもの
-
-| 対象 | 変更しない理由 | 備考 |
-|---|---|---|
-| ... | ... | ... |
-
-### 5.3 このIssueで判断してはいけないもの
-
-| 判断 | 昇格先 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 現状（Current State）
-
-### 6.1 現在の振る舞い
-
-- 現在成立していること:
-  - ...
-- 現在成立していないこと:
-  - ...
-- 現在曖昧なこと:
-  - ...
-
-### 6.2 現在の構造
-
-| 種別 | パス・対象（Path / Target） | 現在の責務 | 備考 |
-|---|---|---|---|
-| 文書（docs） | ... | ... | ... |
-| テンプレート（template） | ... | ... | ... |
-| script / CLI | ... | ... | ... |
-| スキル（skill） | ... | ... | ... |
-| metadata | ... | ... | ... |
-| テスト（test） | ... | ... | ... |
-| コード（code） | ... | ... | ... |
-
-### 6.3 既存パターン
-
-| パターン | 参照先 | 今回の適用方針 |
-|---|---|---|
-| ... | ... | ... |
-
----
-
-## 7. 目標設計差分（Target Design Delta）
-
-### 7.1 設計差分一覧（Design Delta）
-
-| 設計識別子（Design ID） | 種別 | 現在（Current） | 目標（Target） | 固定度 |
-|---|---|---|---|---|
-| DES-001 | 振る舞い（behavior） | ... | ... | `[N]` |
-| DES-002 | 責任（responsibility） | ... | ... | `[N]` |
-| DES-003 | インターフェース（interface） | ... | ... | `[P]` |
-| DES-004 | 文書・テンプレート（docs / template） | ... | ... | `[N]` |
-| DES-005 | 検証（verification） | ... | ... | `[N]` |
-
-### 7.2 目標の要約（Target）
-
-- ...
-- ...
-
-### 7.3 非目標（Non-Target）
-
-- ...
-- ...
-
----
-
-## 8. 視覚的な設計概要（Visual Design Overview）
-
-PlantUML図は必須ではない。ただし、構造・依存・状態・メッセージ処理・分岐ロジックが人間レビューで誤解されやすい場合は図示する。
-
-### 8.1 図表一覧（Diagram Index）
-
-| 図識別子（Diagram ID） | 種類 | 固定度 | 目的 | 関連設計識別子（Design ID） | 状態 |
-|---|---|---|---|---|---|
-| VIS-001 | component / package | `[P]` | 変更対象と依存関係を示す | `DES-...` | draft |
-| VIS-002 | class | `[P]` | 主要な構造関係を示す | `DES-...` | draft |
-| VIS-003 | sequence | `[P]` | 実行時の協調を示す | `DES-...` | draft |
-| VIS-004 | state / activity | `[P]` | 状態遷移または分岐を示す | `DES-...` | draft |
-
-### 8.2 VIS-001: 範囲・影響マップ（Scope / Impact Map）
-
-```plantuml
-@startuml
-title VIS-001 範囲・影響マップ（Scope / Impact Map）
-
-skinparam componentStyle rectangle
-
-package "Issue 対象範囲（Scope）" {
-  [Target Artifact / Module A] as A
-  [Target Artifact / Module B] as B
-}
-
-package "Existing System" {
-  [Existing Module / Template] as C
-  [Existing Skill / Workflow] as D
-}
-
-package "対象外（Out of 対象範囲（Scope））" {
-  [Out-of-scope Component] as X
-}
-
-A --> B : uses / updates
-A --> C : follows existing pattern
-B --> D : must remain compatible
-A -[#red,dashed]-> X : must not change
-@enduml
+```mermaid
+flowchart LR
+    C[CLI / Skill] --> A[Issue Planning Application]
+    A --> G[Exact GitHub Preflight]
+    G --> P[Operation Definition Resolver]
+    P --> B[Minimal Body Synthesizer]
+    P --> D[Static Attachment Directory Path]
+    A --> E[Dynamic Evidence Paths]
+    A --> T[Thread Policy]
+    B --> O[Direct Oracle Adapter]
+    D --> O
+    E --> O
+    T --> O
+    O --> X[ChatGPT]
+    X --> V[Existing Typed Output Validator]
+    V --> K[Evidence-only Candidate / Review]
+    K --> H[Existing Human / Apply Gate]
 ```
 
-### 8.3 VIS-002: 静的構造・クラス図（Static Structure / Class Diagram）
+`Operation Definition Resolver` は operation 名から既知の prompt template path、attachment directory path、
+output expectation、thread lane を選ぶ。attachment directory の内容は解決しない。
 
-継承・実装関係を表す場合は、親クラス・抽象クラス・インターフェースを上側、子クラス・実装クラスを下側に置く。PlantUMLでは原則 `Child --|> Parent` または `Implementation ..|> Interface` の形で記述し、見た目として矢印が下から上へ向くようにする。
+## 5. Provider resource layout
 
-```plantuml
-@startuml
-title VIS-002 Static Structure
+### 5.1 Issue Planning
 
-abstract class "Base Renderer" as BaseRenderer
-class "Primary Model / Aggregate" as Aggregate <<Aggregate Root>> {
-  +operation()
+provider 正本を次の self-contained operation directory へ整理する。
+
+```text
+src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/
+└── resources/
+    └── operations/
+        ├── planning/
+        │   ├── prompt.md
+        │   └── attachments/
+        │       ├── authoring-instructions.md
+        │       ├── authority-boundary.md
+        │       └── output-contract.md
+        ├── review/
+        │   ├── prompt.md
+        │   └── attachments/
+        │       ├── defect-review-instructions.md
+        │       ├── authority-boundary.md
+        │       └── output-contract.md
+        └── revision/
+            ├── prompt.md
+            └── attachments/
+                ├── semantic-revision-instructions.md
+                ├── authority-boundary.md
+                └── output-contract.md
+```
+
+設計上重要なのは file 名の固定 inventory ではなく、次の二つだけである。
+
+- `prompt.md` は application が読む既知の minimal body template。
+- `attachments/` は direct Oracle へ path を渡す opaque directory。
+
+`attachments/` 配下 file の追加・削除・階層変更を application registry へ列挙しない。共通 material の共有を
+symlink に依存させず、各 operation directory を transport 単位として self-contained にする。
+
+### 5.2 Clarification convention
+
+clarification は source HEAD 時点で skill-owned workflow であり、Issue Planning public runtime command ではない。
+再利用する場合の provider convention は次とする。
+
+```text
+src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/
+└── resources/
+    └── chatgpt-operation/
+        ├── prompt.md
+        └── attachments/
+            ├── clarification-loop.md
+            └── handoff-contract.md
+```
+
+Issue #354 では resource convention と docs / skill guidance までを定義する。direct Oracle runtime wiring を
+追加する場合は clarification owning scope の後続 Issue で行う。
+
+### 5.3 Projection
+
+provider tree は次へ投影する。
+
+- `.agents/skills/spec-dock-issue-planning/resources/operations/...`
+- `.agents/skills/spec-dock-clarification/resources/chatgpt-operation/...`
+- installed target の同一 path。
+
+projection test は tree inventory を「許可 file の固定一覧」として制限せず、provider と projection の
+recursive byte parity を比較する。
+
+## 6. Operation definition
+
+application 内部の operation registry は file content ではなく root path と policy を保持する。
+
+```python
+@dataclass(frozen=True)
+class ChatGptOperationDefinition:
+    operation: Literal["planning", "review", "revision", "clarification"]
+    prompt_template_path: Path
+    attachment_directory_path: Path
+    output_kind: Literal["authoring_zip", "review_json", "advisory_text"]
+    thread_lane: Literal["blue", "fresh_red"]
+```
+
+`clarification` は reusable definition として表現できるが、公開 command へ登録されるまでは invocation registry
+へ露出しない。未登録 operation を generic fallback で送信しない。
+
+known root の選択と `prompt.md` の読取りは product configuration であり、Option C の entry inspection ではない。
+`attachment_directory_path` に対し `rglob`、`iterdir`、`walk`、`stat`、`resolve`、`read_*` を実行しない。
+
+## 7. Synthesized input contract
+
+現行 `SynthesizedPlanningPrompt` を byte materialized attachment から path reference へ変更する。
+
+```python
+@dataclass(frozen=True)
+class SynthesizedChatGptOperation:
+    operation: Literal["planning", "review", "revision"]
+    prompt: str
+    attachment_paths: tuple[Path, ...]
+    output_expectation: PlanningOutputExpectation
+    thread_request: ThreadRequest
+```
+
+廃止対象:
+
+- `PlanningPromptAttachment.content`
+- `classification`
+- `source_label`
+- per-attachment `sha256`
+- `attachments: tuple[tuple[str, str], ...]`
+- exact attachment index の本文生成
+- `_safe_source_file`
+- descriptor-relative input file read
+- input content scan / hard byte count
+- `_attachments_match_source_manifest`
+- `_exact_attachments_have_sensitive_content`
+
+維持対象:
+
+- typed repository / branch / HEAD / Issue identity。
+- output expectation。
+- exact GitHub hard-failure instruction。
+- source preflight / postflight。
+- output artifact validation。
+
+## 8. Minimal body contract
+
+### 8.1 共通 field
+
+本文は human-readable Markdown とし、次の field だけを operation template へ埋め込む。
+
+```text
+operation
+objective
+repository
+branch
+source_head
+initiative_id
+epic_id
+issue_id
+authority
+mutation_prohibition
+expected_output
+github_exact_access_failure
+attachments_instruction
+```
+
+本文へ static attachment inventory、entry name、entry hash、size、content summary を入れない。
+
+### 8.2 Planning
+
+Planning 本文は「既存 Issue の requirement / design / plan と exactly-one onboarding companion を
+authoring ZIP で作成する」という目的までを含む。具体的な completeness 観点、標準構造、出力 path は attached
+Markdown が所有する。
+
+### 8.3 Review
+
+Review 本文は fresh read-only defect-only operation、review target identity、expected closed JSON を含む。
+Candidate ZIP 自体は dynamic path として添付する。Candidate SHA / reviewed identity digest は formal evidence
+identity であり、directory manifest ではない。
+
+### 8.4 Revision
+
+Revision 本文は selected P0 / P1 finding ID、prior Candidate identity、Review result identity、preserve
+assumption identifiers を含められる。finding の全文と revision 手順は attached Review JSON と static revision
+instruction が所有する。
+
+### 8.5 Clarification
+
+Clarification 本文は現在の一問、scope identity、mode、期待する advisory answer を含む。source list、
+interview semantics、handoff template は attached Markdown が所有する。
+
+## 9. Attachment path assembly
+
+operation ごとの path list は entry を materialize せず、次の順で組み立てる。
+
+1. provider-owned static `attachments/` directory。
+2. operation が必須とする original dynamic evidence paths。
+3. optional operator-supplied attachment directory paths。
+
+| Operation | Static path | Dynamic paths |
+|---|---|---|
+| planning | `.../operations/planning/attachments/` | optional external attachment directories |
+| review | `.../operations/review/attachments/` | Candidate ZIP、必要時の reviewed identity evidence |
+| revision | `.../operations/revision/attachments/` | prior Candidate ZIP、exact Review JSON、revision request |
+| clarification | `.../chatgpt-operation/attachments/` | current interview / research artifacts as supplied by owner |
+
+application は top-level path の semantic order だけを決める。directory 配下 order は再構成しない。
+
+### 9.1 禁止される実装
+
+```python
+# 禁止例
+for entry in attachment_dir.rglob("*"):
+    if entry.is_file() and entry.suffix in ALLOWED:
+        copy_and_hash(entry)
+```
+
+```python
+# 目標
+argv.extend(["--file", os.fspath(attachment_dir)])
+```
+
+複数 path が必要な場合の exact argv は direct Oracle capability characterization で確定する。repeatable
+`--file` が supported なら各 path をそのまま追加する。unsupported の場合、temporary pack、symlink farm、
+automatic archive で代替せず STOP / REPLAN とする。
+
+## 10. Oracle adapter boundary
+
+### 10.1 維持する処理
+
+- PATH から executable を解決し、identity を再検証する。
+- supported Oracle version / capability を preflight する。
+- loopback managed Chrome endpoint を検証する。
+- sanitized child environment を使う。
+- `shell=False`、direct argv、single submission を使う。
+- same invocation の timeout / harvest recovery を維持する。
+- terminal session artifact から typed ZIP / JSON を snapshot する。
+- private transcript / session path を public result へ露出しない。
+
+### 10.2 削除する処理
+
+- `TemporaryDirectory` 配下の `prompt-pack/` 生成。
+- `_write_transport_pack`。
+- `context-NNN.md` への text conversion。
+- input manifest / provenance / source-manifest / stale-if file 生成。
+- exact attachment copy / re-read / SHA verification。
+- input pack marker file。
+
+temporary `staging` は Oracle output artifact の private snapshot に必要な範囲で残せる。input directory を
+再構成する用途へ使わない。
+
+### 10.3 Failure normalization
+
+entry-specific error vocabulary を追加しない。attachment submission failure は existing transport boundary で
+content-free に正規化する。既存の `oracle_unavailable`、`oracle_capability_unsupported`、
+`oracle_session_recovery_required`、`oracle_artifact_*` などを再利用し、filename や content を public details へ
+含めない。
+
+## 11. Thread continuity design
+
+### 11.1 Thread policy
+
+```mermaid
+stateDiagram-v2
+    [*] --> NoBlue
+    NoBlue --> BlueActive: planning / clarification start
+    BlueActive --> BlueActive: verified semantic revision
+    BlueActive --> NewBlueRequired: unavailable / identity mismatch
+    NewBlueRequired --> BlueActive: lineage exact + complete resubmission
+    NewBlueRequired --> HumanBlocked: lineage ambiguous
+    HumanBlocked --> BlueActive: Human selects exact lineage
+    BlueActive --> FreshRed: review Candidate N
+    FreshRed --> [*]: closed Review JSON
+```
+
+Red thread は state store へ reusable binding として登録しない。
+
+### 11.2 Adapter-private binding
+
+```python
+@dataclass(frozen=True)
+class BlueThreadBinding:
+    schema_version: int
+    repository: str
+    branch: str
+    source_head: str
+    issue_id: str
+    candidate_identity_sha256: str | None
+    provider_thread_handle: str
+    supersedes_binding_digest: str | None
+```
+
+保存先は repository と Candidate の外側にある provider-owned private operational state とする。候補は
+Oracle home 配下の SpecDock namespace だが、既存 Oracle retention / permissions と衝突しないことを S01 で
+確認してから確定する。
+
+禁止事項:
+
+- Candidate ZIP / Review JSON / canonical docs への handle 埋込み。
+- public command result / log / report への raw handle 出力。
+- raw transcript の新規永続化。
+- source HEAD または Candidate lineage が変わった binding の黙示 reuse。
+
+### 11.3 Reuse 判定
+
+Blue binding reuse は次がすべて一致する場合だけ許す。
+
+- repository
+- branch
+- source HEAD
+- Issue ID
+- operation lane = Blue
+- revision の場合、prior Candidate identity が binding lineage と一意に接続する
+- direct Oracle が binding の継続可能性を確認できる
+
+static attachment directory の hash / inventory は判定に使わない。resource tree の更新は current complete input を
+次 turn に添付することで反映する。
+
+### 11.4 Recovery
+
+- handle が missing / expired / invalid: new Blue。
+- repository / branch / HEAD mismatch: old binding を invalidate し new Blue。
+- Candidate lineage exact: automatic new Blue + complete current inputs。
+- Candidate lineage ambiguous: `continuity_confirmation_required` 相当の content-free blocked result。
+- new Blue は old handle を本文へ書かず、internal supersession digest だけを持てる。
+
+exact public reason 名は existing status vocabulary と CLI compatibility を確認して決める。新 reason が必要な場合も
+session ID や filename を details へ含めない。
+
+### 11.5 Oracle continuation port
+
+application は exact CLI flag を知らない。
+
+```python
+class ChatGptThreadPort(Protocol):
+    def start(self, request: OracleInvocationRequest) -> OracleInvocationResult: ...
+    def continue_verified(
+        self,
+        binding: BlueThreadBinding,
+        request: OracleInvocationRequest,
+    ) -> OracleInvocationResult: ...
+```
+
+infra adapter は supported direct Oracle interface のみを実装する。Oracle に continuation interface がなければ、
+port を fake で埋めず S01 stop condition を発火する。
+
+## 12. Application flow
+
+### 12.1 Planning create
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant CLI
+    participant App as IssuePlanningApplication
+    participant Git as GitHubPreflight
+    participant Prompt as OperationResolver
+    participant Oracle as DirectOracleAdapter
+    participant Validator as ExistingZIPValidator
+
+    Operator->>CLI: planning create --issue ... [--attachment-dir ...]
+    CLI->>App: PlanningCreateRequest
+    App->>Git: exact branch / HEAD preflight
+    Git-->>App: PlanningSourceEvidence
+    App->>Prompt: resolve planning + synthesize minimal body
+    Prompt-->>App: body + static directory path
+    App->>Oracle: start/reuse Blue with direct paths
+    Oracle-->>App: authoring ZIP snapshot
+    App->>Git: source-current postflight
+    App->>Validator: validate ZIP / inventory / identity
+    Validator-->>App: evidence-only Candidate
+```
+
+### 12.2 Review
+
+- Candidate を existing validator で読み、identity を固定する。
+- fresh Red request を必ず作る。
+- static review directory + original Candidate path を direct attachment とする。
+- Red output を strict `PlanningReviewResult` として検証する。
+- Blue binding を変更しない。
+
+### 12.3 Semantic revision
+
+- exact Candidate、Review result、revision request を既存 validator で検証する。
+- P0 / P1 selected findings だけを semantic revision trigger とする。
+- Blue binding を照合する。
+- static revision directory + original evidence paths を direct attachment とする。
+- revised ZIP を既存 authoring validator へ渡す。
+- Candidate publication 後、Blue binding の candidate lineage を新 identity へ更新する。
+- mechanical revision は ChatGPT operation ではないため変更しない。
+
+## 13. Output contract
+
+Issue #354 は input simplification を理由に output validation を緩めない。
+
+### 13.1 Authoring ZIP
+
+維持する条件:
+
+- expected logical filename。
+- expected internal root。
+- `requirement.md`、`design.md`、`plan.md`。
+- runtime-selected exactly-one onboarding companion。
+- path traversal / unsupported ZIP feature / malformed archive の rejection。
+- Candidate material / source baseline / SHA / byte count。
+- no canonical mutation before Human-approved apply。
+
+content-level では、13固定 H2 / 4固定 PlantUML のような過剰な prompt hardcode を削除し、semantic completeness、
+subordinate onboarding status、少なくとも一つの有効 diagram など必要最小限を validator / review で確認する。
+
+### 13.2 Review JSON
+
+維持する top-level key:
+
+```json
+{
+  "reviewed_identity": {},
+  "reviewed_identity_sha256": "<sha256>",
+  "verdict": "pass|fail",
+  "findings": []
 }
-class "Child Entity" as Entity <<Entity>>
-class "Value Object" as ValueObject <<Value Object>>
-class "Domain Event" as DomainEvent <<Domain Event>>
-interface "Repository Port" as Repository <<Port>>
-class "Application Service" as AppService <<Application Service>>
-class "Markdown Renderer" as MarkdownRenderer
-
-MarkdownRenderer --|> BaseRenderer
-Aggregate *-- Entity : owns
-Aggregate --> ValueObject : uses
-Aggregate ..> DomainEvent : emits
-AppService --> Aggregate : delegates decision
-AppService --> Repository : loads / saves
-@enduml
 ```
 
-### 8.4 VIS-003: 実行時シーケンス図（Runtime Sequence Diagram）
+duplicate key、NaN、unknown key、identity mismatch、invalid severity を reject する。
 
-```plantuml
-@startuml
-title VIS-003 実行時シーケンス（Runtime Sequence）
+### 13.3 Clarification
 
-actor "User / Agent" as User
-participant "コマンド（Command） / Entry Point" as Entry
-participant "Application Service" as App
-participant "Domain Logic" as Domain
-database "Workspace Files" as Files
-participant "Report / Evidence" as Report
+clarification の output は existing skill handoff に従う advisory text / artifact であり、Issue #354 は global
+closed schema を強制しない。
 
-User -> Entry : trigger operation
-Entry -> App : parse and dispatch
-App -> Domain : apply rule / decision
-Domain --> App : result / decision
-App -> Files : write or update artifacts
-App -> Report : record evidence destination
-Entry --> User : success / failure result
-@enduml
+## 14. CLI migration
+
+### 14.1 Before
+
+```text
+planning create --issue <id> --output <dir> --context-manifest <json>
 ```
 
-### 8.5 VIS-004: 状態・アクティビティ図（State / Activity Diagram）
+JSON は `relevant_source_paths` と `operator_context` を持ち、Runtime が個別 file を読み、検査、text attachment へ
+変換する。
 
-```plantuml
-@startuml
-title VIS-004 State / Activity Model
+### 14.2 After
 
-[*] --> Draft
-Draft --> Approved : approve requirement/design
-Approved --> InProgress : start implementation
-InProgress --> Verified : pass verification
-Verified --> Completed : finish issue
-InProgress --> Draft : replan required
-Approved --> Draft : design change required
-Completed --> [*]
-@enduml
+推奨形:
+
+```text
+planning create --issue <id> --output <dir> [--attachment-dir <path>]...
 ```
 
----
-
-## 9. 振る舞い設計（Behavioral Design）
+- no JSON parsing。
+- no individual path extraction。
+- no content read。
+- no directory tree validation。
+- provider static directory は常に operation definition から追加。
+- operator path は指定文字列を transport path として保持する。
+
+`argparse` の path conversion や relative path resolution が Oracle cwd semantics を変えないよう、string / Path の
+exact handoff を focused test で固定する。missing path を preflight で独自分類せず Oracle failure へ委ねる。
+
+旧 flag は deprecation translation せず hard cutover する。help / skill / docs / CLI tests を同時更新する。
+
+## 15. Source freshness と attachment identity
+
+existing GitHub preflight の `PlanningSourceEvidence` と postflight は維持する。これは repository source state の
+証拠であり、input attachment manifest ではない。
+
+- local / remote HEAD parity。
+- named branch / upstream。
+- canonical Issue source path の source snapshot。
+- post-invocation staleness check。
 
-### 振る舞い設計 DES-BEH-001:
+`source-manifest.json` を attachment として生成する処理は削除する。内部 `source_manifest_hash` が publication race
+検出に必要なら result object 内で保持できるが、operation attachment directory の contents を hash してはならない。
 
-- 固定度:
-  - `[N]`
-- 関連Requirement:
-  - `AC-...`
-  - `BH-...`
-- 関連Diagram:
-  - `VIS-...`
-- 開始条件（Trigger）:
-  - ...
-- Actor / Caller:
-  - ...
-- Inputs and meaning:
-  - ...
-- Preconditions:
-  - ...
-- Decision rules:
-  - ...
-- Postconditions:
-  - ...
-- Observable result:
-  - ...
-- Failures:
-  - ...
-- Must not happen:
-  - ...
+## 16. Security / privacy boundary
 
----
-
-## 10. 責任モデル（Responsibility Model）
+Option C は「input directory を安全と判定する scanner を持たない」という product decision である。これは
+添付内容が安全であることを SpecDock が保証するという意味ではない。
 
-| 構成要素・作業成果物（Building Block / Artifact） | 責任 | 禁止事項（Must Not Do） | 関連設計識別子（Design ID） | 関連図（Diagram） |
-|---|---|---|---|---|
-| ... | ... | ... | `DES-...` | `VIS-...` |
-| ... | ... | ... | `DES-...` | `VIS-...` |
+- operation pack maintainer / operator が material を選ぶ。
+- Runtime は secrets / path / special entry を検査しない。
+- direct Oracle / ChatGPT が受理または失敗する。
+- failure diagnostics は content-free。
+- child environment sanitization、managed Chrome boundary、executable identity、output artifact isolation は維持。
+- session / conversation identifier、private URL、raw transcript を Candidate / Review / public result に残さない。
+- output ZIP を展開 / adopt する側の safety validator は維持。
 
-### 10.1 判断の所有者
+## 17. Provider / dogfood implementation mapping
 
-| 判断 | 所有者 | 理由 |
-|---|---|---|
-| ... | ... | ... |
+| Provider source | Dogfood / installed target |
+|---|---|
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py` | `spec-dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py` |
+| `src/.../application/issue_planning.py` | `spec-dock/scripts/.../application/issue_planning.py` |
+| `src/.../domain/issue_planning_contracts.py` | `spec-dock/scripts/.../domain/issue_planning_contracts.py` |
+| `src/.../infra/issue_planning_chatgpt.py` | `spec-dock/scripts/.../infra/issue_planning_chatgpt.py` |
+| `src/.../commands/issue_planning.py` | `spec-dock/scripts/.../commands/issue_planning.py` |
+| `src/spec_dock/assets/install_root/.agents/skills/...` | `.agents/skills/...` |
+| `src/spec_dock/assets/spec_dock/docs/...` | `spec-dock/docs/...` |
 
-### 10.2 境界
+provider を先に変更し、project の既存 projection mechanism で dogfood を再生成する。二重手編集をしない。
 
-| 境界 | 内側 | 外側 | このIssueでの扱い |
-|---|---|---|---|
-| ... | ... | ... | ... |
+## 18. Test architecture
 
----
+### 18.1 新しい positive tests
 
-## 11. インターフェース・契約差分（Interface / Contract Delta）
+- minimal body に identity / authority / output があり、attached instruction body がない。
+- operation resource file を増減しても application object / test inventory を変えない。
+- static directory、nested / hidden / symlink / FIFO を含む fixture で adapter が tree を一度も走査しない。
+- original Candidate / Review path が direct Oracle argv へそのまま渡る。
+- planning / review / revision の expected top-level attachment path order。
+- verified Blue continuation、new Blue recovery、fresh Red。
+- installed runtime が new resource root を解決する。
+- provider / projection recursive byte parity。
 
-Standard gradeでは、原則として公開contractの破壊的変更を扱わない。公開contract変更が判明した場合は `strict` 以上へ引き上げる。
+### 18.2 削除または置換する tests
 
-### 11.1 契約影響要約（Contract 影響（Impact） Summary）
+- relevant source file safe-read / descriptor race。
+- attachment secret / private path scan。
+- attachment size / count limits。
+- attachment SHA index。
+- generated `context-NNN.md` / manifest / source-manifest。
+- exact 13 heading / 4 PlantUML prompt text。
+- prompt character budget based on old concatenated contract。
+- `--context-manifest` parse / help。
 
-| Contract種別 | 影響 | 備考 |
-|---|---|---|
-| 公開CLI契約（Public CLI contract） | none / local / unknown | ... |
-| 公開API契約（Public API contract） | none / local / unknown | ... |
-| イベント・メッセージ契約（Event / message contract） | none / local / unknown | ... |
-| テンプレート契約（Template contract） | none / local / unknown | ... |
-| メタデータ・生成インデックス（Metadata / generated index） | none / local / unknown | ... |
-| 内部interface（Internal interface） | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
-| 文書・workflow契約（Docs / workflow contract） | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
+### 18.3 維持する regression tests
 
-### 11.2 局所インターフェース差分（Local Interface Delta）
+- exact GitHub branch / HEAD / no default fallback。
+- managed Chrome / Oracle capability / environment。
+- direct argv / no shell / no personal wrapper。
+- session artifact / harvest recovery。
+- authoring ZIP / Review JSON strict parser。
+- Candidate / Review / Human / apply identity。
+- source stale / publication race。
+- output directory safety / transaction。
+- public result no transcript / no private path。
+- end-to-end create / review / revise / apply。
+- provider / dogfood projection。
 
-| 設計識別子（Design ID） | 対象 | 変更内容 | 互換性 | 固定度 | 関連Diagram |
-|---|---|---|---|---|---|
-| DES-INT-001 | ... | ... | 互換 / N/A（compatible / N/A） / unknown | `[N]` | `VIS-...` |
-| DES-INT-002 | ... | ... | 互換 / N/A（compatible / N/A） / unknown | `[P]` | `VIS-...` |
+## 19. 親 docs の整合更新
 
----
+親 Epic の Requirement / Design に残る次を更新する。
 
-## 12. データ・状態・メタデータ差分（Data / State / Metadata Delta）
+- 「詳細 instruction は prompt body が正本」。
+- 「attachments は reference-only / data-only で instruction を含まない」。
+- attachment manifest / exact SHA index を formal input contract とする記述。
+- phase ごとに常に fresh session を作る記述。
 
-Standard gradeでは、原則としてmigrationや破壊的な既存データ変換を扱わない。
+更新後も維持するもの:
 
-### 12.1 状態差分要約（State Delta Summary）
+- ChatGPT is non-authoritative。
+- fresh formal Review。
+- exact GitHub branch / HEAD。
+- direct Oracle。
+- Candidate / Review / Human / apply。
+- output ZIP / closed JSON。
 
-| 対象 | 現在（Current） | 目標（Target） | 互換性 | 関連図（Diagram） |
-|---|---|---|---|---|
-| ... | ... | ... | ... | `VIS-...` |
+Issue-local decisionを親 scope の別目的へ広げず、矛盾している contract wording のみを反映する。
 
-### 12.2 生成物・管理対象作業成果物（Generated / Managed Artifacts）への影響
+## 20. Alternatives
 
-| 作業成果物（Artifact） | 影響 | 備考 |
-|---|---|---|
-| `.meta.json` | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
-| `.assurance.json` | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
-| `.agent/index*.json` | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
-| `.agent/tree*.json` | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
-| テンプレート（templates） | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
-| 文書（docs） | なし / 変更あり / 不明（なし / 変更あり / 不明（none / changed / unknown）） | ... |
+### A. 現行 prompt pack を維持し scanner だけ無効化
 
----
+不採用。directory の file 増減に応じて `context-NNN.md` / manifest を生成する責務が残り、Option C の
+「そのまま渡す」を満たさない。
 
-## 13. 失敗・境界・互換性設計（Failure / Edge / Compatibility Design）
+### B. Directory を ZIP 化して一つ添付
 
-### 13.1 失敗時の意味論（Failure Semantics）
+不採用。automatic conversion であり、entry semantics と transport failure を SpecDock が変更する。
 
-| Failure 識別子（ID） | 条件 | 期待される扱い | 状態変更 | 観測点 | 関連Diagram |
-|---|---|---|---|---|---|
-| FAIL-001 | ... | ... | なし / 部分的 / rollback / N/A（none / partial / rollback / N/A） | ... | `VIS-...` |
+### C. Symlink を解決し regular file だけ添付
 
-### 13.2 互換性メモ（Compatibility Notes）
+不採用。input の内容を変更し、operator が置いた directory と ChatGPT input が一致しない。
 
-- 既存利用者への影響:
-  - ...
-- 既存workspaceへの影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-- rollback方法:
-  - ...
+### D. Personal wrapper の follow-up を runtime から呼ぶ
 
----
+不採用。product dependency / evidence boundary に違反する。
 
-## 14. セキュリティ・プライバシー確認（Security / Privacy Check）
+### E. 全 operation 共通の versioned attachment schema
 
-| 項目 | 影響 | 備考 |
-|---|---|---|
-| 認証 | なし / 不明（none / unknown） | ... |
-| 認可 | なし / 不明（none / unknown） | ... |
-| 機密情報（secret / token / credential） | なし / 不明（none / unknown） | ... |
-| 個人情報 / 機微情報 | なし / 不明（none / unknown） | ... |
-| ログ出力 | なし / 不明（none / unknown） | ... |
-| 外部API権限（GitHub API） | なし / 不明（none / unknown） | ... |
+不採用。ユーザーが求める operation-specific flexibility と file 増減による保守性を損なう。
 
-影響がある、または不明な場合は `critical` への引き上げを検討する。
+### F. Input と output の全 validator を削除
 
----
+不採用。Option C は input directory だけの決定であり、output evidence / Human authority を緩める根拠ではない。
 
-## 15. 観測性・証跡設計（Observability / Evidence Design）
+## 21. 設計停止条件
 
-| 証跡ID（Evidence ID） | 観測対象 | 証拠の種類 | 関連設計識別子（Design ID） | 関連Diagram |
-|---|---|---|---|---|
-| EVD-001 | ... | test / CLI output / file diff / docs diff / 手動（manual） review | `DES-...` | `VIS-...` |
-| EVD-002 | ... | test / CLI output / file diff / docs diff / 手動（manual） review | `DES-...` | `VIS-...` |
+- Oracle directory attachment contract を primary capability test で確認できない。
+- dynamic file と static directory を同一 invocation へ direct に渡せない。
+- direct Oracle continuation を確認できない。
+- path を direct に渡す前に Runtime が tree materialization を必要とする。
+- Candidate / Review output validator の regression が必要になる。
+- clarification public surface を owning scope なしで追加する必要が生じる。
 
-Reportに残すべき証拠:
-
-- ...
-- ...
-
----
-
-## 16. 文書・テンプレート・スキル影響（Docs / Template / Skill 影響（Impact））
-
-| パス（Path） | 更新理由 | 必須 |
-|---|---|---|
-| ... | ... | はい / いいえ（yes / no） |
-
-提供側・利用側反映（Provider / Consumer）:
-
-| 対象 | 影響 | 対応 |
-|---|---|---|
-| `src/spec_dock/assets/...` | はい / いいえ / 不明（yes / no / unknown） | ... |
-| ワークスペース（root `spec-dock/...`） | はい / いいえ / 不明（yes / no / unknown） | ... |
-
----
-
-## 17. 検討した代替案（Alternatives Considered）
-
-| Alternative 識別子（ID） | 代替案 | 利点 | 欠点 | 採否 |
-|---|---|---|---|---|
-| ALT-001 | ... | ... | ... | adopted / rejected |
-
----
-
-## 18. 実装へ委譲する設計仮説（Design Hypotheses Left to Implementation）
-
-| Hypothesis 識別子（ID） | 内容 | 制約 | 判断タイミング |
-|---|---|---|---|
-| HYP-001 | ... | ... | during implementation / during refactor |
-
-実装中に変更してはいけないもの:
-
-- `[N]` ...
-- `[N]` ...
-
----
-
-## 19. 検証への含意（検証（Verification） Implications）
-
-| 設計識別子（Design ID） | 検証すべき内容 | 推奨検証レベル（Verification Level） | 報告証跡（Report Evidence） | 関連図（Diagram） |
-|---|---|---|---|---|
-| DES-001 | ... | unit / integration / CLI / docs / テンプレート / 手動 | `EVD-...` | `VIS-...` |
-| DES-002 | ... | unit / integration / CLI / docs / テンプレート / 手動 | `EVD-...` | `VIS-...` |
-
-検証レベル（Verification Level）:
-
-- `unit`: 小さな純粋ロジックまたは関数単位
-- `integration`: 複数コンポーネントの連携
-- `CLI`: CLIコマンド実行
-- `docs`: 文書整合性
-- `template`: scaffold / template生成確認
-- `contract`: 契約互換性確認
-- `手動（manual）`: 人間による確認
-- `none`: 変更性質上不要。ただし理由を記述する
-
----
-
-## 20. 計画への引き渡し（Plan Handoff）
-
-### 20.1 固定設計契約（Fixed Design Contracts）
-
-`plan.md` と実装が必ず守る設計契約。
-
-- `DES-...`
-- `DES-...`
-
-### 20.2 振る舞いバックログ種（Behavior Backlog Seeds）
-
-| 種識別子（Seed ID） | 振る舞い / 成果 | 関連設計識別子（Design ID） | 関連Requirement | 関連Diagram |
-|---|---|---|---|---|
-| B-SEED-001 | ... | `DES-...` | `AC-...` | `VIS-...` |
-| B-SEED-002 | ... | `DES-...` | `AC-...` | `VIS-...` |
-
-### 20.3 推奨検証ゲート（推奨検証（Suggested 検証（Verification）） Gates）
-
-- ...
-- ...
-
-### 20.4 停止・再計画条件（Stop / Replan Triggers）
-
-- [ ] Redの理由が設計上の想定と異なる
-- [ ] 要件の期待値を変更したくなる
-- [ ] 公開contract変更が必要になる
-- [ ] 移行（migration）が必要になる
-- [ ] セキュリティ・プライバシー（security / privacy）影響が見つかる
-- [ ] 上位Epic / Initiativeの設計を変更する必要がある
-- [ ] rollbackが難しい変更になった
-- [ ] 複数Issueへ影響する設計判断が必要になった
-- [ ] Standard gradeの前提を満たさなくなった
-
----
-
-## 21. 未確定事項（Open Questions）
-
-### 未解決事項 OQ-001:
-
-- 質問:
-  - ...
-- 影響:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before plan / before implementation / can defer
-- 推奨:
-  - ...
-- 解決状態:
-  - open / resolved / escalated
-
----
-
-## 22. 図表レビューチェックリスト（Diagram Review Checklist）
-
-- [ ] 各図にDiagram IDがある
-- [ ] 各図に固定度 `[N] / [P] / [I]` が明示されている
-- [ ] 各図が設計識別子（Design ID）と対応している
-- [ ] 図だけにしか存在しない設計契約がない
-- [ ] 図で表現した制約が本文または表にも記載されている
-- [ ] 図が実装詳細を過剰に固定していない
-- [ ] UMLが不要なIssueでは、図を省略した理由が明確である
-
----
-
-## 23. 設計承認チェックリスト（Design Approval Checklist）
-
-- [ ] すべての関連ACが設計識別子（Design ID）へ対応している
-- [ ] すべての関連BHが振る舞い設計（Behavioral Design）へ反映されている
-- [ ] 関連するCONが設計制約として扱われている
-- [ ] `standard` gradeに留まる理由が明記されている
-- [ ] `strict` / `critical` escalation triggerを確認した
-- [ ] public contract変更がない、またはescalation済み
-- [ ] migrationがない、またはescalation済み
-- [ ] セキュリティ・プライバシー（security / privacy） sensitiveな影響がない、またはescalation済み
-- [ ] 設計意図が明確である
-- [ ] Current Stateと目標設計差分（Target Design Delta）が区別されている
-- [ ] 責任所有者が曖昧でない
-- [ ] 実装詳細を過剰に固定していない
-- [ ] TDDへ委ねる内部設計が明示されている
-- [ ] 固定設計契約（Fixed Design Contracts）が列挙されている
-- [ ] 振る舞いバックログ種（Behavior Backlog Seeds）がある
-- [ ] 検証への含意（検証（Verification） Implications）がある
-
----
-
-## 24. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-08-03 | 初稿（Initial draft） | ... | ... |
+停止条件に該当した場合、Issue #354 の実装を partial success として押し切らず、capability evidence と再設計点を
+Issue report へ記録する。

@@ -1,605 +1,527 @@
 ---
 種別: 実装計画書（Issue）
 ID: "iss-00354"
-タイトル: "Define ChatGPT Context and Attachment Contract"
-状態: "approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-08-03"
+タイトル: "ChatGPT Context and Attachment Contract"
+状態: "draft"
+作成者: "ChatGPT Blue Team authoring planner"
+最終更新: "2026-08-04"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00331", "init-00322"]
 ---
 
+# iss-00354 ChatGPT Context and Attachment Contract 実装計画書
 
-# iss-00354 Define ChatGPT Context and Attachment Contract — Issue 実装計画書（Standard / TDD）
+> **Candidate / evidence-only**  
+> 本計画は `CAND-ISS-00354-20260803T172642Z` の未採用案である。repository 変更、Red Team review、commit、PR、merge を
+> 実施していない。
 
-この文書は、承認済みの `requirement.md` と `design.md` を、TDDに沿って実行可能な **マイルストーン（Milestone）、振る舞いバックログ（Behavior Backlog）、TDD Cycle、Validation Gate、報告証跡（Report Evidence）** へ変換する。
+## 1. 実装方針
 
-この文書は planned executable workflow contract である。実行中の観測結果、Red / Green / Refactor の実績、逸脱、追加判断、発見事項は `report.md` に記録する。
+Issue #334 で完成済みの Issue Planning lifecycle を土台に、input boundary だけを増分変更する。
 
----
+- provider source を正本とする。
+- old behavior を characterization test で固定してから、Option A / C の failing test を追加する。
+- minimal body、direct path transport、thread policy を別 step に分ける。
+- output ZIP / Review JSON / Candidate / Human / apply の regression を各 step で通す。
+- dogfood projection、skills、docs、親 Epic consistency を一つの closure に含める。
+- Oracle capability が不足する場合は停止し、personal wrapper / API へ逃げない。
 
-## 0. 文書の位置づけ
+## 2. Source HEAD 時点の baseline
 
-### この文書が定義すること
-
-- このIssueをどの順序で実装・検証するか
-- どのマイルストーン（Milestone）で何が成立するか
-- どの振る舞いをTDDの対象にするか
-- どの単位でRed-Green-Refactorを回すか
-- 各振る舞いに必要な検証レベル
-- 実装中に守るべき変更範囲
-- 実装中に停止・再計画すべき条件
-- `report.md` に残すべき証拠の記録先
-- 最終完了条件
-
-### この文書が定義しないこと
-
-- 新しい要件
-- 新しい設計判断
-- 上位設計の再定義
-- 実装後の観測証拠そのもの
-- TDD中に発見されるprivateな内部構造
-
----
-
-## 1. 計画開始条件（Plan Readiness）
-
-### 1.1 必須入力（Required Inputs）
-
-| 作業成果物（Artifact） | 状態 | 確認事項 |
-|---|---|---|
-| `requirement.md` | 下書き / 承認済み（draft / approved） | AC、BH、CON、等級（Grade）判定材料がある |
-| `design.md` | 下書き / 承認済み（draft / approved） | 固定設計契約（Fixed Design Contracts）、Behavior Seeds、検証への含意（検証（Verification） Implications）がある |
-| `report.md` | 存在 / 欠落（exists / missing） | 実行証拠の記録先がある |
-| 親Epic design | 確認済み / N/A（reviewed / N/A） | 継承すべき制約が確認済み |
-| 親Initiative design | 確認済み / N/A（reviewed / N/A） | 戦略的制約に矛盾しない |
-| ADR / architecture docs | 確認済み / N/A（reviewed / N/A） | 関連制約が確認済み |
-
-### 1.2 計画開始条件（Plan）
-
-- [ ] `requirement.md` が承認済み、または実装計画作成に十分な状態である
-- [ ] `design.md` が承認済み、または計画への引き渡し（Plan Handoff）が記載済みである
-- [ ] 未解決のBlocking Open Questionがない
-- [ ] Issue Gradeが `standard` として妥当である
-- [ ] `standard` の前提を破る既知リスクがない
-- [ ] 実装中に変更してよい設計仮説と、変更してはいけない設計契約が区別されている
-- [ ] `report.md` への証拠記録方針がある
-
----
-
-## 2. 実装戦略（Implementation Strategy）
-
-このIssueでは、原則として **TDDによる段階的な垂直スライス実装** を採用する。
-
-```text
-Issue 受け入れ範囲（Acceptance Envelope）
-└── マイルストーン（Milestone）
-    └── 振る舞いバックログ（Behavior Backlog） Item
-        └── 実行中の TDD サイクル（Active TDD Cycle）
-            ├── Red
-            ├── Confirm Red
-            ├── Minimal Green
-            ├── Local Regression
-            ├── Refactor
-            └── 報告証跡（Report Evidence）
-```
-
-### 2.1 基本方針
-
-- Issue 全体は広く理解する
-- マイルストーン（Milestone）単位で独立検証可能な中間成果を管理する
-- 振る舞いバックログ（Behavior Backlog）で実装対象の振る舞いを列挙する
-- TDD Cycleは実行直前に一つずつ具体化する
-- 一つのTDD Cycleでは、原則として一つの独立した振る舞い仮説だけを扱う
-- Redの失敗理由を確認してからproduction codeを変更する
-- RefactorはGreen状態でのみ行う
-- 観測証拠は `plan.md` ではなく `report.md` に残す
-
-### 2.2 TDD の Red 方針（TDD Red Policy）
-
-| Red種別 | 許容数 | 扱い |
-|---|---:|---|
-| Intentional outer Red | 最大1 | マイルストーン（Milestone）のguiding testとして許容 |
-| Intentional inner Red | 最大1 | 現在の実行中の TDD サイクル（Active TDD Cycle）のみ |
-| Existing regression Red | 0 | 発生したら即停止 |
-| Unknown Red | 0 | 原因を確認するまで実装へ進まない |
-
-### 2.3 Red代替証跡（Red Alternative）
-
-TDDのRedが適切でない場合は、理由を明示して代替証拠を固定する。
-
-| 対象 | Red分類 | 理由 | 代替証拠 |
-|---|---|---|---|
-| ... | red-required / covered-existing / characterization-first / 点検（inspect）-only / 手動（manual）-required / not-applicable | ... | ... |
-
----
-
-## 3. 範囲と変更面（対象範囲（Scope） and Change Surface）
-
-### 3.1 許可変更面（Allowed Change Surface）
-
-| 種別 | パス・対象（Path / Target） | 許可する変更 | 関連設計識別子（Design ID） |
-|---|---|---|---|
-| コード（code） | ... | ... | `DES-...` |
-| テスト（tests） | ... | ... | `DES-...` |
-| 文書（docs） | ... | ... | `DES-...` |
-| テンプレート（templates） | ... | ... | `DES-...` |
-| スキル群（skills） | ... | ... | `DES-...` |
-| scripts | ... | ... | `DES-...` |
-| metadata | ... | ... | `DES-...` |
-
-### 3.2 禁止変更（Forbidden Changes）
-
-| 対象 | 禁止理由 | 必要になった場合の対応 |
-|---|---|---|
-| ... | ... | 停止して再計画 / escalate / 後続issue（後続（follow-up） issue） |
-
-### 3.3 提供側・利用側反映（Provider / Consumer）
-
-| 対象 | 変更要否 | 対応 |
-|---|---|---|
-| `src/spec_dock/assets/...` | はい / いいえ / 不明（yes / no / unknown） | ... |
-| ワークスペース（root `spec-dock/...`） | はい / いいえ / 不明（yes / no / unknown） | ... |
-
----
-
-## 4. 実行概要（Execution Overview）
-
-### 4.1 マイルストーン要約（マイルストーン（Milestone） Summary）
-
-| マイルストーン（Milestone） 識別子（ID） | 成果 | 主なBehavior | 検証（Verification） ゲート（Gate） | 状態 |
-|---|---|---|---|---|
-| M1 | ... | `B-...` | ... | planned |
-| M2 | ... | `B-...` | ... | planned |
-| M3 | ... | `B-...` | ... | planned |
-| M90 | 文書・テンプレート（docs / template） / skill影響解決 | `B-...` | docs / diff / review | planned |
-| M99 | final quality gate | all | full verification | planned |
-
-### 4.2 マイルストーン依存（マイルストーン（Milestone） Dependency）
-
-```plantuml
-@startuml
-title Implementation マイルストーン依存（マイルストーン（Milestone） Dependency）
-start
-:M1 Minimal behavior path;
-:M2 Edge / failure behavior;
-:M3 Integration / artifact behavior;
-:M90 Docs and template impact;
-:M99 Final quality gate;
-stop
-@enduml
-```
-
-### 4.3 実装順序の理由
-
-- ...
-- ...
-
----
-
-## 5. 受け入れ範囲（Acceptance Envelope）
-
-### 5.1 受け入れ成果（Acceptance Outcomes）
-
-| 成果識別子（Outcome ID） | 内容 | 関連AC | 関連設計識別子（Design ID） | 完了証拠 |
-|---|---|---|---|---|
-| OUT-001 | ... | `AC-...` | `DES-...` | `EVD-...` |
-| OUT-002 | ... | `AC-...` | `DES-...` | `EVD-...` |
-
-### 5.2 起きてはいけないこと（Must Not Happen）
-
-| 識別子（ID） | 内容 | 検証方法 |
-|---|---|---|
-| MNH-001 | ... | ... |
-| MNH-002 | ... | ... |
-
----
-
-## 6. 仕様固定クロージャ一覧（Spec-Locked クロージャ（Closure） Index）
-
-| クロージャ識別子（Closure ID） | 要件識別子（Requirement ID） | 設計識別子（Design ID） | 閉じる内容 | 検証レベル（Verification Level） | 報告証跡（Report Evidence） |
-|---|---|---|---|---|---|
-| CLOS-001 | AC-001 | DES-001 | ... | unit・CLI・テンプレート・文書 | `report.md#...` |
-| CLOS-002 | AC-002 | DES-002 | ... | unit / integration / 手動（manual） | `report.md#...` |
-| CLOS-003 | BH-001 | DES-003 | ... | unit / CLI | `report.md#...` |
-| CLOS-004 | CON-001 | DES-004 | ... | 点検・文書（点検（inspect）ion / docs） | `report.md#...` |
-| CLOS-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | DES-... | ... | ... | `report.md#...` |
-
----
-
-## 7. 振る舞いバックログ（Behavior Backlog）
-
-Behaviorは、ファイル変更単位ではなく、観測可能な成果または保証として記述する。
-
-| 振る舞い識別子（Behavior ID） | マイルストーン（Milestone） | 振る舞い / 保証 | 関連クロージャ（Closure） | 依存 | 優先度 | 状態 |
-|---|---|---|---|---|---|---|
-| B-001 | M1 | ... | `CLOS-...` | none | high | ready |
-| B-002 | M1 | ... | `CLOS-...` | B-001 | medium | planned |
-| B-003 | M2 | ... | `CLOS-...` | B-001 | high | planned |
-| B-004 | M3 | ... | `CLOS-...` | B-002 | medium | planned |
-| B-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | `CLOS-...` | ... | ... | planned |
-
-状態: `planned` / `ready` / `active` / `complete` / `split` / `blocked` / `removed`
-
-### 7.1 Behavior選択基準
-
-- 依存する前提がGreenである
-- 一つの振る舞い仮説に分割できる
-- 期待されるRed理由を説明できる
-- focused verificationを短時間で実行できる
-- 既存の設計契約を変更しない
-- Issueの中心リスクを減らす
-
-### 7.2 Behavior分割ルール
-
-- 独立した事前条件が複数ある
-- 独立した事後条件が複数ある
-- 失敗理由が複数ある
-- 異なるverification levelが必要
-- 異なる責任主体を変更する
-- 異なるcontractを変更する
-- 原子性、冪等性、互換性など複数の保証を同時に含む
-
----
-
-## 8. 実行中の振る舞い（Active Behavior）
-
-実行中のBehaviorだけを詳細化する。完了したら、このセクションを次のBehaviorへ更新する。過去の実績は `report.md` に記録する。
-
-- 振る舞い識別子（Behavior ID）:
-  - `B-...`
-- 関連マイルストーン（Milestone）:
-  - M...
-- 関連クロージャ（Closure）:
-  - `CLOS-...`
-- 関連設計識別子（Design ID）:
-  - `DES-...`
-- なぜ次に実行するか:
-  - ...
-- 依存関係:
-  - ...
-- 分割判断:
-  - one-cycle / split-required / unknown
-
-### 振る舞い受け入れ条件（Behavior Acceptance）
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い範囲（Behavior Scope）
-
-| 項目 | 内容 |
+| 項目 | Baseline |
 |---|---|
-| Allowed paths | ... |
-| Forbidden paths | ... |
-| Required tests / checks | ... |
-| Report証跡記録先（Report evidence destination） | ... |
-| Stop conditions | ... |
+| Branch / HEAD | `codex/iss-00354-chatgpt-context-contract` / `88a9fdb567f17f50bee421862d3b7859a5eb6384` |
+| Issue docs | approved front matter を持つが本文は Standard template の placeholder |
+| Planning input | canonical / relevant source individual read + scanner + generated prompt pack |
+| CLI | optional `--context-manifest` |
+| Oracle input | one generated directory via `--file` |
+| Session | role invocation ごとに new random session。同 invocation recovery のみ |
+| Planning output | exact authoring ZIP |
+| Review output | strict closed JSON |
+| Authority | Candidate / Review evidence-only、Human-approved applyのみmanaged write |
+| Projection | provider / installed / dogfood copiesあり |
+| Assurance | `standard` provisional |
 
----
+## 3. 変更対象
 
-## 9. 実行中の TDD サイクル（Active TDD Cycle）
+### 3.1 Primary provider code
 
-現在のTDD Cycleだけを詳細化する。Standardでは、将来の全Cycleを完全固定しない。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_contracts.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/issue_planning.py`
+- 必要なら `application/ports.py` / bootstrap wiring。ただし既存 port ownership を確認して限定する。
 
-### 9.1 サイクルメタデータ（Cycle Metadata）
+### 3.2 Provider resources / skills
 
-- Cycle ID:
-  - TDD-...
-- Parent Behavior:
-  - `B-...`
-- Cycle type:
-  - red-green-refactor / characterization / 点検（inspect）-only / 手動（manual）-required
-- Related クロージャ（Closure）:
-  - `CLOS-...`
-- 関連設計識別子（Design ID）:
-  - `DES-...`
-- Status:
-  - 計画済み / red / green / refactored / 完了 / blocked（planned / red / green / refactored / complete / blocked）
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/resources/`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
+- clarification resource convention / skill guidance（runtime public command は追加しない）。
 
-### 9.2 振る舞い仮説（Behavioral Hypothesis）
+### 3.3 Tests
 
-```text
-...
+- `tests/unit/application/test_issue_planning_prompt.py`
+- `tests/unit/application/test_issue_planning.py`
+- `tests/unit/infra/test_issue_planning_chatgpt.py`
+- `tests/unit/commands/test_issue_planning.py`
+- `tests/cli_runtime/test_chatgpt_cli.py`
+- `tests/integration/test_issue_planning_e2e.py`
+- installed projection / wrapper tests のうち resource path を固定する箇所。
+
+### 3.4 Docs
+
+provider と dogfood の双方:
+
+- `docs/workflow_issue.md`
+- `docs/workflow_chatgpt_authoring_pack.md`
+- `docs/authoring/chatgpt-pack.md`
+- Issue Planning / Clarification skill。
+- `epic-00331` Requirement / Design の矛盾箇所。
+- Issue #354 canonical three documents / report は Human-approved adoption 時だけ更新する。
+
+## 4. Milestone S01 — Capability characterization と regression boundary
+
+### 4.1 目的
+
+production code を変える前に、direct Oracle だけで次を満たせるか確認する。
+
+1. directory path を recursive attachment として受け取る exact contract。
+2. static directory と dynamic file を同 invocation へ渡す contract。
+3. same Blue conversation を継続する direct Oracle contract。
+4. attachment failure の exit / session status / artifact behavior。
+
+### 4.2 Red
+
+focused infra tests に、fake executable の help / argv / session behavior を使った characterization test を追加する。
+
+- directory path を一つの `--file` operand として保持する。
+- multiple direct attachment operand の exact order。
+- continuation start / resume の exact command。
+- unsupported capability で prompt submission 0。
+- personal wrapper / API fallback invocation 0。
+- output snapshot behavior 不変。
+
+real Oracle を必要とする capability smoke は opt-in / local integration とし、unit test が undocumented flag を
+発明しない。
+
+### 4.3 Green
+
+- `_ROOT_CAPABILITIES` / `_SESSION_CAPABILITIES` を実測 interface に合わせて更新する。
+- application へまだ新 architecture を入れず、supported / unsupported 判定だけを明示する。
+- capability receipt は report に command surface と version だけを content-free に記録する。
+
+### 4.4 Stop gate
+
+次のいずれかなら S02 へ進まない。
+
+- directory attachment unsupported。
+- multiple path unsupported かつ conversion なしの表現がない。
+- continuation unsupported。
+- supported interface が personal wrapper にしかない。
+
+### 4.5 Verification
+
+```bash
+uv run pytest tests/unit/infra/test_issue_planning_chatgpt.py -q
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py \
+  tests/unit/infra/test_issue_planning_chatgpt.py
+uv run mypy src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py
 ```
 
-### 9.3 テスト・証跡計画（Test / Evidence Plan）
+## 5. Milestone S02 — Operation resource layout と minimal body
 
-- Red分類:
-  - red-required / covered-existing / characterization-first / 点検（inspect）-only / 手動（manual）-required / not-applicable
-- 期待するRed理由:
-  - ...
-- Redが期待どおりでない場合の対応:
-  - stop / repair test / replan / escalate
-- 代替証拠:
-  - ...
+### 5.1 Red
 
-Concrete Test Seed:
+`test_issue_planning_prompt.py` を新契約へ書き換える。
 
-- `tc-...`:
-  - 前提:
-    - ...
-  - 操作:
-    - ...
-  - 期待結果:
-    - ...
-  - 失敗検出:
-    - ...
-  - 検証方法:
-    - ...
-  - 関連クロージャ（Closure）:
-    - `CLOS-...`
-  - 関連Report destination:
-    - `report.md#...`
+- planning / review / revision の body に exact identity、authority、output がある。
+- detailed instruction text、13 heading contract、4 diagram contract、attachment SHA index が body にない。
+- `prompt.md` と `attachments/` path が operation ごとに分離される。
+- attachments へ file を追加しても registry / code を変更しない。
+- reviewer は fresh / read-only / defect-only。
+- revision は selected P0 / P1 identity を扱う。
+- provider / installed resource resolver が new root を解決する。
 
-### 9.4 最小 Green 境界（Minimal Green Boundary）
+### 5.2 Green
 
-- Allowed implementation boundary:
-  - ...
-- Do not implement yet:
-  - ...
-- Do not refactor yet:
-  - ...
-- Must preserve:
-  - ...
+- `resources/operations/{planning,review,revision}/` を作る。
+- old `planner-prompt.md`、`reviewer-prompt.md`、`revision-prompt.md`、
+  `transport-output-contract.md` の内容を minimal `prompt.md` と detailed `attachments/*.md` に分割する。
+- `issue_planning_prompt.py` に operation registry と minimal body renderer を追加する。
+- onboarding の固定 13 H2 / 4 PlantUML text を削除し、subordinate status と必要な diagram guidance へ縮小する。
 
-### 9.5 集中検証（Focused 検証（Verification））
+### 5.3 Refactor
 
-| 種別 | コマンド（Command） / Evidence | 期待 |
-|---|---|---|
-| Focused test | `...` | ... |
-| Local regression | `...` | ... |
-| Static / lint | `...` | ... |
-| Manual / 点検（inspect） | ... | ... |
+- shared authority wording を code concatenation で重複排除しない。各 operation directory を self-contained にする。
+- generic unknown operation fallback を作らない。
+- body field ordering を deterministic にする。
 
-### 9.6 リファクタリング確認点（Refactor Checkpoint）
+### 5.4 Verification
 
-- Refactor必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Refactor対象候補:
-  - ...
-- Refactor guardrail:
-  - 振る舞いを変えない
-  - 公開契約（public contract）を変えない
-  - 設計書の正規契約（Normative Contract）を変えない
-  - ローカル回帰（local regression）を再実行する
+```bash
+uv run pytest tests/unit/application/test_issue_planning_prompt.py -q
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py \
+  tests/unit/application/test_issue_planning_prompt.py
+uv run mypy src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py
+```
 
----
+## 6. Milestone S03 — Input model を bytes から path へ変更
 
-## 10. マイルストーン計画（マイルストーン（Milestone） Plans）
+### 6.1 Red
 
-### M1: 実装単位1（Implementation Unit 1）
-#### 成果
+- `SynthesizedPlanningPrompt` が attachment bytes / classification / SHA を保持しない。
+- directory fixture 内に nested、hidden、symlink、FIFO を作っても prompt synthesis が tree を触らない。
+- `Path.rglob`、`iterdir`、`resolve`、`read_bytes`、`stat` を monkeypatch で failure にしても synthesis が成功する。
+- optional operator attachment directory の path text が変更されない。
+- source / operator content scanner が invocation path で呼ばれない。
 
-- ...
-- ...
+### 6.2 Green
 
-#### 含まれるBehavior
+- `SynthesizedChatGptOperation` または既存 type の互換を切り、`attachment_paths` を導入する。
+- `PlanningPromptAttachment`、input SHA index、file-safe-read helpers、hard size / count constants を削除する。
+- `PlanningContext` から `relevant_source_paths` / `operator_context` を formal prompt materialization 用 field として
+  除去する。source staleness に必要な typed state は別 contract へ残す。
+- `_attachments_match_source_manifest` と `_exact_attachments_have_sensitive_content` を transport path から削除する。
+- body dynamic identity に old content scanner を適用しない。typed identity validation は維持する。
 
-| 振る舞い識別子（Behavior ID） | 内容 | クロージャ（Closure） | 状態 |
+### 6.3 Refactor
+
+- source preflight state と ChatGPT attachment state を別 object にする。
+- output expectation type は変更を最小化する。
+- static / dynamic / operator paths の top-level order を operation assembler が明示する。
+
+### 6.4 Verification
+
+```bash
+uv run pytest tests/unit/application/test_issue_planning_prompt.py \
+  tests/unit/application/test_issue_planning.py -q
+```
+
+## 7. Milestone S04 — Direct Oracle attachment transport
+
+### 7.1 Red
+
+`test_issue_planning_chatgpt.py` に次を追加する。
+
+- adapter argv が static directory path を direct `--file` operand にする。
+- dynamic Candidate / Review path を original path のまま渡す。
+- input `TemporaryDirectory/prompt-pack` を作らない。
+- `.specdock-authoring-pack`、`context-*.md`、`manifest.json`、`source-manifest.json`、
+  `provenance.json`、`stale-if.json` を作らない。
+- directory tree API を一度も呼ばない。
+- Oracle attachment error で entry exclusion / retry / conversion 0。
+- existing managed Chrome / env / executable / output tests が pass。
+
+### 7.2 Green
+
+- `_write_transport_pack` と input pack generation を削除する。
+- `invoke_issue_planning_chatgpt` が synthesized `attachment_paths` を direct argv へ追加する。
+- output snapshot 用 private staging だけを残す。
+- supported Oracle capability に従う exact repeated file syntax を実装する。
+- attachment submission failure を existing content-free public reason へ正規化する。
+
+### 7.3 Refactor
+
+- argv assembly を pure function に分離し、no-prewalk test を容易にする。
+- prompt submission は一回だけ。
+- same invocation recovery path も initial invocation と同じ attachment semantics を保持する。
+
+### 7.4 Verification
+
+```bash
+uv run pytest tests/unit/infra/test_issue_planning_chatgpt.py -q
+uv run pytest tests/integration/test_issue_planning_e2e.py -q
+```
+
+## 8. Milestone S05 — Planning / Review / Revision orchestration と CLI cutover
+
+### 8.1 Planning create
+
+#### Red
+
+- `--context-manifest` が help / parser から消える。
+- optional repeatable `--attachment-dir` 相当が exact path を request へ渡す。
+- missing / unusual path を CLI が content inspect しない。
+- provider static planning directory は常に追加される。
+- exact GitHub preflight / postflight と Candidate publication は不変。
+
+#### Green
+
+- `PlanningCreateRequest.context_manifest_path` を directory path collection へ置換する。
+- `_load_planning_context_manifest` と merge helpers を削除する。
+- canonical docs は GitHub exact HEAD から ChatGPT が読む。formal route で local file text attachment を再生成しない。
+- help / skill / docs を hard cutover へ更新する。
+
+### 8.2 Review
+
+#### Red
+
+- fresh Red request が必ず new thread を要求する。
+- Candidate ZIP path が copy / rename されない。
+- reviewed identity digest は formal identity として body / output validator に bind される。
+- Blue binding は read / mutate されない。
+
+#### Green
+
+- `review_prompt_synthesizer` の `PlanningPromptAttachment` 生成を direct evidence path / compact body identity へ置換する。
+- `reviewed-identity.json` / `reviewed-identity-sha256.txt` の temporary input file が不要なら body identity へ移す。
+- Oracle output closed JSON parser と identity comparison は維持する。
+
+### 8.3 Semantic revision
+
+#### Red
+
+- prior Candidate、exact Review、revision request が original path。
+- selected P0 / P1 と preserved assumptions が minimal body identity。
+- prior canonical docs の duplicate attachment copy を作らない。
+- revised ZIP validation / publication 不変。
+- mechanical lane 不変。
+
+#### Green
+
+- `revision_prompt_synthesizer` を operation assembler へ置換する。
+- exact Candidate / Review validator を invocation 前に維持する。
+- static revision directory と dynamic evidence paths を direct Oracle へ渡す。
+
+### 8.4 Verification
+
+```bash
+uv run pytest tests/unit/commands/test_issue_planning.py \
+  tests/cli_runtime/test_chatgpt_cli.py \
+  tests/unit/application/test_issue_planning.py -q
+```
+
+## 9. Milestone S06 — Blue continuity / fresh Red
+
+### 9.1 Red
+
+- first planning starts Blue。
+- same identity / lineage semantic revision continues verified Blue。
+- review always starts fresh Red。
+- source HEAD change invalidates Blue。
+- unavailable handle + exact lineage starts new Blue with complete current inputs。
+- ambiguous lineage blocks before submission。
+- public result / Candidate / Review does not contain provider handle。
+- no raw transcript persistence。
+- same invocation timeout recovery remains distinct from cross-operation continuity。
+
+### 9.2 Green
+
+- `ChatGptThreadPort` と `BlueThreadBinding` を domain / application boundary に追加する。
+- provider-owned private store を existing Oracle home / state convention に合わせて実装する。
+- binding key は repository / branch / Issue / lane とし、source HEAD / Candidate lineage を record に保持する。
+- planning / semantic revision は reuse policy を application で判定する。
+- review は `fresh_red` request を強制し、binding store に reusable Red state を残さない。
+- new Blue は current minimal body と current static / dynamic attachment paths を完全に送る。
+- Human confirmation が必要な case を content-free blocked result へ正規化する。
+
+### 9.3 Refactor
+
+- provider handle を serialization、repr、equality、CLI output から除外する。
+- internal supersession は raw handle ではなく digest / generation で追跡する。
+- retention / cleanup は existing Oracle lifecycle を尊重し、独自 transcript archive を作らない。
+
+### 9.4 Stop gate
+
+S01 で direct continuation interface が確認できなかった場合、本 milestone は実装しない。wrapper fallback を使わず、
+capability gap と後続設計を report する。
+
+### 9.5 Verification
+
+```bash
+uv run pytest tests/unit/infra/test_issue_planning_chatgpt.py \
+  tests/unit/application/test_issue_planning.py \
+  tests/integration/test_issue_planning_e2e.py -q
+```
+
+## 10. Milestone S07 — Provider projection、docs、parent consistency
+
+### 10.1 Provider / dogfood
+
+- provider runtime / resource / skill / docs を更新する。
+- project の既存 projection / installer workflow を実行する。
+- dogfood copy を手編集しない。
+- recursive tree byte parity test を追加または更新する。
+- resource file 増減を fixed allowlist が拒否しないことを確認する。
+
+### 10.2 Skill / docs
+
+更新内容:
+
+- minimal body と detailed attachments。
+- `--attachment-dir` hard cutover。
+- Option C の operator responsibility。
+- input manifest / scanner を持たない。
+- output ZIP / JSON safety は維持。
+- Blue continuity / fresh Red。
+- personal wrapper は runtime dependency ではない。
+- normal transport failure に委ねる。
+- clarification は reusable convention、public wiring は follow-up。
+
+### 10.3 Parent Epic
+
+`epic-00331` Requirement / Design の次の矛盾だけを修正する。
+
+- detailed instruction の本文集中。
+- attachments reference-only。
+- attachment SHA / manifest を input authority とする記述。
+- phase ごとの session policy。
+
+Issue ordering、scope allocation、Candidate / Human lifecycle は変更しない。
+
+### 10.4 Issue docs / report
+
+この Candidate をそのまま canonical overwrite しない。Human が採用する場合:
+
+1. Candidate preservation。
+2. Evidence Adoption Ledger。
+3. canonical three docs へ main orchestrator が反映。
+4. fresh spec review。
+5. assurance rebind。
+6. implementation readiness gate。
+
+## 11. Milestone S08 — Regression、quality gate、closure evidence
+
+### 11.1 Focused suite
+
+```bash
+uv run pytest \
+  tests/unit/application/test_issue_planning_prompt.py \
+  tests/unit/application/test_issue_planning.py \
+  tests/unit/infra/test_issue_planning_chatgpt.py \
+  tests/unit/commands/test_issue_planning.py \
+  tests/cli_runtime/test_chatgpt_cli.py \
+  tests/integration/test_issue_planning_e2e.py -q
+```
+
+### 11.2 Static quality
+
+```bash
+uv run ruff check \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime \
+  tests/unit/application/test_issue_planning_prompt.py \
+  tests/unit/application/test_issue_planning.py \
+  tests/unit/infra/test_issue_planning_chatgpt.py \
+  tests/unit/commands/test_issue_planning.py \
+  tests/cli_runtime/test_chatgpt_cli.py \
+  tests/integration/test_issue_planning_e2e.py
+
+uv run mypy src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime
+./spec-dock/scripts/spec-dock validate
+git diff --check
+```
+
+repository の canonical `make lint` / ordinary pytest lane が Issue #334 report で利用されている場合、focused suite 後に
+同じ entrypoint を実行する。
+
+### 11.3 Explicit contract checks
+
+- grep / test で runtime path に `context-NNN.md`、input manifest generation、attachment scanner が残っていない。
+- output `manifest` / Candidate provenance を誤って削除していない。
+- provider / dogfood parity。
+- personal wrapper path / API fallback / default branch fallback 0。
+- attachment directory prewalk 0。
+- Reviewer fresh thread reuse 0。
+- provider handle public serialization 0。
+- old `--context-manifest` docs 0。
+- parent Epic contradiction 0。
+
+### 11.4 Review gates
+
+- fresh code review は exact pushed HEAD を対象にする。
+- P0 / P1 だけを blocking repair loop へ戻す。
+- P2 / P3 は non-blocking follow-up として記録する。
+- Review PASS は Human adoption / execution-ready ではない。
+- PR / merge / Issue close は別 workflow。
+
+## 12. テスト観点マトリクス
+
+| Behavior | Unit | Integration / E2E | Regression |
 |---|---|---|---|
-| B-001 | ... | `CLOS-...` | planned |
-| B-002 | ... | `CLOS-...` | planned |
+| minimal body | prompt test | fake Oracle captures prompt | exact GitHub / output wording |
+| direct directory path | infra argv test | fake Oracle sees directory operand | no tree walk |
+| dynamic path passthrough | application + infra | review / revision chain | Candidate bytes unchanged |
+| no input manifest | infra filesystem assertion | E2E pack inventory | output manifest remains |
+| normal transport failure | infra result mapping | fake Oracle failure | no fallback |
+| Blue reuse | thread store / adapter | planning → revision | no handle leak |
+| fresh Red | application | Candidate N review | no PASS reuse |
+| continuity recovery | application / store | invalid binding scenario | Human block ambiguity |
+| output ZIP | existing parser tests | create / revise | exact root / inventory |
+| Review JSON | existing strict parser | review | duplicate / unknown key reject |
+| provider projection | resource parity | installer smoke | file add/remove no code change |
+| CLI cutover | command tests | CLI runtime | old flag rejected |
 
-#### マイルストーンゲート（マイルストーン（Milestone） Gate）
+## 13. 移行順と互換性
 
-| ゲート（Gate） | コマンド（Command） / Evidence | 期待結果 | 報告先（Report Destination） |
-|---|---|---|---|
-| Focused suite | `...` | pass | `report.md#...` |
-| Local regression | `...` | pass | `report.md#...` |
-| Manual review | ... | 承認済み / N/A | `report.md#...` |
+1. S01 capability gate。
+2. new resources と new model を provider に追加。
+3. application を direct path へ切替。
+4. adapter の generated pack を削除。
+5. CLI / docs を同 commit boundary で hard cutover。
+6. thread continuity を追加。
+7. projection / parent docs。
+8. full regression。
 
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] このマイルストーンの差分だけで意味が通る
-    - [ ] 必要な検証が完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+partial dual-mode は作らない。old `--context-manifest` と new directory mode を同時維持すると、同一 operation に
+inspection path と no-inspection path が混在し、契約が不明確になるためである。
 
-### M2: 実装単位2（Implementation Unit 2）
-#### 成果
+rollback は commit-level revert とする。runtime 内に legacy fallback switch を残さない。
 
-- ...
-- ...
+## 14. 実装中の停止条件
 
-#### 含まれるBehavior
+次を検出した時点で mutation を止める。
 
-| 振る舞い識別子（Behavior ID） | 内容 | クロージャ（Closure） | 状態 |
-|---|---|---|---|
-| B-003 | ... | `CLOS-...` | planned |
+- current branch / remote HEAD が source baseline から変化した。
+- worktree に task scope 外の変更がある。
+- Oracle capability characterization が不十分。
+- direct attachment のために temporary copy / ZIP が必要。
+- continuation のために personal wrapper が必要。
+- output validator を緩める必要がある。
+- provider / dogfood parity の生成経路を特定できない。
+- clarification public command が必要になったが owning Issue がない。
+- existing Candidate / Review / apply regression が失敗し、原因が本 Issue の intended input change ではない。
+- P0 / P1 review finding が未解決。
 
-#### マイルストーンゲート（マイルストーン（Milestone） Gate）
+## 15. Evidence と report 記録
 
-| ゲート（Gate） | コマンド（Command） / Evidence | 期待結果 | 報告先（Report Destination） |
-|---|---|---|---|
-| ... | ... | ... | ... |
+Issue report には最低限次を記録する。
 
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] このマイルストーンの差分だけで意味が通る
-    - [ ] 必要な検証が完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+- implementation source HEAD / resulting HEAD。
+- Oracle version と確認した attachment / continuation capability。
+- provider paths と projection paths。
+- removed old input contract。
+- retained output / authority contract。
+- focused / ordinary test commands と結果。
+- provider / dogfood parity。
+- Blue continuity / fresh Red behavior。
+- normal transport failure scenario。
+- remaining follow-up。
+- Candidate / Review / Human authority boundary。
+- PR / merge / Issue close 未実施ならその状態。
 
----
+attachment contents、secret-like value、private absolute path、raw transcript、provider thread handle は記録しない。
 
-## 11. 検証段階（検証（Verification） Ladder）
+## 16. Follow-up 候補
 
-| レベル（Level） | 名称 | 目的 | コマンド（Command） / Evidence |
-|---|---|---|---|
-| L1 | Active Cycle Focused | 現在のCycleだけを確認 | `...` |
-| L2 | Local Module / 作業成果物（Artifact） | 近接範囲の回帰確認 | `...` |
-| L3 | 対象範囲（Scope）回帰（範囲回帰（対象範囲（Scope） Regression）） | Issue 対象scope全体の確認 | `...` |
-| L4 | Contract / Template / CLI | contractやscaffold挙動確認 | `...` |
-| L5 | Static / Lint / Type | 静的検証 | `...` |
-| L6 | Docs / Skill Consistency | docs・template・skill整合性 | `...` |
-| L7 | Final ゲート（Gate） | Issue 最終確認 | `...` |
+本 Issue の completion を阻害しない follow-up:
 
----
+1. clarification の provider-owned direct Oracle public operation wiring。
+2. other product-owned ChatGPT operations への operation directory convention 展開。
+3. thread binding retention / cleanup の cross-operation policy が複数 scope に広がる場合の ADR triage。
+4. Oracle capability version update policy。
+5. optional operator tooling for preparing trusted attachment directories。ただし runtime scanner / classifier にはしない。
 
-## 12. 委任契約（Delegation Contract）
+## 17. Definition of Done
 
-Codexやsubagentへ委任する場合、各作業が判断なしに実行できるようにする。
-
-| ステップ・振る舞い（Step / Behavior） | 委任ロール（Delegated Role） | 許可パス（Allowed Paths） | レビュー観点（Reviewer Focus） | 報告先（Report Destination） |
-|---|---|---|---|---|
-| `B-...` | dev-coder / doc-writer / reviewer / none | ... | code / spec / docs | `report.md#...` |
-
----
-
-## 13. 報告証跡対応（報告証跡（Report Evidence） Mapping）
-
-| 証跡ID（Evidence ID） | 対象 | 報告節（Report Section） | 記録内容 |
-|---|---|---|---|
-| EVD-001 | Red / Alternative Evidence | `report.md#...` | ... |
-| EVD-002 | Green検証（Green Verification） | `report.md#...` | ... |
-| EVD-003 | Refactor証跡（Refactor Evidence） | `report.md#...` | ... |
-| EVD-004 | Regression Result | `report.md#...` | ... |
-| EVD-005 | 設計逸脱・判断（Design Deviation / Decision） | `report.md#...` | ... |
-| EVD-006 | 文書・テンプレート影響（Docs / Template 影響（Impact）） | `report.md#...` | ... |
-| EVD-007 | Final ゲート（Gate） | `report.md#...` | ... |
-
-Report記録ルール:
-
-- Red / Green / Refactorの実績はreport.mdに記録する
-- 期待と異なるRedはreport.mdに記録し、必要に応じてreplanする
-- 実装中に見つかった新しいテスト候補はreport.mdに記録する
-- plan.mdは観測実績の正本にしない
-
----
-
-## 14. 修正・停止ルール（Amendment and Stop Rules）
-
-### 即時停止条件（Immediate Stop Conditions）
-
-- [ ] 新しいテストがproduction change前から成功する
-- [ ] Red理由が想定と異なる
-- [ ] 既存Regressionが失敗した
-- [ ] 承認済みRequirementの期待値を変更したくなる
-- [ ] 承認済みDesignのNormative Contractを変更したくなる
-- [ ] 公開契約（public contract）変更が必要になる
-- [ ] 移行（migration）が必要になる
-- [ ] セキュリティ・プライバシー（security / privacy）影響が判明する
-- [ ] Forbidden changesが必要になる
-- [ ] Issue外の設計判断が必要になる
-- [ ] Standard gradeの前提を満たさなくなった
-
-### 停止後の対応（Stop）
-
-| 状況 | 対応 |
-|---|---|
-| テスト設計ミス | テストを修正し、Redを再確認 |
-| 要件曖昧 | 要件文書（requirement.md）へ戻す |
-| 設計契約変更が必要 | 設計書（design.md）を更新しreview |
-| 対象範囲外変更（対象範囲（Scope））が必要 | 後続issue（後続（follow-up） issue）またはreplan |
-| Grade escalationが必要 | 等級 strict / critical へ変更 |
-| 外部判断が必要 | 上位文書（Epic・Initiative・ADR）へ昇格 |
-
----
-
-## 15. 文書・テンプレート・スキル影響解消（Docs / Template / Skill 影響（Impact） Resolution）
-
-| 対象 | 影響 | 必要な対応 | 報告証跡（Report Evidence） |
-|---|---|---|---|
-| 文書（docs） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| テンプレート（templates） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| スキル群（skills） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| ワークフロー文書（workflow docs） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| 提供資産（provider assets） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| 検証workspace（dogfooding workspace） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] このマイルストーンの差分だけで意味が通る
-    - [ ] 必要な検証が完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 次のマイルストーンの未完了差分が混ざっていない
-
----
-
-## 16. 最終品質ゲート（Final Quality Gate）
-
-| Check | コマンド（Command） / Evidence | 期待結果（Expected） | 報告先（Report Destination） |
-|---|---|---|---|
-| Requirement closure | 点検（inspect） closure index | all closed | `report.md#...` |
-| Design contract compliance | 点検（inspect） design IDs | 違反なし | `report.md#...` |
-| Focused tests | `...` | pass | `report.md#...` |
-| Local regression | `...` | pass | `report.md#...` |
-| Static checks | `...` | pass | `report.md#...` |
-| Docs / template checks | `...` | pass / N/A | `report.md#...` |
-| Manual review | ... | 承認済み / N/A | `report.md#...` |
-
-- static analysis / lint:
-  - 実行対象: このリポジトリで設定されている静的解析、lint、format check
-  - pass条件: 既知の許容済み例外を除き成功する
-- tests:
-  - 実行対象: 単体テスト、およびこのIssueの影響範囲に必要な統合テスト / CLIテスト / regression test
-  - pass条件: すべて成功する
-  - 実行できない検証がある場合: 未実施理由と代替確認を `report.md` に記録する
-- report:
-  - [ ] 実行したコマンド、結果、未実施の理由を `report.md` に記録する
-  - [ ] PR 作成後の GitHub Actions を、基礎的な lint / test 失敗の初回検出場所にしていない
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] 静的解析 / lint が完了している
-    - [ ] 必要なテストが完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 未完了差分が混ざっていない
-
-最終終了契約（Final Exit Contract）:
-
-- [ ] すべてのクロージャ識別子（Closure ID）が完了している
-- [ ] すべてのマイルストーン（Milestone）が完了している
-- [ ] 振る舞いバックログ（Behavior Backlog）に未解決の必須項目が残っていない
-- [ ] 実行中の TDD サイクル（Active TDD Cycle）がcompleteである
-- [ ] 検証段階（検証（Verification） Ladder）の必要Levelが成功している
-- [ ] Docs / Template / Skill影響が解決済みである
-- [ ] Report evidenceが記録済みである
-- [ ] Standard gradeの前提を破っていない
-- [ ] 後続（follow-up）が必要な場合、明示されている
-
----
-
-## 17. フォローアップ候補（Follow-up Candidates）
-
-| 識別子（ID） | 内容 | 理由 | 推奨先 |
-|---|---|---|---|
-| FU-001 | ... | ... | Issue / Epic / ADR |
-| FU-002 | ... | ... | Issue / Epic / ADR |
-
----
-
-## 18. 計画承認チェックリスト（Plan Approval Checklist）
-
-- [ ] requirement.mdのAC / BH / CONがクロージャ（Closure） Indexへ対応している
-- [ ] design.mdの固定設計契約（Fixed Design Contracts）がPlanに反映されている
-- [ ] design.mdの検証への含意（検証（Verification） Implications）が検証段階（検証（Verification） Ladder）へ反映されている
-- [ ] マイルストーン（Milestone）が独立検証可能な成果として定義されている
-- [ ] 振る舞いバックログ（Behavior Backlog）が観測可能な振る舞い単位で書かれている
-- [ ] 実行中の TDD サイクル（Active TDD Cycle）が一つの振る舞い仮説に絞られている
-- [ ] Redまたは代替証拠の方針が明示されている
-- [ ] 最小 Green 境界（Minimal Green Boundary）が明示されている
-- [ ] Refactor Guardrailが明示されている
-- [ ] Allowed / Forbidden changesが明確である
-- [ ] Stop Conditionsが具体的である
-- [ ] Report evidence destinationが明示されている
-
----
-
-## 19. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-08-03 | 初稿（Initial draft） | ... | ... |
+- canonical requirement / design / plan が adopted and freshly reviewed。
+- S01 stop gate を通過。
+- Option A / C の tests が pass。
+- old input pack / scanners / context manifest が production path から除去。
+- direct Oracle、exact GitHub、output validators、Human gate が回帰なし。
+- Blue continuity / fresh Red が direct Oracle の supported interface で実装済み、または unsupported capability として
+  明示停止・再計画済み。
+- provider / installed / dogfood parity。
+- docs / skills / parent Epic consistency。
+- focused + static + validation gates pass。
+- report evidence 完了。
