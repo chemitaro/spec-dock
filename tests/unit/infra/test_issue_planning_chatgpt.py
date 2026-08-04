@@ -53,10 +53,19 @@ def test_path_oracle_direct_argv_environment_and_planner_snapshot(
     role: str,
 ) -> None:
     executable = _fake_executable(tmp_path, symlink=True)
-    calls: list[tuple[list[str], dict[str, str], bool]] = []
+    calls: list[tuple[list[str], dict[str, str], bool, object, bool, bool]] = []
 
     def fake_run(argv, **kwargs):
-        calls.append((list(argv), dict(kwargs["env"]), kwargs["shell"]))
+        calls.append(
+            (
+                list(argv),
+                dict(kwargs["env"]),
+                kwargs["shell"],
+                kwargs["stdin"],
+                kwargs["capture_output"],
+                kwargs["check"],
+            )
+        )
         if argv[1:] == ["--version"]:
             return _completed(argv, stdout=b"0.16.1\n")
         if argv[1:] == ["--help"]:
@@ -85,9 +94,24 @@ def test_path_oracle_direct_argv_environment_and_planner_snapshot(
     assert result.review_json is None
     submit_calls = [call for call in calls if "--prompt" in call[0]]
     assert len(submit_calls) == 1
-    argv, child_env, shell = submit_calls[0]
+    argv, child_env, shell, stdin, capture_output, check = submit_calls[0]
     assert Path(argv[0]) == executable.resolve()
     assert shell is False
+    assert stdin is subprocess.DEVNULL
+    assert capture_output is True
+    assert check is False
+    assert [call[0][1:] for call in calls[:3]] == [
+        ["--version"],
+        ["--help"],
+        ["session", "--help"],
+    ]
+    assert all(
+        shell is False
+        and stdin is subprocess.DEVNULL
+        and capture_output is True
+        and check is False
+        for _, _, shell, stdin, capture_output, check in calls
+    )
     assert child_env["PATH"] == os.environ["PATH"]
     assert child_env["LANG"] == "ja_JP.UTF-8"
     assert "SPECDOCK_ORACLE_REMOTE_CHROME" not in child_env
@@ -503,6 +527,7 @@ def test_unsupported_version_or_capability_submits_no_prompt(
 ) -> None:
     executable = _fake_executable(tmp_path)
     calls: list[list[str]] = []
+    recovery_calls: list[object] = []
 
     def fake_run(argv, **kwargs):
         calls.append(list(argv))
@@ -525,9 +550,81 @@ def test_unsupported_version_or_capability_submits_no_prompt(
         pytest.fail("prompt must not be submitted")
 
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(
+        issue_planning_chatgpt,
+        "_recover_same_session",
+        lambda **kwargs: recovery_calls.append(kwargs),
+    )
     result = _invoke(tmp_path)
     assert (result.status, result.reason) == ("blocked", "oracle_capability_unsupported")
     assert not any("--prompt" in argv for argv in calls)
+    assert not any("--harvest" in argv for argv in calls)
+    assert recovery_calls == []
+    assert not (tmp_path / "oracle-home" / "sessions").exists()
+
+
+@pytest.mark.parametrize(
+    "preflight_failure",
+    [
+        "version-timeout",
+        "version-nonzero",
+        "root-help-timeout",
+        "root-help-nonzero",
+        "session-help-timeout",
+        "session-help-nonzero",
+    ],
+)
+def test_preflight_timeout_or_nonzero_submits_no_prompt_or_recovery(
+    monkeypatch,
+    tmp_path: Path,
+    preflight_failure: str,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    recovery_calls: list[object] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        command = argv[1:]
+        if command == ["--version"]:
+            if preflight_failure == "version-timeout":
+                raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+            return _completed(
+                argv,
+                stdout=b"0.16.1\n",
+                returncode=1 if preflight_failure == "version-nonzero" else 0,
+            )
+        if command == ["--help"]:
+            if preflight_failure == "root-help-timeout":
+                raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+            return _completed(
+                argv,
+                stdout=_root_help(),
+                returncode=1 if preflight_failure == "root-help-nonzero" else 0,
+            )
+        if command == ["session", "--help"]:
+            if preflight_failure == "session-help-timeout":
+                raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+            return _completed(
+                argv,
+                stdout=_session_help(),
+                returncode=1 if preflight_failure == "session-help-nonzero" else 0,
+            )
+        pytest.fail("preflight failure must prevent prompt submission")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(
+        issue_planning_chatgpt,
+        "_recover_same_session",
+        lambda **kwargs: recovery_calls.append(kwargs),
+    )
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("blocked", "oracle_capability_unsupported")
+    assert not any("--prompt" in argv for argv in calls)
+    assert not any("--harvest" in argv for argv in calls)
+    assert recovery_calls == []
+    assert not (tmp_path / "oracle-home" / "sessions").exists()
 
 
 def test_preflight_receipt_records_content_free_capability_surface(
@@ -604,6 +701,70 @@ def test_preflight_receipt_fail_closes_before_help_for_unsupported_version(
     assert calls == [[str(executable.resolve()), "--version"]]
 
 
+@pytest.mark.parametrize(
+    "version_output",
+    [
+        b"0.16.1\nextra\n",
+        b"/private/home/user/oracle\n",
+        b"https://private.example/session/opaque\n",
+        b"malformed version\n",
+    ],
+)
+def test_preflight_receipt_rejects_non_token_version_output(
+    monkeypatch,
+    tmp_path: Path,
+    version_output: bytes,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=version_output)
+        pytest.fail("malformed version output must not probe help")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    receipt = issue_planning_chatgpt._read_oracle_preflight_receipt(
+        executable,
+        child_env=issue_planning_chatgpt._sanitized_child_environment(),
+        cwd=tmp_path,
+    )
+
+    assert receipt.version is None
+    assert receipt.supported_by_current_runtime is False
+    assert version_output.decode().strip() not in repr(receipt)
+    assert calls == [[str(executable.resolve()), "--version"]]
+
+
+def test_malformed_version_output_submits_no_prompt_or_recovery(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    recovery_calls: list[object] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\nextra\n")
+        pytest.fail("malformed version output must not probe help or submit")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(
+        issue_planning_chatgpt,
+        "_recover_same_session",
+        lambda **kwargs: recovery_calls.append(kwargs),
+    )
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("blocked", "oracle_capability_unsupported")
+    assert calls == [[str(executable.resolve()), "--version"]]
+    assert recovery_calls == []
+    assert not (tmp_path / "oracle-home" / "sessions").exists()
+
+
 def test_executable_identity_change_before_submit_starts_no_prompt(
     monkeypatch,
     tmp_path: Path,
@@ -671,6 +832,13 @@ def test_timeout_recovers_same_session_without_duplicate_submit(
     assert managed_chrome_preflights == 1
     assert sum("--prompt" in argv for argv in calls) == 1
     assert sum("--harvest" in argv for argv in calls) == 1
+    prompt_argv = next(argv for argv in calls if "--prompt" in argv)
+    harvest_argv = next(argv for argv in calls if "--harvest" in argv)
+    _assert_exact_harvest_argv(
+        harvest_argv,
+        executable=executable,
+        session_id=_session_id(prompt_argv),
+    )
 
 
 def test_recovery_polls_same_session_after_harvest_until_completed(
@@ -714,7 +882,11 @@ def test_recovery_polls_same_session_after_harvest_until_completed(
     assert sum("--harvest" in argv for argv in calls) == 1
     prompt_argv = next(argv for argv in calls if "--prompt" in argv)
     harvest_argv = next(argv for argv in calls if "--harvest" in argv)
-    assert harvest_argv[2] == _session_id(prompt_argv)
+    _assert_exact_harvest_argv(
+        harvest_argv,
+        executable=executable,
+        session_id=_session_id(prompt_argv),
+    )
 
 
 def test_recovery_polls_after_harvest_timeout_until_completed(
@@ -758,7 +930,11 @@ def test_recovery_polls_after_harvest_timeout_until_completed(
     assert sum("--harvest" in argv for argv in calls) == 1
     prompt_argv = next(argv for argv in calls if "--prompt" in argv)
     harvest_argv = next(argv for argv in calls if "--harvest" in argv)
-    assert harvest_argv[2] == _session_id(prompt_argv)
+    _assert_exact_harvest_argv(
+        harvest_argv,
+        executable=executable,
+        session_id=_session_id(prompt_argv),
+    )
 
 
 def test_recovery_poll_uses_one_monotonic_deadline(
@@ -1383,6 +1559,8 @@ def _root_help() -> bytes:
 
 
 def _assert_managed_chrome_argv(argv: list[str]) -> None:
+    assert argv.count("--engine") == 1
+    assert argv[argv.index("--engine") + 1] == "browser"
     assert argv.count("--model") == 1
     assert argv[argv.index("--model") + 1] == "Pro"
     assert argv.count("--browser-model-strategy") == 1
@@ -1390,8 +1568,27 @@ def _assert_managed_chrome_argv(argv: list[str]) -> None:
     assert argv.count("--remote-chrome") == 1
     assert argv[argv.index("--remote-chrome") + 1] == "127.0.0.1:9223"
     assert argv.count("--browser-no-cookie-sync") == 1
+    assert argv.count("--wait") == 1
+    assert argv.count("--browser-attachments") == 1
+    assert argv[argv.index("--browser-attachments") + 1] == "always"
     for singleton in ("--prompt", "--file", "--slug"):
         assert argv.count(singleton) == 1
+    assert Path(argv[argv.index("--file") + 1]).name == "prompt-pack"
+
+
+def _assert_exact_harvest_argv(
+    argv: list[str],
+    *,
+    executable: Path,
+    session_id: str,
+) -> None:
+    assert argv == [
+        str(executable.resolve()),
+        "session",
+        session_id,
+        "--harvest",
+        "--no-recover",
+    ]
 
 
 class _FakeHttpResponse:

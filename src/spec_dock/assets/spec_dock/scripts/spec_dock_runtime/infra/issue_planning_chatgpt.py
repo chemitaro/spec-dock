@@ -48,6 +48,7 @@ _DEFAULT_RECOVERY_TIMEOUT_SECONDS = 2 * 60
 _RECOVERY_POLL_INTERVAL_SECONDS = 0.25
 _TERMINAL_STATUSES = frozenset({"completed"})
 _SessionState = Literal["terminal", "nonterminal", "missing", "invalid"]
+_ORACLE_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _ROOT_CAPABILITIES = (
     b"--engine",
     b"--file",
@@ -422,11 +423,8 @@ def _read_oracle_preflight_receipt(
 
 
 def _preflight_version(stdout: bytes) -> str | None:
-    for line in stdout.decode("utf-8", errors="replace").splitlines():
-        value = line.strip()
-        if value:
-            return value
-    return None
+    value = stdout.decode("utf-8", errors="replace").strip()
+    return value if _ORACLE_VERSION_RE.fullmatch(value) else None
 
 
 def _run_oracle(
