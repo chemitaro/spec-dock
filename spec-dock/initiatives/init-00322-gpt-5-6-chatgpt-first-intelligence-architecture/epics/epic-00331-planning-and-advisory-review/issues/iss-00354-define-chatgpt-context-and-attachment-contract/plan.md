@@ -47,7 +47,7 @@ Oracle `0.17.0` 対応はS09以降へ追加し、既存処理をゼロから再�
 | Repository | `chemitaro/spec-dock` |
 | Branch | `codex/iss-00354-chatgpt-context-contract` |
 | Historical Candidate source HEAD | `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` |
-| Current canonical docs HEAD | `dba243168647902c8883c0a44ed58a89c754070b` |
+| Current canonical docs HEAD | `9ffef840c50c4796da784aab699c1b7d74d7637e` |
 | Branch comparison | current canonical HEADとGitHub branch tipがidentical / ahead 0 / behind 0 |
 | Default fallback | not used |
 | Current supported Oracle constant | `0.16.1` |
