@@ -13,7 +13,7 @@ ID: "iss-00354"
 
 > **Canonical / approved for Issue implementation preparation**
 > 本計画は Candidate v2 の Red Team PASS と、S01〜S13 各マイルストーンの ChatGPT-Use 実装ブリーフ運用を統合した iss-00354 の正規実行計画である。
-> 実装開始前に current HEAD、assurance、report のゲートを再確認し、各ステップのブリーフを生成する。実装、test execution、PR、merge、Issue close は未実施である。
+> 正規文書としての採用と実装実行可否は別であり、current exact-HEAD fresh review が FAIL の間は execution-ready としない。実装開始前に current HEAD、assurance、report のゲートを再確認し、各ステップのブリーフを生成する。実装、test execution、PR、merge、Issue close は未実施である。
 
 ## 1. 実装方針
 
@@ -46,8 +46,9 @@ Oracle `0.17.0` 対応はS09以降へ追加し、既存処理をゼロから再�
 |---|---|
 | Repository | `chemitaro/spec-dock` |
 | Branch | `codex/iss-00354-chatgpt-context-contract` |
-| Source HEAD | `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` |
-| Branch comparison | exact HEADとidentical / ahead 0 / behind 0 |
+| Historical Candidate source HEAD | `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` |
+| Current canonical docs HEAD | `dba243168647902c8883c0a44ed58a89c754070b` |
+| Branch comparison | current canonical HEADとGitHub branch tipがidentical / ahead 0 / behind 0 |
 | Default fallback | not used |
 | Current supported Oracle constant | `0.16.1` |
 | Current model argv | `--model Pro --browser-model-strategy select` |
@@ -585,26 +586,26 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 
 | closure id | step | 対応要件 | 観測可能な受入条件 | 必須証跡 |
 |---|---|---|---|---|
-| `cl-s01-capability` | S01 | REQ-021, REQ-026 | 0.16.1 と 0.17.0 の capability 境界を実測し、未確定 capability では invocation しない | capability receipt、characterization test、report |
-| `cl-s02-resources` | S02 | REQ-001, REQ-002 | operation resource の追加・削除が registry 変更なしで反映される | resource diff、unit test、report |
-| `cl-s03-path-input` | S03 | REQ-003, REQ-026 | 入力は path のまま保持され、tree traversal と内容再構成を行わない | argv assertion、failure spy、report |
-| `cl-s04-direct-transport` | S04 | REQ-004, REQ-026 | original path が Oracle argv に直接渡り、生成 pack が作られない | direct argv test、CLI test、report |
-| `cl-s05-cli-cutover` | S05 | REQ-005, REQ-031 | planning/review/revision の parser と identity binding が新契約で一致する | command test、closed identity test、report |
-| `cl-s06-blue-red` | S06 | REQ-031, REQ-032 | successful submission lineage を Blue に保持し、Red は fresh thread のみを使う | lineage test、privacy test、report |
-| `cl-s07-projection` | S07 | REQ-006, REQ-007 | provider、installed、dogfood の docs/skill projection が一致する | parity check、docs diff、report |
-| `cl-s08-regression` | S08 | REQ-008, REQ-033 | focused suite、static gate、validate が pass し、closure ledger が完成する | command output、report |
+| `cl-s01-capability` | S01 | REQ-004–007, REQ-021–023, REQ-026 | 0.16.1 と 0.17.0 の capability 境界を実測し、未確定 capability では invocation しない | capability receipt、characterization test、report |
+| `cl-s02-resources` | S02 | REQ-002, REQ-003, REQ-009, REQ-010 | operation resource の追加・削除が registry 変更なしで反映される | resource diff、unit test、report |
+| `cl-s03-path-input` | S03 | REQ-004–007 | 入力は path のまま保持され、tree traversal と内容再構成を行わない | argv assertion、failure spy、report |
+| `cl-s04-direct-transport` | S04 | REQ-004, REQ-006, REQ-007, REQ-016 | original path が Oracle argv に直接渡り、生成 pack が作られない | direct argv test、CLI test、report |
+| `cl-s05-cli-cutover` | S05 | REQ-001, REQ-009, REQ-010, REQ-019 | planning/review/revision の parser と identity binding が新契約で一致する | command test、closed identity test、report |
+| `cl-s06-blue-red` | S06 | REQ-011–014, REQ-031, REQ-032 | successful submission lineage を Blue に保持し、Red は fresh thread のみを使う | lineage test、privacy test、report |
+| `cl-s07-projection` | S07 | REQ-018, REQ-020 | provider、installed、dogfood の docs/skill projection が一致する | parity check、docs diff、report |
+| `cl-s08-regression` | S08 | REQ-017, REQ-033 | focused suite、static gate、validate が pass し、closure ledger が完成する | command output、report |
 | `cl-s09-profile` | S09 | REQ-021, REQ-023 | versioned profile が capability と harvest/capture builder を所有する | profile tests、0.17 receipt、report |
 | `cl-s10-recovery` | S10 | REQ-027, REQ-028, REQ-030 | false/unknown submission は recovery 0、post-submit は profile builder のみ一回 | table-driven tests、mapping tests、report |
 | `cl-s11-browser` | S11 | REQ-024, REQ-025, REQ-026, REQ-033 | prompt、model、attachment、response、artifact の同一 lineage 証跡が得られる | sanitized smoke receipt、report |
 | `cl-s12-artifact-reader` | S12 | REQ-029, REQ-030 | versioned reader が exact capture と strict artifact validation を行う | fixture tests、integration output、report |
-| `cl-s13-closure` | S13 | REQ-006, REQ-007, REQ-008, REQ-033 | projection、docs、quality、review、adoption の最終ゲートが一致する | parity、quality commands、final report |
+| `cl-s13-closure` | S13 | REQ-018, REQ-020, REQ-031–033 | projection、docs、quality、review、adoption の最終ゲートが一致する | parity、quality commands、final report |
 
 ### 17.6.3 ステップ別実行カード
 
 #### S01 — Capability characterization
 
 - 振る舞いスライス: direct directory、multiple path、continuation の capability を現在の PATH Oracle で観測し、未対応 capability は停止する。
-- delegation contract: `dev-coder`; 入力は `requirement.md`、`design.md`、S01 ブリーフ、既存 Oracle adapter/tests。許可パスは `tests/unit/infra/` と capability receipt 用 `artifacts/implementation-briefs/`。既存 runtime の recovery 仕様と wrapper は変更しない。
+- delegation contract: delegated role=`dev-coder`; input docs=`requirement.md`, `design.md`, S01 brief, existing Oracle adapter/tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`, `tests/unit/infra/`, `artifacts/implementation-briefs/s01-capability-characterization.md`; forbidden changes=application orchestration, generic recovery policy, Oracle wrapper, unrelated docs; acceptance criteria=`cl-s01-capability` receipt proves 0.16.1/0.17.0 capability boundary and unsupported invocation count 0; required verification=infra characterization unit test and recorded receipt; reviewer focus=`code-reviewer` checks capability boundary, argv, and no fallback; stop conditions=capability remains ambiguous or allowed-path expansion is required; output required=changed files, capability receipt, test result, risks, and report Ledger Note.
 - 具体テストケース: `tc-s01-001` は capability が未対応の fixture を与えたとき prompt/recovery invocation が 0 になることを確認する。前提は fake Oracle と version receipt、操作は S01 characterization command、期待結果は capability receipt と blocked classification、失敗検出は未対応 capability の押し切り、検証方法は infra unit test と report command output。
 - step closure contract: `cl-s01-capability` の receipt、test pass、ChatGPT-Use ブリーフ、report EAL を記録する。
 - step gate / report destination: capability が安全に確定できなければ停止。`report.md` の Step Contract Closure、Test Contract Closure、Reviewer Gate Status に記録する。
@@ -612,7 +613,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S02 — Operation resources
 
 - 振る舞いスライス: planning/review/revision の resource directory と minimal body を self-contained にする。
-- delegation contract: `doc-writer`; 入力は S02 ブリーフ、`src/spec_dock/assets/install_root/` の resource source、prompt renderer tests。許可パスは provider resource、installed projection、resource unit tests。operation registry以外の runtime policy は変更しない。
+- delegation contract: primary delegated role=`dev-coder` for renderer/tests plus `doc-writer` subtask for shipped resources; input docs=S02 brief, `requirement.md`, `design.md`, `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/resources/`, and prompt renderer tests; allowed paths=`src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/resources/`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`, `tests/unit/application/test_issue_planning_prompt.py`, and installed projection; forbidden changes=operation policy, Oracle transport, unrelated CLI; acceptance criteria=`cl-s02-resources` proves operation-specific resources drive a deterministic minimal body without registry edits; required verification=resource unit tests, renderer snapshot/byte diff, and docs projection check; reviewer focus=`code-reviewer` checks renderer/registry contract and `spec-reviewer` checks resource wording; stop conditions=registry code edit or missing operation resource; output required=resource diff, test result, rendered body sample, risks, and report Ledger Note.
 - 具体テストケース: `tc-s02-001` は resource file を一つ増減しても registry のコード変更なしに renderer が deterministic body を出すことを確認する。前提は temp resource tree、操作は resource fixture の差し替え、期待結果は body identity が変わり必要 attachment 一覧だけが更新、失敗検出は未知 operation fallback、検証方法は application unit test と byte diff。
 - step closure contract: resource diff、minimal body snapshot、fresh ChatGPT-Use brief review を記録する。
 - step gate / report destination: unknown operation や registry edit が必要なら停止。docs/worker evidence と closure を `report.md` に記録する。
@@ -620,7 +621,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S03 — Path input model
 
 - 振る舞いスライス: synthesized bytes/classification を path input に置換し、operator path text を保持する。
-- delegation contract: `dev-coder`; 入力は S03 ブリーフ、application contracts、scanner tests。許可パスは input contract、scanner、application tests。symlink/FIFO を読む新処理、path materialization、内容 hash の新契約は追加しない。
+- delegation contract: delegated role=`dev-coder`; input docs=S03 brief, `requirement.md`, `design.md`, application contracts, scanner tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_contracts.py`, `tests/unit/application/test_issue_planning_prompt.py`, `tests/unit/domain/test_issue_planning_contracts.py`; forbidden changes=symlink/FIFO traversal, path materialization, new content hashing, transport adapter; acceptance criteria=`cl-s03-path-input` proves original paths and limits survive with zero tree/content inspection; required verification=unit tests with read/rglob/stat spies and argv assertions; reviewer focus=`code-reviewer` checks path-only contract and input immutability; stop conditions=any required materialization or new inspection rule; output required=contract diff, spy result, tests, risks, and report Ledger Note.
 - 具体テストケース: `tc-s03-001` は nested/hidden/symlink/FIFO fixture に対して tree API spy が 0 のまま argv assembly が成功することを確認する。前提は path-only request、操作は synthesize request、期待結果は original paths と limits のみが保持される、失敗検出は read_bytes/rglob/stat の呼び出し、検証方法は unit test と spy assertion。
 - step closure contract: input contract diff と spy pass を `cl-s03-path-input` に紐付ける。
 - step gate / report destination: path materialization が必要になったら S03 を閉じず report から plan amendment へ戻す。
@@ -628,7 +629,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S04 — Direct attachment transport
 
 - 振る舞いスライス: static directory と dynamic evidence を original `--file` operands として Oracle へ渡す。
-- delegation contract: `dev-coder`; 入力は S04 ブリーフ、Oracle transport adapter、CLI tests。許可パスは `infra/issue_planning_chatgpt.py` と transport tests。generated pack、copy、ZIP、exclusion、retry policy は新規追加しない。
+- delegation contract: delegated role=`dev-coder`; input docs=S04 brief, `requirement.md`, `design.md`, Oracle transport adapter, CLI tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`, `tests/integration/test_issue_planning_chatgpt_transport.py`; forbidden changes=generated pack, copy, ZIP, exclusion, retry policy, Oracle wrapper; acceptance criteria=`cl-s04-direct-transport` proves original paths are direct `--file` operands and no generated input pack is created; required verification=argv equality test, no-tree spy, and transport CLI smoke; reviewer focus=`code-reviewer` checks direct Oracle boundary and one-shot semantics; stop conditions=direct capability unsupported or generated context appears; output required=adapter diff, argv receipt, tests, risks, and report Ledger Note.
 - 具体テストケース: `tc-s04-001` は required direct path を渡したとき argv に同一 path が現れ、tree/copy/ZIP API が 0 であることを確認する。前提は static directory と dynamic evidence file、操作は direct command build、期待結果は one-shot submission argv、失敗検出は generated context file、検証方法は argv equality test と CLI smoke。
 - step closure contract: direct argv、no-tree spy、CLI regression を `cl-s04-direct-transport` に紐付ける。
 - step gate / report destination: direct capability が無ければ inline を勝手に追加せず S01 receipt を参照して停止する。
@@ -636,7 +637,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S05 — Orchestration / CLI cutover
 
 - 振る舞いスライス: old manifest option を除去し、planning/review/revision の exact identity と output contract を維持する。
-- delegation contract: `dev-coder`; 入力は S05 ブリーフ、commands、contracts、CLI tests。許可パスは command/application/contracts/tests。Candidate publication と closed JSON parser は変更しない。
+- delegation contract: delegated role=`dev-coder`; input docs=S05 brief, `requirement.md`, `design.md`, command contracts, CLI tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/issue_planning.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_contracts.py`, `tests/unit/commands/test_issue_planning.py`, `tests/unit/application/test_issue_planning.py`; forbidden changes=Candidate publication format, closed JSON parser, unrelated commands; acceptance criteria=`cl-s05-cli-cutover` proves planning/review/revision parser and exact branch/repository/HEAD identity binding; required verification=command unit tests and closed-identity test; reviewer focus=`code-reviewer` checks parser compatibility and publication transaction; stop conditions=identity mismatch, old option still accepted, or publication mutation; output required=command/application diff, tests, identity receipt, risks, and report Ledger Note.
 - 具体テストケース: `tc-s05-001` は old option を拒否し、repeatable path option を同じ request identity へ渡すことを確認する。前提は parser fixture と exact branch identity、操作は planning/review/revision command、期待結果は deterministic request、失敗検出は candidate rename/copy、検証方法は command unit test。
 - step closure contract: parser、identity、publication transaction の三点を pass にする。
 - step gate / report destination: identity mismatch または publication mutation が検出されたら stop。report の implementation ledger に記録する。
@@ -644,7 +645,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S06 — Blue continuity / fresh Red
 
 - 振る舞いスライス: successful submission semantics に基づく Blue lineage と fresh Red isolation を実装する。
-- delegation contract: `dev-coder`; 入力は S06 ブリーフ、thread ports、lineage tests。許可パスは application/domain contracts と tests。private handle/transcript の public persistence、Red thread reuse は禁止する。
+- delegation contract: delegated role=`dev-coder`; input docs=S06 brief, `requirement.md`, `design.md`, thread ports, lineage tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/`, `tests/unit/application/test_issue_planning.py`, `tests/unit/domain/`; forbidden changes=private handle/transcript public persistence, Red thread reuse, merge/close; acceptance criteria=`cl-s06-blue-red` proves successful-submission Blue continuity and fresh Red binding with no private evidence leakage; required verification=lineage transaction tests, privacy assertions, and unavailable handling test; reviewer focus=`code-reviewer` checks lifecycle isolation and `qa-reviewer` checks evidence boundary; stop conditions=continuation identity is ambiguous or Red binding can be reused; output required=lineage diff, receipt, tests, risks, and report Ledger Note.
 - 具体テストケース: `tc-s06-001` は successful submission 後の revision が同一 Blue binding を使い、review invocation は新しい binding を作ることを確認する。前提は exact candidate identity、操作は revise then review、期待結果は Blue continuation と fresh Red、失敗検出は Red binding reuse、検証方法は transaction test と privacy assertion。
 - step closure contract: source HEAD drift、ambiguous lineage、unavailable handling を pass にする。
 - step gate / report destination: continuation capability が未対応なら wrapper fallback を作らず capability gap を report に記録する。
@@ -652,7 +653,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S07 — Projection / docs consistency
 
 - 振る舞いスライス: provider source を更新し installed/dogfood projection と parent wording を一致させる。
-- delegation contract: `doc-writer`; 入力は S07 ブリーフ、provider assets、workflow/docs。許可パスは provider docs、installed projection、dogfood docs、parent Epic の scoped wording。runtime code と別 Issue の canonical docs は変更しない。
+- delegation contract: delegated role=`doc-writer`; input docs=S07 brief, `requirement.md`, `design.md`, provider assets, workflow/docs; allowed paths=`src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/`, `src/spec_dock/assets/spec_dock/docs/`, `spec-dock/`, and the scoped parent Epic wording; forbidden changes=runtime code, unrelated Issue canonical docs, parent lifecycle state; acceptance criteria=`cl-s07-projection` proves provider/installed/dogfood byte parity and parent wording consistency; required verification=projection update, recursive parity check, and docs diff; reviewer focus=`spec-reviewer` checks requirement wording and `qa-reviewer` checks projection parity; stop conditions=parent boundary or generated projection source is ambiguous; output required=docs diff, parity receipt, tests/docs-only result, risks, and report Ledger Note.
 - 具体テストケース: `tc-s07-001` は provider update 後に projection command を実行し、recursive byte parity が pass することを確認する。前提は clean projection baseline、操作は provider update、期待結果は allowlist なしの parity、失敗検出は provider/dogfood drift、検証方法は parity script と docs diff。
 - step closure contract: docs impact S90 と provider parity receipt を記録する。
 - step gate / report destination: parent boundaryが変わる場合は Epic planningへ戻す。
@@ -660,7 +661,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S08 — Regression / quality closure
 
 - 振る舞いスライス: retained S01–S07 の focused suite、static gate、validate と closure ledger を確定する。
-- delegation contract: `dev-coder`; 入力は S08 ブリーフ、focused test list、quality commands。許可パスは tests、report、quality evidence。production behavior をこの step で追加しない。
+- delegation contract: delegated role=`dev-coder`; input docs=S08 brief, `requirement.md`, `design.md`, focused test list, quality commands; allowed paths=`tests/`, `report.md`, and step quality evidence; forbidden changes=production behavior, unrelated docs, merge/close; acceptance criteria=`cl-s08-regression` proves focused suite, static gate, validate, diff check, and closure ledger all pass on one HEAD; required verification=the plan-listed pytest/ruff/mypy/validate commands and report audit; reviewer focus=`qa-reviewer` checks coverage and `code-reviewer` checks no production drift; stop conditions=any quality gate fails or closure is stale; output required=command output, test summary, closure update, risks, and report Ledger Note.
 - 具体テストケース: `tc-s08-001` は focused pytest、ruff、mypy、validate、diff check を同一 HEAD で実行する。前提は全 step closure が pass、操作は計画記載コマンド、期待結果は全 exit 0、失敗検出は stale projection/未記録 closure、検証方法は command output と report。
 - step closure contract: `cl-s08-regression` と S99 input を記録する。
 - step gate / report destination: いずれかの quality gate が fail なら commit candidate を作らず report を blocked にする。
@@ -668,7 +669,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S09 — Oracle 0.17 profile
 
 - 振る舞いスライス: exact version/capability/profile-owned builders を追加し、0.16.1 の旧 argv を回帰保持する。
-- delegation contract: `dev-coder`; 入力は S09 ブリーフ、Oracle profile contracts、characterization receipt。許可パスは infra profile/reader と infra tests。generic backend abstraction、wrapper/API fallback は禁止する。
+- delegation contract: delegated role=`dev-coder`; input docs=S09 brief, `requirement.md`, `design.md`, Oracle profile contracts, characterization receipt; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_oracle_artifact.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`, `tests/unit/infra/test_issue_planning_oracle_artifact.py`; forbidden changes=generic backend abstraction, wrapper/API fallback, unrelated profiles; acceptance criteria=`cl-s09-profile` proves versioned profile owns capability and harvest/capture builders for 0.16.1 and characterized 0.17.0; required verification=profile tests, builder spy, ruff/mypy, and 0.17 receipt; reviewer focus=`code-reviewer` checks version locality and builder binding; stop conditions=help/metadata/model/capability remains ambiguous; output required=profile diff, receipt, tests, risks, and report Ledger Note.
 - 具体テストケース: `tc-s09-001` は 0.16.1 fixture が旧 exact argv、0.17.0 fixture が characterized builders、unknown version が invocation 0 になることを確認する。前提は versioned fixture、操作は profile preflight、期待結果は exact builder binding、失敗検出は generic hardcode、検証方法は profile unit test。
 - step closure contract: `cl-s09-profile` の receipt、builder spy、mypy/ruff を記録する。
 - step gate / report destination: help/metadata/model/capabilityが曖昧なら S10 以降へ進まない。
@@ -676,7 +677,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S10 — Stage evidence / bounded recovery
 
 - 振る舞いスライス: failure class と public reason mapping を pure decision engine で固定し、submission evidence に基づき回復を限定する。
-- delegation contract: `dev-coder`; 入力は S10 ブリーフ、failure taxonomy、domain/application/CLI contracts。許可パスは decision engine、mapper、tests。fallback/default mapping と post-submit new execution は禁止する。
+- delegation contract: delegated role=`dev-coder`; input docs=S10 brief, `requirement.md`, `design.md`, failure taxonomy, domain/application/CLI contracts; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_contracts.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py`, `tests/unit/domain/`, `tests/unit/application/`; forbidden changes=fallback/default mapping, post-submit new execution, unrelated recovery policy; acceptance criteria=`cl-s10-recovery` proves exact internal-to-public status/reason mapping and bounded call counts for false/unknown/submitted evidence; required verification=table-driven mapping tests, call-count assertions, public serialization test; reviewer focus=`code-reviewer` checks pure decision boundary and `qa-reviewer` checks failure matrix; stop conditions=exact mapping or recovery budget is ambiguous; output required=decision/mapping diff, matrix result, tests, risks, and report Ledger Note.
 - 具体テストケース: `tc-s10-001` は全 failure class × `prompt_submitted=False|None` で harvest/capture 0、submitted true の incomplete/download pending で profile builder 一回を確認する。前提は table fixtures、操作は decision function、期待結果は exact status/reason pair、失敗検出は stage-blind retry、検証方法は table-driven unit test。
 - step closure contract: `cl-s10-recovery` の call count、mapping、public serialization を記録する。
 - step gate / report destination: exact mapping または recovery budget が崩れたら S11 を開始しない。
@@ -684,7 +685,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S11 — Prompt / model / attachment verification
 
 - 振る舞いスライス: representative prompt、model evidence、direct/inline attachment、response completion を一つの attempt lineage で検証する。
-- delegation contract: `dev-coder`; 入力は S11 ブリーフ、prompt corpus、browser smoke matrix、sanitized receipts。許可パスは prompt/application tests と opt-in smoke script。private credentials、browser profile、raw transcript は保存しない。
+- delegation contract: delegated role=`dev-coder`; input docs=S11 brief, `requirement.md`, `design.md`, prompt corpus, browser smoke matrix, sanitized receipts; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`, `tests/unit/application/`, and the opt-in smoke script; forbidden changes=private credentials, browser profile, raw transcript, unrelated Oracle wrapper; acceptance criteria=`cl-s11-browser` proves prompt, model evidence, direct/inline attachment, response, and artifact fields share one attempt lineage; required verification=receipt schema assertions and opt-in browser smoke with sanitized output; reviewer focus=`qa-reviewer` checks external evidence and `code-reviewer` checks prompt/attachment wiring; stop conditions=GPT-5.6 Luna/Max or attachment delivery is unverified; output required=sanitized receipt, test result, model evidence status, risks, and report Ledger Note.
 - 具体テストケース: `tc-s11-001` は Japanese/Unicode prompt と required direct attachment で model verified、prompt submitted、response completed を同一 receipt に記録する。前提は managed Chrome、操作は opt-in smoke、期待結果は sanitized fields、失敗検出は unverified model/attachment drop、検証方法は receipt schema assertion。
 - step closure contract: `cl-s11-browser` の external_local_observation と test result を report に記録する。
 - step gate / report destination: GPT-5.6 Luna / Max が実測できない場合はその事実を記録し、未検証を成功扱いしない。
@@ -692,7 +693,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S12 — Download / ZIP artifact reader
 
 - 振る舞いスライス: versioned reader で response complete と artifact downloaded を分離し、strict ZIP validation を通す。
-- delegation contract: `dev-coder`; 入力は S12 ブリーフ、artifact fixtures、reader contracts。許可パスは infra reader と integration tests。generic hardcoded harvest/capture、unsafe extraction、automatic regeneration は禁止する。
+- delegation contract: delegated role=`dev-coder`; input docs=S12 brief, `requirement.md`, `design.md`, artifact fixtures, reader contracts; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_oracle_artifact.py`, `tests/unit/infra/`, `tests/integration/`; forbidden changes=generic hardcoded harvest/capture, unsafe extraction, automatic regeneration; acceptance criteria=`cl-s12-artifact-reader` proves response/download/capture separation, exact profile capture, and strict ZIP validation; required verification=0.16.1/0.17.0 fixture matrix, invocation spy, and integration output; reviewer focus=`code-reviewer` checks extraction safety and version binding; stop conditions=missing/ambiguous artifact or path escape; output required=reader diff, fixture results, integration output, risks, and report Ledger Note.
 - 具体テストケース: `tc-s12-001` は submitted true/response complete/artifact pending で selected profile capture 一回、missing/ambiguous/path escape は rejected になることを確認する。前提は 0.16.1/0.17.0 fixture、操作は reader/capture、期待結果は exact reason、失敗検出は wrong-version acceptance、検証方法は fixture unit/integration test。
 - step closure contract: `cl-s12-artifact-reader` の fixture matrix と invocation spy を記録する。
 - step gate / report destination: expected artifact が不在または複数の場合は publication を行わず blocked/rejected evidence を残す。
@@ -700,7 +701,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 #### S13 — Integration / projection / closure
 
 - 振る舞いスライス: direct 0.17 planning、review/revision、projection、docs、quality、review/adoption の全体を current HEAD で閉じる。
-- delegation contract: `dev-coder` と `doc-writer`; 入力は S13 ブリーフ、S01–S12 closures、full quality commands。許可パスは integration tests、provider/docs projection、report。merge、Issue close、production rollout は禁止する。
+- delegation contract: delegated roles=`dev-coder` plus `doc-writer`; input docs=S13 brief, `requirement.md`, `design.md`, S01–S12 closures, full quality commands; allowed paths=`tests/integration/`, provider/docs projection, and `report.md`; forbidden changes=merge, Issue close, production rollout, unrelated canonical docs; acceptance criteria=`cl-s13-closure` proves direct 0.17 planning→fresh Red→Blue revision, projection parity, quality, review, and adoption gates on one pushed HEAD; required verification=integration suite, validate, parity, report audit, and final exit contract; reviewer focus=`qa-reviewer` checks whole-issue evidence and `spec-reviewer` checks docs/identity alignment; stop conditions=P0/P1, stale identity, required check, or unresolved EAL; output required=integration receipt, final gate matrix, changed files, risks, and report Ledger Note.
 - 具体テストケース: `tc-s13-001` は planning→fresh Red review→Blue revision と provider/dogfood parity を同一 pushed HEAD で確認する。前提は S01–S12 pass、操作は full quality gate、期待結果は all required evidence と no unresolved ledger、失敗検出は stale HEAD/未採用 artifact、検証方法は integration suite、validate、parity、report audit。
 - step closure contract: `cl-s13-closure`、S90、S99、Final Exit Contract を report に記録し、PR/merge workflowへ引き渡す。
 - step gate / report destination: P0/P1、fresh review、source identity、required check のいずれかが未解決なら Issue finish を実行しない。

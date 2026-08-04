@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | resolved | scope | ChatGPT-Use reviewer | Candidate v2 と current HEAD の境界および実装準備ゲート | Candidate v2 の immutable identity を保持する; current HEAD の正規文書をレビュー対象にする | Candidate v2 は証跡として保持し、現行の承認済み正規文書を実装準備の対象にする | v2 Red Team PASS、current HEAD の GitHub 同期、要件・設計・計画・report のゲート検証 | applied | `candidate-note.md`, `report.md`, current HEAD `704fe487aff0ec9996abe6fa564ce3559d8f736e` | 実装開始前に S01〜S13 ブリーフを作成し、各ステップの検証を report に記録する |
+| D-001 | resolved | scope | ChatGPT-Use reviewer | Candidate v2 と current canonical working copy の権威境界および実装準備ゲート | Candidate v2 の immutable identity を historical evidence として保持し、current HEAD の正規文書を別レコードでレビュー対象にする | Candidate v2 archive は `deferred`、current canonical docs は `dba243168647902c8883c0a44ed58a89c754070b` に固定する。fresh exact-HEAD review が PASS するまで execution-ready にしない | v2 Red Team PASS の scope は Candidate source HEAD `d0659cfa...` に限定され、current report/candidate-note と後続 HEAD は別レビューが必要 | applied | `candidate-note.md`, `report.md`, current HEAD `dba243168647902c8883c0a44ed58a89c754070b`, GitHub parity | fresh review PASS 後に S01〜S13 ブリーフを作成し、各ステップの検証を report に記録する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -61,9 +61,11 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 - Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
 
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
-|---|---|---|---|---|---|---|
-| EAL-001 | adopted | reviewer | ChatGPT-Use advisory review and v2 Red Team PASS | requirement.md, design.md, plan.md, report.md | review findings were applied to canonical Issue docs; candidate identity remains immutable | `reviews/red-team-review-v2.md`, `report.md`, current branch history | implementation preparation only; execute approved plan after fresh per-step brief |
+| ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EAL-001 | adopted | `reviews/red-team-review-v2.md` | red-team-review | Candidate v2 の requirement/design/plan/ADR は P0/P1 なしで PASS した | `requirement.md`, `design.md`, `plan.md` | historical design inputs only | v2 PASS は Candidate source HEAD に対する結果であり、ZIP archive 自体の canonical adoption を意味しない | formal_pass | `reviews/red-team-review-v2.md`, `candidate-note.md` | issue orchestrator | spec-reviewer | no | immutable evidence として保持し、current HEAD の fresh review と分離する |
+| EAL-002 | adopted | `/private/tmp/iss-00354-chatgpt-review-20260804/implementation-readiness-review.md` | chatgpt-use-advisory | 前回 current-working-copy advisory review のP1三件を repair input として取り込んだ | `report.md`, `plan.md`, `candidate-note.md` | adoption/gate/step-contract sections | advisory finding は canonical docs の修正根拠として採用したが、review PASS や implementation approval には昇格していない | blocked_advisory | `/private/tmp/iss-00354-chatgpt-review-20260804/implementation-readiness-review.md`, commits `704fe487`, `dba243168` | issue orchestrator | ChatGPT-Use reviewer | no | 修正履歴として保持し、fresh exact-HEAD review の対象外にしない |
+| EAL-003 | adopted | `/private/tmp/iss-00354-chatgpt-review-v3-20260804/review-compact.md` | chatgpt-use-red-team | current HEAD `dba243168...` に対する fresh review は P0=0/P1=3 の FAIL であり、F01–F03 を repair input として採用する | `report.md`, `plan.md`, `candidate-note.md` | current binding, EAL, reviewer gates, executable step contract | FAIL の指摘だけを修正入力として採用し、reviewer の canonical modification や implementation start は行わない | fresh_fail | `/private/tmp/iss-00354-chatgpt-review-v3-20260804/review-compact.md` (SHA-256 `0e57f60f1a86a1be3299d360e55509b5905edd7e3bfaaa98c0809eb69fa4f26f`) | issue orchestrator | ChatGPT-Use Red Team | yes | F01–F03 を反映して新しい pushed HEAD を fresh Red Team に渡す |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -79,9 +81,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | current requirement.md, Candidate v2 MANIFEST/CHECKSUMS, and v2 Red Team PASS | none | adopted | pass | no | promote |
-| design | current design.md, runtime classifier, and Candidate v2 Red Team PASS | none | adopted | pass | no | promote |
-| plan | current plan.md S01-S13 closure index, step contracts, and implementation-brief rule | none | adopted | pass | no | promote |
+| requirement | current requirement.md, Candidate v2 MANIFEST/CHECKSUMS, and exact-head review record | current fresh review returned FAIL; F01 authority boundary remains repaired in this revision | adopted_for_review | pending (blocked by fresh FAIL) | yes | fresh re-review |
+| design | current design.md, runtime classifier, and exact-head review record | current fresh review returned FAIL; no design redesign was requested | adopted_for_review | pending (blocked by fresh FAIL) | yes | fresh re-review |
+| plan | current plan.md S01-S13 closure index and step-local contracts | current fresh review returned FAIL; F02 step contract repair is included in this revision | adopted_for_review | pending (blocked by fresh FAIL) | yes | fresh re-review |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -109,7 +111,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | pass | execute approved plan |
+| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | current fresh review FAIL | pending | re-review |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -226,15 +228,15 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | Issue is evaluated with the standard profile; lite evidence is not used | `pass` | `ready` |
-| `standard` | `manual fallback` | `used` | Manual authoring fallback: canonical docs and report were reconciled after the advisory review; external review path is recorded in report.md | `pass` | `ready` |
-| `strict` | `manual fallback` | `used` | Manual fallback evidence is present for this document-only preparation; strict execution is not selected | `pass` | `ready` |
-| `critical` | `manual fallback` | `used` | Critical execution is not selected; no critical-grade promotion is claimed | `pass` | `ready` |
+| `lite` | `not applicable` | `not applicable` | Lite specialist evidence is not used; the current exact-head review still fails | `pending` | `blocked` |
+| `standard` | `manual fallback` | `used` | Manual authoring fallback is retained, but fresh exact-head Red Team review is FAIL (P0=0/P1=3) | `pending` | `blocked` |
+| `strict` | `manual fallback` | `used` | Strict execution is not selected and current exact-head review is FAIL | `pending` | `blocked` |
+| `critical` | `manual fallback` | `used` | Critical execution is not selected and current exact-head review is FAIL | `pending` | `blocked` |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01-S13 | implementation-readiness review | spec-reviewer | fresh | pass | no | execute approved plan | ChatGPT-Use review is advisory; the next review must inspect the pushed current HEAD |
+| S01-S13 | implementation-readiness review | spec-reviewer / ChatGPT-Use Red Team | fresh | fail | no | re-review | Current exact-head review at `dba243168647902c8883c0a44ed58a89c754070b` is FAIL (P0=0/P1=3); implementation start is blocked until a fresh PASS |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -279,7 +281,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ## 修正コミットとGitHub同期（2026-08-04）
 
-- 修正コミット: `704fe487aff0ec9996abe6fa564ce3559d8f736e` (`docs(iss-00354): v2レビュー反映を要件基準へ反映`)
+- 修正コミット: `dba243168647902c8883c0a44ed58a89c754070b` (`docs(iss-00354): 調整結果をカンディデートノートへ反映`)
 - repository: `chemitaro/spec-dock`
 - branch: `codex/iss-00354-chatgpt-context-contract`
 - local HEAD と GitHub branch HEAD: `identical`
@@ -293,7 +295,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - この追加は実装手順の運用補足であり、ユーザー指示により既存の仕様レビューを再実行しない。実装開始・ChatGPTレビュー・正式採用は別ゲートで確認する。
 - この時点ではブリーフ本文の生成、実装、テスト、assurance の正式採用更新は行っていない。
 
-## ChatGPT-Use 実装準備レビュー（2026-08-04）
+## ChatGPT-Use Advisory Review（2026-08-04 / historical pre-repair）
 
 - 実行経路: ChatGPT-Use / Oracle `0.17.0` / browser foreground。repository `chemitaro/spec-dock`、branch `codex/iss-00354-chatgpt-context-contract`、HEAD `57ba2cd56d9bf3722c9ea097ba861f06f966b9c1` を GitHub で確認し、default branch fallback は使用していない。
 - 要求モデル: `GPT-5.6 Luna` / `Reasoning Effort Max`。現行 wrapper の選択肢に Luna はなく、browser で Max を指定すると API 経路へ切り替わり個人ビルドで無効となるため、要求どおりの実行はできなかった。
@@ -301,6 +303,15 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - 外部レビュー出力: `/private/tmp/iss-00354-chatgpt-review-20260804/implementation-readiness-review.md`、SHA-256 `8e1be273dcfabbae7f34797bab5f392e1e59f462a9f42c2d82a98c579bcd385a`。
 - advisory 判定: `blocked`。P0 は `None`。P1 は (1) Candidate PASS と current HEAD / canonical authority の未閉鎖、(2) `design-not-substantive` に続く executable plan gate 未閉鎖、(3) `report.md` の EAL・phase gate・reviewer gate が scaffold のまま、の3件。
 - 採否: ChatGPT-Use 出力は advisory evidence として扱い、修正・ZIP生成・canonical adoption・assurance promotion・implementation start はこのレビューでは実施していない。
+
+## ChatGPT-Use Fresh Red Team Review（2026-08-04 / current HEAD）
+
+- 実行経路: ChatGPT-Use / Oracle `0.17.0` / browser foreground。repository `chemitaro/spec-dock`、branch `codex/iss-00354-chatgpt-context-contract`、HEAD `dba243168647902c8883c0a44ed58a89c754070b` を GitHub で確認し、default branch fallback は使用していない。
+- 添付対象: `requirement.md`、`design.md`、`plan.md`、`report.md`、`candidate-note.md`、`.assurance.json`、ADR、v2 Red Team review、およびレビュー指示 `prompt.md`。レビュアーは対象 branch のファイルと添付内容を照合した。
+- モデル選択証跡: wrapper は requested `gpt-5.6` / target `GPT-5.6 Sol`、resolved UI label `Pro`、`strategy=current`、`verified=no` を記録した。`GPT-5.6 Luna / Max` の実測成功とは主張しない。
+- 外部レビュー出力: `/private/tmp/iss-00354-chatgpt-review-v3-20260804/review-compact.md`、SHA-256 `0e57f60f1a86a1be3299d360e55509b5905edd7e3bfaaa98c0809eb69fa4f26f`。
+- fresh Red Team verdict: `FAIL`、P0 `0`、P1 `3`。`RT-354-F01` は Candidate/current canonical authority、`RT-354-F02` は S01〜S13 step contract、`RT-354-F03` は report の EAL/reviewer gate の意味整合を指摘した。
+- disposition: 三件の P1 は `EAL-003` として repair input に採用した。Red Team は read-only のままで、Candidate ZIP、canonical docs、repository をレビュー中に変更していない。implementation start、assurance promotion、PR、merge、Issue close は未実施であり、fresh PASS まで blocked とする。
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
@@ -322,12 +333,12 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / candidate identity alignment | v2 Red Team PASS is recorded; fresh review of the pushed current HEAD is pending | 1 advisory review before repair; next review will be fresh | pending |
+| spec-reviewer / ChatGPT-Use Red Team | requirement / design / plan / report / candidate identity alignment | v2 Red Team PASS is historical Candidate evidence; current exact-head fresh review at `dba243168...` is FAIL with P0=0/P1=3, recorded in the fresh review section | 2 prior review records plus current fresh FAIL; re-review required after F01–F03 repair | fail / blocked |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| current branch HEAD | documentation repair commit and pushed branch | final external review output and SHA will be recorded after fresh ChatGPT review | pending fresh review | pending |
+| current branch HEAD | documentation repair commit and pushed branch | current fresh review output and SHA are recorded above; a new repair commit and pushed HEAD are required before re-review | blocked by fresh FAIL | pending re-review |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: 前回のChatGPT advisory reviewは、Candidate v2とcurrent HEADの結び付け、executable plan、report gateをP1として指摘した。

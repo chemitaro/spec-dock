@@ -13,8 +13,8 @@
 | Source HEAD | `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` |
 | Generated UTC | `2026-08-04T04:35:33Z` |
 | Generated JST | `2026-08-04T13:35:33+09:00` |
-| Authority | `canonical` for iss-00354 implementation preparation |
-| Adoption status | `adopted_for_implementation_preparation` |
+| Authority | `historical_immutable_evidence` (not canonical) |
+| Adoption status | `deferred` (`evidence_only`; no `planning apply` provenance) |
 | Review status | v1 `FAIL`; v2 `PASS` (P0/P1なし) |
 
 ## Immutable inputs
@@ -29,7 +29,20 @@
 
 Candidate v1、repository、canonical documents、Git/GitHub state were not modified. v2 is a new logical root and archive identity.
 
-Candidate v2 の ZIP bytes と identity は immutable に保持する。current branch では、v2 PASS 後にユーザー承認で実装ブリーフ運用、実行可能 plan 契約、report gate の準備補足を統合した。これらの canonical working-copy amendments は v2 ZIP の再生成や上書きではなく、`report.md` の adoption ledger と current commit history で追跡する。
+Candidate v2 の ZIP bytes と identity は immutable な historical evidence として保持する。Candidate archive 自体は `planning apply` と exact Human decision の証跡がないため canonical へ採用しない。Candidate から採用した判断だけを、後続の current canonical working copy に別途反映し、`report.md` の adoption ledger と current commit history で追跡する。
+
+## Current canonical working-copy binding
+
+| Field | Value |
+|---|---|
+| Authority | `canonical` for iss-00354 implementation-preparation documents only |
+| Adoption status | `pending_fresh_exact_head_review` (implementation not started) |
+| Repository | `chemitaro/spec-dock` |
+| Branch | `codex/iss-00354-chatgpt-context-contract` |
+| Source HEAD | `dba243168647902c8883c0a44ed58a89c754070b` |
+| GitHub parity | `identical` (default branch fallback not used) |
+
+Current canonical working copy is the only source for the next review target. It is not execution-ready until a fresh review of this exact HEAD passes and the corresponding gate is recorded in `report.md`.
 
 ## GitHub verification
 
@@ -66,8 +79,8 @@ Review-excluded supporting material:
 Current working-copy binding:
 
 - Current branch HEAD and GitHub parity are recorded in `report.md` before each review.
-- Latest pushed repair HEAD: `704fe487aff0ec9996abe6fa564ce3559d8f736e` on `codex/iss-00354-chatgpt-context-contract`.
-- The current working copy is reviewed after the post-adoption commit; the immutable v2 review remains the historical Candidate review.
+- Latest pushed repair HEAD: `dba243168647902c8883c0a44ed58a89c754070b` on `codex/iss-00354-chatgpt-context-contract`.
+- The immutable v2 review remains the historical Candidate review; the current canonical working copy requires a separate fresh exact-HEAD review.
 
 ## Integrity controls
 
