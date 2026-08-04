@@ -39,7 +39,7 @@ Candidate v2 の ZIP bytes と identity は immutable な historical evidence �
 | Adoption status | `pending_fresh_exact_head_review` (implementation not started) |
 | Repository | `chemitaro/spec-dock` |
 | Branch | `codex/iss-00354-chatgpt-context-contract` |
-| Source HEAD | `9ffef840c50c4796da784aab699c1b7d74d7637e` |
+| Source HEAD | `d556295a93a51b9c2f1e697a7d18e21876727f77` |
 | GitHub parity | `identical` (default branch fallback not used) |
 
 Current canonical working copy is the only source for the next review target. It is not execution-ready until a fresh review of this exact HEAD passes and the corresponding gate is recorded in `report.md`.
@@ -79,7 +79,7 @@ Review-excluded supporting material:
 Current working-copy binding:
 
 - Current branch HEAD and GitHub parity are recorded in `report.md` before each review.
-- Latest pushed repair HEAD: `9ffef840c50c4796da784aab699c1b7d74d7637e` on `codex/iss-00354-chatgpt-context-contract`.
+- Latest pushed repair HEAD: `d556295a93a51b9c2f1e697a7d18e21876727f77` on `codex/iss-00354-chatgpt-context-contract`.
 - The immutable v2 review remains the historical Candidate review; the current canonical working copy requires a separate fresh exact-HEAD review.
 
 ## Integrity controls
