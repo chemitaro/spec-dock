@@ -70,7 +70,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-005 | adopted | `/private/tmp/iss-00354-chatgpt-review-v5-20260804/review.md` | chatgpt-use-red-team | exact branch HEAD `079685b2a38baf9300c5bec7d5589ce9712bc7d3` に対する fresh review は PASS（P0=0/P1=0）であり、R3-01〜R3-03 の修正後文書を実装準備のレビュー済み入力として扱える | `requirement.md`, `design.md`, `plan.md`, `report.md`, `candidate-note.md` | review/adoption gates and implementation-preparation boundary | v5 review scope is defect-only and confirms identity, executable plan, report gate semantics, and code baseline without architecture redesign; implementation and Human adoption remain separate | fresh_pass | `/private/tmp/iss-00354-chatgpt-review-v5-20260804/review.md` (SHA-256 `d0a2e1bef291bab88797e166c5e96a368357452f7c2b4ddeaca402dc8bf5ea1a`) | issue orchestrator | ChatGPT-Use Red Team | no | record PASS, retain evidence-only Candidate boundary, and begin S01 brief only after normal execution preflight |
 | EAL-006 | adopted | `/private/tmp/iss-00354-s01-brief-20260804/brief.md` | chatgpt-use-implementation-brief | S01の実装前ブリーフは、厳格なOracle preflight、content-free receipt、0.16.1境界テスト、未知の0.17 capabilityを停止ゲートとして扱う方針を具体化した | `artifacts/implementation-briefs/s01-capability-characterization.md`, `report.md` | S01 implementation scope and step evidence | byte-identical artifact copy and SHA match were verified; model evidence is recorded separately and does not claim Luna/Max | advisory_adopted | `/private/tmp/iss-00354-s01-brief-20260804/brief.md` (SHA-256 `391c7a2a8f65a9c5caff2a3a8b8239f9603f00858cc924c971574afec39a33c4`) | issue orchestrator | ChatGPT-Use | no | retain artifact and use it only for S01 implementation context |
 | EAL-007 | adopted | `/private/tmp/iss-00354-s01-review-v2-20260804/review.md` | chatgpt-use-red-team | exact branch HEAD `e599d19e2027cfd599f00aa730f90bf52dc06742` に対する fresh review は PASS（P0=0/P1=0、P2=1）であり、前回S01-R01/R02は解消された。P2はexact-HEADのコマンド証跡をreportへ追記する非コード課題である | `report.md`, `issue_planning_chatgpt.py`, `test_issue_planning_chatgpt.py` | S01 review gate and execution evidence | GitHub branch tipとsource/test blobが一致し、scope逸脱・privacy leak・argv driftは確認されなかった。P2の最小修正としてこのreportへ実行結果を記録する | fresh_pass | `/private/tmp/iss-00354-s01-review-v2-20260804/review.md` (SHA-256 `3636c3c4b421be893293cbcfced6a0680ef9eaa9c813a8c76fee64a96bf21518`) | issue orchestrator | ChatGPT-Use Red Team | no | append exact-HEAD test/static command evidence; keep S01 stop gate for live 0.17 capabilities |
-| EAL-008 | adopted | Oracle native capability probe | oracle-native-capability-probe | PATH Oracle 0.17.0のhelp surfaceは確認できたが、direct-directory probeはモデル選択UIエラーまたはレート制限モーダルで送信前に終了し、positive acceptance evidenceは取得できなかった | `report.md` | S01 capability stop gate | three fresh probe sessions were assistant-turn 0; no prompt/recovery/harvest evidence exists; classify directory/multiple/continuation/attachment-failure as unknown and do not enable production support | observed_unknown | `oracle session s01-directory-probe/current/retry --harvest --no-recover`、local command output（raw prompt/path/session handleは保存しない） | issue orchestrator | implementation execution | no | retry only after browser rate-limit/model-picker recovery; S02 remains blocked |
+| EAL-008 | adopted | Oracle native capability probe | oracle-native-capability-probe | PATH Oracle 0.17.0のhelp surfaceと、directory、multiple path、native follow-upのpositive evidenceを確認した。missing pathは送信前にfail-closedした | `report.md` | S01 capability receipt and stop gate | sanitized receiptは管理一時領域に保存し、raw prompt/path/session handleは保存しない。remote post-upload attachment-failure stageだけはunknownとしてS10へ引き継ぐ | observed_supported_with_gap | `/private/tmp/codex-agent-work/501/session-20260804t115555z-iss-00354-s01-capability-probes-67ecbf19/receipt.md` (SHA-256 `a91c02140d5f649ae164c2817a5977f8536dd3b5b17e947357f6279cd6ee422d`)、Oracle native probe sessions | issue orchestrator | implementation execution | no | S01 closure; carry remote attachment-failure stage as S10 characterization input |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -177,19 +177,19 @@ result: design substantive; plan executable; report evidence blocked (`report-sp
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | strict version parsing, preflight failure, argv and recovery boundary cases | ChatGPT-Use implementation review v2 | strict parser and timeout/nonzero/argv tests added; no plan amendment | `cl-s01-capability` | no | fresh review recorded below; live 0.17 capabilities remain unknown |
+| S01 | strict version parsing, preflight failure, argv and recovery boundary cases | ChatGPT-Use implementation review v2 and native Oracle probe | strict parser, timeout/nonzero/argv tests, and sanitized directory/multiple/continuation receipt recorded; no plan amendment | `cl-s01-capability` | no | remote post-upload attachment-failure stage is deferred to S10 |
 | S02〜S13 | no execution tests yet; closure risks are enumerated in plan.md | plan | no implementation response yet | `cl-s02-profile`〜`cl-s13-closure` | no | each step requires its own brief and evidence |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | `cl-s01-capability` | strict preflight receipt, fail-closed unsupported capability, and 0.16.1 regression tests | implementation and focused test evidence recorded below; live directory/multiple/continuation/attachment capability remains uncharacterized | open | S01 stop gate remains open until live capability characterization |
+| S01 | `cl-s01-capability` | strict preflight receipt, fail-closed unsupported capability, 0.16.1 regression tests, and direct capability receipt | implementation, focused test, exact HEAD, and sanitized live receipt recorded; remote post-upload failure stage explicitly deferred to S10 | closed | directory/multiple/continuation supported; S02 may start |
 | S02〜S13 | `cl-s02-profile`〜`cl-s13-closure` | per-step behavior slice and gate in plan.md | no implementation observation yet; closure is pending execution | pending | implementation must populate each row per step |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| `cl-s01-capability` | S01 | yes | implementation | focused pytest, infra subset, ruff, mypy, diff check; live capability characterization pending | executed; code/static checks pass | open | close only after live capability evidence and report update |
+| `cl-s01-capability` | S01 | yes | implementation | focused pytest, infra subset, full infra, ruff, mypy, diff check, and sanitized direct capability receipt | executed; all code/static checks pass and receipt recorded | pass | remote post-upload failure stage is a later S10 obligation |
 | `cl-s02-profile`〜`cl-s13-closure` | S02〜S13 | yes | inspect-only before implementation | runtime gate and per-step test command to be added at execution | not executed | pending | closure evidence is required during execution |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
@@ -197,7 +197,7 @@ result: design substantive; plan executable; report evidence blocked (`report-sp
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| `cl-s01-capability` | S01 | exact-HEAD test/static command output and live Oracle capability probe | code/static checks observed; live directory/multiple/continuation/attachment behavior not observed | open | live capability evidence is required before S02 |
+| `cl-s01-capability` | S01 | exact-HEAD test/static command output and live Oracle capability probe | code/static checks pass; directory/multiple/continuation supported; missing-path preflight fail-closed; remote post-upload failure stage unknown | pass | S02 may start; S10 must characterize remaining stage |
 | `cl-s02-profile`〜`cl-s13-closure` | S02〜S13 | execution-specific command output | not observed before implementation | pending | implementation will populate each row |
 
 #### クロージャ差分（Closure Delta）
@@ -221,19 +221,20 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | blocked-pending-live-capability | provider infra implementation with per-step ChatGPT-Use brief | dev-coder | provider infra adapter and existing infra unit test only | plan.md and current Issue scope | S01 code/test changes and report evidence | no 0.17 profile, stage decoder, inline fallback, artifact reader, application/domain/CLI, merge or close | focused tests/static checks, fresh ChatGPT review, and live capability gate | unknown live directory/multiple/continuation/attachment behavior | changed files, verification result, and adoption decision | code review PASS; S01 remains blocked by live capability characterization |
-| S02-S13 | blocked-pending-s01 | implementation with per-step ChatGPT-Use brief | dev-coder | step-local allowed paths in plan.md | plan.md and current Issue scope | only the active step's allowed files | no execution before S01 capability gate, no merge or close | per-step brief, tests, report closure | S01 stop gate unresolved | begin only after S01 closure |
+| S01 | implemented-ready-for-s02 | provider infra implementation with per-step ChatGPT-Use brief | dev-coder | provider infra adapter and existing infra unit test only | plan.md and current Issue scope | S01 code/test changes and report evidence | no 0.17 profile, stage decoder, inline fallback, artifact reader, application/domain/CLI, merge or close | focused tests/static checks, fresh ChatGPT review, and live capability gate | remote post-upload attachment-failure stage remains unknown for S10 | changed files, verification result, and adoption decision | code review PASS; directory/multiple/continuation receipt recorded; S01 closed |
+| S02-S13 | pending-active-step | implementation with per-step ChatGPT-Use brief | dev-coder | step-local allowed paths in plan.md | plan.md and current Issue scope | only the active step's allowed files | no execution before active step brief/review, no merge or close | per-step brief, tests, report closure | active step gate or capability ambiguity | begin S02 after this report commit |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder | Implemented strict preflight receipt and 0.16.1 regression-boundary tests within the approved provider infra scope | `issue_planning_chatgpt.py`, `test_issue_planning_chatgpt.py` | 92 focused tests; 60 infra subset; ruff/mypy/diff check passed | ChatGPT-Use Fresh Red Team v2 PASS (P0=0/P1=0, P2=1) | live capability unknown; S01 closure open | parent integration records exact HEAD and evidence |
-| S02-S13 | dev-coder | not started; waits for S01 capability gate | none | not executed | pending | blocked until S01 closure | do not start |
+| S01 | dev-coder | Implemented strict preflight receipt and 0.16.1 regression-boundary tests within the approved provider infra scope | `issue_planning_chatgpt.py`, `test_issue_planning_chatgpt.py` | 92 focused tests; 60 infra subset; 507 infra tests passed/573 skipped; ruff/mypy/diff check passed | ChatGPT-Use Fresh Red Team v2 PASS (P0=0/P1=0, P2=1) | remote post-upload attachment-failure stage remains unknown for S10 | parent integration records exact HEAD and sanitized capability receipt |
+| S02-S13 | dev-coder | not started; S01 capability gate is closed and S02 is next | none | not executed | pending | no unresolved S01 blocker | begin with S02 brief |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01-S13 | no delegation exception; documentation work was performed in the active Issue scope | user request to repair review findings and prepare for ChatGPT review; risk accepted: no | Issue canonical docs and report only | document updates and read-only verification | no rollback needed; immutable Candidate v2 retained | `git diff --check` pass; report evidence gate and guidance are blocked until fresh review | ChatGPT-Use fresh review required after push | do not continue execution until fresh PASS and non-blocking gate evidence |
+| S01 | no delegation exception; code implementation was delegated within the approved provider infra scope | user request to implement and review; risk accepted: no | provider infra source/test and report evidence | S01 implementation, verification, and report update | no rollback needed; immutable Candidate v2 retained | focused/full infra tests, diff check, fresh ChatGPT review, and sanitized capability receipt | S01 review PASS; remote post-upload failure stage deferred to S10 | continue to S02; no merge or close |
+| S02-S13 | no delegation exception; documentation work was performed in the active Issue scope | user request to implement and review; risk accepted: no | step-local allowed paths in plan.md | per-step implementation and report evidence | no rollback needed; immutable Candidate v2 retained | per-step ChatGPT brief, tests, review, and diff check | active step gate or capability ambiguity | stop on plan-defined gate; no merge or close |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
@@ -248,14 +249,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | implementation review | spec-reviewer | fresh | pass | no | promote | ChatGPT-Use Red Team v2 at exact HEAD `e599d19e...` is PASS (P0=0/P1=0, P2=1); P2 is evidence bookkeeping only; no architecture redesign requested; S01 execution still stops at live capability gate |
-| S02-S13 | implementation-readiness review | ChatGPT-Use Red Team | pending | blocked | no | wait for S01 closure | each step requires a fresh brief/review as prescribed by plan.md |
+| S01 | implementation review | spec-reviewer | fresh | pass | no | promote | ChatGPT-Use Red Team v2 at exact HEAD `e599d19e...` is PASS (P0=0/P1=0, P2=1); code scope is valid and sanitized S01 capability receipt now closes the S01 gate; remote post-upload failure stage is deferred to S10 |
+| S02-S13 | implementation-readiness review | ChatGPT-Use Red Team | pending | blocked | no | wait for active step brief and S01 evidence | each step requires a fresh brief/review as prescribed by plan.md |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | implemented-open | `e599d19e2027cfd599f00aa730f90bf52dc06742` | `e599d19e2027cfd599f00aa730f90bf52dc06742` | local/GitHub parity; clean before this report update | provider infra + existing infra unit test only | source/test and S01 brief | `git diff --check` | live capability evidence and report update remain |
-| S02-S13 | pending | not started | none | not applicable | no product-code change | step-local paths in plan.md | not run | blocked by S01 stop gate |
+| S01 | committed | `e599d19e2027cfd599f00aa730f90bf52dc06742` | `e599d19e2027cfd599f00aa730f90bf52dc06742` plus report evidence commits | local/GitHub parity; clean before next step | provider infra + existing infra unit test only | source/test, S01 brief, and sanitized capability receipt | `git diff --check` | directory/multiple/continuation evidence recorded; remote failure stage deferred to S10 |
+| S02-S13 | pending | not started | none | not applicable | no product-code change | step-local paths in plan.md | not run | each step awaits its own brief and review |
 
 #### 変更したファイル
 - S01 implementation: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`
@@ -364,8 +365,8 @@ v3修正後に次回対象として記録した `d556295a93a51b9c2f1e697a7d18e21
 - commit / push: `e599d19e2027cfd599f00aa730f90bf52dc06742` (`fix(iss-00354): S01のpreflight検証とテストを堅牢化`) をpush済み。検証後のreport更新前はcleanで、remote parityを確認した。
 - ChatGPT-Use fresh Red Team: `/private/tmp/iss-00354-s01-review-v2-20260804/review.md`（SHA-256 `3636c3c4b421be893293cbcfced6a0680ef9eaa9c813a8c76fee64a96bf21518`）。GitHub exact HEAD、source/test blob、scope境界を照合し、P0=0、P1=0、P2=1、P3=0の **PASS**。P2は、レビュー入力時点でreportへexact-HEADコマンド証跡が未記録だったという非コードの記録課題であり、このセクションとEAL-007で解消記録を追加した。
 - モデル証跡: wrapperは requested `gpt-5.6`、target/resolved `GPT-5.6 Sol`、`strategy=select`、`verified=yes`。要求されたGPT-5.6 Luna / Reasoning Effort Maxの実測成功とは主張しない（`--reasoning-effort max`は個人OracleビルドでAPI実行無効となるため使用していない）。
-- live capability probe: PATH Oracle `0.17.0` の `--version`、root `--help`、`session --help` は exit 0 で確認した。helpには `--file <paths...>`、`--followup` が明示されているが、実際のacceptanceを確認する direct-directory probe は、`s01-directory-probe` がモデル選択UIエラー、`s01-directory-current` と `s01-directory-retry` が添付処理中のレート制限モーダルで送信前に終了した。各セッションは assistant turns=0 で、prompt/recovery/harvestの呼出しや応答証跡はない。個人設定・認証情報・private prompt/pathはreportへ保存していない。
-- S01停止ゲート: direct directory、multiple paths、continuation、attachment-failure stageのpositive acceptance evidenceは取得できず、すべて `unknown`。`cl-s01-capability`はopenのまま、S02以降は開始しない。レート制限・モデル選択UIの復旧後に、同じ無害fixtureと明示syntaxで再開する。
+- live capability probe: PATH Oracle `0.17.0` の `--version`、root `--help`、`session --help` は exit 0 で確認した。helpには `--file <paths...>`、`--followup` が明示され、directory単独（`files=1`・marker一致）、directory＋standalone file（`files=2`・両marker一致）、Oracle-native `--followup`（A→B）が成功した。存在しないpathはブラウザー起動前に拒否され、prompt/recovery/harvestは0だった。個人設定・認証情報・private prompt/pathはreportへ保存していない。
+- S01停止ゲート: directory、multiple paths、continuationは `supported` と確定し、`cl-s01-capability`を閉じる。remote post-upload attachment-failure stageは `unknown` のままS10入力へ引き継ぐが、S02〜S08を妨げるS01停止条件ではない。
 - 実装、assurance promotion、PR作成、merge、Issue closeはこの時点では実施していない。
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
@@ -383,7 +384,7 @@ v3修正後に次回対象として記録した `d556295a93a51b9c2f1e697a7d18e21
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | S01 provider infra implementation and unit tests | strict preflight/recovery boundary; no scope expansion | 1 ChatGPT-Use Fresh Red Team review | PASS for P0/P1; S01 live capability gate remains open |
+| code-reviewer | S01 provider infra implementation and unit tests | strict preflight/recovery boundary; no scope expansion | 1 ChatGPT-Use Fresh Red Team review plus sanitized native capability receipt | PASS for P0/P1; S01 gate closed, remote post-upload failure stage deferred to S10 |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
