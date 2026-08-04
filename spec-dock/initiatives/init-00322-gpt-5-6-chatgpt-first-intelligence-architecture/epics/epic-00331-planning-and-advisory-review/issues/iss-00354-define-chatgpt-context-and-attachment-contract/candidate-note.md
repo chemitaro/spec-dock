@@ -39,10 +39,10 @@ Candidate v2 の ZIP bytes と identity は immutable な historical evidence �
 | Adoption status | `pending_fresh_exact_head_review` (implementation not started) |
 | Repository | `chemitaro/spec-dock` |
 | Branch | `codex/iss-00354-chatgpt-context-contract` |
-| Source HEAD | `d556295a93a51b9c2f1e697a7d18e21876727f77` |
-| GitHub parity | `identical` (default branch fallback not used) |
+| Last reviewed branch HEAD | `bb75f6d5fcd142d8f2d0dd3ff4a06a057b4ee709` |
+| GitHub parity at last review | `identical` (default branch fallback not used) |
 
-Current canonical working copy is the only source for the next review target. It is not execution-ready until a fresh review of this exact HEAD passes and the corresponding gate is recorded in `report.md`.
+The last reviewed branch tip is historical evidence for the completed v4 review. The next review target must be the exact newly pushed branch tip supplied in the review prompt and verified through GitHub immediately before review; no static prior hash is treated as the next target. The scope is not execution-ready until that fresh exact-head review passes and the corresponding gate is recorded in `report.md`.
 
 ## GitHub verification
 
@@ -78,9 +78,9 @@ Review-excluded supporting material:
 
 Current working-copy binding:
 
-- Current branch HEAD and GitHub parity are recorded in `report.md` before each review.
-- Latest pushed repair HEAD: `d556295a93a51b9c2f1e697a7d18e21876727f77` on `codex/iss-00354-chatgpt-context-contract`.
-- The immutable v2 review remains the historical Candidate review; the current canonical working copy requires a separate fresh exact-HEAD review.
+- The exact branch tip is verified through GitHub immediately before each review and recorded in that review's external identity evidence.
+- The v4 review target was `bb75f6d5fcd142d8f2d0dd3ff4a06a057b4ee709`; any repair commit after it is a new review target and is not pre-adopted.
+- The immutable v2 review remains the historical Candidate review; each current canonical working copy requires a separate fresh exact-HEAD review.
 
 ## Integrity controls
 
