@@ -185,11 +185,13 @@ S03 と S04 は、bytes/materialization 契約から original path の direct Or
 - `cl-s04-direct-transport` / `tc-s04-001` は infra 側の repeated `--file` operands、generated input pack の廃止、transport regression を所有する。
 - Red は責務別に先行作成してよいが、Green、commit candidate、review-ready、closure は同一 resulting HEAD でのみ成立する。片方だけを close してはならない。
 - compatibility property、dual-write、path-to-bytes 再構成、一時 pack、inline fallback、attachment drop、alternate backend は追加しない。
-- S03/S04 の production write allowlist は次の3ファイル、test write allowlist は次の4ファイルとする。
-  - production: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`
-  - tests: `tests/unit/application/test_issue_planning_prompt.py`, `tests/unit/application/test_issue_planning.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`, `tests/integration/test_issue_planning_chatgpt_transport.py`
-- `domain/issue_planning_contracts.py`、domain tests、CLI/commands、Oracle artifact reader、resource files、installed/dogfood projection は read/run-only とし、この cutover で直接変更しない。必要になった場合は停止して計画を再補正する。
-- S03/S04 の実装前に `artifacts/implementation-briefs/s03-s04-atomic-cutover-plan-clarification.md` を参照し、plan/report の atomic boundary 採用を記録する。
+- S03/S04 の production write allowlist は runtime の3ファイルと Review resource の provider 正本、test write allowlist は次の5ファイルとする。
+  - production runtime: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`
+  - production resource: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/resources/operations/review/attachments/instructions.md`
+  - tests: `tests/unit/application/test_issue_planning_prompt.py`, `tests/unit/application/test_issue_planning.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`, `tests/integration/test_issue_planning_chatgpt_transport.py`, `tests/integration/test_issue_planning_e2e.py`
+- Review resource は generated identity attachments を参照せず、minimal body に描画される identity/digest を参照する契約へ更新する。provider resource を先に変更し、installed/dogfood の対応 projection は同じ atomic change-set で provider sync により再生成する（projection の手編集はしない）。
+- `domain/issue_planning_contracts.py`、domain tests、CLI/commands、Oracle artifact reader、上記以外の operation resource wording/inventory は read/run-only とし、この cutover で直接変更しない。必要になった場合は停止して計画を再補正する。
+- S03/S04 の実装前に `artifacts/implementation-briefs/s03-s04-atomic-cutover-plan-clarification-v2.md` を参照し、plan/report の atomic boundary と v1 P1修正を採用した記録を確認する。元の `s03-s04-atomic-cutover-plan-clarification.md` は履歴証跡として保持する。
 - S03/S04 の両 closure が同じ HEAD で成立するまで、S05 を開始しない。
 
 ## 9. Retained Milestone S05 — Orchestration / CLI cutover
