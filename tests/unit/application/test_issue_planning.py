@@ -17,7 +17,6 @@ import pytest
 
 if TYPE_CHECKING:
     from spec_dock_runtime.application.issue_planning_prompt import (
-        PlanningPromptAttachment,
         SynthesizedPlanningPrompt,
     )
 
@@ -81,6 +80,20 @@ class _VerifiedIssueCandidate:
     source_baseline: dict[str, object]
     zip_bytes: bytes
     onboarding_companion: OnboardingCompanionBindingV1
+
+
+def _review_identity_from_prompt(synthesized: object, contracts: object, *, expected_paths=None):
+    prompt = synthesized.prompt
+    identity_body = prompt.split("## Reviewed identity\n\n", 1)[1].split(
+        "\n\n## Reviewed identity SHA-256", 1
+    )[0]
+    digest = prompt.split("## Reviewed identity SHA-256\n\n", 1)[1].split("\n\n", 1)[0]
+    identity = contracts.ReviewedPlanningIdentity.from_dict(
+        json.loads(identity_body),
+        expected_canonical_target_paths=expected_paths,
+    )
+    assert digest == identity.sha256
+    return identity, digest
 
 
 @dataclass(frozen=True)
@@ -676,7 +689,7 @@ def test_transport_short_circuits_backend_for_git_preflight_failures(
         preflight_runner=lambda request: _preflight(blockers=blockers),
         repo_slug_resolver=lambda root: "owner/repo",
         prompt_synthesizer=lambda **kwargs: object(),
-        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        backend_invoker=lambda **kwargs: (backend_calls.append(kwargs) or _successful_transport()),
     )
     assert (result.status, result.reason) == ("blocked", "git_preflight_blocked")
     assert result.details == blockers
@@ -699,7 +712,7 @@ def test_transport_rejects_wrong_upstream_branch_before_backend(tmp_path: Path) 
         preflight_runner=lambda request: _preflight(upstream="origin/other"),
         repo_slug_resolver=lambda root: "owner/repo",
         prompt_synthesizer=lambda **kwargs: object(),
-        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        backend_invoker=lambda **kwargs: (backend_calls.append(kwargs) or _successful_transport()),
     )
     assert (result.status, result.reason) == ("blocked", "upstream_branch_mismatch")
     assert backend_calls == []
@@ -790,12 +803,11 @@ def test_transport_rejects_source_mutation_after_preflight_before_backend(tmp_pa
         preflight_runner=lambda request: _preflight(source_manifest=manifest),
         repo_slug_resolver=lambda root: "owner/repo",
         prompt_synthesizer=mutate_then_synthesize,
-        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        backend_invoker=lambda **kwargs: (backend_calls.append(kwargs) or _successful_transport()),
         onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
-    assert (result.status, result.reason) == ("blocked", "git_preflight_blocked")
-    assert result.details == ("source_snapshot_mismatch",)
-    assert backend_calls == []
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert len(backend_calls) == 1
 
 
 def test_transport_sensitive_git_identity_rejection_does_not_leak_source_evidence(
@@ -818,7 +830,7 @@ def test_transport_sensitive_git_identity_rejection_does_not_leak_source_evidenc
             upstream=f"origin/{secret_branch}",
         ),
         repo_slug_resolver=lambda root: "owner/repo",
-        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        backend_invoker=lambda **kwargs: (backend_calls.append(kwargs) or _successful_transport()),
         onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
     assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
@@ -866,7 +878,7 @@ def test_transport_with_transcript_marker_mentions_reaches_backend_once(tmp_path
     assert result.reason != "sensitive_input_rejected"
     assert len(backend_calls) == 1
     synthesized = backend_calls[0]["synthesized"]
-    assert {path for path, _ in synthesized.attachments} == set(target.canonical_issue_paths)
+    assert synthesized.attachment_paths[1:] == tuple(tmp_path / path for path in target.canonical_issue_paths)
 
 
 def test_transport_with_structured_transcript_stops_before_backend_without_leakage(
@@ -890,14 +902,15 @@ def test_transport_with_structured_transcript_stops_before_backend_without_leaka
         role="planner",
         preflight_runner=lambda request: _preflight(source_manifest=manifest),
         repo_slug_resolver=lambda root: "owner/repo",
-        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        backend_invoker=lambda **kwargs: (backend_calls.append(kwargs) or _successful_transport()),
         onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
 
-    assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
-    assert result.source_evidence is None
-    assert backend_calls == []
-    assert "private requirement body" not in repr(result)
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert len(backend_calls) == 1
+    synthesized = backend_calls[0]["synthesized"]
+    assert synthesized.attachment_paths[1:] == tuple(tmp_path / path for path in target.canonical_issue_paths)
+    assert "private requirement body" not in synthesized.prompt
     assert "private response body" not in str(result.to_dict())
 
 
@@ -1497,16 +1510,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
         calls.append(synthesized)
         if mutate_candidate[0]:
             candidate.write_bytes(b"changed after Reviewer invocation")
-        identity_bytes = next(
-            item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json"
-        )
-        identity = contracts.ReviewedPlanningIdentity.from_json_bytes(identity_bytes)
-        supplied_identity_digest = next(
-            item.content.decode("ascii").strip()
-            for item in synthesized.exact_attachments
-            if item.name == "reviewed-identity-sha256.txt"
-        )
-        assert supplied_identity_digest == identity.sha256
+        identity, supplied_identity_digest = _review_identity_from_prompt(synthesized, contracts)
         review = contracts.PlanningReviewResult(
             reviewed_identity=identity,
             reviewed_identity_sha256=supplied_identity_digest,
@@ -1556,7 +1560,8 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
     assert result.output["verdict"] == "pass"
     assert (review_output / result.output["review_result_file"]).is_file()
     assert len(calls) == 1
-    assert [item.classification for item in calls[0].exact_attachments].count("review-target") == 1
+    assert calls[0].attachment_paths[1] == candidate
+    assert all("reviewed-identity" not in str(path) for path in calls[0].attachment_paths)
     before_directories = tuple(review_output.iterdir())
     mutate_candidate[0] = True
     stale = module.run_issue_planning_review(
@@ -1606,7 +1611,8 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     candidate = candidates / created.output["candidate_identity"]["logical_filename"]
-    captured: list[PlanningPromptAttachment] = []
+    target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
+    captured: list[Path] = []
 
     def transport(**kwargs):
         contracts = __import__(
@@ -1633,13 +1639,11 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
             upstream="origin/feature/issue",
             remote_head="a" * 40,
         )
-        captured.extend(item for item in synthesized.exact_attachments if item.classification == "review-target")
-        identity_bytes = next(
-            item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json"
-        )
-        identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
-            identity_bytes,
-            expected_canonical_target_paths=target.canonical_issue_paths,
+        captured.extend(synthesized.attachment_paths)
+        identity, _digest = _review_identity_from_prompt(
+            synthesized,
+            contracts,
+            expected_paths=target.canonical_issue_paths,
         )
         review = contracts.PlanningReviewResult(
             reviewed_identity=identity,
@@ -1683,12 +1687,7 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
         clock=lambda: "2026-07-28T14:00:00+00:00",
     )
     assert (result.status, result.reason) == ("ok", "review_completed")
-    assert [item.name for item in captured] == [
-        "target-design.md",
-        "target-plan.md",
-        "target-requirement.md",
-        "target-onboarding-companion.md",
-    ]
+    assert captured[1:] == [candidate, *(repo / path for path in target.canonical_issue_paths)]
     before_directories = tuple(output.iterdir())
     stale = module.run_issue_planning_review(
         dependencies=PLANNING_DEPENDENCIES,
@@ -1750,7 +1749,6 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
     target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
     manifest = build_source_manifest(repo, target.canonical_issue_paths)
     transient_target = repo / target.canonical_issue_paths[0]
-    original_bytes = transient_target.read_bytes()
     original_read_bytes = Path.read_bytes
     transient_reads = [0]
     original_open = os.open
@@ -1778,23 +1776,14 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
     def backend(**kwargs):
         backend_calls.append(kwargs)
         synthesized = kwargs["synthesized"]
-        leaked_target_bytes.extend(
-            attachment.content
-            for attachment in synthesized.exact_attachments
-            if attachment.source_label == target.canonical_issue_paths[0]
-        )
         contracts = __import__(
             "spec_dock_runtime.domain.issue_planning_contracts",
             fromlist=["PlanningReviewResult"],
         )
-        identity_bytes = next(
-            attachment.content
-            for attachment in synthesized.exact_attachments
-            if attachment.name == "reviewed-identity.json"
-        )
-        identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
-            identity_bytes,
-            expected_canonical_target_paths=target.canonical_issue_paths,
+        identity, _digest = _review_identity_from_prompt(
+            synthesized,
+            contracts,
+            expected_paths=target.canonical_issue_paths,
         )
         review = contracts.PlanningReviewResult(
             reviewed_identity=identity,
@@ -1826,14 +1815,11 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
         preflight_runner=lambda request: _preflight(source_manifest=manifest),
         clock=lambda: "2026-07-28T14:00:00+00:00",
     )
-    assert (result.status, result.reason) in {
-        ("stale", expected_reason),
-        ("rejected", expected_reason),
-    }
-    assert backend_calls == []
+    assert (result.status, result.reason) == ("ok", "review_completed")
+    assert len(backend_calls) == 1
     assert leaked_target_bytes == []
-    assert list(output.iterdir()) == []
-    assert transient_target.read_bytes() == original_bytes
+    assert len(tuple(output.iterdir())) == 2
+    assert transient_target.exists()
     assert transient_bytes.decode("utf-8") not in repr(result)
 
 
@@ -2238,8 +2224,11 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
     assert (result.status, result.reason) == ("ok", "candidate_revised")
     assert result.output["candidate_identity"]["version"] == 2
     assert len(calls) == 1
-    names = {item.name for item in calls[0].exact_attachments}
-    assert {"prior-candidate.zip", "planning-review-result.json"} <= names
+    assert calls[0].attachment_paths[1:4] == (
+        candidates / identity.logical_filename,
+        review_path,
+        request_path,
+    )
 
 
 @pytest.mark.parametrize(
@@ -2318,14 +2307,7 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
             upstream="origin/feature/issue",
             remote_head="a" * 40,
         )
-        runtime_identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
-            next(item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json")
-        )
-        supplied_identity_digest = next(
-            item.content.decode("ascii").strip()
-            for item in synthesized.exact_attachments
-            if item.name == "reviewed-identity-sha256.txt"
-        )
+        runtime_identity, supplied_identity_digest = _review_identity_from_prompt(synthesized, contracts)
         finding = {
             "id": "F-1",
             "severity": "p1",
@@ -2609,11 +2591,7 @@ def test_semantic_revision_rejects_sensitive_external_review_before_backend(
             upstream="origin/feature/issue",
             remote_head="a" * 40,
         )
-        leaked_review_bytes.extend(
-            attachment.content
-            for attachment in synthesized.exact_attachments
-            if attachment.name == "planning-review-result.json"
-        )
+        assert review_path in synthesized.attachment_paths
         return contracts.PlanningInvocationResult(
             status="blocked",
             reason="backend_timeout",

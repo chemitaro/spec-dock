@@ -4,7 +4,6 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path, PurePath
 import re
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -14,7 +13,6 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     run_github_sync_preflight,
 )
 from spec_dock_runtime.application.issue_planning_prompt import (
-    PlanningPromptAttachment,
     authoring_output_expectation,
     synthesize_issue_planning_prompt,
     synthesize_planning_evidence_prompt,
@@ -60,8 +58,6 @@ from spec_dock_runtime.domain.issue_planning_contracts import (
 )
 from spec_dock_runtime.presentation.issue_planning import render_planning_review_summary
 
-MAX_REVIEW_SOURCE_FILE_BYTES = 2_000_000
-MAX_REVIEW_SOURCE_TOTAL_BYTES = 10_000_000
 _INVALID_ISSUE_ID = "iss-00000"
 
 if TYPE_CHECKING:
@@ -131,6 +127,16 @@ def _result_issue_id(value: str) -> str:
         return normalize_id_input(value, prefix="iss", field="issue")
     except (AttributeError, RuntimeError, ValueError):
         return _INVALID_ISSUE_ID
+
+
+def _context_source_operands(repo_root: Path, context: PlanningContext) -> tuple[Path, ...]:
+    seen: set[str] = set()
+    operands: list[Path] = []
+    for relative in (*context.canonical_issue_paths, *context.relevant_source_paths):
+        if relative not in seen:
+            seen.add(relative)
+            operands.append(repo_root / relative)
+    return tuple(operands)
 
 
 def resolve_existing_issue_target(
@@ -799,21 +805,6 @@ def run_issue_planning_transport(
             reason=reason,
             source_evidence=None if reason == "sensitive_input_rejected" else source_evidence,
         )
-    if _exact_attachments_have_sensitive_content(synthesized):
-        return PlanningInvocationResult(
-            status="rejected",
-            reason="sensitive_input_rejected",
-        )
-    if not _attachments_match_source_manifest(
-        synthesized,
-        repository.source_manifest.source_hashes,
-    ):
-        return PlanningInvocationResult(
-            status="blocked",
-            reason="git_preflight_blocked",
-            source_evidence=source_evidence,
-            details=("source_snapshot_mismatch",),
-        )
     return backend_invoker(
         repo_root=repo_root,
         role=role,
@@ -1106,7 +1097,6 @@ def run_issue_planning_review(
             reason="operation_candidate_required",
             issue_id=result_issue_id,
         )
-    repository_descriptor: int | None = None
     try:
         target = resolve_existing_issue_target(request.issue_id, records, repo_root)
         gateway.validate_candidate_output_directory(request.output_dir, repo_root)
@@ -1126,7 +1116,6 @@ def run_issue_planning_review(
                 raise ValueError("Candidate Issue does not match Review target")
         else:
             raise ValueError("Review mode is invalid")
-        repository_descriptor = gateway.open_safe_directory_descriptor(repo_root.resolve(strict=True))
     except IssuePlanningCandidateArchiveRejected as error:
         return PlanningCommandResult(
             status="rejected",
@@ -1155,18 +1144,10 @@ def run_issue_planning_review(
                 source_head=context.source_head,
                 candidate_identity=candidate.identity,
             )
-            targets = (
-                PlanningPromptAttachment(
-                    name="target-candidate.zip",
-                    classification="review-target",
-                    source_label=candidate.identity.logical_filename,
-                    content=candidate.zip_bytes,
-                ),
-            )
+            targets = (request.candidate_path,)
         else:
             assert request.reviewed_head is not None
             assert candidate is not None
-            assert repository_descriptor is not None
             if context.source_head != request.reviewed_head:
                 raise ValueError("reviewed HEAD does not match synchronized source")
             binding = GitBoundOperationBindingV1.create(
@@ -1187,35 +1168,16 @@ def run_issue_planning_review(
                 git_bound_operation_binding=binding,
                 expected_canonical_target_paths=target.canonical_issue_paths,
             )
-            canonical_targets = tuple(
-                PlanningPromptAttachment(
-                    name=f"target-{Path(path).name}",
-                    classification="review-target",
-                    source_label=path,
-                    content=gateway.read_bounded_regular_file_at(
-                        repository_descriptor,
-                        path,
-                        max_bytes=MAX_REVIEW_SOURCE_FILE_BYTES,
-                    ),
-                )
-                for path in target.canonical_issue_paths
+            targets = (request.candidate_path,)
+        source_paths = _context_source_operands(repo_root, context)
+        if request.mode == "git-bound":
+            dynamic_paths = (
+                *targets,
+                *(repo_root / path for path in context.canonical_issue_paths),
+                *(repo_root / path for path in context.relevant_source_paths if path not in context.canonical_issue_paths),
             )
-            targets = (
-                *canonical_targets,
-                PlanningPromptAttachment(
-                    name="target-onboarding-companion.md",
-                    classification="review-target",
-                    source_label=candidate.onboarding_companion.path,
-                    content=candidate.files[candidate.onboarding_companion.path],
-                ),
-            )
-        identity_bytes = _canonical_json_bytes(identity.to_dict())
-        assert repository_descriptor is not None
-        supplemental = _read_review_supplemental_attachments(
-            context,
-            repository_descriptor=repository_descriptor,
-            gateway=gateway,
-        )
+        else:
+            dynamic_paths = (*targets, *source_paths)
         captured_identity[:] = [identity]
         return synthesize_planning_evidence_prompt(
             role="reviewer",
@@ -1225,41 +1187,24 @@ def run_issue_planning_review(
             context=context,
             remote_head=kwargs["remote_head"],
             upstream=kwargs["upstream"],
-            exact_attachments=(
-                *targets,
-                PlanningPromptAttachment(
-                    name="reviewed-identity.json",
-                    classification="formal-evidence",
-                    source_label="reviewed-identity.json",
-                    content=identity_bytes,
-                ),
-                PlanningPromptAttachment(
-                    name="reviewed-identity-sha256.txt",
-                    classification="formal-evidence",
-                    source_label="reviewed-identity-sha256.txt",
-                    content=f"{identity.sha256}\n".encode("ascii"),
-                ),
-            ),
-            supplemental_attachments=supplemental,
+            attachment_paths=dynamic_paths,
+            reviewed_identity=identity.to_dict(),
+            reviewed_identity_sha256=identity.sha256,
         )
 
-    try:
-        transport = transport_runner(
-            issue=target.issue_id,
-            records=records,
-            repo_root=repo_root,
-            role="reviewer",
-            repo_slug_resolver=repo_slug_resolver,
-            backend_invoker=backend_invoker,
-            relevant_source_paths=relevant_source_paths,
-            operator_context=operator_context,
-            timeout_seconds=timeout_seconds,
-            preflight_runner=preflight_runner,
-            prompt_synthesizer=review_prompt_synthesizer,
-        )
-    finally:
-        assert repository_descriptor is not None
-        os.close(repository_descriptor)
+    transport = transport_runner(
+        issue=target.issue_id,
+        records=records,
+        repo_root=repo_root,
+        role="reviewer",
+        repo_slug_resolver=repo_slug_resolver,
+        backend_invoker=backend_invoker,
+        relevant_source_paths=relevant_source_paths,
+        operator_context=operator_context,
+        timeout_seconds=timeout_seconds,
+        preflight_runner=preflight_runner,
+        prompt_synthesizer=review_prompt_synthesizer,
+    )
     if transport.status != "pass":
         if (
             request.mode == "git-bound"
@@ -1592,37 +1537,15 @@ def run_issue_planning_revise(
                 issue_id,
                 onboarding_companion_path,
             )
-            base = synthesize_issue_planning_prompt(**{
-                **kwargs,
-                "role": "semantic_revision",
-                "output_expectation": expectation,
-            })
-            attachments = [
-                PlanningPromptAttachment(
-                    name="prior-candidate.zip",
-                    classification="review-target",
-                    source_label=candidate.identity.logical_filename,
-                    content=candidate.zip_bytes,
-                ),
-                PlanningPromptAttachment(
-                    name="planning-review-result.json",
-                    classification="formal-evidence",
-                    source_label="planning-review-result.json",
-                    content=review_bytes,
-                ),
-            ]
-            attachments.extend(
-                PlanningPromptAttachment(
-                    name=f"prior-{name}",
-                    classification="supplemental-context",
-                    source_label=f"candidate/{name}",
-                    content=candidate.files[name],
-                )
-                for name in DOCUMENT_NAMES
-            )
             instructions = (
                 *(f"selected finding {finding.id}: {finding.severity}" for finding in selected.values()),
                 *(f"preserve assumption: {item}" for item in revision.preserve_assumptions),
+            )
+            attachment_paths = (
+                request.candidate_path,
+                review_evidence.review_result_path,
+                request.request_path,
+                *_context_source_operands(repo_root, runtime_context),
             )
             return synthesize_planning_evidence_prompt(
                 role="semantic_revision",
@@ -1632,9 +1555,8 @@ def run_issue_planning_revise(
                 context=runtime_context,
                 remote_head=kwargs["remote_head"],
                 upstream=kwargs["upstream"],
-                exact_attachments=tuple(attachments),
+                attachment_paths=attachment_paths,
                 instructions=instructions,
-                supplemental_attachments=base.attachments,
                 output_expectation=expectation,
             )
 
@@ -2120,102 +2042,6 @@ def _manifest_string_values(value: object, field_name: str) -> tuple[str, ...]:
 
 def _merge_context_values(existing: Sequence[str], supplied: Sequence[str]) -> tuple[str, ...]:
     return tuple(sorted({*existing, *supplied}, key=lambda value: value.encode("utf-8")))
-
-
-def _attachments_match_source_manifest(
-    synthesized: object,
-    expected_hashes: dict[str, str],
-) -> bool:
-    attachments = getattr(synthesized, "attachments", None)
-    if not isinstance(attachments, tuple):
-        return False
-    actual_hashes: dict[str, str] = {}
-    for attachment in attachments:
-        if (
-            not isinstance(attachment, tuple)
-            or len(attachment) != 2
-            or not isinstance(attachment[0], str)
-            or not isinstance(attachment[1], str)
-            or attachment[0] in actual_hashes
-        ):
-            return False
-        actual_hashes[attachment[0]] = hashlib.sha256(attachment[1].encode("utf-8")).hexdigest()
-    if actual_hashes != expected_hashes:
-        return False
-    exact_attachments = getattr(synthesized, "exact_attachments", None)
-    if not isinstance(exact_attachments, tuple):
-        return False
-    for attachment in exact_attachments:
-        source_label = getattr(attachment, "source_label", None)
-        classification = getattr(attachment, "classification", None)
-        content = getattr(attachment, "content", None)
-        if (
-            classification == "review-target"
-            and isinstance(source_label, str)
-            and source_label in expected_hashes
-            and (not isinstance(content, bytes) or hashlib.sha256(content).hexdigest() != expected_hashes[source_label])
-        ):
-            return False
-    return True
-
-
-def _read_review_supplemental_attachments(
-    context: PlanningContext,
-    *,
-    repository_descriptor: int,
-    gateway: IssuePlanningGateway,
-) -> tuple[tuple[str, str], ...]:
-    for value in context.operator_context:
-        if scan_constraint_sensitive_payload(value) or private_absolute_path_finding(value):
-            raise ValueError("sensitive Review context rejected")
-    attachments: list[tuple[str, str]] = []
-    total = 0
-    paths = tuple(
-        sorted(
-            {*context.canonical_issue_paths, *context.relevant_source_paths},
-            key=lambda value: value.encode("utf-8"),
-        )
-    )
-    for path in paths:
-        content = gateway.read_bounded_regular_file_at(
-            repository_descriptor,
-            path,
-            max_bytes=MAX_REVIEW_SOURCE_FILE_BYTES,
-        )
-        total += len(content)
-        if total > MAX_REVIEW_SOURCE_TOTAL_BYTES:
-            raise ValueError("Review context exceeds bounded size")
-        text = content.decode("utf-8", errors="strict")
-        if scan_constraint_sensitive_payload(text) or private_absolute_path_finding(text):
-            raise ValueError("sensitive Review context rejected")
-        attachments.append((path, text))
-    return tuple(attachments)
-
-
-def _exact_attachments_have_sensitive_content(synthesized: object) -> bool:
-    exact_attachments = getattr(synthesized, "exact_attachments", None)
-    if not isinstance(exact_attachments, tuple):
-        return True
-    for attachment in exact_attachments:
-        content = getattr(attachment, "content", None)
-        if not isinstance(content, bytes):
-            return True
-        text = content.decode("utf-8", errors="ignore")
-        if scan_constraint_sensitive_payload(text) or private_absolute_path_finding(text):
-            return True
-    return False
-
-
-def _canonical_json_bytes(value: dict[str, Any]) -> bytes:
-    return (
-        json.dumps(
-            value,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        + b"\n"
-    )
 
 
 def _review_result_has_sensitive_content(result: PlanningReviewResult) -> bool:

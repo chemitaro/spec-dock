@@ -309,9 +309,10 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
             upstream="origin/feature/issue",
             remote_head="a" * 40,
         )
-        identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
-            next(item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json")
-        )
+        identity_body = synthesized.prompt.split("## Reviewed identity\n\n", 1)[1].split(
+            "\n\n## Reviewed identity SHA-256", 1
+        )[0]
+        identity = contracts.ReviewedPlanningIdentity.from_dict(json.loads(identity_body))
         reviewer_identities.append(identity)
         findings = (
             (

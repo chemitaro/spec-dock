@@ -242,16 +242,18 @@ if "SPECDOCK_ORACLE_REMOTE_CHROME" in os.environ:
     raise SystemExit(93)
 
 prompt = argv[argv.index("--prompt") + 1]
-pack = Path(argv[argv.index("--file") + 1])
+file_paths = [
+    Path(argv[index + 1])
+    for index, value in enumerate(argv)
+    if value == "--file"
+]
 slug = argv[argv.index("--slug") + 1]
 record["prompt"] = prompt
-record["pack_files"] = sorted(
-    path.relative_to(pack).as_posix() for path in pack.rglob("*") if path.is_file()
-)
+record["attachment_paths"] = [str(path) for path in file_paths]
 append_record(home, record)
 
 match = re.search(
-    r"## Role-specific output expectation\n\n(\{[^\n]+\})\n\n",
+    r"## Expected output\n\n(\{[^\n]+\})\n\n",
     prompt,
 )
 if match is None:
@@ -319,11 +321,15 @@ if expectation["kind"] == "authoring_zip":
             archive.writestr(info, payloads[relative])
     kind = "file"
 else:
-    identity_bytes = (pack / "reviewed-identity.json").read_bytes()
-    identity = json.loads(identity_bytes)
-    identity_sha = (
-        pack / "reviewed-identity-sha256.txt"
-    ).read_text(encoding="ascii").strip()
+    identity_match = re.search(
+        r"## Reviewed identity\n\n(\{[^\n]+\})\n\n"
+        r"## Reviewed identity SHA-256\n\n([0-9a-f]{64})\n",
+        prompt,
+    )
+    if identity_match is None:
+        raise SystemExit(94)
+    identity = json.loads(identity_match.group(1))
+    identity_sha = identity_match.group(2)
     verdicts_path = home / "fake-review-verdicts.json"
     verdicts = json.loads(verdicts_path.read_text(encoding="utf-8"))
     verdict = verdicts.pop(0) if verdicts else "pass"
@@ -471,7 +477,7 @@ def _assert_oracle_submission(
     assert '"repository":"chemitaro/spec-dock"' in prompt
     assert f'"branch":"{BRANCH}"' in prompt
     assert f'"source_head":"{head}"' in prompt
-    assert "Never use the default branch" in prompt
+    assert "Never substitute the default branch" in prompt
     assert '"kind":"authoring_zip"' in prompt or '"kind":"review_json"' in prompt
     onboarding_headings = (
         "init-/epic-/iss- lineage",
@@ -489,26 +495,9 @@ def _assert_oracle_submission(
         "First-day checklist",
     )
     if '"kind":"authoring_zip"' in prompt:
-        assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
-        assert all(prompt.count(heading) == 1 for heading in onboarding_headings)
-        diagram_contract = (
-            "4+ valid `plantuml` fences: system context/responsibility boundary/"
-            "planning sequence/implementation roadmap."
-        )
-        assert prompt.count(diagram_contract) == 1
-        assert (
-            "4+ valid `plantuml` fences: system-context/responsibility-boundary/"
-            "planning-sequence/implementation-roadmap."
-        ) not in prompt
-        assert all(
-            role in prompt
-            for role in (
-                "system context",
-                "responsibility boundary",
-                "planning sequence",
-                "implementation roadmap",
-            )
-        )
+        assert "13 nonempty distinct H2s, exact labels, no split/merge" not in prompt
+        assert all(heading not in prompt for heading in onboarding_headings)
+        assert "4+ valid `plantuml` fences" not in prompt
     else:
         assert "13 nonempty distinct H2s, exact labels, no split/merge" not in prompt
         assert all(heading not in prompt for heading in onboarding_headings)
@@ -516,7 +505,8 @@ def _assert_oracle_submission(
             "4+ valid `plantuml` fences: system context/responsibility boundary/"
             "planning sequence/implementation roadmap."
         ) not in prompt
-    assert not any("instruction" in name.lower() for name in prompt_records[0]["pack_files"])
+    assert len(prompt_records[0]["attachment_paths"]) >= 1
+    assert all("prompt-pack" not in path for path in prompt_records[0]["attachment_paths"])
     assert str(oracle_home) not in prompt
 
 

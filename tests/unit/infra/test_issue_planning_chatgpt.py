@@ -15,7 +15,6 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.issue_planning_prompt import (  # noqa: E402
     PlanningOutputExpectation,
-    PlanningPromptAttachment,
     SynthesizedPlanningPrompt,
 )
 from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
@@ -478,7 +477,7 @@ def test_role_expectation_mismatch_starts_no_process(
         synthesized=SynthesizedPlanningPrompt(
             role="reviewer",
             prompt="fixed",
-            attachments=(),
+            attachment_paths=(),
             output_expectation=_authoring_expectation(),
         ),
     )
@@ -1279,28 +1278,58 @@ def test_cross_kind_output_is_rejected(monkeypatch, tmp_path: Path, role: str) -
     assert result.review_json is None
 
 
-def test_prompt_pack_preserves_exact_binary_attachment_bytes(tmp_path: Path) -> None:
-    candidate = b"PK\x03\x04\x00\xffexact"
+def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(kwargs["env"], argv)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    paths = (tmp_path / "attachments", tmp_path / "candidate.zip", tmp_path / "source.md")
     synthesized = SynthesizedPlanningPrompt(
-        role="reviewer",
+        role="planner",
         prompt="fixed prompt",
-        attachments=(),
-        exact_attachments=(
-            PlanningPromptAttachment(
-                name="target-candidate.zip",
-                classification="review-target",
-                source_label="candidate.zip",
-                content=candidate,
-            ),
-        ),
-        output_expectation=_review_expectation(),
+        attachment_paths=paths,
+        output_expectation=_authoring_expectation(),
     )
-    pack = tmp_path / "pack"
-    issue_planning_chatgpt._write_transport_pack(pack, synthesized, _source_evidence())
-    assert (pack / "target-candidate.zip").read_bytes() == candidate
-    assert not (pack / "prompt.md").exists()
-    assert not (pack / "expected-output-contract.md").exists()
-    assert not (pack / "safe-output-constraints.md").exists()
+    result = issue_planning_chatgpt.invoke_issue_planning_chatgpt(
+        repo_root=tmp_path,
+        role="planner",
+        source_evidence=_source_evidence(),
+        synthesized=synthesized,
+    )
+
+    assert result.status == "pass"
+    submit = next(argv for argv in calls if "--prompt" in argv)
+    assert [Path(submit[index + 1]) for index, value in enumerate(submit) if value == "--file"] == list(paths)
+    assert len([value for value in submit if value == "--file"]) == len(paths)
+    assert not any("prompt-pack" in str(path) for path in tmp_path.iterdir())
+
+
+def test_s04_direct_transport_accepts_path_only_synthesized_input() -> None:
+    synthesized = SynthesizedPlanningPrompt(
+        role="planner",
+        prompt="fixed prompt",
+        attachment_paths=(Path("attachments"), Path("spec-dock/requirement.md")),
+        output_expectation=_authoring_expectation(),
+    )
+
+    assert synthesized.attachment_paths == (
+        Path("attachments"),
+        Path("spec-dock/requirement.md"),
+    )
 
 
 @pytest.mark.parametrize("mismatch", ["logical-filename", "internal-root"])
@@ -1527,7 +1556,7 @@ def _invoke(
         synthesized=SynthesizedPlanningPrompt(
             role=role,
             prompt=prompt,
-            attachments=(("source.md", "safe context"),),
+            attachment_paths=(tmp_path / "attachments", tmp_path / "source.md"),
             output_expectation=(_review_expectation() if role == "reviewer" else _authoring_expectation()),
         ),
         timeout_seconds=timeout_seconds,
@@ -1571,9 +1600,13 @@ def _assert_managed_chrome_argv(argv: list[str]) -> None:
     assert argv.count("--wait") == 1
     assert argv.count("--browser-attachments") == 1
     assert argv[argv.index("--browser-attachments") + 1] == "always"
-    for singleton in ("--prompt", "--file", "--slug"):
+    for singleton in ("--prompt", "--slug"):
         assert argv.count(singleton) == 1
-    assert Path(argv[argv.index("--file") + 1]).name == "prompt-pack"
+    assert argv.count("--file") == 2
+    assert [Path(argv[index + 1]).name for index, value in enumerate(argv) if value == "--file"] == [
+        "attachments",
+        "source.md",
+    ]
 
 
 def _assert_exact_harvest_argv(

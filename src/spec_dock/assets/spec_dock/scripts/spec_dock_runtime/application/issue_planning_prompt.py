@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
 from dataclasses import dataclass
-import hashlib
 import json
-import os
 from pathlib import Path, PurePosixPath
 import re
-import stat
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
@@ -24,8 +20,6 @@ if TYPE_CHECKING:
 
 MAX_DEPENDENCIES = 32
 MAX_RELEVANT_FILES = 16
-MAX_RELEVANT_FILE_BYTES = 256 * 1024
-MAX_RELEVANT_TOTAL_BYTES = 2 * 1024 * 1024
 MAX_OPERATOR_ENTRIES = 16
 MAX_OPERATOR_ENTRY_BYTES = 4 * 1024
 MAX_OPERATOR_TOTAL_BYTES = 32 * 1024
@@ -144,41 +138,11 @@ class PlanningOutputExpectation:
 
 
 @dataclass(frozen=True)
-class PlanningPromptAttachment:
-    name: str
-    classification: Literal["review-target", "supplemental-context", "formal-evidence"]
-    source_label: str
-    content: bytes
-
-    def __post_init__(self) -> None:
-        for value, field_name in ((self.name, "name"), (self.source_label, "source_label")):
-            if not isinstance(value, str) or not value or "\\" in value or is_credential_like_path(value):
-                raise ValueError(f"planning attachment {field_name} is unsafe")
-            path = PurePosixPath(value)
-            if path.is_absolute() or any(part in ("", ".", "..") or part.startswith(".") for part in path.parts):
-                raise ValueError(f"planning attachment {field_name} is unsafe")
-        if self.classification not in {
-            "review-target",
-            "supplemental-context",
-            "formal-evidence",
-        }:
-            raise ValueError("planning attachment classification is invalid")
-        if not isinstance(self.content, bytes):
-            raise ValueError("planning attachment content must be bytes")
-
-    @property
-    def sha256(self) -> str:
-        return hashlib.sha256(self.content).hexdigest()
-
-
-@dataclass(frozen=True)
 class SynthesizedPlanningPrompt:
     role: Literal["planner", "semantic_revision", "reviewer"]
     prompt: str
-    attachments: tuple[tuple[str, str], ...]
-    exact_attachments: tuple[PlanningPromptAttachment, ...] = ()
+    attachment_paths: tuple[Path, ...]
     output_expectation: PlanningOutputExpectation | None = None
-    attachment_paths: tuple[Path, ...] = ()
 
 
 def synthesize_issue_planning_prompt(
@@ -196,28 +160,8 @@ def synthesize_issue_planning_prompt(
     if len(context.relevant_source_paths) > MAX_RELEVANT_FILES:
         raise ValueError("relevant source paths exceed bounded limit")
 
-    root = repo_root.resolve(strict=True)
-    paths = (*context.canonical_issue_paths, *context.relevant_source_paths)
-    attachments: list[tuple[str, str]] = []
-    relevant_bytes = 0
-    for relative in sorted(set(paths), key=lambda item: item.encode("utf-8")):
-        is_relevant = relative in context.relevant_source_paths
-        _safe_source_file(root, relative)
-        raw = _read_source_file_descriptor_relative(
-            root,
-            relative,
-            max_bytes=(MAX_RELEVANT_FILE_BYTES if is_relevant else None),
-        )
-        if is_relevant:
-            relevant_bytes += len(raw)
-            if len(raw) > MAX_RELEVANT_FILE_BYTES or relevant_bytes > MAX_RELEVANT_TOTAL_BYTES:
-                raise ValueError("relevant source bytes exceed bounded limit")
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError as error:
-            raise ValueError("relevant source must be UTF-8") from error
-        _reject_sensitive(text)
-        attachments.append((relative, text))
+    root = repo_root
+    source_paths = _source_attachment_paths(root, context)
 
     expectation = output_expectation or _expectation_for_context(role, context)
     identity: dict[str, object] = {
@@ -240,9 +184,8 @@ def synthesize_issue_planning_prompt(
     return SynthesizedPlanningPrompt(
         role=role,
         prompt=prompt,
-        attachments=tuple(attachments),
+        attachment_paths=(resources.attachments_dir, *source_paths),
         output_expectation=expectation,
-        attachment_paths=(resources.attachments_dir,),
     )
 
 
@@ -255,9 +198,10 @@ def synthesize_planning_evidence_prompt(
     context: PlanningContext | None = None,
     remote_head: str | None = None,
     upstream: str | None = None,
-    exact_attachments: tuple[PlanningPromptAttachment, ...],
+    attachment_paths: tuple[Path, ...] = (),
     instructions: tuple[str, ...] = (),
-    supplemental_attachments: tuple[tuple[str, str], ...] = (),
+    reviewed_identity: dict[str, object] | None = None,
+    reviewed_identity_sha256: str | None = None,
     resource_root: Path | None = None,
     output_expectation: PlanningOutputExpectation | None = None,
 ) -> SynthesizedPlanningPrompt:
@@ -273,12 +217,12 @@ def synthesize_planning_evidence_prompt(
         raise ValueError("planning context identity does not match evidence inputs")
     if re.fullmatch(r"[0-9a-f]{40}", source_head) is None:
         raise ValueError("source HEAD is invalid")
-    if not exact_attachments:
-        raise ValueError("exact planning attachments are required")
-    names = [item.name for item in exact_attachments]
-    labels = [item.source_label for item in exact_attachments]
-    if len(names) != len(set(names)) or len(labels) != len(set(labels)):
-        raise ValueError("planning attachment names and source labels must be unique")
+    if role == "reviewer" and reviewed_identity is None:
+        raise ValueError("reviewed identity is required")
+    if (reviewed_identity is None) != (reviewed_identity_sha256 is None):
+        raise ValueError("reviewed identity and digest must be provided together")
+    if reviewed_identity_sha256 is not None and re.fullmatch(r"[0-9a-f]{64}", reviewed_identity_sha256) is None:
+        raise ValueError("reviewed identity digest is invalid")
     resources = _resolve_operation_resources(role, resource_root=resource_root)
     _validate_operation_context(context)
     identity: dict[str, object] = {
@@ -303,15 +247,15 @@ def synthesize_planning_evidence_prompt(
         identity=identity,
         operation_context=_render_operation_context(context),
         expectation=expectation,
+        reviewed_identity=reviewed_identity,
+        reviewed_identity_sha256=reviewed_identity_sha256,
         revision_scope=instructions if role == "semantic_revision" else (),
     )
     return SynthesizedPlanningPrompt(
         role=role,
         prompt=prompt,
-        attachments=supplemental_attachments,
-        exact_attachments=exact_attachments,
+        attachment_paths=(resources.attachments_dir, *attachment_paths),
         output_expectation=expectation,
-        attachment_paths=(resources.attachments_dir,),
     )
 
 
@@ -402,6 +346,8 @@ def _render_minimal_body(
     identity: dict[str, object],
     operation_context: str,
     expectation: PlanningOutputExpectation,
+    reviewed_identity: dict[str, object] | None = None,
+    reviewed_identity_sha256: str | None = None,
     revision_scope: tuple[str, ...] = (),
 ) -> str:
     sections = [
@@ -429,6 +375,15 @@ def _render_minimal_body(
             "or finish an Issue. Review PASS is not Human approval or execution readiness."
         ),
     ]
+    if reviewed_identity is not None:
+        rendered_identity = _canonical_json(reviewed_identity)
+        _reject_sensitive(rendered_identity)
+        sections.extend(
+            (
+                f"## Reviewed identity\n\n{rendered_identity}",
+                f"## Reviewed identity SHA-256\n\n{reviewed_identity_sha256}",
+            )
+        )
     if operation == "revision":
         revision_values = "\n".join(f"- {item}" for item in revision_scope) or "none"
         sections.append(f"## Revision scope\n\n{revision_values}")
@@ -509,89 +464,29 @@ def _safe_relative_expectation_path(value: str) -> None:
         raise ValueError("output expectation path is unsafe")
 
 
-def _safe_source_file(root: Path, relative: str) -> Path:
+def _source_attachment_paths(root: Path, context: PlanningContext) -> tuple[Path, ...]:
+    paths = _ordered_unique((*context.canonical_issue_paths, *context.relevant_source_paths))
+    for relative in paths:
+        _validate_source_path(relative)
+    return tuple(root / relative for relative in paths)
+
+
+def _ordered_unique(values: tuple[str, ...]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            result.append(value)
+    return tuple(result)
+
+
+def _validate_source_path(relative: str) -> None:
     if "\\" in relative or is_credential_like_path(relative):
         raise ValueError("relevant source path is unsafe")
     path = PurePosixPath(relative)
     if path.is_absolute() or any(part in ("", ".", "..", ".workbench") for part in path.parts):
         raise ValueError("relevant source path is unsafe")
-    target = root / Path(*path.parts)
-    current = root
-    for part in path.parts:
-        current = current / part
-        if current.is_symlink():
-            raise ValueError("relevant source path is symlinked")
-    try:
-        resolved = target.resolve(strict=True)
-    except OSError as error:
-        raise ValueError("relevant source path is missing") from error
-    if not resolved.is_relative_to(root) or not resolved.is_file():
-        raise ValueError("relevant source path is outside repository or not a file")
-    return resolved
-
-
-def _read_source_file_descriptor_relative(
-    root: Path,
-    relative: str,
-    *,
-    max_bytes: int | None,
-) -> bytes:
-    required_flags = ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC", "O_NONBLOCK")
-    if any(not getattr(os, name, 0) for name in required_flags) or not getattr(os, "supports_dir_fd", ()):
-        raise ValueError("repository descriptor reads are unavailable")
-    path = PurePosixPath(relative)
-    parts = path.parts
-    if not parts:
-        raise ValueError("relevant source path is unsafe")
-    descriptor_fds: list[int] = []
-    try:
-        root_before = root.lstat()
-        if not stat.S_ISDIR(root_before.st_mode):
-            raise ValueError("repository root is not a directory")
-        root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-        root_fd = os.open(root, root_flags)
-        descriptor_fds.append(root_fd)
-        root_opened = os.fstat(root_fd)
-        root_after = root.lstat()
-        root_identity = (root_before.st_dev, root_before.st_ino, root_before.st_mode)
-        if (root_opened.st_dev, root_opened.st_ino, root_opened.st_mode) != root_identity or (
-            root_after.st_dev,
-            root_after.st_ino,
-            root_after.st_mode,
-        ) != root_identity:
-            raise ValueError("repository root identity changed")
-
-        parent_fd = root_fd
-        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-        for part in parts[:-1]:
-            parent_fd = os.open(part, directory_flags, dir_fd=parent_fd)
-            descriptor_fds.append(parent_fd)
-        final_flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
-        final_fd = os.open(parts[-1], final_flags, dir_fd=parent_fd)
-        descriptor_fds.append(final_fd)
-        final_status = os.fstat(final_fd)
-        if not stat.S_ISREG(final_status.st_mode):
-            raise ValueError("relevant source path is not a regular file")
-        return _read_descriptor_bytes(final_fd, max_bytes=max_bytes)
-    except (OSError, TypeError):
-        raise ValueError("relevant source path is unavailable") from None
-    finally:
-        for descriptor in reversed(descriptor_fds):
-            with suppress(OSError):
-                os.close(descriptor)
-
-
-def _read_descriptor_bytes(descriptor: int, *, max_bytes: int | None) -> bytes:
-    chunks: list[bytes] = []
-    total = 0
-    while True:
-        chunk = os.read(descriptor, 64 * 1024)
-        if not chunk:
-            return b"".join(chunks)
-        total += len(chunk)
-        if max_bytes is not None and total > max_bytes:
-            raise ValueError("relevant source bytes exceed bounded limit")
-        chunks.append(chunk)
 
 
 def _reject_sensitive(text: str) -> None:

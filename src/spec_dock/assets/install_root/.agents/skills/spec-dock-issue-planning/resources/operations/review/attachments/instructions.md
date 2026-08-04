@@ -1,9 +1,7 @@
 # Issue Planning Review Detailed Instructions
 
-Use the exact supplied identity as `reviewed_identity`. Use the exact digest from
-`reviewed-identity-sha256.txt` as `reviewed_identity_sha256`; do not substitute the attachment
-SHA-256 of `reviewed-identity.json`, whose trailing LF is transport framing rather than part of
-the identity digest.
+Use the exact `Reviewed identity` value from the minimal body as `reviewed_identity`. Use the
+exact `Reviewed identity SHA-256` value from the minimal body as `reviewed_identity_sha256`.
 
 Set `verdict` to `fail` if and only if at least one finding is `p0` or `p1`; otherwise set it to
 `pass`. Make findings unique. Each finding uses only `id`, `severity`, `exact_location`,

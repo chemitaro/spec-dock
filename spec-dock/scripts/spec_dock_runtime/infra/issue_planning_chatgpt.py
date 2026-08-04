@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
-import hashlib
+from dataclasses import dataclass
 import http.client
 import json
 import os
@@ -47,6 +47,7 @@ _DEFAULT_RECOVERY_TIMEOUT_SECONDS = 2 * 60
 _RECOVERY_POLL_INTERVAL_SECONDS = 0.25
 _TERMINAL_STATUSES = frozenset({"completed"})
 _SessionState = Literal["terminal", "nonterminal", "missing", "invalid"]
+_ORACLE_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _ROOT_CAPABILITIES = (
     b"--engine",
     b"--file",
@@ -72,6 +73,19 @@ _SESSION_ROLE_SLUGS = {
     "semantic_revision": "semantic-revision",
     "reviewer": "reviewer",
 }
+
+
+@dataclass(frozen=True)
+class _OraclePreflightReceipt:
+    """Content-free result of the current Oracle preflight checks."""
+
+    version: str | None
+    version_exit_code: int | None
+    root_help_exit_code: int | None
+    session_help_exit_code: int | None
+    missing_root_capabilities: tuple[str, ...]
+    missing_session_capabilities: tuple[str, ...]
+    supported_by_current_runtime: bool
 
 
 def resolve_issue_planning_github_repository(repo_root: Path) -> str | None:
@@ -111,9 +125,7 @@ def invoke_issue_planning_chatgpt(
 
     with TemporaryDirectory(prefix="specdock-issue-planning-") as raw_temp:
         temp_root = Path(raw_temp)
-        pack = temp_root / "prompt-pack"
         staging = temp_root / "staging"
-        _write_transport_pack(pack, synthesized, source_evidence)
         session_id = _new_session_id(role, source_evidence)
         session_root = _oracle_home(child_env) / "sessions" / session_id
         if session_root.exists() or session_root.is_symlink():
@@ -148,9 +160,9 @@ def invoke_issue_planning_chatgpt(
             session_id,
             "--prompt",
             synthesized.prompt,
-            "--file",
-            str(pack),
         ]
+        for attachment_path in synthesized.attachment_paths:
+            argv.extend(("--file", str(attachment_path)))
         run_timeout = (
             timeout_seconds if timeout_seconds is not None and timeout_seconds > 0 else _DEFAULT_RUN_TIMEOUT_SECONDS
         )
@@ -300,23 +312,75 @@ def _preflight_supported_oracle(
     child_env: dict[str, str],
     cwd: Path,
 ) -> bool:
+    return _read_oracle_preflight_receipt(
+        executable,
+        child_env=child_env,
+        cwd=cwd,
+    ).supported_by_current_runtime
+
+
+def _read_oracle_preflight_receipt(
+    executable: Path,
+    *,
+    child_env: dict[str, str],
+    cwd: Path,
+) -> _OraclePreflightReceipt:
+    missing_root_capabilities = tuple(flag.decode("ascii") for flag in _ROOT_CAPABILITIES)
+    missing_session_capabilities = tuple(flag.decode("ascii") for flag in _SESSION_CAPABILITIES)
     try:
-        version = _run_oracle(
+        version_result = _run_oracle(
             [str(executable), "--version"],
             child_env=child_env,
             cwd=cwd,
             timeout=_PREFLIGHT_TIMEOUT_SECONDS,
         )
-        if version.returncode != 0 or version.stdout.decode("utf-8", errors="replace").strip() != (
-            SUPPORTED_ORACLE_VERSION
-        ):
-            return False
+    except (OSError, subprocess.TimeoutExpired):
+        return _OraclePreflightReceipt(
+            version=None,
+            version_exit_code=None,
+            root_help_exit_code=None,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    version = _preflight_version(version_result.stdout)
+    if version_result.returncode != 0 or version != SUPPORTED_ORACLE_VERSION:
+        return _OraclePreflightReceipt(
+            version=version,
+            version_exit_code=version_result.returncode,
+            root_help_exit_code=None,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    try:
         root_help = _run_oracle(
             [str(executable), "--help"],
             child_env=child_env,
             cwd=cwd,
             timeout=_PREFLIGHT_TIMEOUT_SECONDS,
         )
+    except (OSError, subprocess.TimeoutExpired):
+        return _OraclePreflightReceipt(
+            version=version,
+            version_exit_code=version_result.returncode,
+            root_help_exit_code=None,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    missing_root_capabilities = tuple(
+        flag.decode("ascii")
+        for flag in _ROOT_CAPABILITIES
+        if flag not in root_help.stdout
+    )
+    try:
         session_help = _run_oracle(
             [str(executable), "session", "--help"],
             child_env=child_env,
@@ -324,13 +388,40 @@ def _preflight_supported_oracle(
             timeout=_PREFLIGHT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return False
-    return (
-        root_help.returncode == 0
-        and session_help.returncode == 0
-        and all(flag in root_help.stdout for flag in _ROOT_CAPABILITIES)
-        and all(flag in session_help.stdout for flag in _SESSION_CAPABILITIES)
+        return _OraclePreflightReceipt(
+            version=version,
+            version_exit_code=version_result.returncode,
+            root_help_exit_code=root_help.returncode,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    missing_session_capabilities = tuple(
+        flag.decode("ascii")
+        for flag in _SESSION_CAPABILITIES
+        if flag not in session_help.stdout
     )
+    return _OraclePreflightReceipt(
+        version=version,
+        version_exit_code=version_result.returncode,
+        root_help_exit_code=root_help.returncode,
+        session_help_exit_code=session_help.returncode,
+        missing_root_capabilities=missing_root_capabilities,
+        missing_session_capabilities=missing_session_capabilities,
+        supported_by_current_runtime=(
+            root_help.returncode == 0
+            and session_help.returncode == 0
+            and not missing_root_capabilities
+            and not missing_session_capabilities
+        ),
+    )
+
+
+def _preflight_version(stdout: bytes) -> str | None:
+    value = stdout.decode("utf-8", errors="replace").strip()
+    return value if _ORACLE_VERSION_RE.fullmatch(value) else None
 
 
 def _run_oracle(
@@ -550,72 +641,6 @@ def _new_session_id(
     source_evidence: PlanningSourceEvidence,
 ) -> str:
     return f"specdock-{_SESSION_ROLE_SLUGS[role]}-{source_evidence.snapshot_id[:6]}-{secrets.token_hex(4)}"
-
-
-def _write_transport_pack(
-    pack: Path,
-    synthesized: SynthesizedPlanningPrompt,
-    source: PlanningSourceEvidence,
-) -> None:
-    pack.mkdir()
-    (pack / ".specdock-authoring-pack").write_text("issue-planning-transport-v2\n", encoding="utf-8")
-    attachment_names: list[str] = []
-    for index, (relative, body) in enumerate(synthesized.attachments):
-        name = f"context-{index:03d}.md"
-        attachment_names.append(name)
-        (pack / name).write_text(f"source_path: {relative}\n\n{body}", encoding="utf-8")
-    exact_source_hashes: dict[str, str] = {}
-    for attachment in synthesized.exact_attachments:
-        if attachment.name in attachment_names:
-            raise ValueError("exact planning attachment name collides with prompt pack")
-        target = pack / attachment.name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(attachment.content)
-        if hashlib.sha256(target.read_bytes()).hexdigest() != attachment.sha256:
-            raise OSError("exact planning attachment changed while writing prompt pack")
-        attachment_names.append(attachment.name)
-        exact_source_hashes[attachment.source_label] = attachment.sha256
-    manifest = {
-        "schema_version": 2,
-        "generated_by": "spec-dock-issue-planning",
-        "expected_output_root": "oracle-session-artifact",
-        "required_metadata": [],
-        "files": attachment_names,
-        "authority": "evidence_only",
-        "adoption_status": "unreviewed",
-        "bundle_generation_not_promotion": True,
-    }
-    provenance = {
-        "evidence_mode": "github-synced",
-        "sync_state": "synced",
-        "github_sync": "verified",
-        "source_manifest_hash": source.source_manifest_hash,
-        "authority": "evidence_only",
-        "adoption_status": "unreviewed",
-        "bundle_generation_not_promotion": True,
-    }
-    source_hashes = {path: hashlib.sha256(body.encode("utf-8")).hexdigest() for path, body in synthesized.attachments}
-    for label, digest in exact_source_hashes.items():
-        existing = source_hashes.get(label)
-        if existing is not None and existing != digest:
-            raise ValueError("planning attachment source label has conflicting bytes")
-        source_hashes[label] = digest
-    source_manifest = {
-        "source_paths": list(source_hashes),
-        "source_hashes": source_hashes,
-        "source_manifest_hash": source.source_manifest_hash,
-    }
-    _write_json(pack / "manifest.json", manifest)
-    _write_json(pack / "provenance.json", provenance)
-    _write_json(pack / "source-manifest.json", source_manifest)
-    _write_json(pack / "stale-if.json", {"source_head_changes": source.local_head})
-
-
-def _write_json(path: Path, payload: object) -> None:
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _invocation_contract_is_valid(
