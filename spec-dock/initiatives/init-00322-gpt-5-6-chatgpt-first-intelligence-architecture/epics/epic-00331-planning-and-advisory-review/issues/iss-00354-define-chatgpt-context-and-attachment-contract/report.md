@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | resolved | scope | ChatGPT-Use reviewer | Candidate v2 と current HEAD の境界および実装準備ゲート | Candidate v2 の immutable identity を保持する; current HEAD の正規文書をレビュー対象にする | Candidate v2 は証跡として保持し、現行の承認済み正規文書を実装準備の対象にする | v2 Red Team PASS、current HEAD の GitHub 同期、要件・設計・計画・report のゲート検証 | applied | `candidate-note.md`, `report.md`, current HEAD `8e0881d42913c268f26be531ed022aeda1de100f` | 実装開始前に S01〜S13 ブリーフを作成し、各ステップの検証を report に記録する |
+| D-001 | resolved | scope | ChatGPT-Use reviewer | Candidate v2 と current HEAD の境界および実装準備ゲート | Candidate v2 の immutable identity を保持する; current HEAD の正規文書をレビュー対象にする | Candidate v2 は証跡として保持し、現行の承認済み正規文書を実装準備の対象にする | v2 Red Team PASS、current HEAD の GitHub 同期、要件・設計・計画・report のゲート検証 | applied | `candidate-note.md`, `report.md`, current HEAD `704fe487aff0ec9996abe6fa564ce3559d8f736e` | 実装開始前に S01〜S13 ブリーフを作成し、各ステップの検証を report に記録する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -276,6 +276,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - 検証: 配置先で `shasum -a 256 -c CHECKSUMS.sha256` を実行し、Candidate v2 に含まれる全エントリが一致した。v2 Red Team は fresh thread で PASS（P0/P1 なし）となった。
 - 配置状態: `copied_to_issue_scope`
 - 正式採用状態: `deferred`。今回の依頼は解凍した仕様書等の配置であり、`planning apply`、assurance 更新、implementation start は実行していない。Candidate 文書に記載された `evidence-only` / `unadopted` の境界を維持する。
+
+## 修正コミットとGitHub同期（2026-08-04）
+
+- 修正コミット: `704fe487aff0ec9996abe6fa564ce3559d8f736e` (`docs(iss-00354): v2レビュー反映を要件基準へ反映`)
+- repository: `chemitaro/spec-dock`
+- branch: `codex/iss-00354-chatgpt-context-contract`
+- local HEAD と GitHub branch HEAD: `identical`
+- 修正後のChatGPTレビュー対象: このコミット以降の current branch 全体。default branch fallback は使用しない。
 
 ## 実装ブリーフ運用追加（2026-08-04）
 

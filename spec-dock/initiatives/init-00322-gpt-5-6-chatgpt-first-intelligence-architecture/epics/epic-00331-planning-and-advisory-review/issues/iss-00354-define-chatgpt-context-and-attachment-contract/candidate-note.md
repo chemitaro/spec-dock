@@ -66,6 +66,7 @@ Review-excluded supporting material:
 Current working-copy binding:
 
 - Current branch HEAD and GitHub parity are recorded in `report.md` before each review.
+- Latest pushed repair HEAD: `704fe487aff0ec9996abe6fa564ce3559d8f736e` on `codex/iss-00354-chatgpt-context-contract`.
 - The current working copy is reviewed after the post-adoption commit; the immutable v2 review remains the historical Candidate review.
 
 ## Integrity controls
