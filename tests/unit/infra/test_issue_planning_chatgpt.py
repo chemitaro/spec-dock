@@ -1,11 +1,14 @@
+import builtins
 import hashlib
 import io
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+from types import SimpleNamespace
 import zipfile
 
 import pytest
@@ -19,12 +22,16 @@ from spec_dock_runtime.application.issue_planning_prompt import (  # noqa: E402
 )
 from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
 from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
+from spec_dock_runtime.domain import issue_planning_contracts  # noqa: E402
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     OracleAuthoringZipSnapshot,
     PlanningInvocationResult,
     PlanningSourceEvidence,
 )
-from spec_dock_runtime.infra import issue_planning_chatgpt  # noqa: E402
+from spec_dock_runtime.infra import (  # noqa: E402
+    issue_planning_chatgpt,
+    issue_planning_oracle_artifact,
+)
 from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
 
 PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
@@ -1314,10 +1321,30 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
     original_rglob = Path.rglob
     original_resolve = Path.resolve
     original_stat = Path.stat
+    original_read_bytes = Path.read_bytes
+    original_open = Path.open
+    original_builtin_open = builtins.open
+    original_scandir = os.scandir
+    original_listdir = os.listdir
+    original_zip_file = zipfile.ZipFile
+    original_sha256 = hashlib.sha256
+    input_archive_calls = 0
+    input_copy_calls = 0
+    input_hash_calls = 0
 
     def guard(path: Path) -> None:
         if rejects_input_mutation(path):
             raise AssertionError("direct transport mutated or inspected an input path")
+
+    def path_like(value: object) -> Path | None:
+        if isinstance(value, (str, os.PathLike)):
+            return Path(value)
+        return None
+
+    def guard_value(value: object) -> None:
+        candidate = path_like(value)
+        if candidate is not None:
+            guard(candidate)
 
     def guarded_mkdir(path: Path, *args: object, **kwargs: object) -> None:
         guard(path)
@@ -1363,6 +1390,66 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
         guard(path)
         return original_stat(path, *args, **kwargs)
 
+    def guarded_read_bytes(path: Path, *args: object, **kwargs: object) -> bytes:
+        guard(path)
+        return original_read_bytes(path, *args, **kwargs)
+
+    def guarded_open(path: Path, *args: object, **kwargs: object):
+        guard(path)
+        return original_open(path, *args, **kwargs)
+
+    def guarded_builtin_open(file: object, *args: object, **kwargs: object):
+        guard_value(file)
+        return original_builtin_open(file, *args, **kwargs)
+
+    def guarded_scandir(path: object = "."):
+        guard_value(path)
+        return original_scandir(path)
+
+    def guarded_listdir(path: object = ".") -> list[str]:
+        guard_value(path)
+        return original_listdir(path)
+
+    def guarded_copy_operation(*args: object, **kwargs: object):
+        nonlocal input_copy_calls
+        if any(
+            (candidate := path_like(value)) is not None
+            and rejects_input_mutation(candidate)
+            for value in args[:2]
+        ):
+            input_copy_calls += 1
+            raise AssertionError("direct transport copied an input path")
+        return kwargs.pop("_original")(  # type: ignore[no-any-return]
+            *args,
+            **kwargs,
+        )
+
+    def guarded_copyfileobj(*args: object, **kwargs: object):
+        return original_copyfileobj(*args, **kwargs)
+
+    def guarded_zip_file(file: object, *args: object, **kwargs: object):
+        nonlocal input_archive_calls
+        candidate = path_like(file)
+        if candidate is not None and rejects_input_mutation(candidate):
+            input_archive_calls += 1
+            raise AssertionError("direct transport archived an input path")
+        return original_zip_file(file, *args, **kwargs)
+
+    def guarded_sha256(*args: object, **kwargs: object):
+        nonlocal input_hash_calls
+        input_hash_calls += 1
+        raise AssertionError("direct transport hashed an input path")
+
+    def artifact_without_hash(kind: str, path: Path) -> dict[str, object]:
+        contents = original_read_bytes(path)
+        return {
+            "kind": kind,
+            "path": str(path),
+            "sizeBytes": len(contents),
+            "sha256": original_sha256(contents).hexdigest(),
+            "validation": {"type": "zip" if kind == "file" else "generic", "ok": True},
+        }
+
     monkeypatch.setattr(Path, "mkdir", guarded_mkdir)
     monkeypatch.setattr(Path, "write_bytes", guarded_write_bytes)
     monkeypatch.setattr(Path, "write_text", guarded_write_text)
@@ -1374,6 +1461,59 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
     monkeypatch.setattr(Path, "rglob", guarded_rglob)
     monkeypatch.setattr(Path, "resolve", guarded_resolve)
     monkeypatch.setattr(Path, "stat", guarded_stat)
+    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+    monkeypatch.setattr(Path, "open", guarded_open)
+    monkeypatch.setattr(builtins, "open", guarded_builtin_open)
+    monkeypatch.setattr(os, "scandir", guarded_scandir)
+    monkeypatch.setattr(os, "listdir", guarded_listdir)
+    original_copy = shutil.copy
+    original_copy2 = shutil.copy2
+    original_copyfile = shutil.copyfile
+    original_move = shutil.move
+    original_copyfileobj = shutil.copyfileobj
+    monkeypatch.setattr(
+        shutil,
+        "copy",
+        lambda *args, **kwargs: guarded_copy_operation(
+            *args, _original=original_copy, **kwargs
+        ),
+    )
+    monkeypatch.setattr(
+        shutil,
+        "copy2",
+        lambda *args, **kwargs: guarded_copy_operation(
+            *args, _original=original_copy2, **kwargs
+        ),
+    )
+    monkeypatch.setattr(
+        shutil,
+        "copyfile",
+        lambda *args, **kwargs: guarded_copy_operation(
+            *args, _original=original_copyfile, **kwargs
+        ),
+    )
+    monkeypatch.setattr(
+        shutil,
+        "move",
+        lambda *args, **kwargs: guarded_copy_operation(
+            *args, _original=original_move, **kwargs
+        ),
+    )
+    monkeypatch.setattr(shutil, "copyfileobj", guarded_copyfileobj)
+    monkeypatch.setattr(zipfile, "ZipFile", guarded_zip_file)
+    monkeypatch.setattr(hashlib, "sha256", guarded_sha256)
+    monkeypatch.setattr(
+        issue_planning_oracle_artifact,
+        "hashlib",
+        SimpleNamespace(sha256=original_sha256),
+    )
+    monkeypatch.setattr(
+        issue_planning_contracts,
+        "hashlib",
+        SimpleNamespace(sha256=original_sha256),
+    )
+    monkeypatch.setattr(sys.modules[__name__], "_artifact", artifact_without_hash)
+
     synthesized = SynthesizedPlanningPrompt(
         role="planner",
         prompt="fixed prompt",
@@ -1392,6 +1532,9 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
     assert [Path(submit[index + 1]) for index, value in enumerate(submit) if value == "--file"] == list(paths)
     assert len([value for value in submit if value == "--file"]) == len(paths)
     assert not any("prompt-pack" in str(path) for path in tmp_path.iterdir())
+    assert input_archive_calls == 0
+    assert input_copy_calls == 0
+    assert input_hash_calls == 0
 
 
 def test_s04_direct_transport_accepts_path_only_synthesized_input() -> None:
