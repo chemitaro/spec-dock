@@ -36,13 +36,23 @@ Candidate v2 の ZIP bytes と identity は immutable な historical evidence �
 | Field | Value |
 |---|---|
 | Authority | `canonical` for iss-00354 implementation-preparation documents only |
-| Adoption status | `pending_fresh_exact_head_review` (implementation not started) |
+| Adoption status | `fresh_review_pass_recorded` (implementation not started) |
 | Repository | `chemitaro/spec-dock` |
 | Branch | `codex/iss-00354-chatgpt-context-contract` |
-| Last reviewed branch HEAD | `bb75f6d5fcd142d8f2d0dd3ff4a06a057b4ee709` |
+| Last reviewed branch HEAD | `079685b2a38baf9300c5bec7d5589ce9712bc7d3` |
 | GitHub parity at last review | `identical` (default branch fallback not used) |
 
-The last reviewed branch tip is historical evidence for the completed v4 review. The next review target must be the exact newly pushed branch tip supplied in the review prompt and verified through GitHub immediately before review; no static prior hash is treated as the next target. The scope is not execution-ready until that fresh exact-head review passes and the corresponding gate is recorded in `report.md`.
+The last reviewed branch tip is the exact HEAD used by the completed v5 Fresh Red Team review. The v5 PASS is recorded in `report.md` as `EAL-005`; it is a review/adoption result only and does not mean implementation, assurance promotion, PR, merge, or Issue close has occurred. Any later repair commit is a new review target and must be checked through GitHub before another fresh review.
+
+## Latest Fresh Review Outcome
+
+| Field | Value |
+|---|---|
+| Review target | `079685b2a38baf9300c5bec7d5589ce9712bc7d3` |
+| Verdict | `PASS` (P0=0 / P1=0) |
+| Reviewer evidence | `/private/tmp/iss-00354-chatgpt-review-v5-20260804/review.md` |
+| Evidence SHA-256 | `d0a2e1bef291bab88797e166c5e96a368357452f7c2b4ddeaca402dc8bf5ea1a` |
+| Adoption boundary | PASS evidence recorded; implementation not started |
 
 ## GitHub verification
 
