@@ -1307,10 +1307,18 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
         return _completed(argv)
 
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
-    paths = (tmp_path / "attachments", tmp_path / "candidate.zip", Path("source.md"))
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    static_directory = repo_root / "attachments"
+    static_directory.mkdir()
+    relative_source = Path("source.md")
+    (repo_root / relative_source).write_text("source\n", encoding="utf-8")
+    external_candidate = tmp_path / "candidate.zip"
+    external_candidate.write_bytes(b"candidate")
+    paths = (static_directory, external_candidate, relative_source)
     input_root = paths[0]
-    relative_input_aliases = (Path("source.md"),)
-    absolute_input_aliases = tuple(tmp_path / path for path in relative_input_aliases)
+    relative_input_aliases = (relative_source,)
+    absolute_input_aliases = tuple(repo_root / path for path in relative_input_aliases)
     protected_input_paths = set(paths) | set(absolute_input_aliases)
 
     def rejects_input_mutation(path: Path) -> bool:
@@ -1527,7 +1535,7 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
         output_expectation=_authoring_expectation(),
     )
     result = issue_planning_chatgpt.invoke_issue_planning_chatgpt(
-        repo_root=tmp_path,
+        repo_root=repo_root,
         role="planner",
         source_evidence=_source_evidence(),
         synthesized=synthesized,
@@ -1535,10 +1543,15 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
 
     assert result.status == "pass"
     submit = next(argv for argv in calls if "--prompt" in argv)
-    assert [Path(submit[index + 1]) for index, value in enumerate(submit) if value == "--file"] == list(paths)
+    file_operands = [submit[index + 1] for index, value in enumerate(submit) if value == "--file"]
+    assert file_operands == [str(path) for path in paths]
+    assert file_operands[-1] == "source.md"
+    assert not Path(file_operands[-1]).is_absolute()
+    assert file_operands[1] == str(external_candidate)
+    assert not Path(file_operands[1]).is_relative_to(repo_root)
     assert len([value for value in submit if value == "--file"]) == len(paths)
-    assert submit_cwds == [tmp_path]
-    assert not any("prompt-pack" in str(path) for path in tmp_path.iterdir())
+    assert submit_cwds == [repo_root]
+    assert not any("prompt-pack" in str(path) for path in repo_root.iterdir())
     assert input_archive_calls == 0
     assert input_copy_calls == 0
     assert input_hash_calls == 0
