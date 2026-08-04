@@ -1,212 +1,163 @@
-# 新規参加者向け: SpecDock ChatGPT 入力契約の読み方
+# 新規参加者向け: Oracle 0.17.0 対応版 ChatGPT 入力契約
 
-> **補助資料 / non-canonical**  
-> この文書は `CAND-ISS-00354-20260803T172642Z` の onboarding companion である。`requirement.md`、`design.md`、`plan.md` に
-> 従属し、第四の canonical specification ではない。矛盾時は三文書が優先する。
+> **補助資料 / non-canonical / Red Team レビュー対象外**  
+> 本書は `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z` の exactly-one onboarding companion である。`requirement.md`、`design.md`、`plan.md`、
+> `decisions/ADR-ISS354-001-oracle-017-browser-compatibility.md` に従属する。
 
-## 1. この Issue が解決する問題
+## 1. 最初に理解すること
 
-従来の Issue Planning runtime は、ChatGPT へ渡す情報を安全に整形するため、source file を一件ずつ読み、
-UTF-8、symlink、size、secret、path を検査し、temporary prompt pack と manifest を生成していた。
+Issue #354の中心は、ChatGPT inputを次へ分けることにある。
 
-Issue #354 の最終判断は、この入力処理を単純化する。
+- minimal body:目的、exact source identity、authority、expected output。
+- attachments:詳細instructionとevidence。
+- transport:SpecDockはdirectory entryを読まず、original pathをPATH Oracleへ渡す。
+- output:ZIP / JSONを既存validatorで厳格に検証する。
 
-- Chat body: 作業開始に必要な最小 identity と命令。
-- Attachments: 詳細 instruction と evidence。
-- Attachment directory: SpecDock は中身を理解せず、directory path のまま direct Oracle へ渡す。
-- Output: 既存の ZIP / JSON validator で厳格に検証する。
+Oracle `0.17.0` 対応はこの設計を置き換えない。Oracle versionごとのbrowser contract、stage evidence、bounded recoveryを追加する。
 
-つまり「入力を信頼済み directory としてそのまま渡す」ことと、「ChatGPT output を無条件に信頼する」ことは
-全く別である。
-
-## 2. 一枚で見る全体像
+## 2. 一枚で見るflow
 
 ```mermaid
 flowchart TB
-    Human[Human / Issue owner]
-    CLI[SpecDock command / skill]
-    Git[Exact GitHub branch + HEAD gate]
-    Body[Minimal chat body]
-    Dir[Operation attachment directory]
-    Dyn[Dynamic evidence paths]
-    Oracle[Provider-owned direct Oracle]
-    Blue[ChatGPT Blue]
-    Red[Fresh ChatGPT Red]
-    Out[ZIP / closed JSON]
-    Validator[Existing Runtime validators]
-    Candidate[Evidence-only Candidate / Review]
-    Apply[Human-approved apply]
+    Human[Human / Codex]
+    Git[Exact GitHub branch + HEAD]
+    Body[Minimal body]
+    Paths[Original attachment paths]
+    Profile[Exact Oracle compatibility profile]
+    Oracle[PATH Oracle + managed Chrome]
+    Stages[Model → Attach → Reconstruct → Submit → Response → Download]
+    Recovery{Recovery decision}
+    Same[Same-session harvest/capture]
+    New[One pre-submit new execution]
+    Validate[Strict ZIP / JSON validation]
+    Evidence[Evidence-only Candidate / Review]
 
-    Human --> CLI
-    CLI --> Git
+    Human --> Git
     Git --> Body
-    Git --> Dir
-    CLI --> Dyn
+    Git --> Paths
     Body --> Oracle
-    Dir --> Oracle
-    Dyn --> Oracle
-    Oracle --> Blue
-    Oracle --> Red
-    Blue --> Out
-    Red --> Out
-    Out --> Validator
-    Validator --> Candidate
-    Candidate --> Apply
+    Paths --> Oracle
+    Profile --> Oracle
+    Oracle --> Stages
+    Stages --> Recovery
+    Recovery -->|model or direct attach, submitted=false, budget| New
+    New --> Oracle
+    Recovery -->|submitted=true| Same
+    Same --> Validate
+    Stages -->|normal completion| Validate
+    Validate --> Evidence
 ```
 
-## 3. 変わるもの / 変わらないもの
+## 3. 変わらない境界
 
-### 変わるもの
+- repository `chemitaro/spec-dock`、branch `codex/iss-00354-chatgpt-context-contract`、source HEAD `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1`をexactに使う。
+- default branch、personal wrapper、APIへfallbackしない。
+- Oracle-native user/project configはOracleの責任として尊重する。
+- formal必須値はexplicit argvで渡す。
+- Blueはauthoring、Candidate versionごとのRedはfresh review。
+- ChatGPT outputはevidence-only。Human-approved applyまでcanonicalではない。
+- input directoryをscanしなくても、output ZIP / JSON validationは削除しない。
 
-- role instruction を本文へ全部連結しない。
-- individual source file を `context-NNN.md` に変換しない。
-- input manifest / checksum を生成しない。
-- attachment directory を prewalk しない。
-- `--context-manifest` を directory-oriented input へ置き換える。
-- Planning と Semantic Revision で verified Blue thread を継続する。
-- onboarding の見出し数や diagram 数を過剰に hardcode しない。
+## 4. Oracle execution と ChatGPT conversation は別物
 
-### 変わらないもの
+Oracle processが起動しても、promptが送信される前に失敗すればChatGPT conversation turnは作られていない。
 
-- named current branch / exact HEAD。
-- default branch fallback 禁止。
-- direct Oracle / managed Chrome。
-- personal wrapper / API fallback 禁止。
-- Candidate は evidence-only。
-- Review は fresh read-only Red。
-- Planner / Revision は ZIP、Reviewer は closed JSON。
-- output parser、Candidate identity、Review identity、Human approval。
-- ChatGPT に repository mutation をさせない。
-
-## 4. Option C を誤解しない
-
-Option C は「何でも安全」という意味ではない。責任の置き場所を変える。
-
-| 項目 | Owner |
+| 状態 | Conversationへの影響 |
 |---|---|
-| attachment directory に何を置くか | pack maintainer / operator |
-| directory entry の意味判断 | SpecDock は行わない |
-| transport が受け取れるか | direct Oracle / ChatGPT の実結果 |
-| transport failure からの除外・変換 | 行わない |
-| exact GitHub source identity | SpecDock preflight |
-| ChatGPT output の形式・identity | SpecDock output validator |
-| canonical adoption | Human-approved apply |
+| model picker failure / `promptSubmitted=false` | Blue/Red turn未作成 |
+| attachment failure / `promptSubmitted=false` | Blue/Red turn未作成 |
+| reconstruction mismatch / `promptSubmitted=false` | Blue/Red turn未作成、automatic retryなし |
+| `promptSubmitted=true` | turn作成済み。new execution禁止 |
+| response complete / download failed |同じturnのartifactをsame-sessionで回収 |
 
-directory に hidden file、symlink、特殊 entry があっても、SpecDock は「安全だから採用」「危険だから除外」と
-判定しない。directory path を渡し、transport の通常結果を扱う。
+Fresh Redとは「Oracle processが一つ」という意味ではなく、「Candidate versionについてsuccessful prompt submissionが一つのnew Red
+conversationにだけ行われる」という意味である。
 
-## 5. Operation ごとの入力
-
-### Planning
-
-- Body: Issue の目的、repository / branch / HEAD、scope identity、authority、ZIP expectation。
-- Static attachments: authoring instructions、authority、output contract。
-- Dynamic attachments: optional operator attachment directory。
-- Thread: existing verified Blue または new Blue。
-
-### Review
-
-- Body: fresh read-only defect review、reviewed identity、closed JSON expectation。
-- Static attachments: review criteria、severity rule、output schema。
-- Dynamic attachments: exact Candidate ZIP。
-- Thread: Candidate version ごとに必ず fresh Red。
-
-### Semantic Revision
-
-- Body: exact Candidate / Review identity、selected P0 / P1 IDs、ZIP expectation。
-- Static attachments: revision rules、preservation rule、output contract。
-- Dynamic attachments: prior Candidate ZIP、exact Review JSON、revision request。
-- Thread: verified Blue。不能なら complete current input で new Blue。
-
-### Clarification
-
-- Body: one essential question、scope identity、advisory output。
-- Static attachments: grill loop、handoff contract。
-- Dynamic attachments: owner が選んだ interview / research material。
-- Thread: target convention は Blue。ただし current source HEAD では public runtime wiring は別 scope。
-
-## 6. Blue / Red thread boundary
+## 5. Recovery早見表
 
 ```mermaid
-sequenceDiagram
-    actor Human
-    participant Blue as Blue thread
-    participant Runtime
-    participant Red1 as Fresh Red for Candidate v1
-    participant Red2 as Fresh Red for Candidate v2
-
-    Human->>Runtime: clarify / plan
-    Runtime->>Blue: minimal body + current attachments
-    Blue-->>Runtime: Candidate v1 ZIP
-    Runtime->>Red1: fresh review + Candidate v1
-    Red1-->>Runtime: FAIL JSON
-    Runtime->>Blue: exact Review + Candidate v1
-    Blue-->>Runtime: Candidate v2 ZIP
-    Runtime->>Red2: fresh review + Candidate v2
-    Red2-->>Runtime: PASS JSON
-    Runtime-->>Human: evidence only; Human decision still required
+stateDiagram-v2
+    [*] --> PreSubmit
+    PreSubmit --> NewExecution: retryable model failure / budget 1
+    PreSubmit --> NewExecution: classified direct attach failure / inline / budget 1
+    PreSubmit --> Blocked: reconstruction mismatch
+    PreSubmit --> Submitted: promptSubmitted=true
+    Submitted --> SameSession: timeout / generation pending
+    SameSession --> Response
+    Response --> SameSession: download pending
+    Response --> Validated: artifact captured
+    Validated --> [*]
 ```
 
-Red は Blue の follow-up ではない。PASS を別 Candidate へ流用しない。
+重要なルール:
 
-## 7. Blue thread が壊れたら
+- automatic new execution budgetは全体で`1`。model retry後にinline retryを追加しない。
+- inlineはsame original pathsをOracle-native modeで渡すだけ。SpecDockはcopy/ZIP/filterしない。
+- required attachmentを「なし」に落とさない。
+- submitted後はpromptを再送しない。
+- invalid ZIPを新しいChatGPT responseで作り直さない。
 
-1. 旧 thread を正本扱いしない。
-2. repository、branch、HEAD、Issue、Candidate lineage を再検証する。
-3. lineage が一意なら、新 Blue に current body と current attachments を完全送信する。
-4. lineage が曖昧なら Human に止める。
-5. default branch、本文だけ再送、古い Candidate、personal wrapper へ fallback しない。
-6. attachment manifest SHA は再開判定に使わない。
+## 6. Model evidence
 
-## 8. 最初に読む code
+SpecDockはlogical `Pro`を要求する。UI labelはOracle / ChatGPT側で変わり得る。
 
-1. `application/issue_planning_prompt.py`
-2. `application/issue_planning.py`
-3. `infra/issue_planning_chatgpt.py`
-4. `domain/issue_planning_contracts.py`
-5. `commands/issue_planning.py`
-6. `tests/unit/application/test_issue_planning_prompt.py`
-7. `tests/unit/infra/test_issue_planning_chatgpt.py`
-8. `tests/integration/test_issue_planning_e2e.py`
+- `GPT-5.6 Sol`は外部smokeで見えた一例。
+- generic codeへhardcodeしない。
+- formal successにはsame attemptで`model_verified=true`とobserved labelが必要。
+- `current`や別modelへ黙って切り替えない。
 
-provider path は `src/spec_dock/assets/...`、dogfood path は `spec-dock/...` または `.agents/...` である。
-provider を正本として projection する。
+## 7. Prompt reconstruction
 
-## 9. 最初の一日チェックリスト
+現行adapterはpromptを一つのargv valueとしてshellなしで渡す。0.17対応では次を別々に証明する。
 
-- [ ] exact branch / HEAD を確認した。
-- [ ] Issue / Epic / Initiative と親 #334 を読んだ。
-- [ ] 17件の clarification artifact の最新版 Option C を理解した。
-- [ ] input directory と output ZIP safety を混同していない。
-- [ ] old scanner test の削除と output regression test の維持を区別した。
-- [ ] Oracle directory / multiple path / continuation capability を実測した。
-- [ ] unsupported の場合に wrapper fallback せず停止した。
-- [ ] provider と dogfood を手で二重編集していない。
-- [ ] Red は fresh、Blue だけが継続である。
-- [ ] Candidate / Review を canonical adoption と呼んでいない。
+1. application / infra unit test: exact `str`がexact argvへ入る。
+2. Oracle browser smoke: reconstruction mismatchなしで`promptSubmitted=true`になる。
+3. representative long Japanese Markdown promptでも成立する。
+
+mismatch時にpromptを短くしたり、引用符や改行を勝手に変えたりしない。
+
+## 8. 最初に読むfile
+
+1. Issue `requirement.md` / `design.md` / `plan.md`。
+2. `decisions/ADR-ISS354-001-oracle-017-browser-compatibility.md`。
+3. `application/issue_planning_prompt.py`。
+4. `infra/issue_planning_chatgpt.py`。
+5. `infra/issue_planning_oracle_artifact.py`。
+6. `domain/issue_planning_contracts.py`。
+7. `tests/unit/infra/test_issue_planning_chatgpt.py`。
+8. `tests/integration/test_issue_planning_e2e.py`。
+
+provider pathを正本とし、dogfood copyを手で二重編集しない。
+
+## 9. 初日チェックリスト
+
+- [ ] exact branch / HEADをconnectorで確認した。
+- [ ] GitHub sourceとexternal local evidenceを区別した。
+- [ ] current 0.16.1 baselineとunimplemented 0.17 planを区別した。
+- [ ] Option A / Cとoutput validationを混同していない。
+- [ ] compatibility profileを単なるversion constantと考えていない。
+- [ ] `promptSubmitted`前後でrecoveryが変わることを理解した。
+- [ ] model retryとinline retryが同じbudgetを共有することを確認した。
+- [ ] `GPT-5.6 Sol`を恒久model IDと断定していない。
+- [ ] private path / URL / session handle / transcriptをevidenceに貼っていない。
+- [ ] Candidate / ReviewをcanonicalまたはPASSと呼んでいない。
 
 ## 10. よくある誤り
 
-- **誤り:** Option C だから output ZIP parser も削除する。  
-  **正:** Option C は input attachment directory に限定される。
+- **誤り:** `0.16.1`を`0.17.0`へ置換すればよい。  
+  **正:** help、stage evidence、session schema、artifact readerをprofile単位で確認する。
 
-- **誤り:** detailed instruction は untrusted なので添付できない。  
-  **正:** authority は body / Runtime が保持するが、添付は operation instruction を含める。
+- **誤り:** reconstruction mismatchならinlineでretryする。  
+  **正:** inlineはclassified direct attachment failureだけ。mismatchはautomatic retryしない。
 
-- **誤り:** directory を一度 ZIP にしてから渡せば同じ。  
-  **正:** automatic conversion であり、採用決定に反する。
+- **誤り:** model optionが見えなければ`current`を使う。  
+  **正:** silent model driftになる。logical model不変でbounded retryまたはblock。
 
-- **誤り:** symlink を解決して regular file だけ選べば親切。  
-  **正:** input を変更する独自 policy であり、採用決定に反する。
+- **誤り:** responseが終わればZIPもある。  
+  **正:** response completion、download、snapshot、validationは別stage。
 
-- **誤り:** Review も Blue thread で続ければ効率的。  
-  **正:** Red independence を壊す。
+- **誤り:** post-submit failureでnew executionする。  
+  **正:** duplicate Candidate / Reviewを生む。same-session recoveryだけ。
 
-- **誤り:** direct Oracle に continuation がなければ personal wrapper を使う。  
-  **正:** product boundary 違反。STOP / REPLAN する。
-
-## 11. 完了の見分け方
-
-implementation が終わったと言えるのは、minimal body と no-prewalk direct attachment が test で証明され、
-direct Oracle / exact GitHub / output validation / Human gate が回帰せず、provider / dogfood / docs / parent Epic
-が整合し、fresh review と Human gate を通過したときだけである。
+- **誤り:** external wrapper smokeはSpecDock direct adapterのPASS証拠。  
+  **正:**補助観測。direct PATH Oracle smokeが別途必要。

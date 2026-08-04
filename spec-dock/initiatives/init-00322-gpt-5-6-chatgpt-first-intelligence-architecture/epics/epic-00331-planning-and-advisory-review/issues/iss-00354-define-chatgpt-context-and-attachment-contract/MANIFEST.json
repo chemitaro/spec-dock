@@ -1,0 +1,104 @@
+{
+  "candidate": {
+    "adoption_status": "unreviewed",
+    "authority": "evidence_only",
+    "branch": "codex/iss-00354-chatgpt-context-contract",
+    "candidate_id": "CAND-ISS-00354-ORACLE017-V2-20260804T043533Z",
+    "candidate_version": "v2",
+    "generated_jst": "2026-08-04T13:35:33+09:00",
+    "generated_utc": "2026-08-04T04:35:33Z",
+    "internal_logical_root": "iss-00354-oracle-017-compatibility-candidate-v2-20260804t043533z/",
+    "logical_filename": "iss-00354-oracle-017-compatibility-candidate-v2-20260804t043533z.zip",
+    "repository": "chemitaro/spec-dock",
+    "source_head": "d0659cfa83bf97a05ceab01f4d9ce76162a2baa1"
+  },
+  "files": [
+    {
+      "bytes": 5458,
+      "path": "artifacts/context-and-attachment-contract.md",
+      "sha256": "ac41924ffa0f24ce2086a62b68034fa0ecb0616f4da02828eca19990f78e57c7"
+    },
+    {
+      "bytes": 10720,
+      "path": "artifacts/decision-and-migration-ledger.md",
+      "sha256": "002991650c3e63dfd41abf6f92be62a3df53740748a8117f0fa97860089f944b"
+    },
+    {
+      "bytes": 13689,
+      "path": "artifacts/implementation-and-test-matrix.md",
+      "sha256": "d7aea99a286df2b1c8c0c93c2867cf0062da224519112adbe254d2b5f645c915"
+    },
+    {
+      "bytes": 7109,
+      "path": "artifacts/oracle-017-failure-classification.md",
+      "sha256": "234310b8c2bcf0e00fe1d21f56dd468653ece95455a3e9ef938236dc9238d824"
+    },
+    {
+      "bytes": 3963,
+      "path": "candidate-note.md",
+      "sha256": "15c4e47f6c1099d13e5b185d9792b947b46d343591c45dc79b3324ecc9c30ad0"
+    },
+    {
+      "bytes": 13347,
+      "path": "decisions/ADR-ISS354-001-oracle-017-browser-compatibility.md",
+      "sha256": "5f5956d73106e250fcac8ad6e2646f51acc1a0f081e169378820ff5f872e71c8"
+    },
+    {
+      "bytes": 33212,
+      "path": "design.md",
+      "sha256": "07e7a2891fcc56b3b5bc6ff4bb0e5fff8c14d218e305ae0c2056f0b1fa96175f"
+    },
+    {
+      "bytes": 7374,
+      "path": "onboarding.md",
+      "sha256": "020f366a79eb413b1fbc3cd0cd8e4def15dc7f885c83f56b16928398b4cd2c4d"
+    },
+    {
+      "bytes": 30825,
+      "path": "plan.md",
+      "sha256": "a3b1f57c50651bf0e99ceaee9ec6986f4d159437e0c397e8c9d83f81014beef5"
+    },
+    {
+      "bytes": 35688,
+      "path": "requirement.md",
+      "sha256": "33fb89687e5a7d8db7859d55ae8976122d5c08c16f1435b0edafbf263f8a3557"
+    },
+    {
+      "bytes": 4564,
+      "path": "reviews/red-team-review-v1.md",
+      "sha256": "e0e7b138ea4bb4b386515b2f76b52cc887c977fb4363611e2ffa0e3f3ccf6d0d"
+    }
+  ],
+  "integrity": {
+    "checksums_scope": "all regular files except CHECKSUMS.sha256; includes MANIFEST.json",
+    "manifest_scope": "all payload files except MANIFEST.json and CHECKSUMS.sha256",
+    "zip_sha256_location": "external delivery metadata after archive sealing"
+  },
+  "review_excluded": [
+    "onboarding.md",
+    "candidate-note.md",
+    "MANIFEST.json",
+    "CHECKSUMS.sha256",
+    "reviews/red-team-review-v1.md",
+    "artifacts/*"
+  ],
+  "review_scope": [
+    "requirement.md",
+    "design.md",
+    "plan.md",
+    "decisions/ADR-ISS354-001-oracle-017-browser-compatibility.md"
+  ],
+  "revision_binding": {
+    "formal_review_path": "reviews/red-team-review-v1.md",
+    "formal_review_verdict": "fail",
+    "prior_candidate_id": "CAND-ISS-00354-ORACLE017-20260804T033922Z",
+    "prior_candidate_logical_filename": "iss-00354-oracle-017-compatibility-candidate-20260804t033922z.zip",
+    "prior_candidate_sha256": "8f979a5609b5d4dfa899871d50d51a659e273a7191b97e36c4d8de253348d13c",
+    "scope_rule": "complete replacement; only selected P1 findings repaired",
+    "selected_findings": [
+      "P1-1",
+      "P1-2"
+    ]
+  },
+  "schema_version": 1
+}

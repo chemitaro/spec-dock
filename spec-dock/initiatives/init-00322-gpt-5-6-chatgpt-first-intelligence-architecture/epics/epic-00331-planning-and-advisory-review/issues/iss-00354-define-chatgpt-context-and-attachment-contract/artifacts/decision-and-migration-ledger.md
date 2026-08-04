@@ -1,176 +1,180 @@
 # 補助アーティファクト: 決定履歴・矛盾・移行台帳
 
-> **補助資料 / non-canonical**  
-> 本台帳は `CAND-ISS-00354-20260803T172642Z` の source-grounded synthesis であり、canonical report または Evidence Adoption Ledger
-> そのものではない。
+> **non-canonical / Red Team レビュー対象外**  
+> `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z` のsource-grounded synthesis。既存17件のclarification/interview/research履歴とprior Candidate decisionsを
+> 失効させず、Oracle 0.17増分を追記する。正式なEvidence Adoption Ledgerではない。
 
-## 1. GitHub 確認結果
+## 1. GitHub verification
 
-| 項目 | 結果 |
+| Field | Result |
 |---|---|
 | Repository | `chemitaro/spec-dock` |
 | Requested branch | `codex/iss-00354-chatgpt-context-contract` |
-| Requested source HEAD | `88a9fdb567f17f50bee421862d3b7859a5eb6384` |
-| Branch existence | confirmed |
-| Branch vs requested HEAD | identical / ahead 0 / behind 0 |
+| Requested source HEAD | `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` |
+| Branch existence | confirmed via GitHub Connector |
+| Branch vs HEAD | identical / ahead 0 / behind 0 |
 | Default branch fallback | not used |
-| Branch vs `main` | inspected snapshotでは branch が4 commits ahead |
-| Issue hierarchy | `init-00322` → `epic-00331` → `iss-00354`; parent GitHub Issue `#334` |
-| Issue assurance | `standard` provisional |
+| Mutation | none |
 
-## 2. 全 artifact 確認一覧
+## 2. Preserved historical evidence inventory
 
-指定 directory 内の次の17ファイルをファイル名で全件確認した。
+source HEADのexisting ledgerが確認した17件を、今回も歴史的sourceとして保持する。
 
-| # | Filename | 主な役割 / 採用判断 |
-|---:|---|---|
-| 1 | `20260803t005640z-research-current-chatgpt-context-attachment-research.md` | 現行 prompt / attachment / Oracle adapter 調査 |
-| 2 | `20260803t005840z-interview-chatgpt-thread-continuity-scope-interview.md` | Blue継続 / fresh Red の Option A 採用 |
-| 3 | `20260803t010552z-chatgpt-output-chatgpt-clarification-analysis.md` | continuity advisory。user decision に従属 |
-| 4 | `20260803t011239z-interview-chatgpt-thread-failure-recovery-interview.md` | continuity failure時の fail-closed / new Blue 採用 |
-| 5 | `20260803t011552z-chatgpt-output-chatgpt-continuity-recovery-analysis.md` | recovery advisory。manifest SHA提案は後続決定で失効 |
-| 6 | `20260803t023549z-interview-chatgpt-context-attachment-matrix-interview.md` | body / attachment matrix の Option A 採用 |
-| 7 | `20260803t023819z-chatgpt-output-chatgpt-context-attachment-matrix-analysis.md` | matrix advisory。strict envelopeの一部は歴史的 |
-| 8 | `20260803t024349z-interview-chatgpt-output-template-contract-interview.md` | operation別 output instruction 採用 |
-| 9 | `20260803t024658z-chatgpt-output-chatgpt-output-template-contract-analysis.md` | ZIP / JSON guidance。入力manifest案は失効 |
-| 10 | `20260803t025103z-interview-chatgpt-context-contract-scope-interview.md` | product/personal分離、operation directory方式へ修正採用 |
-| 11 | `20260803t025321z-chatgpt-output-chatgpt-context-contract-scope-analysis.md` | common strict profile案は部分失効 |
-| 12 | `20260803t030211z-disc-chatgpt-operation-pack-flexible-input-discussion.md` | Option Cを統合した最終synthesis |
-| 13 | `20260803t030323z-interview-chatgpt-attachment-directory-safety-interview.md` | 初期safe collection質問。推奨安全策は最終決定で不採用 |
-| 14 | `20260803t030543z-chatgpt-output-chatgpt-attachment-directory-safety-analysis.md` | fail-closed / scanner提案は歴史的記録 |
-| 15 | `20260803t034911z-interview-chatgpt-attachment-transport-entry-boundary-interview.md` | 無検査・全件・direct transport Option C 最終採用 |
-| 16 | `20260803t035221z-chatgpt-output-chatgpt-attachment-transport-entry-boundary-analysis.md` | transport advisory。user Option C が優先 |
-| 17 | `rules.md` | artifact directory local rule |
+1. `20260803t005640z-research-current-chatgpt-context-attachment-research.md`
+2. `20260803t005840z-interview-chatgpt-thread-continuity-scope-interview.md`
+3. `20260803t010552z-chatgpt-output-chatgpt-clarification-analysis.md`
+4. `20260803t011239z-interview-chatgpt-thread-failure-recovery-interview.md`
+5. `20260803t011552z-chatgpt-output-chatgpt-continuity-recovery-analysis.md`
+6. `20260803t023549z-interview-chatgpt-context-attachment-matrix-interview.md`
+7. `20260803t023819z-chatgpt-output-chatgpt-context-attachment-matrix-analysis.md`
+8. `20260803t024349z-interview-chatgpt-output-template-contract-interview.md`
+9. `20260803t024658z-chatgpt-output-chatgpt-output-template-contract-analysis.md`
+10. `20260803t025103z-interview-chatgpt-context-contract-scope-interview.md`
+11. `20260803t025321z-chatgpt-output-chatgpt-context-contract-scope-analysis.md`
+12. `20260803t030211z-disc-chatgpt-operation-pack-flexible-input-discussion.md`
+13. `20260803t030323z-interview-chatgpt-attachment-directory-safety-interview.md`
+14. `20260803t030543z-chatgpt-output-chatgpt-attachment-directory-safety-analysis.md`
+15. `20260803t034911z-interview-chatgpt-attachment-transport-entry-boundary-interview.md`
+16. `20260803t035221z-chatgpt-output-chatgpt-attachment-transport-entry-boundary-analysis.md`
+17. `rules.md`
 
-## 3. 最終採用事項
+今回のCandidateはこれらのraw contentを再生成・削除・renameせず、existing ledgerの採否を前提にする。
 
-### D-001 Minimal body
+## 3. Preserved decisions D-001–D-010
 
-目的、operation、repository、branch、HEAD、scope identity、authority、output だけを本文に置く。
-
-### D-002 Detailed attachment instructions
-
-詳細手順、review criteria、revision rules、output schema / examples は Markdown attachments に置く。
-attachments は instruction を含み得る。
-
-### D-003 Operation directory
-
-各 product-owned operation は prompt template と attachment directory を別管理する。file 増減で code を変えない。
-
-### D-004 Option C direct transport
-
-directory path を direct Oracle へ渡す。SpecDock は tree を walk / inspect / transform / hash / filter しない。
-
-### D-005 Normal error
-
-unsupported entry / transport failure は Oracle / ChatGPT の通常 error。自動除外、変換、retry、fallbackをしない。
-
-### D-006 Output remains typed
-
-Planning / Revision は ZIP、Review は closed JSON。output validator と Human binding は維持する。
-
-### D-007 Blue / Red
-
-Clarification / Planning / Semantic Revision は verified Blue。Candidateごとの Review は fresh Red。
-
-### D-008 Continuity recovery
-
-Blue validation失敗時は complete current inputs で new Blue。lineage曖昧時は Human block。
-
-### D-009 Product boundary
-
-direct Oracle only。personal `chatgpt-use` wrapper は runtime dependency / formal evidence source にしない。
-
-### D-010 Non-authority
-
-ChatGPT output は evidence-only。canonical mutation / adoption はしない。
-
-## 4. 置換済み提案
-
-| Historical proposal | Status | 理由 |
+| ID | Decision | Status in this Candidate |
 |---|---|---|
-| attachment manifest + per-file SHA | superseded | Option C が入力 manifest / checksum を拒否 |
-| filename / extension allowlist | superseded | contents / names を分類しない |
-| regular-file only / symlink reject | superseded | symlink / special entry を判断しない |
-| secret / private path scanner | superseded for input attachment collection | operator responsibility。content-free public diagnosticsは維持 |
-| size / count hard limits | superseded for input attachment collection | transport通常結果へ委ねる |
-| transport capability precheck per entry | superseded | entry除外 /変換を誘発する |
-| automatic ZIP conversion | rejected | inputを変更する |
-| strict all-operation profile/schema | rejected | operation-specific flexibilityに反する |
-| attachment reference-only | rejected | detailed instructions を attachmentsへ移す |
-| Blue / Red same thread | rejected | fresh review independenceを壊す |
-| every failure requires Human confirmation | rejected | exact lineageならnew Blueを開始できる |
-| personal wrapper continuation | rejected | product dependency boundaryに反する |
+| D-001 | minimal body | retained |
+| D-002 | detailed instructions in attachments | retained |
+| D-003 | operation-specific prompt + attachment directory | retained |
+| D-004 | Option C direct opaque path transport | retained |
+| D-005 | no per-entry exclusion/conversion/backend retry | retained; D-014でnarrow clarification |
+| D-006 | typed ZIP / closed JSON output | retained |
+| D-007 | Blue continuity / fresh Red | retained |
+| D-008 | exact-lineage new Blue / ambiguous Human block | retained |
+| D-009 | direct PATH Oracle; no personal wrapper dependency | retained |
+| D-010 | ChatGPT non-authority / evidence-only | retained |
 
-## 5. Current implementation conflict table
+## 4. New Oracle 0.17 decisions
 
-| Current implementation | Conflict | Target |
+### D-011 Exact versioned profile
+
+`0.17.0`をexact compatibility profileとしてcharacterizeする。single constant replacementやsemver wildcardを採用しない。
+
+### D-012 Oracle-native config remains allowed
+
+accepted #334 boundaryを維持し、Oracle user/project configを隔離しない。required formal valuesだけexplicit argvにする。
+
+### D-013 Logical model / observed label separation
+
+logical `Pro` requestとUI labelを分離する。external smokeの`GPT-5.6 Sol`をdirect evidenceなしにhardcodeしない。
+
+### D-014 One bounded Oracle-native transport recovery
+
+D-005の「retry禁止」は、failing entry exclusion、input mutation、backend/model/branch fallback、unbounded retryを禁止した判断として維持する。
+今回、classified direct attachment failureかつ`promptSubmitted=false`の場合だけ、same original pathsをOracle-native inline modeで
+一度new executionへ渡すnarrow amendmentを追加する。reconstruction mismatchには適用しない。
+
+### D-015 Submission boundary
+
+pre-submit model/attachment failureはoverall budget内のnew execution、reconstruction mismatchはblock、post-submit failureはsame-sessionのみ。
+
+### D-016 Versioned artifact capture
+
+response completionとdownload/snapshotを分離し、0.17 session schemaをdedicated readerで検証する。invalid outputを再生成しない。
+
+### D-017 External evidence provenance
+
+`oracle-browser-recovery-report.md`はexternal local observationであり、GitHub sourceまたはSpecDock production executionと表現しない。
+raw personal pathはCandidate本文へ複製しない。
+
+### D-018 Provisional scope
+
+ADRはIssue/Initiative-local。other operations / global architectureへの展開は別triageとする。
+
+## 5. Candidate v1 Red Review repair ledger
+
+| Repair ID | Review finding | v2 disposition | Scope boundary |
+|---|---|---|---|
+| R-001 | stage-blind hardcoded harvest/profile command ownership gap | corrected in requirement §3.1/REQ-021/027–029, design §3/6/10–13, plan S09–S12, ADR Decisions 1/4/5 | no architecture replacement; current behavior characterized then moved into version profile |
+| R-002 | non-authoritative public reason mapping | corrected with one closed mapping in REQ-030, design §15, plan S10/S12/§18, ADR Decision 6 | only reason contract and tests; no new backend or lifecycle |
+
+Prior Candidate `iss-00354-oracle-017-compatibility-candidate-20260804t033922z.zip` and SHA `8f979a5609b5d4dfa899871d50d51a659e273a7191b97e36c4d8de253348d13c` remain immutable. The attached review copy is
+`reviews/red-team-review-v1.md`; only its two P1 findings are selected for semantic revision. No P2/P3 or unrequested redesign is introduced.
+
+### D-019 Profile-owned recovery command boundary
+
+Current stage-blind/hardcoded 0.16.1 recovery is a migration baseline, not target behavior. Exact-version profile owns declared inline capability,
+harvest builder, and capture builder. False/unknown submission invokes neither builder.
+
+### D-020 Closed public mapping
+
+Five stage-specific reasons are added; existing unavailability/capability/session/artifact reasons are retained. Many-to-one is permitted only inside
+capability/profile、runtime unavailable、artifact validation families and forbidden across model/attachment/reconstruction/generation/download stages.
+
+## 6. Facts / hypotheses / unverified matrix
+
+| Claim | Classification | Consequence |
 |---|---|---|
-| `MAX_RELEVANT_FILES` / byte limits | Option C | remove from input path |
-| `_safe_source_file` / descriptor reads | Option C | no source file materialization |
-| `_reject_sensitive` on attachment content | Option C | remove from input collection |
-| `PlanningPromptAttachment` classification / SHA | Option C | direct Path references |
-| exact attachment index in body | Option A/C | remove |
-| role + transport resources concatenated into body | Option A | minimal `prompt.md`; detailed attachments |
-| `_write_transport_pack` | Option C | direct Oracle path argv |
-| generated `context-NNN.md` | Option C | remove |
-| generated input manifest / source-manifest | Option C | remove |
-| `_attachments_match_source_manifest` | Option C | remove from input path |
-| `--context-manifest` | operation directory | hard cutover |
-| per-role random new session | Blue continuity | provider-owned thread policy |
-| onboarding 13 H2 / 4 PlantUML prompt hardcode | flexible content | semantic minimum |
-| exact ZIP / Review JSON parser | no conflict | retain |
-| Candidate / Review / Human binding | no conflict | retain |
-| exact GitHub preflight / postflight | no conflict | retain |
-| managed Chrome / direct Oracle | no conflict | retain |
+| current adapter exact-pins 0.16.1 | GitHub confirmed | profile extraction required |
+| current adapter explicit Pro/select and one prompt | GitHub confirmed | regression baseline |
+| current reader rejects other versions | GitHub confirmed | no constant-only migration |
+| external representative prompt mismatch across modes | external observed | stage class / no auto retry |
+| short smoke observed GPT-5.6 Sol verified | external observed | mapping hypothesis only |
+| `Available: Got it.` then retry success | external observed | possible transient model class; root cause unknown |
+| browser state/start order caused failure | hypothesis | smoke dimension, not design fact |
+| direct PATH Oracle reproduces wrapper behavior | unverified | S09/S11 blocking test |
+| 0.17 metadata has `promptSubmitted` exact field | unverified | decoder must characterize equivalent evidence |
+| inline transport is safe/available in direct Oracle | unverified | disabled until profile evidence |
 
-## 6. Parent scope contradictions
+## 7. Current implementation conflict / delta
 
-`epic-00331` canonical docs currently state that detailed role / task / authority / output contract is in the prompt body and
-attachments are reference-only data. Issue #354 final decision changes this responsibility split。
+| Current implementation | Existing #354 target | Oracle 0.17 delta |
+|---|---|---|
+| exact 0.16.1 constant | preserve fail-closed semantics | profile registry + 0.17 decoder |
+| generated prompt pack | direct path / no materialization | direct primary + optional Oracle-native inline |
+| `Pro` / `select` fixed argv | keep logical explicit request | verified observed label / no hardcoded UI name |
+| stage-blind hardcoded harvest on nonzero/nonterminal | characterize then remove from generic adapter | profile builder + true-submission gate; false/unknown calls 0 |
+| generic nonzero -> recovery | refine | pre-submit class must not be harvested blindly |
+| artifact reader assumes 0.16.1 schema | strict output retained | version-dispatched reader |
+| public reasons mostly artifact/session generic | retain existing reasons | add five stage-specific reasons and closed many-to-one rules |
 
-Migration rule:
+## 8. Rejected / not adopted
 
-- update only the conflicting input contract wording;
-- keep exact GitHub identity;
-- keep Candidate / Review / Human / apply lifecycle;
-- keep fresh Review;
-- keep direct Oracle;
-- keep output ZIP / closed JSON;
-- do not change Issue ordering or Epic completion criteria beyond necessary consistency。
+| Proposal | Disposition | Reason |
+|---|---|---|
+| personal wrapper integration | rejected | D-009 / product boundary |
+| automatic API fallback | rejected | authority/provenance drift |
+| semver range acceptance | rejected | unknown browser/schema behavior |
+| prompt normalization / shortening | rejected | changes exact input |
+| model `current` fallback | rejected | silent model drift |
+| hardcode `GPT-5.6 Sol` globally | rejected | one external observation only |
+| no-attachment production fallback | rejected | required evidence loss |
+| per-entry exclusion / automatic ZIP | rejected | Option C violation |
+| post-submit new execution | rejected | duplicate conversation/output |
+| unlimited/configurable retry | rejected | non-deterministic and duplicate risk |
+| config isolation | rejected | accepted Oracle-native config boundary |
+| output validator relaxation | rejected | input compatibility does not weaken output safety |
 
-## 7. Output Candidate と runtime output の区別
+## 9. Migration ledger
 
-この手動 Candidate ZIP は user brief に従い、三文書、exactly-one onboarding、補助 artifacts を含む。
-source HEAD 時点の formal Issue Planning runtime は canonical three documents + exactly-one onboarding companion の
-exact authoring ZIPを期待する。
+| Step | From | To | Rollback boundary |
+|---|---|---|---|
+| M-01 | single 0.16.1 constant | behavior-preserving 0.16.1 profile | revert extraction |
+| M-02 | unknown 0.17 blocked | characterized 0.17 profile | remove profile / block |
+| M-03 | generic execution outcome | stage evidence + pure recovery decision | disable new recovery actions |
+| M-04 | generated pack | direct paths | commit-level revert; no dual mode |
+| M-05 | direct only | direct + classified one-shot inline | disable inline policy only |
+| M-06 | single-version reader | version-dispatched readers | remove 0.17 reader/profile |
+| M-07 | external observation only | direct browser smoke evidence | no promotion if smoke fails |
 
-したがって、この Candidate の補助 artifact inventory を runtime authoring ZIP schema の変更として暗黙採用しない。
-runtime output inventory を変える場合は別の明示要件・validator変更・reviewが必要である。
+## 10. Adoption caution
 
-## 8. Technical capability gates
+このCandidate自体はEAL adoptionではない。Humanが採用する場合、reportで少なくとも次を別entryにする。
 
-ユーザー判断は完了しているが、implementation 前に primary contract を確認する必要がある。
-
-1. direct Oracle directory attachment。
-2. multiple direct attachment paths。
-3. direct Oracle same-conversation continuation。
-4. normal failure mapping。
-
-unsupported 時の選択肢は「停止して再設計」のみであり、wrapper / API fallback はない。
-
-## 9. Follow-up ownership
-
-| Topic | Ownership |
-|---|---|
-| Issue Planning input implementation | iss-00354 |
-| Parent Epic contradiction update | iss-00354 closure |
-| Clarification public direct-Oracle command | clarification owning follow-up |
-| Other ChatGPT roles | operation-specific follow-up |
-| Cross-scope thread retention ADR | only if policy expands beyond Issue-local |
-| Generic attachment preparation tooling | optional operator tooling; runtime scannerにはしない |
-
-## 10. Candidate authority
-
-本台帳は Blue Team evidence である。正式な EAL reflection は main orchestrator が canonical docs へ採用する時に行う。
-本 Candidate は Red Team review、PASS / FAIL、patch、PR、commit、push、merge、Issue close を含まない。
+- prior Option A/C Candidate adoption。
+- external wrapper recovery report: source role `external_local_observation`。
+- direct PATH Oracle 0.17 capability receipt: source role `command` / `integration evidence`。
+- browser smoke result。
+- model mapping acceptance / rejection。
+- ADR adoption / withdrawal。

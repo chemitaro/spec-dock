@@ -1,331 +1,253 @@
-# 補助アーティファクト: 既存実装対応表・テスト観点・停止条件
+# 補助アーティファクト: 実装対応表・Oracle 0.17 Test Matrix
 
-> **補助資料 / non-canonical**  
-> `CAND-ISS-00354-20260803T172642Z` の実装者向け cross-reference であり、三文書が優先する。
+> **implementation aid / non-canonical / Red Team レビュー対象外**  
+> `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z` のcross-reference。review対象四文書が優先する。
 
 ## 1. Module-by-module delta
 
-| Module | Keep | Remove / replace | Add |
+| Module | Keep | Existing #354 change | Oracle 0.17 addition |
 |---|---|---|---|
-| `application/issue_planning_prompt.py` | typed identity、output expectation、GitHub hard failure | source safe-read、limits、scanner、attachment bytes/index/SHA、resource concatenation | operation registry、minimal body、attachment path tuple |
-| `application/issue_planning.py` | create/review/revise/apply orchestration、pre/postflight、Candidate lifecycle | context manifest load、input sensitivity check、source-manifest attachment match、exact attachment materialization | static/dynamic/operator path assembly、thread policy |
-| `domain/issue_planning_contracts.py` | Candidate / Review / Human / source evidence | prompt-materialization-only fields as needed | operation input、thread request/binding types |
-| `infra/issue_planning_chatgpt.py` | direct Oracle、managed Chrome、sanitized env、recovery、typed output snapshot | `_write_transport_pack`、input temp pack、manifest/provenance/context copies | direct attachment argv、thread start/continue adapter |
-| `commands/issue_planning.py` | existing command family / output format | `--context-manifest` | directory-oriented option |
-| `application/ports.py` | existing gateway boundaries | none unless old attachment bytes port exists | private thread store / adapter port if needed |
-| operation resources | role intent / authority / output meaning | old flat resource layout、fixed onboarding headings | per-operation `prompt.md` + opaque `attachments/` |
-| skills/docs | direct Oracle、exact branch、Human gate | reference-only attachments、input manifest safety、old CLI | Option A/C、Blue/Red、operator responsibility |
-| parent Epic docs | lifecycle / identity / authority | conflicting body/attachment wording | scoped consistency amendment |
+| `application/issue_planning_prompt.py` | typed identity/output | minimal body + path tuple | prompt corpus/digest contract |
+| `application/issue_planning.py` | lifecycle/pre-postflight | path assembly/thread policy | recovery decision integration / attempt budget |
+| `domain/issue_planning_contracts.py` | Candidate/Review/Human/result | operation/thread types | stage/failure/recovery content-free types |
+| `infra/issue_planning_chatgpt.py` | PATH Oracle/managed Chrome/env/one submit/stage-blind hardcoded harvest | remove prompt pack/direct paths/generic recovery argv | profile registry/stage decoder/direct-inline bounded loop/profile-owned harvest-capture builders |
+| `infra/issue_planning_oracle_artifact.py` | strict bounded snapshot | output safety unchanged | 0.16/0.17 version-dispatched readers |
+| `commands/issue_planning.py` | command family | context manifest hard cutover | no retry override flags |
+| resources | authority/output meaning | per-operation prompt/attachments | 0.17 failure/recovery operator guidance |
+| docs/skills | exact source/direct Oracle/Human gate | Option A/C/Blue-Red | profile/stage/withdrawal guidance |
 
-## 2. Test replacement map
+## 2. Profile tests
 
-### 2.1 `tests/unit/application/test_issue_planning_prompt.py`
+| Test | Expected |
+|---|---|
+| exact `0.16.1` | existing profile accepted |
+| exact `0.17.0` before registration | submission 0 / unsupported |
+| exact `0.17.0` with complete profile | help/schema checks then invoke |
+| `0.17.1` / `0.18.0` unknown | fail-closed |
+| missing required root/session flag | fail-closed |
+| executable identity changes after preflight | prompt submission 0 |
+| Oracle config file contains model | explicit profile model argv wins; config not deleted |
+| temporary HOME isolation attempted | test failure |
 
-Replace:
-
-- descriptor-relative source read race tests。
-- UTF-8 source requirement。
-- relevant source count / byte budget。
-- operator context byte budget。
-- secret / private path attachment rejection。
-- attachment index / SHA。
-- fixed prompt character budget。
-- exact 13 heading / 4 diagram text。
-
-Add:
-
-- deterministic minimal body。
-- no detailed instruction in body。
-- operation definition path resolution。
-- attachment directory path only。
-- no tree walk / stat / read。
-- file add/remove independent from code。
-- planning / review / revision body field matrix。
-- no thread handle leak。
-
-Retain:
-
-- canonical Issue ID / output expectation validation。
-- reviewer read-only / defect-only meaning。
-- formal output / authority wording semantics。
-- installed resource resolution, adapted to new tree。
-
-### 2.2 `tests/unit/application/test_issue_planning.py`
-
-Add:
-
-- planning static + optional directory path assembly。
-- Review Candidate original path。
-- Revision Candidate / Review / request original paths。
-- no duplicated prior docs。
-- Blue continuation request。
-- fresh Red request。
-- continuity ambiguous blocked before backend。
-- source preflight / postflight unchanged。
-
-Retain:
-
-- existing Issue target resolution。
-- Candidate publication。
-- Review identity。
-- P0 / P1 revision trigger。
-- mechanical revision。
-- apply / transaction / stale behavior。
-
-### 2.3 `tests/unit/infra/test_issue_planning_chatgpt.py`
-
-Replace:
-
-- `_write_transport_pack` manifest assertions。
-- exact binary copy into pack。
-- source hash manifest assertions。
-
-Add:
-
-- pure argv builder uses original paths。
-- directory fixture with hidden / symlink / FIFO does not trigger tree operation。
-- no input temporary pack。
-- normal attachment failure no retry / exclusion。
-- direct continuation capability。
-- Blue private handle absent from public result。
-- fresh Red new session。
-- output snapshot unchanged。
-
-Retain:
-
-- Oracle executable / version / help。
-- managed Chrome。
-- sanitized environment。
-- shell false。
-- same invocation recovery。
-- invalid session metadata。
-- typed ZIP / JSON。
-- output archive safety。
-- transcript / private diagnostic containment。
-
-### 2.4 CLI / integration
-
-Update:
-
-- `--context-manifest` help / parsing removal。
-- new directory option。
-- fake Oracle prompt parsing for minimal body。
-- fake Oracle attachment operand capture。
-- no generated prompt-pack inventory assertion。
-- end-to-end create → review → revise → apply。
-- installed skill guidance。
-
-## 3. No-prewalk proof
-
-Option C は「scanner testを削除した」だけでは証明できない。次を直接 test する。
+## 3. Prompt exactness tests
 
 ```python
-def fail_tree_access(*args, **kwargs):
-    raise AssertionError("attachment directory must not be inspected")
-
-monkeypatch.setattr(Path, "rglob", fail_tree_access)
-monkeypatch.setattr(Path, "iterdir", fail_tree_access)
-monkeypatch.setattr(Path, "resolve", fail_tree_access)
-monkeypatch.setattr(Path, "read_bytes", fail_tree_access)
+@pytest.mark.parametrize("case", PROMPT_CASES)
+def test_prompt_is_one_exact_argv_operand(case, fake_oracle):
+    outcome = invoke(case.text)
+    assert fake_oracle.prompt_calls == [case.text]
+    assert fake_oracle.shell is False
+    assert outcome.private_evidence[0].prompt_sha256 == sha256(case.text.encode("utf-8"))
 ```
 
-path object 自体の string conversion に必要な method まで過剰 monkeypatch しない。adapter の pure argv assembly が
-directory pathを保持し、filesystem syscall 0であることを spy する。
+Cases:
 
-FIFO fixture は test teardown が hang しないよう、作成だけ行い、openしないことを assertion とする。
+- ASCII short control。
+- Japanese / Unicode / combining characters。
+- quotes / backticks / `$()` literal。
+- Markdown fences / JSON snippets。
+- trailing newline true / false。
+- representative Issue #354 brief。
 
-## 4. Input / output boundary regression
+No test should assert ChatGPT answer text as prompt reconstruction proof. Browser receiptのsubmission / mismatch stageを使用する。
 
-| Boundary | Must be removed | Must remain |
-|---|---|---|
-| Input directory | per-entry safe read、hash、manifest、secret scan、quota | top-level path selection |
-| GitHub source | attachment-based source substitute | exact named branch / HEAD pre/postflight |
-| Oracle process | generated input pack | direct argv、managed Chrome、env sanitization |
-| ChatGPT output | none | typed ZIP / JSON snapshot |
-| Candidate | none | identity、SHA、source baseline、evidence-only |
-| Review | none | closed JSON、fresh Red、identity |
-| Apply | none | exact Human decision、transaction safety |
+## 4. Recovery decision table
 
-A regression test が「manifest」という文字列を検出する場合、input manifest と output Candidate manifest を
-区別する。全 manifest を一括削除しない。
+| # | Model | Attach | Reconstruct | Submitted | Response | Artifact | Budget | Action | Harvest/Capture |
+|---:|---|---|---|---|---|---|---:|---|---|
+| 1 | unknown | n/a | n/a | unknown | n/a | n/a | 1 | capability block | `0/0` |
+| 2 | transient fail | n/a | n/a | false | false | none | 1 | new execution same model | `0/0` |
+| 3 | transient fail | n/a | n/a | false | false | none | 0 | block model reason | `0/0` |
+| 4 | verified | direct fail | n/a | false | false | none | 1 | new execution inline | `0/0` |
+| 5 | verified | direct fail | n/a | false | false | none | 0 | block attachment reason | `0/0` |
+| 6 | verified | prepared | mismatch | false | false | none | 1 | block reconstruction reason | `0/0` |
+| 7 | verified | prepared | ok | true | false | none | any | profile harvest | `1/0` max |
+| 8 | verified | prepared | ok | true | true | pending | any | profile capture | `0/1` max |
+| 9 | verified | prepared | ok | true | true | invalid | any | reject exact artifact reason | additional `0/0` |
+| 10 | verified | prepared | ok | true | true | snapshotted | any | accept | `0/0` |
 
-## 5. Body content assertions
+Invariant tests:
 
-Planning minimal body の expected assertions:
+- all internal classes with submitted=false or unknown call both builders zero times。
+- action 2 or 4 consumes the only automatic new-execution token。
+- after any `Submitted=true`, actions 2/4 cannot be constructed。
+- action 6 never chooses inline/model retry。
+- successful submission count <= 1。
+- total Oracle executions <= 2。
 
-- operation / objective。
-- repository / branch / source HEAD。
-- Initiative / Epic / Issue。
-- GitHub exact access failure。
-- no mutation。
-- authoring ZIP。
-- attached instructions。
+## 5. No-prewalk / original path proof
 
-Not present:
+Monkeypatch/spy:
 
-- attachment filename inventory。
-- attachment SHA。
-- source file content。
-- detailed 13-heading onboarding contract。
-- full JSON schema。
-- personal wrapper。
-- default branch fallback。
+```python
+def fail_tree_access(*_args, **_kwargs):
+    raise AssertionError("attachment directory must remain opaque")
 
-Review / Revision は target identity が必要なため Candidate / Review SHA を含められる。これは input directory
-checksumではない。
-
-## 6. Thread tests
-
-### 6.1 Blue reuse
-
-Given:
-
-- binding repo / branch / HEAD / Issue match。
-- Candidate lineage match。
-- provider reports handle resumable。
-
-Then:
-
-- `continue_verified` once。
-- `start` zero。
-- complete current static / dynamic attachment paths supplied。
-- no handle in public result。
-
-### 6.2 New Blue
-
-Given:
-
-- handle missing / expired。
-- lineage exact。
-
-Then:
-
-- old binding invalidated。
-- `start` once。
-- current body / static dir / prior Candidate / Review / request supplied。
-- new binding privately stored。
-- public output says only content-free restart status if needed。
-
-### 6.3 Human block
-
-Given:
-
-- two plausible prior Candidates or identity mismatch。
-
-Then:
-
-- backend invocation zero。
-- status blocked。
-- no automatic selection。
-- no default branch / wrapper fallback。
-
-### 6.4 Fresh Red
-
-For Candidate v1 and v2:
-
-- two distinct start operations。
-- no Blue binding use。
-- no Red handle reuse。
-- v1 PASS cannot validate v2。
-
-## 7. Resource parity tests
-
-Target behavior:
-
-```text
-provider operation tree
-  == recursive relative path + bytes ==
-installed operation tree
-  == recursive relative path + bytes ==
-dogfood operation tree
+for name in ("rglob", "iterdir", "read_bytes", "read_text", "stat", "resolve"):
+    monkeypatch.setattr(Path, name, fail_tree_access)
 ```
 
-test は file name allowlist を持たず、tree 増減を expected parity 差分として扱う。hidden file も parity comparison の
-対象になり得るが、runtime attachment collector が検査するという意味ではない。
+`Path.__fspath__` / string conversionに必要なoperationを過剰patchしない。direct / inline argv bothでtop-level path stringが同じであることを
+assertする。FIFOは作成だけしopenしない。
 
-## 8. Documentation checks
+## 6. Stage decoder fixtures
 
-Search and remove / revise stale guidance:
+Sanitized fixture set:
 
-```text
---context-manifest
-relevant_source_paths
-operator_context
-attachments are untrusted reference data  # instruction禁止の意味で使っている箇所
-context-NNN.md
-source-manifest.json                       # input transportとして
-13 nonempty distinct H2s
-4+ valid `plantuml` fences
-```
+| Fixture | Stage/evidence |
+|---|---|
+| `017-model-unavailable.json` | model unverified, submitted=false |
+| `017-attachment-direct-failed.json` | model verified, direct failed, submitted=false |
+| `017-reconstruction-mismatch.json` | mismatch, submitted=false |
+| `017-submitted-running.json` | submitted=true, response=false |
+| `017-response-download-pending.json` | response=true, artifact pending |
+| `017-completed-authoring-zip.json` | artifact downloaded/validated |
+| `017-completed-review-json.json` | review payload available |
+| `017-schema-unknown.json` | decoder must reject |
 
-Retain references where they describe historical evidence or output Candidate safety。blind global replace はしない。
+Fixture names are proposed test assets, not claims about actual Oracle filename/field names. S09 must generate them fromactual sanitized observations.
 
-## 9. Focused commands
+## 7. Model tests
+
+- logical `pro` -> profile-specific exact argv。
+- `model_verified=false|unknown` cannot produce pass。
+- non-empty observed label required。
+- observed label binds tosame execution as submission。
+- external observation `GPT-5.6 Sol` may appear in evidence test data, not generic model enum。
+- retry retains identical logical selector / strategy。
+- `current` / default / alternate model invocation count 0。
+
+## 8. Direct / inline tests
+
+- direct primary for static directory + dynamic Candidate/Review paths。
+- direct classified failure + submitted=false + budget -> inline exactly once。
+- inline uses same prompt digest and same ordered path tuple。
+- no file read/copy/archive/temp input pack。
+- inline not selected for mismatch/model/download/artifact error。
+- formal operation never removes required paths。
+- no third attempt after inline failure。
+
+## 9. Same-session tests
+
+- characterization proves current stage-blind behavior calls `_recover_same_session` without submission evidence。
+- migration removes generic literal `session` / `--harvest` / `--no-recover` argv assembly。
+- 0.16.1 profile builder returns the former exact command; 0.17 builders return characterized fixture commands only。
+- every failure class with submitted=false or unknown -> harvest builder 0 / capture builder 0; no cleanup exception。
+- submitted=true + response=false -> selected profile harvest exact argv once; prompt command exactly once。
+- submitted=true + response=true + artifact pending -> selected profile capture exact argv once。
+- missing builder -> capability unsupported before same-session command invocation。
+- executable identity must still match for profile recovery command。
+- invalid session metadata -> exact artifact/session result; no new execution。
+
+## 10. Artifact reader and public mapping tests
+
+Retain:
+
+- contained session root / no symlink traversal。
+- bounded metadata/artifact bytes。
+- size + SHA verification。
+- one expected ZIP / one Review payload。
+- ZIP path/compression/entry limits。
+- strict JSON duplicate/unknown/non-finite rejection。
+
+Add:
+
+- exact profile/reader/version/recovery-builder binding。
+- 0.17 pending/downloadfailed/completed state decoding。
+- cross-version fixture rejection。
+- response complete but download remains failed after profile capture -> `blocked/oracle_output_download_failed`。
+- profile command cannot execute safely -> `blocked/oracle_session_recovery_required`。
+- terminal capture but no expected file -> `rejected/oracle_artifact_missing`。
+- exact status/reason assertion for every REQ-030 row。
+- five new reasons accepted; existing reasons retained。
+- many-to-one accepted only for capability/profile、runtime unavailable、artifact validation families。
+- unknown internal class rejected before public serialization。
+
+## 11. Browser smoke matrix
+
+| Run | Prompt | Target kind | Attachment | Expected evidence |
+|---|---|---|---|---|
+| B-01 | short control | standard | none diagnostic | browser/model/reconstruct/submit/response |
+| B-02 | short control | project | none diagnostic | same, target category only |
+| B-03 | representative | standard | required direct | full through artifact capture |
+| B-04 | representative | project | required direct | full through artifact capture |
+| B-05 | representative | selected target | inline diagnostic only if classified direct failure | one recovery max |
+| B-06 | authoring output | accepted target | required direct | logical filename/root/SHA/ZIP validation |
+
+External wrapper results can pre-populate a hypothesis ledger but cannot mark B-01–B-06 pass。
+
+## 12. Privacy assertions
+
+Search serialized public result / report summary for absence of:
+
+- raw prompt substring。
+- external personal wrapper absolute path。
+- Oracle home / session directory。
+- raw target URL / project identifier。
+- browser endpoint。
+- provider handle / transcript。
+- attachment filenames where content-free reason does not require them。
+
+Allowed content-free values:
+
+- profile ID/version。
+- stage enum / failure class。
+- logical model / observed label / verified bool。
+- target kind category。
+- attachment mode。
+- counts / digest / byte length。
+- retry count。
+
+## 13. Authoritative mapping reference
+
+| Internal failure class | Public status | Public reason | Contract status |
+|---|---|---|---|
+| executable / managed Chrome unavailable | `blocked` | `oracle_unavailable` | existing reason retained |
+| `profile_unsupported` / required capability missing / `prompt_submitted=unknown` / required profile builder missing | `blocked` | `oracle_capability_unsupported` | existing reason retained; allowed many-to-one capability family |
+| `model_selection_unavailable` after the permitted retry is unavailable or exhausted | `blocked` | `oracle_model_selection_unavailable` | new public reason |
+| `attachment_submission_failed` after the permitted inline path is unavailable or exhausted | `blocked` | `oracle_attachment_submission_failed` | new public reason |
+| `prompt_reconstruction_mismatch` | `blocked` | `oracle_prompt_reconstruction_mismatch` | new public reason |
+| `generation_incomplete` after one characterized same-session harvest | `blocked` | `oracle_generation_incomplete` | new public reason |
+| characterized recovery command cannot be executed safely, or same-session state remains undecidable for infrastructure reasons | `blocked` | `oracle_session_recovery_required` | existing reason retained; not a known-stage catch-all |
+| `output_download_failed` after one characterized same-session capture | `blocked` | `oracle_output_download_failed` | new public reason |
+| expected artifact absent after terminal capture | `rejected` | `oracle_artifact_missing` | existing reason retained |
+| multiple candidate artifacts | `rejected` | `oracle_artifact_ambiguous` | existing reason retained |
+| path / mode / size / SHA / validation / ZIP / JSON defect | `rejected` | `oracle_artifact_rejected` | existing reason retained; allowed many-to-one validation family |
+
+The mapping is closed and authoritative. The five stage-specific classes—model selection, attachment submission,
+prompt reconstruction, generation, and output download—must not be collapsed into one another, into
+`oracle_capability_unsupported`, or into `oracle_session_recovery_required`. Many-to-one normalization is allowed only for the
+three explicitly listed same-semantics families: capability/profile validation, runtime unavailability, and artifact validation.
+An unknown internal failure class has no default public mapping and must fail the mapper contract before serialization.
+
+## 14. Focused commands
 
 ```bash
 uv run pytest tests/unit/application/test_issue_planning_prompt.py -q
 uv run pytest tests/unit/application/test_issue_planning.py -q
 uv run pytest tests/unit/infra/test_issue_planning_chatgpt.py -q
+uv run pytest tests/unit/infra -k 'oracle and (profile or session or artifact or download)' -q
 uv run pytest tests/unit/commands/test_issue_planning.py -q
 uv run pytest tests/cli_runtime/test_chatgpt_cli.py -q
 uv run pytest tests/integration/test_issue_planning_e2e.py -q
-```
-
-Combined:
-
-```bash
-uv run pytest \
-  tests/unit/application/test_issue_planning_prompt.py \
-  tests/unit/application/test_issue_planning.py \
-  tests/unit/infra/test_issue_planning_chatgpt.py \
-  tests/unit/commands/test_issue_planning.py \
-  tests/cli_runtime/test_chatgpt_cli.py \
-  tests/integration/test_issue_planning_e2e.py -q
-```
-
-Static / repo:
-
-```bash
 uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime tests
 uv run mypy src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime
 ./spec-dock/scripts/spec-dock validate
 git diff --check
 ```
 
-repository が既存 `make lint` / ordinary pytest / installer smoke を標準 gate とする場合は追加実行する。
+## 15. Stop matrix
 
-## 10. Stop conditions
-
-| Condition | Required action |
+| Condition | Action |
 |---|---|
-| exact branch / HEAD mismatch | stop; do not use default branch |
-| Oracle directory attachment unsupported | stop / replan |
-| multiple path unsupported | stop; do not build temporary pack |
-| continuation unsupported | stop; do not call personal wrapper |
-| no-prewalk test requires production tree scan | design defect; return to S03/S04 |
-| output ZIP / JSON test regresses | stop; input simplificationで緩和しない |
-| Candidate / Human binding regresses | stop |
-| provider / dogfood parity fails | stop before review |
-| stale parent docs remain | closure incomplete |
-| clarification wiring needs new public command | follow-up owner required |
-| P0 / P1 review finding | repair and fresh review |
-| unscoped worktree changes | isolate before implementation |
-
-## 11. Completion evidence checklist
-
-- [ ] exact implementation HEAD。
-- [ ] Oracle capability evidence。
-- [ ] no generated input pack。
-- [ ] no attachment tree inspection。
-- [ ] direct static / dynamic path。
-- [ ] old CLI cutover。
-- [ ] Blue continuity。
-- [ ] fresh Red。
-- [ ] output regressions pass。
-- [ ] provider / installed / dogfood parity。
-- [ ] docs / skills / parent Epic consistency。
-- [ ] focused tests。
-- [ ] static gates。
-- [ ] SpecDock validation。
-- [ ] fresh review。
-- [ ] Human gate status accurately reported。
+| exact branch/HEAD mismatch | stop; no default branch |
+| 0.17 version/help/schema incomplete | block profile |
+| submission evidence unknown | block profile |
+| model verification unavailable | block profile |
+| representative reconstruction mismatch | stop / investigate; no auto retry |
+| inline requires materialization/drop | disable inline / stop |
+| post-submit needs new execution | stop / redesign |
+| output validator regression | stop |
+| provider projection mismatch | stop before review |
+| private evidence leak | stop / repair |
+| P0/P1 review finding | repair + fresh review |

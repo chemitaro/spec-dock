@@ -252,6 +252,19 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ---
 
+## 候補 v2 配置記録（2026-08-04）
+
+- 対象候補: `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z`
+- 対象 ZIP: `iss-00354-oracle-017-compatibility-candidate-v2-20260804t043533z.zip`
+- ZIP SHA-256: `a870bb35971d86a5a0c5311f404ab717669d6bbaf6798a03a0ad3061537202f8`
+- source HEAD: `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1`
+- source branch: `codex/iss-00354-chatgpt-context-contract`
+- 配置先: `spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00354-define-chatgpt-context-and-attachment-contract/`
+- 配置内容: Candidate の `requirement.md`、`design.md`、`plan.md`、ADR、全アーティファクト、`MANIFEST.json`、`CHECKSUMS.sha256`、Candidate 注記、および v1/v2 の正式レビュー記録を、解凍したファイルとして配置した。既存の履歴アーティファクトは削除していない。
+- 検証: 配置先で `shasum -a 256 -c CHECKSUMS.sha256` を実行し、Candidate v2 に含まれる全エントリが一致した。v2 Red Team は fresh thread で PASS（P0/P1 なし）となった。
+- 配置状態: `copied_to_issue_scope`
+- 正式採用状態: `deferred`。今回の依頼は解凍した仕様書等の配置であり、`planning apply`、assurance 更新、implementation start は実行していない。Candidate 文書に記載された `evidence-only` / `unadopted` の境界を維持する。
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）

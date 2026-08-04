@@ -1,182 +1,141 @@
 ---
 種別: 設計書（Issue）
 ID: "iss-00354"
-タイトル: "ChatGPT Context and Attachment Contract"
+タイトル: "ChatGPT Context and Attachment Contract — Oracle 0.17.0 増分設計"
 状態: "draft"
 作成者: "ChatGPT Blue Team authoring planner"
 最終更新: "2026-08-04"
-依存: ["requirement.md"]
+依存: ["requirement.md", "decisions/ADR-ISS354-001-oracle-017-browser-compatibility.md"]
 親: ["epic-00331", "init-00322"]
 ---
 
 # iss-00354 ChatGPT Context and Attachment Contract 設計書
 
-> **Candidate / evidence-only**  
-> 本設計は `CAND-ISS-00354-20260803T172642Z` の Blue Team 案であり、canonical design、review PASS、実装承認ではない。
+> **Candidate / evidence-only / unreviewed**  
+> 本設計は `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z` の増分案であり、canonical design、review PASS、実装承認ではない。
 
-## 1. 設計の目的
+## 1. 設計目的
 
-既存 Issue Planning runtime の強い output / authority boundary を維持したまま、ChatGPT input を次へ変更する。
+source HEAD `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` の既存設計は、long synthesized prompt + generated prompt packを
+minimal body + direct attachment pathsへ移行し、Blue continuity / fresh Redとtyped output validationを維持する。
+本改訂はそのtarget architectureを変えず、Oracle `0.17.0` のversion/config/browser behaviorを次の四境界へ局所化する。
 
-- 長い合成 prompt + generated prompt pack
-- から
-- minimal body + direct attachment paths
+1. exact version と capabilityを束ねる compatibility profile。
+2. model / attachment / reconstruction / submission / response / download / snapshot のstage evidence。
+3. pre-submit new execution と post-submit same-session recoveryを分けるbounded decision engine。
+4. Oracle `0.17.0` session artifact schemaを扱うversioned decoder。
 
-入力 directory は SpecDock が materialize しない。詳細 instruction は provider-owned attachment directory へ
-置き、directory path を direct Oracle に渡す。Candidate / Review / Revision の dynamic evidence は original
-path のまま追加する。
+Target identity:
 
-同時に、Blue authoring thread の継続と Candidate ごとの fresh Red thread を provider-owned direct Oracle
-adapter 内で表現する。ただし exact Oracle capability を実装前に確認し、unsupported interface を推測しない。
+| Field | Value |
+|---|---|
+| Repository | `chemitaro/spec-dock` |
+| Branch | `codex/iss-00354-chatgpt-context-contract` |
+| Source HEAD | `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` |
+| Verification | branch and requested HEAD identical; default fallback not used |
+
+本manual Candidateのexpanded inventory（ADR / artifactsを含む）はdelivery evidenceであり、production authoring ZIPのexact inventoryを
+変更する設計ではない。
 
 ## 2. 設計原則
 
-1. **Input と output の safety boundary を分離する。**  
-   Option C は input attachment directory に適用する。output ZIP / JSON、Candidate identity、Human binding の
-   検証は維持する。
-2. **Directory を data として扱わない。**  
-   application は directory 内 entry を読まず、path を transport へ渡すだけとする。
-3. **Provider-owned resources を正本とする。**  
-   `src/spec_dock/assets/...` を編集し、installed / dogfood projection を同期する。
-4. **No fallback.**  
-   default branch、personal wrapper、API、alternate backend、automatic conversion を用いない。
-5. **Blue と Red を分離する。**  
-   Blue continuity は authoring convenience、Red fresh は review independence であり、一つの session policy に
-   統合しない。
-6. **Existing lifecycle を増分変更する。**  
-   `planning create` / `review planning` / `planning revise` / `planning apply` と output parser を作り直さない。
-7. **Capability gap は停止条件である。**  
-   unsupported Oracle behavior を temporary wrapper で埋めない。
+1. **既存 lifecycle を増分変更する。** Issue #334のcreate/review/revise/applyと#354 S01–S08を作り直さない。
+2. **Option A / Cを維持する。** bodyとattachmentsを分離し、directory entryをmaterializeしない。
+3. **Versionをcapabilityの代理にしない。** exact version、help surface、runtime evidence、artifact schemaをprofileとして検証する。
+4. **Config isolationをしない。** Oracle-native user/project configを尊重し、formal必須値はexplicit argvにする。
+5. **Logical modelとUI labelを分ける。** generic codeは`GPT-5.6 Sol`を前提にしない。
+6. **Submissionが回復境界である。** pre-submitは限定new execution、post-submitはsame-sessionのみ。
+7. **One successful submission.** 一つのoperation lineageで自動的に複数ChatGPT responseを生成しない。
+8. **Failureをstageで分類する。** reconstruction、model、attachment、downloadを混同しない。
+9. **Output safetyを維持する。** input simplification / compatibility updateを理由にZIP/JSON validatorを緩めない。
+10. **Unsupportedは停止する。** wrapper、API、default model、default branch、automatic conversionへ逃げない。
 
-## 3. 現行アーキテクチャ
+## 3. Current architecture と確認済みbaseline
 
-| Layer / file | 現行責務 | Issue #354 での扱い |
+| Layer / file | Source HEADで確認した責務 | 0.17増分 |
 |---|---|---|
-| `application/issue_planning_prompt.py` | source file safe-read、content scan、role resource連結、attachment index / SHA | input materialization を除去し minimal body / path contract へ置換 |
-| `application/issue_planning.py` | preflight、context manifest、planning / review / revision orchestration、postflight | lifecycle 維持。old input checks / manifest matching を削除 |
-| `domain/issue_planning_contracts.py` | typed identity、Candidate / Review / Human contracts | identity / output contracts 維持。operation input / thread policy を追加または分離 |
-| `infra/issue_planning_chatgpt.py` | direct Oracle、managed Chrome、temporary prompt pack、session recovery、typed output | direct Oracle / output取得維持。temporary input pack を direct path argv へ置換 |
-| `commands/issue_planning.py` | CLI parse、`--context-manifest` | directory-oriented attachment option へ hard cutover |
-| operation resources | planner / reviewer / revision / transport text | minimal prompt template と per-operation attachments へ再配置 |
-| tests | old input safetyと成熟した lifecycle/outputを混在固定 | old input contract testsを置換し、output/lifecycle regressionsを保持 |
-| docs / skills | context manifest、reference-only attachments、input manifest safety | Option A/Cへ更新。output evidence laneは維持 |
+| `application/issue_planning_prompt.py` | source safe-read、scanner、long prompt、materialized attachments | 既存#354設計どおりminimal body/pathへ。prompt exactness fixture追加 |
+| `application/issue_planning.py` | pre/postflight、create/review/revise/apply orchestration | recovery decisionとattempt budgetを注入、lifecycle維持 |
+| `domain/issue_planning_contracts.py` | typed identity、Candidate/Review/Human/result contracts | content-free attempt evidence、closed public reason mapping追加 |
+| `infra/issue_planning_chatgpt.py` | PATH Oracle、exact 0.16.1、managed Chrome、explicit `Pro/select`、one submit | profile selection、stage parser、direct/inline argv、bounded orchestration |
+| `infra/issue_planning_oracle_artifact.py` | private Oracle 0.16.1 metadata / artifact reader | version-dispatched decoder。定数置換禁止 |
+| `commands/issue_planning.py` | current CLI / `--context-manifest` | 既存#354のdirectory cutoverを維持。retry modeをpublic flag化しない |
+| unit / integration tests | 0.16.1 exact version、argv、strict artifacts | 0.17 profile fixtures、stage matrix、exact public mapping、browser receipt tests追加 |
 
-現行 provider / dogfood runtime file は同一 SHA で投影されている。変更は両面の parity を壊さない。
+Source HEADのrecovery baselineはstage-blindである。`invoke_issue_planning_chatgpt`はnonzero/timeoutまたはsession nonterminalで
+`promptSubmitted`をdecodeせず`_recover_same_session`を呼び、同helperは
+`oracle session <session-id> --harvest --no-recover`をgeneric adapter内で直接構築する。これは「submit後だけのharvest」ではない。
+
+実施済みbaselineとして維持するもの:
+
+- PATH Oracle executable resolution / identity check。
+- managed Chrome loopback preflight。
+- `shell=False`、one `--prompt`、sanitized environment。
+- current logical model request `Pro` / strategy `select`。
+- typed ZIP / JSON snapshotとstrict validation。
+- exact GitHub source gate、Candidate / Review / Human authority。
+
+移行で置換するbaseline:
+
+- stage-blind recovery gateを`prompt_submitted is True` gateへ置換する。
+- generic adapterのhardcoded session harvest argvを0.16.1 profileへ移し、0.17ではcharacterized profile buildersだけを使う。
+
+実施済みとみなさないもの:
+
+- Option A / C production migration。
+- Oracle `0.17.0` profile、declared inline capability、harvest/capture builders。
+- 0.17 stage evidence / model mapping / inline recovery。
+- 0.17 artifact decoder / browser smoke PASS。
 
 ## 4. Target architecture
 
 ```mermaid
 flowchart LR
-    C[CLI / Skill] --> A[Issue Planning Application]
-    A --> G[Exact GitHub Preflight]
-    G --> P[Operation Definition Resolver]
-    P --> B[Minimal Body Synthesizer]
-    P --> D[Static Attachment Directory Path]
-    A --> E[Dynamic Evidence Paths]
-    A --> T[Thread Policy]
-    B --> O[Direct Oracle Adapter]
-    D --> O
-    E --> O
-    T --> O
-    O --> X[ChatGPT]
-    X --> V[Existing Typed Output Validator]
-    V --> K[Evidence-only Candidate / Review]
-    K --> H[Existing Human / Apply Gate]
+    CLI[CLI / Skill] --> APP[Issue Planning Application]
+    APP --> GIT[Exact GitHub Preflight]
+    GIT --> OP[Operation Resolver]
+    OP --> BODY[Minimal Body]
+    OP --> PATHS[Static + Dynamic Original Paths]
+    APP --> POL[Blue / Fresh Red Policy]
+    APP --> PROF[Oracle Compatibility Registry]
+    PROF --> ADP[Direct Oracle Adapter]
+    BODY --> ADP
+    PATHS --> ADP
+    POL --> ADP
+    ADP --> STAGE[Stage Evidence Parser]
+    STAGE --> DECIDE[Recovery Decision Engine]
+    DECIDE -->|pre-submit, budget 1| ADP
+    DECIDE -->|post-submit| HARVEST[Same-session Harvest / Capture]
+    HARVEST --> READER[Versioned Artifact Reader]
+    STAGE --> READER
+    READER --> VALID[Existing ZIP / JSON Validators]
+    VALID --> EVID[Evidence-only Candidate / Review]
+    EVID --> HUMAN[Existing Human / Apply Gate]
 ```
 
-`Operation Definition Resolver` は operation 名から既知の prompt template path、attachment directory path、
-output expectation、thread lane を選ぶ。attachment directory の内容は解決しない。
+applicationはOracle CLI field名やsession metadata field名を知らない。infra profile / parserがactual `0.17.0` contractを
+adapter-neutral evidenceへ翻訳する。
 
-## 5. Provider resource layout
+## 5. Operation input architecture の保持
 
-### 5.1 Issue Planning
-
-provider 正本を次の self-contained operation directory へ整理する。
+### 5.1 Resource layout
 
 ```text
-src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/
-└── resources/
-    └── operations/
-        ├── planning/
-        │   ├── prompt.md
-        │   └── attachments/
-        │       ├── authoring-instructions.md
-        │       ├── authority-boundary.md
-        │       └── output-contract.md
-        ├── review/
-        │   ├── prompt.md
-        │   └── attachments/
-        │       ├── defect-review-instructions.md
-        │       ├── authority-boundary.md
-        │       └── output-contract.md
-        └── revision/
-            ├── prompt.md
-            └── attachments/
-                ├── semantic-revision-instructions.md
-                ├── authority-boundary.md
-                └── output-contract.md
+resources/operations/
+├── planning/
+│   ├── prompt.md
+│   └── attachments/
+├── review/
+│   ├── prompt.md
+│   └── attachments/
+└── revision/
+    ├── prompt.md
+    └── attachments/
 ```
 
-設計上重要なのは file 名の固定 inventory ではなく、次の二つだけである。
+`prompt.md`だけをknown templateとして読む。`attachments/`はopaque directory pathであり、file inventoryをregistryに持たない。
 
-- `prompt.md` は application が読む既知の minimal body template。
-- `attachments/` は direct Oracle へ path を渡す opaque directory。
-
-`attachments/` 配下 file の追加・削除・階層変更を application registry へ列挙しない。共通 material の共有を
-symlink に依存させず、各 operation directory を transport 単位として self-contained にする。
-
-### 5.2 Clarification convention
-
-clarification は source HEAD 時点で skill-owned workflow であり、Issue Planning public runtime command ではない。
-再利用する場合の provider convention は次とする。
-
-```text
-src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/
-└── resources/
-    └── chatgpt-operation/
-        ├── prompt.md
-        └── attachments/
-            ├── clarification-loop.md
-            └── handoff-contract.md
-```
-
-Issue #354 では resource convention と docs / skill guidance までを定義する。direct Oracle runtime wiring を
-追加する場合は clarification owning scope の後続 Issue で行う。
-
-### 5.3 Projection
-
-provider tree は次へ投影する。
-
-- `.agents/skills/spec-dock-issue-planning/resources/operations/...`
-- `.agents/skills/spec-dock-clarification/resources/chatgpt-operation/...`
-- installed target の同一 path。
-
-projection test は tree inventory を「許可 file の固定一覧」として制限せず、provider と projection の
-recursive byte parity を比較する。
-
-## 6. Operation definition
-
-application 内部の operation registry は file content ではなく root path と policy を保持する。
-
-```python
-@dataclass(frozen=True)
-class ChatGptOperationDefinition:
-    operation: Literal["planning", "review", "revision", "clarification"]
-    prompt_template_path: Path
-    attachment_directory_path: Path
-    output_kind: Literal["authoring_zip", "review_json", "advisory_text"]
-    thread_lane: Literal["blue", "fresh_red"]
-```
-
-`clarification` は reusable definition として表現できるが、公開 command へ登録されるまでは invocation registry
-へ露出しない。未登録 operation を generic fallback で送信しない。
-
-known root の選択と `prompt.md` の読取りは product configuration であり、Option C の entry inspection ではない。
-`attachment_directory_path` に対し `rglob`、`iterdir`、`walk`、`stat`、`resolve`、`read_*` を実行しない。
-
-## 7. Synthesized input contract
-
-現行 `SynthesizedPlanningPrompt` を byte materialized attachment から path reference へ変更する。
+### 5.2 Synthesized operation
 
 ```python
 @dataclass(frozen=True)
@@ -188,478 +147,514 @@ class SynthesizedChatGptOperation:
     thread_request: ThreadRequest
 ```
 
-廃止対象:
+current `PlanningPromptAttachment.content`、classification、per-file SHA、input manifestは既存#354 targetどおり廃止する。
+prompt textはapplicationが生成したexact stringとしてinfraへ渡す。
 
-- `PlanningPromptAttachment.content`
-- `classification`
-- `source_label`
-- per-attachment `sha256`
-- `attachments: tuple[tuple[str, str], ...]`
-- exact attachment index の本文生成
-- `_safe_source_file`
-- descriptor-relative input file read
-- input content scan / hard byte count
-- `_attachments_match_source_manifest`
-- `_exact_attachments_have_sensitive_content`
+## 6. Oracle compatibility profile
 
-維持対象:
+以下は概念contractであり、0.17.0のactual flag / commandはS09 characterizationで確定する。generic adapterが
+undocumented argvを発明してはならない。
 
-- typed repository / branch / HEAD / Issue identity。
-- output expectation。
-- exact GitHub hard-failure instruction。
-- source preflight / postflight。
-- output artifact validation。
+```python
+OracleSessionCommandBuilder = Callable[[Path, str], tuple[str, ...]]
 
-## 8. Minimal body contract
+@dataclass(frozen=True)
+class OracleCompatibilityProfile:
+    version: str
+    required_root_capabilities: frozenset[str]
+    required_session_capabilities: frozenset[str]
+    browser_argv_policy: BrowserArgvPolicy
+    model_policy: OracleModelPolicy
+    attachment_policy: OracleAttachmentPolicy
+    inline_mode_characterized: bool
+    stage_evidence_decoder: StageEvidenceDecoder
+    artifact_reader: OracleArtifactReader
+    harvest_argv_builder: OracleSessionCommandBuilder | None
+    capture_argv_builder: OracleSessionCommandBuilder | None
+```
 
-### 8.1 共通 field
+`harvest_argv_builder`は`prompt_submitted=true`かつresponse incomplete用、`capture_argv_builder`は
+`prompt_submitted=true`かつresponse complete / artifact pending用である。0.17で同じOracle commandを使う場合も、同じ
+characterized builderを二つのfieldへ明示bindする。generic adapterはliteral `session` / `--harvest` / `--no-recover`を持たない。
 
-本文は human-readable Markdown とし、次の field だけを operation template へ埋め込む。
+### 6.1 Registry selection
 
 ```text
-operation
-objective
-repository
-branch
-source_head
-initiative_id
-epic_id
-issue_id
-authority
-mutation_prohibition
-expected_output
-github_exact_access_failure
-attachments_instruction
+oracle --version
+  -> exact normalized version
+  -> registry lookup
+  -> help/capability validation
+  -> stage decoder + inline declaration + recovery builders validation
+  -> profile-specific session fixture validation
+  -> executable identity recheck
+  -> invocation
 ```
 
-本文へ static attachment inventory、entry name、entry hash、size、content summary を入れない。
+- `0.16.1` profileは現行hardcoded harvest commandをbehavior-preserving builderとして所有するが、automatic downgrade targetではない。
+- `0.17.0` profileはS09でcharacterizedされたinline capabilityとharvest/capture buildersが揃う場合だけ登録する。
+- `0.17.x` wildcard、major/minor range、unknown patchを自動受理しない。
+- builder欠落、profile selection後のhelp / session evidence mismatch、submission state undecodableは
+  `blocked` / `oracle_capability_unsupported`で停止する。
 
-### 8.2 Planning
+### 6.2 Config boundary
 
-Planning 本文は「既存 Issue の requirement / design / plan と exactly-one onboarding companion を
-authoring ZIP で作成する」という目的までを含む。具体的な completeness 観点、標準構造、出力 path は attached
-Markdown が所有する。
+child environmentは既存allowlistを維持し、`HOME` / `ORACLE_HOME_DIR` / cwdをinvocation専用値へ差し替えてOracle configを
+無効化しない。SpecDockは次をexplicit argvにする。
 
-### 8.3 Review
+- browser engine。
+- logical model requestとmodel strategy。
+- managed Chrome endpointとcookie sync policy。
+- wait / attachment mode。
+- session slug。
+- exact prompt。
+- original attachment paths。
 
-Review 本文は fresh read-only defect-only operation、review target identity、expected closed JSON を含む。
-Candidate ZIP 自体は dynamic path として添付する。Candidate SHA / reviewed identity digest は formal evidence
-identity であり、directory manifest ではない。
+standard/project target URLはOracle-native config / browser stateであり、SpecDockはraw URLをread / log / public resultへ出さない。
+smoke evidenceは`target_kind=standard|project`のcontent-free categoryだけを残せる。
 
-### 8.4 Revision
-
-Revision 本文は selected P0 / P1 finding ID、prior Candidate identity、Review result identity、preserve
-assumption identifiers を含められる。finding の全文と revision 手順は attached Review JSON と static revision
-instruction が所有する。
-
-### 8.5 Clarification
-
-Clarification 本文は現在の一問、scope identity、mode、期待する advisory answer を含む。source list、
-interview semantics、handoff template は attached Markdown が所有する。
-
-## 9. Attachment path assembly
-
-operation ごとの path list は entry を materialize せず、次の順で組み立てる。
-
-1. provider-owned static `attachments/` directory。
-2. operation が必須とする original dynamic evidence paths。
-3. optional operator-supplied attachment directory paths。
-
-| Operation | Static path | Dynamic paths |
-|---|---|---|
-| planning | `.../operations/planning/attachments/` | optional external attachment directories |
-| review | `.../operations/review/attachments/` | Candidate ZIP、必要時の reviewed identity evidence |
-| revision | `.../operations/revision/attachments/` | prior Candidate ZIP、exact Review JSON、revision request |
-| clarification | `.../chatgpt-operation/attachments/` | current interview / research artifacts as supplied by owner |
-
-application は top-level path の semantic order だけを決める。directory 配下 order は再構成しない。
-
-### 9.1 禁止される実装
+## 7. Stage evidence contract
 
 ```python
-# 禁止例
-for entry in attachment_dir.rglob("*"):
-    if entry.is_file() and entry.suffix in ALLOWED:
-        copy_and_hash(entry)
+class OracleStage(str, Enum):
+    PREFLIGHT = "preflight"
+    BROWSER_READY = "browser_ready"
+    MODEL_SELECTED = "model_selected"
+    ATTACHMENTS_PREPARED = "attachments_prepared"
+    PROMPT_RECONSTRUCTED = "prompt_reconstructed"
+    PROMPT_SUBMITTED = "prompt_submitted"
+    RESPONSE_COMPLETED = "response_completed"
+    ARTIFACT_DOWNLOADED = "artifact_downloaded"
+    ARTIFACT_SNAPSHOTTED = "artifact_snapshotted"
 ```
-
-```python
-# 目標
-argv.extend(["--file", os.fspath(attachment_dir)])
-```
-
-複数 path が必要な場合の exact argv は direct Oracle capability characterization で確定する。repeatable
-`--file` が supported なら各 path をそのまま追加する。unsupported の場合、temporary pack、symlink farm、
-automatic archive で代替せず STOP / REPLAN とする。
-
-## 10. Oracle adapter boundary
-
-### 10.1 維持する処理
-
-- PATH から executable を解決し、identity を再検証する。
-- supported Oracle version / capability を preflight する。
-- loopback managed Chrome endpoint を検証する。
-- sanitized child environment を使う。
-- `shell=False`、direct argv、single submission を使う。
-- same invocation の timeout / harvest recovery を維持する。
-- terminal session artifact から typed ZIP / JSON を snapshot する。
-- private transcript / session path を public result へ露出しない。
-
-### 10.2 削除する処理
-
-- `TemporaryDirectory` 配下の `prompt-pack/` 生成。
-- `_write_transport_pack`。
-- `context-NNN.md` への text conversion。
-- input manifest / provenance / source-manifest / stale-if file 生成。
-- exact attachment copy / re-read / SHA verification。
-- input pack marker file。
-
-temporary `staging` は Oracle output artifact の private snapshot に必要な範囲で残せる。input directory を
-再構成する用途へ使わない。
-
-### 10.3 Failure normalization
-
-entry-specific error vocabulary を追加しない。attachment submission failure は existing transport boundary で
-content-free に正規化する。既存の `oracle_unavailable`、`oracle_capability_unsupported`、
-`oracle_session_recovery_required`、`oracle_artifact_*` などを再利用し、filename や content を public details へ
-含めない。
-
-## 11. Thread continuity design
-
-### 11.1 Thread policy
-
-```mermaid
-stateDiagram-v2
-    [*] --> NoBlue
-    NoBlue --> BlueActive: planning / clarification start
-    BlueActive --> BlueActive: verified semantic revision
-    BlueActive --> NewBlueRequired: unavailable / identity mismatch
-    NewBlueRequired --> BlueActive: lineage exact + complete resubmission
-    NewBlueRequired --> HumanBlocked: lineage ambiguous
-    HumanBlocked --> BlueActive: Human selects exact lineage
-    BlueActive --> FreshRed: review Candidate N
-    FreshRed --> [*]: closed Review JSON
-```
-
-Red thread は state store へ reusable binding として登録しない。
-
-### 11.2 Adapter-private binding
 
 ```python
 @dataclass(frozen=True)
-class BlueThreadBinding:
-    schema_version: int
-    repository: str
-    branch: str
-    source_head: str
-    issue_id: str
-    candidate_identity_sha256: str | None
-    provider_thread_handle: str
-    supersedes_binding_digest: str | None
+class OracleAttemptEvidence:
+    profile_version: str
+    terminal_stage: OracleStage
+    logical_model: str
+    observed_model_label: str | None
+    model_verified: bool | None
+    attachment_mode: Literal["direct", "inline", "none"]
+    prompt_submitted: bool | None
+    response_completed: bool | None
+    artifact_state: Literal["none", "pending", "downloaded", "snapshotted", "invalid"]
+    failure_class: OracleFailureClass | None
 ```
 
-保存先は repository と Candidate の外側にある provider-owned private operational state とする。候補は
-Oracle home 配下の SpecDock namespace だが、既存 Oracle retention / permissions と衝突しないことを S01 で
-確認してから確定する。
+actual Oracle metadata / stdout / session artifactをどのfieldからdecodeするかはprofile-privateである。evidenceがambiguousなら
+`None`を推測で`False`/`True`に変換せず、formal operationをunsupportedまたはrecovery-requiredとして停止する。
 
-禁止事項:
+public `PlanningInvocationResult`へ出すのはstatus、content-free reason、backend exit code、response size/SHA等の既存安全fieldと、
+必要最小限のstage enumだけとする。raw prompt、label以外のUI text、URL、handle、transcriptは出さない。
 
-- Candidate ZIP / Review JSON / canonical docs への handle 埋込み。
-- public command result / log / report への raw handle 出力。
-- raw transcript の新規永続化。
-- source HEAD または Candidate lineage が変わった binding の黙示 reuse。
+## 8. Prompt synthesis / reconstruction design
 
-### 11.3 Reuse 判定
+### 8.1 Application guarantee
 
-Blue binding reuse は次がすべて一致する場合だけ許す。
+- promptは一つのPython `str`としてdeterministicに生成する。
+- infraは一つの`--prompt` operandへそのまま渡す。
+- `shell=False`、stdin disabled、encoding conversion fileを作らない。
+- line ending、quotation、Unicode、末尾改行をadapterがnormalizeしない。
+- internal correlation用に`sha256(prompt.encode("utf-8"))`、UTF-8 byte length、ends-with-newline flagを保持できる。
 
-- repository
-- branch
-- source HEAD
-- Issue ID
-- operation lane = Blue
-- revision の場合、prior Candidate identity が binding lineage と一意に接続する
-- direct Oracle が binding の継続可能性を確認できる
+### 8.2 Oracle evidence
 
-static attachment directory の hash / inventory は判定に使わない。resource tree の更新は current complete input を
-次 turn に添付することで反映する。
+0.17 profileは少なくとも次を区別できる必要がある。
 
-### 11.4 Recovery
+- reconstruction succeeded and submission occurred。
+- reconstruction mismatch and `promptSubmitted=false`。
+- submission state unknown。
 
-- handle が missing / expired / invalid: new Blue。
-- repository / branch / HEAD mismatch: old binding を invalidate し new Blue。
-- Candidate lineage exact: automatic new Blue + complete current inputs。
-- Candidate lineage ambiguous: `continuity_confirmation_required` 相当の content-free blocked result。
-- new Blue は old handle を本文へ書かず、internal supersession digest だけを持てる。
+mismatchはattachment modeやmodel strategyを自動変更して再試行しない。外部証跡ではdirect / inline / none、standard / project、
+select / currentにまたがって再現しており、単一transport retryで回復すると仮定できないためである。
 
-exact public reason 名は existing status vocabulary と CLI compatibility を確認して決める。新 reason が必要な場合も
-session ID や filename を details へ含めない。
+### 8.3 Test corpus
 
-### 11.5 Oracle continuation port
+- ASCII short control。
+- 日本語、絵文字、combining character。
+- single/double quotes、backticks、shell-like text。
+- CR/LF input policyを明示したLF canonical body。
+- trailing newlineあり/なし。
+- representative Issue #354 brief相当の長さとMarkdown fence。
+- attachmentあり/なしの同一prompt digest。
 
-application は exact CLI flag を知らない。
+unit testはsubprocess argv exact equalityを証明し、browser smokeはOracle stage evidenceでsuccessful reconstruction / submissionを確認する。
 
-```python
-class ChatGptThreadPort(Protocol):
-    def start(self, request: OracleInvocationRequest) -> OracleInvocationResult: ...
-    def continue_verified(
-        self,
-        binding: BlueThreadBinding,
-        request: OracleInvocationRequest,
-    ) -> OracleInvocationResult: ...
+## 9. Model selection design
+
+### 9.1 Logical request
+
+applicationは`logical_model="pro"`を要求する。current adapterの`--model Pro` / `select`は0.16.1 baselineであり、0.17 profileが
+同じargvを使えるかS09でcharacterizeする。
+
+### 9.2 Verified evidence
+
+success判定には次が必要である。
+
+- profileが要求したlogical selector。
+- Oracleがmodel selectionをverifiedとしたこと。
+- observed non-empty UI label。
+- successful prompt submissionとの同一attempt binding。
+
+`GPT-5.6 Sol`は外部smokeのobserved labelとしてledgerに残すが、generic enum、prompt、test global constantへ埋め込まない。
+0.17 direct smokeでmappingを確認した場合、profile fixture / receipt expectationに局所化する。
+
+### 9.3 Transient model failure
+
+`Available: Got it.`の観測はUI readiness / overlayの可能性を示すが、root causeは未確認である。profileがこのfailureを
+retryable pre-submit classとして安全に識別できる場合だけ、recovery engineはnew executionを一度許可する。
+
+- logical modelとstrategyは変更しない。
+- `current`へfallbackしない。
+- new executionはoverall automatic new-execution budgetを消費する。
+- retry後もunverifiedならblockする。
+
+## 10. Attachment transport design
+
+### 10.1 Direct primary
+
+path assembly orderは既存設計どおりである。
+
+1. provider static attachment directory。
+2. required dynamic evidence original paths。
+3. optional operator-supplied directory paths。
+
+adapterはtop-level pathsをOracle `0.17.0` profileのdirect attachment syntaxで渡し、tree APIを呼ばない。
+
+### 10.2 Inline fallback
+
+inlineはgeneric fallbackではなく、profile contractに存在する`inline_mode_characterized`を含む次のpredicateをすべて満たす
+場合のone-shot recoveryである。
+
+```text
+failure_class == attachment_submission_failed
+AND prompt_submitted is false
+AND profile.inline_mode_characterized is true
+AND overall_new_execution_budget_remaining == 1
+AND all required original paths are retained
 ```
 
-infra adapter は supported direct Oracle interface のみを実装する。Oracle に continuation interface がなければ、
-port を fake で埋めず S01 stop condition を発火する。
+`prompt_submitted is None`はfalseとして扱わずblockする。false / unknownのどちらでもsame-session harvest / capture builderは呼ばない。
 
-## 12. Application flow
+実行時:
 
-### 12.1 Planning create
+- new Oracle execution / new session slugを使う。
+- same logical Blue/Red operation lineageを維持する。
+- same exact promptとoriginal pathsを渡す。
+- pathをread / copy / convert / ZIP / filterしない。
+- required attachmentsを`none`へ落とさない。
+- inline failure後はblockし、directへ戻るthird attemptをしない。
+
+### 10.3 No-attachment smoke
+
+attachmentなしはdiagnostic smoke variationとしてのみ使用できる。formal Planning / Review / Revisionでrequired evidenceを
+削除するproduction fallbackではない。
+
+## 11. Recovery state machine
 
 ```mermaid
-sequenceDiagram
-    actor Operator
-    participant CLI
-    participant App as IssuePlanningApplication
-    participant Git as GitHubPreflight
-    participant Prompt as OperationResolver
-    participant Oracle as DirectOracleAdapter
-    participant Validator as ExistingZIPValidator
-
-    Operator->>CLI: planning create --issue ... [--attachment-dir ...]
-    CLI->>App: PlanningCreateRequest
-    App->>Git: exact branch / HEAD preflight
-    Git-->>App: PlanningSourceEvidence
-    App->>Prompt: resolve planning + synthesize minimal body
-    Prompt-->>App: body + static directory path
-    App->>Oracle: start/reuse Blue with direct paths
-    Oracle-->>App: authoring ZIP snapshot
-    App->>Git: source-current postflight
-    App->>Validator: validate ZIP / inventory / identity
-    Validator-->>App: evidence-only Candidate
+stateDiagram-v2
+    [*] --> Preflight
+    Preflight --> Blocked: unknown profile/capability/builder
+    Preflight --> Model: profile accepted
+    Model --> ModelRetry: retryable + submitted=false + budget
+    ModelRetry --> Model: new execution once
+    Model --> Attach: verified
+    Attach --> InlineRetry: direct failure + submitted=false + inline characterized + budget
+    InlineRetry --> Attach: new execution / inline once
+    Attach --> Reconstruct: prepared
+    Reconstruct --> Blocked: reconstruction mismatch / submitted=false
+    Reconstruct --> Blocked: submission unknown
+    Reconstruct --> Submitted: exact reconstruction + submitted=true
+    Submitted --> Generating
+    Generating --> ProfileHarvest: timeout/nonterminal
+    ProfileHarvest --> Generating: profile harvest argv once
+    Generating --> Response: completed
+    Response --> Capture
+    Capture --> ProfileCapture: download pending/failure
+    ProfileCapture --> Capture: profile capture argv once
+    Capture --> Validate: artifact snapshot
+    Validate --> Rejected: missing/ambiguous/invalid
+    Validate --> Completed: typed output valid
 ```
 
-### 12.2 Review
+### 11.1 Decision contract
 
-- Candidate を existing validator で読み、identity を固定する。
-- fresh Red request を必ず作る。
-- static review directory + original Candidate path を direct attachment とする。
-- Red output を strict `PlanningReviewResult` として検証する。
-- Blue binding を変更しない。
+```python
+class RecoveryAction(str, Enum):
+    BLOCK = "block"
+    NEW_EXECUTION_SAME_MODEL = "new_execution_same_model"
+    NEW_EXECUTION_INLINE = "new_execution_inline"
+    SAME_SESSION_HARVEST = "same_session_harvest"
+    SAME_SESSION_CAPTURE = "same_session_capture"
+    ACCEPT = "accept"
 
-### 12.3 Semantic revision
+@dataclass(frozen=True)
+class RecoveryBudget:
+    automatic_new_executions_remaining: int = 1
+    same_session_harvest_remaining: int = 1
+    same_session_capture_remaining: int = 1
+```
 
-- exact Candidate、Review result、revision request を既存 validator で検証する。
-- P0 / P1 selected findings だけを semantic revision trigger とする。
-- Blue binding を照合する。
-- static revision directory + original evidence paths を direct attachment とする。
-- revised ZIP を既存 authoring validator へ渡す。
-- Candidate publication 後、Blue binding の candidate lineage を新 identity へ更新する。
-- mechanical revision は ChatGPT operation ではないため変更しない。
+Decision invariants:
 
-## 13. Output contract
+1. `prompt_submitted is False or None`なら`SAME_SESSION_HARVEST` / `SAME_SESSION_CAPTURE`を構築できず、builder call countは0。
+2. `prompt_submitted is True`かつresponse incompleteなら、selected profileの`harvest_argv_builder`だけを一度使う。
+3. `prompt_submitted is True`かつresponse complete / artifact pendingなら、selected profileの`capture_argv_builder`だけを一度使う。
+4. generic adapterはsession recovery argvを組み立てない。builderが`None`ならcapability unsupported。
+5. model retryとinline retryは同じnew-execution budgetを共有する。post-submit actionはnew-execution budgetを使用せず、prompt再送を
+   構築できないAPIにする。
+6. characterized builder実行後にknown generation/download stageが終端しなければ、REQ-030のstage-specific reasonを返す。
+   builder自体を安全に実行できない場合だけ既存`oracle_session_recovery_required`を使う。
 
-Issue #354 は input simplification を理由に output validation を緩めない。
+## 12. Blue / Red thread integration
 
-### 13.1 Authoring ZIP
+### 12.1 Attemptとconversation
 
-維持する条件:
+- pre-submit failure: ChatGPT conversation turnを作成していない。Blue binding / Red review stateをadvanceしない。
+- successful Blue submission: verified Blue bindingへcommitする。
+- successful Red submission: Candidate versionのfresh Redを消費する。二度目のsuccessful submissionを自動で作らない。
+- post-submit timeout/download failure:同一session recoveryのみで、same conversationのoutputを回収する。
+
+### 12.2 Binding transaction
+
+```text
+prepare operation identity
+-> select Blue/fresh Red policy
+-> execute Oracle attempt(s) pre-submit within budget
+-> on first successful submission, bind private session/thread evidence
+-> recover same session if needed
+-> validate output
+-> update Blue candidate lineage only after valid Candidate publication
+```
+
+Red bindingは再利用可能storeへ残さない。provider handleはprivate operational stateであり、public serializationしない。
+
+## 13. Versioned artifact reader / download capture
+
+### 13.1 Reader dispatch
+
+current `SUPPORTED_ORACLE_VERSION = "0.16.1"`を`"0.17.0"`へ単純置換しない。
+
+```python
+reader = profile.artifact_reader
+metadata = reader.read_session_metadata(session_root, session_id)
+receipt = profile.stage_evidence_decoder.decode(metadata, diagnostics)
+artifact = reader.snapshot_expected_output(metadata, staging)
+```
+
+0.16.1 readerのstrict invariantsを保持し、0.17.0のactual schema用にseparate fixture / decoderを作る。共通化は、
+mode、contained path、bounded size、SHA、validation、ZIP/JSON strictnessの意味が同じとcharacterizeできた部分だけに限定する。
+
+### 13.2 Download failure
+
+response completion evidenceと`prompt_submitted=true`があり、expected file artifactがpending / download-failedである場合、selected
+profileの`capture_argv_builder`が返すexact argvを一度だけ実行する。generic adapterは0.16.1 harvest commandを代用しない。
+`prompt_submitted=false` / unknownではcaptureを行わない。
+
+次の場合はrecoveryを行わずrejectする。
+
+- artifact path traversal / symlink / wrong session root。
+- ambiguous file artifacts。
+- validation false / size-SHA mismatch。
+- malformed ZIP / unsupported feature。
+- response completion evidenceがないのにartifactだけ推測するcase。
+
+### 13.3 Output identity
+
+Planning / Revision:
 
 - expected logical filename。
 - expected internal root。
-- `requirement.md`、`design.md`、`plan.md`。
-- runtime-selected exactly-one onboarding companion。
-- path traversal / unsupported ZIP feature / malformed archive の rejection。
-- Candidate material / source baseline / SHA / byte count。
-- no canonical mutation before Human-approved apply。
+- `requirement.md`、`design.md`、`plan.md`、exactly-one onboarding。
+- source baseline / Candidate SHA / evidence-only。
 
-content-level では、13固定 H2 / 4固定 PlantUML のような過剰な prompt hardcode を削除し、semantic completeness、
-subordinate onboarding status、少なくとも一つの有効 diagram など必要最小限を validator / review で確認する。
+Review:
 
-### 13.2 Review JSON
+- strict closed JSON。
+- reviewed identity equality。
+- duplicate / unknown key rejection。
 
-維持する top-level key:
+## 14. Application / infra ports
 
-```json
-{
-  "reviewed_identity": {},
-  "reviewed_identity_sha256": "<sha256>",
-  "verdict": "pass|fail",
-  "findings": []
-}
+### 14.1 Application request
+
+applicationはtransport mode retryをpublic CLI optionにしない。policyはprofile + failure evidence + fixed budgetから決定する。
+operatorが`--force-inline`や`--retry-unlimited`を指定できるsurfaceを作らない。
+
+### 14.2 Infra result
+
+infraはprivate receiptとpublic resultを分ける。
+
+```python
+@dataclass(frozen=True)
+class OracleTransportOutcome:
+    public_result: PlanningInvocationResult
+    private_attempt_evidence: tuple[OracleAttemptEvidence, ...]
 ```
 
-duplicate key、NaN、unknown key、identity mismatch、invalid severity を reject する。
+private evidenceはreportへraw dumpせず、implementation completion時にcontent-free summaryとして採用台帳へ反映する。
 
-### 13.3 Clarification
+## 15. Failure normalization
 
-clarification の output は existing skill handoff に従う advisory text / artifact であり、Issue #354 は global
-closed schema を強制しない。
+Internal failure classからpublic resultへのmappingは設計時点で閉じ、S10の調査事項へ先送りしない。
 
-## 14. CLI migration
+| Internal failure class | Public status | Public reason | Contract status |
+|---|---|---|---|
+| executable / managed Chrome unavailable | `blocked` | `oracle_unavailable` | existing reason retained |
+| `profile_unsupported` / required capability missing / `prompt_submitted=unknown` / required profile builder missing | `blocked` | `oracle_capability_unsupported` | existing reason retained; allowed many-to-one capability family |
+| `model_selection_unavailable` after the permitted retry is unavailable or exhausted | `blocked` | `oracle_model_selection_unavailable` | new public reason |
+| `attachment_submission_failed` after the permitted inline path is unavailable or exhausted | `blocked` | `oracle_attachment_submission_failed` | new public reason |
+| `prompt_reconstruction_mismatch` | `blocked` | `oracle_prompt_reconstruction_mismatch` | new public reason |
+| `generation_incomplete` after one characterized same-session harvest | `blocked` | `oracle_generation_incomplete` | new public reason |
+| characterized recovery command cannot be executed safely, or same-session state remains undecidable for infrastructure reasons | `blocked` | `oracle_session_recovery_required` | existing reason retained; not a known-stage catch-all |
+| `output_download_failed` after one characterized same-session capture | `blocked` | `oracle_output_download_failed` | new public reason |
+| expected artifact absent after terminal capture | `rejected` | `oracle_artifact_missing` | existing reason retained |
+| multiple candidate artifacts | `rejected` | `oracle_artifact_ambiguous` | existing reason retained |
+| path / mode / size / SHA / validation / ZIP / JSON defect | `rejected` | `oracle_artifact_rejected` | existing reason retained; allowed many-to-one validation family |
 
-### 14.1 Before
+The mapping is closed and authoritative. The five stage-specific classes—model selection, attachment submission,
+prompt reconstruction, generation, and output download—must not be collapsed into one another, into
+`oracle_capability_unsupported`, or into `oracle_session_recovery_required`. Many-to-one normalization is allowed only for the
+three explicitly listed same-semantics families: capability/profile validation, runtime unavailability, and artifact validation.
+An unknown internal failure class has no default public mapping and must fail the mapper contract before serialization.
 
-```text
-planning create --issue <id> --output <dir> --context-manifest <json>
-```
-
-JSON は `relevant_source_paths` と `operator_context` を持ち、Runtime が個別 file を読み、検査、text attachment へ
-変換する。
-
-### 14.2 After
-
-推奨形:
-
-```text
-planning create --issue <id> --output <dir> [--attachment-dir <path>]...
-```
-
-- no JSON parsing。
-- no individual path extraction。
-- no content read。
-- no directory tree validation。
-- provider static directory は常に operation definition から追加。
-- operator path は指定文字列を transport path として保持する。
-
-`argparse` の path conversion や relative path resolution が Oracle cwd semantics を変えないよう、string / Path の
-exact handoff を focused test で固定する。missing path を preflight で独自分類せず Oracle failure へ委ねる。
-
-旧 flag は deprecation translation せず hard cutover する。help / skill / docs / CLI tests を同時更新する。
-
-## 15. Source freshness と attachment identity
-
-existing GitHub preflight の `PlanningSourceEvidence` と postflight は維持する。これは repository source state の
-証拠であり、input attachment manifest ではない。
-
-- local / remote HEAD parity。
-- named branch / upstream。
-- canonical Issue source path の source snapshot。
-- post-invocation staleness check。
-
-`source-manifest.json` を attachment として生成する処理は削除する。内部 `source_manifest_hash` が publication race
-検出に必要なら result object 内で保持できるが、operation attachment directory の contents を hash してはならない。
+`planning_context_rejected`、`github_exact_branch_unavailable`、successful `transport_received`などOracle stage taxonomy外の既存pairは
+この表で変更しない。domain constructor / CLI testsは各internal classについて表以外のstatus/reason pairをrejectする。
 
 ## 16. Security / privacy boundary
 
-Option C は「input directory を安全と判定する scanner を持たない」という product decision である。これは
-添付内容が安全であることを SpecDock が保証するという意味ではない。
+- raw personal wrapper pathはCandidateへ複製しない。source evidenceは「personal wrapperを使用した外部観測」として識別する。
+- target URLは`standard|project` categoryだけを保持し、raw private URLを保存しない。
+- promptはhash/lengthのみをcontent-free diagnosticsに使用し、raw textをsession summaryへ再保存しない。
+- observed model labelはcredentialではないが、UI full dumpやoverlay textをpublic resultへ出さない。
+- session handle、browser endpoint、Oracle home、private absolute path、transcriptをpublic outputへ含めない。
+- child environment sanitization、executable identity、loopback managed Chrome、output staging isolationを維持する。
 
-- operation pack maintainer / operator が material を選ぶ。
-- Runtime は secrets / path / special entry を検査しない。
-- direct Oracle / ChatGPT が受理または失敗する。
-- failure diagnostics は content-free。
-- child environment sanitization、managed Chrome boundary、executable identity、output artifact isolation は維持。
-- session / conversation identifier、private URL、raw transcript を Candidate / Review / public result に残さない。
-- output ZIP を展開 / adopt する側の safety validator は維持。
+## 17. Test architecture
 
-## 17. Provider / dogfood implementation mapping
+### 17.1 Unit — profile / version / argv
 
-| Provider source | Dogfood / installed target |
+- exact `0.17.0` profile selection。
+- unknown `0.17.1` / `0.18.0` rejection until explicit profile。
+- required root/session help flag checks。
+- profile contractに`inline_mode_characterized`、harvest builder、capture builderが存在する。
+- Oracle configを隔離するenv rewriteがない。
+- explicit logical model / strategy / managed Chrome / prompt / paths。
+- direct and inline argv builders preserve original paths。
+- generic adapterにliteral `session` / `--harvest` / `--no-recover` recovery assemblyがない。
+- 0.16.1 profile builderが旧exact argvを返し、0.17 builderはcharacterized fixtureのexact argvだけを返す。
+- generic codeに`GPT-5.6 Sol` literalがない。
+
+### 17.2 Unit — prompt / stage / recovery
+
+- migration characterization: source baselineはnonzero/nonterminalでsubmission evidenceを見ずhardcoded harvestを呼ぶstage-blind behavior。
+- target: every failure class with `prompt_submitted=False` or `None` -> harvest builder calls 0 / capture builder calls 0。
+- reconstruction mismatch -> action BLOCK、new execution 0、harvest 0、capture 0。
+- model transient -> new execution maximum 1、logical model unchanged。
+- direct attachment failure -> inline maximum 1、tree syscall 0。
+- model retry後のattachment failure -> second new execution 0。
+- `prompt_submitted=True`, response incomplete -> selected profile harvest exact argv once; generic hardcoded argv 0。
+- `prompt_submitted=True`, response complete/artifact pending -> selected profile capture exact argv once; new execution 0。
+- missing builder -> `blocked` / `oracle_capability_unsupported` before recovery command execution。
+
+### 17.3 Unit — authoritative public mapping
+
+- each internal class in Design §15 maps to exactly the listed status/reason pair。
+- five new reasons are accepted by domain validation and CLI serialization。
+- existing `oracle_unavailable`、`oracle_capability_unsupported`、`oracle_session_recovery_required`、`oracle_artifact_*` remain accepted。
+- many-to-one is accepted only for capability/profile、runtime unavailable、artifact validation families。
+- model / attachment / reconstruction / generation / download classes cannot map to each other or a generic reason。
+- unknown internal failure class has no default mapping and is rejected before serialization。
+
+### 17.4 Unit — artifact reader
+
+- sanitized Oracle 0.17 fixture for completed ZIP / Review JSON。
+- pending / download failed / missing / ambiguous / malformed schema。
+- 0.16.1 and 0.17.0 decoder isolation。
+- wrong version/profile binding rejects。
+- size/SHA/contained path/ZIP limits unchanged。
+
+### 17.5 Integration / fake Oracle
+
+- preflight -> model -> attach -> reconstruct -> submit -> response -> artifact stage receipts。
+- false/unknown submission across exit-code and session-state combinations never invokes harvest/capture。
+- one prompt submission across timeout/profile harvest。
+- direct failure then one inline execution with same digest/paths。
+- model failure then retry success。
+- mismatch blocks before output publication。
+- response complete then delayed artifact appears after profile capture command。
+- exact public status/reason assertions for every terminal class。
+- Candidate / Review / source postflight unchanged。
+
+### 17.6 Opt-in browser smoke
+
+Matrix dimensions:
+
+| Dimension | Values |
 |---|---|
-| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py` | `spec-dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py` |
-| `src/.../application/issue_planning.py` | `spec-dock/scripts/.../application/issue_planning.py` |
-| `src/.../domain/issue_planning_contracts.py` | `spec-dock/scripts/.../domain/issue_planning_contracts.py` |
-| `src/.../infra/issue_planning_chatgpt.py` | `spec-dock/scripts/.../infra/issue_planning_chatgpt.py` |
-| `src/.../commands/issue_planning.py` | `spec-dock/scripts/.../commands/issue_planning.py` |
-| `src/spec_dock/assets/install_root/.agents/skills/...` | `.agents/skills/...` |
-| `src/spec_dock/assets/spec_dock/docs/...` | `spec-dock/docs/...` |
+| Prompt | short control / representative Issue #354 |
+| Target kind | standard / project, Oracle-native configuration only |
+| Attachment | required direct / characterized inline diagnostic / none diagnostic |
+| Model | logical Pro request, observed label + verified evidence |
+| Output | simple answer control / authoring ZIP capture |
 
-provider を先に変更し、project の既存 projection mechanism で dogfood を再生成する。二重手編集をしない。
+formal compatibility evidence requires at least representative prompt + required direct attachment + verified model + submitted + response completed + ZIP
+captured. None/inline tests alone do not prove production compatibility。
 
-## 18. Test architecture
+## 18. Migration sequence
 
-### 18.1 新しい positive tests
+1. Preserve current 0.16.1 tests and explicitly characterize its stage-blind hardcoded harvest behavior。
+2. Extract the exact 0.16.1 recovery argv into the 0.16.1 compatibility profile without behavior change。
+3. Remove hardcoded same-session recovery argv construction from generic `issue_planning_chatgpt.py`。
+4. Characterize 0.17.0 help / session / model / attachment / reconstruction / exact harvest / exact capture / artifact schema。
+5. Add 0.17 profile with declared inline capability、harvest builder、capture builder、sanitized fixtures; keep unknown versions blocked。
+6. Introduce stage evidence parser and enforce false/unknown -> harvest/capture 0 before enabling any recovery。
+7. Add the closed Design §15 public mapping, new reason acceptance, and exact CLI/domain tests。
+8. Wire direct path transport from existing #354 S03/S04 target and enable one-shot inline only after evidence。
+9. Add versioned artifact reader and profile-owned same-session download capture。
+10. Run provider / installed / dogfood projection and full output/source regressions。
+11. Record evidence in report and run fresh review / Human gate。
 
-- minimal body に identity / authority / output があり、attached instruction body がない。
-- operation resource file を増減しても application object / test inventory を変えない。
-- static directory、nested / hidden / symlink / FIFO を含む fixture で adapter が tree を一度も走査しない。
-- original Candidate / Review path が direct Oracle argv へそのまま渡る。
-- planning / review / revision の expected top-level attachment path order。
-- verified Blue continuation、new Blue recovery、fresh Red。
-- installed runtime が new resource root を解決する。
-- provider / projection recursive byte parity。
+No dual hidden fallback modeを作らない。rollbackは0.17 profile registration / deploymentをreviewed changeとしてrevertし、runtimeが
+0.16.1へ自動downgradeしない。
 
-### 18.2 削除または置換する tests
+## 19. Alternatives
 
-- relevant source file safe-read / descriptor race。
-- attachment secret / private path scan。
-- attachment size / count limits。
-- attachment SHA index。
-- generated `context-NNN.md` / manifest / source-manifest。
-- exact 13 heading / 4 PlantUML prompt text。
-- prompt character budget based on old concatenated contract。
-- `--context-manifest` parse / help。
+### A. `SUPPORTED_ORACLE_VERSION = "0.17.0"`への定数置換
+不採用。help、session metadata、artifact schema、model/prompt evidence差分を検証しない。
 
-### 18.3 維持する regression tests
+### B. `>=0.17.0`を許可
+不採用。fast-moving CLIでunknown patchをformal evidence laneへ入れる。
 
-- exact GitHub branch / HEAD / no default fallback。
-- managed Chrome / Oracle capability / environment。
-- direct argv / no shell / no personal wrapper。
-- session artifact / harvest recovery。
-- authoring ZIP / Review JSON strict parser。
-- Candidate / Review / Human / apply identity。
-- source stale / publication race。
-- output directory safety / transaction。
-- public result no transcript / no private path。
-- end-to-end create / review / revise / apply。
-- provider / dogfood projection。
+### C. Personal wrapperでreconstructionを補正
+不採用。product dependency / provenance boundary違反。
 
-## 19. 親 docs の整合更新
+### D. mismatch時にpromptをnormalize / shortenしてretry
+不採用。exact inputを変更し、failure root causeとauthoring intentを隠す。
 
-親 Epic の Requirement / Design に残る次を更新する。
+### E. model `current` / observed `GPT-5.6 Sol`へhardcode
+不採用。silent model driftまたは一時UI labelへの過適合になる。
 
-- 「詳細 instruction は prompt body が正本」。
-- 「attachments は reference-only / data-only で instruction を含まない」。
-- attachment manifest / exact SHA index を formal input contract とする記述。
-- phase ごとに常に fresh session を作る記述。
+### F. direct failure時にattachmentを落とす / ZIP化する
+不採用。required evidenceとOption Cを変更する。
 
-更新後も維持するもの:
+### G. post-submit failureでnew execution
+不採用。duplicate Candidate / Red review / thread ambiguityを生む。
 
-- ChatGPT is non-authoritative。
-- fresh formal Review。
-- exact GitHub branch / HEAD。
-- direct Oracle。
-- Candidate / Review / Human / apply。
-- output ZIP / closed JSON。
+### H. Oracle configをtemporary HOMEで隔離
+不採用。accepted Oracle-native config boundaryを覆す。
 
-Issue-local decisionを親 scope の別目的へ広げず、矛盾している contract wording のみを反映する。
+## 20. 設計停止条件
 
-## 20. Alternatives
+- stage evidenceでsubmission前後を識別できず、false/unknown時のharvest/capture 0を保証できない。
+- observed model verificationをattemptへbindできない。
+- inline transportがoriginal pathを保持せずmaterializationを要求する。
+- 0.17 artifact schemaをstrict readerで扱えない。
+- representative prompt reconstructionが安定しない。
+- bounded recoveryを越えるretryが必要になる。
+- output validator、exact GitHub、Blue/Red、Human gateを緩める必要がある。
+- external wrapper / API / alternate backendが必要になる。
 
-### A. 現行 prompt pack を維持し scanner だけ無効化
-
-不採用。directory の file 増減に応じて `context-NNN.md` / manifest を生成する責務が残り、Option C の
-「そのまま渡す」を満たさない。
-
-### B. Directory を ZIP 化して一つ添付
-
-不採用。automatic conversion であり、entry semantics と transport failure を SpecDock が変更する。
-
-### C. Symlink を解決し regular file だけ添付
-
-不採用。input の内容を変更し、operator が置いた directory と ChatGPT input が一致しない。
-
-### D. Personal wrapper の follow-up を runtime から呼ぶ
-
-不採用。product dependency / evidence boundary に違反する。
-
-### E. 全 operation 共通の versioned attachment schema
-
-不採用。ユーザーが求める operation-specific flexibility と file 増減による保守性を損なう。
-
-### F. Input と output の全 validator を削除
-
-不採用。Option C は input directory だけの決定であり、output evidence / Human authority を緩める根拠ではない。
-
-## 21. 設計停止条件
-
-- Oracle directory attachment contract を primary capability test で確認できない。
-- dynamic file と static directory を同一 invocation へ direct に渡せない。
-- direct Oracle continuation を確認できない。
-- path を direct に渡す前に Runtime が tree materialization を必要とする。
-- Candidate / Review output validator の regression が必要になる。
-- clarification public surface を owning scope なしで追加する必要が生じる。
-
-停止条件に該当した場合、Issue #354 の実装を partial success として押し切らず、capability evidence と再設計点を
-Issue report へ記録する。
+停止時は本ADRのwithdrawal条件を適用し、Issue-local再設計へ戻す。
