@@ -273,6 +273,15 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - この追加は実装手順の運用補足であり、ユーザー指示により既存の仕様レビューを再実行しない。実装開始・ChatGPTレビュー・正式採用は別ゲートで確認する。
 - この時点ではブリーフ本文の生成、実装、テスト、assurance の正式採用更新は行っていない。
 
+## ChatGPT-Use 実装準備レビュー（2026-08-04）
+
+- 実行経路: ChatGPT-Use / Oracle `0.17.0` / browser foreground。repository `chemitaro/spec-dock`、branch `codex/iss-00354-chatgpt-context-contract`、HEAD `57ba2cd56d9bf3722c9ea097ba861f06f966b9c1` を GitHub で確認し、default branch fallback は使用していない。
+- 要求モデル: `GPT-5.6 Luna` / `Reasoning Effort Max`。現行 wrapper の選択肢に Luna はなく、browser で Max を指定すると API 経路へ切り替わり個人ビルドで無効となるため、要求どおりの実行はできなかった。
+- 実測モデル: Oracle の model selection evidence は requested `gpt-5.6`、resolved `GPT-5.6 Sol`、`verified=yes`。ChatGPT 回答本文の `GPT-5.6 Pro` という自己申告とは一致しないため、自己申告は採用せず、wrapper の実測証跡を正とする。
+- 外部レビュー出力: `/private/tmp/iss-00354-chatgpt-review-20260804/implementation-readiness-review.md`、SHA-256 `8e1be273dcfabbae7f34797bab5f392e1e59f462a9f42c2d82a98c579bcd385a`。
+- advisory 判定: `blocked`。P0 は `None`。P1 は (1) Candidate PASS と current HEAD / canonical authority の未閉鎖、(2) `design-not-substantive` に続く executable plan gate 未閉鎖、(3) `report.md` の EAL・phase gate・reviewer gate が scaffold のまま、の3件。
+- 採否: ChatGPT-Use 出力は advisory evidence として扱い、修正・ZIP生成・canonical adoption・assurance promotion・implementation start はこのレビューでは実施していない。
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
