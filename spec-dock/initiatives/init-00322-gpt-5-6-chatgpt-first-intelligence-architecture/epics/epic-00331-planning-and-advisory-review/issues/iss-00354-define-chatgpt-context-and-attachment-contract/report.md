@@ -265,6 +265,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - 配置状態: `copied_to_issue_scope`
 - 正式採用状態: `deferred`。今回の依頼は解凍した仕様書等の配置であり、`planning apply`、assurance 更新、implementation start は実行していない。Candidate 文書に記載された `evidence-only` / `unadopted` の境界を維持する。
 
+## 実装ブリーフ運用追加（2026-08-04）
+
+- `plan.md` の S01〜S13 各マイルストーンに、実装開始前の ChatGPT-Use ブリーフ作成手順を一行ずつ追加した。
+- ブリーフの対象モデルは `GPT-5.6 Luna`、推論レベルは `Max` とし、`artifacts/implementation-briefs/sXX-*.md` に保存する。
+- Codex は各ブリーフを参照して当該マイルストーンを実装し、採用判断・実測結果・未解決リスクは `report.md` に記録する。
+- この追加は実装手順の運用補足であり、ユーザー指示により既存の仕様レビューを再実行しない。実装開始・ChatGPTレビュー・正式採用は別ゲートで確認する。
+- この時点ではブリーフ本文の生成、実装、テスト、assurance の正式採用更新は行っていない。
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）

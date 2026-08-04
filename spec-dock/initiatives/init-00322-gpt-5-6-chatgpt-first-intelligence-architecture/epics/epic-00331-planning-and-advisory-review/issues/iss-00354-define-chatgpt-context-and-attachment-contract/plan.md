@@ -95,6 +95,8 @@ S09はこのstage-blind/hardcoded baselineを先にcharacterization testで固�
 
 **Status:** retained from prior plan; source HEADでcompletion evidenceなし。
 
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S01 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s01-capability-characterization.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
+
 ### Red
 
 - direct Oracle directory attachment exact syntax。
@@ -118,6 +120,8 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 
 **Status:** retained / unverified complete。
 
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S02 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s02-operation-resources.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
+
 ### Red
 
 - planning/review/revision bodyにidentity、authority、outputがある。
@@ -136,6 +140,8 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 
 **Status:** retained / unverified complete。
 
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S03 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s03-input-path-model.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
+
 ### Red
 
 - synthesized contractがattachment bytes/classification/SHAを保持しない。
@@ -152,6 +158,8 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 ## 8. Retained Milestone S04 — Direct Oracle attachment transport
 
 **Status:** retained / unverified complete。
+
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S04 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s04-direct-attachment-transport.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
 ### Red
 
@@ -170,6 +178,8 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 ## 9. Retained Milestone S05 — Orchestration / CLI cutover
 
 **Status:** retained / unverified complete。
+
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S05 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s05-orchestration-cli-cutover.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
 ### Planning
 
@@ -192,6 +202,8 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 ## 10. Retained Milestone S06 — Blue continuity / fresh Red
 
 **Status:** retained / unverified complete。
+
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S06 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s06-blue-red-continuity.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
 ### Red
 
@@ -217,6 +229,8 @@ direct continuation unsupportedならwrapperで補わず、capability gapをrepo
 
 **Status:** retained / unverified complete。
 
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S07 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s07-projection-docs-consistency.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
+
 - providerを先に変更し、project projection mechanismでinstalled/dogfoodを再生成する。
 - recursive byte parityを固定allowlistなしで検証する。
 - Option A/C、directory input、Blue/Red、direct Oracle、normal failure、output safetyをskills/docsへ反映する。
@@ -226,6 +240,8 @@ direct continuation unsupportedならwrapperで補わず、capability gapをrepo
 ## 12. Retained Milestone S08 — Regression / quality / closure evidence
 
 **Status:** retained / unverified complete。
+
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S08 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s08-regression-quality-closure.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
 ### Focused suite
 
@@ -259,6 +275,8 @@ git diff --check
 
 **Depends on:** S01 baseline characterization。  
 **Blocking:** yes。
+
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S09 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s09-oracle-017-profile.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
 ### 13.1 Red — current stage-blind behaviorとhardcoded argvを固定
 
@@ -320,6 +338,8 @@ submission state、model verified、artifact schema、inline capability、harves
 
 **Depends on:** S09。  
 **Blocking:** yes。
+
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S10 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s10-stage-recovery-taxonomy.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
 ### 14.1 Red — invocation-level recovery boundary
 
@@ -407,6 +427,8 @@ Acceptance requires exact call counts、exact profile argv、exact status/reason
 **Depends on:** S09–S10とS02–S05のtarget input path。  
 **Blocking:** yes。
 
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S11 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s11-browser-verification.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
+
 ### 15.1 Prompt synthesis tests
 
 - short ASCII control。
@@ -460,6 +482,8 @@ representative prompt + required direct attachment + verified model + prompt sub
 **Depends on:** S09–S11。  
 **Blocking:** yes。
 
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S12 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s12-artifact-reader.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
+
 ### 16.1 Red
 
 - 0.17 completed session + valid ZIP fixture。
@@ -496,6 +520,8 @@ Invocation-level spiesでprofile builder以外のsession command 0、false/unkno
 
 **Depends on:** S01–S12。  
 **Blocking:** yes。
+
+- 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S13 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s13-integration-closure.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
 ### 17.1 Integration
 
@@ -541,6 +567,7 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 ### 17.5 Review / adoption
 
 - implementation後のfresh code reviewはexact pushed HEADを対象にする。
+- 各マイルストーンの実装内容レビューはサブエージェントではなく ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で実施し、指摘と採否を `report.md` に記録する。ChatGPT の出力だけで canonical adoption、assurance 更新、実装完了を主張しない。
 - P0/P1をrepairし、new Candidate/review identityへbindする。
 - PASSはHuman adoption / merge / Issue closeを意味しない。
 
