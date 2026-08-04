@@ -140,13 +140,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### セッションログ（2026-08-04 / implementation preparation — historical pre-S01）
 
 #### 対象
-- Step: S01〜S13（implementation not started）
+- Step: S01〜S13（pre-S01 historical snapshot; implementation not started at that checkpoint）
 - AC/EC: `plan.md` section 17.6 の closure contract を参照
 - 計画上の出典（Planned source）:
   - `plan.md` section 17.6
   - `cl-s01-capability`〜`cl-s13-closure`
 
-#### 実施内容
+#### 実施内容（pre-S01 historical snapshot）
 - Candidate v2 identity、current canonical docs、report evidence gate の整合を確認し、実装準備の承認境界を記録した。
 - S01〜S13 の実行カード、delegation contract、具体テストケース、closure id を `plan.md` に追加した。
 
@@ -270,14 +270,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ---
 
-### セッションログ（追加実装）
+### セッションログ（追加実装 — historical pre-S01）
 
 #### 対象
 - Step: none
 - AC/EC: none
 
 #### 実施内容
-- 追加実装は未実施。次回は S01 の ChatGPT-Use 実装ブリーフ生成から開始する。
+- この時点では追加実装は未実施であり、次回をS01のChatGPT-Use実装ブリーフ生成としていた。現在のS01実装結果は後段の「S01実装・Fresh Red Team Review」に記録する。
 
 ---
 
@@ -380,7 +380,7 @@ v3修正後に次回対象として記録した `d556295a93a51b9c2f1e697a7d18e21
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | no product-code diff; documentation repair only | 0 | not applicable before implementation |
+| code-reviewer | S01 provider infra implementation and unit tests | strict preflight/recovery boundary; no scope expansion | 1 ChatGPT-Use Fresh Red Team review | PASS for P0/P1; S01 live capability gate remains open |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
