@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
+from dataclasses import dataclass
 import hashlib
 import http.client
 import json
@@ -72,6 +73,19 @@ _SESSION_ROLE_SLUGS = {
     "semantic_revision": "semantic-revision",
     "reviewer": "reviewer",
 }
+
+
+@dataclass(frozen=True)
+class _OraclePreflightReceipt:
+    """Content-free result of the current Oracle preflight checks."""
+
+    version: str | None
+    version_exit_code: int | None
+    root_help_exit_code: int | None
+    session_help_exit_code: int | None
+    missing_root_capabilities: tuple[str, ...]
+    missing_session_capabilities: tuple[str, ...]
+    supported_by_current_runtime: bool
 
 
 def resolve_issue_planning_github_repository(repo_root: Path) -> str | None:
@@ -300,23 +314,75 @@ def _preflight_supported_oracle(
     child_env: dict[str, str],
     cwd: Path,
 ) -> bool:
+    return _read_oracle_preflight_receipt(
+        executable,
+        child_env=child_env,
+        cwd=cwd,
+    ).supported_by_current_runtime
+
+
+def _read_oracle_preflight_receipt(
+    executable: Path,
+    *,
+    child_env: dict[str, str],
+    cwd: Path,
+) -> _OraclePreflightReceipt:
+    missing_root_capabilities = tuple(flag.decode("ascii") for flag in _ROOT_CAPABILITIES)
+    missing_session_capabilities = tuple(flag.decode("ascii") for flag in _SESSION_CAPABILITIES)
     try:
-        version = _run_oracle(
+        version_result = _run_oracle(
             [str(executable), "--version"],
             child_env=child_env,
             cwd=cwd,
             timeout=_PREFLIGHT_TIMEOUT_SECONDS,
         )
-        if version.returncode != 0 or version.stdout.decode("utf-8", errors="replace").strip() != (
-            SUPPORTED_ORACLE_VERSION
-        ):
-            return False
+    except (OSError, subprocess.TimeoutExpired):
+        return _OraclePreflightReceipt(
+            version=None,
+            version_exit_code=None,
+            root_help_exit_code=None,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    version = _preflight_version(version_result.stdout)
+    if version_result.returncode != 0 or version != SUPPORTED_ORACLE_VERSION:
+        return _OraclePreflightReceipt(
+            version=version,
+            version_exit_code=version_result.returncode,
+            root_help_exit_code=None,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    try:
         root_help = _run_oracle(
             [str(executable), "--help"],
             child_env=child_env,
             cwd=cwd,
             timeout=_PREFLIGHT_TIMEOUT_SECONDS,
         )
+    except (OSError, subprocess.TimeoutExpired):
+        return _OraclePreflightReceipt(
+            version=version,
+            version_exit_code=version_result.returncode,
+            root_help_exit_code=None,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    missing_root_capabilities = tuple(
+        flag.decode("ascii")
+        for flag in _ROOT_CAPABILITIES
+        if flag not in root_help.stdout
+    )
+    try:
         session_help = _run_oracle(
             [str(executable), "session", "--help"],
             child_env=child_env,
@@ -324,13 +390,43 @@ def _preflight_supported_oracle(
             timeout=_PREFLIGHT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return False
-    return (
-        root_help.returncode == 0
-        and session_help.returncode == 0
-        and all(flag in root_help.stdout for flag in _ROOT_CAPABILITIES)
-        and all(flag in session_help.stdout for flag in _SESSION_CAPABILITIES)
+        return _OraclePreflightReceipt(
+            version=version,
+            version_exit_code=version_result.returncode,
+            root_help_exit_code=root_help.returncode,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
+
+    missing_session_capabilities = tuple(
+        flag.decode("ascii")
+        for flag in _SESSION_CAPABILITIES
+        if flag not in session_help.stdout
     )
+    return _OraclePreflightReceipt(
+        version=version,
+        version_exit_code=version_result.returncode,
+        root_help_exit_code=root_help.returncode,
+        session_help_exit_code=session_help.returncode,
+        missing_root_capabilities=missing_root_capabilities,
+        missing_session_capabilities=missing_session_capabilities,
+        supported_by_current_runtime=(
+            root_help.returncode == 0
+            and session_help.returncode == 0
+            and not missing_root_capabilities
+            and not missing_session_capabilities
+        ),
+    )
+
+
+def _preflight_version(stdout: bytes) -> str | None:
+    for line in stdout.decode("utf-8", errors="replace").splitlines():
+        value = line.strip()
+        if value:
+            return value
+    return None
 
 
 def _run_oracle(

@@ -492,7 +492,10 @@ def test_invalid_path_entries_are_unavailable(
     assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
 
 
-@pytest.mark.parametrize("preflight_failure", ["version", "root-help", "session-help"])
+@pytest.mark.parametrize(
+    "preflight_failure",
+    ["version", "unsupported-version", "root-help", "session-help"],
+)
 def test_unsupported_version_or_capability_submits_no_prompt(
     monkeypatch,
     tmp_path: Path,
@@ -504,7 +507,13 @@ def test_unsupported_version_or_capability_submits_no_prompt(
     def fake_run(argv, **kwargs):
         calls.append(list(argv))
         if argv[1:] == ["--version"]:
-            version = b"0.16.2\n" if preflight_failure == "version" else b"0.16.1\n"
+            version = (
+                b"0.16.2\n"
+                if preflight_failure == "version"
+                else b"0.17.0\n"
+                if preflight_failure == "unsupported-version"
+                else b"0.16.1\n"
+            )
             return _completed(argv, stdout=version)
         if argv[1:] == ["--help"]:
             return _completed(argv, stdout=b"missing flags" if preflight_failure == "root-help" else _root_help())
@@ -519,6 +528,80 @@ def test_unsupported_version_or_capability_submits_no_prompt(
     result = _invoke(tmp_path)
     assert (result.status, result.reason) == ("blocked", "oracle_capability_unsupported")
     assert not any("--prompt" in argv for argv in calls)
+
+
+def test_preflight_receipt_records_content_free_capability_surface(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help() + b" private-help-output")
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help() + b" private-session-help-output")
+        pytest.fail("preflight receipt must not submit a prompt")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    receipt = issue_planning_chatgpt._read_oracle_preflight_receipt(
+        executable,
+        child_env=issue_planning_chatgpt._sanitized_child_environment(),
+        cwd=tmp_path,
+    )
+
+    assert receipt.version == "0.16.1"
+    assert receipt.version_exit_code == 0
+    assert receipt.root_help_exit_code == 0
+    assert receipt.session_help_exit_code == 0
+    assert receipt.missing_root_capabilities == ()
+    assert receipt.missing_session_capabilities == ()
+    assert receipt.supported_by_current_runtime is True
+    assert "private-help-output" not in repr(receipt)
+    assert "private-session-help-output" not in repr(receipt)
+    assert calls == [
+        [str(executable.resolve()), "--version"],
+        [str(executable.resolve()), "--help"],
+        [str(executable.resolve()), "session", "--help"],
+    ]
+
+
+def test_preflight_receipt_fail_closes_before_help_for_unsupported_version(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.17.0\n")
+        pytest.fail("unsupported version must not probe help")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    receipt = issue_planning_chatgpt._read_oracle_preflight_receipt(
+        executable,
+        child_env=issue_planning_chatgpt._sanitized_child_environment(),
+        cwd=tmp_path,
+    )
+
+    assert receipt.version == "0.17.0"
+    assert receipt.version_exit_code == 0
+    assert receipt.root_help_exit_code is None
+    assert receipt.session_help_exit_code is None
+    assert receipt.missing_root_capabilities == tuple(
+        flag.decode("ascii") for flag in issue_planning_chatgpt._ROOT_CAPABILITIES
+    )
+    assert receipt.missing_session_capabilities == tuple(
+        flag.decode("ascii") for flag in issue_planning_chatgpt._SESSION_CAPABILITIES
+    )
+    assert receipt.supported_by_current_runtime is False
+    assert calls == [[str(executable.resolve()), "--version"]]
 
 
 def test_executable_identity_change_before_submit_starts_no_prompt(
