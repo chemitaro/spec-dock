@@ -464,11 +464,14 @@ def _safe_relative_expectation_path(value: str) -> None:
         raise ValueError("output expectation path is unsafe")
 
 
-def _source_attachment_paths(root: Path, context: PlanningContext) -> tuple[Path, ...]:
+def _source_attachment_paths(_root: Path, context: PlanningContext) -> tuple[Path, ...]:
     paths = _ordered_unique((*context.canonical_issue_paths, *context.relevant_source_paths))
     for relative in paths:
         _validate_source_path(relative)
-    return tuple(root / relative for relative in paths)
+    # Repository-relative operands must remain lexical.  The Oracle child runs
+    # with cwd=repo_root, so prefixing the repository root would change the
+    # transport identity and leak a host-specific absolute path.
+    return tuple(Path(relative) for relative in paths)
 
 
 def _ordered_unique(values: tuple[str, ...]) -> tuple[str, ...]:

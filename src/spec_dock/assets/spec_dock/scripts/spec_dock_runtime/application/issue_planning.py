@@ -129,13 +129,15 @@ def _result_issue_id(value: str) -> str:
         return _INVALID_ISSUE_ID
 
 
-def _context_source_operands(repo_root: Path, context: PlanningContext) -> tuple[Path, ...]:
+def _context_source_operands(_repo_root: Path, context: PlanningContext) -> tuple[Path, ...]:
     seen: set[str] = set()
     operands: list[Path] = []
     for relative in (*context.canonical_issue_paths, *context.relevant_source_paths):
         if relative not in seen:
             seen.add(relative)
-            operands.append(repo_root / relative)
+            # Oracle executes with cwd=repo_root; preserve the repository-
+            # relative lexical operand instead of leaking a host absolute path.
+            operands.append(Path(relative))
     return tuple(operands)
 
 
@@ -1173,8 +1175,8 @@ def run_issue_planning_review(
         if request.mode == "git-bound":
             dynamic_paths = (
                 *targets,
-                *(repo_root / path for path in context.canonical_issue_paths),
-                *(repo_root / path for path in context.relevant_source_paths if path not in context.canonical_issue_paths),
+                *(Path(path) for path in context.canonical_issue_paths),
+                *(Path(path) for path in context.relevant_source_paths if path not in context.canonical_issue_paths),
             )
         else:
             dynamic_paths = (*targets, *source_paths)

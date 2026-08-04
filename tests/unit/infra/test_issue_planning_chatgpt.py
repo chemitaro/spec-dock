@@ -1298,6 +1298,82 @@ def test_direct_file_operands_preserve_order_and_do_not_materialize_pack(
 
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
     paths = (tmp_path / "attachments", tmp_path / "candidate.zip", tmp_path / "source.md")
+    input_root = paths[0]
+
+    def rejects_input_mutation(path: Path) -> bool:
+        return path in paths or path.is_relative_to(input_root)
+
+    original_mkdir = Path.mkdir
+    original_write_bytes = Path.write_bytes
+    original_write_text = Path.write_text
+    original_unlink = Path.unlink
+    original_rename = Path.rename
+    original_replace = Path.replace
+    original_iterdir = Path.iterdir
+    original_glob = Path.glob
+    original_rglob = Path.rglob
+    original_resolve = Path.resolve
+    original_stat = Path.stat
+
+    def guard(path: Path) -> None:
+        if rejects_input_mutation(path):
+            raise AssertionError("direct transport mutated or inspected an input path")
+
+    def guarded_mkdir(path: Path, *args: object, **kwargs: object) -> None:
+        guard(path)
+        original_mkdir(path, *args, **kwargs)
+
+    def guarded_write_bytes(path: Path, *args: object, **kwargs: object) -> int:
+        guard(path)
+        return original_write_bytes(path, *args, **kwargs)
+
+    def guarded_write_text(path: Path, *args: object, **kwargs: object) -> int:
+        guard(path)
+        return original_write_text(path, *args, **kwargs)
+
+    def guarded_unlink(path: Path, *args: object, **kwargs: object) -> None:
+        guard(path)
+        original_unlink(path, *args, **kwargs)
+
+    def guarded_rename(path: Path, *args: object, **kwargs: object) -> Path:
+        guard(path)
+        return original_rename(path, *args, **kwargs)
+
+    def guarded_replace(path: Path, *args: object, **kwargs: object) -> Path:
+        guard(path)
+        return original_replace(path, *args, **kwargs)
+
+    def guarded_iterdir(path: Path, *args: object, **kwargs: object):
+        guard(path)
+        return original_iterdir(path, *args, **kwargs)
+
+    def guarded_glob(path: Path, *args: object, **kwargs: object):
+        guard(path)
+        return original_glob(path, *args, **kwargs)
+
+    def guarded_rglob(path: Path, *args: object, **kwargs: object):
+        guard(path)
+        return original_rglob(path, *args, **kwargs)
+
+    def guarded_resolve(path: Path, *args: object, **kwargs: object) -> Path:
+        guard(path)
+        return original_resolve(path, *args, **kwargs)
+
+    def guarded_stat(path: Path, *args: object, **kwargs: object):
+        guard(path)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", guarded_mkdir)
+    monkeypatch.setattr(Path, "write_bytes", guarded_write_bytes)
+    monkeypatch.setattr(Path, "write_text", guarded_write_text)
+    monkeypatch.setattr(Path, "unlink", guarded_unlink)
+    monkeypatch.setattr(Path, "rename", guarded_rename)
+    monkeypatch.setattr(Path, "replace", guarded_replace)
+    monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
+    monkeypatch.setattr(Path, "glob", guarded_glob)
+    monkeypatch.setattr(Path, "rglob", guarded_rglob)
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
+    monkeypatch.setattr(Path, "stat", guarded_stat)
     synthesized = SynthesizedPlanningPrompt(
         role="planner",
         prompt="fixed prompt",

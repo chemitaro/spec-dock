@@ -878,7 +878,7 @@ def test_transport_with_transcript_marker_mentions_reaches_backend_once(tmp_path
     assert result.reason != "sensitive_input_rejected"
     assert len(backend_calls) == 1
     synthesized = backend_calls[0]["synthesized"]
-    assert synthesized.attachment_paths[1:] == tuple(tmp_path / path for path in target.canonical_issue_paths)
+    assert synthesized.attachment_paths[1:] == tuple(Path(path) for path in target.canonical_issue_paths)
 
 
 def test_transport_with_structured_transcript_stops_before_backend_without_leakage(
@@ -909,7 +909,7 @@ def test_transport_with_structured_transcript_stops_before_backend_without_leaka
     assert (result.status, result.reason) == ("pass", "transport_received")
     assert len(backend_calls) == 1
     synthesized = backend_calls[0]["synthesized"]
-    assert synthesized.attachment_paths[1:] == tuple(tmp_path / path for path in target.canonical_issue_paths)
+    assert synthesized.attachment_paths[1:] == tuple(Path(path) for path in target.canonical_issue_paths)
     assert "private requirement body" not in synthesized.prompt
     assert "private response body" not in str(result.to_dict())
 
@@ -1560,7 +1560,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
     assert result.output["verdict"] == "pass"
     assert (review_output / result.output["review_result_file"]).is_file()
     assert len(calls) == 1
-    assert calls[0].attachment_paths[1] == candidate
+    assert calls[0].attachment_paths[1] is candidate
     assert all("reviewed-identity" not in str(path) for path in calls[0].attachment_paths)
     before_directories = tuple(review_output.iterdir())
     mutate_candidate[0] = True
@@ -1687,7 +1687,7 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
         clock=lambda: "2026-07-28T14:00:00+00:00",
     )
     assert (result.status, result.reason) == ("ok", "review_completed")
-    assert captured[1:] == [candidate, *(repo / path for path in target.canonical_issue_paths)]
+    assert captured[1:] == [candidate, *(Path(path) for path in target.canonical_issue_paths)]
     before_directories = tuple(output.iterdir())
     stale = module.run_issue_planning_review(
         dependencies=PLANNING_DEPENDENCIES,
@@ -2159,6 +2159,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
     review_sha = hashlib.sha256(review_bytes).hexdigest()
     review_path = tmp_path / "review.json"
     review_path.write_bytes(review_bytes)
+    prior_candidate_path = candidates / identity.logical_filename
     request_path = tmp_path / "semantic.json"
     request_path.write_text(
         json.dumps(
@@ -2208,7 +2209,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
     result = module.run_issue_planning_revise(
         dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
-            candidates / identity.logical_filename,
+            prior_candidate_path,
             request_path,
             revised,
         ),
@@ -2224,11 +2225,9 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
     assert (result.status, result.reason) == ("ok", "candidate_revised")
     assert result.output["candidate_identity"]["version"] == 2
     assert len(calls) == 1
-    assert calls[0].attachment_paths[1:4] == (
-        candidates / identity.logical_filename,
-        review_path,
-        request_path,
-    )
+    assert calls[0].attachment_paths[1] is prior_candidate_path
+    assert calls[0].attachment_paths[2] is review_path
+    assert calls[0].attachment_paths[3] is request_path
 
 
 @pytest.mark.parametrize(

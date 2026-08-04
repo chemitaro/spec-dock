@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import sys
 
@@ -29,8 +30,8 @@ def test_s03_path_only_prompt_contract_has_no_materialized_inputs(
     assert not hasattr(synthesized, "exact_attachments")
     assert synthesized.attachment_paths == (
         issue_planning_prompt._provider_resource_root() / "operations" / "planning" / "attachments",
-        *(tmp_path / path for path in _context().canonical_issue_paths),
-        *(tmp_path / path for path in _context().relevant_source_paths),
+        *(Path(path) for path in _context().canonical_issue_paths),
+        *(Path(path) for path in _context().relevant_source_paths),
     )
 
 
@@ -143,7 +144,7 @@ def test_prompt_synthesis_accepts_transcript_marker_mentions_without_turn_pairs(
     )
 
     assert synthesized.attachment_paths[1:] == tuple(
-        tmp_path / path
+        Path(path)
         for path in (*_context().canonical_issue_paths, *_context().relevant_source_paths)
     )
 
@@ -247,7 +248,7 @@ def test_synthesize_prompt_is_deterministic_and_contains_source_identity(tmp_pat
     assert "owner/repo" in first.prompt
     assert "origin/feature/issue" in first.prompt
     assert first.attachment_paths[1:] == tuple(
-        tmp_path / path
+        Path(path)
         for path in (*_context().canonical_issue_paths, *_context().relevant_source_paths)
     )
 
@@ -263,7 +264,10 @@ def test_prompt_source_paths_remain_opaque_even_when_missing(
         remote_head="a" * 40,
     )
 
-    assert all(not path.exists() for path in synthesized.attachment_paths[1:])
+    assert synthesized.attachment_paths[1:] == tuple(
+        Path(path)
+        for path in (*_context().canonical_issue_paths, *_context().relevant_source_paths)
+    )
 
 
 @pytest.mark.parametrize(
@@ -371,7 +375,7 @@ def test_planner_prompt_contains_exact_zip_and_connector_contract(tmp_path: Path
         assert instructions.count(heading) == 1
     assert synthesized.attachment_paths == (
         resource_root / "operations" / "planning" / "attachments",
-        *(tmp_path / path for path in (*_context().canonical_issue_paths, *_context().relevant_source_paths)),
+        *(Path(path) for path in (*_context().canonical_issue_paths, *_context().relevant_source_paths)),
     )
 
 
@@ -746,13 +750,53 @@ def test_operation_attachment_directory_is_opaque(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    attachments = resource_root / "operations" / "planning" / "attachments"
+    nested = attachments / "nested"
+    nested.mkdir()
+    (attachments / ".hidden.md").write_text("hidden", encoding="utf-8")
+    (nested / "child.md").write_text("child", encoding="utf-8")
+    symlink = attachments / "link.md"
+    symlink.symlink_to(nested / "child.md")
+    fifo = attachments / "pipe"
+    os.mkfifo(fifo)
+    dynamic_paths = tuple(Path(path) for path in (*_context().canonical_issue_paths, *_context().relevant_source_paths))
+
+    def is_forbidden(path: Path) -> bool:
+        if path in dynamic_paths:
+            return True
+        if path == attachments:
+            return False
+        return path.is_relative_to(attachments)
 
     def reject_child_enumeration(*_args: object, **_kwargs: object) -> object:
         raise AssertionError("operation attachments must remain opaque")
 
+    original_read_bytes = Path.read_bytes
+    original_resolve = Path.resolve
+    original_stat = Path.stat
+
+    def reject_dynamic_or_child(path: Path) -> None:
+        if is_forbidden(path):
+            raise AssertionError("path-only synthesis inspected input content or children")
+
+    def guarded_read_bytes(path: Path, *args: object, **kwargs: object) -> bytes:
+        reject_dynamic_or_child(path)
+        return original_read_bytes(path, *args, **kwargs)
+
+    def guarded_resolve(path: Path, *args: object, **kwargs: object) -> Path:
+        reject_dynamic_or_child(path)
+        return original_resolve(path, *args, **kwargs)
+
+    def guarded_stat(path: Path, *args: object, **kwargs: object) -> os.stat_result:
+        reject_dynamic_or_child(path)
+        return original_stat(path, *args, **kwargs)
+
     monkeypatch.setattr(Path, "iterdir", reject_child_enumeration)
     monkeypatch.setattr(Path, "glob", reject_child_enumeration)
     monkeypatch.setattr(Path, "rglob", reject_child_enumeration)
+    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
+    monkeypatch.setattr(Path, "stat", guarded_stat)
 
     synthesized = issue_planning_prompt.synthesize_issue_planning_prompt(
         role="planner",
