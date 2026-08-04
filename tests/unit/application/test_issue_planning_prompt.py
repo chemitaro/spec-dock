@@ -313,6 +313,8 @@ def test_prompt_source_descriptor_read_preserves_names_order_and_bytes(
     ("changes", "message"),
     [
         ({"dependency_summary": tuple(f"iss-{index:05d}" for index in range(1, 34))}, "dependencies"),
+        ({"dependency_summary": ("token=abc123secret",)}, "sensitive"),
+        ({"dependency_summary": ("/Users/alice/private/file",)}, "private"),
         ({"relevant_source_paths": tuple(f"src/f{index}.py" for index in range(17))}, "relevant"),
         ({"operator_context": tuple("x" for _ in range(17))}, "operator"),
         ({"operator_context": ("token=abc123secret",)}, "sensitive"),
@@ -424,6 +426,7 @@ def test_review_prompt_classifies_exact_targets_and_formal_evidence() -> None:
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
+        context=_context(),
         exact_attachments=(
             attachment(
                 name="target-candidate.zip",
@@ -446,6 +449,80 @@ def test_review_prompt_classifies_exact_targets_and_formal_evidence() -> None:
     assert "reviewed_identity_sha256" in synthesized.prompt
 
 
+def test_evidence_prompt_binds_full_context_identity_and_operation_context() -> None:
+    attachment = issue_planning_prompt.PlanningPromptAttachment
+    context = _context(
+        dependency_summary=("iss-00007", "iss-00008"),
+        operator_context=("preserve review lineage",),
+    )
+    synthesized = issue_planning_prompt.synthesize_planning_evidence_prompt(
+        role="reviewer",
+        source_head=context.source_head,
+        repository=context.repository,
+        branch=context.branch,
+        context=context,
+        exact_attachments=(
+            attachment(
+                name="reviewed-identity.json",
+                classification="formal-evidence",
+                source_label="reviewed-identity.json",
+                content=b"{}\n",
+            ),
+        ),
+    )
+
+    identity_start = synthesized.prompt.index("## Exact source identity")
+    identity_end = synthesized.prompt.index("## Operation context")
+    identity = synthesized.prompt[identity_start:identity_end]
+    for field in (
+        "branch",
+        "issue_id",
+        "parent_epic_id",
+        "parent_initiative_id",
+        "remote_head",
+        "repository",
+        "source_head",
+        "upstream",
+    ):
+        assert f'"{field}"' in identity
+    context_start = synthesized.prompt.index("## Operation context")
+    context_end = synthesized.prompt.index("## GitHub connector gate")
+    operation_context = synthesized.prompt[context_start:context_end]
+    assert "iss-00007" in operation_context
+    assert "preserve review lineage" in operation_context
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"dependency_summary": ("token=abc123secret",)}, "sensitive"),
+        ({"dependency_summary": ("/Users/alice/private/file",)}, "private"),
+        ({"operator_context": ("token=abc123secret",)}, "sensitive"),
+        ({"operator_context": ("/Users/alice/private/file",)}, "private"),
+    ],
+)
+def test_evidence_prompt_rejects_sensitive_operation_context(
+    changes: dict[str, object],
+    message: str,
+) -> None:
+    attachment = issue_planning_prompt.PlanningPromptAttachment(
+        name="reviewed-identity.json",
+        classification="formal-evidence",
+        source_label="reviewed-identity.json",
+        content=b"{}\n",
+    )
+    context = _context(**changes)
+    with pytest.raises(ValueError, match=message):
+        issue_planning_prompt.synthesize_planning_evidence_prompt(
+            role="reviewer",
+            source_head=context.source_head,
+            repository=context.repository,
+            branch=context.branch,
+            context=context,
+            exact_attachments=(attachment,),
+        )
+
+
 def test_semantic_revision_prompt_is_self_contained_without_session_locator() -> None:
     attachment = issue_planning_prompt.PlanningPromptAttachment
     synthesized = issue_planning_prompt.synthesize_planning_evidence_prompt(
@@ -453,6 +530,7 @@ def test_semantic_revision_prompt_is_self_contained_without_session_locator() ->
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
+        context=_context(),
         exact_attachments=(
             attachment(
                 name="prior-candidate.zip",
@@ -507,6 +585,7 @@ def test_reviewer_prompt_has_one_attachment_authority() -> None:
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
+        context=_context(),
         exact_attachments=(
             attachment(
                 name="target-candidate.zip",
@@ -547,6 +626,7 @@ def test_semantic_revision_companion_contract_is_self_contained() -> None:
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
+        context=_context(),
         exact_attachments=(
             attachment(
                 name="prior-candidate.zip",
@@ -611,6 +691,7 @@ def test_prompt_tuning_fixed_scenario_character_budgets(tmp_path: Path) -> None:
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
+        context=_context(),
         exact_attachments=(
             attachment(
                 name="target-candidate.zip",
@@ -641,6 +722,7 @@ def test_prompt_tuning_fixed_scenario_character_budgets(tmp_path: Path) -> None:
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
+        context=_context(),
         exact_attachments=(
             attachment(
                 name="prior-candidate.zip",
@@ -707,9 +789,9 @@ def test_operation_resources_resolve_all_closed_operations(tmp_path: Path) -> No
     }
 
     assert {item.operation for item in resolved.values()} == {"planning", "review", "revision"}
-    assert resolved["planner"].prompt == "Create a planning package."
-    assert resolved["reviewer"].prompt == "Perform a fresh, read-only, defect-only review."
-    assert resolved["semantic_revision"].prompt == "Complete replacement semantic revision."
+    assert resolved["planner"].prompt == "Create a planning package.\n"
+    assert resolved["reviewer"].prompt == "Perform a fresh, read-only, defect-only review.\n"
+    assert resolved["semantic_revision"].prompt == "Complete replacement semantic revision.\n"
     assert all(item.attachments_dir.name == "attachments" for item in resolved.values())
     assert all(item.attachments_dir.is_dir() for item in resolved.values())
 
@@ -735,6 +817,49 @@ def test_missing_operation_resource_fails_closed(tmp_path: Path, missing: str) -
         missing_path.unlink()
 
     with pytest.raises(ValueError, match="managed Issue Planning operation resources are incomplete"):
+        issue_planning_prompt._resolve_operation_resources(
+            "planner",
+            resource_root=resource_root,
+        )
+
+
+def test_prompt_resource_symlink_fails_closed(tmp_path: Path) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    prompt_path = resource_root / "operations" / "planning" / "prompt.md"
+    prompt_path.unlink()
+    target = tmp_path / "prompt-target.md"
+    target.write_text("planning\n", encoding="utf-8")
+    prompt_path.symlink_to(target)
+
+    with pytest.raises(ValueError, match="managed Issue Planning operation resources are incomplete"):
+        issue_planning_prompt._resolve_operation_resources(
+            "planner",
+            resource_root=resource_root,
+        )
+
+
+def test_attachment_resource_symlink_fails_closed(tmp_path: Path) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    attachments = resource_root / "operations" / "planning" / "attachments"
+    (attachments / "instructions.md").unlink()
+    attachments.rmdir()
+    target = tmp_path / "attachments-target"
+    target.mkdir()
+    attachments.symlink_to(target, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="managed Issue Planning operation resources are incomplete"):
+        issue_planning_prompt._resolve_operation_resources(
+            "planner",
+            resource_root=resource_root,
+        )
+
+
+def test_invalid_utf8_operation_prompt_fails_closed(tmp_path: Path) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    prompt_path = resource_root / "operations" / "planning" / "prompt.md"
+    prompt_path.write_bytes(b"\xff\n")
+
+    with pytest.raises(UnicodeDecodeError):
         issue_planning_prompt._resolve_operation_resources(
             "planner",
             resource_root=resource_root,
@@ -815,6 +940,7 @@ def test_minimal_body_is_deterministic_and_excludes_input_inventory(
             source_head="a" * 40,
             repository="owner/repo",
             branch="feature/issue",
+            context=_context(),
             exact_attachments=(
                 attachment(
                     name="target-candidate.zip",
@@ -886,11 +1012,16 @@ def test_tc_s02_001_attachment_child_change_needs_no_registry_change(tmp_path: P
     }
     baseline = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
     attachments_dir = resource_root / "operations" / "planning" / "attachments"
-    (attachments_dir / "new-detail.md").write_text("new detail\n", encoding="utf-8")
+    new_detail = attachments_dir / "new-detail.md"
+    new_detail.write_text("new detail\n", encoding="utf-8")
     changed = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
 
     assert changed.prompt == baseline.prompt
     assert changed.attachment_paths == baseline.attachment_paths
+    new_detail.unlink()
+    restored = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
+    assert restored.prompt == baseline.prompt
+    assert restored.attachment_paths == baseline.attachment_paths
 
 
 def test_tc_s02_001_prompt_change_changes_only_corresponding_body(
@@ -908,15 +1039,74 @@ def test_tc_s02_001_prompt_change_changes_only_corresponding_body(
     }
     baseline = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
     prompt_path = resource_root / "operations" / "planning" / "prompt.md"
-    prompt_path.write_text("Updated planning purpose.\n", encoding="utf-8")
+    prompt_path.write_text("  Updated planning purpose.\n", encoding="utf-8")
     changed = issue_planning_prompt.synthesize_issue_planning_prompt(**kwargs)
 
     assert changed.prompt != baseline.prompt
     assert changed.prompt == baseline.prompt.replace(
         "Create a planning package.",
-        "Updated planning purpose.",
+        "  Updated planning purpose.",
     )
     assert changed.attachment_paths == baseline.attachment_paths
+
+
+@pytest.mark.parametrize(
+    ("role", "operation"),
+    [("planner", "planning"), ("reviewer", "review"), ("semantic_revision", "revision")],
+)
+def test_tc_s02_001_prompt_change_is_scoped_to_one_operation(
+    tmp_path: Path,
+    role: str,
+    operation: str,
+) -> None:
+    resource_root = _write_nested_operation_resources(tmp_path / "resources")
+    _write_context_files(tmp_path)
+    attachment = issue_planning_prompt.PlanningPromptAttachment(
+        name="reviewed-identity.json",
+        classification="formal-evidence",
+        source_label="reviewed-identity.json",
+        content=b"{}\n",
+    )
+
+    def render(target_role: str) -> issue_planning_prompt.SynthesizedPlanningPrompt:
+        if target_role == "planner":
+            return issue_planning_prompt.synthesize_issue_planning_prompt(
+                role="planner",
+                context=_context(),
+                repo_root=tmp_path,
+                upstream="origin/feature/issue",
+                remote_head="a" * 40,
+                resource_root=resource_root,
+            )
+        return issue_planning_prompt.synthesize_planning_evidence_prompt(
+            role=target_role,
+            source_head="a" * 40,
+            repository="owner/repo",
+            branch="feature/issue",
+            context=_context(),
+            exact_attachments=(attachment,),
+            instructions=("selected finding F-1: p1",) if target_role == "semantic_revision" else (),
+            resource_root=resource_root,
+            output_expectation=(
+                issue_planning_prompt.authoring_output_expectation(
+                    "iss-00003",
+                    "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
+                )
+                if target_role == "semantic_revision"
+                else None
+            ),
+        )
+
+    roles = ("planner", "reviewer", "semantic_revision")
+    baseline = {target_role: render(target_role) for target_role in roles}
+    prompt_path = resource_root / "operations" / operation / "prompt.md"
+    prompt_path.write_text(f"  Updated {operation} purpose.\n", encoding="utf-8")
+    changed = {target_role: render(target_role) for target_role in roles}
+
+    assert changed[role].prompt != baseline[role].prompt
+    for other_role in roles:
+        if other_role != role:
+            assert changed[other_role].prompt == baseline[other_role].prompt
 
 
 def _write_nested_operation_resources(root: Path) -> Path:

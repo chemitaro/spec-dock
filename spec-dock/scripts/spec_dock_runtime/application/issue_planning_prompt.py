@@ -192,20 +192,9 @@ def synthesize_issue_planning_prompt(
     output_expectation: PlanningOutputExpectation | None = None,
 ) -> SynthesizedPlanningPrompt:
     resources = _resolve_operation_resources(role, resource_root=resource_root)
-    if len(context.dependency_summary) > MAX_DEPENDENCIES:
-        raise ValueError("dependencies exceed bounded limit")
+    _validate_operation_context(context)
     if len(context.relevant_source_paths) > MAX_RELEVANT_FILES:
         raise ValueError("relevant source paths exceed bounded limit")
-    if len(context.operator_context) > MAX_OPERATOR_ENTRIES:
-        raise ValueError("operator context exceeds bounded limit")
-
-    operator_bytes = 0
-    for entry in context.operator_context:
-        encoded = entry.encode("utf-8")
-        operator_bytes += len(encoded)
-        if len(encoded) > MAX_OPERATOR_ENTRY_BYTES or operator_bytes > MAX_OPERATOR_TOTAL_BYTES:
-            raise ValueError("operator context exceeds bounded byte limit")
-        _reject_sensitive(entry)
 
     root = repo_root.resolve(strict=True)
     paths = (*context.canonical_issue_paths, *context.relevant_source_paths)
@@ -263,12 +252,25 @@ def synthesize_planning_evidence_prompt(
     source_head: str,
     repository: str,
     branch: str,
+    context: PlanningContext | None = None,
+    remote_head: str | None = None,
+    upstream: str | None = None,
     exact_attachments: tuple[PlanningPromptAttachment, ...],
     instructions: tuple[str, ...] = (),
     supplemental_attachments: tuple[tuple[str, str], ...] = (),
     resource_root: Path | None = None,
     output_expectation: PlanningOutputExpectation | None = None,
 ) -> SynthesizedPlanningPrompt:
+    if context is None:
+        raise ValueError("planning context is required")
+    if (
+        context.source_head != source_head
+        or context.repository != repository
+        or context.branch != branch
+        or (remote_head is not None and remote_head != context.source_head)
+        or (upstream is not None and upstream != f"origin/{context.branch}")
+    ):
+        raise ValueError("planning context identity does not match evidence inputs")
     if re.fullmatch(r"[0-9a-f]{40}", source_head) is None:
         raise ValueError("source HEAD is invalid")
     if not exact_attachments:
@@ -278,12 +280,18 @@ def synthesize_planning_evidence_prompt(
     if len(names) != len(set(names)) or len(labels) != len(set(labels)):
         raise ValueError("planning attachment names and source labels must be unique")
     resources = _resolve_operation_resources(role, resource_root=resource_root)
+    _validate_operation_context(context)
     identity: dict[str, object] = {
-        "branch": branch,
-        "repository": repository,
-        "source_head": source_head,
+        "branch": context.branch,
+        "issue_id": context.issue_id,
+        "parent_epic_id": context.parent_epic_id,
+        "parent_initiative_id": context.parent_initiative_id,
+        "remote_head": context.source_head if remote_head is None else remote_head,
+        "repository": context.repository,
+        "source_head": context.source_head,
+        "upstream": f"origin/{context.branch}" if upstream is None else upstream,
     }
-    _reject_sensitive(_canonical_json(identity))
+    _render_identity(identity)
     for instruction in instructions:
         _reject_sensitive(instruction)
     expectation = output_expectation or (_review_expectation() if role == "reviewer" else None)
@@ -293,7 +301,7 @@ def synthesize_planning_evidence_prompt(
         operation=resources.operation,
         purpose=resources.prompt,
         identity=identity,
-        operation_context="none",
+        operation_context=_render_operation_context(context),
         expectation=expectation,
         revision_scope=instructions if role == "semantic_revision" else (),
     )
@@ -334,8 +342,8 @@ def _resolve_operation_resources(
         or not attachments_dir.is_dir()
     ):
         raise ValueError("managed Issue Planning operation resources are incomplete")
-    prompt = prompt_path.read_text(encoding="utf-8").strip()
-    if not prompt:
+    prompt = prompt_path.read_text(encoding="utf-8")
+    if not prompt.strip():
         raise ValueError("managed Issue Planning operation prompt is empty")
     return _OperationResources(
         operation=operation,
@@ -348,7 +356,26 @@ def _canonical_json(value: dict[str, object]) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def _validate_operation_context(context: PlanningContext) -> None:
+    if len(context.dependency_summary) > MAX_DEPENDENCIES:
+        raise ValueError("dependencies exceed bounded limit")
+    if len(context.operator_context) > MAX_OPERATOR_ENTRIES:
+        raise ValueError("operator context exceeds bounded limit")
+    for entry in context.dependency_summary:
+        _reject_sensitive(entry)
+    operator_bytes = 0
+    for entry in context.operator_context:
+        encoded = entry.encode("utf-8")
+        operator_bytes += len(encoded)
+        if len(encoded) > MAX_OPERATOR_ENTRY_BYTES or operator_bytes > MAX_OPERATOR_TOTAL_BYTES:
+            raise ValueError("operator context exceeds bounded byte limit")
+        _reject_sensitive(entry)
+
+
 def _render_identity(identity: dict[str, object]) -> str:
+    missing = tuple(field for field in _IDENTITY_FIELDS if field not in identity or identity[field] is None)
+    if missing:
+        raise ValueError(f"exact source identity is incomplete: {','.join(missing)}")
     closed = {key: identity[key] for key in _IDENTITY_FIELDS if key in identity}
     rendered = _canonical_json(closed)
     _reject_sensitive(rendered)
@@ -358,12 +385,14 @@ def _render_identity(identity: dict[str, object]) -> str:
 def _render_operation_context(context: PlanningContext | None) -> str:
     if context is None:
         return "none"
-    return _canonical_json(
+    rendered = _canonical_json(
         {
             "dependency_summary": list(context.dependency_summary),
             "operator_context": list(context.operator_context),
         }
     )
+    _reject_sensitive(rendered)
+    return rendered
 
 
 def _render_minimal_body(

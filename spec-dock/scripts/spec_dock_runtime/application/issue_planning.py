@@ -1222,6 +1222,9 @@ def run_issue_planning_review(
             source_head=context.source_head,
             repository=context.repository,
             branch=context.branch,
+            context=context,
+            remote_head=kwargs["remote_head"],
+            upstream=kwargs["upstream"],
             exact_attachments=(
                 *targets,
                 PlanningPromptAttachment(
@@ -1626,6 +1629,9 @@ def run_issue_planning_revise(
                 source_head=runtime_context.source_head,
                 repository=runtime_context.repository,
                 branch=runtime_context.branch,
+                context=runtime_context,
+                remote_head=kwargs["remote_head"],
+                upstream=kwargs["upstream"],
                 exact_attachments=tuple(attachments),
                 instructions=instructions,
                 supplemental_attachments=base.attachments,
