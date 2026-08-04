@@ -2,7 +2,7 @@
 種別: issue-local decision record
 ID: "ADR-ISS354-001"
 タイトル: "Oracle 0.17.0 browser compatibility profile and bounded recovery boundary"
-状態: "proposed"
+状態: "accepted"
 作成者: "ChatGPT Blue Team authoring planner"
 最終更新: "2026-08-04"
 対象: ["iss-00354", "epic-00331", "init-00322"]
@@ -10,13 +10,13 @@ ID: "ADR-ISS354-001"
 
 # ADR-ISS354-001 Oracle 0.17.0 browser compatibility profile and bounded recovery boundary
 
-> **Review target / evidence-only / provisional**  
-> 本recordは `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z` のレビュー対象である。Issue `iss-00354` と Initiative `init-00322` のformal Issue Planning laneに
-> 限定した暫定判断であり、Oracle全利用、全ChatGPT operation、組織全体の永続architectureを変更しない。
+> **Accepted for iss-00354 / initiative-local provisional decision**
+> 本recordは Candidate v2 の Red Team PASS とユーザー承認を経て、Issue `iss-00354` と Initiative `init-00322` の formal Issue Planning lane に限定して採用する暫定判断である。
+> Oracle 全利用、全 ChatGPT operation、組織全体の永続 architecture は変更しない。
 
 ## Status
 
-`proposed` / unreviewed / not adopted。Candidate v1の正式Red Review FAILに含まれたP1二件だけを修正したv2である。
+`accepted` / initiative-local / implementation-preparation scope。Candidate v1の正式Red Review FAILに含まれたP1二件だけを修正したv2を基礎とする。
 
 ## Context
 

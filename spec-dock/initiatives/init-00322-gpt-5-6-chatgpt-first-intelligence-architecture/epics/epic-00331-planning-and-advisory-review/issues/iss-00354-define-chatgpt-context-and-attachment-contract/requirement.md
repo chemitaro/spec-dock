@@ -2,7 +2,7 @@
 種別: 要件定義書（Issue）
 ID: "iss-00354"
 タイトル: "ChatGPT Context and Attachment Contract — Oracle 0.17.0 互換性増分"
-状態: "draft"
+状態: "approved"
 作成者: "ChatGPT Blue Team authoring planner"
 最終更新: "2026-08-04"
 親: ["epic-00331", "init-00322"]
@@ -10,9 +10,10 @@ ID: "iss-00354"
 
 # iss-00354 ChatGPT Context and Attachment Contract 要件定義書
 
-> **Candidate / evidence-only / unreviewed**  
-> 本文書は `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z` に含まれる Blue Team Candidate である。canonical 文書の採用、Red Team の
-> PASS/FAIL、Human approval、`planning apply`、実装完了、commit、push、PR、merge、Issue close を表さない。
+> **Canonical / approved for Issue implementation preparation**
+> 本文書は Candidate v2 の Red Team PASS と、ユーザーが承認した実装準備補足を統合した iss-00354 の正規要件である。
+> Candidate v2 の immutable identity は `candidate-note.md` と `report.md` に保持し、current HEAD の確認値も report に記録する。
+> この承認は実装準備のためのものであり、実装完了、commit、push、PR、merge、Issue close を意味しない。
 > 今回の Red Team レビュー対象は本書、`design.md`、`plan.md`、
 > `decisions/ADR-ISS354-001-oracle-017-browser-compatibility.md` の四文書だけである。
 

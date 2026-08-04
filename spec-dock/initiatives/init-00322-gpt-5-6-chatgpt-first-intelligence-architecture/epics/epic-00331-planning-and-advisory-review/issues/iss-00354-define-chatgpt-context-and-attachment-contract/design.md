@@ -2,7 +2,7 @@
 種別: 設計書（Issue）
 ID: "iss-00354"
 タイトル: "ChatGPT Context and Attachment Contract — Oracle 0.17.0 増分設計"
-状態: "draft"
+状態: "approved"
 作成者: "ChatGPT Blue Team authoring planner"
 最終更新: "2026-08-04"
 依存: ["requirement.md", "decisions/ADR-ISS354-001-oracle-017-browser-compatibility.md"]
@@ -11,8 +11,9 @@ ID: "iss-00354"
 
 # iss-00354 ChatGPT Context and Attachment Contract 設計書
 
-> **Candidate / evidence-only / unreviewed**  
-> 本設計は `CAND-ISS-00354-ORACLE017-V2-20260804T043533Z` の増分案であり、canonical design、review PASS、実装承認ではない。
+> **Canonical / approved for Issue implementation preparation**
+> 本設計は Candidate v2 の Red Team PASS と、ユーザーが承認した実装準備補足を統合した iss-00354 の正規設計である。
+> Candidate v2 の immutable identity と current HEAD の結び付けは `candidate-note.md` と `report.md` に記録する。
 
 ## 1. 設計目的
 

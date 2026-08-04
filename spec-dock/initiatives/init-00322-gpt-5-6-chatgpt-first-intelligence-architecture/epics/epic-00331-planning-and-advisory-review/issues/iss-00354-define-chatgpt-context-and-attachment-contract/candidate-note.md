@@ -13,9 +13,9 @@
 | Source HEAD | `d0659cfa83bf97a05ceab01f4d9ce76162a2baa1` |
 | Generated UTC | `2026-08-04T04:35:33Z` |
 | Generated JST | `2026-08-04T13:35:33+09:00` |
-| Authority | `evidence_only` |
-| Adoption status | `unreviewed` |
-| Review status | v1 `FAIL`; v2 not yet reviewed |
+| Authority | `canonical` for iss-00354 implementation preparation |
+| Adoption status | `adopted_for_implementation_preparation` |
+| Review status | v1 `FAIL`; v2 `PASS` (P0/P1なし) |
 
 ## Immutable inputs
 
@@ -28,6 +28,8 @@
 | Selected findings | exactly two P1 findings; no P2/P3 or architecture redesign |
 
 Candidate v1、repository、canonical documents、Git/GitHub state were not modified. v2 is a new logical root and archive identity.
+
+Candidate v2 の ZIP bytes と identity は immutable に保持する。current branch では、v2 PASS 後にユーザー承認で実装ブリーフ運用、実行可能 plan 契約、report gate の準備補足を統合した。これらの canonical working-copy amendments は v2 ZIP の再生成や上書きではなく、`report.md` の adoption ledger と current commit history で追跡する。
 
 ## GitHub verification
 
@@ -43,9 +45,9 @@ GitHub Connectorでrepositoryとrequested branchを確認し、branchとrequeste
 
 No other architecture, lifecycle, authority, source identity, or scope decision was changed.
 
-## Review scope for next turn
+## Review scope and current working-copy binding
 
-Review target:
+Completed formal review target:
 
 1. `requirement.md`
 2. `design.md`
@@ -60,6 +62,11 @@ Review-excluded supporting material:
 - `reviews/red-team-review-v1.md`
 - all files under `artifacts/`
 - `candidate-note.md`
+
+Current working-copy binding:
+
+- Current branch HEAD and GitHub parity are recorded in `report.md` before each review.
+- The current working copy is reviewed after the post-adoption commit; the immutable v2 review remains the historical Candidate review.
 
 ## Integrity controls
 
@@ -90,5 +97,6 @@ iss-00354-oracle-017-compatibility-candidate-v2-20260804t043533z/
 └── candidate-note.md
 ```
 
-This expanded manual delivery inventory does not amend the production Issue Planning authoring ZIP schema. It contains no v2 Red verdict,
-canonical adoption, implementation claim, patch, commit, push, PR, merge, or Issue-close action.
+This expanded manual delivery inventory does not amend the production Issue Planning authoring ZIP schema. The immutable v2 archive remains
+historical evidence; current canonical adoption and implementation-preparation status are recorded in `report.md`. Implementation, PR, merge,
+and Issue-close actions remain unperformed.
