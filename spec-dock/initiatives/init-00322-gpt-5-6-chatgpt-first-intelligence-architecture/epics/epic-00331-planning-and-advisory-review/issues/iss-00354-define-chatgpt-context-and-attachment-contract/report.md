@@ -357,6 +357,7 @@ v3修正後に次回対象として記録した `d556295a93a51b9c2f1e697a7d18e21
 - exact HEAD検証:
   - `uv run pytest tests/unit/infra/test_issue_planning_chatgpt.py -q` -> **92 passed**
   - `uv run pytest tests/unit/infra -k 'issue_planning and (oracle or session or capability)' -q` -> **60 passed, 1020 deselected**
+  - `uv run pytest tests/unit/infra -q` -> **507 passed, 573 skipped**
   - `uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py tests/unit/infra/test_issue_planning_chatgpt.py` -> **pass**
   - `uv run mypy src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py` -> **Success: no issues found**
   - `git diff --check` -> **pass**
