@@ -1,4 +1,5 @@
 import builtins
+from dataclasses import replace
 import hashlib
 import io
 import json
@@ -658,6 +659,7 @@ def test_preflight_receipt_records_content_free_capability_surface(
     )
 
     assert receipt.version == "0.16.1"
+    assert receipt.profile_id == "oracle-0.16.1"
     assert receipt.version_exit_code == 0
     assert receipt.root_help_exit_code == 0
     assert receipt.session_help_exit_code == 0
@@ -739,6 +741,33 @@ def test_help_option_matching_rejects_near_match_tokens() -> None:
     assert "--file" in tokens
 
 
+def test_incomplete_profile_blocks_before_help_or_prompt(monkeypatch, tmp_path: Path) -> None:
+    executable = _fake_executable(tmp_path)
+    profile = issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY["0.16.1"]
+    monkeypatch.setitem(
+        issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY,
+        "0.16.1",
+        replace(profile, capture_argv_builder=None),
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        pytest.fail("incomplete profile must not probe help or submit")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    receipt = issue_planning_chatgpt._read_oracle_preflight_receipt(
+        executable,
+        child_env=issue_planning_chatgpt._sanitized_child_environment(),
+        cwd=tmp_path,
+    )
+    assert receipt.profile_id == "oracle-0.16.1"
+    assert receipt.supported_by_current_runtime is False
+    assert calls == [[str(executable.resolve()), "--version"]]
+
+
 def test_preflight_receipt_fail_closes_before_help_for_unsupported_version(
     monkeypatch,
     tmp_path: Path,
@@ -760,6 +789,7 @@ def test_preflight_receipt_fail_closes_before_help_for_unsupported_version(
     )
 
     assert receipt.version == "0.17.0"
+    assert receipt.profile_id is None
     assert receipt.version_exit_code == 0
     assert receipt.root_help_exit_code is None
     assert receipt.session_help_exit_code is None

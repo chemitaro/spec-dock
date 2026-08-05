@@ -32,7 +32,7 @@ from spec_dock_runtime.infra.issue_planning_oracle_artifact import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from spec_dock_runtime.application.issue_planning_prompt import (
         PlanningOutputExpectation,
@@ -75,6 +75,12 @@ class _OracleCompatibilityProfile:
     artifact_reader: OracleArtifactReader
     harvest_argv_builder: Callable[[Path, str], tuple[str, ...]]
     capture_argv_builder: Callable[[Path, str], tuple[str, ...]]
+
+    @property
+    def browser_argv_policy(self) -> Callable[..., list[str]]:
+        """Expose the profile-owned browser policy without a generic fallback."""
+
+        return self.browser_argv_builder
 
 
 def _build_oracle_0161_browser_argv(
@@ -199,6 +205,10 @@ def _profile_is_complete(profile: _OracleCompatibilityProfile | None) -> bool:
         and callable(profile.capture_argv_builder)
         and reader is not None
         and reader.version == profile.version
+        and callable(reader.read_session_status)
+        and callable(reader.snapshot_authoring_zip)
+        and callable(reader.snapshot_review_json)
+        and callable(reader.has_exact_repository_access_failure)
     )
 
 
@@ -262,7 +272,7 @@ def invoke_issue_planning_chatgpt(
             or _executable_identity(final_executable) != executable_identity
         ):
             return _result("blocked", "oracle_unavailable", source_evidence, None)
-        argv = profile.browser_argv_builder(
+        argv = profile.browser_argv_policy(
             final_executable,
             managed_chrome,
             session_id,
@@ -568,7 +578,7 @@ def _preflight_version(stdout: bytes) -> str | None:
 
 
 def _run_oracle(
-    argv: list[str],
+    argv: Sequence[str],
     *,
     child_env: dict[str, str],
     cwd: Path,
@@ -616,7 +626,7 @@ def _recover_same_session(
         return pre_harvest_state
     with suppress(OSError, subprocess.TimeoutExpired):
         _run_oracle(
-            list(profile.harvest_argv_builder(recovery_executable, session_id)),
+            profile.harvest_argv_builder(recovery_executable, session_id),
             child_env=child_env,
             cwd=cwd,
             timeout=remaining,
