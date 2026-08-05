@@ -38,3 +38,64 @@ S07 の実装前に `spec-dock update` を実行したところ、今回の範�
 - S07 の変更後も旧 `--context-manifest` は Issue Planning の実行契約として残していない（文書中の出現は廃止を説明する注記のみ）。
 
 この分析は S07 の implementation evidence として `report.md` の EAL に登録する。provider source、S07 projection、親 Epic 文言、S07 brief 以外の差分を S07 の成果として採用しない。
+
+## S07 Blue repair parity receipt
+
+```text
+repair_source_head: 21a2c4c2bfb6e30a925e64f8bb9508687b128417
+provider_source_preflight:
+  command: PYTHONPATH="$ROOT/src" uv run python - <<'PY' ...
+  observed_module_path: <current-checkout>/src/spec_dock/cli.py
+  exit_code: 0
+projection_update:
+  command: PYTHONPATH="$ROOT/src" uv run python -m spec_dock.cli update "$ROOT"
+  exit_code: 1
+  stop_reason: host-adapter meta.json operation-not-permitted
+  policy: no out-of-allowlist projection was adopted; runtime projection extras were restored
+fresh_install:
+  command: PYTHONPATH="$ROOT/src" uv run python -m spec_dock.cli init <fresh-installed>
+  exit_code: 0
+recursive_parity:
+  - comparison: skill_provider_dogfood
+    source_root: src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning
+    projection_root: .agents/skills/spec-dock-issue-planning
+    file_count: 7
+    tree_sha256: 2ec1f6b8951ea581a8893e8ee9fc02a14dae9b81194d53661c9a06861c40c05f
+    parity_exclusions: []
+    status: pass
+  - comparison: skill_provider_fresh_installed
+    source_root: src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning
+    projection_root: <fresh-installed>
+    file_count: 7
+    tree_sha256: 2ec1f6b8951ea581a8893e8ee9fc02a14dae9b81194d53661c9a06861c40c05f
+    parity_exclusions: []
+    status: pass
+  - comparison: docs_provider_dogfood
+    source_root: src/spec_dock/assets/spec_dock/docs
+    projection_root: spec-dock/docs
+    file_count: 37
+    tree_sha256: 821ee25b75ee2db41dd660a40815b533b71e846f46fdbdff9faf653fcc47fb8a
+    parity_exclusions: []
+    status: pass
+  - comparison: docs_provider_fresh_installed
+    source_root: src/spec_dock/assets/spec_dock/docs
+    projection_root: <fresh-installed>
+    file_count: 37
+    tree_sha256: 821ee25b75ee2db41dd660a40815b533b71e846f46fdbdff9faf653fcc47fb8a
+    parity_exclusions: []
+    status: pass
+validate:
+  command: ./spec-dock/scripts/spec-dock validate
+  exit_code: 0
+diff_check:
+  command: git diff --check
+  exit_code: 0
+scope_audit:
+  unexpected_changed_files: []
+```
+
+The failed `update` command is retained as an execution boundary observation. It
+must not be replaced by a remote package update or used to justify importing
+runtime projection changes. The fresh `init` and all four recursive parity
+comparisons used the current checkout's provider source and completed without
+exclusions.

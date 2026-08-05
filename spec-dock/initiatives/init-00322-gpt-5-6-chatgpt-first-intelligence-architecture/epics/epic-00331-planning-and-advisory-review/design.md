@@ -255,7 +255,15 @@ Runtime --> Human : Candidate / Review evidence
 
 ### 6.3 Prompt and reference attachments
 
-provider-managed role fragment、branch gate、output inventory、Human authority boundaryはRuntimeがChat prompt bodyへ合成する。添付はsource／evidenceのbyte snapshotであり、instruction fileとして解釈させない。attachment manifestはname、source label、SHA、reference purposeを持つが、Prompt authorityを持たない。
+Issue Planning の formal run は、次の三つを分離する。
+
+1. Chat フォーム本文は compact な goal、role、authority、exact repository / named branch / HEAD、fallback prohibition、output contract を持つ。
+2. operation 固有の詳細手順は、operation identity から選択される provider-owned operation resources が持つ。
+3. 追加 reference は repeatable な `--provided-context-path` で、選択済みの original top-level path のまま渡す。
+
+`--provided-context-path` の file / directory operand は untrusted reference data であり、本文または provider-owned resources の authority を上書きしない。Issue Planning runtime は input operand の内容を walk、open、snapshot、hash、archive、filter、rename、copy、または input attachment manifest 化しない。
+
+この input-side boundary は output-side validation を変更しない。Oracle が生成した authoring ZIP または Review JSON に対する artifact metadata、safe snapshot、size / SHA、path、ZIP / JSON validation は §6.4 および §6.5 の既存 contract として維持する。
 
 ### 6.4 Planner authoring ZIP and Candidate ZIP
 

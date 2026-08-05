@@ -87,8 +87,14 @@ The required Planner/Semantic Revision output is exactly one authoring ZIP conta
    ```bash
    ./spec-dock/scripts/spec-dock-chatgpt review planning \
      --issue <iss-id> --mode archive-candidate \
-     --candidate <candidate.zip> --output <external-review-dir>
+     --candidate <candidate.zip> --output <external-review-dir> \
+     --provided-context-path <additional-review-reference>
    ```
+
+   The same repeatable option may be used with the explicit `git-bound`
+   Review form. Each operand remains an already-selected opaque file or
+   directory path; preserve order and lexical identity and do not inspect or
+   materialize its contents.
 
    Use the same Candidate with `--mode git-bound --candidate <candidate.zip> --reviewed-head <sha>` only as the explicit fallback when the current canonical three documents must be reviewed. Do not silently reuse a PASS across modes or Candidate versions.
 4. Consume only the exact published `planning-review-result.json`. When P0/P1 findings exist, write the closed `planning-revision-request.json` beside that exact Review result and run:
@@ -97,8 +103,14 @@ The required Planner/Semantic Revision output is exactly one authoring ZIP conta
    ./spec-dock/scripts/spec-dock-chatgpt planning revise \
      --candidate <candidate.zip> \
      --request <external-review-dir>/planning-revision-request.json \
-     --output <external-output-dir>
+     --output <external-output-dir> \
+     --provided-context-path <additional-revision-reference>
    ```
+
+   `--provided-context-path` is available only for Planning create, Formal
+   Planning Review, and Semantic Revision. Do not add or pass it to
+   `planning apply`. A closed Mechanical Revision uses its deterministic
+   path/field/literal scope and does not consume this open reference option.
 
    The command resolves only the fixed sibling `planning-review-result.json`; it does not scan other directories. Review the new Candidate in a fresh conversation. P2/P3-only observations do not trigger revision.
 5. Obtain an explicit Human decision bound to the exact PASS Review bytes and reviewed identity. The CLI never generates, guesses, or completes this decision.
@@ -155,7 +167,7 @@ Queued tabs, slow responses, retryable timeouts, stale sync, missing prompt cont
 ## Stop Conditions
 
 - Active Issue or parent Epic context is missing, stale, or contradictory.
-- Repository/branch evidence required for ChatGPT-first planning is unavailable and no explicit local-context run was approved.
+- The exact current repository, named branch, and HEAD cannot be verified through GitHub for the formal Issue Planning run. Stop unconditionally. Do not substitute `local-context`, the default branch, another branch, attachments, prompt context, or memory.
 - ChatGPT returns `information_insufficient`; ask the human for the missing information instead of fabricating artifacts.
 - Candidate or Review identity is missing, stale, ambiguous, or does not match the exact Human decision.
 - Review is not PASS, or apply does not return `ready`.
