@@ -60,6 +60,50 @@ def test_0170_reader_accepts_core_schema_and_ignores_transfer_origin(tmp_path: P
     assert snapshot.sha256 == hashlib.sha256(zip_path.read_bytes()).hexdigest()
 
 
+@pytest.mark.parametrize("unknown_first", [False, True])
+@pytest.mark.parametrize("kind", ["transcript", "repository-failure", "missing"])
+def test_0170_authoring_zip_rejects_mixed_uncharacterized_inventory(
+    monkeypatch,
+    tmp_path: Path,
+    unknown_first: bool,
+    kind: str,
+) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "oracle-017-attachment-characterization.zip"
+    _write_zip(zip_path)
+    unknown_path = session / "artifacts" / "uncharacterized.md"
+    unknown_path.write_bytes(b"uncharacterized\n")
+    unknown_entry = _artifact(kind if kind != "missing" else "file", unknown_path)
+    if kind == "missing":
+        unknown_entry.pop("kind")
+    zip_entry = _artifact("file", zip_path)
+    entries = [unknown_entry, zip_entry] if unknown_first else [zip_entry, unknown_entry]
+    _write_metadata(session, entries)
+
+    delegated: list[object] = []
+    original = artifact_reader._snapshot_authoring_zip_from_metadata
+
+    def spy(*args, **kwargs):
+        delegated.append((args, kwargs))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(artifact_reader, "_snapshot_authoring_zip_from_metadata", spy)
+    staging_dir = tmp_path / "staging"
+    reader = artifact_reader.artifact_reader_for_version("0.17.0")
+
+    with pytest.raises(artifact_reader.OracleArtifactError) as error:
+        reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.17.0",
+            staging_dir=staging_dir,
+        )
+
+    assert error.value.code == "oracle_artifact_rejected"
+    assert delegated == []
+    assert not staging_dir.exists()
+
+
 @pytest.mark.parametrize("defect", ["path", "sizeBytes", "sha256", "validation"])
 def test_0170_extra_fields_cannot_override_core_defect(tmp_path: Path, defect: str) -> None:
     session = _session(tmp_path)

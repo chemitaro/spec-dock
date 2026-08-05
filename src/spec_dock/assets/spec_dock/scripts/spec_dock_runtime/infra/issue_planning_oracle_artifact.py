@@ -103,6 +103,13 @@ def snapshot_authoring_zip(
     )
 
 
+def _require_oracle_0170_file_only_inventory(metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    artifacts = _artifact_inventory(metadata)
+    if any(item.get("kind") != "file" for item in artifacts):
+        raise OracleArtifactError("oracle_artifact_rejected")
+    return artifacts
+
+
 def snapshot_authoring_zip_0170(
     session_root: Path,
     *,
@@ -111,6 +118,7 @@ def snapshot_authoring_zip_0170(
     staging_dir: Path,
 ) -> OracleAuthoringZipSnapshot:
     metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
+    _require_oracle_0170_file_only_inventory(metadata)
     return _snapshot_authoring_zip_from_metadata(
         session_root,
         metadata=metadata,
@@ -247,9 +255,7 @@ def has_exact_repository_access_failure_0170(
 ) -> bool:
     """Recognize only the exact terminal connector-failure sentinel."""
     metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
-    artifacts = _artifact_inventory(metadata)
-    if any(item.get("kind") != "file" for item in artifacts):
-        raise OracleArtifactError("oracle_artifact_rejected")
+    _require_oracle_0170_file_only_inventory(metadata)
     _ = staging_dir
     return False
 
