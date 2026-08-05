@@ -823,3 +823,79 @@ Prompt本文、計画上の希望model、過去sessionのmodel evidenceから未
 * Literal path `/private/tmp/iss-00354-s07-blue-repair-prompt-20260805.md`自体はこの実行環境から取得できなかった。本ブリーフはGitHub named branchのexact HEAD、添付Fresh Red review、現行Skill／workflow／Parent Design／plan／report／S07 brief／cleanup analysisを根拠に再構成した。
 * 本応答ではrepository変更、projection update、fresh init、parity script、validate、commit、push、Fresh Red再レビューを実行していない。
 * Fresh Redの四P1以外の新しい欠陥判定やS07 PASS判定は行っていない。
+
+## Fresh Red v2 repair addendum (bounded evidence correction)
+
+Fresh Red v2 reviewed pushed HEAD `51ec44361934991c0ba347eed7e5047c719ec122` and returned FAIL with P0=0/P1=3. This addendum corrects only `RT-354-S07-V2-001` through `003`; it does not change the provider Skill, parent design, runtime, tests, or prior Red bytes.
+
+### Exact parity command actually executed
+
+The following complete command was executed at the source HEAD above. The temporary installed root was removed by the trap, and the command body is recorded without truncation.
+
+```bash
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+SOURCE_HEAD='51ec44361934991c0ba347eed7e5047c719ec122'
+cd "$ROOT"
+test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+PYTHONPATH="$ROOT/src" uv run python - <<'PY'
+from pathlib import Path
+import spec_dock.cli
+root = Path.cwd().resolve()
+observed = Path(spec_dock.cli.__file__).resolve()
+expected = (root / "src/spec_dock/cli.py").resolve()
+if observed != expected:
+    raise SystemExit(f"wrong installer source: {observed} != {expected}")
+print("provider_installer_source=<current-checkout>/src/spec_dock/cli.py")
+PY
+INSTALL_TMP="$(mktemp -d /private/tmp/iss-00354-s07-fresh-v3-XXXXXX)"
+trap 'rm -rf "$INSTALL_TMP"' EXIT
+PYTHONPATH="$ROOT/src" uv run python -m spec_dock.cli init "$INSTALL_TMP"
+PYTHONPATH="$ROOT/src" uv run python - "$INSTALL_TMP" <<'PY'
+from __future__ import annotations
+import hashlib
+from pathlib import Path
+import sys
+repo = Path.cwd().resolve()
+installed = Path(sys.argv[1]).resolve()
+pairs = (("skill_provider_dogfood", repo / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning", repo / ".agents/skills/spec-dock-issue-planning"), ("skill_provider_fresh_installed", repo / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning", installed / ".agents/skills/spec-dock-issue-planning"), ("docs_provider_dogfood", repo / "src/spec_dock/assets/spec_dock/docs", repo / "spec-dock/docs"), ("docs_provider_fresh_installed", repo / "src/spec_dock/assets/spec_dock/docs", installed / "spec-dock/docs"))
+def manifest(root: Path) -> dict[str, tuple[int, str]]:
+    result = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink(): raise SystemExit(f"unexpected symlink: {root}:{relative}")
+        if path.is_dir(): continue
+        if not path.is_file(): raise SystemExit(f"unexpected non-file: {root}:{relative}")
+        data = path.read_bytes(); result[relative] = (len(data), hashlib.sha256(data).hexdigest())
+    return result
+for label, source_root, projection_root in pairs:
+    source = manifest(source_root); projection = manifest(projection_root)
+    if source != projection: raise SystemExit(f"{label}: parity mismatch")
+    tree_sha = hashlib.sha256("\n".join(f"{relative}\0{size}\0{digest}" for relative, (size, digest) in sorted(source.items())).encode("utf-8")).hexdigest()
+    print(f"{label}: source={source_root} projection={projection_root} files={len(source)}/{len(projection)} tree_sha256={tree_sha} parity_exclusions=[] status=pass")
+PY
+```
+
+Observed receipts: provider preflight exit 0; fresh `init` exit 0; recursive parity exit 0; Skill file counts 7/7 and tree SHA `2ec1f6b8951ea581a8893e8ee9fc02a14dae9b81194d53661c9a06861c40c05f`; docs file counts 37/37 and tree SHA `821ee25b75ee2db41dd660a40815b533b71e846f46fdbdff9faf653fcc47fb8a`; all comparisons used `parity_exclusions=[]`. The historical update command remained `PYTHONPATH="$ROOT/src" uv run python -m spec_dock.cli update "$ROOT"`, exit 1 due host-adapter `meta.json` operation-not-permitted; no remote package replacement was used.
+
+### Historical eight-file scope reconciliation
+
+The `21a2c4c2...` → `51ec4436...` range contains five direct Blue repair paths and three immutable evidence-import paths. Evidence import is not a Blue modification; this eight-path set supersedes the earlier five-path audit only for this historical range.
+
+```text
+direct_blue_edit_path_count: 5
+evidence_import_path_count: 3
+base: 21a2c4c2bfb6e30a925e64f8bb9508687b128417
+head: 51ec44361934991c0ba347eed7e5047c719ec122
+expected_changed_file_count: 8
+observed_changed_file_count: 8
+missing_expected_files: []
+unexpected_changed_files: []
+status: pass
+```
+
+The exact audit invocation was `git diff --name-only "$BASE" "$HEAD"` compared with the sorted eight-path set (five direct Blue edits plus the v1 Blue brief and v1 Red canonical/raw evidence imports). Its observed receipt was `direct_blue_edit_path_count=5 evidence_import_path_count=3 expected_changed_file_count=8 observed_changed_file_count=8 missing_expected_files=[] unexpected_changed_files=[] status=pass`; v1 review bytes remain read-only and byte-identical.
+
+### Current-state boundary
+
+The v1 repair commit is pushed and its exact tip was handed to Fresh Red v2. Fresh Red v2 returned FAIL with P1×3, so S07 remains open. The next correction is limited to this addendum, the cleanup artifact, and `report.md`; a new pushed HEAD requires a fresh Red v3 review. No PASS, closure, S08 start, PR, merge, Issue close, or Issue finish is implied.
