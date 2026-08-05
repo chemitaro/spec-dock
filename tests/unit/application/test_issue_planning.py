@@ -349,7 +349,10 @@ class _FakeThreadPort:
         self.last_continuation_binding: BlueThreadBinding | None = None
         self.continuation_kwargs: dict[str, object] | None = None
         self.new_kwargs: dict[str, object] | None = None
+        self.fresh_red_kwargs: dict[str, object] | None = None
         self.last_red_binding: object | None = None
+        self.last_new_receipt: ThreadInvocationReceipt | None = None
+        self.last_fresh_red_receipt: ThreadInvocationReceipt | None = None
 
     def resolve_blue(self, lineage: object) -> BlueBindingResolution:
         if self.resolution == "exact":
@@ -372,13 +375,18 @@ class _FakeThreadPort:
         red_binding = object() if red else None
         if red_binding is not None:
             self.last_red_binding = red_binding
-        return ThreadInvocationReceipt(
+        receipt = ThreadInvocationReceipt(
             result=result,
             mode=cast("Any", mode),
             submission_state="successful" if result.status == "pass" else "unknown",
             blue_binding=None if red else self.blue_binding,
             red_binding=red_binding,
         )
+        if mode == "new_blue":
+            self.last_new_receipt = receipt
+        elif mode == "fresh_red":
+            self.last_fresh_red_receipt = receipt
+        return receipt
 
     def invoke_new_blue(self, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
         self.new_calls += 1
@@ -406,6 +414,7 @@ class _FakeThreadPort:
     def invoke_fresh_red(self, reviewed_identity: object, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
         del reviewed_identity
         self.fresh_red_calls += 1
+        self.fresh_red_kwargs = kwargs
         return self._invoke(invoker, kwargs, mode="fresh_red", red=True)
 
     def commit_blue(self, receipt: ThreadInvocationReceipt, new_lineage: object) -> None:
@@ -444,6 +453,21 @@ def _forge_dataclass(cls: type[object], **values: object) -> object:
     for name, value in values.items():
         object.__setattr__(forged, name, value)
     return forged
+
+
+class _EquivalentString(str):
+    def __new__(cls, value: str, equivalent: str) -> _EquivalentString:
+        instance = super().__new__(cls, value)
+        instance.equivalent = equivalent
+        return instance
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, str) and str.__eq__(self.equivalent, other)
+
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
+
+    __hash__ = str.__hash__
 
 
 def test_application_issue_planning_unit_tests_use_application_owned_test_doubles_only() -> None:
@@ -3196,6 +3220,7 @@ def test_s06_blue_binding_hides_provider_handle_and_requires_exact_resolution() 
         "D" * 64,
         "d" * 63,
         "g" * 64,
+        _EquivalentString("f" * 64, "d" * 64),
     ),
 )
 def test_s06_blue_binding_rejects_noncanonical_lineage_digest(digest: str) -> None:
@@ -3210,10 +3235,43 @@ def test_s06_blue_binding_rejects_missing_provider_handle_and_unknown_resolution
         BlueBindingResolution(cast("Any", "forged"))
 
 
+def test_s06_ports_reject_scalar_subclass_resolution_and_receipt_fields() -> None:
+    binding = BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=object())
+    with pytest.raises(ValueError, match="invalid Blue binding resolution status"):
+        BlueBindingResolution(_EquivalentString("forged", "exact"), binding)
+
+    result = _successful_transport()
+    for field_name, value in (
+        ("mode", _EquivalentString("fresh_red", "new_blue")),
+        ("submission_state", _EquivalentString("unknown", "successful")),
+    ):
+        with pytest.raises(ValueError):
+            ThreadInvocationReceipt(
+                result=result,
+                mode=(value if field_name == "mode" else "new_blue"),
+                submission_state=(value if field_name == "submission_state" else "successful"),
+                blue_binding=binding,
+            )
+
+    for field_name, value in (
+        ("status", _EquivalentString("blocked", "pass")),
+        ("reason", _EquivalentString("backend_timeout", "transport_received")),
+    ):
+        mutated_result = _successful_transport()
+        object.__setattr__(mutated_result, field_name, value)
+        with pytest.raises(ValueError):
+            ThreadInvocationReceipt(
+                result=mutated_result,
+                mode="new_blue",
+                submission_state="successful",
+                blue_binding=binding,
+            )
+
+
 def test_s06_receipt_closes_mode_submission_binding_matrix() -> None:
     binding = BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=object())
-    passing = SimpleNamespace(status="pass")
-    blocked = SimpleNamespace(status="blocked")
+    passing = SimpleNamespace(status="pass", reason="transport_received")
+    blocked = SimpleNamespace(status="blocked", reason="backend_timeout")
     ThreadInvocationReceipt(
         result=passing,
         mode="new_blue",
@@ -3464,45 +3522,109 @@ def test_s06_thread_source_drift_stops_before_resolve_transport_backend_publish_
 def test_s06_private_thread_sentinel_stays_out_of_public_and_artifact_surfaces(tmp_path: Path) -> None:
     class _PrivateHandle:
         def __repr__(self) -> str:
-            return "sentinel-private-provider-handle"
+            return "sentinel-private-provider-handle /Users/private/s06 transcript-marker"
 
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    reviews = tmp_path / "reviews"
+    candidates.mkdir()
+    reviews.mkdir()
+    gateway = _FakeIssuePlanningGateway()
+    thread_port = _StatefulThreadPort()
     private_handle = _PrivateHandle()
-    binding = BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=private_handle)
-    invocation = _successful_transport()
-    receipt = ThreadInvocationReceipt(
-        result=invocation,
-        mode="new_blue",
-        submission_state="successful",
-        blue_binding=binding,
+    thread_port.blue_binding = BlueThreadBinding(
+        lineage_sha256="d" * 64,
+        provider_handle=private_handle,
     )
-    command = __import__(
-        "spec_dock_runtime.domain.issue_planning_contracts",
-        fromlist=["PlanningCommandResult"],
-    ).PlanningCommandResult(
-        status="blocked",
-        reason="planning_context_rejected",
-        issue_id="iss-00003",
-        details=("thread_receipt_invalid",),
+    dependencies = IssuePlanningDependencies(_FakeClock(), gateway, thread_port)
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create", "run_issue_planning_review", "run_issue_planning_transport"],
     )
-    synthesized = SimpleNamespace(
-        prompt="minimal prompt",
-        attachment_paths=(Path("candidate.zip"), Path("review.json")),
+    created = module.run_issue_planning_create(
+        dependencies=dependencies,
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: _successful_transport(),
+        transport_runner=module.run_issue_planning_transport,
+        preflight_runner=lambda request: _preflight(),
     )
+    assert (created.status, created.reason) == ("ok", "candidate_created")
+    candidate_path = Path(created.output["candidate_path"])
+
+    def review_backend(**kwargs: object):
+        contracts = __import__(
+            "spec_dock_runtime.domain.issue_planning_contracts",
+            fromlist=["PlanningReviewResult"],
+        )
+        identity, digest = _review_identity_from_prompt(kwargs["synthesized"], contracts)
+        review = contracts.PlanningReviewResult(
+            reviewed_identity=identity,
+            reviewed_identity_sha256=digest,
+            verdict="pass",
+            findings=(),
+        )
+        payload = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+        source_evidence = cast("Any", kwargs["source_evidence"])
+        return _successful_review_transport(payload, source_manifest_hash=source_evidence.source_manifest_hash)
+
+    reviewed = module.run_issue_planning_review(
+        dependencies=dependencies,
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="archive-candidate",
+            output_dir=reviews,
+            candidate_path=candidate_path,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=review_backend,
+        transport_runner=module.run_issue_planning_transport,
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (reviewed.status, reviewed.reason) == ("ok", "review_completed")
+    assert thread_port.last_new_receipt is not None
+    assert thread_port.last_fresh_red_receipt is not None
+    assert thread_port.last_fresh_red_receipt.red_binding is not thread_port.blue_binding
+    assert thread_port.new_kwargs is not None
+    assert thread_port.fresh_red_kwargs is not None
+    assert thread_port.new_kwargs["synthesized"] is not thread_port.fresh_red_kwargs["synthesized"]
+
+    with zipfile.ZipFile(candidate_path) as archive:
+        candidate_surface = b"".join(
+            name.encode("utf-8") + archive.read(name)
+            for name in archive.namelist()
+        )
+    review_result_bytes = (reviews / reviewed.output["review_result_file"]).read_bytes()
+    review_summary_bytes = (reviews / reviewed.output["review_summary_file"]).read_bytes()
     rendered = "\n".join(
         (
-            repr(binding),
-            repr(receipt),
-            json.dumps(invocation.to_dict(), sort_keys=True),
-            json.dumps(command.to_dict(), sort_keys=True),
-            invocation.authoring_zip.zip_bytes.decode("latin1") if invocation.authoring_zip else "",
-            repr(synthesized.prompt),
-            repr(synthesized.attachment_paths),
-            *(repr(path) for path in synthesized.attachment_paths),
+            repr(thread_port.blue_binding),
+            repr(thread_port.last_new_receipt),
+            repr(thread_port.last_fresh_red_receipt),
+            json.dumps(created.to_dict(), sort_keys=True),
+            json.dumps(reviewed.to_dict(), sort_keys=True),
+            candidate_surface.decode("latin1"),
+            review_result_bytes.decode("utf-8"),
+            review_summary_bytes.decode("utf-8"),
+            *(str(kwargs["synthesized"].prompt) for kwargs in (thread_port.new_kwargs, thread_port.fresh_red_kwargs)),
+            *(repr(kwargs["synthesized"].attachment_paths) for kwargs in (thread_port.new_kwargs, thread_port.fresh_red_kwargs)),
+            *(
+                repr(path)
+                for kwargs in (thread_port.new_kwargs, thread_port.fresh_red_kwargs)
+                for path in kwargs["synthesized"].attachment_paths
+            ),
         )
     )
     assert "sentinel-private-provider-handle" not in rendered
-    assert "provider_handle" not in repr(binding)
-    assert "thread receipt" not in rendered
+    assert "transcript-marker" not in rendered
+    assert "/Users/private/s06" not in rendered
+    assert '"provider_handle"' not in rendered
 
 
 def test_s06_review_always_uses_a_fresh_red_thread(tmp_path: Path) -> None:
@@ -3721,7 +3843,10 @@ def test_s06_semantic_revision_stops_on_unknown_resolution_status(tmp_path: Path
     assert thread_port.continuation_calls == 0
 
 
-@pytest.mark.parametrize("forged_kind", ["unknown", "cross_lineage", "invalid_sha"])
+@pytest.mark.parametrize(
+    "forged_kind",
+    ["unknown", "cross_lineage", "invalid_sha", "status_scalar", "lineage_scalar"],
+)
 def test_s06_forged_resolution_is_blocked_before_transport_or_new_blue(
     tmp_path: Path,
     forged_kind: str,
@@ -3736,10 +3861,24 @@ def test_s06_forged_resolution_is_blocked_before_transport_or_new_blue(
             status="forged",
             binding=None,
         )
+    elif forged_kind == "status_scalar":
+        forged_resolution = _forge_dataclass(
+            BlueBindingResolution,
+            status=_EquivalentString("forged", "exact"),
+            binding=None,
+        )
     else:
         forged_binding = _forge_dataclass(
             BlueThreadBinding,
-            lineage_sha256=("f" * 64 if forged_kind == "cross_lineage" else "G" * 64),
+            lineage_sha256=(
+                "f" * 64
+                if forged_kind == "cross_lineage"
+                else (
+                    "G" * 64
+                    if forged_kind == "invalid_sha"
+                    else _EquivalentString("f" * 64, "d" * 64)
+                )
+            ),
             provider_handle=object(),
         )
         forged_resolution = _forge_dataclass(
@@ -3782,7 +3921,20 @@ def test_s06_forged_resolution_is_blocked_before_transport_or_new_blue(
     assert thread_port.commits == []
 
 
-@pytest.mark.parametrize("forged_kind", ["simple_result", "blue_red", "missing_blue", "unknown_with_blue"])
+@pytest.mark.parametrize(
+    "forged_kind",
+    [
+        "simple_result",
+        "blue_red",
+        "missing_blue",
+        "unknown_with_blue",
+        "mode_scalar",
+        "unknown_state_scalar",
+        "successful_state_scalar",
+        "status_scalar",
+        "reason_scalar",
+    ],
+)
 def test_s06_forged_receipt_blocks_before_publisher_and_commit(
     tmp_path: Path,
     forged_kind: str,
@@ -3809,9 +3961,32 @@ def test_s06_forged_receipt_blocks_before_publisher_and_commit(
         fields["red_binding"] = object()
     elif forged_kind == "missing_blue":
         fields["blue_binding"] = None
-    else:
+    elif forged_kind == "unknown_with_blue":
         fields["submission_state"] = "unknown"
-    forged_receipt = _forge_dataclass(ThreadInvocationReceipt, **fields)
+    if forged_kind in {
+        "mode_scalar",
+        "unknown_state_scalar",
+        "successful_state_scalar",
+        "status_scalar",
+        "reason_scalar",
+    }:
+        forged_receipt = ThreadInvocationReceipt(**cast("Any", fields))
+        if forged_kind == "mode_scalar":
+            object.__setattr__(forged_receipt, "mode", _EquivalentString("fresh_red", "new_blue"))
+        elif forged_kind == "unknown_state_scalar":
+            object.__setattr__(forged_receipt, "submission_state", _EquivalentString("unknown", "not_submitted"))
+        elif forged_kind == "successful_state_scalar":
+            object.__setattr__(
+                forged_receipt,
+                "submission_state",
+                _EquivalentString("not_submitted", "successful"),
+            )
+        elif forged_kind == "status_scalar":
+            object.__setattr__(valid_result, "status", _EquivalentString("blocked", "pass"))
+        else:
+            object.__setattr__(valid_result, "reason", _EquivalentString("backend_timeout", "transport_received"))
+    else:
+        forged_receipt = _forge_dataclass(ThreadInvocationReceipt, **fields)
 
     class _ForgedReceiptPort(_FakeThreadPort):
         def invoke_new_blue(self, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
@@ -3844,6 +4019,7 @@ def test_s06_forged_receipt_blocks_before_publisher_and_commit(
     assert (result.status, result.reason) == ("blocked", "planning_context_rejected")
     assert result.details == ("thread_receipt_invalid",)
     assert thread_port.new_calls == 1
+    assert thread_port.continuation_calls == 0
     assert backend_calls == []
     assert publisher_calls == []
     assert thread_port.commits == []

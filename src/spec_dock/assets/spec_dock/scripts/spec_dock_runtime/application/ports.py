@@ -423,7 +423,8 @@ class BlueThreadBinding:
     provider_handle: object = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.lineage_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", self.lineage_sha256) is None:
+        lineage_sha256 = self.lineage_sha256
+        if type(lineage_sha256) is not str or re.fullmatch(r"[0-9a-f]{64}", lineage_sha256) is None:
             raise ValueError("lineage_sha256 must be lowercase SHA-256")
         if self.provider_handle is None:
             raise ValueError("provider_handle is required")
@@ -435,13 +436,17 @@ class BlueBindingResolution:
     binding: BlueThreadBinding | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self.status not in ("exact", "unavailable", "ambiguous"):
+        status = self.status
+        if type(status) is not str:
             raise ValueError("invalid Blue binding resolution status")
-        if self.status == "exact" and self.binding is None:
+        if status not in ("exact", "unavailable", "ambiguous"):
+            raise ValueError("invalid Blue binding resolution status")
+        binding = self.binding
+        if status == "exact" and binding is None:
             raise ValueError("exact Blue binding resolution requires a binding")
-        if self.status == "exact" and not isinstance(self.binding, BlueThreadBinding):
+        if status == "exact" and type(binding) is not BlueThreadBinding:
             raise ValueError("exact Blue binding resolution requires a BlueThreadBinding")
-        if self.status != "exact" and self.binding is not None:
+        if status != "exact" and binding is not None:
             raise ValueError("only exact Blue binding resolution may carry a binding")
 
 
@@ -457,34 +462,48 @@ class ThreadInvocationReceipt:
     continuation_unavailable_before_submission: bool = False
 
     def __post_init__(self) -> None:
-        if self.mode not in ("new_blue", "continuation", "fresh_red"):
+        mode = self.mode
+        submission_state = self.submission_state
+        if type(mode) is not str:
             raise ValueError("invalid thread invocation mode")
-        if self.submission_state not in ("successful", "not_submitted", "unknown"):
+        if type(submission_state) is not str:
             raise ValueError("invalid thread submission state")
-        if not isinstance(self.continuation_unavailable_before_submission, bool):
+        if mode not in ("new_blue", "continuation", "fresh_red"):
+            raise ValueError("invalid thread invocation mode")
+        if submission_state not in ("successful", "not_submitted", "unknown"):
+            raise ValueError("invalid thread submission state")
+        continuation_unavailable = self.continuation_unavailable_before_submission
+        if type(continuation_unavailable) is not bool:
             raise ValueError("continuation_unavailable_before_submission must be boolean")
-        if self.blue_binding is not None and not isinstance(self.blue_binding, BlueThreadBinding):
+        result_status = self.result.status
+        result_reason = self.result.reason
+        if type(result_status) is not str:
+            raise ValueError("thread invocation result status is invalid")
+        if type(result_reason) is not str:
+            raise ValueError("thread invocation result reason is invalid")
+        if self.blue_binding is not None and type(self.blue_binding) is not BlueThreadBinding:
             raise ValueError("blue_binding must be BlueThreadBinding")
         if self.blue_binding is not None and self.red_binding is not None:
             raise ValueError("Blue and Red bindings are mutually exclusive")
-        result_status = getattr(self.result, "status", None)
         if result_status not in ("pass", "blocked", "rejected"):
             raise ValueError("thread invocation result status is invalid")
-        if result_status == "pass" and self.submission_state != "successful":
+        if result_status == "pass" and result_reason != "transport_received":
+            raise ValueError("pass result requires transport_received")
+        if result_status == "pass" and submission_state != "successful":
             raise ValueError("pass result requires successful submission")
-        if self.submission_state in ("not_submitted", "unknown"):
+        if submission_state in ("not_submitted", "unknown"):
             if self.blue_binding is not None or self.red_binding is not None:
                 raise ValueError("unsubmitted invocation must not carry a binding")
-        elif self.mode in ("new_blue", "continuation"):
+        elif mode in ("new_blue", "continuation"):
             if self.blue_binding is None:
                 raise ValueError("successful Blue invocation requires a Blue binding")
             if self.red_binding is not None:
                 raise ValueError("Blue invocation must not carry a Red binding")
         elif self.red_binding is None:
             raise ValueError("successful fresh Red invocation requires a Red binding")
-        if self.continuation_unavailable_before_submission and not (
-            self.mode == "continuation"
-            and self.submission_state == "not_submitted"
+        if continuation_unavailable and not (
+            mode == "continuation"
+            and submission_state == "not_submitted"
             and result_status != "pass"
             and self.blue_binding is None
             and self.red_binding is None

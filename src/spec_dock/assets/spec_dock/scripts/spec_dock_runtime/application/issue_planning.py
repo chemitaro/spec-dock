@@ -722,27 +722,40 @@ def _thread_command_contract_failure(issue_id: str) -> PlanningCommandResult:
 def _validate_blue_resolution(
     resolution: BlueBindingResolution,
     prior_lineage: GitBoundOperationBindingV1,
-) -> str:
+) -> tuple[str, BlueThreadBinding | None]:
     """Validate a resolved Blue binding against the requested Candidate lineage."""
 
     if type(resolution) is not BlueBindingResolution:
         raise ValueError("Blue binding resolution type is invalid")
+    if type(prior_lineage) is not GitBoundOperationBindingV1:
+        raise ValueError("Blue binding prior lineage type is invalid")
     status = resolution.status
+    prior_binding_sha256 = prior_lineage.binding_sha256
+    if (
+        type(status) is not str
+        or type(prior_binding_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", prior_binding_sha256) is None
+    ):
+        raise ValueError("Blue binding resolution scalar is invalid")
     if status not in ("exact", "unavailable", "ambiguous"):
         raise ValueError("invalid Blue binding resolution status")
     binding = resolution.binding
     if status == "exact":
         if type(binding) is not BlueThreadBinding:
             raise ValueError("exact Blue binding is invalid")
-        if not isinstance(binding.lineage_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", binding.lineage_sha256) is None:
+        binding_lineage_sha256 = binding.lineage_sha256
+        if (
+            type(binding_lineage_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", binding_lineage_sha256) is None
+        ):
             raise ValueError("Blue binding lineage is invalid")
         if binding.provider_handle is None:
             raise ValueError("Blue binding provider handle is required")
-        if binding.lineage_sha256 != prior_lineage.binding_sha256:
+        if binding_lineage_sha256 != prior_binding_sha256:
             raise ValueError("Blue binding lineage mismatch")
     elif binding is not None:
         raise ValueError("non-exact Blue binding must not carry a binding")
-    return status
+    return status, binding
 
 
 def _validate_thread_receipt(
@@ -752,7 +765,16 @@ def _validate_thread_receipt(
     required_binding: BlueThreadBinding | None = None,
     required_lineage_sha256: str | None = None,
     required_provider_handle: object | None = None,
-) -> None:
+) -> tuple[
+    PlanningInvocationResult,
+    str,
+    str,
+    str,
+    str,
+    bool,
+    BlueThreadBinding | None,
+    object | None,
+]:
     """Re-check private receipt invariants at the application boundary."""
 
     if type(receipt) is not ThreadInvocationReceipt:
@@ -760,60 +782,106 @@ def _validate_thread_receipt(
     result = receipt.result
     if type(result) is not PlanningInvocationResult:
         raise ValueError("thread invocation result type is invalid")
-    if mode not in ("new_blue", "continuation", "fresh_red"):
+    expected_mode = mode
+    receipt_mode = receipt.mode
+    submission_state = receipt.submission_state
+    result_status = result.status
+    result_reason = result.reason
+    continuation_unavailable = receipt.continuation_unavailable_before_submission
+    if (
+        type(expected_mode) is not str
+        or type(receipt_mode) is not str
+        or type(submission_state) is not str
+        or type(result_status) is not str
+        or type(result_reason) is not str
+        or type(continuation_unavailable) is not bool
+    ):
+        raise ValueError("thread invocation scalar is invalid")
+    if expected_mode not in ("new_blue", "continuation", "fresh_red"):
         raise ValueError("invalid expected thread invocation mode")
-    if receipt.mode != mode:
+    if receipt_mode != expected_mode:
         raise ValueError("thread invocation mode mismatch")
-    if receipt.submission_state not in ("successful", "not_submitted", "unknown"):
+    if submission_state not in ("successful", "not_submitted", "unknown"):
         raise ValueError("invalid thread submission state")
-    if not isinstance(receipt.continuation_unavailable_before_submission, bool):
-        raise ValueError("continuation_unavailable_before_submission must be boolean")
     blue_binding = receipt.blue_binding
     red_binding = receipt.red_binding
     if blue_binding is not None:
         if type(blue_binding) is not BlueThreadBinding:
             raise ValueError("blue_binding must be BlueThreadBinding")
+        blue_binding_lineage_sha256 = blue_binding.lineage_sha256
         if (
-            not isinstance(blue_binding.lineage_sha256, str)
-            or re.fullmatch(r"[0-9a-f]{64}", blue_binding.lineage_sha256) is None
+            type(blue_binding_lineage_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", blue_binding_lineage_sha256) is None
         ):
             raise ValueError("Blue binding lineage is invalid")
         if blue_binding.provider_handle is None:
             raise ValueError("Blue binding provider handle is required")
     if blue_binding is not None and red_binding is not None:
         raise ValueError("Blue and Red bindings are mutually exclusive")
-    result_status = result.status
     if result_status not in ("pass", "blocked", "rejected"):
         raise ValueError("thread invocation result status is invalid")
-    if result_status == "pass" and receipt.submission_state != "successful":
+    if result_status == "pass" and result_reason != "transport_received":
+        raise ValueError("pass result requires transport_received")
+    if result_status == "pass" and submission_state != "successful":
         raise ValueError("pass result requires successful submission")
-    if receipt.submission_state in ("not_submitted", "unknown"):
+    if submission_state in ("not_submitted", "unknown"):
         if blue_binding is not None or red_binding is not None:
             raise ValueError("unsubmitted invocation must not carry a binding")
-    elif mode in ("new_blue", "continuation"):
+    elif expected_mode in ("new_blue", "continuation"):
         if blue_binding is None or red_binding is not None:
             raise ValueError("successful Blue invocation requires a Blue binding")
     elif blue_binding is not None or red_binding is None:
         raise ValueError("successful fresh Red invocation requires a Red binding")
-    if receipt.continuation_unavailable_before_submission and not (
-        mode == "continuation"
-        and receipt.submission_state == "not_submitted"
+    if continuation_unavailable and not (
+        expected_mode == "continuation"
+        and submission_state == "not_submitted"
         and result_status != "pass"
         and blue_binding is None
         and red_binding is None
     ):
         raise ValueError("continuation unavailable flag has invalid state")
-    if mode == "continuation" and receipt.submission_state == "successful":
-        if required_binding is None or blue_binding is not required_binding:
+    if expected_mode == "continuation" and submission_state == "successful":
+        if (
+            type(required_binding) is not BlueThreadBinding
+            or blue_binding is None
+            or blue_binding is not required_binding
+        ):
             raise ValueError("continuation Blue binding mismatch")
+        validated_blue_binding = cast("BlueThreadBinding", blue_binding)
+        required_binding_lineage_sha256 = required_binding.lineage_sha256
+        if (
+            type(required_binding_lineage_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", required_binding_lineage_sha256) is None
+            or required_binding.provider_handle is None
+        ):
+            raise ValueError("continuation required binding is invalid")
+        if required_lineage_sha256 is not None and (
+            type(required_lineage_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", required_lineage_sha256) is None
+        ):
+            raise ValueError("continuation required lineage is invalid")
         expected_provider_handle = (
             required_provider_handle if required_provider_handle is not None else required_binding.provider_handle
         )
-        if blue_binding.provider_handle is not expected_provider_handle:
+        if validated_blue_binding.provider_handle is not expected_provider_handle:
             raise ValueError("continuation provider handle mismatch")
-        expected_lineage = required_lineage_sha256 or required_binding.lineage_sha256
-        if blue_binding.lineage_sha256 != expected_lineage:
+        expected_lineage = (
+            required_lineage_sha256
+            if required_lineage_sha256 is not None
+            else required_binding_lineage_sha256
+        )
+        if validated_blue_binding.lineage_sha256 != expected_lineage:
             raise ValueError("continuation lineage mismatch")
+    return (
+        result,
+        receipt_mode,
+        submission_state,
+        result_status,
+        result_reason,
+        continuation_unavailable,
+        blue_binding,
+        red_binding,
+    )
 
 
 def _thread_backend_invoker(
@@ -845,7 +913,7 @@ def _thread_backend_invoker(
                 if reviewed_identity is None:
                     raise ValueError("fresh Red requires a reviewed identity")
                 receipt = thread_port.invoke_fresh_red(reviewed_identity, backend_invoker, **kwargs)
-            _validate_thread_receipt(
+            validated_result, *_ = _validate_thread_receipt(
                 receipt,
                 mode=mode,
                 required_binding=binding,
@@ -855,7 +923,7 @@ def _thread_backend_invoker(
         except (AttributeError, TypeError, ValueError):
             return _thread_contract_failure()
         capture(receipt)
-        return receipt.result
+        return validated_result
 
     return invoke
 
@@ -890,7 +958,16 @@ def _require_publishable_thread_receipt(
         return _thread_command_contract_failure(issue_id)
     try:
         receipt = receipts[0]
-        _validate_thread_receipt(
+        (
+            _validated_result,
+            _validated_mode,
+            validated_submission_state,
+            validated_result_status,
+            validated_result_reason,
+            _validated_continuation_unavailable,
+            validated_blue_binding,
+            validated_red_binding,
+        ) = _validate_thread_receipt(
             receipt,
             mode=mode,
             required_binding=required_binding,
@@ -898,14 +975,14 @@ def _require_publishable_thread_receipt(
             required_provider_handle=required_provider_handle,
         )
         if (
-            receipt.submission_state != "successful"
-            or receipt.result.status != "pass"
-            or receipt.result.reason != "transport_received"
+            validated_submission_state != "successful"
+            or validated_result_status != "pass"
+            or validated_result_reason != "transport_received"
         ):
             raise ValueError("thread receipt is not publishable")
-        if mode in ("new_blue", "continuation") and receipt.blue_binding is None:
+        if mode in ("new_blue", "continuation") and validated_blue_binding is None:
             raise ValueError("publishable Blue receipt requires binding")
-        if mode == "fresh_red" and receipt.red_binding is None:
+        if mode == "fresh_red" and validated_red_binding is None:
             raise ValueError("publishable Red receipt requires binding")
     except (AttributeError, TypeError, ValueError):
         return _thread_command_contract_failure(issue_id)
@@ -1805,7 +1882,7 @@ def run_issue_planning_revise(
                     onboarding_companion=candidate.onboarding_companion,
                 )
                 resolution = dependencies.thread_port.resolve_blue(prior_lineage)
-                resolution_status = _validate_blue_resolution(resolution, prior_lineage)
+                resolution_status, resolved_binding = _validate_blue_resolution(resolution, prior_lineage)
             except (AttributeError, OSError, TypeError, UnicodeError, ValueError):
                 return PlanningCommandResult(
                     status="blocked",
@@ -1821,7 +1898,7 @@ def run_issue_planning_revise(
                     details=("blue_lineage_ambiguous",),
                 )
             if resolution_status == "exact":
-                continuation_binding = resolution.binding
+                continuation_binding = resolved_binding
                 use_continuation = True
             elif resolution_status == "unavailable":
                 continuation_binding = None
@@ -1887,26 +1964,32 @@ def run_issue_planning_revise(
                         backend_invoker,
                         **kwargs,
                     )
-                    _validate_thread_receipt(
+                    (
+                        continuation_result,
+                        _continuation_mode,
+                        continuation_submission_state,
+                        _continuation_status,
+                        _continuation_reason,
+                        continuation_unavailable,
+                        _continuation_blue_binding,
+                        _continuation_red_binding,
+                    ) = _validate_thread_receipt(
                         receipt,
                         mode="continuation",
                         required_binding=continuation_binding,
                         required_lineage_sha256=continuation_lineage_sha256,
                         required_provider_handle=continuation_provider_handle,
                     )
-                    if (
-                        receipt.submission_state == "not_submitted"
-                        and receipt.continuation_unavailable_before_submission
-                    ):
+                    if continuation_submission_state == "not_submitted" and continuation_unavailable is True:
                         receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
-                        _validate_thread_receipt(receipt, mode="new_blue")
+                        continuation_result, *_ = _validate_thread_receipt(receipt, mode="new_blue")
                 else:
                     receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
-                    _validate_thread_receipt(receipt, mode="new_blue")
+                    continuation_result, *_ = _validate_thread_receipt(receipt, mode="new_blue")
             except (AttributeError, TypeError, ValueError):
                 return _thread_contract_failure()
             capture_thread_receipt(receipt)
-            return receipt.result
+            return continuation_result
 
         transport = transport_runner(
             issue=issue_id,
@@ -1930,8 +2013,7 @@ def run_issue_planning_revise(
                 details=transport.details,
             )
         receipt_mode: ThreadInvocationMode = "continuation" if use_continuation else "new_blue"
-        if thread_receipts and thread_receipts[0].mode == "new_blue":
-            receipt_mode = "new_blue"
+        receipt_mode = "continuation" if use_continuation else "new_blue"
         receipt_gate = _require_publishable_thread_receipt(
             thread_port=dependencies.thread_port,
             receipts=thread_receipts,
