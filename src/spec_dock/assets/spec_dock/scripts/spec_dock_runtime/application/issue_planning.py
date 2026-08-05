@@ -17,6 +17,8 @@ from spec_dock_runtime.application.issue_planning_prompt import (
     synthesize_planning_evidence_prompt,
 )
 from spec_dock_runtime.application.ports import (
+    BlueThreadBinding,
+    ChatGptThreadPort,
     ExpectedPlanningTargetsView,
     IssuePlanningApplyOutputRejected,
     IssuePlanningCandidateArchiveRejected,
@@ -29,6 +31,8 @@ from spec_dock_runtime.application.ports import (
     PlanningApplyExecutionView,
     PublishedCandidateView,
     PublishedPlanningReviewView,
+    ThreadInvocationReceipt,
+    ThreadSubmissionState,
     VerifiedIssueCandidateView,
 )
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
@@ -697,6 +701,71 @@ def _git_blob_oid(content: bytes) -> str:
     return hashlib.sha1(header + content).hexdigest()
 
 
+def _legacy_thread_receipt(
+    backend_invoker: Callable[..., PlanningInvocationResult],
+    **kwargs: Any,
+) -> ThreadInvocationReceipt:
+    """Adapt the legacy one-shot backend without guessing non-pass semantics."""
+
+    result = backend_invoker(**kwargs)
+    state: ThreadSubmissionState = (
+        "successful"
+        if result.status == "pass" and result.reason == "transport_received"
+        else "unknown"
+    )
+    return ThreadInvocationReceipt(result=result, submission_state=state)
+
+
+def _thread_backend_invoker(
+    *,
+    backend_invoker: Callable[..., PlanningInvocationResult],
+    thread_port: ChatGptThreadPort | None,
+    mode: Literal["new_blue", "continuation", "fresh_red"],
+    capture: Callable[[ThreadInvocationReceipt], None],
+    binding: BlueThreadBinding | None = None,
+    reviewed_identity: ReviewedPlanningIdentity | None = None,
+) -> Callable[..., PlanningInvocationResult]:
+    """Select the private thread policy while preserving the transport contract."""
+
+    def invoke(**kwargs: Any) -> PlanningInvocationResult:
+        if thread_port is None:
+            receipt = _legacy_thread_receipt(backend_invoker, **kwargs)
+        elif mode == "new_blue":
+            receipt = thread_port.invoke_new_blue(backend_invoker, **kwargs)
+        elif mode == "continuation":
+            if binding is None:
+                raise ValueError("continuation requires an exact Blue binding")
+            receipt = thread_port.invoke_continuation(binding, backend_invoker, **kwargs)
+        else:
+            if reviewed_identity is None:
+                raise ValueError("fresh Red requires a reviewed identity")
+            receipt = thread_port.invoke_fresh_red(reviewed_identity, backend_invoker, **kwargs)
+        capture(receipt)
+        return receipt.result
+
+    return invoke
+
+
+def _commit_published_blue(
+    *,
+    thread_port: ChatGptThreadPort | None,
+    receipt: ThreadInvocationReceipt | None,
+    lineage: GitBoundOperationBindingV1,
+) -> PlanningCommandResult | None:
+    if thread_port is None or receipt is None:
+        return None
+    if receipt.submission_state != "successful":
+        return None
+    if receipt.blue_binding is None:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="planning_context_rejected",
+            details=("blue_binding_unavailable",),
+        )
+    thread_port.commit_blue(receipt, lineage)
+    return None
+
+
 def run_issue_planning_transport(
     *,
     issue: str,
@@ -895,13 +964,23 @@ def run_issue_planning_create(
             provided_context_paths=request.provided_context_paths,
         )
 
+    thread_receipts: list[ThreadInvocationReceipt] = []
+
+    def capture_thread_receipt(receipt: ThreadInvocationReceipt) -> None:
+        thread_receipts[:] = [receipt]
+
     transport = transport_runner(
         issue=target.issue_id,
         records=records,
         repo_root=repo_root,
         role="planner",
         repo_slug_resolver=repo_slug_resolver,
-        backend_invoker=backend_invoker,
+        backend_invoker=_thread_backend_invoker(
+            backend_invoker=backend_invoker,
+            thread_port=dependencies.thread_port,
+            mode="new_blue",
+            capture=capture_thread_receipt,
+        ),
         dependency_loader=load_dependency_snapshot,
         relevant_source_paths=relevant_source_paths,
         operator_context=operator_context,
@@ -957,7 +1036,7 @@ def run_issue_planning_create(
             details=error.findings if isinstance(error, IssuePlanningCandidateArchiveRejected) else (),
         )
     try:
-        dependencies = load_dependency_snapshot(target.issue_id)
+        dependency_resolutions = load_dependency_snapshot(target.issue_id)
         context = PlanningContext(
             issue_id=target.issue_id,
             repository=transport.source_evidence.repository,
@@ -967,7 +1046,7 @@ def run_issue_planning_create(
             parent_initiative_id=target.parent_initiative_id,
             dependency_summary=tuple(
                 sorted(
-                    {resolution.resolved_node_id for resolution in dependencies},
+                    {resolution.resolved_node_id for resolution in dependency_resolutions},
                     key=lambda value: value.encode("utf-8"),
                 )
             ),
@@ -1051,6 +1130,13 @@ def run_issue_planning_create(
         candidate_identity=published.identity,
         onboarding_companion=published.onboarding_companion,
     )
+    commit_result = _commit_published_blue(
+        thread_port=dependencies.thread_port,
+        receipt=thread_receipts[0] if thread_receipts else None,
+        lineage=binding,
+    )
+    if commit_result is not None:
+        return replace(commit_result, issue_id=target.issue_id)
     return PlanningCommandResult(
         status="ok",
         reason="candidate_created",
@@ -1188,13 +1274,33 @@ def run_issue_planning_review(
             reviewed_identity_sha256=identity.sha256,
         )
 
+    thread_receipts: list[ThreadInvocationReceipt] = []
+
+    def capture_thread_receipt(receipt: ThreadInvocationReceipt) -> None:
+        thread_receipts[:] = [receipt]
+
+    def review_backend_invoker(**kwargs: Any) -> PlanningInvocationResult:
+        if len(captured_identity) != 1:
+            return PlanningInvocationResult(
+                status="blocked",
+                reason="planning_context_rejected",
+                details=("review_identity_unavailable",),
+            )
+        return _thread_backend_invoker(
+            backend_invoker=backend_invoker,
+            thread_port=dependencies.thread_port,
+            mode="fresh_red",
+            capture=capture_thread_receipt,
+            reviewed_identity=captured_identity[0],
+        )(**kwargs)
+
     transport = transport_runner(
         issue=target.issue_id,
         records=records,
         repo_root=repo_root,
         role="reviewer",
         repo_slug_resolver=repo_slug_resolver,
-        backend_invoker=backend_invoker,
+        backend_invoker=review_backend_invoker,
         relevant_source_paths=relevant_source_paths,
         operator_context=operator_context,
         timeout_seconds=timeout_seconds,
@@ -1521,6 +1627,40 @@ def run_issue_planning_revise(
     else:
         selected = {finding.id: finding for finding in review.findings if finding.id in revision.finding_ids}
 
+        thread_receipts: list[ThreadInvocationReceipt] = []
+        continuation_binding: BlueThreadBinding | None = None
+        use_continuation = False
+        if dependencies.thread_port is not None:
+            try:
+                prior_lineage = GitBoundOperationBindingV1.create(
+                    issue_id=issue_id,
+                    repository=candidate.identity.source_repository,
+                    branch=candidate.identity.source_branch,
+                    source_head=candidate.identity.source_head,
+                    candidate_identity=candidate.identity,
+                    onboarding_companion=candidate.onboarding_companion,
+                )
+                resolution = dependencies.thread_port.resolve_blue(prior_lineage)
+            except (OSError, UnicodeError, ValueError):
+                return PlanningCommandResult(
+                    status="blocked",
+                    reason="planning_context_rejected",
+                    issue_id=issue_id,
+                    details=("blue_lineage_ambiguous",),
+                )
+            if resolution.status == "ambiguous":
+                return PlanningCommandResult(
+                    status="blocked",
+                    reason="planning_context_rejected",
+                    issue_id=issue_id,
+                    details=("blue_lineage_ambiguous",),
+                )
+            continuation_binding = resolution.binding
+            use_continuation = resolution.status == "exact"
+
+        def capture_thread_receipt(receipt: ThreadInvocationReceipt) -> None:
+            thread_receipts[:] = [receipt]
+
         def revision_prompt_synthesizer(**kwargs: Any) -> Any:
             runtime_context = cast("PlanningContext", kwargs["context"])
             if (
@@ -1557,13 +1697,33 @@ def run_issue_planning_revise(
                 output_expectation=expectation,
             )
 
+        def revision_backend_invoker(**kwargs: Any) -> PlanningInvocationResult:
+            if dependencies.thread_port is None:
+                receipt = _legacy_thread_receipt(backend_invoker, **kwargs)
+            elif use_continuation:
+                assert continuation_binding is not None
+                receipt = dependencies.thread_port.invoke_continuation(
+                    continuation_binding,
+                    backend_invoker,
+                    **kwargs,
+                )
+                if (
+                    receipt.submission_state == "not_submitted"
+                    and receipt.continuation_unavailable_before_submission
+                ):
+                    receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
+            else:
+                receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
+            capture_thread_receipt(receipt)
+            return receipt.result
+
         transport = transport_runner(
             issue=issue_id,
             records=records,
             repo_root=repo_root,
             role="semantic_revision",
             repo_slug_resolver=repo_slug_resolver,
-            backend_invoker=backend_invoker,
+            backend_invoker=revision_backend_invoker,
             relevant_source_paths=tuple(cast("list[str]", candidate.source_baseline["relevant_paths"])),
             operator_context=(),
             timeout_seconds=timeout_seconds,
@@ -1701,6 +1861,13 @@ def run_issue_planning_revise(
         candidate_identity=published.identity,
         onboarding_companion=published.onboarding_companion,
     )
+    commit_result = _commit_published_blue(
+        thread_port=dependencies.thread_port,
+        receipt=thread_receipts[0] if revision.lane == "semantic" and thread_receipts else None,
+        lineage=binding,
+    )
+    if commit_result is not None:
+        return replace(commit_result, issue_id=issue_id)
     return PlanningCommandResult(
         status="ok",
         reason="candidate_revised",

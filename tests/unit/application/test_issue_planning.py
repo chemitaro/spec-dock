@@ -25,10 +25,13 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.issue_planning import resolve_existing_issue_target  # noqa: E402
 from spec_dock_runtime.application.ports import (  # noqa: E402
+    BlueBindingResolution,
+    BlueThreadBinding,
     IssuePlanningCandidateArchiveRejected,
     IssuePlanningCandidateCollision,
     IssuePlanningCandidatePublicationFailed,
     IssuePlanningDependencies,
+    ThreadInvocationReceipt,
 )
 from spec_dock_runtime.domain.authoring_pack.preflight_contract import (  # noqa: E402
     FetchSummary,
@@ -331,6 +334,55 @@ class _FakeIssuePlanningGateway:
 
 
 PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_FakeClock(), gateway=_FakeIssuePlanningGateway())
+
+
+class _FakeThreadPort:
+    def __init__(self, *, resolution: str = "unavailable") -> None:
+        self.resolution = resolution
+        self.blue_binding = BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=object())
+        self.new_calls = 0
+        self.continuation_calls = 0
+        self.fresh_red_calls = 0
+        self.commits: list[object] = []
+        self.last_continuation_binding: BlueThreadBinding | None = None
+
+    def resolve_blue(self, lineage: object) -> BlueBindingResolution:
+        del lineage
+        if self.resolution == "exact":
+            return BlueBindingResolution("exact", self.blue_binding)
+        return BlueBindingResolution(cast("Any", self.resolution))
+
+    def _invoke(self, invoker: object, kwargs: dict[str, object], *, red: bool = False) -> ThreadInvocationReceipt:
+        result = cast("Any", invoker)(**kwargs)
+        return ThreadInvocationReceipt(
+            result=result,
+            submission_state="successful" if result.status == "pass" else "unknown",
+            blue_binding=None if red else self.blue_binding,
+            red_binding=object() if red else None,
+        )
+
+    def invoke_new_blue(self, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
+        self.new_calls += 1
+        return self._invoke(invoker, kwargs)
+
+    def invoke_continuation(
+        self,
+        binding: BlueThreadBinding,
+        invoker: object,
+        **kwargs: object,
+    ) -> ThreadInvocationReceipt:
+        self.continuation_calls += 1
+        self.last_continuation_binding = binding
+        return self._invoke(invoker, kwargs)
+
+    def invoke_fresh_red(self, reviewed_identity: object, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
+        del reviewed_identity
+        self.fresh_red_calls += 1
+        return self._invoke(invoker, kwargs, red=True)
+
+    def commit_blue(self, receipt: ThreadInvocationReceipt, new_lineage: object) -> None:
+        assert receipt.blue_binding is self.blue_binding
+        self.commits.append(new_lineage)
 
 
 def test_application_issue_planning_unit_tests_use_application_owned_test_doubles_only() -> None:
@@ -2976,6 +3028,211 @@ def test_publication_guard_validates_candidate_then_source_without_drift(revisio
 
     assert result is True
     assert events == ["candidate_loader", "source_preflight", "candidate_loader"]
+
+
+def test_s06_blue_binding_hides_provider_handle_and_requires_exact_resolution() -> None:
+    handle = object()
+    binding = BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=handle)
+
+    assert repr(handle) not in repr(binding)
+    assert "provider_handle" not in repr(binding)
+    with pytest.raises(ValueError, match="requires a binding"):
+        BlueBindingResolution("exact")
+    with pytest.raises(ValueError, match="only exact"):
+        BlueBindingResolution("unavailable", binding)
+
+
+def test_s06_create_invokes_new_blue_and_commits_only_after_publication(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    candidates.mkdir()
+    gateway = _FakeIssuePlanningGateway()
+    thread_port = _FakeThreadPort()
+    dependencies = IssuePlanningDependencies(
+        clock=_FakeClock(),
+        gateway=gateway,
+        thread_port=thread_port,
+    )
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+
+    def transport_runner(**kwargs: object):
+        return cast("Any", kwargs["backend_invoker"])()
+
+    result = module.run_issue_planning_create(
+        dependencies=dependencies,
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: _successful_transport(),
+        transport_runner=transport_runner,
+        preflight_runner=lambda request: _preflight(),
+    )
+
+    assert (result.status, result.reason) == ("ok", "candidate_created")
+    assert thread_port.new_calls == 1
+    assert thread_port.continuation_calls == 0
+    assert thread_port.fresh_red_calls == 0
+    assert len(thread_port.commits) == 1
+    assert Path(result.output["candidate_path"]).is_file()
+
+
+def test_s06_review_always_uses_a_fresh_red_thread(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    reviews = tmp_path / "reviews"
+    candidates.mkdir()
+    reviews.mkdir()
+    gateway = _FakeIssuePlanningGateway()
+    create_port = _FakeThreadPort()
+    create_dependencies = IssuePlanningDependencies(_FakeClock(), gateway, create_port)
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create", "run_issue_planning_review", "run_issue_planning_transport"],
+    )
+    created = module.run_issue_planning_create(
+        dependencies=create_dependencies,
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: _successful_transport(),
+        transport_runner=lambda **kwargs: cast("Any", kwargs["backend_invoker"])(),
+        preflight_runner=lambda request: _preflight(),
+    )
+    candidate_path = Path(created.output["candidate_path"])
+    review_port = _FakeThreadPort()
+    review_dependencies = IssuePlanningDependencies(_FakeClock(), gateway, review_port)
+
+    def review_backend(**kwargs: object):
+        contracts = __import__(
+            "spec_dock_runtime.domain.issue_planning_contracts",
+            fromlist=["PlanningReviewResult"],
+        )
+        identity, digest = _review_identity_from_prompt(kwargs["synthesized"], contracts)
+        review = contracts.PlanningReviewResult(
+            reviewed_identity=identity,
+            reviewed_identity_sha256=digest,
+            verdict="pass",
+            findings=(),
+        )
+        payload = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+        source_evidence = cast("Any", kwargs["source_evidence"])
+        return _successful_review_transport(payload, source_manifest_hash=source_evidence.source_manifest_hash)
+
+    result = module.run_issue_planning_review(
+        dependencies=review_dependencies,
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="archive-candidate",
+            output_dir=reviews,
+            candidate_path=candidate_path,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=review_backend,
+        transport_runner=module.run_issue_planning_transport,
+        preflight_runner=lambda request: _preflight(),
+    )
+
+    assert (result.status, result.reason) == ("ok", "review_completed")
+    assert review_port.fresh_red_calls == 1
+    assert review_port.continuation_calls == 0
+    assert review_port.new_calls == 0
+    assert review_port.commits == []
+
+
+@pytest.mark.parametrize("resolution", ["exact", "unavailable"])
+def test_s06_semantic_revision_continues_blue_or_starts_new_blue(
+    tmp_path: Path,
+    resolution: str,
+) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    module = setup["module"]
+    identity = setup["identity"]
+    thread_port = _FakeThreadPort(resolution=resolution)
+    dependencies = IssuePlanningDependencies(
+        _FakeClock(),
+        PLANNING_DEPENDENCIES.gateway,
+        thread_port,
+    )
+
+    def transport_runner(**kwargs: object):
+        return cast("Any", kwargs["backend_invoker"])()
+
+    result = module.run_issue_planning_revise(
+        dependencies=dependencies,
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(
+            setup["review_path"],
+            setup["review_sha"],
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: _successful_transport(
+            source_manifest_hash=setup["source_hash"],
+        ),
+        transport_runner=transport_runner,
+        preflight_runner=lambda request: _preflight(),
+    )
+
+    assert (result.status, result.reason) == ("ok", "candidate_revised")
+    assert thread_port.continuation_calls == (1 if resolution == "exact" else 0)
+    assert thread_port.new_calls == (0 if resolution == "exact" else 1)
+    assert thread_port.fresh_red_calls == 0
+    assert len(thread_port.commits) == 1
+    if resolution == "exact":
+        assert thread_port.last_continuation_binding is thread_port.blue_binding
+
+
+def test_s06_semantic_revision_stops_on_ambiguous_blue_lineage(tmp_path: Path) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    identity = setup["identity"]
+    thread_port = _FakeThreadPort(resolution="ambiguous")
+    dependencies = IssuePlanningDependencies(
+        _FakeClock(),
+        PLANNING_DEPENDENCIES.gateway,
+        thread_port,
+    )
+    module = setup["module"]
+
+    result = module.run_issue_planning_revise(
+        dependencies=dependencies,
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(
+            setup["review_path"],
+            setup["review_sha"],
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("ambiguous Blue must not invoke backend"),
+        transport_runner=lambda **kwargs: pytest.fail("ambiguous Blue must stop before transport"),
+        preflight_runner=lambda request: _preflight(),
+    )
+
+    assert (result.status, result.reason) == ("blocked", "planning_context_rejected")
+    assert result.details == ("blue_lineage_ambiguous",)
+    assert thread_port.new_calls == 0
+    assert thread_port.continuation_calls == 0
+    assert thread_port.commits == []
 
 
 @pytest.mark.parametrize("revision", [False, True])

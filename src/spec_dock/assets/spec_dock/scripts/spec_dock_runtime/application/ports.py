@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Protocol
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -408,10 +408,65 @@ class IssuePlanningGateway(Protocol):
     ) -> PlanningApplyOperationView: ...
 
 
+ThreadSubmissionState = Literal["successful", "not_submitted", "unknown"]
+BlueBindingResolutionStatus = Literal["exact", "unavailable", "ambiguous"]
+
+
+@dataclass(frozen=True)
+class BlueThreadBinding:
+    """Private provider binding keyed by a content-free Candidate lineage digest."""
+
+    lineage_sha256: str
+    provider_handle: object = field(repr=False, compare=False)
+
+
+@dataclass(frozen=True)
+class BlueBindingResolution:
+    status: BlueBindingResolutionStatus
+    binding: BlueThreadBinding | None = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self.status == "exact" and self.binding is None:
+            raise ValueError("exact Blue binding resolution requires a binding")
+        if self.status != "exact" and self.binding is not None:
+            raise ValueError("only exact Blue binding resolution may carry a binding")
+
+
+@dataclass(frozen=True)
+class ThreadInvocationReceipt:
+    """Content-free application receipt; provider handles never serialize."""
+
+    result: Any = field(repr=False, compare=False)
+    submission_state: ThreadSubmissionState
+    blue_binding: BlueThreadBinding | None = field(default=None, repr=False, compare=False)
+    red_binding: object | None = field(default=None, repr=False, compare=False)
+    continuation_unavailable_before_submission: bool = False
+
+
+class ChatGptThreadPort(Protocol):
+    """Optional private thread capability; absence is an unavailable capability."""
+
+    def resolve_blue(self, lineage: Any) -> BlueBindingResolution: ...
+
+    def invoke_new_blue(self, invoker: Any, **kwargs: Any) -> ThreadInvocationReceipt: ...
+
+    def invoke_continuation(
+        self,
+        binding: BlueThreadBinding,
+        invoker: Any,
+        **kwargs: Any,
+    ) -> ThreadInvocationReceipt: ...
+
+    def invoke_fresh_red(self, reviewed_identity: Any, invoker: Any, **kwargs: Any) -> ThreadInvocationReceipt: ...
+
+    def commit_blue(self, receipt: ThreadInvocationReceipt, new_lineage: Any) -> None: ...
+
+
 @dataclass(frozen=True)
 class IssuePlanningDependencies:
     clock: Clock
     gateway: IssuePlanningGateway
+    thread_port: ChatGptThreadPort | None = None
 
 
 class SyncLegacyRunner(Protocol):
