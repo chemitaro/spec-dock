@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from spec_dock_runtime.domain.issue_planning_contracts import (
         IssueCandidateIdentity,
         OnboardingCompanionBindingV1,
+        PlanningInvocationResult,
         ReviewedPlanningIdentity,
     )
     from spec_dock_runtime.domain.models import IssueSnapshot, SpecGraph
@@ -448,7 +449,7 @@ class BlueBindingResolution:
 class ThreadInvocationReceipt:
     """Content-free application receipt; provider handles never serialize."""
 
-    result: Any = field(repr=False, compare=False)
+    result: PlanningInvocationResult = field(repr=False, compare=False)
     mode: ThreadInvocationMode
     submission_state: ThreadSubmissionState
     blue_binding: BlueThreadBinding | None = field(default=None, repr=False, compare=False)

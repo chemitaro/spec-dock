@@ -1,4 +1,4 @@
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, fields
 import hashlib
 import json
 from pathlib import Path
@@ -9,6 +9,7 @@ import pytest
 RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
+from spec_dock_runtime.application.ports import ThreadInvocationReceipt  # noqa: E402
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     GitBoundOperationBindingV1,
     IssueCandidateIdentity,
@@ -1052,3 +1053,14 @@ def test_s06_public_contract_shapes_remain_content_free() -> None:
         assert "blue_binding" not in value
         assert "transcript" not in rendered
         assert "sentinel-private" not in rendered
+
+
+def test_s06_thread_receipt_closes_public_result_type_and_private_fields() -> None:
+    receipt_fields = {item.name: item for item in fields(ThreadInvocationReceipt)}
+    assert receipt_fields["result"].type == "PlanningInvocationResult"
+    assert receipt_fields["result"].repr is False
+    assert receipt_fields["result"].compare is False
+    assert receipt_fields["blue_binding"].repr is False
+    assert receipt_fields["blue_binding"].compare is False
+    assert receipt_fields["red_binding"].repr is False
+    assert receipt_fields["red_binding"].compare is False

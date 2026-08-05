@@ -725,19 +725,24 @@ def _validate_blue_resolution(
 ) -> str:
     """Validate a resolved Blue binding against the requested Candidate lineage."""
 
-    if not isinstance(resolution, BlueBindingResolution):
+    if type(resolution) is not BlueBindingResolution:
         raise ValueError("Blue binding resolution type is invalid")
-    resolution.__post_init__()
-    if resolution.status == "exact":
-        binding = resolution.binding
-        if not isinstance(binding, BlueThreadBinding):
+    status = resolution.status
+    if status not in ("exact", "unavailable", "ambiguous"):
+        raise ValueError("invalid Blue binding resolution status")
+    binding = resolution.binding
+    if status == "exact":
+        if type(binding) is not BlueThreadBinding:
             raise ValueError("exact Blue binding is invalid")
-        binding.__post_init__()
+        if not isinstance(binding.lineage_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", binding.lineage_sha256) is None:
+            raise ValueError("Blue binding lineage is invalid")
+        if binding.provider_handle is None:
+            raise ValueError("Blue binding provider handle is required")
         if binding.lineage_sha256 != prior_lineage.binding_sha256:
             raise ValueError("Blue binding lineage mismatch")
-    elif resolution.binding is not None:
+    elif binding is not None:
         raise ValueError("non-exact Blue binding must not carry a binding")
-    return resolution.status
+    return status
 
 
 def _validate_thread_receipt(
@@ -750,28 +755,64 @@ def _validate_thread_receipt(
 ) -> None:
     """Re-check private receipt invariants at the application boundary."""
 
-    if not isinstance(receipt, ThreadInvocationReceipt):
+    if type(receipt) is not ThreadInvocationReceipt:
         raise ValueError("thread invocation receipt type is invalid")
-    # A port/test double may have bypassed dataclass construction or mutated an
-    # otherwise frozen instance. Re-run the closed contract before consuming it.
-    receipt.__post_init__()
-    if receipt.blue_binding is not None:
-        receipt.blue_binding.__post_init__()
+    result = receipt.result
+    if type(result) is not PlanningInvocationResult:
+        raise ValueError("thread invocation result type is invalid")
+    if mode not in ("new_blue", "continuation", "fresh_red"):
+        raise ValueError("invalid expected thread invocation mode")
     if receipt.mode != mode:
         raise ValueError("thread invocation mode mismatch")
-    result_status = getattr(receipt.result, "status", None)
+    if receipt.submission_state not in ("successful", "not_submitted", "unknown"):
+        raise ValueError("invalid thread submission state")
+    if not isinstance(receipt.continuation_unavailable_before_submission, bool):
+        raise ValueError("continuation_unavailable_before_submission must be boolean")
+    blue_binding = receipt.blue_binding
+    red_binding = receipt.red_binding
+    if blue_binding is not None:
+        if type(blue_binding) is not BlueThreadBinding:
+            raise ValueError("blue_binding must be BlueThreadBinding")
+        if (
+            not isinstance(blue_binding.lineage_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", blue_binding.lineage_sha256) is None
+        ):
+            raise ValueError("Blue binding lineage is invalid")
+        if blue_binding.provider_handle is None:
+            raise ValueError("Blue binding provider handle is required")
+    if blue_binding is not None and red_binding is not None:
+        raise ValueError("Blue and Red bindings are mutually exclusive")
+    result_status = result.status
     if result_status not in ("pass", "blocked", "rejected"):
         raise ValueError("thread invocation result status is invalid")
+    if result_status == "pass" and receipt.submission_state != "successful":
+        raise ValueError("pass result requires successful submission")
+    if receipt.submission_state in ("not_submitted", "unknown"):
+        if blue_binding is not None or red_binding is not None:
+            raise ValueError("unsubmitted invocation must not carry a binding")
+    elif mode in ("new_blue", "continuation"):
+        if blue_binding is None or red_binding is not None:
+            raise ValueError("successful Blue invocation requires a Blue binding")
+    elif blue_binding is not None or red_binding is None:
+        raise ValueError("successful fresh Red invocation requires a Red binding")
+    if receipt.continuation_unavailable_before_submission and not (
+        mode == "continuation"
+        and receipt.submission_state == "not_submitted"
+        and result_status != "pass"
+        and blue_binding is None
+        and red_binding is None
+    ):
+        raise ValueError("continuation unavailable flag has invalid state")
     if mode == "continuation" and receipt.submission_state == "successful":
-        if required_binding is None or receipt.blue_binding is not required_binding:
+        if required_binding is None or blue_binding is not required_binding:
             raise ValueError("continuation Blue binding mismatch")
         expected_provider_handle = (
             required_provider_handle if required_provider_handle is not None else required_binding.provider_handle
         )
-        if receipt.blue_binding.provider_handle is not expected_provider_handle:
+        if blue_binding.provider_handle is not expected_provider_handle:
             raise ValueError("continuation provider handle mismatch")
         expected_lineage = required_lineage_sha256 or required_binding.lineage_sha256
-        if receipt.blue_binding.lineage_sha256 != expected_lineage:
+        if blue_binding.lineage_sha256 != expected_lineage:
             raise ValueError("continuation lineage mismatch")
 
 
@@ -791,9 +832,9 @@ def _thread_backend_invoker(
             # Preserve the legacy one-shot path without manufacturing a
             # private S06 receipt when the optional capability is absent.
             return backend_invoker(**kwargs)
-        expected_lineage_sha256 = binding.lineage_sha256 if binding is not None else None
-        expected_provider_handle = binding.provider_handle if binding is not None else None
         try:
+            expected_lineage_sha256 = binding.lineage_sha256 if binding is not None else None
+            expected_provider_handle = binding.provider_handle if binding is not None else None
             if mode == "new_blue":
                 receipt = thread_port.invoke_new_blue(backend_invoker, **kwargs)
             elif mode == "continuation":
@@ -856,7 +897,11 @@ def _require_publishable_thread_receipt(
             required_lineage_sha256=required_lineage_sha256,
             required_provider_handle=required_provider_handle,
         )
-        if receipt.submission_state != "successful" or getattr(receipt.result, "status", None) != "pass":
+        if (
+            receipt.submission_state != "successful"
+            or receipt.result.status != "pass"
+            or receipt.result.reason != "transport_received"
+        ):
             raise ValueError("thread receipt is not publishable")
         if mode in ("new_blue", "continuation") and receipt.blue_binding is None:
             raise ValueError("publishable Blue receipt requires binding")
@@ -1775,8 +1820,19 @@ def run_issue_planning_revise(
                     issue_id=issue_id,
                     details=("blue_lineage_ambiguous",),
                 )
-            continuation_binding = resolution.binding
-            use_continuation = resolution_status == "exact"
+            if resolution_status == "exact":
+                continuation_binding = resolution.binding
+                use_continuation = True
+            elif resolution_status == "unavailable":
+                continuation_binding = None
+                use_continuation = False
+            else:
+                return PlanningCommandResult(
+                    status="blocked",
+                    reason="planning_context_rejected",
+                    issue_id=issue_id,
+                    details=("blue_lineage_ambiguous",),
+                )
             if continuation_binding is not None:
                 continuation_lineage_sha256 = continuation_binding.lineage_sha256
                 continuation_provider_handle = continuation_binding.provider_handle
