@@ -1867,6 +1867,13 @@ def run_issue_planning_revise(
         selected = {finding.id: finding for finding in review.findings if finding.id in revision.finding_ids}
 
         thread_receipts: list[ThreadInvocationReceipt] = []
+        final_thread_contract: tuple[
+            ThreadInvocationReceipt,
+            PlanningInvocationResult,
+            ThreadInvocationMode,
+            str,
+            BlueThreadBinding | None,
+        ] | None = None
         continuation_binding: BlueThreadBinding | None = None
         continuation_lineage_sha256: str | None = None
         continuation_provider_handle: object | None = None
@@ -1954,6 +1961,7 @@ def run_issue_planning_revise(
             )
 
         def revision_backend_invoker(**kwargs: Any) -> PlanningInvocationResult:
+            nonlocal final_thread_contract
             if dependencies.thread_port is None:
                 return backend_invoker(**kwargs)
             try:
@@ -1966,12 +1974,12 @@ def run_issue_planning_revise(
                     )
                     (
                         continuation_result,
-                        _continuation_mode,
+                        continuation_mode,
                         continuation_submission_state,
                         _continuation_status,
                         _continuation_reason,
                         continuation_unavailable,
-                        _continuation_blue_binding,
+                        continuation_blue_binding,
                         _continuation_red_binding,
                     ) = _validate_thread_receipt(
                         receipt,
@@ -1980,12 +1988,51 @@ def run_issue_planning_revise(
                         required_lineage_sha256=continuation_lineage_sha256,
                         required_provider_handle=continuation_provider_handle,
                     )
+                    final_thread_contract = (
+                        receipt,
+                        continuation_result,
+                        continuation_mode,
+                        continuation_submission_state,
+                        continuation_blue_binding,
+                    )
                     if continuation_submission_state == "not_submitted" and continuation_unavailable is True:
                         receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
-                        continuation_result, *_ = _validate_thread_receipt(receipt, mode="new_blue")
+                        (
+                            continuation_result,
+                            new_blue_mode,
+                            new_blue_submission_state,
+                            _new_blue_status,
+                            _new_blue_reason,
+                            _new_blue_unavailable,
+                            new_blue_binding,
+                            _new_blue_red_binding,
+                        ) = _validate_thread_receipt(receipt, mode="new_blue")
+                        final_thread_contract = (
+                            receipt,
+                            continuation_result,
+                            new_blue_mode,
+                            new_blue_submission_state,
+                            new_blue_binding,
+                        )
                 else:
                     receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
-                    continuation_result, *_ = _validate_thread_receipt(receipt, mode="new_blue")
+                    (
+                        continuation_result,
+                        new_blue_mode,
+                        new_blue_submission_state,
+                        _new_blue_status,
+                        _new_blue_reason,
+                        _new_blue_unavailable,
+                        new_blue_binding,
+                        _new_blue_red_binding,
+                    ) = _validate_thread_receipt(receipt, mode="new_blue")
+                    final_thread_contract = (
+                        receipt,
+                        continuation_result,
+                        new_blue_mode,
+                        new_blue_submission_state,
+                        new_blue_binding,
+                    )
             except (AttributeError, TypeError, ValueError):
                 return _thread_contract_failure()
             capture_thread_receipt(receipt)
@@ -2012,17 +2059,30 @@ def run_issue_planning_revise(
                 issue_id=issue_id,
                 details=transport.details,
             )
-        receipt_mode: ThreadInvocationMode = "continuation" if use_continuation else "new_blue"
-        receipt_mode = "continuation" if use_continuation else "new_blue"
-        receipt_gate = _require_publishable_thread_receipt(
-            thread_port=dependencies.thread_port,
-            receipts=thread_receipts,
-            issue_id=issue_id,
-            mode=receipt_mode,
-            required_binding=(continuation_binding if receipt_mode == "continuation" else None),
-            required_lineage_sha256=(continuation_lineage_sha256 if receipt_mode == "continuation" else None),
-            required_provider_handle=(continuation_provider_handle if receipt_mode == "continuation" else None),
-        )
+        if dependencies.thread_port is not None and final_thread_contract is None:
+            return _thread_command_contract_failure(issue_id)
+        if dependencies.thread_port is not None:
+            (
+                final_receipt,
+                _final_result,
+                receipt_mode,
+                _final_submission_state,
+                _final_blue_binding,
+            ) = cast(
+                "tuple[ThreadInvocationReceipt, PlanningInvocationResult, ThreadInvocationMode, str, BlueThreadBinding | None]",
+                final_thread_contract,
+            )
+            receipt_gate = _require_publishable_thread_receipt(
+                thread_port=dependencies.thread_port,
+                receipts=(final_receipt,),
+                issue_id=issue_id,
+                mode=receipt_mode,
+                required_binding=(continuation_binding if receipt_mode == "continuation" else None),
+                required_lineage_sha256=(continuation_lineage_sha256 if receipt_mode == "continuation" else None),
+                required_provider_handle=(continuation_provider_handle if receipt_mode == "continuation" else None),
+            )
+        else:
+            receipt_gate = None
         if receipt_gate is not None:
             return receipt_gate
         authoring_zip = transport.authoring_zip

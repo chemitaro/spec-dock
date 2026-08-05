@@ -351,8 +351,10 @@ class _FakeThreadPort:
         self.new_kwargs: dict[str, object] | None = None
         self.fresh_red_kwargs: dict[str, object] | None = None
         self.last_red_binding: object | None = None
+        self.last_continuation_receipt: ThreadInvocationReceipt | None = None
         self.last_new_receipt: ThreadInvocationReceipt | None = None
         self.last_fresh_red_receipt: ThreadInvocationReceipt | None = None
+        self.committed_receipts: list[ThreadInvocationReceipt] = []
 
     def resolve_blue(self, lineage: object) -> BlueBindingResolution:
         if self.resolution == "exact":
@@ -384,6 +386,8 @@ class _FakeThreadPort:
         )
         if mode == "new_blue":
             self.last_new_receipt = receipt
+        elif mode == "continuation":
+            self.last_continuation_receipt = receipt
         elif mode == "fresh_red":
             self.last_fresh_red_receipt = receipt
         return receipt
@@ -419,6 +423,7 @@ class _FakeThreadPort:
 
     def commit_blue(self, receipt: ThreadInvocationReceipt, new_lineage: object) -> None:
         assert receipt.blue_binding is self.blue_binding
+        self.committed_receipts.append(receipt)
         self.commits.append(new_lineage)
 
 
@@ -3741,6 +3746,11 @@ def test_s06_semantic_revision_continues_blue_or_starts_new_blue(
     assert len(thread_port.commits) == 1
     if resolution == "exact":
         assert thread_port.last_continuation_binding is thread_port.blue_binding
+        assert thread_port.last_continuation_receipt is not None
+        assert thread_port.last_continuation_receipt.mode == "continuation"
+    else:
+        assert thread_port.last_new_receipt is not None
+        assert thread_port.last_new_receipt.mode == "new_blue"
 
 
 def test_s06_semantic_revision_stops_on_ambiguous_blue_lineage(tmp_path: Path) -> None:
@@ -4108,6 +4118,11 @@ def test_s06_semantic_revision_fallback_reuses_exact_synthesized_input(tmp_path:
     prompt = "continuation prompt"
     attachment_paths = (Path("candidate.zip"), Path("review.json"), Path("revision.json"))
     synthesized = SimpleNamespace(prompt=prompt, attachment_paths=attachment_paths)
+    publisher_calls: list[object] = []
+
+    def publish(**kwargs: object) -> object:
+        publisher_calls.append(kwargs)
+        return dependencies.gateway.build_and_publish_candidate(**kwargs)
 
     result = module.run_issue_planning_revise(
         dependencies=dependencies,
@@ -4122,13 +4137,18 @@ def test_s06_semantic_revision_fallback_reuses_exact_synthesized_input(tmp_path:
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=backend,
         transport_runner=lambda **kwargs: cast("Any", kwargs["backend_invoker"])(synthesized=synthesized),
+        publisher=publish,
         preflight_runner=lambda request: _preflight(),
     )
     assert (result.status, result.reason) == ("ok", "candidate_revised")
     assert thread_port.continuation_calls == 1
     assert thread_port.new_calls == 1
+    assert thread_port.last_new_receipt is not None
+    assert thread_port.last_new_receipt.mode == "new_blue"
+    assert len(publisher_calls) == 1
     assert len(synthesized_ids) == 1
     assert len(thread_port.commits) == 1
+    assert thread_port.committed_receipts == [thread_port.last_new_receipt]
     assert thread_port.continuation_kwargs is not None
     assert thread_port.new_kwargs is not None
     assert thread_port.continuation_kwargs["synthesized"] is thread_port.new_kwargs["synthesized"]
@@ -4145,6 +4165,45 @@ def test_s06_semantic_revision_fallback_reuses_exact_synthesized_input(tmp_path:
             strict=True,
         )
     )
+
+
+def test_s06_semantic_revision_fallback_rejects_mutated_raw_mode_before_publish_or_commit(
+    tmp_path: Path,
+) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    identity = setup["identity"]
+    thread_port = _FakeThreadPort(resolution="exact", continuation_unavailable=True)
+    dependencies = IssuePlanningDependencies(_FakeClock(), PLANNING_DEPENDENCIES.gateway, thread_port)
+    module = setup["module"]
+    publisher_calls: list[object] = []
+
+    def transport_runner(**kwargs: object) -> object:
+        result = cast("Any", kwargs["backend_invoker"])(synthesized=SimpleNamespace())
+        assert thread_port.last_new_receipt is not None
+        object.__setattr__(thread_port.last_new_receipt, "mode", "continuation")
+        return result
+
+    result = module.run_issue_planning_revise(
+        dependencies=dependencies,
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(setup["review_path"], setup["review_sha"]),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: _successful_transport(source_manifest_hash=setup["source_hash"]),
+        transport_runner=transport_runner,
+        publisher=lambda **kwargs: publisher_calls.append(kwargs),
+        preflight_runner=lambda request: _preflight(),
+    )
+
+    assert (result.status, result.reason) == ("blocked", "planning_context_rejected")
+    assert result.details == ("thread_receipt_invalid",)
+    assert publisher_calls == []
+    assert thread_port.commits == []
 
 
 @pytest.mark.parametrize("revision", [False, True])
