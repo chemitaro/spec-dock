@@ -14,6 +14,10 @@ Operational entrypoint は `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
 - reviewed Epic plan が final delivery Issue を明示している場合だけ、中間 Issue は個別 PR を作らず、relay-style に `issue finish` から次 Issue の `issue start` へ進む。それ以外の multi-Issue Epic では通常の PR Delivery / Merge Preparation Gate に従う。
 - Capacity limit、queued tab、retryable timeout、recoverable browser/backend failure は wait / retry / recover で扱う。manual planning skill は hard / unrecoverable failure と user-approved emergency backup evidence がある場合だけ使う。
 
+### Issue Planningとの境界
+
+この汎用authoring-pack laneは、受信したZIP／tree／Markdownをevidenceとして保存・検査するためのものです。Issue Planningの正式runは、provider-owned operation resources、compact Prompt本文、repeatableな`--provided-context-path`、PATH-resolved Oracle adapterを使います。汎用packの可変backend指定やlocal-context evidenceを、Issue Planningの正式依存・fallback・命令authorityへ読み替えません。Issue PlanningのBlue continuity／fresh Red、pre-submit／post-submit failure境界、Candidate ZIP／closed Review JSONのoutput contractは、Issue Planning skillとIssue-local canonical docsが所有します。
+
 ## 正規計画と送達の全体像（ChatGPT First SpecDock Planning And Delivery Workflow）
 
 ```plantuml

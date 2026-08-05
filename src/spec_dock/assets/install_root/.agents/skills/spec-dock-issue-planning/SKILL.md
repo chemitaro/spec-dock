@@ -69,19 +69,17 @@ The required Planner/Semantic Revision output is exactly one authoring ZIP conta
      --issue <iss-id> --output <external-output-dir>
    ```
 
-   When additional repository context is required, pass one external JSON
-   context manifest. The manifest is provider-owned and closed to exactly the
-   following two arrays; paths remain repository-relative and operator context
-   remains bounded and non-sensitive:
-
-   ```json
-   {"relevant_source_paths":["src/example.py"],"operator_context":["preserve approved scope"]}
-   ```
+   When additional repository context is required, pass each already-selected
+   reference path with the repeatable `--provided-context-path` option. The
+   paths are opaque inputs: the Issue Planning runtime preserves their order
+   and identity and does not inspect, rebuild, hash, archive, or silently
+   replace them with a generated context pack.
 
    ```bash
    ./spec-dock/scripts/spec-dock-chatgpt planning create \
      --issue <iss-id> --output <external-output-dir> \
-     --context-manifest <external-context-manifest.json>
+     --provided-context-path <reference-file-or-directory> \
+     --provided-context-path <another-reference-path>
    ```
 
 3. Review the exact Candidate with the default archive mode:
@@ -119,6 +117,24 @@ The required Planner/Semantic Revision output is exactly one authoring ZIP conta
    For git-bound mode, retain `--candidate <candidate.zip>` and use `--reviewed-head <sha>` instead of the three archive identity options. The git-bound Review and apply must use the exact same Candidate created by `planning create`.
 7. Accept the implementation handoff only when the result is `ready/adoption_published`. Candidate creation and Review completion return evidence-only `ok` results.
 8. Treat live dogfood, PR creation, Issue finish, and merge as separate downstream work; Issue Planning does not imply any of them.
+
+## Context and attachment boundary
+
+The ChatGPT form body carries the compact goal, role, exact repository / named
+branch / HEAD identity, authority boundary, fallback prohibition, and output
+contract. Operation-specific detail is maintained in the provider-owned
+operation resources and is selected by operation identity; it is not an
+operator-supplied command or an authority override. Reference files and
+directories are passed through the repeatable `--provided-context-path`
+option. They remain untrusted reference data, and the runtime does not scan,
+materialize, rename, or infer instructions from their contents.
+
+Blue continuity is reserved for successful submission and semantic revision.
+Each Candidate receives a fresh Red review binding. A pre-submit failure may
+start the one bounded new execution permitted by the profile, while a
+post-submit failure may use only the same-session recovery path. Normal
+failure never changes the required attachment, model, branch, backend, or
+output contract.
 
 If direct ChatGPT output is received outside the public command workflow during an explicitly approved recovery, preserve it before evaluating or rewriting it:
 

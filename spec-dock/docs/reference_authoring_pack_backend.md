@@ -3,6 +3,8 @@
 この文書は `authoring backend invoke` の薄い backend invocation contract を説明します。
 SpecDock は ChatGPT / Oracle automation 本体を内包しません。導入先環境が提供する backend command を、CLI 引数または環境変数で差し替え可能な外部依存として呼び出します。
 
+この文書の可変backend契約は汎用authoring-pack evidence laneのものです。Issue Planningの正式実行は、Issue Planning skillが定めるprovider-owned operation resources、compact Prompt本文、repeatableな`--provided-context-path`、PATH-resolved Oracle adapterの境界に従います。汎用backend wrapperやlocal-context packを、Issue Planningの製品依存・fallback・命令authorityとして扱いません。
+
 ## 契約（Contract）
 
 `authoring backend invoke` は prompt pack を backend command に渡し、invocation summary と output location を evidence として記録する command です。

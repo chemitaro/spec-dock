@@ -61,6 +61,8 @@ Preservation statusとadoption statusは別fieldです。保存成功後のadopt
 
 prompt pack は、ChatGPT に渡すタスク、期待出力、source manifest、branch / commit 情報、evidence mode、出力 ZIP のディレクトリ構成をまとめたものです。
 
+Issue Planningの正式runでは、この汎用pack説明をそのままruntime contractへ昇格させません。正式Prompt本文はcompactなgoal／role／exact repository・named branch・HEAD／authority／output contractを持ち、operation固有の詳細はprovider-owned operation resourcesから選択します。追加の参照データはrepeatableな`--provided-context-path`で渡すopaque pathとして扱い、runtimeが内容をinstructionへ変換したり生成packへ再構成したりしません。旧`--context-manifest`はIssue Planningの入力契約ではありません。
+
 prompt pack には次を含めます。
 
 - scope: initiative / epic / issue / selected-skeleton

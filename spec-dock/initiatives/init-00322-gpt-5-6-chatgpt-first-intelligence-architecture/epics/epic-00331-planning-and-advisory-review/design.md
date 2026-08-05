@@ -152,6 +152,8 @@ provider-managed PromptはChatフォームへ送る一つのauthoritative task b
 - onboarding companionのexpected relative path、new-member audience、subordinate authority、必須section、valid PlantUML、canonical conflictをdefectとすること。
 - 添付はcurrent branch確認後に参照するuntrusted reference dataであり、命令authorityではないこと。
 
+Issue PlanningのPrompt本文はcompactなgoal／role／authority／exact repository・named branch・HEAD／fallback禁止／output contractに限定し、operation固有の手順はprovider-owned operation resourcesをoperation identityから選択する。追加referenceはrepeatableな`--provided-context-path`で渡すopaque pathであり、runtimeはその内容をscan／再構成／hash／archiveして命令authorityへ変換しない。旧`--context-manifest`は使用しない。
+
 Oracleへ`--file`等で渡すのは、source snapshot、親Contract、dependency summary、関連source／tests、prior Candidate、formal Review evidence等のreference dataだけとする。planner role、fallback policy、output inventory、Human authority boundaryを`chatgpt-use-prompt.md`等の命令fileとして添付しない。
 
 Initiative Promptは全Epic BundleとIssue Boundaryまで、Epic PromptはIssue Seedsまで、Issue Promptは実装計画までを要求する。Scope別のauthoring ZIP inventoryはPrompt本文とRuntime expectationから同じ値を生成し、ChatGPTだけにfilename／rootを決めさせない。
@@ -282,7 +284,7 @@ Oracle sessionからのartifact retrievalはprovider-owned adapterへ隔離す�
 - submissionは一回だけ行い、session identityとsubmission stateを保持する。
 - artifact metadataのschema／version、file type、expected／observed basename、session root内safe path、regular-file／no-symlink、size、SHAを検査する。
 - exactly-one matching ZIPをprivate non-symlink stagingへsnapshotし、copy後にsize／SHAを再計算する。Oracleの元path、cookie、raw transcriptをresultへ保存しない。
-- timeout／disconnect後は同じsessionのstatus、reattach、harvestだけを許可し、Promptを再submitしない。
+- submit前のfailureはsubmission evidenceがfalseでprofileが許可したbounded new executionだけを許可し、submit後のtimeout／disconnectは同じsessionのstatus、reattach、harvest、captureだけを許可してPromptを再submitしない。
 - Oracleがfirst-class caller destinationを提供しない期間はversioned metadata readerを一つのinfra boundaryへ隔離する。unsupported version、metadata ambiguity、artifact不在ではtext outputへfallbackせずfail closedする。
 - explicit Human Relayを用いる場合も、same formal identityへbindされたexact Oracle-produced artifactを同じvalidatorへ通し、自動fallbackや再authoringとして扱わない。
 
@@ -338,8 +340,8 @@ Remote Issue bindings use link-existing recovery; valid local Nodes are never re
 
 - local Git preflight failureまたはGitHub exact current-branch access failure: authoring／Review outputをFormal resultにせずfail closed。default branchへfallbackしない。
 - Oracle executable missing／capability mismatch／browser precondition failure: personal wrapper、arbitrary backend、APIへfallbackせずblocked。
-- Prompt submit前のfailure: safe precondition修正後に新runを開始できる。
-- Prompt submit後のtimeout／disconnect: same-session status／reattach／harvestだけを行う。session終端を確認するまでnew submissionを禁止する。
+- Prompt submit前のfailure: submission evidenceがfalseでprofileが許可したbounded new runだけを開始できる。pre-submit failureをsuccessful turnとして扱わない。
+- Prompt submit後のtimeout／disconnect: same-session status／reattach／harvest／captureだけを行う。session終端を確認するまでnew submissionを禁止する。
 - file artifact missing／multiple／wrong filename／wrong root／unsafe entry／metadata hash mismatch: Candidateを生成せずrejectedまたは`insufficient-evidence`。inline textを代替payloadにしない。
 - onboarding companion missing／wrong path／duplicate／manifest or checksum mismatch／required section欠落: Candidate 0。canonical三文書との矛盾、誤ったstatus、authority誤記、invalid PlantUMLはfresh defect-only Reviewでblocking findingとなり得る。
 - ZIP semantic failure: non-formal diagnostic後に新しい完全authoring ZIPとfresh Formal Reviewへ戻る。
