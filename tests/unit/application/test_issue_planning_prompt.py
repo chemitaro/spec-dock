@@ -1,6 +1,10 @@
+import builtins
+import hashlib
 import os
 from pathlib import Path
+import shutil
 import sys
+import zipfile
 
 import pytest
 
@@ -38,10 +42,41 @@ def test_provided_context_paths_are_ordered_opaque_and_identity_preserving(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    context = _context()
     provided_relative = Path("operator/context/../opaque")
     provided_absolute = Path("/outside/context")
     protected = (provided_relative, provided_absolute)
-    inspected: list[tuple[str, Path]] = []
+    required_same_lexical = Path(str(provided_relative))
+    assert required_same_lexical == provided_relative
+    assert required_same_lexical is not provided_relative
+    forbidden_calls: list[str] = []
+
+    def path_like(value: object) -> Path | None:
+        if isinstance(value, (str, os.PathLike)):
+            return Path(os.fsdecode(os.fspath(value)))
+        return None
+
+    def is_protected(value: object) -> bool:
+        candidate = path_like(value)
+        return candidate is not None and any(
+            candidate == root or candidate.is_relative_to(root) for root in protected
+        )
+
+    def forbid(api: str, value: object = "") -> None:
+        forbidden_calls.append(api)
+        raise AssertionError(f"forbidden provided-context access: {api}: {value}")
+
+    def path_spy(name: str, original):
+        def spy(self: Path, *args: object, **kwargs: object):
+            if is_protected(self):
+                forbid(f"Path.{name}", self)
+            if name in {"rename", "replace"} and args and is_protected(args[0]):
+                forbid(f"Path.{name}", args[0])
+            if name in {"rename", "replace"} and is_protected(kwargs.get("target")):
+                forbid(f"Path.{name}", kwargs["target"])
+            return original(self, *args, **kwargs)
+
+        return spy
 
     for name in (
         "exists",
@@ -58,19 +93,148 @@ def test_provided_context_paths_are_ordered_opaque_and_identity_preserving(
         "iterdir",
         "glob",
         "rglob",
+        "rename",
+        "replace",
     ):
-        original = getattr(Path, name)
+        monkeypatch.setattr(Path, name, path_spy(name, getattr(Path, name)))
 
-        def spy(self: Path, *args: object, _name=name, _original=original, **kwargs: object):
-            if any(self is candidate for candidate in protected):
-                inspected.append((_name, self))
-            return _original(self, *args, **kwargs)
+    original_builtin_open = builtins.open
 
-        monkeypatch.setattr(Path, name, spy)
+    def builtin_open_spy(file, *args: object, **kwargs: object):
+        if is_protected(file):
+            forbid("builtins.open", file)
+        return original_builtin_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", builtin_open_spy)
+
+    def os_spy(name: str, original):
+        def spy(*args: object, **kwargs: object):
+            if args and is_protected(args[0]):
+                forbid(f"os.{name}", args[0])
+            if name in {"rename", "replace"} and len(args) > 1 and is_protected(args[1]):
+                forbid(f"os.{name}", args[1])
+            return original(*args, **kwargs)
+
+        return spy
+
+    for name in (
+        "stat",
+        "lstat",
+        "open",
+        "listdir",
+        "scandir",
+        "walk",
+        "rename",
+        "replace",
+    ):
+        monkeypatch.setattr(os, name, os_spy(name, getattr(os, name)))
+
+    def shutil_copy_spy(name: str, original):
+        def spy(source, destination, *args: object, **kwargs: object):
+            if is_protected(source):
+                forbid(f"shutil.{name}", source)
+            if is_protected(destination):
+                forbid(f"shutil.{name}", destination)
+            return original(source, destination, *args, **kwargs)
+
+        return spy
+
+    for name in ("copy", "copy2", "copyfile", "copytree"):
+        monkeypatch.setattr(shutil, name, shutil_copy_spy(name, getattr(shutil, name)))
+
+    def archive_spy(api: str, *args: object, **kwargs: object):
+        del args, kwargs
+        forbid(api)
+
+    monkeypatch.setattr(shutil, "make_archive", lambda *args, **kwargs: archive_spy("shutil.make_archive", *args, **kwargs))
+    monkeypatch.setattr(zipfile, "ZipFile", lambda *args, **kwargs: archive_spy("zipfile.ZipFile", *args, **kwargs))
+
+    hash_names = {"sha256", "new", "file_digest", *hashlib.algorithms_guaranteed}
+    for name in sorted(hash_names):
+        if hasattr(hashlib, name):
+            monkeypatch.setattr(
+                hashlib,
+                name,
+                lambda *args, _name=name, **kwargs: archive_spy(f"hashlib.{_name}", *args, **kwargs),
+            )
+
+    module_aliases = (
+        "ZipFile",
+        "make_archive",
+        "copy",
+        "copy2",
+        "copyfile",
+        "copytree",
+        "sha256",
+        "new",
+        "file_digest",
+    )
+    for name in module_aliases:
+        if hasattr(issue_planning_prompt, name):
+            monkeypatch.setattr(
+                issue_planning_prompt,
+                name,
+                lambda *args, _name=name, **kwargs: archive_spy(
+                    f"issue_planning_prompt.{_name}", *args, **kwargs
+                ),
+            )
+
+    descendant = Path(str(provided_absolute)) / ".hidden" / "child"
+    rebuilt = Path(str(provided_relative))
+
+    def call_os(name: str, *args: object):
+        return os.__dict__[name](*args)
+
+    def call_builtin_open(path: Path):
+        return builtins.__dict__["open"](str(path), "rb")
+
+    canaries = (
+        ("Path.stat", lambda: Path(str(provided_relative)).stat()),
+        ("Path.read_bytes", lambda: descendant.read_bytes()),
+        ("Path.exists", lambda: rebuilt.exists()),
+        ("Path.is_file", lambda: rebuilt.is_file()),
+        ("Path.is_dir", lambda: rebuilt.is_dir()),
+        ("Path.is_symlink", lambda: rebuilt.is_symlink()),
+        ("Path.lstat", lambda: rebuilt.lstat()),
+        ("Path.resolve", lambda: rebuilt.resolve()),
+        ("Path.absolute", lambda: rebuilt.absolute()),
+        ("Path.open", lambda: rebuilt.open("rb")),
+        ("Path.read_text", lambda: rebuilt.read_text()),
+        ("Path.iterdir", lambda: rebuilt.iterdir()),
+        ("Path.glob", lambda: rebuilt.glob("*")),
+        ("Path.rglob", lambda: rebuilt.rglob("*")),
+        ("Path.rename", lambda: rebuilt.rename(tmp_path / "renamed")),
+        ("Path.replace", lambda: rebuilt.replace(tmp_path / "replaced")),
+        ("builtins.open", lambda: call_builtin_open(descendant)),
+        ("os.stat", lambda: call_os("stat", rebuilt)),
+        ("os.lstat", lambda: call_os("lstat", rebuilt)),
+        ("os.open", lambda: call_os("open", rebuilt, os.O_RDONLY)),
+        ("os.listdir", lambda: call_os("listdir", descendant)),
+        ("os.scandir", lambda: call_os("scandir", descendant)),
+        ("os.walk", lambda: call_os("walk", descendant)),
+        ("os.rename", lambda: call_os("rename", rebuilt, tmp_path / "renamed-os")),
+        ("os.replace", lambda: call_os("replace", rebuilt, tmp_path / "replaced-os")),
+        ("shutil.copy", lambda: shutil.copy(rebuilt, tmp_path / "copy")),
+        ("shutil.copy2", lambda: shutil.copy2(rebuilt, tmp_path / "copy2")),
+        ("shutil.copyfile", lambda: shutil.copyfile(rebuilt, tmp_path / "copyfile")),
+        ("shutil.copytree", lambda: shutil.copytree(rebuilt, tmp_path / "copytree")),
+        ("zipfile.ZipFile", lambda: zipfile.ZipFile(tmp_path / "probe.zip", "w")),
+        (
+            "shutil.make_archive",
+            lambda: shutil.make_archive(str(tmp_path / "probe"), "zip", root_dir=provided_relative),
+        ),
+        ("hashlib.sha256", lambda: hashlib.sha256(b"probe")),
+        ("hashlib.new", lambda: hashlib.new("sha256", b"probe")),
+    )
+    for label, probe in canaries:
+        with pytest.raises(AssertionError, match="forbidden provided-context access"):
+            probe()
+        assert forbidden_calls[-1] == label
+    forbidden_calls.clear()
 
     planner = issue_planning_prompt.synthesize_issue_planning_prompt(
         role="planner",
-        context=_context(),
+        context=context,
         repo_root=tmp_path,
         upstream="origin/feature/issue",
         remote_head="a" * 40,
@@ -81,19 +245,25 @@ def test_provided_context_paths_are_ordered_opaque_and_identity_preserving(
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
-        context=_context(),
-        attachment_paths=(Path("candidate.zip"),),
+        context=context,
+        attachment_paths=(Path("candidate.zip"), required_same_lexical),
         provided_context_paths=(provided_relative, provided_absolute, provided_relative),
         reviewed_identity={"mode": "archive-candidate"},
         reviewed_identity_sha256="a" * 64,
     )
 
-    assert planner.attachment_paths[-3:] == (
+    planning_resources = issue_planning_prompt._provider_resource_root()
+    assert planner.attachment_paths == (
+        planning_resources / "operations" / "planning" / "attachments",
+        *(Path(path) for path in (*context.canonical_issue_paths, *context.relevant_source_paths)),
         provided_relative,
         provided_absolute,
         provided_relative,
     )
-    assert reviewer.attachment_paths[-3:] == (
+    assert reviewer.attachment_paths == (
+        planning_resources / "operations" / "review" / "attachments",
+        Path("candidate.zip"),
+        required_same_lexical,
         provided_relative,
         provided_absolute,
         provided_relative,
@@ -101,11 +271,18 @@ def test_provided_context_paths_are_ordered_opaque_and_identity_preserving(
     assert planner.attachment_paths[-3] is provided_relative
     assert planner.attachment_paths[-2] is provided_absolute
     assert planner.attachment_paths[-1] is provided_relative
+    assert reviewer.attachment_paths[-3] is provided_relative
+    assert reviewer.attachment_paths[-2] is provided_absolute
+    assert reviewer.attachment_paths[-1] is provided_relative
+    assert reviewer.attachment_paths[2] is required_same_lexical
     assert str(planner.attachment_paths[-3]) == "operator/context/../opaque"
     assert str(planner.attachment_paths[-2]) == "/outside/context"
     assert "operator/context" not in planner.prompt
     assert "/outside/context" not in planner.prompt
-    assert inspected == []
+    assert "operator/context" not in reviewer.prompt
+    assert "/outside/context" not in reviewer.prompt
+    assert "candidate.zip" not in reviewer.prompt
+    assert forbidden_calls == []
 
 
 ONBOARDING_HEADING_CONTRACT = (
