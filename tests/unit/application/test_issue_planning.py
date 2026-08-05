@@ -348,6 +348,7 @@ class _FakeThreadPort:
         self.last_continuation_binding: BlueThreadBinding | None = None
         self.continuation_kwargs: dict[str, object] | None = None
         self.new_kwargs: dict[str, object] | None = None
+        self.last_red_binding: object | None = None
 
     def resolve_blue(self, lineage: object) -> BlueBindingResolution:
         if self.resolution == "exact":
@@ -367,12 +368,15 @@ class _FakeThreadPort:
         red: bool = False,
     ) -> ThreadInvocationReceipt:
         result = cast("Any", invoker)(**kwargs)
+        red_binding = object() if red else None
+        if red_binding is not None:
+            self.last_red_binding = red_binding
         return ThreadInvocationReceipt(
             result=result,
             mode=cast("Any", mode),
             submission_state="successful" if result.status == "pass" else "unknown",
             blue_binding=None if red else self.blue_binding,
-            red_binding=object() if red else None,
+            red_binding=red_binding,
         )
 
     def invoke_new_blue(self, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
@@ -405,6 +409,32 @@ class _FakeThreadPort:
 
     def commit_blue(self, receipt: ThreadInvocationReceipt, new_lineage: object) -> None:
         assert receipt.blue_binding is self.blue_binding
+        self.commits.append(new_lineage)
+
+
+class _StatefulThreadPort(_FakeThreadPort):
+    """One private store shared by the S06 end-to-end unit transaction."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.committed_blue_binding: BlueThreadBinding | None = None
+
+    def resolve_blue(self, lineage: object) -> BlueBindingResolution:
+        requested = cast("Any", lineage).binding_sha256
+        if self.committed_blue_binding is None:
+            return BlueBindingResolution("unavailable")
+        if self.committed_blue_binding.lineage_sha256 != requested:
+            return BlueBindingResolution("ambiguous")
+        self.blue_binding = self.committed_blue_binding
+        return BlueBindingResolution("exact", self.committed_blue_binding)
+
+    def commit_blue(self, receipt: ThreadInvocationReceipt, new_lineage: object) -> None:
+        assert receipt.blue_binding is not None
+        self.committed_blue_binding = BlueThreadBinding(
+            lineage_sha256=cast("Any", new_lineage).binding_sha256,
+            provider_handle=receipt.blue_binding.provider_handle,
+        )
+        self.blue_binding = self.committed_blue_binding
         self.commits.append(new_lineage)
 
 
@@ -2425,7 +2455,11 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
     assert "/Users/alice" not in repr(result)
 
 
-def _semantic_revision_setup(tmp_path: Path) -> dict[str, Any]:
+def _semantic_revision_setup(
+    tmp_path: Path,
+    *,
+    dependencies: IssuePlanningDependencies = PLANNING_DEPENDENCIES,
+) -> dict[str, Any]:
     repo = tmp_path / "repo"
     repo.mkdir()
     issue_dir = _planning_tree(repo)
@@ -2440,14 +2474,19 @@ def _semantic_revision_setup(tmp_path: Path) -> dict[str, Any]:
     snapshot = _preflight()
     assert snapshot.repository is not None
     source_hash = snapshot.repository.source_manifest.source_manifest_hash
+    def create_transport(**kwargs: object):
+        if dependencies.thread_port is None:
+            return _successful_transport(source_manifest_hash=source_hash)
+        return cast("Any", kwargs["backend_invoker"])()
+
     created = module.run_issue_planning_create(
-        dependencies=PLANNING_DEPENDENCIES,
+        dependencies=dependencies,
         request=module.PlanningCreateRequest("iss-00003", candidates),
         records=[_record(issue_dir)],
         repo_root=repo,
         repo_slug_resolver=lambda root: "owner/repo",
-        backend_invoker=lambda **kwargs: None,
-        transport_runner=lambda **kwargs: _successful_transport(source_manifest_hash=source_hash),
+        backend_invoker=lambda **kwargs: _successful_transport(source_manifest_hash=source_hash),
+        transport_runner=create_transport,
         preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
@@ -3051,6 +3090,83 @@ def test_publication_guard_validates_candidate_then_source_without_drift(revisio
 
     assert result is True
     assert events == ["candidate_loader", "source_preflight", "candidate_loader"]
+
+
+def test_s06_stateful_blue_revision_and_fresh_red_transaction(tmp_path: Path) -> None:
+    thread_port = _StatefulThreadPort()
+    dependencies = IssuePlanningDependencies(
+        _FakeClock(),
+        PLANNING_DEPENDENCIES.gateway,
+        thread_port,
+    )
+    setup = _semantic_revision_setup(tmp_path, dependencies=dependencies)
+    module = setup["module"]
+    identity = setup["identity"]
+    blue_v1 = thread_port.committed_blue_binding
+    assert blue_v1 is not None
+
+    revised = module.run_issue_planning_revise(
+        dependencies=dependencies,
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(
+            setup["review_path"],
+            setup["review_sha"],
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: _successful_transport(source_manifest_hash=setup["source_hash"]),
+        transport_runner=lambda **kwargs: cast("Any", kwargs["backend_invoker"])(synthesized=object()),
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (revised.status, revised.reason) == ("ok", "candidate_revised")
+    candidate_v2 = Path(revised.output["candidate_path"])
+
+    reviews = tmp_path / "reviews"
+    reviews.mkdir()
+
+    def review_backend(**kwargs: object):
+        contracts = setup["contracts"]
+        reviewed_identity, digest = _review_identity_from_prompt(kwargs["synthesized"], contracts)
+        review = contracts.PlanningReviewResult(
+            reviewed_identity=reviewed_identity,
+            reviewed_identity_sha256=digest,
+            verdict="pass",
+            findings=(),
+        )
+        payload = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+        source_evidence = cast("Any", kwargs["source_evidence"])
+        return _successful_review_transport(payload, source_manifest_hash=source_evidence.source_manifest_hash)
+
+    reviewed = module.run_issue_planning_review(
+        dependencies=dependencies,
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="archive-candidate",
+            output_dir=reviews,
+            candidate_path=candidate_v2,
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=review_backend,
+        transport_runner=module.run_issue_planning_transport,
+        preflight_runner=lambda request: _preflight(),
+    )
+
+    assert (reviewed.status, reviewed.reason) == ("ok", "review_completed")
+    assert thread_port.new_calls == 1
+    assert thread_port.continuation_calls == 1
+    assert thread_port.last_continuation_binding is blue_v1
+    assert thread_port.committed_blue_binding is not None
+    assert thread_port.committed_blue_binding.provider_handle is blue_v1.provider_handle
+    assert thread_port.fresh_red_calls == 1
+    assert thread_port.last_red_binding is not thread_port.committed_blue_binding.provider_handle
+    assert len(thread_port.commits) == 2
 
 
 def test_s06_blue_binding_hides_provider_handle_and_requires_exact_resolution() -> None:

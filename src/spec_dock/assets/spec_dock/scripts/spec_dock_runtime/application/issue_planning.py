@@ -746,6 +746,7 @@ def _validate_thread_receipt(
     mode: ThreadInvocationMode,
     required_binding: BlueThreadBinding | None = None,
     required_lineage_sha256: str | None = None,
+    required_provider_handle: object | None = None,
 ) -> None:
     """Re-check private receipt invariants at the application boundary."""
 
@@ -764,7 +765,10 @@ def _validate_thread_receipt(
     if mode == "continuation" and receipt.submission_state == "successful":
         if required_binding is None or receipt.blue_binding is not required_binding:
             raise ValueError("continuation Blue binding mismatch")
-        if receipt.blue_binding.provider_handle is not required_binding.provider_handle:
+        expected_provider_handle = (
+            required_provider_handle if required_provider_handle is not None else required_binding.provider_handle
+        )
+        if receipt.blue_binding.provider_handle is not expected_provider_handle:
             raise ValueError("continuation provider handle mismatch")
         expected_lineage = required_lineage_sha256 or required_binding.lineage_sha256
         if receipt.blue_binding.lineage_sha256 != expected_lineage:
@@ -787,6 +791,8 @@ def _thread_backend_invoker(
             # Preserve the legacy one-shot path without manufacturing a
             # private S06 receipt when the optional capability is absent.
             return backend_invoker(**kwargs)
+        expected_lineage_sha256 = binding.lineage_sha256 if binding is not None else None
+        expected_provider_handle = binding.provider_handle if binding is not None else None
         try:
             if mode == "new_blue":
                 receipt = thread_port.invoke_new_blue(backend_invoker, **kwargs)
@@ -802,7 +808,8 @@ def _thread_backend_invoker(
                 receipt,
                 mode=mode,
                 required_binding=binding,
-                required_lineage_sha256=(binding.lineage_sha256 if binding is not None else None),
+                required_lineage_sha256=expected_lineage_sha256,
+                required_provider_handle=expected_provider_handle,
             )
         except (AttributeError, TypeError, ValueError):
             return _thread_contract_failure()
@@ -832,6 +839,7 @@ def _require_publishable_thread_receipt(
     mode: ThreadInvocationMode,
     required_binding: BlueThreadBinding | None = None,
     required_lineage_sha256: str | None = None,
+    required_provider_handle: object | None = None,
 ) -> PlanningCommandResult | None:
     """Gate all thread-backed publication on one valid submitted receipt."""
 
@@ -846,6 +854,7 @@ def _require_publishable_thread_receipt(
             mode=mode,
             required_binding=required_binding,
             required_lineage_sha256=required_lineage_sha256,
+            required_provider_handle=required_provider_handle,
         )
         if receipt.submission_state != "successful" or getattr(receipt.result, "status", None) != "pass":
             raise ValueError("thread receipt is not publishable")
@@ -1738,6 +1747,7 @@ def run_issue_planning_revise(
         thread_receipts: list[ThreadInvocationReceipt] = []
         continuation_binding: BlueThreadBinding | None = None
         continuation_lineage_sha256: str | None = None
+        continuation_provider_handle: object | None = None
         use_continuation = False
         if dependencies.thread_port is not None:
             try:
@@ -1769,6 +1779,7 @@ def run_issue_planning_revise(
             use_continuation = resolution_status == "exact"
             if continuation_binding is not None:
                 continuation_lineage_sha256 = continuation_binding.lineage_sha256
+                continuation_provider_handle = continuation_binding.provider_handle
 
         def capture_thread_receipt(receipt: ThreadInvocationReceipt) -> None:
             thread_receipts[:] = [receipt]
@@ -1825,6 +1836,7 @@ def run_issue_planning_revise(
                         mode="continuation",
                         required_binding=continuation_binding,
                         required_lineage_sha256=continuation_lineage_sha256,
+                        required_provider_handle=continuation_provider_handle,
                     )
                     if (
                         receipt.submission_state == "not_submitted"
@@ -1871,6 +1883,7 @@ def run_issue_planning_revise(
             mode=receipt_mode,
             required_binding=(continuation_binding if receipt_mode == "continuation" else None),
             required_lineage_sha256=(continuation_lineage_sha256 if receipt_mode == "continuation" else None),
+            required_provider_handle=(continuation_provider_handle if receipt_mode == "continuation" else None),
         )
         if receipt_gate is not None:
             return receipt_gate
