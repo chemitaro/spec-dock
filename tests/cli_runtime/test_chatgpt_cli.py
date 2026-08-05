@@ -76,11 +76,25 @@ def test_top_level_and_group_help_expose_only_closed_command_family() -> None:
 @pytest.mark.parametrize(
     ("args", "required_options"),
     [
-        (("planning", "create", "--help"), ("--issue", "--output", "--context-manifest", "--format")),
-        (("planning", "revise", "--help"), ("--candidate", "--request", "--output", "--format")),
+        (
+            ("planning", "create", "--help"),
+            ("--issue", "--output", "--provided-context-path", "--format"),
+        ),
+        (
+            ("planning", "revise", "--help"),
+            ("--candidate", "--request", "--output", "--provided-context-path", "--format"),
+        ),
         (
             ("review", "planning", "--help"),
-            ("--issue", "--mode", "--candidate", "--reviewed-head", "--output", "--format"),
+            (
+                "--issue",
+                "--mode",
+                "--candidate",
+                "--reviewed-head",
+                "--output",
+                "--provided-context-path",
+                "--format",
+            ),
         ),
         (
             ("planning", "apply", "--help"),
@@ -107,6 +121,36 @@ def test_leaf_help_freezes_required_and_conditional_options(args, required_optio
         assert option in result.stdout
     for forbidden in ("--repo", "--repository", "--branch", "--target", "--prompt", "--backend"):
         assert forbidden not in result.stdout
+
+
+def test_leaf_help_hard_cuts_context_manifest() -> None:
+    for args in (
+        ("planning", "create", "--help"),
+        ("planning", "revise", "--help"),
+        ("review", "planning", "--help"),
+    ):
+        result = _run_help(*args)
+        assert result.returncode == 0
+        assert "--context-manifest" not in result.stdout
+        assert "--provided-context-path" in result.stdout
+
+    apply = _run_help("planning", "apply", "--help")
+    assert apply.returncode == 0
+    assert "--provided-context-path" not in apply.stdout
+
+
+def test_context_manifest_is_rejected_by_cli() -> None:
+    result = _run_help(
+        "planning",
+        "create",
+        "--issue",
+        "iss-00003",
+        "--output",
+        "/tmp/out",
+        "--context-manifest",
+        "/tmp/context.json",
+    )
+    assert result.returncode == 2
 
 
 def test_core_cli_help_does_not_include_chatgpt_leaf_commands() -> None:

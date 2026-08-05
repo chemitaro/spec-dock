@@ -436,6 +436,7 @@ def _assert_oracle_submission(
     oracle_home: Path,
     executable: Path,
     env: dict[str, str],
+    expected_attachment_paths: tuple[Path, ...] = (),
 ) -> None:
     prompt_records = [record for record in records if "--prompt" in record["argv"]]
     assert len(prompt_records) == 1
@@ -514,6 +515,10 @@ def _assert_oracle_submission(
     assert len(prompt_records[0]["attachment_paths"]) >= 1
     assert all("prompt-pack" not in path for path in prompt_records[0]["attachment_paths"])
     assert str(oracle_home) not in prompt
+    if expected_attachment_paths:
+        assert prompt_records[0]["attachment_paths"][-len(expected_attachment_paths) :] == [
+            str(path) for path in expected_attachment_paths
+        ]
 
 
 def _invoke(
@@ -525,6 +530,7 @@ def _invoke(
     executable: Path,
     expects_oracle: bool = False,
     expected_returncode: int = 0,
+    expected_attachment_paths: tuple[Path, ...] = (),
 ) -> dict[str, Any]:
     before = len(_invocation_records(oracle_home))
     completed = subprocess.run(
@@ -556,6 +562,7 @@ def _invoke(
             oracle_home=oracle_home,
             executable=executable,
             env=env,
+            expected_attachment_paths=expected_attachment_paths,
         )
     else:
         assert new_records == []
@@ -569,14 +576,19 @@ def _create(
     env: dict[str, str],
     oracle_home: Path,
     executable: Path,
+    provided_paths: tuple[Path, ...] = (),
 ) -> tuple[Path, dict[str, Any], dict[str, Any]]:
+    args = ["planning", "create", "--issue", ISSUE_ID, "--output", str(output)]
+    for path in provided_paths:
+        args.extend(["--provided-context-path", str(path)])
     result = _invoke(
         target,
-        ["planning", "create", "--issue", ISSUE_ID, "--output", str(output)],
+        args,
         env=env,
         oracle_home=oracle_home,
         executable=executable,
         expects_oracle=True,
+        expected_attachment_paths=provided_paths,
     )
     assert (result["status"], result["reason"]) == ("ok", "candidate_created")
     identity = result["output"]["candidate_identity"]
@@ -594,6 +606,7 @@ def _review(
     env: dict[str, str],
     oracle_home: Path,
     executable: Path,
+    provided_paths: tuple[Path, ...] = (),
 ) -> tuple[Path, dict[str, Any]]:
     args = [
         "review",
@@ -608,6 +621,8 @@ def _review(
     args.extend(["--candidate", str(candidate)])
     if mode == "git-bound":
         args.extend(["--reviewed-head", _run_git(target, "rev-parse", "HEAD", env=env)])
+    for path in provided_paths:
+        args.extend(["--provided-context-path", str(path)])
     result = _invoke(
         target,
         args,
@@ -615,6 +630,7 @@ def _review(
         oracle_home=oracle_home,
         executable=executable,
         expects_oracle=True,
+        expected_attachment_paths=provided_paths,
     )
     assert (result["status"], result["reason"]) == ("ok", "review_completed")
     return output / result["output"]["review_result_file"], result
@@ -1004,12 +1020,16 @@ def test_failed_review_semantic_revision_reaches_fresh_pass(
     for path in (candidates, first_reviews, revised, fresh_reviews):
         path.mkdir()
     forbidden_before = _forbidden_snapshot(target, issue_dir)
+    create_context_paths = (Path("operator/create"), Path("operator/create"))
+    review_context_paths = (Path("operator/review"), Path("/outside/review"))
+    revision_context_paths = (Path("operator/revision"), Path("/outside/revision"))
     candidate, identity, _ = _create(
         target,
         candidates,
         env=runtime_env,
         oracle_home=oracle_home,
         executable=executable,
+        provided_paths=create_context_paths,
     )
     old_bytes = candidate.read_bytes()
     review_path, first_review = _review(
@@ -1020,6 +1040,7 @@ def test_failed_review_semantic_revision_reaches_fresh_pass(
         env=runtime_env,
         oracle_home=oracle_home,
         executable=executable,
+        provided_paths=review_context_paths,
     )
     request_path = review_path.with_name("planning-revision-request.json")
     request_path.write_text(
@@ -1048,11 +1069,16 @@ def test_failed_review_semantic_revision_reaches_fresh_pass(
             str(request_path),
             "--output",
             str(revised),
+            "--provided-context-path",
+            str(revision_context_paths[0]),
+            "--provided-context-path",
+            str(revision_context_paths[1]),
         ],
         env=runtime_env,
         oracle_home=oracle_home,
         executable=executable,
         expects_oracle=True,
+        expected_attachment_paths=revision_context_paths,
     )
     assert (revision["status"], revision["reason"]) == ("ok", "candidate_revised")
     new_identity = revision["output"]["candidate_identity"]
@@ -1066,6 +1092,7 @@ def test_failed_review_semantic_revision_reaches_fresh_pass(
         env=runtime_env,
         oracle_home=oracle_home,
         executable=executable,
+        provided_paths=review_context_paths,
     )
     assert fresh["output"]["verdict"] == "pass"
     assert new_identity["version"] == identity["version"] + 1

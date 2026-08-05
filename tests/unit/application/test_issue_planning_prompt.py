@@ -25,7 +25,6 @@ def test_s03_path_only_prompt_contract_has_no_materialized_inputs(
         upstream="origin/feature/issue",
         remote_head="a" * 40,
     )
-
     assert not hasattr(synthesized, "attachments")
     assert not hasattr(synthesized, "exact_attachments")
     assert synthesized.attachment_paths == (
@@ -33,6 +32,80 @@ def test_s03_path_only_prompt_contract_has_no_materialized_inputs(
         *(Path(path) for path in _context().canonical_issue_paths),
         *(Path(path) for path in _context().relevant_source_paths),
     )
+
+
+def test_provided_context_paths_are_ordered_opaque_and_identity_preserving(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provided_relative = Path("operator/context/../opaque")
+    provided_absolute = Path("/outside/context")
+    protected = (provided_relative, provided_absolute)
+    inspected: list[tuple[str, Path]] = []
+
+    for name in (
+        "exists",
+        "is_file",
+        "is_dir",
+        "is_symlink",
+        "stat",
+        "lstat",
+        "resolve",
+        "absolute",
+        "open",
+        "read_text",
+        "read_bytes",
+        "iterdir",
+        "glob",
+        "rglob",
+    ):
+        original = getattr(Path, name)
+
+        def spy(self: Path, *args: object, _name=name, _original=original, **kwargs: object):
+            if any(self is candidate for candidate in protected):
+                inspected.append((_name, self))
+            return _original(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, name, spy)
+
+    planner = issue_planning_prompt.synthesize_issue_planning_prompt(
+        role="planner",
+        context=_context(),
+        repo_root=tmp_path,
+        upstream="origin/feature/issue",
+        remote_head="a" * 40,
+        provided_context_paths=(provided_relative, provided_absolute, provided_relative),
+    )
+    reviewer = issue_planning_prompt.synthesize_planning_evidence_prompt(
+        role="reviewer",
+        source_head="a" * 40,
+        repository="owner/repo",
+        branch="feature/issue",
+        context=_context(),
+        attachment_paths=(Path("candidate.zip"),),
+        provided_context_paths=(provided_relative, provided_absolute, provided_relative),
+        reviewed_identity={"mode": "archive-candidate"},
+        reviewed_identity_sha256="a" * 64,
+    )
+
+    assert planner.attachment_paths[-3:] == (
+        provided_relative,
+        provided_absolute,
+        provided_relative,
+    )
+    assert reviewer.attachment_paths[-3:] == (
+        provided_relative,
+        provided_absolute,
+        provided_relative,
+    )
+    assert planner.attachment_paths[-3] is provided_relative
+    assert planner.attachment_paths[-2] is provided_absolute
+    assert planner.attachment_paths[-1] is provided_relative
+    assert str(planner.attachment_paths[-3]) == "operator/context/../opaque"
+    assert str(planner.attachment_paths[-2]) == "/outside/context"
+    assert "operator/context" not in planner.prompt
+    assert "/outside/context" not in planner.prompt
+    assert inspected == []
 
 
 ONBOARDING_HEADING_CONTRACT = (

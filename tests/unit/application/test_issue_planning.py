@@ -940,75 +940,16 @@ def test_current_front_matter_inconsistency_short_circuits_backend(tmp_path: Pat
     assert backend_calls == []
 
 
-def test_context_manifest_is_bounded_and_loaded_outside_repository(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    manifest = tmp_path / "context.json"
-    manifest.write_text(
-        '{"relevant_source_paths":["src/example.py"],"operator_context":["preserve approved scope"]}\n',
-        encoding="utf-8",
-    )
+def test_provided_context_path_is_an_opaque_request_value(tmp_path: Path) -> None:
     module = __import__(
         "spec_dock_runtime.application.issue_planning",
-        fromlist=["_load_planning_context_manifest"],
+        fromlist=["PlanningCreateRequest", "PlanningReviewRequest", "PlanningReviseRequest"],
     )
-
-    assert module._load_planning_context_manifest(
-        manifest,
-        repo_root=repo,
-        gateway=PLANNING_DEPENDENCIES.gateway,
-    ) == (("src/example.py",), ("preserve approved scope",))
-
-
-def test_context_manifest_rejects_unknown_keys_without_backend_work(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    manifest = tmp_path / "context.json"
-    manifest.write_text(
-        '{"relevant_source_paths":[],"operator_context":[],"unexpected":true}\n',
-        encoding="utf-8",
-    )
-    module = __import__(
-        "spec_dock_runtime.application.issue_planning",
-        fromlist=["_load_planning_context_manifest"],
-    )
-
-    with pytest.raises(ValueError, match="schema"):
-        module._load_planning_context_manifest(
-            manifest,
-            repo_root=repo,
-            gateway=PLANNING_DEPENDENCIES.gateway,
-        )
-
-
-def test_create_rejects_deeply_nested_context_manifest_without_backend_work(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    issue_dir = _planning_tree(repo)
-    output = tmp_path / "output"
-    output.mkdir()
-    manifest = tmp_path / "context.json"
-    nested = "[" * 10000 + "0" + "]" * 10000
-    manifest.write_text(
-        '{"relevant_source_paths":' + nested + ',"operator_context":[]}',
-        encoding="utf-8",
-    )
-    module = __import__(
-        "spec_dock_runtime.application.issue_planning",
-        fromlist=["PlanningCreateRequest", "run_issue_planning_create"],
-    )
-    backend_calls: list[object] = []
-    result = module.run_issue_planning_create(
-        dependencies=PLANNING_DEPENDENCIES,
-        request=module.PlanningCreateRequest("iss-00003", output, manifest),
-        records=[_record(issue_dir)],
-        repo_root=repo,
-        repo_slug_resolver=lambda _root: "owner/repo",
-        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
-    )
-
-    assert (result.status, result.reason) == ("rejected", "planning_context_rejected")
-    assert backend_calls == []
+    provided = Path("operator/context")
+    assert module.PlanningCreateRequest("iss-00003", tmp_path).provided_context_paths == ()
+    assert module.PlanningCreateRequest("iss-00003", tmp_path, (provided,)).provided_context_paths == (provided,)
+    assert module.PlanningReviewRequest("iss-00003", "archive-candidate", tmp_path).provided_context_paths == ()
+    assert module.PlanningReviseRequest(tmp_path / "candidate.zip", tmp_path / "request.json", tmp_path).provided_context_paths == ()
 
 
 def test_invalid_issue_id_rejections_keep_structured_result_contract(tmp_path: Path) -> None:
@@ -1112,17 +1053,12 @@ def test_create_maps_s02_nonpass_without_candidate_work(tmp_path: Path) -> None:
     assert publisher_calls == []
 
 
-def test_create_forwards_context_manifest_values_to_transport(tmp_path: Path) -> None:
+def test_create_forwards_provided_context_paths_only_to_prompt_synthesis(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     issue_dir = _planning_tree(repo)
     output = tmp_path / "output"
     output.mkdir()
-    manifest = tmp_path / "context.json"
-    manifest.write_text(
-        '{"relevant_source_paths":["src/example.py"],"operator_context":["preserve approved scope"]}\n',
-        encoding="utf-8",
-    )
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
         fromlist=["PlanningInvocationResult"],
@@ -1133,23 +1069,45 @@ def test_create_forwards_context_manifest_values_to_transport(tmp_path: Path) ->
         fromlist=["run_issue_planning_create"],
     )
 
+    prompt_calls: list[dict[str, object]] = []
+
+    def prompt_synthesizer(**kwargs: object) -> object:
+        prompt_calls.append(kwargs)
+        return object()
+
     def transport(**kwargs):
         captured.update(kwargs)
+        kwargs["prompt_synthesizer"](sentinel=True)
         return contracts.PlanningInvocationResult(status="blocked", reason="backend_timeout")
 
     result = module.run_issue_planning_create(
         dependencies=PLANNING_DEPENDENCIES,
-        request=module.PlanningCreateRequest("iss-00003", output, manifest),
+        request=module.PlanningCreateRequest(
+            "iss-00003",
+            output,
+            (Path("relative/context"), Path("/external/context"), Path("relative/context")),
+        ),
         records=[_record(issue_dir)],
         repo_root=repo,
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
         transport_runner=transport,
+        prompt_synthesizer=prompt_synthesizer,
     )
 
     assert (result.status, result.reason) == ("blocked", "backend_timeout")
-    assert captured["relevant_source_paths"] == ("src/example.py",)
-    assert captured["operator_context"] == ("preserve approved scope",)
+    assert captured["relevant_source_paths"] == ()
+    assert captured["operator_context"] == ()
+    assert prompt_calls == [
+        {
+            "sentinel": True,
+            "provided_context_paths": (
+                Path("relative/context"),
+                Path("/external/context"),
+                Path("relative/context"),
+            ),
+        }
+    ]
 
 
 def test_create_rejects_post_oracle_source_drift_before_publication(
@@ -1547,6 +1505,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
             mode="archive-candidate",
             output_dir=review_output,
             candidate_path=candidate,
+            provided_context_paths=(Path("operator/review"), Path("operator/review")),
         ),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1561,6 +1520,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
     assert (review_output / result.output["review_result_file"]).is_file()
     assert len(calls) == 1
     assert calls[0].attachment_paths[1] is candidate
+    assert calls[0].attachment_paths[-2:] == (Path("operator/review"), Path("operator/review"))
     assert all("reviewed-identity" not in str(path) for path in calls[0].attachment_paths)
     before_directories = tuple(review_output.iterdir())
     mutate_candidate[0] = True
@@ -1982,7 +1942,12 @@ def test_mechanical_revision_requires_blocking_review_and_publishes_v2(
     old_sha = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
     result = module.run_issue_planning_revise(
         dependencies=PLANNING_DEPENDENCIES,
-        request=module.PlanningReviseRequest(candidate_path, request_path, revised),
+        request=module.PlanningReviseRequest(
+            candidate_path,
+            request_path,
+            revised,
+            (Path("missing/mechanical"), Path("/outside/mechanical")),
+        ),
         review_evidence=module.PlanningRevisionEvidenceInput(
             review_path,
             hashlib.sha256(review_bytes).hexdigest(),
@@ -2212,6 +2177,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
             prior_candidate_path,
             request_path,
             revised,
+            (Path("operator/revision"), Path("/outside/revision")),
         ),
         review_evidence=module.PlanningRevisionEvidenceInput(review_path, review_sha),
         records=[_record(issue_dir)],
@@ -2228,6 +2194,10 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
     assert calls[0].attachment_paths[1] is prior_candidate_path
     assert calls[0].attachment_paths[2] is review_path
     assert calls[0].attachment_paths[3] is request_path
+    assert calls[0].attachment_paths[-2:] == (
+        Path("operator/revision"),
+        Path("/outside/revision"),
+    )
 
 
 @pytest.mark.parametrize(

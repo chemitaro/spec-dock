@@ -152,6 +152,7 @@ def synthesize_issue_planning_prompt(
     repo_root: Path,
     upstream: str,
     remote_head: str,
+    provided_context_paths: tuple[Path, ...] = (),
     resource_root: Path | None = None,
     output_expectation: PlanningOutputExpectation | None = None,
 ) -> SynthesizedPlanningPrompt:
@@ -184,7 +185,7 @@ def synthesize_issue_planning_prompt(
     return SynthesizedPlanningPrompt(
         role=role,
         prompt=prompt,
-        attachment_paths=(resources.attachments_dir, *source_paths),
+        attachment_paths=(resources.attachments_dir, *source_paths, *provided_context_paths),
         output_expectation=expectation,
     )
 
@@ -199,6 +200,7 @@ def synthesize_planning_evidence_prompt(
     remote_head: str | None = None,
     upstream: str | None = None,
     attachment_paths: tuple[Path, ...] = (),
+    provided_context_paths: tuple[Path, ...] = (),
     instructions: tuple[str, ...] = (),
     reviewed_identity: dict[str, object] | None = None,
     reviewed_identity_sha256: str | None = None,
@@ -254,7 +256,7 @@ def synthesize_planning_evidence_prompt(
     return SynthesizedPlanningPrompt(
         role=role,
         prompt=prompt,
-        attachment_paths=(resources.attachments_dir, *attachment_paths),
+        attachment_paths=(resources.attachments_dir, *attachment_paths, *provided_context_paths),
         output_expectation=expectation,
     )
 

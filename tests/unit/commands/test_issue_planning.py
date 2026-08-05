@@ -182,7 +182,53 @@ def test_each_leaf_dispatches_exactly_one_typed_request(argv, use_case_name, req
     assert isinstance(calls[0], request_type)
 
 
-def test_planning_create_forwards_external_context_manifest_path() -> None:
+@pytest.mark.parametrize(
+    ("argv_prefix", "use_case_name"),
+    [
+        (
+            [
+                "planning",
+                "create",
+                "--issue",
+                "iss-00003",
+                "--output",
+                "/tmp/out",
+            ],
+            "planning_create",
+        ),
+        (
+            [
+                "review",
+                "planning",
+                "--issue",
+                "iss-00003",
+                "--mode",
+                "archive-candidate",
+                "--candidate",
+                "/tmp/candidate.zip",
+                "--output",
+                "/tmp/out",
+            ],
+            "planning_review",
+        ),
+        (
+            [
+                "planning",
+                "revise",
+                "--candidate",
+                "/tmp/candidate.zip",
+                "--request",
+                "/tmp/request.json",
+                "--output",
+                "/tmp/out",
+            ],
+            "planning_revise",
+        ),
+    ],
+)
+def test_planning_commands_forward_repeatable_provided_context_paths(
+    argv_prefix: list[str], use_case_name: str,
+) -> None:
     calls = []
 
     def fake(request):
@@ -190,20 +236,43 @@ def test_planning_create_forwards_external_context_manifest_path() -> None:
         return PlanningCommandResult(status="ok", reason="candidate_created", issue_id="iss-00003")
 
     registry = build_registry()
-    namespace = build_parser(registry).parse_args([
-        "planning",
-        "create",
-        "--issue",
-        "iss-00003",
-        "--output",
-        "/tmp/out",
-        "--context-manifest",
-        "/tmp/context.json",
-    ])
+    namespace = build_parser(registry).parse_args(
+        [
+            *argv_prefix,
+            "--provided-context-path",
+            "relative/context",
+            "--provided-context-path",
+            "/external/context",
+            "--provided-context-path",
+            "relative/context",
+        ]
+    )
     with contextlib.redirect_stdout(io.StringIO()):
-        assert dispatch(namespace, registry, _use_cases(planning_create=fake)) == 0
+        assert dispatch(namespace, registry, _use_cases(**{use_case_name: fake})) == 0
     assert len(calls) == 1
-    assert calls[0].context_manifest_path == Path("/tmp/context.json")
+    assert calls[0].provided_context_paths == (
+        Path("relative/context"),
+        Path("/external/context"),
+        Path("relative/context"),
+    )
+
+
+def test_planning_create_rejects_context_manifest_without_use_case_call() -> None:
+    registry = build_registry()
+    with pytest.raises(SystemExit) as error:
+        build_parser(registry).parse_args(
+            [
+                "planning",
+                "create",
+                "--issue",
+                "iss-00003",
+                "--output",
+                "/tmp/out",
+                "--context-manifest",
+                "/tmp/context.json",
+            ]
+        )
+    assert error.value.code == 2
 
 
 @pytest.mark.parametrize(

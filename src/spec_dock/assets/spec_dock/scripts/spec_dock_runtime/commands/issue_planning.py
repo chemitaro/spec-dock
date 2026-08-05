@@ -30,7 +30,7 @@ class PlanningCreateArgs(CommandArgs):
     issue_id: str
     output_dir: Path
     output_format: OutputFormat
-    context_manifest_path: Path | None
+    provided_context_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,7 @@ class PlanningReviseArgs(CommandArgs):
     request_path: Path
     output_dir: Path
     output_format: OutputFormat
+    provided_context_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ class PlanningReviewArgs(CommandArgs):
     output_format: OutputFormat
     candidate_path: Path | None
     reviewed_head: str | None
+    provided_context_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -98,10 +100,7 @@ def _add_format(parser: argparse.ArgumentParser) -> None:
 def _add_create_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--issue", required=True, help="Existing Issue ID")
     parser.add_argument("--output", required=True, help="Existing external output directory")
-    parser.add_argument(
-        "--context-manifest",
-        help="Optional external JSON manifest with relevant_source_paths and operator_context",
-    )
+    _add_provided_context_path(parser)
     _add_format(parser)
 
 
@@ -113,6 +112,7 @@ def _add_revise_arguments(parser: argparse.ArgumentParser) -> None:
         help="Request JSON; sibling planning-review-result.json required in same directory",
     )
     parser.add_argument("--output", required=True, help="Existing external output directory")
+    _add_provided_context_path(parser)
     _add_format(parser)
 
 
@@ -125,7 +125,17 @@ def _add_review_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--reviewed-head", help="Reviewed Git HEAD (git-bound only)")
     parser.add_argument("--output", required=True, help="Existing external output directory")
+    _add_provided_context_path(parser)
     _add_format(parser)
+
+
+def _add_provided_context_path(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--provided-context-path",
+        action="append",
+        metavar="PATH",
+        help="Optional opaque context path passed directly to Oracle; repeatable.",
+    )
 
 
 def _add_apply_arguments(parser: argparse.ArgumentParser) -> None:
@@ -154,7 +164,7 @@ def _create_args(ns: argparse.Namespace) -> CommandArgs:
         issue_id=ns.issue,
         output_dir=Path(ns.output),
         output_format=_output_format(ns),
-        context_manifest_path=Path(ns.context_manifest) if ns.context_manifest is not None else None,
+        provided_context_paths=_provided_context_paths(ns),
     )
 
 
@@ -164,6 +174,7 @@ def _revise_args(ns: argparse.Namespace) -> CommandArgs:
         request_path=Path(ns.request),
         output_dir=Path(ns.output),
         output_format=_output_format(ns),
+        provided_context_paths=_provided_context_paths(ns),
     )
 
 
@@ -178,6 +189,7 @@ def _review_args(ns: argparse.Namespace) -> CommandArgs:
         output_format=_output_format(ns),
         candidate_path=Path(candidate) if candidate is not None else None,
         reviewed_head=reviewed_head,
+        provided_context_paths=_provided_context_paths(ns),
     )
 
 
@@ -208,7 +220,7 @@ def _run_create(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         PlanningCreateRequest(
             issue_id=typed.issue_id,
             output_dir=typed.output_dir,
-            context_manifest_path=typed.context_manifest_path,
+            provided_context_paths=typed.provided_context_paths,
         )
     )
     return _outcome(result, typed.output_format)
@@ -221,6 +233,7 @@ def _run_revise(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             candidate_path=typed.candidate_path,
             request_path=typed.request_path,
             output_dir=typed.output_dir,
+            provided_context_paths=typed.provided_context_paths,
         )
     )
     return _outcome(result, typed.output_format)
@@ -235,6 +248,7 @@ def _run_review(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             output_dir=typed.output_dir,
             candidate_path=typed.candidate_path,
             reviewed_head=typed.reviewed_head,
+            provided_context_paths=typed.provided_context_paths,
         )
     )
     return _outcome(result, typed.output_format)
@@ -263,6 +277,10 @@ def _expect_args(args: CommandArgs, expected_type: type, command: str):
     if not isinstance(args, expected_type):
         raise RuntimeError(f"Invalid command args for {command}")
     return args
+
+
+def _provided_context_paths(ns: argparse.Namespace) -> tuple[Path, ...]:
+    return tuple(Path(value) for value in (getattr(ns, "provided_context_path", None) or ()))
 
 
 def _outcome(result, output_format: OutputFormat) -> CommandOutcome:
