@@ -116,6 +116,39 @@ def _build_oracle_0161_browser_argv(
     return argv
 
 
+def _build_oracle_0170_browser_argv(
+    executable: Path,
+    managed_chrome: tuple[str, int],
+    session_id: str,
+    prompt: str,
+    attachment_paths: tuple[Path, ...],
+) -> list[str]:
+    """Build the characterized 0.17.0 browser invocation."""
+
+    argv = [
+        str(executable),
+        "--engine",
+        "browser",
+        "--model",
+        "gpt-5.6",
+        "--browser-model-strategy",
+        "select",
+        "--remote-chrome",
+        f"{managed_chrome[0]}:{managed_chrome[1]}",
+        "--browser-no-cookie-sync",
+        "--wait",
+        "--browser-attachments",
+        "always",
+        "--slug",
+        session_id,
+        "--prompt",
+        prompt,
+    ]
+    for attachment_path in attachment_paths:
+        argv.extend(("--file", str(attachment_path)))
+    return argv
+
+
 def _build_oracle_0161_session_argv(
     executable: Path,
     session_id: str,
@@ -131,8 +164,27 @@ def _build_oracle_0161_session_argv(
     )
 
 
+def _build_oracle_0170_session_argv(
+    executable: Path,
+    session_id: str,
+) -> tuple[str, ...]:
+    """Return the characterized 0.17.0 same-session command unchanged."""
+
+    return (
+        str(executable),
+        "session",
+        session_id,
+        "--harvest",
+        "--no-recover",
+    )
+
+
 def _decode_oracle_0161_stage(status_value: str) -> _SessionState:
     return "terminal" if status_value == "completed" else "nonterminal"
+
+
+def _decode_oracle_0170_stage(status_value: object) -> _SessionState:
+    return "terminal" if status_value == "completed" else "invalid"
 
 
 _ORACLE_PROFILE_REGISTRY: dict[str, _OracleCompatibilityProfile] = {
@@ -158,6 +210,29 @@ _ORACLE_PROFILE_REGISTRY: dict[str, _OracleCompatibilityProfile] = {
         artifact_reader=artifact_reader_for_version("0.16.1"),
         harvest_argv_builder=_build_oracle_0161_session_argv,
         capture_argv_builder=_build_oracle_0161_session_argv,
+    ),
+    "0.17.0": _OracleCompatibilityProfile(
+        profile_id="oracle-0.17.0",
+        version="0.17.0",
+        required_root_capabilities=(
+            "--engine",
+            "--file",
+            "--slug",
+            "--wait",
+            "--prompt",
+            "--browser-attachments",
+            "--model",
+            "--browser-model-strategy",
+            "--remote-chrome",
+            "--browser-no-cookie-sync",
+        ),
+        required_session_capabilities=("--harvest", "--no-recover"),
+        browser_argv_builder=_build_oracle_0170_browser_argv,
+        inline_mode_characterized=True,
+        stage_evidence_decoder=_decode_oracle_0170_stage,
+        artifact_reader=artifact_reader_for_version("0.17.0"),
+        harvest_argv_builder=_build_oracle_0170_session_argv,
+        capture_argv_builder=_build_oracle_0170_session_argv,
     ),
 }
 

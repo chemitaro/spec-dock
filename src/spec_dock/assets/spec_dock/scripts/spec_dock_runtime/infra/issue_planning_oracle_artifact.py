@@ -1,4 +1,4 @@
-"""Versioned, private Oracle 0.16.1 session artifact reader."""
+"""Versioned, private Oracle session artifact readers."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from spec_dock_runtime.domain.issue_planning_contracts import (
 )
 
 SUPPORTED_ORACLE_VERSION = "0.16.1"
+SUPPORTED_ORACLE_0170_VERSION = "0.17.0"
 MAX_METADATA_BYTES = 1024 * 1024
 MAX_ARTIFACTS = 32
 MAX_ARTIFACT_BYTES = 64 * 1024 * 1024
@@ -66,6 +67,20 @@ def read_session_status(
     oracle_version: str,
 ) -> str:
     metadata = _read_metadata(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _read_status_from_metadata(metadata)
+
+
+def read_session_status_0170(
+    session_root: Path,
+    *,
+    session_id: str,
+    oracle_version: str,
+) -> str:
+    metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _read_status_from_metadata(metadata)
+
+
+def _read_status_from_metadata(metadata: dict[str, Any]) -> str:
     status_value = metadata.get("status")
     if not isinstance(status_value, str) or not status_value:
         raise OracleArtifactError("oracle_artifact_rejected")
@@ -80,6 +95,34 @@ def snapshot_authoring_zip(
     staging_dir: Path,
 ) -> OracleAuthoringZipSnapshot:
     metadata = _read_metadata(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _snapshot_authoring_zip_from_metadata(
+        session_root,
+        metadata=metadata,
+        staging_dir=staging_dir,
+    )
+
+
+def snapshot_authoring_zip_0170(
+    session_root: Path,
+    *,
+    session_id: str,
+    oracle_version: str,
+    staging_dir: Path,
+) -> OracleAuthoringZipSnapshot:
+    metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _snapshot_authoring_zip_from_metadata(
+        session_root,
+        metadata=metadata,
+        staging_dir=staging_dir,
+    )
+
+
+def _snapshot_authoring_zip_from_metadata(
+    session_root: Path,
+    *,
+    metadata: dict[str, Any],
+    staging_dir: Path,
+) -> OracleAuthoringZipSnapshot:
     artifacts = _artifact_inventory(metadata)
     matches = [
         artifact
@@ -125,6 +168,34 @@ def snapshot_review_json(
     staging_dir: Path,
 ) -> OracleReviewJsonPayload:
     metadata = _read_metadata(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _snapshot_review_json_from_metadata(
+        session_root,
+        metadata=metadata,
+        staging_dir=staging_dir,
+    )
+
+
+def snapshot_review_json_0170(
+    session_root: Path,
+    *,
+    session_id: str,
+    oracle_version: str,
+    staging_dir: Path,
+) -> OracleReviewJsonPayload:
+    metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _snapshot_review_json_from_metadata(
+        session_root,
+        metadata=metadata,
+        staging_dir=staging_dir,
+    )
+
+
+def _snapshot_review_json_from_metadata(
+    session_root: Path,
+    *,
+    metadata: dict[str, Any],
+    staging_dir: Path,
+) -> OracleReviewJsonPayload:
     artifacts = _artifact_inventory(metadata)
     matches = [artifact for artifact in artifacts if artifact.get("kind") == "transcript"]
     if not matches:
@@ -162,6 +233,35 @@ def has_exact_repository_access_failure(
 ) -> bool:
     """Recognize only the exact terminal connector-failure sentinel."""
     metadata = _read_metadata(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _has_exact_repository_access_failure_from_metadata(
+        session_root,
+        metadata=metadata,
+        staging_dir=staging_dir,
+    )
+
+
+def has_exact_repository_access_failure_0170(
+    session_root: Path,
+    *,
+    session_id: str,
+    oracle_version: str,
+    staging_dir: Path,
+) -> bool:
+    """Recognize only the exact terminal connector-failure sentinel."""
+    metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
+    return _has_exact_repository_access_failure_from_metadata(
+        session_root,
+        metadata=metadata,
+        staging_dir=staging_dir,
+    )
+
+
+def _has_exact_repository_access_failure_from_metadata(
+    session_root: Path,
+    *,
+    metadata: dict[str, Any],
+    staging_dir: Path,
+) -> bool:
     artifacts = _artifact_inventory(metadata)
     transcripts = [item for item in artifacts if item.get("kind") == "transcript"]
     has_file_artifact = any(item.get("kind") == "file" for item in artifacts)
@@ -195,7 +295,40 @@ def _read_metadata(
     session_id: str,
     oracle_version: str,
 ) -> dict[str, Any]:
-    if oracle_version != SUPPORTED_ORACLE_VERSION:
+    return _read_metadata_for_version(
+        session_root,
+        session_id=session_id,
+        oracle_version=oracle_version,
+        expected_version=SUPPORTED_ORACLE_VERSION,
+    )
+
+
+def _read_metadata_0170(
+    session_root: Path,
+    *,
+    session_id: str,
+    oracle_version: str,
+) -> dict[str, Any]:
+    metadata = _read_metadata_for_version(
+        session_root,
+        session_id=session_id,
+        oracle_version=oracle_version,
+        expected_version=SUPPORTED_ORACLE_0170_VERSION,
+    )
+    status_value = metadata.get("status")
+    if status_value != "completed":
+        raise OracleArtifactError("oracle_artifact_rejected")
+    return metadata
+
+
+def _read_metadata_for_version(
+    session_root: Path,
+    *,
+    session_id: str,
+    oracle_version: str,
+    expected_version: str,
+) -> dict[str, Any]:
+    if oracle_version != expected_version:
         raise OracleArtifactError("oracle_artifact_rejected")
     if session_root.name != session_id:
         raise OracleArtifactError("oracle_artifact_rejected")
@@ -591,6 +724,13 @@ _ARTIFACT_READER_REGISTRY: dict[str, OracleArtifactReader] = {
         snapshot_authoring_zip=snapshot_authoring_zip,
         snapshot_review_json=snapshot_review_json,
         has_exact_repository_access_failure=has_exact_repository_access_failure,
+    ),
+    SUPPORTED_ORACLE_0170_VERSION: OracleArtifactReader(
+        version=SUPPORTED_ORACLE_0170_VERSION,
+        read_session_status=read_session_status_0170,
+        snapshot_authoring_zip=snapshot_authoring_zip_0170,
+        snapshot_review_json=snapshot_review_json_0170,
+        has_exact_repository_access_failure=has_exact_repository_access_failure_0170,
     ),
 }
 

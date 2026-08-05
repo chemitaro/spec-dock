@@ -542,7 +542,7 @@ def test_unsupported_version_or_capability_submits_no_prompt(
             version = (
                 b"0.16.2\n"
                 if preflight_failure == "version"
-                else b"0.17.0\n"
+                else b"0.17.1\n"
                 if preflight_failure == "unsupported-version"
                 else b"0.16.1\n"
             )
@@ -675,15 +675,20 @@ def test_preflight_receipt_records_content_free_capability_surface(
     ]
 
 
-def test_profile_registry_keeps_only_characterized_0161_contract() -> None:
-    assert tuple(issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY) == ("0.16.1",)
+def test_profile_registry_accepts_only_characterized_exact_contracts() -> None:
+    assert tuple(issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY) == ("0.16.1", "0.17.0")
     profile = issue_planning_chatgpt._profile_for_version("0.16.1")
     assert profile is not None
     assert profile.profile_id == "oracle-0.16.1"
     assert profile.inline_mode_characterized is False
     assert profile.harvest_argv_builder is profile.capture_argv_builder
     assert profile.artifact_reader.version == "0.16.1"
-    assert issue_planning_chatgpt._profile_for_version("0.17.0") is None
+    inline_profile = issue_planning_chatgpt._profile_for_version("0.17.0")
+    assert inline_profile is not None
+    assert inline_profile.profile_id == "oracle-0.17.0"
+    assert inline_profile.inline_mode_characterized is True
+    assert inline_profile.harvest_argv_builder is inline_profile.capture_argv_builder
+    assert inline_profile.artifact_reader.version == "0.17.0"
     assert issue_planning_chatgpt._profile_for_version("0.17.1") is None
 
 
@@ -728,6 +733,138 @@ def test_0161_profile_builders_preserve_exact_argv() -> None:
         "--harvest",
         "--no-recover",
     )
+
+
+def test_0170_profile_builders_preserve_characterized_argv() -> None:
+    profile = issue_planning_chatgpt._profile_for_version("0.17.0")
+    assert profile is not None
+    executable = Path("/opt/oracle")
+    browser_argv = profile.browser_argv_builder(
+        executable,
+        ("127.0.0.1", 9223),
+        "planner-abc123-0123abcd",
+        'literal $(touch nope); "quoted"',
+        (Path("/tmp/attachment.txt"),),
+    )
+    assert browser_argv == [
+        "/opt/oracle",
+        "--engine",
+        "browser",
+        "--model",
+        "gpt-5.6",
+        "--browser-model-strategy",
+        "select",
+        "--remote-chrome",
+        "127.0.0.1:9223",
+        "--browser-no-cookie-sync",
+        "--wait",
+        "--browser-attachments",
+        "always",
+        "--slug",
+        "planner-abc123-0123abcd",
+        "--prompt",
+        'literal $(touch nope); "quoted"',
+        "--file",
+        "/tmp/attachment.txt",
+    ]
+    assert profile.harvest_argv_builder(executable, "planner-abc123-0123abcd") == (
+        "/opt/oracle",
+        "session",
+        "planner-abc123-0123abcd",
+        "--harvest",
+        "--no-recover",
+    )
+
+
+@pytest.mark.parametrize(
+    ("status_value", "expected"),
+    [
+        ("completed", "terminal"),
+        ("running", "invalid"),
+        ("", "invalid"),
+        (None, "invalid"),
+        (123, "invalid"),
+    ],
+)
+def test_0170_stage_decoder_is_completed_only(status_value, expected: str) -> None:
+    profile = issue_planning_chatgpt._profile_for_version("0.17.0")
+    assert profile is not None
+    assert profile.stage_evidence_decoder(status_value) == expected
+
+
+def test_0170_runtime_uses_select_always_profile_and_reader(monkeypatch, tmp_path: Path) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.17.0\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        assert argv[argv.index("--model") + 1] == "gpt-5.6"
+        assert argv[argv.index("--browser-model-strategy") + 1] == "select"
+        assert argv[argv.index("--browser-attachments") + 1] == "always"
+        _write_planner_session(kwargs["env"], argv)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 0
+
+
+def test_0170_recovery_calls_harvest_builder_only(monkeypatch, tmp_path: Path) -> None:
+    executable = _fake_executable(tmp_path)
+    profile = issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY["0.17.0"]
+    harvest_calls: list[tuple[Path, str]] = []
+    capture_calls: list[tuple[Path, str]] = []
+
+    def harvest_builder(executable_path: Path, session_id: str) -> tuple[str, ...]:
+        harvest_calls.append((executable_path, session_id))
+        return profile.harvest_argv_builder(executable_path, session_id)
+
+    def capture_builder(executable_path: Path, session_id: str) -> tuple[str, ...]:
+        capture_calls.append((executable_path, session_id))
+        return profile.capture_argv_builder(executable_path, session_id)
+
+    monkeypatch.setitem(
+        issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY,
+        "0.17.0",
+        replace(
+            profile,
+            harvest_argv_builder=harvest_builder,
+            capture_argv_builder=capture_builder,
+        ),
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.17.0\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+        assert "--harvest" in argv and "--no-recover" in argv
+        _write_planner_session(kwargs["env"], argv, session_id=argv[2])
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path, timeout_seconds=0.1)
+
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert len(harvest_calls) == 1
+    assert capture_calls == []
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 1
 
 
 def test_help_option_matching_rejects_near_match_tokens() -> None:
@@ -778,7 +915,7 @@ def test_preflight_receipt_fail_closes_before_help_for_unsupported_version(
     def fake_run(argv, **kwargs):
         calls.append(list(argv))
         if argv[1:] == ["--version"]:
-            return _completed(argv, stdout=b"0.17.0\n")
+            return _completed(argv, stdout=b"0.17.1\n")
         pytest.fail("unsupported version must not probe help")
 
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
@@ -788,7 +925,7 @@ def test_preflight_receipt_fail_closes_before_help_for_unsupported_version(
         cwd=tmp_path,
     )
 
-    assert receipt.version == "0.17.0"
+    assert receipt.version == "0.17.1"
     assert receipt.profile_id is None
     assert receipt.version_exit_code == 0
     assert receipt.root_help_exit_code is None

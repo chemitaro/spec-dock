@@ -21,9 +21,119 @@ def test_artifact_reader_registry_is_exact_version_bound() -> None:
     assert reader.snapshot_review_json is artifact_reader.snapshot_review_json
     assert reader.has_exact_repository_access_failure is artifact_reader.has_exact_repository_access_failure
 
-    for version in ("0.16.0", "0.16.2", "0.17.0", "0.17.1", "0.18.0"):
+    reader_0170 = artifact_reader.artifact_reader_for_version("0.17.0")
+    assert reader_0170.version == "0.17.0"
+    assert reader_0170.read_session_status is artifact_reader.read_session_status_0170
+    assert reader_0170.snapshot_authoring_zip is artifact_reader.snapshot_authoring_zip_0170
+    assert reader_0170.snapshot_review_json is artifact_reader.snapshot_review_json_0170
+    assert reader_0170.has_exact_repository_access_failure is artifact_reader.has_exact_repository_access_failure_0170
+
+    for version in ("0.16.0", "0.16.2", "0.17.1", "0.18.0"):
         with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
             artifact_reader.artifact_reader_for_version(version)
+
+
+def test_0170_reader_accepts_core_schema_and_ignores_transfer_origin(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "oracle-017-attachment-characterization.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr(
+            "oracle-017-attachment-characterization/payload.txt",
+            "attachment-characterization-ok\n",
+        )
+    entry = _artifact("file", zip_path)
+    entry["transfer"] = {"status": "not-needed", "path": "/outside.zip"}
+    entry["origin"] = {"mode": "local", "sha256": "0" * 64}
+    _write_metadata(session, [entry])
+
+    reader = artifact_reader.artifact_reader_for_version("0.17.0")
+    snapshot = reader.snapshot_authoring_zip(
+        session,
+        session_id=session.name,
+        oracle_version="0.17.0",
+        staging_dir=tmp_path / "staging",
+    )
+    assert snapshot.observed_transport_filename == "oracle-017-attachment-characterization.zip"
+    assert snapshot.size_bytes == zip_path.stat().st_size
+    assert snapshot.sha256 == hashlib.sha256(zip_path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("defect", ["path", "sizeBytes", "sha256", "validation"])
+def test_0170_extra_fields_cannot_override_core_defect(tmp_path: Path, defect: str) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "oracle-017-attachment-characterization.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr(
+            "oracle-017-attachment-characterization/payload.txt",
+            "attachment-characterization-ok\n",
+        )
+    entry = _artifact("file", zip_path)
+    core_value = entry[defect]
+    if defect == "path":
+        entry[defect] = str(session / "outside.zip")
+    elif defect == "sizeBytes":
+        assert isinstance(core_value, int)
+        entry[defect] = core_value + 1
+    elif defect == "sha256":
+        entry[defect] = "0" * 64
+    else:
+        entry[defect] = {"type": "zip", "ok": False}
+    entry["transfer"] = {
+        "path": str(zip_path),
+        "sizeBytes": zip_path.stat().st_size,
+        "sha256": hashlib.sha256(zip_path.read_bytes()).hexdigest(),
+        "validation": {"type": "zip", "ok": True},
+    }
+    entry["origin"] = dict(entry["transfer"])
+    _write_metadata(session, [entry])
+
+    reader = artifact_reader.artifact_reader_for_version("0.17.0")
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.17.0",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+def test_version_bound_readers_reject_cross_version_calls(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    _write_metadata(session, [_artifact("file", zip_path)])
+
+    reader_0161 = artifact_reader.artifact_reader_for_version("0.16.1")
+    reader_0170 = artifact_reader.artifact_reader_for_version("0.17.0")
+    for reader, version in ((reader_0161, "0.17.0"), (reader_0170, "0.16.1")):
+        with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+            reader.snapshot_authoring_zip(
+                session,
+                session_id=session.name,
+                oracle_version=version,
+                staging_dir=tmp_path / f"staging-{version}",
+            )
+
+
+@pytest.mark.parametrize("status", [None, 123, "", "running"])
+def test_0170_reader_rejects_invalid_status(tmp_path: Path, status: object) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    _write_metadata(session, [_artifact("file", zip_path)])
+    metadata_path = session / "meta.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["status"] = status
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    reader = artifact_reader.artifact_reader_for_version("0.17.0")
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.17.0",
+            staging_dir=tmp_path / "staging",
+        )
 
 
 def test_snapshots_exact_oracle_zip_and_review_json(tmp_path: Path) -> None:
