@@ -337,25 +337,39 @@ PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_FakeClock(), gateway=_F
 
 
 class _FakeThreadPort:
-    def __init__(self, *, resolution: str = "unavailable") -> None:
+    def __init__(self, *, resolution: str = "unavailable", continuation_unavailable: bool = False) -> None:
         self.resolution = resolution
+        self.continuation_unavailable = continuation_unavailable
         self.blue_binding = BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=object())
         self.new_calls = 0
         self.continuation_calls = 0
         self.fresh_red_calls = 0
         self.commits: list[object] = []
         self.last_continuation_binding: BlueThreadBinding | None = None
+        self.continuation_kwargs: dict[str, object] | None = None
+        self.new_kwargs: dict[str, object] | None = None
 
     def resolve_blue(self, lineage: object) -> BlueBindingResolution:
-        del lineage
         if self.resolution == "exact":
+            self.blue_binding = BlueThreadBinding(
+                lineage_sha256=cast("Any", lineage).binding_sha256,
+                provider_handle=self.blue_binding.provider_handle,
+            )
             return BlueBindingResolution("exact", self.blue_binding)
         return BlueBindingResolution(cast("Any", self.resolution))
 
-    def _invoke(self, invoker: object, kwargs: dict[str, object], *, red: bool = False) -> ThreadInvocationReceipt:
+    def _invoke(
+        self,
+        invoker: object,
+        kwargs: dict[str, object],
+        *,
+        mode: str,
+        red: bool = False,
+    ) -> ThreadInvocationReceipt:
         result = cast("Any", invoker)(**kwargs)
         return ThreadInvocationReceipt(
             result=result,
+            mode=cast("Any", mode),
             submission_state="successful" if result.status == "pass" else "unknown",
             blue_binding=None if red else self.blue_binding,
             red_binding=object() if red else None,
@@ -363,7 +377,8 @@ class _FakeThreadPort:
 
     def invoke_new_blue(self, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
         self.new_calls += 1
-        return self._invoke(invoker, kwargs)
+        self.new_kwargs = kwargs
+        return self._invoke(invoker, kwargs, mode="new_blue")
 
     def invoke_continuation(
         self,
@@ -373,12 +388,20 @@ class _FakeThreadPort:
     ) -> ThreadInvocationReceipt:
         self.continuation_calls += 1
         self.last_continuation_binding = binding
-        return self._invoke(invoker, kwargs)
+        self.continuation_kwargs = kwargs
+        if self.continuation_unavailable:
+            return ThreadInvocationReceipt(
+                result=SimpleNamespace(status="blocked"),
+                mode="continuation",
+                submission_state="not_submitted",
+                continuation_unavailable_before_submission=True,
+            )
+        return self._invoke(invoker, kwargs, mode="continuation")
 
     def invoke_fresh_red(self, reviewed_identity: object, invoker: object, **kwargs: object) -> ThreadInvocationReceipt:
         del reviewed_identity
         self.fresh_red_calls += 1
-        return self._invoke(invoker, kwargs, red=True)
+        return self._invoke(invoker, kwargs, mode="fresh_red", red=True)
 
     def commit_blue(self, receipt: ThreadInvocationReceipt, new_lineage: object) -> None:
         assert receipt.blue_binding is self.blue_binding
@@ -3042,6 +3065,114 @@ def test_s06_blue_binding_hides_provider_handle_and_requires_exact_resolution() 
         BlueBindingResolution("unavailable", binding)
 
 
+@pytest.mark.parametrize(
+    "digest",
+    (
+        "D" * 64,
+        "d" * 63,
+        "g" * 64,
+    ),
+)
+def test_s06_blue_binding_rejects_noncanonical_lineage_digest(digest: str) -> None:
+    with pytest.raises(ValueError, match="lowercase SHA-256"):
+        BlueThreadBinding(lineage_sha256=digest, provider_handle=object())
+
+
+def test_s06_blue_binding_rejects_missing_provider_handle_and_unknown_resolution() -> None:
+    with pytest.raises(ValueError, match="provider_handle"):
+        BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=None)
+    with pytest.raises(ValueError, match="invalid Blue binding resolution status"):
+        BlueBindingResolution(cast("Any", "forged"))
+
+
+def test_s06_receipt_closes_mode_submission_binding_matrix() -> None:
+    binding = BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=object())
+    passing = SimpleNamespace(status="pass")
+    blocked = SimpleNamespace(status="blocked")
+    ThreadInvocationReceipt(
+        result=passing,
+        mode="new_blue",
+        submission_state="successful",
+        blue_binding=binding,
+    )
+    ThreadInvocationReceipt(
+        result=passing,
+        mode="fresh_red",
+        submission_state="successful",
+        red_binding=object(),
+    )
+    ThreadInvocationReceipt(
+        result=blocked,
+        mode="continuation",
+        submission_state="not_submitted",
+        continuation_unavailable_before_submission=True,
+    )
+    invalid = (
+        {
+            "result": passing,
+            "mode": "new_blue",
+            "submission_state": "successful",
+        },
+        {
+            "result": passing,
+            "mode": "fresh_red",
+            "submission_state": "successful",
+        },
+        {
+            "result": passing,
+            "mode": "continuation",
+            "submission_state": "not_submitted",
+        },
+        {
+            "result": blocked,
+            "mode": "new_blue",
+            "submission_state": "not_submitted",
+            "blue_binding": binding,
+        },
+        {
+            "result": blocked,
+            "mode": "continuation",
+            "submission_state": "not_submitted",
+            "continuation_unavailable_before_submission": True,
+            "blue_binding": binding,
+        },
+    )
+    for values in invalid:
+        with pytest.raises(ValueError):
+            ThreadInvocationReceipt(**values)
+
+
+def test_s06_create_receipt_gate_blocks_before_publisher_when_port_did_not_capture(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    candidates.mkdir()
+    gateway = _FakeIssuePlanningGateway()
+    thread_port = _FakeThreadPort()
+    dependencies = IssuePlanningDependencies(_FakeClock(), gateway, thread_port)
+    publisher_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        dependencies=dependencies,
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: _successful_transport(),
+        transport_runner=lambda **kwargs: _successful_transport(),
+        publisher=lambda **kwargs: publisher_calls.append(kwargs),
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == ("blocked", "planning_context_rejected")
+    assert result.details == ("thread_receipt_invalid",)
+    assert publisher_calls == []
+    assert list(candidates.iterdir()) == []
+
+
 def test_s06_create_invokes_new_blue_and_commits_only_after_publication(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -3233,6 +3364,106 @@ def test_s06_semantic_revision_stops_on_ambiguous_blue_lineage(tmp_path: Path) -
     assert thread_port.new_calls == 0
     assert thread_port.continuation_calls == 0
     assert thread_port.commits == []
+
+
+def test_s06_semantic_revision_stops_on_cross_lineage_exact_binding(tmp_path: Path) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    identity = setup["identity"]
+
+    class _CrossLineagePort(_FakeThreadPort):
+        def resolve_blue(self, lineage: object) -> BlueBindingResolution:
+            del lineage
+            return BlueBindingResolution(
+                "exact",
+                BlueThreadBinding(lineage_sha256="d" * 64, provider_handle=object()),
+            )
+
+    thread_port = _CrossLineagePort(resolution="exact")
+    dependencies = IssuePlanningDependencies(_FakeClock(), PLANNING_DEPENDENCIES.gateway, thread_port)
+    module = setup["module"]
+    result = module.run_issue_planning_revise(
+        dependencies=dependencies,
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(setup["review_path"], setup["review_sha"]),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("cross-lineage Blue must not invoke backend"),
+        transport_runner=lambda **kwargs: pytest.fail("cross-lineage Blue must stop before transport"),
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == ("blocked", "planning_context_rejected")
+    assert result.details == ("blue_lineage_ambiguous",)
+    assert thread_port.new_calls == 0
+    assert thread_port.continuation_calls == 0
+
+
+def test_s06_semantic_revision_stops_on_unknown_resolution_status(tmp_path: Path) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    identity = setup["identity"]
+    thread_port = _FakeThreadPort(resolution="forged")
+    dependencies = IssuePlanningDependencies(_FakeClock(), PLANNING_DEPENDENCIES.gateway, thread_port)
+    module = setup["module"]
+    result = module.run_issue_planning_revise(
+        dependencies=dependencies,
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(setup["review_path"], setup["review_sha"]),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("unknown Blue must not invoke backend"),
+        transport_runner=lambda **kwargs: pytest.fail("unknown Blue must stop before transport"),
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == ("blocked", "planning_context_rejected")
+    assert result.details == ("blue_lineage_ambiguous",)
+    assert thread_port.new_calls == 0
+    assert thread_port.continuation_calls == 0
+
+
+def test_s06_semantic_revision_fallback_reuses_exact_synthesized_input(tmp_path: Path) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    identity = setup["identity"]
+    thread_port = _FakeThreadPort(resolution="exact", continuation_unavailable=True)
+    dependencies = IssuePlanningDependencies(_FakeClock(), PLANNING_DEPENDENCIES.gateway, thread_port)
+    module = setup["module"]
+    synthesized_ids: list[int] = []
+
+    def backend(**kwargs: object):
+        synthesized_ids.append(id(kwargs["synthesized"]))
+        return _successful_transport(source_manifest_hash=setup["source_hash"])
+
+    result = module.run_issue_planning_revise(
+        dependencies=dependencies,
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(setup["review_path"], setup["review_sha"]),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=backend,
+        transport_runner=lambda **kwargs: cast("Any", kwargs["backend_invoker"])(synthesized=object()),
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == ("ok", "candidate_revised")
+    assert thread_port.continuation_calls == 1
+    assert thread_port.new_calls == 1
+    assert len(synthesized_ids) == 1
+    assert len(thread_port.commits) == 1
+    assert thread_port.continuation_kwargs is not None
+    assert thread_port.new_kwargs is not None
+    assert thread_port.continuation_kwargs["synthesized"] is thread_port.new_kwargs["synthesized"]
 
 
 @pytest.mark.parametrize("revision", [False, True])

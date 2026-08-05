@@ -17,6 +17,7 @@ from spec_dock_runtime.application.issue_planning_prompt import (
     synthesize_planning_evidence_prompt,
 )
 from spec_dock_runtime.application.ports import (
+    BlueBindingResolution,
     BlueThreadBinding,
     ChatGptThreadPort,
     ExpectedPlanningTargetsView,
@@ -31,8 +32,8 @@ from spec_dock_runtime.application.ports import (
     PlanningApplyExecutionView,
     PublishedCandidateView,
     PublishedPlanningReviewView,
+    ThreadInvocationMode,
     ThreadInvocationReceipt,
-    ThreadSubmissionState,
     VerifiedIssueCandidateView,
 )
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
@@ -701,19 +702,73 @@ def _git_blob_oid(content: bytes) -> str:
     return hashlib.sha1(header + content).hexdigest()
 
 
-def _legacy_thread_receipt(
-    backend_invoker: Callable[..., PlanningInvocationResult],
-    **kwargs: Any,
-) -> ThreadInvocationReceipt:
-    """Adapt the legacy one-shot backend without guessing non-pass semantics."""
-
-    result = backend_invoker(**kwargs)
-    state: ThreadSubmissionState = (
-        "successful"
-        if result.status == "pass" and result.reason == "transport_received"
-        else "unknown"
+def _thread_contract_failure() -> PlanningInvocationResult:
+    return PlanningInvocationResult(
+        status="blocked",
+        reason="planning_context_rejected",
+        details=("thread_receipt_invalid",),
     )
-    return ThreadInvocationReceipt(result=result, submission_state=state)
+
+
+def _thread_command_contract_failure(issue_id: str) -> PlanningCommandResult:
+    return PlanningCommandResult(
+        status="blocked",
+        reason="planning_context_rejected",
+        issue_id=issue_id,
+        details=("thread_receipt_invalid",),
+    )
+
+
+def _validate_blue_resolution(
+    resolution: BlueBindingResolution,
+    prior_lineage: GitBoundOperationBindingV1,
+) -> str:
+    """Validate a resolved Blue binding against the requested Candidate lineage."""
+
+    if not isinstance(resolution, BlueBindingResolution):
+        raise ValueError("Blue binding resolution type is invalid")
+    resolution.__post_init__()
+    if resolution.status == "exact":
+        binding = resolution.binding
+        if not isinstance(binding, BlueThreadBinding):
+            raise ValueError("exact Blue binding is invalid")
+        binding.__post_init__()
+        if binding.lineage_sha256 != prior_lineage.binding_sha256:
+            raise ValueError("Blue binding lineage mismatch")
+    elif resolution.binding is not None:
+        raise ValueError("non-exact Blue binding must not carry a binding")
+    return resolution.status
+
+
+def _validate_thread_receipt(
+    receipt: ThreadInvocationReceipt,
+    *,
+    mode: ThreadInvocationMode,
+    required_binding: BlueThreadBinding | None = None,
+    required_lineage_sha256: str | None = None,
+) -> None:
+    """Re-check private receipt invariants at the application boundary."""
+
+    if not isinstance(receipt, ThreadInvocationReceipt):
+        raise ValueError("thread invocation receipt type is invalid")
+    # A port/test double may have bypassed dataclass construction or mutated an
+    # otherwise frozen instance. Re-run the closed contract before consuming it.
+    receipt.__post_init__()
+    if receipt.blue_binding is not None:
+        receipt.blue_binding.__post_init__()
+    if receipt.mode != mode:
+        raise ValueError("thread invocation mode mismatch")
+    result_status = getattr(receipt.result, "status", None)
+    if result_status not in ("pass", "blocked", "rejected"):
+        raise ValueError("thread invocation result status is invalid")
+    if mode == "continuation" and receipt.submission_state == "successful":
+        if required_binding is None or receipt.blue_binding is not required_binding:
+            raise ValueError("continuation Blue binding mismatch")
+        if receipt.blue_binding.provider_handle is not required_binding.provider_handle:
+            raise ValueError("continuation provider handle mismatch")
+        expected_lineage = required_lineage_sha256 or required_binding.lineage_sha256
+        if receipt.blue_binding.lineage_sha256 != expected_lineage:
+            raise ValueError("continuation lineage mismatch")
 
 
 def _thread_backend_invoker(
@@ -729,17 +784,28 @@ def _thread_backend_invoker(
 
     def invoke(**kwargs: Any) -> PlanningInvocationResult:
         if thread_port is None:
-            receipt = _legacy_thread_receipt(backend_invoker, **kwargs)
-        elif mode == "new_blue":
-            receipt = thread_port.invoke_new_blue(backend_invoker, **kwargs)
-        elif mode == "continuation":
-            if binding is None:
-                raise ValueError("continuation requires an exact Blue binding")
-            receipt = thread_port.invoke_continuation(binding, backend_invoker, **kwargs)
-        else:
-            if reviewed_identity is None:
-                raise ValueError("fresh Red requires a reviewed identity")
-            receipt = thread_port.invoke_fresh_red(reviewed_identity, backend_invoker, **kwargs)
+            # Preserve the legacy one-shot path without manufacturing a
+            # private S06 receipt when the optional capability is absent.
+            return backend_invoker(**kwargs)
+        try:
+            if mode == "new_blue":
+                receipt = thread_port.invoke_new_blue(backend_invoker, **kwargs)
+            elif mode == "continuation":
+                if binding is None:
+                    raise ValueError("continuation requires an exact Blue binding")
+                receipt = thread_port.invoke_continuation(binding, backend_invoker, **kwargs)
+            else:
+                if reviewed_identity is None:
+                    raise ValueError("fresh Red requires a reviewed identity")
+                receipt = thread_port.invoke_fresh_red(reviewed_identity, backend_invoker, **kwargs)
+            _validate_thread_receipt(
+                receipt,
+                mode=mode,
+                required_binding=binding,
+                required_lineage_sha256=(binding.lineage_sha256 if binding is not None else None),
+            )
+        except (AttributeError, TypeError, ValueError):
+            return _thread_contract_failure()
         capture(receipt)
         return receipt.result
 
@@ -754,15 +820,41 @@ def _commit_published_blue(
 ) -> PlanningCommandResult | None:
     if thread_port is None or receipt is None:
         return None
-    if receipt.submission_state != "successful":
-        return None
-    if receipt.blue_binding is None:
-        return PlanningCommandResult(
-            status="blocked",
-            reason="planning_context_rejected",
-            details=("blue_binding_unavailable",),
-        )
     thread_port.commit_blue(receipt, lineage)
+    return None
+
+
+def _require_publishable_thread_receipt(
+    *,
+    thread_port: ChatGptThreadPort | None,
+    receipts: Sequence[ThreadInvocationReceipt],
+    issue_id: str,
+    mode: ThreadInvocationMode,
+    required_binding: BlueThreadBinding | None = None,
+    required_lineage_sha256: str | None = None,
+) -> PlanningCommandResult | None:
+    """Gate all thread-backed publication on one valid submitted receipt."""
+
+    if thread_port is None:
+        return None
+    if len(receipts) != 1:
+        return _thread_command_contract_failure(issue_id)
+    try:
+        receipt = receipts[0]
+        _validate_thread_receipt(
+            receipt,
+            mode=mode,
+            required_binding=required_binding,
+            required_lineage_sha256=required_lineage_sha256,
+        )
+        if receipt.submission_state != "successful" or getattr(receipt.result, "status", None) != "pass":
+            raise ValueError("thread receipt is not publishable")
+        if mode in ("new_blue", "continuation") and receipt.blue_binding is None:
+            raise ValueError("publishable Blue receipt requires binding")
+        if mode == "fresh_red" and receipt.red_binding is None:
+            raise ValueError("publishable Red receipt requires binding")
+    except (AttributeError, TypeError, ValueError):
+        return _thread_command_contract_failure(issue_id)
     return None
 
 
@@ -996,6 +1088,14 @@ def run_issue_planning_create(
             issue_id=target.issue_id,
             details=transport.details,
         )
+    receipt_gate = _require_publishable_thread_receipt(
+        thread_port=dependencies.thread_port,
+        receipts=thread_receipts,
+        issue_id=target.issue_id,
+        mode="new_blue",
+    )
+    if receipt_gate is not None:
+        return receipt_gate
     authoring_zip = transport.authoring_zip
     if (
         transport.reason != "transport_received"
@@ -1324,6 +1424,14 @@ def run_issue_planning_review(
             issue_id=target.issue_id,
             details=transport.details,
         )
+    receipt_gate = _require_publishable_thread_receipt(
+        thread_port=dependencies.thread_port,
+        receipts=thread_receipts,
+        issue_id=target.issue_id,
+        mode="fresh_red",
+    )
+    if receipt_gate is not None:
+        return receipt_gate
     review_json = transport.review_json
     payload = None if review_json is None else review_json.json_bytes
     if (
@@ -1629,6 +1737,7 @@ def run_issue_planning_revise(
 
         thread_receipts: list[ThreadInvocationReceipt] = []
         continuation_binding: BlueThreadBinding | None = None
+        continuation_lineage_sha256: str | None = None
         use_continuation = False
         if dependencies.thread_port is not None:
             try:
@@ -1641,14 +1750,15 @@ def run_issue_planning_revise(
                     onboarding_companion=candidate.onboarding_companion,
                 )
                 resolution = dependencies.thread_port.resolve_blue(prior_lineage)
-            except (OSError, UnicodeError, ValueError):
+                resolution_status = _validate_blue_resolution(resolution, prior_lineage)
+            except (AttributeError, OSError, TypeError, UnicodeError, ValueError):
                 return PlanningCommandResult(
                     status="blocked",
                     reason="planning_context_rejected",
                     issue_id=issue_id,
                     details=("blue_lineage_ambiguous",),
                 )
-            if resolution.status == "ambiguous":
+            if resolution_status == "ambiguous":
                 return PlanningCommandResult(
                     status="blocked",
                     reason="planning_context_rejected",
@@ -1656,7 +1766,9 @@ def run_issue_planning_revise(
                     details=("blue_lineage_ambiguous",),
                 )
             continuation_binding = resolution.binding
-            use_continuation = resolution.status == "exact"
+            use_continuation = resolution_status == "exact"
+            if continuation_binding is not None:
+                continuation_lineage_sha256 = continuation_binding.lineage_sha256
 
         def capture_thread_receipt(receipt: ThreadInvocationReceipt) -> None:
             thread_receipts[:] = [receipt]
@@ -1699,21 +1811,32 @@ def run_issue_planning_revise(
 
         def revision_backend_invoker(**kwargs: Any) -> PlanningInvocationResult:
             if dependencies.thread_port is None:
-                receipt = _legacy_thread_receipt(backend_invoker, **kwargs)
-            elif use_continuation:
-                assert continuation_binding is not None
-                receipt = dependencies.thread_port.invoke_continuation(
-                    continuation_binding,
-                    backend_invoker,
-                    **kwargs,
-                )
-                if (
-                    receipt.submission_state == "not_submitted"
-                    and receipt.continuation_unavailable_before_submission
-                ):
+                return backend_invoker(**kwargs)
+            try:
+                if use_continuation:
+                    assert continuation_binding is not None
+                    receipt = dependencies.thread_port.invoke_continuation(
+                        continuation_binding,
+                        backend_invoker,
+                        **kwargs,
+                    )
+                    _validate_thread_receipt(
+                        receipt,
+                        mode="continuation",
+                        required_binding=continuation_binding,
+                        required_lineage_sha256=continuation_lineage_sha256,
+                    )
+                    if (
+                        receipt.submission_state == "not_submitted"
+                        and receipt.continuation_unavailable_before_submission
+                    ):
+                        receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
+                        _validate_thread_receipt(receipt, mode="new_blue")
+                else:
                     receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
-            else:
-                receipt = dependencies.thread_port.invoke_new_blue(backend_invoker, **kwargs)
+                    _validate_thread_receipt(receipt, mode="new_blue")
+            except (AttributeError, TypeError, ValueError):
+                return _thread_contract_failure()
             capture_thread_receipt(receipt)
             return receipt.result
 
@@ -1738,6 +1861,19 @@ def run_issue_planning_revise(
                 issue_id=issue_id,
                 details=transport.details,
             )
+        receipt_mode: ThreadInvocationMode = "continuation" if use_continuation else "new_blue"
+        if thread_receipts and thread_receipts[0].mode == "new_blue":
+            receipt_mode = "new_blue"
+        receipt_gate = _require_publishable_thread_receipt(
+            thread_port=dependencies.thread_port,
+            receipts=thread_receipts,
+            issue_id=issue_id,
+            mode=receipt_mode,
+            required_binding=(continuation_binding if receipt_mode == "continuation" else None),
+            required_lineage_sha256=(continuation_lineage_sha256 if receipt_mode == "continuation" else None),
+        )
+        if receipt_gate is not None:
+            return receipt_gate
         authoring_zip = transport.authoring_zip
         if (
             authoring_zip is None

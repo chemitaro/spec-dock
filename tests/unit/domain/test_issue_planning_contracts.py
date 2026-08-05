@@ -13,12 +13,15 @@ from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     GitBoundOperationBindingV1,
     IssueCandidateIdentity,
     OnboardingCompanionBindingV1,
+    OracleAuthoringZipSnapshot,
     PlanningCommandResult,
     PlanningContext,
     PlanningHumanDecisionV1,
+    PlanningInvocationResult,
     PlanningReviewFinding,
     PlanningReviewResult,
     PlanningRevisionRequestV1,
+    PlanningSourceEvidence,
     ReviewedPlanningIdentity,
 )
 
@@ -1003,3 +1006,49 @@ def test_source_evidence_rejects_non_exact_git_identity(changes: dict[str, objec
     values.update(changes)
     with pytest.raises(ValueError):
         contracts.PlanningSourceEvidence(**values)
+
+
+def test_s06_public_contract_shapes_remain_content_free() -> None:
+    binding = _git_binding()
+    invocation_payload = b"{}"
+    invocation = PlanningInvocationResult(
+        status="pass",
+        reason="transport_received",
+        source_evidence=PlanningSourceEvidence(
+            repository="owner/repo",
+            branch="feature/issue",
+            upstream="origin/feature/issue",
+            local_head=HEAD,
+            remote_head=HEAD,
+            source_manifest_hash="d" * 64,
+            snapshot_id="e" * 64,
+            remote_head_disposition="fetched_remote_tracking_ref",
+        ),
+        response_bytes=len(invocation_payload),
+        response_sha256=hashlib.sha256(invocation_payload).hexdigest(),
+        authoring_zip=OracleAuthoringZipSnapshot(
+            expected_logical_filename="candidate.zip",
+            observed_transport_filename="candidate.zip",
+            internal_root="candidate",
+            size_bytes=len(invocation_payload),
+            sha256=hashlib.sha256(invocation_payload).hexdigest(),
+            zip_bytes=invocation_payload,
+        ),
+    )
+    public_values = (
+        binding.to_dict(),
+        invocation.to_dict(),
+        PlanningCommandResult(
+            status="blocked",
+            reason="planning_context_rejected",
+            issue_id="iss-00003",
+            details=("thread_receipt_invalid",),
+        ).to_dict(),
+    )
+    for value in public_values:
+        rendered = json.dumps(value, ensure_ascii=False, sort_keys=True)
+        assert "provider_handle" not in value
+        assert "red_binding" not in value
+        assert "blue_binding" not in value
+        assert "transcript" not in rendered
+        assert "sentinel-private" not in rendered
