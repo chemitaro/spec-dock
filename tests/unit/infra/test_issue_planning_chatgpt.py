@@ -867,6 +867,121 @@ def test_0170_recovery_calls_harvest_builder_only(monkeypatch, tmp_path: Path) -
     assert sum("--harvest" in argv for argv in calls) == 1
 
 
+def test_0170_reviewer_blocks_before_managed_chrome_prompt_or_recovery(monkeypatch, tmp_path: Path) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    managed_chrome_calls: list[object] = []
+    builder_calls: list[object] = []
+    recovery_calls: list[object] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.17.0\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        pytest.fail("0.17.0 reviewer must not submit a prompt")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(
+        issue_planning_chatgpt,
+        "_preflight_managed_chrome",
+        lambda endpoint: managed_chrome_calls.append(endpoint) or True,
+    )
+    profile = issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY["0.17.0"]
+    monkeypatch.setitem(
+        issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY,
+        "0.17.0",
+        replace(
+            profile,
+            browser_argv_builder=lambda *args: builder_calls.append(args) or [],
+        ),
+    )
+    monkeypatch.setattr(
+        issue_planning_chatgpt,
+        "_recover_same_session",
+        lambda **kwargs: recovery_calls.append(kwargs),
+    )
+
+    result = _invoke(tmp_path, role="reviewer")
+
+    assert (result.status, result.reason) == ("blocked", "oracle_capability_unsupported")
+    assert [argv[1:] for argv in calls] == [
+        ["--version"],
+        ["--help"],
+        ["session", "--help"],
+    ]
+    assert managed_chrome_calls == []
+    assert builder_calls == []
+    assert recovery_calls == []
+    assert not (tmp_path / "oracle-home" / "sessions").exists()
+
+
+def test_incomplete_review_capability_blocks_before_help_or_prompt(monkeypatch, tmp_path: Path) -> None:
+    executable = _fake_executable(tmp_path)
+    profile = issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY["0.17.0"]
+    monkeypatch.setitem(
+        issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY,
+        "0.17.0",
+        replace(profile, artifact_reader=replace(profile.artifact_reader, review_output_characterized=None)),
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.17.0\n")
+        pytest.fail("incomplete capability must not probe help or submit")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    receipt = issue_planning_chatgpt._read_oracle_preflight_receipt(
+        executable,
+        child_env=issue_planning_chatgpt._sanitized_child_environment(),
+        cwd=tmp_path,
+    )
+
+    assert receipt.profile_id == "oracle-0.17.0"
+    assert receipt.supported_by_current_runtime is False
+    assert calls == [[str(executable.resolve()), "--version"]]
+
+
+def test_missing_review_capability_blocks_before_help_or_prompt(monkeypatch, tmp_path: Path) -> None:
+    executable = _fake_executable(tmp_path)
+    profile = issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY["0.17.0"]
+    reader = SimpleNamespace(
+        version=profile.artifact_reader.version,
+        read_session_status=profile.artifact_reader.read_session_status,
+        snapshot_authoring_zip=profile.artifact_reader.snapshot_authoring_zip,
+        snapshot_review_json=profile.artifact_reader.snapshot_review_json,
+        has_exact_repository_access_failure=profile.artifact_reader.has_exact_repository_access_failure,
+    )
+    monkeypatch.setitem(
+        issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY,
+        "0.17.0",
+        replace(profile, artifact_reader=reader),
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.17.0\n")
+        pytest.fail("missing capability must not probe help or submit")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    receipt = issue_planning_chatgpt._read_oracle_preflight_receipt(
+        executable,
+        child_env=issue_planning_chatgpt._sanitized_child_environment(),
+        cwd=tmp_path,
+    )
+
+    assert receipt.profile_id == "oracle-0.17.0"
+    assert receipt.supported_by_current_runtime is False
+    assert calls == [[str(executable.resolve()), "--version"]]
+
+
 def test_help_option_matching_rejects_near_match_tokens() -> None:
     tokens = issue_planning_chatgpt._help_option_tokens(
         b"--harvester --browser-model-strategy-extra --file <paths...>"

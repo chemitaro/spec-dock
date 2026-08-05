@@ -20,6 +20,7 @@ def test_artifact_reader_registry_is_exact_version_bound() -> None:
     assert reader.snapshot_authoring_zip is artifact_reader.snapshot_authoring_zip
     assert reader.snapshot_review_json is artifact_reader.snapshot_review_json
     assert reader.has_exact_repository_access_failure is artifact_reader.has_exact_repository_access_failure
+    assert reader.review_output_characterized is True
 
     reader_0170 = artifact_reader.artifact_reader_for_version("0.17.0")
     assert reader_0170.version == "0.17.0"
@@ -27,6 +28,7 @@ def test_artifact_reader_registry_is_exact_version_bound() -> None:
     assert reader_0170.snapshot_authoring_zip is artifact_reader.snapshot_authoring_zip_0170
     assert reader_0170.snapshot_review_json is artifact_reader.snapshot_review_json_0170
     assert reader_0170.has_exact_repository_access_failure is artifact_reader.has_exact_repository_access_failure_0170
+    assert reader_0170.review_output_characterized is False
 
     for version in ("0.16.0", "0.16.2", "0.17.1", "0.18.0"):
         with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
@@ -129,6 +131,62 @@ def test_0170_reader_rejects_invalid_status(tmp_path: Path, status: object) -> N
     reader = artifact_reader.artifact_reader_for_version("0.17.0")
     with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
         reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.17.0",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+def test_0170_reader_rejects_uncharacterized_0161_review_transcript(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    transcript = session / "artifacts" / "transcript.md"
+    transcript.write_bytes(b"# Transcript\n## Answer\n{\"verdict\":\"pass\"}\n")
+    _write_metadata(session, [_artifact("transcript", transcript)])
+
+    reader = artifact_reader.artifact_reader_for_version("0.17.0")
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        reader.snapshot_review_json(
+            session,
+            session_id=session.name,
+            oracle_version="0.17.0",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+def test_0170_reader_rejects_uncharacterized_0161_repository_sentinel(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    transcript = session / "artifacts" / "transcript.md"
+    transcript.write_bytes(b"# Transcript\n## Answer\nrepository access failed\n")
+    _write_metadata(session, [_artifact("transcript", transcript)])
+
+    reader = artifact_reader.artifact_reader_for_version("0.17.0")
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        reader.has_exact_repository_access_failure(
+            session,
+            session_id=session.name,
+            oracle_version="0.17.0",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+@pytest.mark.parametrize("kind", ["transcript", "repository-failure", "missing"])
+def test_0170_reader_rejects_uncharacterized_artifact_kind(tmp_path: Path, kind: str) -> None:
+    session = _session(tmp_path)
+    artifact_path = session / "artifacts" / "unknown.bin"
+    artifact_path.write_bytes(b"uncharacterized\n")
+    entry = _artifact("file", artifact_path)
+    if kind == "transcript":
+        entry = _artifact("transcript", artifact_path)
+    elif kind == "repository-failure":
+        entry["kind"] = "repository-failure"
+    else:
+        entry.pop("kind")
+    _write_metadata(session, [entry])
+
+    reader = artifact_reader.artifact_reader_for_version("0.17.0")
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        reader.has_exact_repository_access_failure(
             session,
             session_id=session.name,
             oracle_version="0.17.0",

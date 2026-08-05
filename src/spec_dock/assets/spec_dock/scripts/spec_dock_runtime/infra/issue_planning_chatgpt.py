@@ -269,6 +269,7 @@ def _profile_for_version(version: str | None) -> _OracleCompatibilityProfile | N
 
 def _profile_is_complete(profile: _OracleCompatibilityProfile | None) -> bool:
     reader = profile.artifact_reader if profile is not None else None
+    review_output_characterized = getattr(reader, "review_output_characterized", None)
     return bool(
         profile is not None
         and profile.required_root_capabilities
@@ -280,6 +281,7 @@ def _profile_is_complete(profile: _OracleCompatibilityProfile | None) -> bool:
         and callable(profile.capture_argv_builder)
         and reader is not None
         and reader.version == profile.version
+        and isinstance(review_output_characterized, bool)
         and callable(reader.read_session_status)
         and callable(reader.snapshot_authoring_zip)
         and callable(reader.snapshot_review_json)
@@ -319,6 +321,13 @@ def invoke_issue_planning_chatgpt(
     )
     profile = _profile_for_version(preflight.version)
     if not preflight.supported_by_current_runtime or profile is None:
+        return _result(
+            "blocked",
+            "oracle_capability_unsupported",
+            source_evidence,
+            None,
+        )
+    if role == "reviewer" and not profile.artifact_reader.review_output_characterized:
         return _result(
             "blocked",
             "oracle_capability_unsupported",

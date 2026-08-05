@@ -54,6 +54,7 @@ class OracleArtifactReader:
     """Version-bound reader entry points for a private Oracle profile."""
 
     version: str
+    review_output_characterized: bool
     read_session_status: Callable[..., str]
     snapshot_authoring_zip: Callable[..., OracleAuthoringZipSnapshot]
     snapshot_review_json: Callable[..., OracleReviewJsonPayload]
@@ -182,12 +183,9 @@ def snapshot_review_json_0170(
     oracle_version: str,
     staging_dir: Path,
 ) -> OracleReviewJsonPayload:
-    metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
-    return _snapshot_review_json_from_metadata(
-        session_root,
-        metadata=metadata,
-        staging_dir=staging_dir,
-    )
+    _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
+    _ = staging_dir
+    raise OracleArtifactError("oracle_artifact_rejected")
 
 
 def _snapshot_review_json_from_metadata(
@@ -249,11 +247,11 @@ def has_exact_repository_access_failure_0170(
 ) -> bool:
     """Recognize only the exact terminal connector-failure sentinel."""
     metadata = _read_metadata_0170(session_root, session_id=session_id, oracle_version=oracle_version)
-    return _has_exact_repository_access_failure_from_metadata(
-        session_root,
-        metadata=metadata,
-        staging_dir=staging_dir,
-    )
+    artifacts = _artifact_inventory(metadata)
+    if any(item.get("kind") != "file" for item in artifacts):
+        raise OracleArtifactError("oracle_artifact_rejected")
+    _ = staging_dir
+    return False
 
 
 def _has_exact_repository_access_failure_from_metadata(
@@ -720,6 +718,7 @@ def _strict_json_object(payload: bytes) -> dict[str, Any]:
 _ARTIFACT_READER_REGISTRY: dict[str, OracleArtifactReader] = {
     SUPPORTED_ORACLE_VERSION: OracleArtifactReader(
         version=SUPPORTED_ORACLE_VERSION,
+        review_output_characterized=True,
         read_session_status=read_session_status,
         snapshot_authoring_zip=snapshot_authoring_zip,
         snapshot_review_json=snapshot_review_json,
@@ -727,6 +726,7 @@ _ARTIFACT_READER_REGISTRY: dict[str, OracleArtifactReader] = {
     ),
     SUPPORTED_ORACLE_0170_VERSION: OracleArtifactReader(
         version=SUPPORTED_ORACLE_0170_VERSION,
+        review_output_characterized=False,
         read_session_status=read_session_status_0170,
         snapshot_authoring_zip=snapshot_authoring_zip_0170,
         snapshot_review_json=snapshot_review_json_0170,
