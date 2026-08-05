@@ -26,15 +26,14 @@ from spec_dock_runtime.domain.issue_planning_contracts import (
 )
 from spec_dock_runtime.infra.git_cli import origin_github_repo_slug
 from spec_dock_runtime.infra.issue_planning_oracle_artifact import (
-    SUPPORTED_ORACLE_VERSION,
     OracleArtifactError,
-    has_exact_repository_access_failure,
-    read_session_status,
-    snapshot_authoring_zip,
-    snapshot_review_json,
+    OracleArtifactReader,
+    artifact_reader_for_version,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from spec_dock_runtime.application.issue_planning_prompt import (
         PlanningOutputExpectation,
         SynthesizedPlanningPrompt,
@@ -45,21 +44,8 @@ _MAX_CDP_VERSION_BYTES = 64 * 1024
 _DEFAULT_RUN_TIMEOUT_SECONDS = 2 * 60 * 60
 _DEFAULT_RECOVERY_TIMEOUT_SECONDS = 2 * 60
 _RECOVERY_POLL_INTERVAL_SECONDS = 0.25
-_TERMINAL_STATUSES = frozenset({"completed"})
 _SessionState = Literal["terminal", "nonterminal", "missing", "invalid"]
 _ORACLE_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
-_ROOT_CAPABILITIES = (
-    b"--engine",
-    b"--file",
-    b"--slug",
-    b"--wait",
-    b"--prompt",
-    b"--browser-attachments",
-    b"--model",
-    b"--browser-model-strategy",
-    b"--remote-chrome",
-)
-_SESSION_CAPABILITIES = (b"--harvest", b"--no-recover")
 _SAFE_ENVIRONMENT_KEYS = frozenset({
     "HOME",
     "LANG",
@@ -76,6 +62,111 @@ _SESSION_ROLE_SLUGS = {
 
 
 @dataclass(frozen=True)
+class _OracleCompatibilityProfile:
+    """Private exact-version Oracle contract selected during preflight."""
+
+    profile_id: str
+    version: str
+    required_root_capabilities: tuple[str, ...]
+    required_session_capabilities: tuple[str, ...]
+    browser_argv_builder: Callable[..., list[str]]
+    inline_mode_characterized: bool
+    stage_evidence_decoder: Callable[[str], _SessionState]
+    artifact_reader: OracleArtifactReader
+    harvest_argv_builder: Callable[[Path, str], tuple[str, ...]]
+    capture_argv_builder: Callable[[Path, str], tuple[str, ...]]
+
+
+def _build_oracle_0161_browser_argv(
+    executable: Path,
+    managed_chrome: tuple[str, int],
+    session_id: str,
+    prompt: str,
+    attachment_paths: tuple[Path, ...],
+) -> list[str]:
+    """Build the characterized 0.16.1 browser invocation without normalization."""
+
+    argv = [
+        str(executable),
+        "--engine",
+        "browser",
+        "--model",
+        "Pro",
+        "--browser-model-strategy",
+        "select",
+        "--remote-chrome",
+        f"{managed_chrome[0]}:{managed_chrome[1]}",
+        "--browser-no-cookie-sync",
+        "--wait",
+        "--browser-attachments",
+        "always",
+        "--slug",
+        session_id,
+        "--prompt",
+        prompt,
+    ]
+    for attachment_path in attachment_paths:
+        argv.extend(("--file", str(attachment_path)))
+    return argv
+
+
+def _build_oracle_0161_session_argv(
+    executable: Path,
+    session_id: str,
+) -> tuple[str, ...]:
+    """Return the characterized 0.16.1 same-session command unchanged."""
+
+    return (
+        str(executable),
+        "session",
+        session_id,
+        "--harvest",
+        "--no-recover",
+    )
+
+
+def _decode_oracle_0161_stage(status_value: str) -> _SessionState:
+    return "terminal" if status_value == "completed" else "nonterminal"
+
+
+_ORACLE_PROFILE_REGISTRY: dict[str, _OracleCompatibilityProfile] = {
+    "0.16.1": _OracleCompatibilityProfile(
+        profile_id="oracle-0.16.1",
+        version="0.16.1",
+        required_root_capabilities=(
+            "--engine",
+            "--file",
+            "--slug",
+            "--wait",
+            "--prompt",
+            "--browser-attachments",
+            "--model",
+            "--browser-model-strategy",
+            "--remote-chrome",
+            "--browser-no-cookie-sync",
+        ),
+        required_session_capabilities=("--harvest", "--no-recover"),
+        browser_argv_builder=_build_oracle_0161_browser_argv,
+        inline_mode_characterized=False,
+        stage_evidence_decoder=_decode_oracle_0161_stage,
+        artifact_reader=artifact_reader_for_version("0.16.1"),
+        harvest_argv_builder=_build_oracle_0161_session_argv,
+        capture_argv_builder=_build_oracle_0161_session_argv,
+    ),
+}
+
+# Retain the existing private test seams while making the profile the owner.
+_ROOT_CAPABILITIES = tuple(
+    capability.encode("ascii")
+    for capability in _ORACLE_PROFILE_REGISTRY["0.16.1"].required_root_capabilities
+)
+_SESSION_CAPABILITIES = tuple(
+    capability.encode("ascii")
+    for capability in _ORACLE_PROFILE_REGISTRY["0.16.1"].required_session_capabilities
+)
+
+
+@dataclass(frozen=True)
 class _OraclePreflightReceipt:
     """Content-free result of the current Oracle preflight checks."""
 
@@ -86,6 +177,29 @@ class _OraclePreflightReceipt:
     missing_root_capabilities: tuple[str, ...]
     missing_session_capabilities: tuple[str, ...]
     supported_by_current_runtime: bool
+    profile_id: str | None = None
+
+
+def _profile_for_version(version: str | None) -> _OracleCompatibilityProfile | None:
+    if version is None:
+        return None
+    return _ORACLE_PROFILE_REGISTRY.get(version)
+
+
+def _profile_is_complete(profile: _OracleCompatibilityProfile | None) -> bool:
+    reader = profile.artifact_reader if profile is not None else None
+    return bool(
+        profile is not None
+        and profile.required_root_capabilities
+        and profile.required_session_capabilities
+        and isinstance(profile.inline_mode_characterized, bool)
+        and callable(profile.browser_argv_builder)
+        and callable(profile.stage_evidence_decoder)
+        and callable(profile.harvest_argv_builder)
+        and callable(profile.capture_argv_builder)
+        and reader is not None
+        and reader.version == profile.version
+    )
 
 
 def resolve_issue_planning_github_repository(repo_root: Path) -> str | None:
@@ -113,7 +227,13 @@ def invoke_issue_planning_chatgpt(
     if executable_identity is None:
         return _result("blocked", "oracle_unavailable", source_evidence, None)
     child_env = _sanitized_child_environment()
-    if not _preflight_supported_oracle(executable, child_env=child_env, cwd=repo_root):
+    preflight = _read_oracle_preflight_receipt(
+        executable,
+        child_env=child_env,
+        cwd=repo_root,
+    )
+    profile = _profile_for_version(preflight.version)
+    if not preflight.supported_by_current_runtime or profile is None:
         return _result(
             "blocked",
             "oracle_capability_unsupported",
@@ -142,27 +262,13 @@ def invoke_issue_planning_chatgpt(
             or _executable_identity(final_executable) != executable_identity
         ):
             return _result("blocked", "oracle_unavailable", source_evidence, None)
-        argv = [
-            str(final_executable),
-            "--engine",
-            "browser",
-            "--model",
-            "Pro",
-            "--browser-model-strategy",
-            "select",
-            "--remote-chrome",
-            f"{managed_chrome[0]}:{managed_chrome[1]}",
-            "--browser-no-cookie-sync",
-            "--wait",
-            "--browser-attachments",
-            "always",
-            "--slug",
+        argv = profile.browser_argv_builder(
+            final_executable,
+            managed_chrome,
             session_id,
-            "--prompt",
             synthesized.prompt,
-        ]
-        for attachment_path in synthesized.attachment_paths:
-            argv.extend(("--file", str(attachment_path)))
+            tuple(synthesized.attachment_paths),
+        )
         run_timeout = (
             timeout_seconds if timeout_seconds is not None and timeout_seconds > 0 else _DEFAULT_RUN_TIMEOUT_SECONDS
         )
@@ -180,7 +286,11 @@ def invoke_issue_planning_chatgpt(
         except (subprocess.TimeoutExpired, OSError):
             needs_recovery = True
 
-        session_state = _session_state(session_root, session_id=session_id)
+        session_state = _session_state(
+            session_root,
+            profile=profile,
+            session_id=session_id,
+        )
         if session_state == "invalid":
             return _result(
                 "rejected",
@@ -192,6 +302,7 @@ def invoke_issue_planning_chatgpt(
             recovered_state = _recover_same_session(
                 executable=final_executable,
                 executable_identity=executable_identity,
+                profile=profile,
                 session_id=session_id,
                 session_root=session_root,
                 child_env=child_env,
@@ -215,6 +326,7 @@ def invoke_issue_planning_chatgpt(
         return _collect_typed_result(
             role=role,
             expectation=expectation,
+            profile=profile,
             session_root=session_root,
             session_id=session_id,
             staging=staging,
@@ -325,8 +437,9 @@ def _read_oracle_preflight_receipt(
     child_env: dict[str, str],
     cwd: Path,
 ) -> _OraclePreflightReceipt:
-    missing_root_capabilities = tuple(flag.decode("ascii") for flag in _ROOT_CAPABILITIES)
-    missing_session_capabilities = tuple(flag.decode("ascii") for flag in _SESSION_CAPABILITIES)
+    legacy_profile = _ORACLE_PROFILE_REGISTRY["0.16.1"]
+    missing_root_capabilities = legacy_profile.required_root_capabilities
+    missing_session_capabilities = legacy_profile.required_session_capabilities
     try:
         version_result = _run_oracle(
             [str(executable), "--version"],
@@ -337,6 +450,7 @@ def _read_oracle_preflight_receipt(
     except (OSError, subprocess.TimeoutExpired):
         return _OraclePreflightReceipt(
             version=None,
+            profile_id=None,
             version_exit_code=None,
             root_help_exit_code=None,
             session_help_exit_code=None,
@@ -346,9 +460,11 @@ def _read_oracle_preflight_receipt(
         )
 
     version = _preflight_version(version_result.stdout)
-    if version_result.returncode != 0 or version != SUPPORTED_ORACLE_VERSION:
+    profile = _profile_for_version(version)
+    if version_result.returncode != 0 or profile is None or not _profile_is_complete(profile):
         return _OraclePreflightReceipt(
             version=version,
+            profile_id=profile.profile_id if profile is not None else None,
             version_exit_code=version_result.returncode,
             root_help_exit_code=None,
             session_help_exit_code=None,
@@ -367,6 +483,7 @@ def _read_oracle_preflight_receipt(
     except (OSError, subprocess.TimeoutExpired):
         return _OraclePreflightReceipt(
             version=version,
+            profile_id=profile.profile_id,
             version_exit_code=version_result.returncode,
             root_help_exit_code=None,
             session_help_exit_code=None,
@@ -375,11 +492,23 @@ def _read_oracle_preflight_receipt(
             supported_by_current_runtime=False,
         )
 
+    root_tokens = _help_option_tokens(root_help.stdout)
     missing_root_capabilities = tuple(
-        flag.decode("ascii")
-        for flag in _ROOT_CAPABILITIES
-        if flag not in root_help.stdout
+        capability
+        for capability in profile.required_root_capabilities
+        if capability not in root_tokens
     )
+    if root_help.returncode != 0 or missing_root_capabilities:
+        return _OraclePreflightReceipt(
+            version=version,
+            profile_id=profile.profile_id,
+            version_exit_code=version_result.returncode,
+            root_help_exit_code=root_help.returncode,
+            session_help_exit_code=None,
+            missing_root_capabilities=missing_root_capabilities,
+            missing_session_capabilities=missing_session_capabilities,
+            supported_by_current_runtime=False,
+        )
     try:
         session_help = _run_oracle(
             [str(executable), "session", "--help"],
@@ -390,6 +519,7 @@ def _read_oracle_preflight_receipt(
     except (OSError, subprocess.TimeoutExpired):
         return _OraclePreflightReceipt(
             version=version,
+            profile_id=profile.profile_id,
             version_exit_code=version_result.returncode,
             root_help_exit_code=root_help.returncode,
             session_help_exit_code=None,
@@ -398,13 +528,15 @@ def _read_oracle_preflight_receipt(
             supported_by_current_runtime=False,
         )
 
+    session_tokens = _help_option_tokens(session_help.stdout)
     missing_session_capabilities = tuple(
-        flag.decode("ascii")
-        for flag in _SESSION_CAPABILITIES
-        if flag not in session_help.stdout
+        capability
+        for capability in profile.required_session_capabilities
+        if capability not in session_tokens
     )
     return _OraclePreflightReceipt(
         version=version,
+        profile_id=profile.profile_id,
         version_exit_code=version_result.returncode,
         root_help_exit_code=root_help.returncode,
         session_help_exit_code=session_help.returncode,
@@ -415,7 +547,18 @@ def _read_oracle_preflight_receipt(
             and session_help.returncode == 0
             and not missing_root_capabilities
             and not missing_session_capabilities
+            and _profile_is_complete(profile)
         ),
+    )
+
+
+_HELP_OPTION_RE = re.compile(rb"(?<![A-Za-z0-9_])--[A-Za-z0-9][A-Za-z0-9-]*")
+
+
+def _help_option_tokens(output: bytes) -> frozenset[str]:
+    return frozenset(
+        match.group(0).decode("ascii")
+        for match in _HELP_OPTION_RE.finditer(output)
     )
 
 
@@ -447,6 +590,7 @@ def _recover_same_session(
     *,
     executable: Path,
     executable_identity: tuple[int, int, int, int],
+    profile: _OracleCompatibilityProfile,
     session_id: str,
     session_root: Path,
     child_env: dict[str, str],
@@ -454,7 +598,7 @@ def _recover_same_session(
     timeout: float,
 ) -> _SessionState:
     deadline = time.monotonic() + timeout
-    initial_state = _session_state(session_root, session_id=session_id)
+    initial_state = _session_state(session_root, profile=profile, session_id=session_id)
     if initial_state in {"terminal", "invalid"}:
         return initial_state
     recovery_executable = _resolve_oracle_executable()
@@ -464,7 +608,7 @@ def _recover_same_session(
         or _executable_identity(recovery_executable) != executable_identity
     ):
         return "nonterminal"
-    pre_harvest_state = _session_state(session_root, session_id=session_id)
+    pre_harvest_state = _session_state(session_root, profile=profile, session_id=session_id)
     if pre_harvest_state in {"terminal", "invalid"}:
         return pre_harvest_state
     remaining = deadline - time.monotonic()
@@ -472,19 +616,14 @@ def _recover_same_session(
         return pre_harvest_state
     with suppress(OSError, subprocess.TimeoutExpired):
         _run_oracle(
-            [
-                str(recovery_executable),
-                "session",
-                session_id,
-                "--harvest",
-                "--no-recover",
-            ],
+            list(profile.harvest_argv_builder(recovery_executable, session_id)),
             child_env=child_env,
             cwd=cwd,
             timeout=remaining,
         )
     return _poll_same_session_state(
         session_root,
+        profile=profile,
         session_id=session_id,
         deadline=deadline,
     )
@@ -493,11 +632,12 @@ def _recover_same_session(
 def _poll_same_session_state(
     session_root: Path,
     *,
+    profile: _OracleCompatibilityProfile,
     session_id: str,
     deadline: float,
 ) -> _SessionState:
     while True:
-        state = _session_state(session_root, session_id=session_id)
+        state = _session_state(session_root, profile=profile, session_id=session_id)
         if state in {"terminal", "invalid"}:
             return state
         remaining = deadline - time.monotonic()
@@ -506,22 +646,28 @@ def _poll_same_session_state(
         time.sleep(min(_RECOVERY_POLL_INTERVAL_SECONDS, remaining))
 
 
-def _session_state(session_root: Path, *, session_id: str) -> _SessionState:
+def _session_state(
+    session_root: Path,
+    *,
+    profile: _OracleCompatibilityProfile,
+    session_id: str,
+) -> _SessionState:
     try:
-        status_value = read_session_status(
+        status_value = profile.artifact_reader.read_session_status(
             session_root,
             session_id=session_id,
-            oracle_version=SUPPORTED_ORACLE_VERSION,
+            oracle_version=profile.version,
         )
     except OracleArtifactError as error:
         return "missing" if error.code == "oracle_session_missing" else "invalid"
-    return "terminal" if status_value in _TERMINAL_STATUSES else "nonterminal"
+    return profile.stage_evidence_decoder(status_value)
 
 
 def _collect_typed_result(
     *,
     role: Literal["planner", "semantic_revision", "reviewer"],
     expectation: PlanningOutputExpectation,
+    profile: _OracleCompatibilityProfile,
     session_root: Path,
     session_id: str,
     staging: Path,
@@ -529,10 +675,11 @@ def _collect_typed_result(
     exit_code: int | None,
 ) -> PlanningInvocationResult:
     try:
-        if has_exact_repository_access_failure(
+        reader = profile.artifact_reader
+        if reader.has_exact_repository_access_failure(
             session_root,
             session_id=session_id,
-            oracle_version=SUPPORTED_ORACLE_VERSION,
+            oracle_version=profile.version,
             staging_dir=staging / "branch-gate",
         ):
             return _result(
@@ -542,10 +689,10 @@ def _collect_typed_result(
                 exit_code,
             )
         if role in {"planner", "semantic_revision"}:
-            authoring_zip = snapshot_authoring_zip(
+            authoring_zip = reader.snapshot_authoring_zip(
                 session_root,
                 session_id=session_id,
-                oracle_version=SUPPORTED_ORACLE_VERSION,
+                oracle_version=profile.version,
                 staging_dir=staging,
             )
             if (
@@ -558,10 +705,10 @@ def _collect_typed_result(
                 exit_code=exit_code,
                 authoring_zip=authoring_zip,
             )
-        review_json = snapshot_review_json(
+        review_json = reader.snapshot_review_json(
             session_root,
             session_id=session_id,
-            oracle_version=SUPPORTED_ORACLE_VERSION,
+            oracle_version=profile.version,
             staging_dir=staging,
         )
         return _pass_result(

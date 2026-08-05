@@ -13,6 +13,19 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 from spec_dock_runtime.infra import issue_planning_oracle_artifact as artifact_reader  # noqa: E402
 
 
+def test_artifact_reader_registry_is_exact_version_bound() -> None:
+    reader = artifact_reader.artifact_reader_for_version("0.16.1")
+    assert reader.version == "0.16.1"
+    assert reader.read_session_status is artifact_reader.read_session_status
+    assert reader.snapshot_authoring_zip is artifact_reader.snapshot_authoring_zip
+    assert reader.snapshot_review_json is artifact_reader.snapshot_review_json
+    assert reader.has_exact_repository_access_failure is artifact_reader.has_exact_repository_access_failure
+
+    for version in ("0.16.0", "0.16.2", "0.17.0", "0.17.1", "0.18.0"):
+        with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+            artifact_reader.artifact_reader_for_version(version)
+
+
 def test_snapshots_exact_oracle_zip_and_review_json(tmp_path: Path) -> None:
     session = _session(tmp_path)
     zip_path = session / "artifacts" / "iss-00003-issue-planning-documents (2).zip"

@@ -673,6 +673,72 @@ def test_preflight_receipt_records_content_free_capability_surface(
     ]
 
 
+def test_profile_registry_keeps_only_characterized_0161_contract() -> None:
+    assert tuple(issue_planning_chatgpt._ORACLE_PROFILE_REGISTRY) == ("0.16.1",)
+    profile = issue_planning_chatgpt._profile_for_version("0.16.1")
+    assert profile is not None
+    assert profile.profile_id == "oracle-0.16.1"
+    assert profile.inline_mode_characterized is False
+    assert profile.harvest_argv_builder is profile.capture_argv_builder
+    assert profile.artifact_reader.version == "0.16.1"
+    assert issue_planning_chatgpt._profile_for_version("0.17.0") is None
+    assert issue_planning_chatgpt._profile_for_version("0.17.1") is None
+
+
+def test_0161_profile_builders_preserve_exact_argv() -> None:
+    profile = issue_planning_chatgpt._profile_for_version("0.16.1")
+    assert profile is not None
+    executable = Path("/opt/oracle")
+    browser_argv = profile.browser_argv_builder(
+        executable,
+        ("127.0.0.1", 9223),
+        "planner-abc123-0123abcd",
+        'literal $(touch nope); "quoted"',
+        (Path("/tmp/attachments"), Path("/tmp/source.md")),
+    )
+    assert browser_argv == [
+        "/opt/oracle",
+        "--engine",
+        "browser",
+        "--model",
+        "Pro",
+        "--browser-model-strategy",
+        "select",
+        "--remote-chrome",
+        "127.0.0.1:9223",
+        "--browser-no-cookie-sync",
+        "--wait",
+        "--browser-attachments",
+        "always",
+        "--slug",
+        "planner-abc123-0123abcd",
+        "--prompt",
+        'literal $(touch nope); "quoted"',
+        "--file",
+        "/tmp/attachments",
+        "--file",
+        "/tmp/source.md",
+    ]
+    assert profile.harvest_argv_builder(executable, "planner-abc123-0123abcd") == (
+        "/opt/oracle",
+        "session",
+        "planner-abc123-0123abcd",
+        "--harvest",
+        "--no-recover",
+    )
+
+
+def test_help_option_matching_rejects_near_match_tokens() -> None:
+    tokens = issue_planning_chatgpt._help_option_tokens(
+        b"--harvester --browser-model-strategy-extra --file <paths...>"
+    )
+    assert "--harvester" in tokens
+    assert "--browser-model-strategy-extra" in tokens
+    assert "--harvest" not in tokens
+    assert "--browser-model-strategy" not in tokens
+    assert "--file" in tokens
+
+
 def test_preflight_receipt_fail_closes_before_help_for_unsupported_version(
     monkeypatch,
     tmp_path: Path,

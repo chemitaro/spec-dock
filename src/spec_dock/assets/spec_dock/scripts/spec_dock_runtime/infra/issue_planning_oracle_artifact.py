@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import io
 import json
@@ -9,8 +10,11 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import zipfile
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from spec_dock_runtime.domain.issue_planning_contracts import (
     OracleAuthoringZipSnapshot,
@@ -42,6 +46,17 @@ class OracleArtifactError(RuntimeError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+@dataclass(frozen=True)
+class OracleArtifactReader:
+    """Version-bound reader entry points for a private Oracle profile."""
+
+    version: str
+    read_session_status: Callable[..., str]
+    snapshot_authoring_zip: Callable[..., OracleAuthoringZipSnapshot]
+    snapshot_review_json: Callable[..., OracleReviewJsonPayload]
+    has_exact_repository_access_failure: Callable[..., bool]
 
 
 def read_session_status(
@@ -567,3 +582,23 @@ def _strict_json_object(payload: bytes) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("JSON root must be an object")
     return value
+
+
+_ARTIFACT_READER_REGISTRY: dict[str, OracleArtifactReader] = {
+    SUPPORTED_ORACLE_VERSION: OracleArtifactReader(
+        version=SUPPORTED_ORACLE_VERSION,
+        read_session_status=read_session_status,
+        snapshot_authoring_zip=snapshot_authoring_zip,
+        snapshot_review_json=snapshot_review_json,
+        has_exact_repository_access_failure=has_exact_repository_access_failure,
+    ),
+}
+
+
+def artifact_reader_for_version(version: str) -> OracleArtifactReader:
+    """Return the exact-version artifact reader, failing closed otherwise."""
+
+    reader = _ARTIFACT_READER_REGISTRY.get(version)
+    if reader is None:
+        raise OracleArtifactError("oracle_artifact_rejected")
+    return reader
