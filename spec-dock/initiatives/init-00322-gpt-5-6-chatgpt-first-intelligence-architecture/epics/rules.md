@@ -1,1 +1,0 @@
-../../../docs/rules/initiative/epics.md
