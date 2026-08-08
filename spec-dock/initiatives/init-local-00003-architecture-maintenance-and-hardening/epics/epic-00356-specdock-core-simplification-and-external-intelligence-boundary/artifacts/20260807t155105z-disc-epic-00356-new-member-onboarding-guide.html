@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>epic-00356 新メンバー向け統合説明資料</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #5e687d;
+      --paper: #f5f7fb;
+      --surface: #ffffff;
+      --line: #dce2ec;
+      --navy: #173b66;
+      --blue: #2868a9;
+      --cyan: #dff3f6;
+      --green: #237a57;
+      --green-bg: #e9f6ef;
+      --amber: #9a5b05;
+      --amber-bg: #fff4dc;
+      --red: #a13a3a;
+      --red-bg: #fff0f0;
+      --purple: #6f4ca1;
+      --purple-bg: #f3eefb;
+      --shadow: 0 14px 38px rgba(23, 59, 102, .10);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+      line-height: 1.78;
+    }
+    a { color: var(--blue); text-underline-offset: 3px; }
+    a:hover { color: var(--navy); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code { background: #edf1f7; padding: .12rem .35rem; border-radius: 5px; font-size: .92em; }
+    pre { overflow: auto; padding: 1rem; border-radius: 10px; background: #101827; color: #eaf1fb; line-height: 1.55; }
+    .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 100vh; }
+    nav {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 28px 22px;
+      background: #102b4b;
+      color: #fff;
+    }
+    nav .brand { font-weight: 800; font-size: 1.12rem; line-height: 1.35; margin-bottom: 8px; }
+    nav .meta { color: #b9cce2; font-size: .78rem; margin-bottom: 24px; }
+    nav a { display: block; color: #dbe9f7; text-decoration: none; padding: 7px 10px; border-radius: 7px; font-size: .86rem; }
+    nav a:hover { background: rgba(255,255,255,.09); color: #fff; }
+    main { min-width: 0; }
+    .hero {
+      padding: 68px clamp(24px, 7vw, 96px) 58px;
+      color: #fff;
+      background: linear-gradient(135deg, #102b4b 0%, #1b5485 60%, #207e8c 100%);
+    }
+    .hero .eyebrow { letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: #cfe8f2; font-size: .82rem; }
+    .hero h1 { max-width: 940px; margin: 12px 0 20px; font-size: clamp(2rem, 4.5vw, 4rem); line-height: 1.16; }
+    .hero p { max-width: 850px; font-size: 1.08rem; color: #e2f0f5; }
+    .badges { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+    .badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; font-size: .82rem; font-weight: 700; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); }
+    .content { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 54px 0 100px; }
+    section { margin: 0 0 70px; scroll-margin-top: 24px; }
+    h2 { margin: 0 0 22px; color: var(--navy); font-size: clamp(1.55rem, 2.7vw, 2.2rem); line-height: 1.3; }
+    h3 { margin: 34px 0 12px; color: #234e78; font-size: 1.32rem; }
+    h4 { margin: 24px 0 8px; font-size: 1.05rem; }
+    .lead { font-size: 1.12rem; color: #364258; }
+    .card, .callout, .diagram, .issue, details {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card, .issue { padding: 24px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .callout { padding: 22px 24px; border-left: 5px solid var(--blue); box-shadow: none; }
+    .callout.warn { background: var(--amber-bg); border-color: #d89027; }
+    .callout.danger { background: var(--red-bg); border-color: var(--red); }
+    .callout.good { background: var(--green-bg); border-color: var(--green); }
+    .callout strong { display: block; margin-bottom: 4px; }
+    .kicker { color: var(--muted); text-transform: uppercase; letter-spacing: .09em; font-size: .74rem; font-weight: 800; }
+    .metric { font-size: 2.1rem; line-height: 1.15; font-weight: 850; color: var(--navy); }
+    .muted { color: var(--muted); }
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: .36rem; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 12px; overflow: hidden; box-shadow: 0 5px 18px rgba(23,59,102,.06); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: var(--navy); background: #eaf0f7; font-size: .9rem; }
+    tr:last-child td { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; border-radius: 12px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 800; }
+    .pill.current { color: var(--green); background: var(--green-bg); }
+    .pill.target { color: var(--purple); background: var(--purple-bg); }
+    .pill.caveat { color: var(--amber); background: var(--amber-bg); }
+    .diagram { padding: 20px; overflow: auto; }
+    .diagram svg { display: block; width: 100%; min-width: 700px; height: auto; }
+    .diagram figcaption { color: var(--muted); text-align: center; font-size: .88rem; margin-top: 12px; }
+    .boundary { border-top: 6px solid var(--blue); }
+    .boundary.keep { border-color: var(--green); }
+    .boundary.remove { border-color: var(--red); }
+    .boundary.external { border-color: var(--purple); }
+    .issue { position: relative; padding-top: 31px; }
+    .issue .num { position: absolute; top: -13px; left: 20px; background: var(--navy); color: #fff; padding: 4px 11px; border-radius: 999px; font-size: .78rem; font-weight: 800; }
+    .issue.blocked .num { background: var(--amber); }
+    .issue h3 { margin-top: 0; }
+    .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; counter-reset: step; }
+    .step { position: relative; padding: 22px 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+    .step::before { counter-increment: step; content: counter(step); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 800; margin-bottom: 10px; }
+    .step:not(:last-child)::after { content: "→"; position: absolute; right: -14px; top: 30px; color: var(--blue); font-size: 1.3rem; font-weight: 900; z-index: 2; }
+    details { margin-top: 15px; padding: 0; box-shadow: none; }
+    summary { cursor: pointer; padding: 14px 18px; font-weight: 800; color: var(--navy); }
+    details pre { margin: 0 14px 14px; }
+    .source-list a { word-break: break-all; }
+    footer { padding: 30px clamp(24px, 7vw, 96px); color: #cfe0f2; background: #102b4b; }
+    @media (max-width: 980px) {
+      .layout { display: block; }
+      nav { position: static; height: auto; }
+      nav .toc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3, .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .step::after { display: none; }
+    }
+    @media (max-width: 680px) {
+      .grid-2, .grid-3, .steps { grid-template-columns: 1fr; }
+      nav .toc { grid-template-columns: 1fr; }
+      .content { width: min(100% - 24px, 1120px); }
+      .hero { padding: 44px 20px; }
+      th, td { min-width: 150px; }
+    }
+    @media print {
+      nav { display: none; }
+      .layout { display: block; }
+      .hero { color: #000; background: #fff; border-bottom: 2px solid #000; }
+      .hero p, .hero .eyebrow { color: #222; }
+      .card, .callout, .diagram, .issue, table { box-shadow: none; break-inside: avoid; }
+      section { break-inside: auto; }
+      a { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav aria-label="目次">
+      <div class="brand">epic-00356<br>統合説明資料</div>
+      <div class="meta">2026-08-08 snapshot<br>Epic-local proposed Artifact</div>
+      <div class="toc">
+        <a href="#summary">1. 5分で分かる要約</a>
+        <a href="#why">2. なぜ軽量化するか</a>
+        <a href="#architecture">3. 目標アーキテクチャ</a>
+        <a href="#workflow">4. 新しい利用イメージ</a>
+        <a href="#issues">5. 4つのIssue</a>
+        <a href="#migration">6. Migration</a>
+        <a href="#acceptance">7. 受け入れ・検証</a>
+        <a href="#status">8. 現在地と注意</a>
+        <a href="#rules">9. 実装判断ルール</a>
+        <a href="#onboarding">10. 最初の一日</a>
+        <a href="#glossary">11. 用語集</a>
+        <a href="#sources">12. 情報源</a>
+      </div>
+    </nav>
+
+    <main>
+      <header class="hero">
+        <div class="eyebrow">SpecDock architecture onboarding</div>
+        <h1>Storage Core + Authoring Kitへ、製品境界を引き直す</h1>
+        <p>epic-00356「SpecDock Core Simplification and External Intelligence Boundary」を、今日参加したメンバーが一冊で理解するための統合説明資料です。</p>
+        <div class="badges">
+          <span class="badge">Epic #356 OPEN</span>
+          <span class="badge">4 Issues / 2 parallel lanes</span>
+          <span class="badge">Planning draft</span>
+          <span class="badge">Requirement review: fail</span>
+          <span class="badge">Implementation: not started</span>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="callout warn">
+          <strong>このHTMLの位置づけ</strong>
+          このファイルは理解支援用のEpic-local Artifactです。仕様の正本は、同じEpic直下の
+          <a href="../requirement.md">requirement.md</a>、<a href="../design.md">design.md</a>、
+          <a href="../plan.md">plan.md</a>、現在地は<a href="../report.md">report.md</a>です。
+          テキスト中心で読む場合は<a href="20260807t155105z-disc-epic-00356-new-member-onboarding-guide.md">Markdown版</a>を参照してください。
+        </div>
+
+        <section id="summary">
+          <h2>1. 5分で分かる要約</h2>
+          <p class="lead">SpecDockを、開発を細かく指揮するワークフロー製品から、仕様と作業構造を安全に保存する小さな基盤へ戻します。</p>
+          <div class="grid-3">
+            <article class="card">
+              <div class="kicker">Product Core</div>
+              <div class="metric">Storage Core</div>
+              <p>node階層、正本文書、Artifact、依存関係、active、GitHub linkageを決定的に管理します。</p>
+            </article>
+            <article class="card">
+              <div class="kicker">Writing Support</div>
+              <div class="metric">Authoring Kit</div>
+              <p>Requirement / Design / Planを、特定モデルに依存せず良く書くためのtemplateとguideです。</p>
+            </article>
+            <article class="card">
+              <div class="kicker">Replaceable Client</div>
+              <div class="metric">External Intelligence</div>
+              <p>ChatGPT、Codex Goal、外部Skill、将来のAgentは製品外からCoreとKitを利用します。</p>
+            </article>
+          </div>
+          <h3>変える理由</h3>
+          <ul>
+            <li>モデル、ブラウザ、Agent harness、レビュー手法の変化がSpecDock本体へ波及している。</li>
+            <li>多数のSkill、command、状態、証跡、testを同時に保守する必要がある。</li>
+            <li>完全自動化がIssueの過剰分割や低価値な文書を生みやすい。</li>
+            <li>安定した構造管理と、変化の速い認知・実行workflowが混在している。</li>
+          </ul>
+          <div class="callout good">
+            <strong>中心判断</strong>
+            自動化を捨てるのではありません。自動化の選び方をSpecDockが固定せず、どの自動化からも使える保存・構造基盤になります。
+          </div>
+          <h3>混同してはいけない三つの状態</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>状態</th><th>2026-08-08時点の実態</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill current">Current Product</span></td><td>多数のmanaged Skillと、<code>assurance</code>、<code>authoring</code>、<code>workflow</code>、<code>delegated-authoring</code>等のRuntime surfaceがまだ存在。軽量化は未実装。</td></tr>
+                <tr><td><span class="pill caveat">Current Planning</span></td><td>Epicと4 Issue、依存edgeは作成済み。Requirement Reviewはfail、Design / Plan Reviewは未実施、Issueはscaffold。</td></tr>
+                <tr><td><span class="pill target">Target Product</span></td><td>Storage Core + Authoring Kit + 2 Skill。旧workflowを削除し、外部インテリジェンスを交換可能にする目標状態。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="why">
+          <h2>2. なぜ軽量化するのか</h2>
+          <div class="grid-2">
+            <article class="card boundary keep">
+              <div class="kicker">Stable responsibility</div>
+              <h3>長期的に安定している責務</h3>
+              <ul>
+                <li>Initiative / Epic / Issueとstable ID</li>
+                <li>GitHub Issueとの対応</li>
+                <li>Requirement / Design / Plan</li>
+                <li>Scope-local Artifact</li>
+                <li>dependency DAGとcycle検査</li>
+                <li>active、projection、managed asset管理</li>
+              </ul>
+            </article>
+            <article class="card boundary remove">
+              <div class="kicker">Fast-changing responsibility</div>
+              <h3>変化が速く、外へ出す責務</h3>
+              <ul>
+                <li>Planning / Review / Execution workflow</li>
+                <li>phase promotion、fresh reviewer gate</li>
+                <li>assurance grade、specialist、delegation</li>
+                <li>ChatGPT-first orchestration</li>
+                <li>PR creation / observation / merge preparation</li>
+                <li>named agent role、host adapter</li>
+              </ul>
+            </article>
+          </div>
+          <h3>認知的自由と構造的安全を分離する</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>操作</th><th>担当</th><th>理由</th></tr></thead>
+              <tbody>
+                <tr><td>Markdown本文の読取り・編集</td><td>人間 / Agent</td><td>内容には文脈と判断が必要</td></tr>
+                <tr><td>node作成・close・delete</td><td>SpecDock CLI</td><td>identityと階層を壊さない</td></tr>
+                <tr><td>dependency変更</td><td>SpecDock CLI</td><td>cycleや不正edgeを保存前に拒否</td></tr>
+                <tr><td>GitHub linkage / projection</td><td>SpecDock CLI</td><td>決定的で再生成可能にする</td></tr>
+                <tr><td>仕様作成・レビュー・実装方法</td><td>Operator</td><td>最適な外部能力を交換可能にする</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="architecture">
+          <h2>3. 目標アーキテクチャ</h2>
+          <figure class="diagram">
+            <svg viewBox="0 0 1040 520" role="img" aria-labelledby="arch-title arch-desc">
+              <title id="arch-title">epic-00356の目標アーキテクチャ</title>
+              <desc id="arch-desc">外部インテリジェンスがRepo-local Skillを通じ、SpecDockのStorage CoreとAuthoring Kitを利用する構造</desc>
+              <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#2868a9"/></marker>
+                <filter id="soft"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#173b66" flood-opacity=".14"/></filter>
+              </defs>
+              <rect x="20" y="25" width="205" height="130" rx="18" fill="#f3eefb" stroke="#6f4ca1" stroke-width="2" filter="url(#soft)"/>
+              <text x="122" y="60" text-anchor="middle" font-size="18" font-weight="700" fill="#513779">External Intelligence</text>
+              <text x="122" y="88" text-anchor="middle" font-size="14" fill="#4d4560">ChatGPT-Use Strict</text>
+              <text x="122" y="111" text-anchor="middle" font-size="14" fill="#4d4560">Codex Goal / future providers</text>
+              <text x="122" y="134" text-anchor="middle" font-size="13" fill="#6a607a">交換可能・製品外</text>
+
+              <rect x="315" y="25" width="300" height="130" rx="18" fill="#e7f2fb" stroke="#2868a9" stroke-width="2" filter="url(#soft)"/>
+              <text x="465" y="60" text-anchor="middle" font-size="18" font-weight="700" fill="#173b66">Repo-local integration</text>
+              <rect x="340" y="82" width="110" height="45" rx="10" fill="#fff" stroke="#2868a9"/>
+              <rect x="466" y="82" width="125" height="45" rx="10" fill="#fff" stroke="#2868a9"/>
+              <text x="395" y="109" text-anchor="middle" font-size="14">spec-dock</text>
+              <text x="528" y="101" text-anchor="middle" font-size="12">spec-dock-</text>
+              <text x="528" y="117" text-anchor="middle" font-size="12">grill-with-docs</text>
+
+              <rect x="705" y="25" width="310" height="260" rx="18" fill="#e9f6ef" stroke="#237a57" stroke-width="2" filter="url(#soft)"/>
+              <text x="860" y="58" text-anchor="middle" font-size="18" font-weight="700" fill="#185d42">SpecDock product boundary</text>
+              <rect x="735" y="82" width="250" height="76" rx="12" fill="#fff" stroke="#237a57"/>
+              <text x="860" y="112" text-anchor="middle" font-size="18" font-weight="700">Storage Core</text>
+              <text x="860" y="137" text-anchor="middle" font-size="14" fill="#50605a">state + invariant</text>
+              <rect x="735" y="180" width="250" height="76" rx="12" fill="#fff" stroke="#237a57"/>
+              <text x="860" y="210" text-anchor="middle" font-size="18" font-weight="700">Authoring Kit</text>
+              <text x="860" y="235" text-anchor="middle" font-size="14" fill="#50605a">meaning + quality guidance</text>
+
+              <rect x="315" y="355" width="300" height="120" rx="18" fill="#fff" stroke="#173b66" stroke-width="2" filter="url(#soft)"/>
+              <text x="465" y="392" text-anchor="middle" font-size="18" font-weight="700" fill="#173b66">Local Spec Graph</text>
+              <text x="465" y="421" text-anchor="middle" font-size="14">node / docs / artifacts / deps</text>
+              <text x="465" y="448" text-anchor="middle" font-size="13" fill="#5e687d">Git repositoryが正本</text>
+
+              <rect x="705" y="355" width="310" height="120" rx="18" fill="#fff4dc" stroke="#d89027" stroke-width="2" filter="url(#soft)"/>
+              <text x="860" y="392" text-anchor="middle" font-size="18" font-weight="700" fill="#7a4a08">GitHub Issues</text>
+              <text x="860" y="421" text-anchor="middle" font-size="14">linkage + lifecycle</text>
+              <text x="860" y="448" text-anchor="middle" font-size="13" fill="#6f6251">仕様本文の正本ではない</text>
+
+              <line x1="225" y1="92" x2="305" y2="92" stroke="#2868a9" stroke-width="3" marker-end="url(#arrow)"/>
+              <line x1="615" y1="92" x2="695" y2="92" stroke="#2868a9" stroke-width="3" marker-end="url(#arrow)"/>
+              <path d="M860,285 C860,325 560,320 500,345" fill="none" stroke="#2868a9" stroke-width="3" marker-end="url(#arrow)"/>
+              <line x1="860" y1="285" x2="860" y2="345" stroke="#2868a9" stroke-width="3" marker-end="url(#arrow)"/>
+            </svg>
+            <figcaption>外部能力はローカル文書とCLIを通じて接続し、Coreはprovider固有情報を保持しません。</figcaption>
+          </figure>
+          <details>
+            <summary>PlantUML source: 目標アーキテクチャ</summary>
+            <pre><code>@startuml
+title epic-00356 目標アーキテクチャ
+skinparam monochrome true
+left to right direction
+actor "Human / Codex" as Operator
+cloud "External Intelligence\nChatGPT-Use Strict\nCodex Goal\nfuture providers" as External
+package "Repo-local integration" {
+  component "spec-dock" as Skill
+  component "spec-dock-grill-with-docs" as Grill
+}
+package "SpecDock product boundary" {
+  component "Storage Core\nstate + invariant" as Core
+  component "Authoring Kit\nmeaning + quality guidance" as Kit
+}
+database "Local Spec Graph\nnode / docs / artifacts / deps" as Graph
+cloud "GitHub Issues\nlinkage + lifecycle" as GitHub
+Operator --&gt; External
+Operator --&gt; Skill
+Operator --&gt; Grill
+External --&gt; Kit
+External --&gt; Graph
+Skill --&gt; Core
+Grill --&gt; Core
+Core --&gt; Graph
+Core --&gt; GitHub
+@enduml</code></pre>
+          </details>
+
+          <h3>残す・削除する・外へ出す</h3>
+          <div class="grid-3">
+            <article class="card boundary keep">
+              <div class="kicker">Keep</div>
+              <h3>Core / Kitに残す</h3>
+              <ul>
+                <li>node / hierarchy / identity</li>
+                <li>GitHub linkage</li>
+                <li>canonical documents / Artifact</li>
+                <li>dependency DAG / projection</li>
+                <li>active / lifecycle primitives</li>
+                <li>Authoring guides</li>
+              </ul>
+            </article>
+            <article class="card boundary remove">
+              <div class="kicker">Remove</div>
+              <h3>製品から削除</h3>
+              <ul>
+                <li>Planning / Execution workflow</li>
+                <li>Assurance / phase promotion</li>
+                <li>delegated authoring state</li>
+                <li>product-owned ChatGPT runtime</li>
+                <li>PR workflow assets / named roles</li>
+              </ul>
+            </article>
+            <article class="card boundary external">
+              <div class="kicker">External</div>
+              <h3>外部で交換可能に利用</h3>
+              <ul>
+                <li>ChatGPT-Use Strict</li>
+                <li>Codex Goal</li>
+                <li>grilling / domain-modeling</li>
+                <li>TDD / debugging / review Skill</li>
+                <li>将来のmodel / provider</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="workflow">
+          <h2>4. 新しい利用イメージ</h2>
+          <div class="steps">
+            <article class="step"><strong>Scopeを決める</strong><br><span class="muted">人間とCodexが対象nodeと目的を確認</span></article>
+            <article class="step"><strong>論点をArtifact化</strong><br><span class="muted">必要ならgrill-with-docsを明示起動</span></article>
+            <article class="step"><strong>外部能力で作成・実装</strong><br><span class="muted">ChatGPTや別Skillを交換可能に利用</span></article>
+            <article class="step"><strong>Coreで構造検証</strong><br><span class="muted">Codexが反映し、validate / sync</span></article>
+          </div>
+          <h3>2つのmanaged Skill</h3>
+          <div class="grid-2">
+            <article class="card">
+              <div class="kicker">Model-invoked</div>
+              <h3><code>spec-dock</code></h3>
+              <p>Scope、parent、正本文書、Artifact、dependency、CLIを案内します。PlanningやImplementationの進め方は規定しません。</p>
+            </article>
+            <article class="card">
+              <div class="kicker">User-invoked only</div>
+              <h3><code>spec-dock-grill-with-docs</code></h3>
+              <p>一つのScope-local ArtifactへFacts、Decisions、Alternatives、Open Questions、Authoring Briefを残します。三文書は自動変更しません。</p>
+            </article>
+          </div>
+          <div class="callout">
+            <strong>外部能力が利用不能な場合</strong>
+            <code>spec-dock-grill-with-docs</code>の該当処理だけが明確に停止します。Storage Coreと通常の<code>spec-dock</code>は影響を受けません。
+          </div>
+          <h3>Coreに保存しないもの</h3>
+          <p>model名、provider設定、browser profile、cookie、wrapper path、session ID、Prompt version、provider固有result schemaは保存しません。</p>
+        </section>
+
+        <section id="issues">
+          <h2>5. 4つのIssueと実施順序</h2>
+          <figure class="diagram">
+            <svg viewBox="0 0 1060 360" role="img" aria-labelledby="dep-title dep-desc">
+              <title id="dep-title">4 Issueの依存関係</title>
+              <desc id="dep-desc">Issue 357と358が並行し、両方が359を、357・358・359が360をブロックする</desc>
+              <defs><marker id="dep-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#2868a9"/></marker></defs>
+              <rect x="30" y="40" width="250" height="105" rx="16" fill="#e9f6ef" stroke="#237a57" stroke-width="2"/>
+              <text x="155" y="72" text-anchor="middle" font-weight="800" font-size="17">iss-00357 / #357</text>
+              <text x="155" y="100" text-anchor="middle" font-size="15">Storage Core runtime</text>
+              <text x="155" y="125" text-anchor="middle" font-size="13" fill="#237a57">Lane A / structurally ready</text>
+              <rect x="30" y="205" width="250" height="105" rx="16" fill="#e9f6ef" stroke="#237a57" stroke-width="2"/>
+              <text x="155" y="237" text-anchor="middle" font-weight="800" font-size="17">iss-00358 / #358</text>
+              <text x="155" y="265" text-anchor="middle" font-size="15">Authoring Kit</text>
+              <text x="155" y="290" text-anchor="middle" font-size="13" fill="#237a57">Lane B / structurally ready</text>
+              <rect x="405" y="122" width="250" height="105" rx="16" fill="#fff4dc" stroke="#d89027" stroke-width="2"/>
+              <text x="530" y="154" text-anchor="middle" font-weight="800" font-size="17">iss-00359 / #359</text>
+              <text x="530" y="182" text-anchor="middle" font-size="15">Two managed Skills</text>
+              <text x="530" y="207" text-anchor="middle" font-size="13" fill="#9a5b05">blocked by 357 + 358</text>
+              <rect x="780" y="122" width="250" height="105" rx="16" fill="#fff0f0" stroke="#a13a3a" stroke-width="2"/>
+              <text x="905" y="154" text-anchor="middle" font-weight="800" font-size="17">iss-00360 / #360</text>
+              <text x="905" y="182" text-anchor="middle" font-size="15">Hard cutover</text>
+              <text x="905" y="207" text-anchor="middle" font-size="13" fill="#a13a3a">blocked by 357 + 358 + 359</text>
+              <path d="M280,92 C350,92 340,150 395,165" fill="none" stroke="#2868a9" stroke-width="3" marker-end="url(#dep-arrow)"/>
+              <path d="M280,258 C350,258 340,200 395,184" fill="none" stroke="#2868a9" stroke-width="3" marker-end="url(#dep-arrow)"/>
+              <line x1="655" y1="174" x2="770" y2="174" stroke="#2868a9" stroke-width="3" marker-end="url(#dep-arrow)"/>
+              <path d="M280,70 C520,5 780,50 830,112" fill="none" stroke="#9eb5ca" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#dep-arrow)"/>
+              <path d="M280,286 C520,345 780,295 830,237" fill="none" stroke="#9eb5ca" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#dep-arrow)"/>
+            </svg>
+            <figcaption>I1とI2は並行可能。I3は両方を受け、I4が唯一の統合・最終検証Issueです。</figcaption>
+          </figure>
+          <details>
+            <summary>PlantUML source: Issue依存関係</summary>
+            <pre><code>@startuml
+title epic-00356 実装Issueの依存関係
+skinparam monochrome true
+left to right direction
+rectangle "iss-00357 / #357\nReduce Runtime to Storage Core\nLane A" as I1
+rectangle "iss-00358 / #358\nSimplify Authoring Kit\nLane B" as I2
+rectangle "iss-00359 / #359\nReplace Managed Skills" as I3
+rectangle "iss-00360 / #360\nCut Over and Retire Legacy" as I4
+I1 --&gt; I3 : prerequisite
+I2 --&gt; I3 : prerequisite
+I1 --&gt; I4 : prerequisite
+I2 --&gt; I4 : prerequisite
+I3 --&gt; I4 : prerequisite
+@enduml</code></pre>
+          </details>
+          <div class="grid-2" style="margin-top:28px">
+            <article class="issue"><span class="num">I1 · OPEN</span><h3><a href="https://github.com/chemitaro/spec-dock/issues/357">iss-00357</a></h3><strong>Reduce Runtime to Storage Core</strong><p>workflow固有commandと実装を削除し、Core操作、storage format、graph invariantを維持します。</p><p class="muted">成果: core-only CLI、removal inventory、focused regression</p></article>
+            <article class="issue"><span class="num">I2 · OPEN</span><h3><a href="https://github.com/chemitaro/spec-dock/issues/358">iss-00358</a></h3><strong>Simplify Authoring Kit</strong><p>三文書の品質支援を残し、grade、reviewer gate、EAL、promotionなど旧workflow語彙を除きます。</p><p class="muted">成果: minimal templates、authoring guides、parity tests</p></article>
+            <article class="issue blocked"><span class="num">I3 · BLOCKED</span><h3><a href="https://github.com/chemitaro/spec-dock/issues/359">iss-00359</a></h3><strong>Replace Managed Workflow Skills</strong><p>managed assetを<code>spec-dock</code>と<code>spec-dock-grill-with-docs</code>へ縮小します。</p><p class="muted">依存: iss-00357 + iss-00358</p></article>
+            <article class="issue blocked"><span class="num">I4 · BLOCKED</span><h3><a href="https://github.com/chemitaro/spec-dock/issues/360">iss-00360</a></h3><strong>Cut Over Distribution</strong><p>installer、dogfood、migration、smoke、absence check、全体検証を一つのdeliveryとして完了します。</p><p class="muted">依存: iss-00357 + iss-00358 + iss-00359</p></article>
+          </div>
+        </section>
+
+        <section id="migration">
+          <h2>6. Migrationとデータ保護</h2>
+          <p class="lead">Workflow compatibilityは残さずhard cutoverします。ただし、利用者の仕様データは守ります。</p>
+          <div class="grid-2">
+            <article class="card boundary keep">
+              <h3>保持するデータ</h3>
+              <ul>
+                <li>node directoryと<code>.meta.json</code></li>
+                <li>dependency edgeとGitHub linkage</li>
+                <li>Requirement / Design / Plan / Report</li>
+                <li>Artifact / Discussion / accepted ADR</li>
+                <li>Workbenchのunmanaged content</li>
+              </ul>
+            </article>
+            <article class="card boundary remove">
+              <h3>削除するmanaged surface</h3>
+              <ul>
+                <li>planning / execution / clarification Skill</li>
+                <li>PR workflow Skill</li>
+                <li>host adapter / named agent role</li>
+                <li>product-owned ChatGPT runtime</li>
+                <li>obsolete workflow docs / templates / tests</li>
+              </ul>
+            </article>
+          </div>
+          <h3>Cutover順序</h3>
+          <div class="steps">
+            <article class="step"><strong>I1 + I2</strong><br><span class="muted">CoreとKitの契約を確定</span></article>
+            <article class="step"><strong>I3</strong><br><span class="muted">2 Skillを接続</span></article>
+            <article class="step"><strong>Consumer smoke</strong><br><span class="muted">fresh init / existing update</span></article>
+            <article class="step"><strong>I4 release</strong><br><span class="muted">dogfood・検証・breaking release</span></article>
+          </div>
+          <details>
+            <summary>PlantUML source: Hard cutover</summary>
+            <pre><code>@startuml
+title Hard cutoverと検証順序
+skinparam monochrome true
+start
+:I1 Storage Coreを確定;
+:I2 Authoring Kitを確定;
+:I3 2つのSkillを接続;
+:Fresh consumerでinit smoke;
+:Existing consumerでupdate preservation / prune smoke;
+if (user data preserved and obsolete assets removed?) then (yes)
+  :Dogfood repositoryを更新;
+  :legacy reference absenceを検査;
+  :validate / sync / full regression;
+  :breaking releaseとして配布;
+else (no)
+  :cutoverを停止;
+  :Git revertまたは旧releaseへrollback;
+endif
+stop
+@enduml</code></pre>
+          </details>
+          <div class="callout danger">
+            <strong>安全境界</strong>
+            user-owned assetをpruneしない、historical documentを一括書換えしない、旧workflowを別名で再実装しない、provider固有情報をCore schemaへ入れない、という4点が重要です。
+          </div>
+          <p><strong>Rollback:</strong> 新Coreに旧workflow fallbackを残さず、Git revert、旧releaseへの明示的version rollback、backupからのmanaged asset復元を使います。</p>
+        </section>
+
+        <section id="acceptance">
+          <h2>7. 受け入れ条件と検証</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>領域</th><th>完了時に確認すること</th><th>主担当</th></tr></thead>
+              <tbody>
+                <tr><td>Fresh install</td><td>Core、Kit、2 Skillだけを導入し、validate成功</td><td>360</td></tr>
+                <tr><td>Command surface</td><td>Core commandは利用可能、旧workflow commandは不在</td><td>357 / 360</td></tr>
+                <tr><td>Local authority</td><td>三文書はローカル正本、GitHub本文は正本ではない</td><td>358 / 360</td></tr>
+                <tr><td>Dependency graph</td><td>add/remove/check、cycle拒否、projection</td><td>357</td></tr>
+                <tr><td>Authoring Kit</td><td>model-neutralで、旧gate語彙を含まない</td><td>358</td></tr>
+                <tr><td>Skill boundary</td><td>2 Skillが責務を越えず、外部能力不在を安全に扱う</td><td>359</td></tr>
+                <tr><td>Existing update</td><td>user dataを保持し、旧managed assetだけprune</td><td>360</td></tr>
+                <tr><td>External smoke</td><td>外部authoringとPlanベース実装が手動で成立</td><td>359 / 360</td></tr>
+                <tr><td>Legacy retirement</td><td>旧方針をcurrent routeから外し、新境界をREADMEで説明</td><td>360</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="grid-2" style="margin-top:22px">
+            <article class="card"><h3>自動検証</h3><ul><li>Ruff / format / mypy</li><li>Core unit / CLI regression</li><li>init / update / uninstall</li><li>asset inventory / absence regression</li><li>provider / dogfood / installed parity</li><li>fresh / existing consumer smoke</li><li>validate / sync</li></ul></article>
+            <article class="card"><h3>手動検証</h3><ul><li>2 Skillの責務境界</li><li>Scope-local Artifact作成</li><li>external capability不在時の停止</li><li>外部AIによるAuthoring Kit利用</li><li>Goal / Planベースの実装</li></ul><p class="muted">特定browserやmodel自体はCIへ固定しません。</p></article>
+          </div>
+        </section>
+
+        <section id="status">
+          <h2>8. 現在地と重要な注意事項</h2>
+          <div class="grid-3">
+            <article class="card"><span class="pill current">現在の事実</span><h3>構造は作成済み</h3><p>Epic #356とIssue #357〜#360はOPEN。依存edgeは5本登録済みです。</p></article>
+            <article class="card"><span class="pill caveat">注意事項</span><h3>仕様は未昇格</h3><p>Epic requirement reviewはfail。各Issueの三文書はscaffoldで、実装は未開始です。</p></article>
+            <article class="card"><span class="pill target">目標設計</span><h3>4 Issueでhard cutover</h3><p>I1 / I2 → I3 → I4の順で、別のfinal-quality Issueは作りません。</p></article>
+          </div>
+          <h3>未解決のreviewer finding</h3>
+          <ol>
+            <li><code>&lt;EPIC_ID&gt;</code>、<code>&lt;GITHUB_ISSUE_NUMBER_OR_URL&gt;</code>が正本文書に残り、実体と不一致。</li>
+            <li>残す<code>issue start</code> / <code>issue finish</code> / readiness projectionのreplacement semanticsが未定義。</li>
+            <li><code>init-00322</code> supersessionのauthority、対象、dispositionが文書上で不十分。</li>
+            <li>外部能力をoptionalとする設計と、手動external smokeを受入条件にする記述の関係が曖昧。</li>
+          </ol>
+          <div class="callout danger">
+            <strong><code>init-00322</code>は文書作成後に既に削除済み</strong>
+            正本文書はhistorical dataを保持しI4でretireする計画でしたが、2026-08-07のユーザー明示指示により、init-00322と配下nodeは再帰削除され、GitHub Issueもclose済みです。実装前にbaseline、保持要件、I4の完了済み作業を正本文書へ反映する必要があります。
+          </div>
+          <div class="callout warn">
+            <strong><code>report.md</code>にはstaleな一行が残る</strong>
+            report前半とlive stateでは4 Issue作成済みですが、Spec Authoring Gate表のplan行には「4 Issueは未作成」と残っています。本資料では「nodeは作成済み、Issue仕様は未具体化」を現在の事実として扱います。
+          </div>
+          <div class="callout warn">
+            <strong>dependency-ready ≠ implementation-ready</strong>
+            iss-00357とiss-00358は依存関係上readyですが、仕様具体化・レビュー・開始承認までは示しません。
+          </div>
+        </section>
+
+        <section id="rules">
+          <h2>9. 実装時の判断ルール</h2>
+          <ol>
+            <li><strong>Provider sourceを先に直す。</strong> <code>src/spec_dock/assets/</code>が配布物のauthorityで、<code>spec-dock/</code>はdogfood projection。</li>
+            <li><strong>Coreとworkflowを混同しない。</strong> 構造invariantは残し、認知的workflowは製品へ戻さない。</li>
+            <li><strong>データ互換性を優先する。</strong> workflow互換性のために旧aliasを恒久維持しない。</li>
+            <li><strong>managed / user-ownedを識別する。</strong> prune対象はSpecDock管理と証明できるassetだけ。</li>
+            <li><strong>外部providerをschemaへ入れない。</strong> 接続はRepo-local / Operator-owned Skill側。</li>
+            <li><strong>I1〜I4の契約境界を守る。</strong> 技術レイヤーごとの過剰分割を避ける。</li>
+            <li><strong>projectionをauthorityにしない。</strong> provider sourceを変更し、dogfood側で確認する。</li>
+            <li><strong>未解決事項を暗黙に決めない。</strong> Epic正本へ戻して解決する。</li>
+          </ol>
+        </section>
+
+        <section id="onboarding">
+          <h2>10. 新メンバーの最初の一日</h2>
+          <div class="grid-2">
+            <article class="card">
+              <h3>読む順番</h3>
+              <ol>
+                <li>このHTMLの要約と目標アーキテクチャ</li>
+                <li><a href="../requirement.md">requirement.md</a></li>
+                <li><a href="../design.md">design.md</a></li>
+                <li><a href="../plan.md">plan.md</a></li>
+                <li><a href="../report.md">report.md</a></li>
+                <li>担当Issueの具体化済み三文書</li>
+              </ol>
+            </article>
+            <article class="card">
+              <h3>状態確認コマンド</h3>
+              <pre><code>git status --short
+./spec-dock/scripts/spec-dock active show
+./spec-dock/scripts/spec-dock deps check \
+  --id epic-00356 --github --json
+./spec-dock/scripts/spec-dock validate</code></pre>
+              <p class="muted">状態確認は実装開始の自動承認ではありません。</p>
+            </article>
+          </div>
+          <h3>担当開始前のチェック</h3>
+          <ul>
+            <li>Epic requirementのfindingがどう処理されたか。</li>
+            <li>担当IssueのRequirement / Design / Planが具体化・レビュー済みか。</li>
+            <li>provider source、dogfood projection、test範囲が明確か。</li>
+            <li>user dataとmanaged assetの境界をtestできるか。</li>
+            <li>dependency上の前提Issueが完了しているか。</li>
+          </ul>
+        </section>
+
+        <section id="glossary">
+          <h2>11. 用語集</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>用語</th><th>このEpicでの意味</th></tr></thead>
+              <tbody>
+                <tr><td>Storage Core</td><td>node、文書、Artifact、依存関係、active、GitHub linkageを保持する決定的基盤</td></tr>
+                <tr><td>Authoring Kit</td><td>三文書を良く書くためのmodel-neutralなtemplateとguide</td></tr>
+                <tr><td>External Intelligence</td><td>ChatGPT、Codex Goal、外部Skillなど交換可能な認知・実行能力</td></tr>
+                <tr><td>canonical document</td><td>node直下のRequirement / Design / Planなどの正本</td></tr>
+                <tr><td>Artifact</td><td>調査、議論、候補をScope-localに保存する非正本の作業面</td></tr>
+                <tr><td>managed asset</td><td>SpecDock installerが導入・更新・削除責任を持つファイル</td></tr>
+                <tr><td>dogfood projection</td><td>配布物をこのリポジトリ自身で利用・検証する側の<code>spec-dock/</code></td></tr>
+                <tr><td>hard cutover</td><td>旧workflowとの恒久dual modeを作らず新境界へ切り替えること</td></tr>
+                <tr><td>dependency-ready</td><td>依存関係だけを見た構造上の状態。仕様・レビュー完了は保証しない</td></tr>
+                <tr><td>provider neutrality</td><td>model、browser、外部Skill固有情報をCore契約へ入れないこと</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="sources">
+          <h2>12. 情報源と優先順位</h2>
+          <p>矛盾がある場合は、次の順で現在の事実を確認します。</p>
+          <ol>
+            <li><code>.meta.json</code>、SpecDock CLI、GitHub live state</li>
+            <li><a href="../report.md">report.md</a>の観測・reviewer記録</li>
+            <li><a href="../requirement.md">requirement.md</a>、<a href="../design.md">design.md</a>、<a href="../plan.md">plan.md</a></li>
+            <li>この説明資料</li>
+            <li>過去の議論Artifact</li>
+          </ol>
+          <div class="source-list">
+            <ul>
+              <li><a href="20260807t114012z-disc-epic-materialization-guide.md">Epic materialization guide</a></li>
+              <li><a href="20260807t114013z-disc-chatgpt-46-pro-core-simplification-discussion.md">ChatGPT 4.6 Proとの議論記録</a></li>
+              <li><a href="https://github.com/chemitaro/spec-dock/issues/356">GitHub #356</a>、<a href="https://github.com/chemitaro/spec-dock/issues/357">#357</a>、<a href="https://github.com/chemitaro/spec-dock/issues/358">#358</a>、<a href="https://github.com/chemitaro/spec-dock/issues/359">#359</a>、<a href="https://github.com/chemitaro/spec-dock/issues/360">#360</a></li>
+            </ul>
+          </div>
+          <div class="callout good">
+            <strong>まとめ</strong>
+            構造とデータはStorage Coreが守り、良い仕様書の書き方はAuthoring Kitが伝え、考え方・レビュー・実装方法は外部インテリジェンスへ委ねます。ただし現在はplanning途中です。reviewer findingとinit-00322削除後のbaseline差分を解消してから、Issue具体化と実装へ進みます。
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        epic-00356 新メンバー向け統合説明資料 · Epic-local proposed Artifact · 2026-08-08
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
