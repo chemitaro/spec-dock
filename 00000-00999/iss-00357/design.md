@@ -2,13 +2,11 @@
 種別: 設計書（Issue）
 ID: "iss-00357"
 タイトル: "Reduce Runtime to Storage Core"
-関連GitHub: ["#357"]
 状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-08-07"
 依存: ["requirement.md"]
 親: ["epic-00356", "init-local-00003"]
-artifact_state: awaiting-assurance-compose
 ---
 
 # iss-00357 Reduce Runtime to Storage Core — 設計 placeholder

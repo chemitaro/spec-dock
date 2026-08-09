@@ -2,7 +2,6 @@
 種別: 要件定義書（Issue）
 ID: "iss-00358"
 タイトル: "Simplify Authoring Kit and Document Contracts"
-関連GitHub: ["#358"]
 状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-08-07"
