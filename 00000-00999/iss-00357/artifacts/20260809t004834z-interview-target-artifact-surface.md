@@ -25,6 +25,8 @@ derived_from:
   - "verified GitHub repository: chemitaro/spec-dock"
   - "verified branch: main"
   - "verified expected SHA: fc15d782e6ad927c618af6f2774f72ad7507af87"
+  - "ChatGPT Use Strict follow-up session: required-strict-github-connector-verificati-5"
+  - "follow-up verified expected SHA: 1c8a8b25470f5b374e44623349d157499df99768"
 reflected_to: []
 ---
 
@@ -112,6 +114,25 @@ reflected_to: []
   - `research`、`interview`、`disc`で調査・質問・統合分析を表現でき、`analysis`の新設は重複を増やす。`pr-repair-batch`は削除対象PR Workflowへ強く結合し、generic importが存在するためChatGPT専用ImportをCurrent Surfaceに残す必要性が低い。
 - 未回答時の影響:
   - Issue 357はCurrent Artifact typeと削除対象Command / Application / Testsを固定できず、Issue 358もArtifact semanticsとGuideの語彙を固定できない。
+
+## 回答後のCLI構文整理
+
+- 位置づけ:
+  - ChatGPT Use StrictがGitHub connectorで`main`先端とSHA `1c8a8b25470f5b374e44623349d157499df99768`の完全一致を確認した上で提示したAdvisoryな設計整理である。
+  - Product semanticsはユーザー回答で確定済みであり、CLI表記は既存契約との整合から解決できる低影響な設計事項と判定した。
+- 推奨Target構文:
+  - `spec-dock new artifact [type] (--initiative <id> | --epic <id> | --issue <id>) --title <title> [--slug <slug>]`
+  - `type`は省略可能な位置引数とし、省略時は`blank`を既定値にする。
+  - 明示的な`blank`指定も維持する。
+  - `--type`という二重構文は追加しない。
+- 理由:
+  - 現行の`new artifact research ...`等を壊さず、位置引数の省略だけを追加できる。
+  - ScopeとTitleは既に名前付き引数であり、位置引数を省略可能にしても構文上の曖昧性は生じない。
+  - 未知typeとHistorical-only typeはファイル書込み前にParserで拒否できる。
+- 必須テス含意:
+  - type省略時の`blank`、明示`blank`、残る5つのTyped Artifact、未知type拒否、Historical-only type拒否、Helpの`[type]`とdefault表示、Blank filenameの`blank` token非含有を回帰対象にする。
+- adoption status:
+  - proposed design resolution。Canonical docsへはまだ未反映。
 
 ## 各Issueへの影響
 
