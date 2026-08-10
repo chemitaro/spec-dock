@@ -9,6 +9,11 @@ from types import SimpleNamespace
 import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
+from tests.cli_runtime.s09_invariance import (
+    S09_LEGACY_EVIDENCE_MUTATIONS,
+    apply_s09_legacy_evidence_mutation,
+    normalize_s09_process_result,
+)
 
 
 def _runtime_modules():
@@ -828,6 +833,78 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             return path_file.read_text(encoding="utf-8").strip()
         return ""
 
+    def _s09_core_durable_state(self, target: Path, bin_dir: Path) -> dict[str, object]:
+        active_path = target / "spec-dock" / ".agent" / "active.json"
+        active = json.loads(active_path.read_text(encoding="utf-8")) if active_path.is_file() else None
+        if isinstance(active, dict) and isinstance(active.get("updated_at"), str):
+            active["updated_at"] = "<timestamp>"
+        state_path = bin_dir / "gh-state.json"
+        gh_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.is_file() else None
+        log_path = bin_dir / "gh-calls.log"
+        gh_calls = log_path.read_text(encoding="utf-8").splitlines() if log_path.is_file() else []
+        index_path = target / "spec-dock" / ".agent" / "index-all.json"
+        issue_status = None
+        if index_path.is_file():
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            issue_status = index.get("nodes", {}).get("iss-00101", {}).get("status")
+        return {
+            "active_manifest": active,
+            "active_pointer": self._active_issue_pointer_text(target),
+            "branch": self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip(),
+            "gh_state": gh_state,
+            "gh_calls": gh_calls,
+            "issue_status": issue_status,
+        }
+
+    def _capture_s09_core_sequence(
+        self,
+        target: Path,
+        bin_dir: Path,
+        *,
+        mutation: str | None,
+    ) -> dict[str, dict[str, object]]:
+        target.mkdir(parents=True)
+        self._prepare_clean_repo_with_two_issues(target)
+        self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
+        mutated_paths = (
+            apply_s09_legacy_evidence_mutation(target, mutation, issue_id="iss-00101") if mutation is not None else ()
+        )
+        mutation_bytes = {path: path.read_bytes() for path in mutated_paths}
+        self._commit_all(target, "S09 invariance input")
+
+        bin_dir.mkdir(parents=True)
+        self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
+        test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+        surfaces = (
+            ("active", ["active", "show"], None, True),
+            ("deps", ["deps", "check", "--id", "iss-00101", "--no-github"], None, True),
+            ("validate", ["validate"], None, True),
+            ("doctor", ["doctor"], None, True),
+            ("start", ["issue", "start", "--id", "iss-00101"], test_env, False),
+            ("finish", ["issue", "finish"], test_env, False),
+        )
+        observations: dict[str, dict[str, object]] = {}
+        for name, args, env, read_only in surfaces:
+            before_state = self._s09_core_durable_state(target, bin_dir)
+            result = self._run_runtime_capture(target, args, env=env)
+            after_state = self._s09_core_durable_state(target, bin_dir)
+            if read_only:
+                assert after_state == before_state, f"{mutation or 'baseline'}:{name} mutated Core durable state"
+                durable_effect: object = "unchanged"
+            else:
+                durable_effect = after_state
+            observations[name] = {
+                "process": normalize_s09_process_result(result, repo_root=target, bin_root=bin_dir),
+                "durable_effect": durable_effect,
+            }
+
+            if read_only or mutation != "legacy_active_extra_fields":
+                assert {path: path.read_bytes() for path in mutated_paths} == mutation_bytes, (
+                    f"{mutation or 'baseline'}:{name} rewrote Historical evidence"
+                )
+
+        return observations
+
     def test_issue_start_sets_active_and_checks_out_issue_branch(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
@@ -1357,6 +1434,28 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert index_all["nodes"]["iss-00101"]["status"] == "done"
             log = (bin_dir / "gh-calls.log").read_text(encoding="utf-8")
             assert log.count("issue list") == list_count_before_finish + 1
+
+    @pytest.mark.parametrize("mutation", S09_LEGACY_EVIDENCE_MUTATIONS)
+    def test_core_operations_legacy_evidence_mutation_invariance(self, mutation: str) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            baseline = self._capture_s09_core_sequence(
+                root / "baseline",
+                root / "baseline-bin",
+                mutation=None,
+            )
+            mutated = self._capture_s09_core_sequence(
+                root / "mutated",
+                root / "mutated-bin",
+                mutation=mutation,
+            )
+
+        assert mutated == baseline, mutation
 
     def test_issue_finish_closes_open_issue_and_clears_active(self) -> None:
         if os.name == "nt":

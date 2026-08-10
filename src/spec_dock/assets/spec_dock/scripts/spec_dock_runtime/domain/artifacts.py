@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import os
 import re
 from typing import TYPE_CHECKING
@@ -9,18 +10,26 @@ import unicodedata
 if TYPE_CHECKING:
     from pathlib import Path
 
-DIRECT_ARTIFACT_TYPES = (
+CURRENT_CREATABLE_ARTIFACT_TYPES = (
     "blank",
     "research",
     "interview",
     "disc",
     "decision-candidate",
-    "pr-repair-batch",
     "adr",
 )
-ROUTING_ONLY_ARTIFACT_TYPES = ("draft-requirement", "draft-design", "draft-plan")
-SUPPORTED_ARTIFACT_TYPES = (*DIRECT_ARTIFACT_TYPES, *ROUTING_ONLY_ARTIFACT_TYPES)
-UNSUPPORTED_ARTIFACT_TYPES = ("scratch", "note")
+DIRECT_ARTIFACT_TYPES = CURRENT_CREATABLE_ARTIFACT_TYPES
+ROUTING_ONLY_ARTIFACT_TYPES: tuple[str, ...] = ()
+HISTORICAL_TIMESTAMP_TYPED_ARTIFACT_TYPES = (
+    "pr-repair-batch",
+    "draft-requirement",
+    "draft-design",
+    "draft-plan",
+    "scratch",
+    "note",
+)
+SUPPORTED_ARTIFACT_TYPES = (*CURRENT_CREATABLE_ARTIFACT_TYPES, *HISTORICAL_TIMESTAMP_TYPED_ARTIFACT_TYPES)
+UNSUPPORTED_ARTIFACT_TYPES = ("analysis",)
 
 _ARTIFACT_TIMESTAMP_INTENT_RE = re.compile(r"^[0-9]{8}[tT][0-9].*$")
 _ARTIFACT_DOC_TYPE_PATTERN = "|".join(
@@ -35,7 +44,10 @@ _BLANK_ARTIFACT_FILENAME_RE = re.compile(
     r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?"
     r"-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
-_GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE = re.compile(r"^[0-9]{3}-(?:adr|disc|note)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
+_GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE = re.compile(
+    r"^(?P<sequence>[0-9]{3})-(?P<artifact_type>adr|disc|note)-"
+    r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+)
 
 
 @dataclass(frozen=True)
@@ -52,6 +64,14 @@ class GenericImportedArtifactFilename:
     timestamp: str
     suffix: int | None
     original_basename: str
+    artifact_id: str
+
+
+@dataclass(frozen=True)
+class SequentialArtifactFilename:
+    sequence: str
+    artifact_type: str
+    slug: str
     artifact_id: str
 
 
@@ -147,12 +167,18 @@ def parse_generic_imported_artifact_filename(name: str) -> GenericImportedArtifa
     if original_basename in ("", ".", ".."):
         return None
     try:
+        original_basename.encode("utf-8")
+    except UnicodeEncodeError:
+        return None
+    try:
         normalized = _replace_unsafe_basename_characters(original_basename)
     except RuntimeError:
         return None
     if normalized != original_basename:
         return None
     timestamp = str(matched.group("ts"))
+    if not _is_valid_artifact_timestamp(timestamp):
+        return None
     suffix_raw = matched.group("nn")
     suffix = int(suffix_raw) if suffix_raw is not None else None
     return GenericImportedArtifactFilename(
@@ -213,8 +239,12 @@ def is_supported_artifact_type(artifact_type: str) -> bool:
     return artifact_type in SUPPORTED_ARTIFACT_TYPES
 
 
+def can_create_artifact_type(artifact_type: str) -> bool:
+    return artifact_type in CURRENT_CREATABLE_ARTIFACT_TYPES
+
+
 def is_direct_artifact_type(artifact_type: str) -> bool:
-    return artifact_type in DIRECT_ARTIFACT_TYPES
+    return can_create_artifact_type(artifact_type)
 
 
 def is_routing_only_artifact_type(artifact_type: str) -> bool:
@@ -228,7 +258,22 @@ def is_ambiguous_blank_artifact_slug(slug: str) -> bool:
 
 
 def is_grandfathered_legacy_artifact_filename(name: str) -> bool:
-    return _GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE.fullmatch(name) is not None
+    return parse_sequential_artifact_filename(name) is not None
+
+
+def parse_sequential_artifact_filename(name: str) -> SequentialArtifactFilename | None:
+    matched = _GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE.fullmatch(name)
+    if matched is None:
+        return None
+    sequence = str(matched.group("sequence"))
+    artifact_type = str(matched.group("artifact_type"))
+    slug = str(matched.group("slug"))
+    return SequentialArtifactFilename(
+        sequence=sequence,
+        artifact_type=artifact_type,
+        slug=slug,
+        artifact_id=f"{sequence}-{artifact_type}",
+    )
 
 
 def parse_artifact_filename(name: str) -> ArtifactFilename | None:
@@ -237,6 +282,8 @@ def parse_artifact_filename(name: str) -> ArtifactFilename | None:
     matched = _TYPED_ARTIFACT_FILENAME_RE.fullmatch(name)
     if matched is not None:
         timestamp = str(matched.group("ts"))
+        if not _is_valid_artifact_timestamp(timestamp):
+            return None
         suffix_raw = matched.group("nn")
         suffix = int(suffix_raw) if suffix_raw is not None else None
         artifact_type = str(matched.group("artifact_type"))
@@ -255,6 +302,8 @@ def parse_artifact_filename(name: str) -> ArtifactFilename | None:
     if matched is None:
         return None
     timestamp = str(matched.group("ts"))
+    if not _is_valid_artifact_timestamp(timestamp):
+        return None
     suffix_raw = matched.group("nn")
     suffix = int(suffix_raw) if suffix_raw is not None else None
     slug = str(matched.group("slug"))
@@ -262,7 +311,7 @@ def parse_artifact_filename(name: str) -> ArtifactFilename | None:
     if re.fullmatch(r"[0-9]{2}", parts[0]) is not None:
         return None
     for end in range(len(parts), 0, -1):
-        if "-".join(parts[:end]) in SUPPORTED_ARTIFACT_TYPES:
+        if "-".join(parts[:end]) in (*SUPPORTED_ARTIFACT_TYPES, *UNSUPPORTED_ARTIFACT_TYPES):
             return None
     artifact_id = timestamp if suffix is None else f"{timestamp}-{suffix:02d}"
     return ArtifactFilename(
@@ -272,6 +321,31 @@ def parse_artifact_filename(name: str) -> ArtifactFilename | None:
         slug=slug,
         artifact_id=artifact_id,
     )
+
+
+def parse_existing_artifact_filename(
+    name: str,
+) -> ArtifactFilename | GenericImportedArtifactFilename | SequentialArtifactFilename | None:
+    typed = parse_artifact_filename(name)
+    if typed is not None:
+        return typed
+    generic = parse_generic_imported_artifact_filename(name)
+    if generic is not None:
+        return generic
+    return parse_sequential_artifact_filename(name)
+
+
+def _has_generic_import_filename_intent(name: str) -> bool:
+    prefix, separator, _basename = name.partition("--")
+    return bool(separator) and _ARTIFACT_TIMESTAMP_INTENT_RE.fullmatch(prefix) is not None
+
+
+def _is_valid_artifact_timestamp(timestamp: str) -> bool:
+    try:
+        parsed = datetime.strptime(timestamp, "%Y%m%dt%H%M%Sz")
+    except ValueError:
+        return False
+    return parsed.strftime("%Y%m%dt%H%M%Sz") == timestamp
 
 
 def artifact_id_from_path(path: Path) -> str:
@@ -284,19 +358,17 @@ def artifact_id_from_path(path: Path) -> str:
 def is_malformed_artifact_candidate(path: Path) -> bool:
     if path.name == "rules.md":
         return False
+    if parse_existing_artifact_filename(path.name) is not None:
+        return False
+    if _has_generic_import_filename_intent(path.name):
+        return True
     if path.suffix != ".md":
         return False
-    if is_grandfathered_legacy_artifact_filename(path.name):
-        return False
-    if parse_generic_imported_artifact_filename(path.name) is not None:
-        return False
-    if parse_artifact_filename(path.name) is not None:
-        return False
     stem = path.stem
-    lowered = stem.lower()
-    parts = lowered.split("-")
     if _ARTIFACT_TIMESTAMP_INTENT_RE.fullmatch(stem) is not None:
         return True
+    lowered = stem.lower()
+    parts = lowered.split("-")
     for artifact_type in (*SUPPORTED_ARTIFACT_TYPES, *UNSUPPORTED_ARTIFACT_TYPES):
         if (
             lowered == artifact_type
@@ -332,12 +404,15 @@ def scan_artifact_slot_ledger(artifacts_dir: Path) -> tuple[str | None, Artifact
         for entry in direct_entries:
             if entry.name == "rules.md":
                 continue
-            typed = parse_artifact_filename(entry.name)
-            generic = parse_generic_imported_artifact_filename(entry.name)
-            parsed = typed if typed is not None else generic
+            parsed = parse_existing_artifact_filename(entry.name)
             if parsed is not None:
                 if not entry.is_file(follow_symlinks=False):
                     return f"Unsafe artifact file under {artifacts_dir}: {entry.name} is not a regular file", empty
+                if isinstance(parsed, SequentialArtifactFilename):
+                    if parsed.artifact_id in artifact_ids:
+                        return f"Duplicate artifact id detected under {artifacts_dir}: id={parsed.artifact_id}", empty
+                    artifact_ids.add(parsed.artifact_id)
+                    continue
                 artifact_id = parsed.artifact_id
                 if artifact_id in artifact_ids:
                     return f"Duplicate artifact id detected under {artifacts_dir}: id={artifact_id}", empty

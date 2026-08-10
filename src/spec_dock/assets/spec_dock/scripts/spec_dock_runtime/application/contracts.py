@@ -428,54 +428,9 @@ class WorkbenchFilesystemError(RuntimeError):
 
 BinaryArtifactCleanupState = Literal["not_created", "removed", "retained"]
 BinaryArtifactPublishWarning = Literal[
-    "create_lock_release_failed",
     "directory_fsync_failed",
-    "destination_mismatch",
-    "destination_read_failed",
     "temp_cleanup_retained",
 ]
-
-
-@dataclass(frozen=True)
-class WorkbenchSourceGuardRequest:
-    repo_root: Path
-    specdock_dir: Path
-    scope_directories: tuple[Path, ...]
-    source_path: Path
-
-
-@dataclass(frozen=True)
-class GuardedWorkbenchSource:
-    source_path: Path
-    workbench_root: Path
-    device: int
-    inode: int
-    mode: int
-
-
-@dataclass(frozen=True)
-class BinaryArtifactPublishRequest:
-    source: WorkbenchSourceGuardRequest
-    destination_path: Path
-
-
-@dataclass(frozen=True)
-class BinaryArtifactPublishResult:
-    source_path: Path
-    destination_path: Path
-    source_sha256: str
-    stream_sha256: str
-    staged_sha256: str
-    destination_sha256: str
-    source_byte_count: int
-    stream_byte_count: int
-    staged_byte_count: int
-    destination_byte_count: int
-    source_inode: int
-    staged_inode: int
-    cleanup_state: BinaryArtifactCleanupState
-    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
-    committed: bool = True
 
 
 class BinaryArtifactPublishError(RuntimeError):
@@ -486,45 +441,6 @@ class BinaryArtifactPublishError(RuntimeError):
         self.cleanup_state = cleanup_state
         self.committed = False
         super().__init__(f"binary artifact publication failed: {code}")
-
-
-ArtifactImportKind = Literal["chatgpt-output"]
-ArtifactStorageIdentity = Literal["blank"]
-
-
-@dataclass(frozen=True)
-class ArtifactImportRequest:
-    import_kind: ArtifactImportKind
-    scope_node_id: str
-    scope_kind: Literal["initiative", "epic", "issue"]
-    source_path: Path
-    title: str
-    slug: str | None
-
-
-@dataclass(frozen=True)
-class ArtifactImportResult:
-    import_kind: ArtifactImportKind
-    storage_identity: ArtifactStorageIdentity
-    artifact_id: str
-    scope_id: str
-    source_path: Path
-    destination_path: Path
-    sha256: str
-    byte_count: int
-    committed: bool
-    cleanup_state: BinaryArtifactCleanupState
-    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
-
-
-class ArtifactImportError(RuntimeError):
-    """Stable content-free failure for the public artifact import command."""
-
-    def __init__(self, *, code: str, cleanup_state: BinaryArtifactCleanupState) -> None:
-        self.code = code
-        self.cleanup_state = cleanup_state
-        self.committed = False
-        super().__init__(f"artifact import failed: {code}")
 
 
 FileArtifactTargetKind = Literal["root", "initiative", "epic", "issue"]
@@ -1126,9 +1042,6 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
-    import_artifact: Callable[[ArtifactImportRequest], ArtifactImportResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("import_artifact is not configured")
-    )
     import_file_artifact: Callable[[FileArtifactImportRequest], FileArtifactImportResult] = lambda _req: (
         _ for _ in ()
     ).throw(RuntimeError("import_file_artifact is not configured"))

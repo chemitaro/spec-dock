@@ -1,3 +1,5 @@
+from importlib import import_module
+from importlib.util import find_spec
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -161,3 +163,45 @@ def test_unknown_command_fault_is_redacted_without_fabricating_publication_state
     assert "private-parent-sentinel" not in str(captured.value)
     assert "not_committed" not in str(captured.value)
     assert "retry" not in str(captured.value)
+
+
+def test_provider_specific_chatgpt_import_backend_is_absent() -> None:
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        contracts = import_module("spec_dock_runtime.application.contracts")
+        ports = import_module("spec_dock_runtime.application.ports")
+        bootstrap = import_module("spec_dock_runtime.cli.bootstrap")
+        commands = import_module("spec_dock_runtime.commands.artifact_import")
+        publisher_module = import_module("spec_dock_runtime.infra.binary_artifact_publisher")
+        cli_text = import_module("spec_dock_runtime.presentation.cli_text")
+
+        assert find_spec("spec_dock_runtime.application.import_artifact") is None
+        assert set(commands.command_specs()) == {"artifact_import_file"}
+        for symbol in (
+            "ArtifactImportRequest",
+            "ArtifactImportResult",
+            "ArtifactImportError",
+            "WorkbenchSourceGuardRequest",
+            "GuardedWorkbenchSource",
+            "BinaryArtifactPublishRequest",
+            "BinaryArtifactPublishResult",
+        ):
+            assert not hasattr(contracts, symbol)
+        for symbol in ("WorkbenchSourceGuard", "BinaryArtifactPublisher"):
+            assert not hasattr(ports, symbol)
+        assert "workbench_source_guard" not in ports.Ports.__dataclass_fields__
+        assert "binary_artifact_publisher" not in ports.Ports.__dataclass_fields__
+        assert not hasattr(publisher_module.FilesystemBinaryArtifactPublisher, "guard_source")
+        assert not hasattr(publisher_module.FilesystemBinaryArtifactPublisher, "publish")
+        for symbol in (
+            "render_artifact_import_text",
+            "render_artifact_import_json",
+            "render_artifact_import_error_text",
+            "render_artifact_import_error_json",
+        ):
+            assert not hasattr(cli_text, symbol)
+        runtime = bootstrap.build_runtime(runtime_scripts_dir.parent, repo_root=runtime_scripts_dir.parent.parent)
+        assert not hasattr(runtime.use_cases, "import_artifact")
+    finally:
+        sys.path.pop(0)

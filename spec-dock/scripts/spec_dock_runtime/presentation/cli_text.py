@@ -10,8 +10,6 @@ if TYPE_CHECKING:
         ActiveClearResult,
         ActiveSetResult,
         ActiveViewResult,
-        ArtifactImportError,
-        ArtifactImportResult,
         CloseNodeResult,
         CreateArtifactDocResult,
         CreateNodeResult,
@@ -182,62 +180,6 @@ def render_new_artifact_text(result: CreateArtifactDocResult) -> CliText:
         f"type={result.artifact_type} id={result.artifact_id} scope={result.scope_node_id} path={rel}"
     )
     return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warnings))
-
-
-def render_artifact_import_text(result: ArtifactImportResult) -> CliText:
-    warning_codes = ",".join(result.warning_codes) if result.warning_codes else "-"
-    line = (
-        "spec-dock: ok (artifact import chatgpt-output) "
-        f"import_kind={result.import_kind} storage_identity={result.storage_identity} "
-        f"artifact_id={result.artifact_id} scope_id={result.scope_id} "
-        f"source={result.source_path.as_posix()} destination={result.destination_path.as_posix()} "
-        f"sha256={result.sha256} byte_count={result.byte_count} "
-        f"committed={_bool_text(result.committed)} cleanup_state={result.cleanup_state} "
-        f"warning_codes={warning_codes}"
-    )
-    return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warning_codes))
-
-
-def render_artifact_import_json(result: ArtifactImportResult) -> CliText:
-    payload = {
-        "status": "ok",
-        "import_kind": result.import_kind,
-        "storage_identity": result.storage_identity,
-        "artifact_id": result.artifact_id,
-        "scope_id": result.scope_id,
-        "source": result.source_path.as_posix(),
-        "destination": result.destination_path.as_posix(),
-        "sha256": result.sha256,
-        "byte_count": result.byte_count,
-        "committed": result.committed,
-        "cleanup_state": result.cleanup_state,
-        "warning_codes": list(result.warning_codes),
-    }
-    return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
-
-
-def render_artifact_import_error_text(error: ArtifactImportError) -> CliText:
-    return CliText(
-        stdout_lines=[],
-        stderr_lines=[
-            "spec-dock: error (artifact import chatgpt-output) "
-            f"import_kind=chatgpt-output storage_identity=blank code={error.code} "
-            f"committed=false cleanup_state={error.cleanup_state}"
-        ],
-        warnings=[],
-    )
-
-
-def render_artifact_import_error_json(error: ArtifactImportError) -> CliText:
-    payload = {
-        "status": "error",
-        "import_kind": "chatgpt-output",
-        "storage_identity": "blank",
-        "code": error.code,
-        "committed": False,
-        "cleanup_state": error.cleanup_state,
-    }
-    return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
 
 
 def render_file_artifact_import_text(result: FileArtifactImportResult) -> CliText:

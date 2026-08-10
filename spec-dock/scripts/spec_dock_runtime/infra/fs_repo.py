@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 from pathlib import Path
 import re
@@ -466,6 +467,26 @@ def _build_meta_payload(record: StoredMetaRecord) -> dict[str, Any]:
 def write_meta(dest_dir: Path, record: StoredMetaRecord) -> None:
     meta_path = dest_dir / _META_FILENAME
     _write_meta_json_with_permission_contract(meta_path, _build_meta_payload(record))
+
+
+def write_meta_at(dest_dir_fd: int, record: StoredMetaRecord) -> None:
+    payload = (json.dumps(_build_meta_payload(record), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    meta_fd = os.open(
+        _META_FILENAME,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o666,
+        dir_fd=dest_dir_fd,
+    )
+    try:
+        offset = 0
+        while offset < len(payload):
+            written = os.write(meta_fd, payload[offset:])
+            if written == 0:
+                raise OSError("short metadata write")
+            offset += written
+        os.fchmod(meta_fd, stat.S_IMODE(os.fstat(meta_fd).st_mode) & ~0o222)
+    finally:
+        os.close(meta_fd)
 
 
 def add_issue_dependency(meta_path: Path, to_id: str) -> None:

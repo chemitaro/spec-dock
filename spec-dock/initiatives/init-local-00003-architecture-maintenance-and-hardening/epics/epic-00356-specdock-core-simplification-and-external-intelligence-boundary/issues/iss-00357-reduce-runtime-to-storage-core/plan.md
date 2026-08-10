@@ -288,7 +288,7 @@ locked expectationを変える必要が出た場合、そのstepを停止し、c
 
 **Forbidden:** profile selection、Assurance compose、新scaffolder、template prose変更。
 
-**ケース概要（規範的なテストカードは§8）:** Initiative / Epic / Issueごとに四文書一つ、`.assurance.json`なし、copy failure rollback、collision no-write、Report空本文でstructural flow成功、IC-1 manifest一致。
+**ケース概要（規範的なテストカードは§8）:** Initiative / Epic / Issueごとに四文書一つ、`.assurance.json`なし、二層stagingのhandled failure rollback、canonical collision no-write、同時createで完成tree一つ、Report空本文でstructural flow成功、IC-1 manifest一致。same-UID非協調tamperingは検知時にcompetitor保全を優先し、SIGKILL / power loss / filesystem corruptionはrecovery保証外とする。
 
 **Verification:** `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_runtime_new_doc_s09.py`。
 
@@ -671,7 +671,7 @@ git status --short
 - Depends on: S01 / E00。Unblocks: S09。Target files: create-node application、existing template-copy port / fixture、Runtime tests / dogfood Runtime。
 - Planned obligation: Fresh三scopeへR/D/P/Reportを一つずつ作り、Assurance / Profileに依存しない。
 - Redまたは代替証拠: `red-required`。scope manifest、no-Assurance、rollback、collision、empty-valid Reportを先に失敗させる。
-- Bounded implementation: existing `copy_scaffolded_tree` mechanismを使い、358-owned proseをread-onlyにする。
+- Bounded implementation: existing `copy_scaffolded_tree` mechanismのfd-aware extensionを、held parent / mode `0700` outer transaction / held payloadの二層stagingで使い、payloadをouter fdからcanonical parent fdへatomic no-replace publishする。358-owned proseをread-onlyにする。
 - Green verification: `CL-357-008`とIC-1 input manifestがpassする。
 - Refactor guardrail: new scaffolder、Profile selector、Assurance composeを禁止する。
 - Amendment trigger: 358のcontent contractと不一致なら358 / IC-1へ戻し、Runtimeでproseを補正しない。
@@ -681,16 +681,16 @@ git status --short
   - input docs: `RQ-357-007`, `AC-357-008`; Design §11 / §14; `CL-357-008`。
   - allowed paths: 本step Target filesだけ。
   - forbidden changes: template prose、Profile / Assurance、installer / skill。
-  - acceptance criteria: three scopes、四文書exact、Assuranceなし、atomic failure、content / mechanism routing。
+  - acceptance criteria: three scopes、四文書exact、Assuranceなし、canonical完成前不可視、通常同時createのno-replace、handled failureのowned cleanup、tampering検知時competitor保全、content / mechanism routing。
   - required tests: new CLI scaffoldとdedicated Fresh fixture。
-  - reviewer focus: existing copy mechanism、rollback、collision、ownership分離。
+  - reviewer focus: existing copy mechanism、outer / payloadのfd ownership、cross-dirfd no-replace commit、handled failure rollback、collision、明示threat boundary。
   - stop conditions: template content変更、new file contract、scaffold structure決定が必要。
   - output required: changed files、fresh manifest、rollback evidence、IC-1 input、risk、material decision有無。
 - `tc-s08-001` acceptance: Fresh three-scope scaffold
-  - 前提: 358-owned approved template tree、Initiative / Epic / Issue empty target、copy failure / collision adapterがある。
-  - 操作: 各scopeを作成し、success / failure時のtreeを検査する。
-  - 期待結果: R/D/P/Report各一つ、`.assurance.json`なし、empty Reportがstructural flowを通り、failure / collisionはpartialなしである。
-  - 失敗検出: Profile / Assurance access、重複 / 欠落、content補正、partial tree。
+  - 前提: 358-owned approved template tree、Initiative / Epic / Issue empty target、outer mkdir / open / identity、payload create / open、copy / rules / meta / publish failure adapter、collision adapter、Darwin / Linux no-replace capability、同時create fixtureがある。
+  - 操作: 各scopeを作成し、success / failure時のtreeを検査する。outer mkdir成功後からopen / identity確定前のI/O failureとsame-UID tampering fixtureを別々に注入する。
+  - 期待結果: R/D/P/Report各一つ、`.assurance.json`なし、empty Reportがstructural flowを通る。commit前handled failure / collisionはcanonical partialなし、identity確認済みowned transactionを回収し、同時createは一完成treeだけをpublishする。outer identity未確定failure / tamperingではcanonical不在、競合entry不変、identity不明hidden entryを削除しない。
+  - 失敗検出: Profile / Assurance access、重複 / 欠落、content補正、canonical partial、owned outer / payload残骸、competitor overwrite / delete、post-commit rollback。
   - 検証方法: CLI test、file manifest、port spy、before / after hash。
   - 関連 closure id: `CL-357-008`。
 - Step gate: report更新後、fresh `code-reviewer`がmechanism / ownership / atomicityをpassする。
