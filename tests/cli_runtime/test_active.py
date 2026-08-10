@@ -27,7 +27,7 @@ class TestCliActive(CliRuntimeHarness):
             self._create_same_repo_linked_hierarchy(target)
 
             # Initiative-only active: epic/issue are placeholders.
-            self._run_runtime(target, ["active", "set", "init-00001", "--force"])
+            self._run_runtime(target, ["active", "set", "init-00001"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert isinstance(active.get("initiative"), dict)
             assert active.get("epic") is None
@@ -39,7 +39,7 @@ class TestCliActive(CliRuntimeHarness):
             assert "Active Issue: なし" in self._read_active_pointer_text(target, "issue", "README.md")
 
             # Epic-only active: issue is a placeholder.
-            self._run_runtime(target, ["active", "set", "epic-00002", "--force"])
+            self._run_runtime(target, ["active", "set", "epic-00002"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert isinstance(active.get("initiative"), dict)
             assert isinstance(active.get("epic"), dict)
@@ -69,14 +69,15 @@ class TestCliActive(CliRuntimeHarness):
             # Legacy flags were removed in favor of a single `target` argument.
             self._run_runtime_expect_fail(target, ["active", "set", "--issue", "1"])
 
-    def test_active_set_rejects_github_and_no_github_together(self) -> None:
+    def test_active_set_rejects_removed_readiness_and_checkout_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
-            p = self._run_runtime_capture(target, ["active", "set", "iss-00003", "--github", "--no-github"])
-            assert p.returncode == 2, p.stdout + p.stderr
-            assert "not allowed with argument" in p.stderr
+            for flag in ("--github", "--no-github", "--force", "--checkout"):
+                p = self._run_runtime_capture(target, ["active", "set", "iss-00003", flag])
+                assert p.returncode == 2, p.stdout + p.stderr
+                assert "error:" in p.stderr
 
     def test_active_set_accepts_explicit_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,7 +85,7 @@ class TestCliActive(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
-            p = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00003", "--force"])
+            p = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00003"])
             assert p.returncode == 0, p.stdout + p.stderr
             assert "spec-dock: ok (active set)" in p.stdout
 
@@ -97,7 +98,7 @@ class TestCliActive(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=123)
 
-            p = self._run_runtime_capture(target, ["active", "set", "--github-issue", "123", "--force"])
+            p = self._run_runtime_capture(target, ["active", "set", "--github-issue", "123"])
             assert p.returncode == 0, p.stdout + p.stderr
             assert "spec-dock: ok (active set)" in p.stdout
 
@@ -190,7 +191,7 @@ class TestCliActive(CliRuntimeHarness):
 
             mismatch = self._run_runtime_capture(
                 target,
-                ["active", "set", "https://github.com/other/repo/issues/123", "--force"],
+                ["active", "set", "https://github.com/other/repo/issues/123"],
             )
             assert mismatch.returncode != 0, mismatch.stdout + mismatch.stderr
             assert "No node found for github.issue_number=123 in repo scope (other/repo)" in mismatch.stderr
@@ -231,7 +232,7 @@ class TestCliActive(CliRuntimeHarness):
 
             by_url = self._run_runtime_capture(
                 target,
-                ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
+                ["active", "set", "https://github.com/current/repo/issues/123"],
             )
             assert by_url.returncode == 0, by_url.stdout + by_url.stderr
             assert "spec-dock: ok (active set)" in by_url.stdout
@@ -248,7 +249,7 @@ class TestCliActive(CliRuntimeHarness):
                 target, ["new", "issue", "--epic", "2", "--title", "Baseline issue", "--github-issue", "124"]
             )
 
-            baseline = self._run_runtime_capture(target, ["active", "set", "iss-00124", "--force"])
+            baseline = self._run_runtime_capture(target, ["active", "set", "iss-00124"])
             assert baseline.returncode == 0, baseline.stdout + baseline.stderr
             active_path = target / "spec-dock" / ".agent" / "active.json"
             before = active_path.read_text(encoding="utf-8")
@@ -257,7 +258,7 @@ class TestCliActive(CliRuntimeHarness):
 
             invalid = self._run_runtime_capture(
                 target,
-                ["active", "set", "git@github.com:owner/repo/issues/123", "--force"],
+                ["active", "set", "git@github.com:owner/repo/issues/123"],
             )
             assert invalid.returncode != 0, invalid.stdout + invalid.stderr
             assert "Invalid target" in invalid.stderr
@@ -1233,7 +1234,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             assert active["issue"]["id"] == "iss-00301"
 
-    def test_active_set_fails_fast_on_unreachable_cycle_and_does_not_run_sync(self) -> None:
+    def test_active_set_ignores_unreachable_dependency_cycle_and_only_patches_active_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -1267,21 +1268,18 @@ class TestCliActive(CliRuntimeHarness):
             self._set_meta_depends_on(issue_dir / "iss-00301-cycle-a", ["iss-00302"])
             self._set_meta_depends_on(issue_dir / "iss-00302-cycle-b", ["iss-00301"])
 
-            # S06: topology invalid/cycle is fail-fast even when unreachable from target.
-            p = self._run_runtime_capture(target, ["active", "set", "iss-00303", "--force"])
-            assert p.returncode != 0, p.stdout + p.stderr
-            assert "Dependency cycle detected" in p.stderr
-            assert not (agent_dir / "active.json").exists()
+            p = self._run_runtime_capture(target, ["active", "set", "iss-00303"])
+            assert p.returncode == 0, p.stdout + p.stderr
+            active = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
+            assert active["issue"]["id"] == "iss-00303"
 
             # `active set` must not run `sync`: cached active field must remain unchanged.
             state_index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
             state_tree_all = json.loads((agent_dir / "tree-all.json").read_text(encoding="utf-8"))
             state_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
             state_tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
-            assert state_index_all["active"] is None
-            assert state_tree_all["active"] is None
-            assert state_index["active"] is None
-            assert state_tree["active"] is None
+            for state in (state_index_all, state_tree_all, state_index, state_tree):
+                assert state["active"]["issue"]["id"] == "iss-00303"
 
     @pytest.mark.skip(
         reason="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli"
@@ -1649,7 +1647,7 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads(after)
             assert active["issue"]["id"] == "iss-local-00001"
 
-    def test_active_set_epic_and_initiative_use_v2_deps_guard(self) -> None:
+    def test_active_set_epic_and_initiative_ignore_dependency_readiness(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -1684,42 +1682,20 @@ class TestCliActive(CliRuntimeHarness):
             agent_dir = target / "spec-dock" / ".agent"
             self._run_runtime(target, ["active", "clear"])
 
-            before_epic = (agent_dir / "active.json").read_text(encoding="utf-8")
-            blocked_epic = self._run_runtime_capture(target, ["active", "set", "epic-00201"])
-            assert blocked_epic.returncode == 1, blocked_epic.stdout + blocked_epic.stderr
-            assert "active set blocked" in blocked_epic.stderr
-            assert "iss-00401" in blocked_epic.stderr
-            after_epic = (agent_dir / "active.json").read_text(encoding="utf-8")
-            assert after_epic == before_epic
-
-            forced_epic = self._run_runtime_capture(target, ["active", "set", "epic-00201", "--force"])
-            assert forced_epic.returncode == 0, forced_epic.stdout + forced_epic.stderr
-            assert "deps_blocked" in forced_epic.stderr
-            assert "blocker: iss-00401" in forced_epic.stderr
-
-            active_after_epic_force = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
-            assert active_after_epic_force["initiative"]["id"] == "init-00101"
-            assert active_after_epic_force["epic"]["id"] == "epic-00201"
-            assert active_after_epic_force["issue"] is None
+            selected_epic = self._run_runtime_capture(target, ["active", "set", "epic-00201"])
+            assert selected_epic.returncode == 0, selected_epic.stdout + selected_epic.stderr
+            active_after_epic = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
+            assert active_after_epic["initiative"]["id"] == "init-00101"
+            assert active_after_epic["epic"]["id"] == "epic-00201"
+            assert active_after_epic["issue"] is None
 
             self._run_runtime(target, ["active", "clear"])
-            before_init = (agent_dir / "active.json").read_text(encoding="utf-8")
-            blocked_init = self._run_runtime_capture(target, ["active", "set", "init-00101"])
-            assert blocked_init.returncode == 1, blocked_init.stdout + blocked_init.stderr
-            assert "active set blocked" in blocked_init.stderr
-            assert "iss-00401" in blocked_init.stderr
-            after_init = (agent_dir / "active.json").read_text(encoding="utf-8")
-            assert after_init == before_init
-
-            forced_init = self._run_runtime_capture(target, ["active", "set", "init-00101", "--force"])
-            assert forced_init.returncode == 0, forced_init.stdout + forced_init.stderr
-            assert "deps_blocked" in forced_init.stderr
-            assert "blocker: iss-00401" in forced_init.stderr
-
-            active_after_init_force = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
-            assert active_after_init_force["initiative"]["id"] == "init-00101"
-            assert active_after_init_force["epic"] is None
-            assert active_after_init_force["issue"] is None
+            selected_init = self._run_runtime_capture(target, ["active", "set", "init-00101"])
+            assert selected_init.returncode == 0, selected_init.stdout + selected_init.stderr
+            active_after_init = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
+            assert active_after_init["initiative"]["id"] == "init-00101"
+            assert active_after_init["epic"] is None
+            assert active_after_init["issue"] is None
 
     @pytest.mark.skip(
         reason="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git"
@@ -1785,6 +1761,7 @@ class TestCliActive(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00123-add-refresh-token"
 
+    @pytest.mark.skip(reason="S01 removed active set checkout; issue start owns checkout and branch re-resolution")
     def test_active_set_re_resolves_node_after_checkout_when_id_format_changes(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a bash stub for gh; skip on Windows.")

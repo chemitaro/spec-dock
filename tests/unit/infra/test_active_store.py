@@ -54,6 +54,80 @@ class TestActiveStoreInfra:
             assert not (legacy_dir / "active.json").exists()
             assert not (legacy_dir / "current.json").exists()
 
+    def test_write_manifest_serializes_exact_minimal_schema_v2(self, monkeypatch) -> None:
+        active_store, _infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            monkeypatch.setattr(active_store, "now_iso", lambda: "2026-08-10T00:00:00Z")
+            active_path = specdock_dir / ".agent" / "active.json"
+            active_path.parent.mkdir(parents=True)
+            active_path.write_text(
+                json.dumps({
+                    "schema_version": 2,
+                    "initiative": {
+                        "id": "init-00001",
+                        "path": "spec-dock/initiatives/init-00001-platform",
+                        "authority": "approved",
+                    },
+                    "epic": {
+                        "id": "epic-00002",
+                        "path": "spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery",
+                        "grants": ["implementation_start"],
+                    },
+                    "issue": {
+                        "id": "iss-00003",
+                        "path": (
+                            "spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/"
+                            "issues/iss-00003-target"
+                        ),
+                        "promotion_record": {"legacy": True},
+                    },
+                })
+                + "\n",
+                encoding="utf-8",
+            )
+            legacy_manifest = active_store.load_active_manifest(specdock_dir).manifest
+
+            active_store.write_active_manifest(specdock_dir, legacy_manifest)
+
+            payload = json.loads((specdock_dir / ".agent" / "active.json").read_text(encoding="utf-8"))
+            assert payload == {
+                "schema_version": 2,
+                "updated_at": "2026-08-10T00:00:00Z",
+                "initiative": {
+                    "id": "init-00001",
+                    "path": "spec-dock/initiatives/init-00001-platform",
+                },
+                "epic": {
+                    "id": "epic-00002",
+                    "path": "spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery",
+                },
+                "issue": {
+                    "id": "iss-00003",
+                    "path": "spec-dock/initiatives/init-00001-platform/epics/epic-00002-delivery/issues/iss-00003-target",
+                },
+            }
+
+    def test_legacy_extra_fields_are_tolerated_without_rewriting_bytes(self) -> None:
+        active_store, _infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            active_path = specdock_dir / ".agent" / "active.json"
+            active_path.parent.mkdir(parents=True)
+            legacy_bytes = (
+                b'{"schema_version":2,"updated_at":"old","initiative":null,"epic":null,'
+                b'"issue":{"id":"iss-00003","path":"spec-dock/issues/iss-00003",'
+                b'"authority":"approved","grants":["implementation_start"],'
+                b'"promotion_record":{"legacy":true},"future_field":"keep-readable"}}\n'
+            )
+            active_path.write_bytes(legacy_bytes)
+
+            loaded = active_store.load_active_manifest(specdock_dir)
+
+            assert loaded.manifest.issue.id == "iss-00003"
+            assert loaded.manifest.issue.path == "spec-dock/issues/iss-00003"
+            assert active_path.read_bytes() == legacy_bytes
+
     def test_apply_active_pointers_uses_repo_relative_paths_and_placeholders_without_cli(self) -> None:
         active_store, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

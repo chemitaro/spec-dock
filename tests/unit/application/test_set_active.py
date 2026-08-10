@@ -1,3 +1,4 @@
+from dataclasses import fields, replace
 from pathlib import Path
 import sys
 
@@ -18,6 +19,20 @@ def _runtime_modules():
     finally:
         sys.path.pop(0)
     return app_contracts, app_ports, app_set_active, domain_models, infra_contracts
+
+
+def _snapshot_paths(paths):
+    out = {}
+    for path in paths:
+        if path.is_symlink():
+            out[path] = ("symlink", path.readlink().as_posix())
+        elif path.is_file():
+            out[path] = ("file", path.read_bytes())
+        elif path.is_dir():
+            out[path] = ("directory", None)
+        else:
+            out[path] = ("missing", None)
+    return out
 
 
 class _StubNodeReader:
@@ -174,6 +189,76 @@ class _StubGitGateway:
     def create_and_checkout_branch(self, repo_root, branch):
         self.calls.append(("create_and_checkout_branch", branch))
         self.current_branch = branch
+
+
+class _FailFastPort:
+    def __init__(self):
+        self.calls = []
+
+    def __getattr__(self, name):
+        self.calls.append(name)
+        raise AssertionError(f"selection-only active set must not call {name}")
+
+
+class _PhaseFailingActiveStateStore:
+    def __init__(self, active_store, fail_phase):
+        self.active_store = active_store
+        self.fail_phase = fail_phase
+
+    def load_active_manifest(self, specdock_dir):
+        return self.active_store.load_active_manifest(specdock_dir)
+
+    def snapshot_current_state(self, specdock_dir):
+        return self.active_store.snapshot_current_state(specdock_dir)
+
+    def write_active_manifest(self, specdock_dir, manifest):
+        written = self.active_store.write_active_manifest(specdock_dir, manifest)
+        if self.fail_phase == "manifest":
+            raise RuntimeError("injected manifest failure")
+        return written
+
+    def apply_active_pointers(self, specdock_dir, manifest, rendered_context_pack):
+        self.active_store.apply_active_pointers(specdock_dir, manifest, rendered_context_pack)
+        if self.fail_phase == "pointers":
+            raise RuntimeError("injected pointer failure")
+
+    def patch_agent_state_active_fields(self, specdock_dir, manifest):
+        self.active_store.patch_agent_state_active_fields(specdock_dir, manifest)
+        if self.fail_phase == "managed":
+            raise RuntimeError("injected managed state failure")
+
+    def restore_previous_state(self, specdock_dir, snapshot):
+        self.active_store.restore_previous_state(specdock_dir, snapshot)
+
+
+class _DirectoryPhaseFailingActiveStateStore:
+    def __init__(self, active_store, fail_phase, directory_paths):
+        self.active_store = active_store
+        self.fail_phase = fail_phase
+        self.directory_paths = list(directory_paths)
+
+    def snapshot_current_state(self, specdock_dir):
+        return self.active_store.snapshot_current_state(specdock_dir)
+
+    def write_active_manifest(self, specdock_dir, manifest):
+        for path in self.directory_paths:
+            self.active_store._unlink_any(path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"corrupted")
+        if self.fail_phase == "manifest":
+            raise RuntimeError("injected manifest failure")
+        return manifest
+
+    def apply_active_pointers(self, specdock_dir, manifest, rendered_context_pack):
+        if self.fail_phase == "pointers":
+            raise RuntimeError("injected pointer failure")
+
+    def patch_agent_state_active_fields(self, specdock_dir, manifest):
+        if self.fail_phase == "managed":
+            raise RuntimeError("injected managed state failure")
+
+    def restore_previous_state(self, specdock_dir, snapshot):
+        self.active_store.restore_previous_state(specdock_dir, snapshot)
 
 
 class TestSetActiveApplication:
@@ -366,219 +451,115 @@ class TestSetActiveApplication:
         )
         assert by_github.selection.issue_id == "iss-00301"
 
-    def test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli(self) -> None:
+    @pytest.mark.parametrize("selector", ["node_id", "github_issue", "repo_github_issue"])
+    def test_set_active_all_selectors_avoid_readiness_github_and_git_ports(self, selector) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
         active_store = _StubActiveStateStore()
+        deps_spy = _FailFastPort()
+        derived_spy = _FailFastPort()
+        issue_spy = _FailFastPort()
+        git_spy = _FailFastPort()
         ports = self._ports(
             app_ports,
             infra_contracts,
             active_store=active_store,
             deps={"iss-00302": ["iss-00301"]},
-            derived_state_reader=_StubDerivedStateReader({"iss-00301": "open", "iss-00302": "open"}),
+            issue_gateway=issue_spy,
+            git_gateway=git_spy,
         )
+        object.__setattr__(ports, "deps_topology_reader", deps_spy)
+        object.__setattr__(ports, "derived_state_reader", derived_spy)
 
-        with pytest.raises(RuntimeError, match="active set blocked"):
-            app_set_active.set_active(
-                self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
-                ports,
-            )
-        assert active_store.written == []
-
-        forced = app_set_active.set_active(
-            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302"), force=True),
-            ports,
-        )
-        assert forced.selection.issue_id == "iss-00302"
-        assert "deps_blocked" in "\n".join(forced.warnings)
-        assert active_store.written[-1].issue.id == "iss-00302"
-
-    def test_set_active_rejects_empty_open_high_level_node_blocker_even_with_force(self) -> None:
-        app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
-        active_store = _StubActiveStateStore()
-        context = infra_contracts.DepsDependencyContext(
-            source_node_id="iss-00302",
-            source_issue_id="iss-00302",
-            target_node_id="epic-00202",
-            target_node_kind="epic",
-            target_issue_ids=(),
-            expansion="empty",
-        )
-        ports = self._ports(
-            app_ports,
-            infra_contracts,
-            active_store=active_store,
-            deps={"iss-00302": []},
-            dependency_contexts={"iss-00302": [context]},
-            issue_gateway=_StubIssueGateway([
-                self._snapshot(domain_models, 202, "OPEN"),
-                self._snapshot(domain_models, 302, "OPEN"),
-            ]),
-        )
-
-        with pytest.raises(RuntimeError) as exc_info:
-            app_set_active.set_active(
-                self._request(
-                    app_contracts,
-                    target=self._node_id_target(app_contracts, "iss-00302"),
-                    use_github=True,
-                    force=True,
-                ),
-                ports,
-            )
-
-        message = str(exc_info.value)
-        assert "epic-00202" in message
-        assert "dependency_disposition=blocking" in message
-        assert "disposition_basis=empty_open_container" in message
-        assert active_store.written == []
-
-    def test_set_active_allows_open_high_level_dependency_when_all_descendants_done(self) -> None:
-        app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
-        active_store = _StubActiveStateStore()
-        context = infra_contracts.DepsDependencyContext(
-            source_node_id="iss-00302",
-            source_issue_id="iss-00302",
-            target_node_id="init-00101",
-            target_node_kind="initiative",
-            target_issue_ids=("iss-00301",),
-            expansion="expanded",
-        )
-        ports = self._ports(
-            app_ports,
-            infra_contracts,
-            active_store=active_store,
-            deps={"iss-00302": ["iss-00301"]},
-            dependency_contexts={"iss-00302": [context]},
-            issue_gateway=_StubIssueGateway([
-                self._snapshot(domain_models, 101, "OPEN"),
-                self._snapshot(domain_models, 301, "CLOSED"),
-                self._snapshot(domain_models, 302, "OPEN"),
-            ]),
-        )
-
+        target = {
+            "node_id": self._node_id_target(app_contracts, "iss-00302"),
+            "github_issue": self._github_target(app_contracts, 302),
+            "repo_github_issue": self._github_target(app_contracts, 302, owner="example", repo="repo"),
+        }[selector]
         result = app_set_active.set_active(
             self._request(
                 app_contracts,
-                target=self._node_id_target(app_contracts, "iss-00302"),
+                target=target,
                 use_github=True,
             ),
             ports,
         )
 
         assert result.selection.issue_id == "iss-00302"
+        assert result.branch is None
+        assert result.warnings == []
         assert active_store.written[-1].issue.id == "iss-00302"
+        assert deps_spy.calls == []
+        assert derived_spy.calls == []
+        assert issue_spy.calls == []
+        assert git_spy.calls == []
 
-    def test_set_active_raw_empty_container_cycle_blocks_before_writing_without_cli(self) -> None:
+    def test_repo_scoped_github_target_infers_single_unscoped_legacy_node_without_git(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        records = [
+            replace(record, github_repo_owner=None, github_repo_name=None) if record.id == "iss-00302" else record
+            for record in self._records(infra_contracts)
+        ]
         active_store = _StubActiveStateStore()
-        ports = self._ports(
-            app_ports,
-            infra_contracts,
-            active_store=active_store,
-            deps={},
-            node_deps={
-                "epic-00202": ["epic-00203"],
-                "epic-00203": ["epic-00202"],
-            },
+        git_spy = _FailFastPort()
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader(records),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+            active_state_store=active_store,
+            git_gateway=git_spy,
         )
 
-        with pytest.raises(RuntimeError, match="Dependency cycle detected"):
+        result = app_set_active.set_active(
+            self._request(
+                app_contracts,
+                target=self._github_target(app_contracts, 302, owner="example", repo="repo"),
+            ),
+            ports,
+        )
+
+        assert result.selection.issue_id == "iss-00302"
+        assert git_spy.calls == []
+
+    @pytest.mark.parametrize("match_count", [0, 2])
+    def test_repo_scoped_github_target_reports_not_found_or_ambiguous_without_writing(self, match_count) -> None:
+        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        records = self._records(infra_contracts)
+        issue_records = [record for record in records if record.kind == "issue"]
+        if match_count == 2:
+            replacements = {
+                record.id: replace(
+                    record,
+                    github_issue_number=999,
+                    github_repo_owner=None,
+                    github_repo_name=None,
+                )
+                for record in issue_records
+            }
+            records = [replacements.get(record.id, record) for record in records]
+        active_store = _StubActiveStateStore()
+        git_spy = _FailFastPort()
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader(records),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+            active_state_store=active_store,
+            git_gateway=git_spy,
+        )
+
+        expected = "No node found" if match_count == 0 else "Ambiguous"
+        with pytest.raises(RuntimeError, match=expected):
             app_set_active.set_active(
                 self._request(
                     app_contracts,
-                    target=self._node_id_target(app_contracts, "iss-00302"),
-                    force=True,
+                    target=self._github_target(app_contracts, 999, owner="example", repo="repo"),
                 ),
                 ports,
             )
 
         assert active_store.written == []
+        assert git_spy.calls == []
 
-    def test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli(self) -> None:
-        app_contracts, app_ports, app_set_active, domain_models, infra_contracts = _runtime_modules()
-        gateway = _StubIssueGateway([
-            self._snapshot(domain_models, 301, "CLOSED"),
-            self._snapshot(domain_models, 302, "OPEN"),
-        ])
-        active_store = _StubActiveStateStore()
-        ports = self._ports(
-            app_ports,
-            infra_contracts,
-            active_store=active_store,
-            deps={"iss-00302": ["iss-00301"]},
-            derived_state_reader=_StubDerivedStateReader({"iss-00301": "open", "iss-00302": "open"}),
-            issue_gateway=gateway,
-        )
-
-        live = app_set_active.set_active(
-            self._request(
-                app_contracts,
-                target=self._node_id_target(app_contracts, "iss-00302"),
-                use_github=True,
-            ),
-            ports,
-        )
-        assert live.selection.issue_id == "iss-00302"
-        assert gateway.issue_index_calls == [(Path("/repo"), 10000)]
-
-        cache_only_store = _StubActiveStateStore()
-        cache_only_ports = self._ports(
-            app_ports,
-            infra_contracts,
-            active_store=cache_only_store,
-            deps={"iss-00302": ["iss-00301"]},
-            derived_state_reader=_StubDerivedStateReader({"iss-00301": "done", "iss-00302": "open"}),
-            issue_gateway=_StubIssueGateway([]),
-        )
-        cache_only = app_set_active.set_active(
-            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
-            cache_only_ports,
-        )
-        assert cache_only.selection.issue_id == "iss-00302"
-        assert cache_only_ports.issue_gateway.issue_index_calls == []
-
-    def test_set_active_no_github_uses_cached_high_level_github_state(self, tmp_path) -> None:
-        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        specdock_dir = tmp_path / "spec-dock"
-        agent_dir = specdock_dir / ".agent"
-        agent_dir.mkdir(parents=True)
-        (agent_dir / "index-all.json").write_text(
-            (
-                '{"nodes":{"epic-00202":{"type":"epic",'
-                '"github":{"issue_number":202,"state":"CLOSED","updated_at":"2026-06-05T00:00:00Z"}}}}\n'
-            ),
-            encoding="utf-8",
-        )
-        active_store = _StubActiveStateStore()
-        context = infra_contracts.DepsDependencyContext(
-            source_node_id="iss-00302",
-            source_issue_id="iss-00302",
-            target_node_id="epic-00202",
-            target_node_kind="epic",
-            target_issue_ids=(),
-            expansion="empty",
-        )
-        ports = self._ports(
-            app_ports,
-            infra_contracts,
-            active_store=active_store,
-            deps={"iss-00302": []},
-            dependency_contexts={"iss-00302": [context]},
-            derived_state_reader=_StubDerivedStateReader({"iss-00302": "open"}),
-            issue_gateway=_StubIssueGateway([]),
-            specdock_dir=specdock_dir,
-        )
-
-        result = app_set_active.set_active(
-            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
-            ports,
-        )
-
-        assert result.selection.issue_id == "iss-00302"
-        assert active_store.written[-1].issue.id == "iss-00302"
-        assert ports.issue_gateway.issue_index_calls == []
-
-    def test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git(self) -> None:
+    def test_internal_checkout_request_preserves_issue_start_compatibility(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
         git_gateway = _StubGitGateway(existing_branches={"iss-00302-target-issue"})
         ports = self._ports(app_ports, infra_contracts, git_gateway=git_gateway)
@@ -587,7 +568,6 @@ class TestSetActiveApplication:
             self._request(
                 app_contracts,
                 target=self._node_id_target(app_contracts, "iss-00302"),
-                force=True,
                 checkout=True,
             ),
             ports,
@@ -596,4 +576,305 @@ class TestSetActiveApplication:
         assert result.branch.desired == "iss-00302-target-issue"
         assert ("require_clean_working_tree", None) in git_gateway.calls
         assert ("checkout_branch", "iss-00302-target-issue") in git_gateway.calls
-        assert ("create_and_checkout_branch", "iss-00302-target-issue") not in git_gateway.calls
+
+    def test_active_manifest_and_context_pack_are_structural_only(self) -> None:
+        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        assert [field.name for field in fields(infra_contracts.ActiveManifestEntry)] == ["id", "path"]
+
+        active_store = _StubActiveStateStore()
+        ports = self._ports(app_ports, infra_contracts, active_store=active_store)
+        app_set_active.set_active(
+            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-00302")),
+            ports,
+        )
+
+        context_pack = active_store.applied[-1][1]
+        for forbidden in ("Authority", "authority", "grants", "promotion", "reviewer", "EAL", "Planning Level"):
+            assert forbidden not in context_pack
+
+    @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
+    @pytest.mark.parametrize("projection_exists", [True, False])
+    @pytest.mark.parametrize("legacy_kind", ["crlf_files", "symlinks"])
+    def test_commit_active_state_rolls_back_every_write_phase_to_legacy_snapshot(
+        self, tmp_path, fail_phase, projection_exists, legacy_kind
+    ) -> None:
+        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        del app_contracts
+        from spec_dock_runtime.infra import active_store as infra_active_store
+
+        repo_root = tmp_path
+        specdock_dir = repo_root / "spec-dock"
+        for layer in ("initiative", "epic", "issue"):
+            (specdock_dir / "system" / "active-none" / layer).mkdir(parents=True)
+        old_issue_dir = specdock_dir / "issues" / "iss-00001-old"
+        old_issue_dir.mkdir(parents=True)
+        legacy_dir = specdock_dir / ".work"
+        legacy_dir.mkdir(parents=True)
+        legacy_active = (
+            b'{"schema_version":2,"initiative":null,"epic":null,'
+            b'"issue":{"id":"iss-00001","path":"spec-dock/issues/iss-00001-old",'
+            b'"authority":"approved","grants":["implementation_start"]}}\r\n'
+        )
+        legacy_current = b'{"issue":{"id":"iss-legacy-current"}}\r\n'
+        legacy_sources = legacy_dir / "snapshots"
+        if legacy_kind == "crlf_files":
+            (legacy_dir / "active.json").write_bytes(legacy_active)
+            (legacy_dir / "current.json").write_bytes(legacy_current)
+        else:
+            legacy_sources.mkdir()
+            (legacy_sources / "active-source.json").write_bytes(legacy_active)
+            (legacy_sources / "current-source.json").write_bytes(legacy_current)
+            (legacy_dir / "active.json").symlink_to("snapshots/active-source.json")
+            (legacy_dir / "current.json").symlink_to("snapshots/current-source.json")
+        old_manifest = infra_active_store.load_active_manifest(specdock_dir).manifest
+        if projection_exists:
+            infra_active_store.apply_active_pointers(specdock_dir, old_manifest, "# old context\n")
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
+            (agent_dir / name).write_text('{"active":{"old":true}}\n', encoding="utf-8")
+
+        watched = [
+            legacy_dir / "active.json",
+            legacy_dir / "current.json",
+            legacy_sources / "active-source.json",
+            legacy_sources / "current-source.json",
+            agent_dir / "active.json",
+            *(agent_dir / name for name in ("index-all.json", "tree-all.json", "index.json", "tree.json")),
+            specdock_dir / "active",
+            *(specdock_dir / "active" / name for name in ("initiative", "epic", "issue", "context-pack.md")),
+        ]
+
+        before = _snapshot_paths(watched)
+        new_manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(id="iss-00002", path="spec-dock/issues/iss-00002-new"),
+        )
+        store = _PhaseFailingActiveStateStore(infra_active_store, fail_phase)
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader([]),
+            repo_root=repo_root,
+            specdock_dir=specdock_dir,
+            active_state_store=store,
+        )
+
+        with pytest.raises(
+            RuntimeError, match=f"injected {fail_phase[:-1] if fail_phase == 'pointers' else fail_phase}"
+        ):
+            app_set_active.commit_active_state(
+                persisted_manifest=new_manifest,
+                patch_manifest=new_manifest,
+                ports=ports,
+                context_pack_text="# new context\n",
+            )
+
+        assert _snapshot_paths(watched) == before
+
+    @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
+    @pytest.mark.parametrize("agent_kind", ["crlf_file", "symlink"])
+    def test_commit_active_state_rolls_back_agent_manifest_verbatim(self, tmp_path, fail_phase, agent_kind) -> None:
+        _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        from spec_dock_runtime.infra import active_store as infra_active_store
+
+        specdock_dir = tmp_path / "spec-dock"
+        for layer in ("initiative", "epic", "issue"):
+            (specdock_dir / "system" / "active-none" / layer).mkdir(parents=True)
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        active_bytes = (
+            b'{"schema_version":2,"initiative":null,"epic":null,'
+            b'"issue":{"id":"iss-00001","path":"spec-dock/issues/iss-00001-old"}}\r\n'
+        )
+        active_source = agent_dir / "snapshots" / "active-source.json"
+        active_path = agent_dir / "active.json"
+        if agent_kind == "crlf_file":
+            active_path.write_bytes(active_bytes)
+        else:
+            active_source.parent.mkdir()
+            active_source.write_bytes(active_bytes)
+            active_path.symlink_to("snapshots/active-source.json")
+        old_manifest = infra_active_store.load_active_manifest(specdock_dir).manifest
+        infra_active_store.apply_active_pointers(specdock_dir, old_manifest, "# old context\n")
+
+        watched = [active_path, active_source]
+        before = _snapshot_paths(watched)
+        new_manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(id="iss-00002", path="spec-dock/issues/iss-00002-new"),
+        )
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader([]),
+            repo_root=tmp_path,
+            specdock_dir=specdock_dir,
+            active_state_store=_PhaseFailingActiveStateStore(infra_active_store, fail_phase),
+        )
+
+        with pytest.raises(
+            RuntimeError, match=f"injected {fail_phase[:-1] if fail_phase == 'pointers' else fail_phase}"
+        ):
+            app_set_active.commit_active_state(
+                persisted_manifest=new_manifest,
+                patch_manifest=new_manifest,
+                ports=ports,
+                context_pack_text="# new context\n",
+            )
+
+        assert _snapshot_paths(watched) == before
+
+    @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
+    def test_commit_active_state_rolls_back_root_symlink_and_external_projection(self, tmp_path, fail_phase) -> None:
+        _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        from spec_dock_runtime.infra import active_store as infra_active_store
+
+        specdock_dir = tmp_path / "spec-dock"
+        for layer in ("initiative", "epic", "issue"):
+            (specdock_dir / "system" / "active-none" / layer).mkdir(parents=True)
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "active.json").write_bytes(b'{"schema_version":2,"initiative":null,"epic":null,"issue":null}\r\n')
+        external_active = tmp_path / "external-active"
+        external_active.mkdir()
+        active_dir = specdock_dir / "active"
+        active_dir.symlink_to("../external-active", target_is_directory=True)
+        for layer in ("initiative", "epic", "issue"):
+            (external_active / layer).symlink_to(f"../old-{layer}")
+        (external_active / "context-pack.md").write_bytes(b"# old context\r\n")
+        (external_active / "unmanaged.bin").write_bytes(b"\x00old\xff")
+
+        watched = [
+            active_dir,
+            external_active,
+            *(external_active / layer for layer in ("initiative", "epic", "issue")),
+            external_active / "context-pack.md",
+            external_active / "current-runbook.json",
+            external_active / "unmanaged.bin",
+            agent_dir / "active.json",
+        ]
+        before = _snapshot_paths(watched)
+        new_manifest = infra_contracts.ActiveManifest(initiative=None, epic=None, issue=None)
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader([]),
+            repo_root=tmp_path,
+            specdock_dir=specdock_dir,
+            active_state_store=_PhaseFailingActiveStateStore(infra_active_store, fail_phase),
+        )
+
+        with pytest.raises(
+            RuntimeError, match=f"injected {fail_phase[:-1] if fail_phase == 'pointers' else fail_phase}"
+        ):
+            app_set_active.commit_active_state(
+                persisted_manifest=new_manifest,
+                patch_manifest=new_manifest,
+                ports=ports,
+                context_pack_text="# new context\n",
+            )
+
+        assert _snapshot_paths(watched) == before
+
+    @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
+    @pytest.mark.parametrize("managed_kind", ["crlf_files", "dangling_symlinks", "existing_symlinks"])
+    def test_commit_active_state_rolls_back_all_managed_agent_files_verbatim(
+        self, tmp_path, fail_phase, managed_kind
+    ) -> None:
+        _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        from spec_dock_runtime.infra import active_store as infra_active_store
+
+        specdock_dir = tmp_path / "spec-dock"
+        for layer in ("initiative", "epic", "issue"):
+            (specdock_dir / "system" / "active-none" / layer).mkdir(parents=True)
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "active.json").write_text(
+            '{"schema_version":2,"initiative":null,"epic":null,"issue":null}\n',
+            encoding="utf-8",
+        )
+        infra_active_store.apply_active_pointers(specdock_dir, None, "# old context\n")
+
+        managed_names = ("index-all.json", "tree-all.json", "index.json", "tree.json")
+        external_dir = tmp_path / "external-managed"
+        external_dir.mkdir()
+        managed_paths = [agent_dir / name for name in managed_names]
+        target_paths = [external_dir / name for name in managed_names]
+        for path, target in zip(managed_paths, target_paths, strict=True):
+            old_bytes = f'{{"active":{{"old":true}},"name":"{path.name}"}}\r\n'.encode()
+            if managed_kind == "crlf_files":
+                path.write_bytes(old_bytes)
+            elif managed_kind == "dangling_symlinks":
+                path.symlink_to(target)
+            else:
+                target.write_bytes(old_bytes)
+                path.symlink_to(target)
+        unmanaged_path = external_dir / "unmanaged.bin"
+        unmanaged_path.write_bytes(b"\x00unmanaged\xff")
+
+        watched = [*managed_paths, *target_paths, unmanaged_path]
+        before = _snapshot_paths(watched)
+        new_manifest = infra_contracts.ActiveManifest(initiative=None, epic=None, issue=None)
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader([]),
+            repo_root=tmp_path,
+            specdock_dir=specdock_dir,
+            active_state_store=_PhaseFailingActiveStateStore(infra_active_store, fail_phase),
+        )
+
+        with pytest.raises(
+            RuntimeError, match=f"injected {fail_phase[:-1] if fail_phase == 'pointers' else fail_phase}"
+        ):
+            app_set_active.commit_active_state(
+                persisted_manifest=new_manifest,
+                patch_manifest=new_manifest,
+                ports=ports,
+                context_pack_text="# new context\n",
+            )
+
+        assert _snapshot_paths(watched) == before
+
+    @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
+    def test_commit_active_state_rolls_back_directory_path_trees_verbatim(self, tmp_path, fail_phase) -> None:
+        _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        from spec_dock_runtime.infra import active_store as infra_active_store
+
+        specdock_dir = tmp_path / "spec-dock"
+        agent_dir = specdock_dir / ".agent"
+        legacy_dir = specdock_dir / ".work"
+        directory_paths = [
+            agent_dir / "active.json",
+            legacy_dir / "active.json",
+            legacy_dir / "current.json",
+            *(agent_dir / name for name in ("index-all.json", "tree-all.json", "index.json", "tree.json")),
+        ]
+        watched: list[Path] = []
+        for index, path in enumerate(directory_paths):
+            nested = path / "nested"
+            nested.mkdir(parents=True)
+            raw_path = nested / "raw.bin"
+            raw_path.write_bytes(b"\x00old\r\n" + bytes([index]))
+            link_path = path / "link"
+            link_path.symlink_to("nested/raw.bin")
+            empty_path = path / "empty"
+            empty_path.mkdir()
+            watched.extend((path, nested, raw_path, link_path, empty_path))
+
+        before = _snapshot_paths(watched)
+        new_manifest = infra_contracts.ActiveManifest(initiative=None, epic=None, issue=None)
+        store = _DirectoryPhaseFailingActiveStateStore(infra_active_store, fail_phase, directory_paths)
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader([]),
+            repo_root=tmp_path,
+            specdock_dir=specdock_dir,
+            active_state_store=store,
+        )
+
+        with pytest.raises(
+            RuntimeError, match=f"injected {fail_phase[:-1] if fail_phase == 'pointers' else fail_phase}"
+        ):
+            app_set_active.commit_active_state(
+                persisted_manifest=new_manifest,
+                patch_manifest=new_manifest,
+                ports=ports,
+                context_pack_text="# new context\n",
+            )
+
+        assert _snapshot_paths(watched) == before

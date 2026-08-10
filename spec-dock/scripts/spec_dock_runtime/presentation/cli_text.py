@@ -478,7 +478,18 @@ def render_issue_start_text(result: IssueStartResult) -> CliText:
     ]
     if result.active_set.branch is not None:
         stdout_lines.append(f"spec-dock: ok (issue checkout) branch={result.active_set.branch.desired}")
-    return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
+    post_sync_line = _post_sync_stdout_line(result.post_sync, label="issue start")
+    if post_sync_line is not None:
+        stdout_lines.append(post_sync_line)
+    return CliText(
+        stdout_lines=stdout_lines,
+        stderr_lines=_post_sync_stderr_lines(
+            result.post_sync,
+            label="issue start",
+            target=f"issue={result.requested_issue_id}",
+        ),
+        warnings=_post_sync_warnings(list(result.warnings), result.post_sync),
+    )
 
 
 def render_issue_finish_text(result: IssueFinishResult) -> CliText:
