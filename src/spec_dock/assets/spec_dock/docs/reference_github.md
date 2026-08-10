@@ -11,7 +11,7 @@
 ## 1. 前提（どのリポジトリが対象になるか）
 
 spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略するわけではありません。  
-`import` / `issue start` / `issue finish` / `active set` / deps check / sync の `gh issue view` 系では repo slug が分かっている場合に `--repo owner/repo` を付け、same-repo URL import でも current repo を明示して読み取ります。
+`import` / `issue start` / `issue finish` / deps check / sync の `gh issue view` 系では repo slug が分かっている場合に `--repo owner/repo` を付け、same-repo URL import でも current repo を明示して読み取ります。`active set` は GitHub を照会しません。
 一方で `gh issue create` / `gh issue list` は repo root を `cwd` にして実行し、対象リポジトリ解決は **`gh` の通常解釈**に委ねます。
 
 補足:
@@ -48,8 +48,8 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 - `issue finish` は active issue lifecycle の通常終了 command です
   - `./spec-dock/scripts/spec-dock issue finish` を受け付けます
   - active issue の linked GitHub issue を close し、already-closed も success として扱います
-  - `issue finish` は lifecycle closure 専用です。linked GitHub issue を close または already-closed と確認し、active state を解除しますが、commit、push、PR、merge、validate、test、review の完了は保証しません。delivery completion には tests、reviews、reports、PR/merge workflow の別証跡が必要です。
-  - active state は close / already-closed の確認成功後にだけ解除されます
+  - `issue finish` は lifecycle closure 専用です。linked GitHub issue を close または already-closed と確認した後に active state を解除し、post-sync を行います。commit、push、PR、merge、validate、test、review の完了は保証しません。
+  - active state は close / already-closed の確認成功後にだけ解除されます。close 失敗時は active を保持し、clear 失敗時は sync を実行しません
 - `delete` は local spec node を削除し、linked GitHub Issue があれば close-only で扱います
   - top-level command として `./spec-dock/scripts/spec-dock delete <target> --yes` / `--id <node-id> --yes` / `--github-issue <n> --yes` を受け付けます
   - `issue` target は leaf delete を行い、linked GitHub issue は local delete 前に close します
@@ -91,24 +91,19 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 
 ## 4. `issue start` / `active set` と checkout（安全装置）
 
-通常の issue execution 開始は `issue start` を primary path とし、`active set` は manual / recovery path として残します。
+通常の issue execution 開始は `issue start` です。`active set` は Initiative / Epic / Issue を選択する構造操作として残ります。
 
-- `issue start <target>` は issue node を解決して active set と checkout を一操作で行います
-- `issue start` は unfinished active issue branch 上で別 issue を start しようとした場合だけ default で block します
-- `issue start -f` / `--force` は unfinished active issue guard だけを bypass します。依存未解決や dirty worktree など他の safety check は bypass しません
-- `main` / `master` / `develop` / `staging` や non-issue branch からの `issue start` は block しません
-- `issue start` の block message では `issue finish`、`issue start <target> -f`、manual `active set` の次アクションを案内します
+- `issue start <target>` は Issue node を解決し、別 active Issue の linked GitHub state による unfinished guard、dependency readiness、branch checkout、active 設定、post-sync の順に実行します
+- `issue start -f` / `--force` は unfinished active Issue guard だけを bypass します。dependency blocker、invalid target、checkout 失敗、active write 失敗は bypass しません
+- 現在の branch は guard の判断材料ではありません。`OPEN` 以外を finished と推測できない active Issue は fail-closed で停止します
+- `issue start` の block message では `issue finish`、必要時だけ `issue start <target> -f`、または dependency 解消の次アクションを案内します
 
 `active set` は target を active として固定します。
 
-- デフォルトは **no-checkout**（active 更新のみ）です
-- 後方互換として `active set <target>` は維持されます
-- explicit form として `active set --id <node-id>` / `active set --github-issue <n>` も使えます
-- checkout は `active set <target> --checkout` を明示したときだけ実行します
-- `active set` は direct manual / recovery command であり、unfinished active issue guard の対象外です
-- target 解決はローカル node（`.meta.json`）を優先し、未解決なら checkout/active 変更なしで失敗します
-- `--checkout` 時に作業ツリーが dirty の場合は安全のため checkout を中断します
-- `--checkout` を伴う場合、ブランチ名は `<id>-<slug>`（不適合なら `<id>`）へ正規化されます（非ASCIIブランチ名を避ける）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
+- positional、`--id <node-id>`、`--github-issue <n>` の target 指定を受け付けます
+- target 解決はローカル node を使い、未解決なら active 変更なしで失敗します
+- checkout、GitHub state 取得、dependency 判定、unfinished guard、`--force` は持ちません。blocked Issue も調査・計画のために選択できます
+- `active show` は現在の選択を表示し、`active clear` は選択を解除します
 
 ## 4.5 `close` の target syntax と副作用境界
 

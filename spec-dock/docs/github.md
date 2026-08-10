@@ -38,7 +38,7 @@ gh issue create --title "<title>" --body "<body>"
 
 ### 1.3 Issue ブランチ checkout（`issue start <github_issue_number>`）
 
-GitHub Issue 番号から **active issue 設定 → ブランチ作成/checkout** を一括で行えます。通常の Issue 実行では `issue start` を primary path として使います。
+GitHub Issue 番号から、active Issue の unfinished guard、dependency readiness、ブランチ作成/checkout、active 設定、post-sync を順に実行します。通常の Issue 実行では `issue start` を使います。
 
 ```bash
 ./spec-dock/scripts/spec-dock issue start 123
@@ -47,11 +47,10 @@ GitHub Issue 番号から **active issue 設定 → ブランチ作成/checkout*
 注意:
 - 安全のため、**未コミット/未追跡の変更がある場合はエラーで中断**します（作業を保護するため）
 - 仕様ツリー内に `github.issue_number == 123` のノードが存在しない場合もエラーになります
-- `issue start` は issue node のみを対象にします。initiative / epic を checkout する manual / recovery 作業では `active set <target> --checkout` を明示してください
+- `issue start` は issue node のみを対象にします。Initiative / Epic を選択する場合は `active set <target>` を使います。`active set` は branch を変更しません
 
 補足:
 - `issue start --id iss-00123` のように issue node ID で直接指定できます。
-- `active set iss-00123 --checkout` は同じ checkout 命名 contract を使いますが、unfinished issue guard を持たない manual / recovery 用の low-level command です。
 - ブランチ名は日本語タイトルを使わず、`<node-id>-<slug>` 形式を使います（例: `iss-00123-add-refresh-token`）。
 - desired branch が既にある場合は、その既存 branch の checkout を優先します。
 

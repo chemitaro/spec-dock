@@ -30,6 +30,7 @@ ID: "iss-00357"
 - S08でFresh Initiative / Epic / Issueを既存scaffolder / repository mechanismのfd-aware extensionへ統一し、四canonical documentsを各一つ、`.assurance.json`なしで生成することを固定した。fresh review 1〜3を受け、通常process concurrency / handled failureとsame-UID tampering / crash recoveryの達成可能な境界をspec-reviewで固定し、mode 0700 outer transactionとheld payloadの二層staging、cross-dirfd no-replace publishへ再設計した。review 4 P2のunchanged-shebang mode parityも補正し、S08 / template 83、Fresh CLI 38 / skip 5、S09 retained 65、lint / parity / diff-check、fresh review 5をpassしたため、`CL-357-008`をcloseした。
 - S09で`validate_tree.py`からdelegated authority / Evidence Adoption Ledgerのcontent gateだけを除去し、thin / heavy Report、EAL、delegated metadata、Assurance、Planning Level、legacy active extra fields、draft / repair Artifactの9-token mutationをactive / deps / start / finish / validate / doctorで内容非依存にした。各mutationの独立baselineに対するprocess / durable state完全比較、read-only surfaceのHistorical raw-byte保持、4 content-read入口のcall-zero、required Report欠損negative controlを固定した。focused `35 passed / 1 skipped`、unit file-read `10 passed`、validate / deps use-case `34 passed`、lint / parity / diff-check、fresh code review 2 / QA review 3をpassしたため、`CL-357-009`をcloseした。
 - M2 commit `daa222ee62e3690e97bd455362d211ba11fa20a9`でS05〜S09を確定した。S10ではE00 exhaustive auditでtest / contract / 360 default sourceのinventory omissionを検出して`DEC-357-S10-008〜010`へ明示採用し、retained / 360 casesを保持したままprovider / dogfood各18 moduleと専用test 14fileを削除した。absence / retained import / generic port / 360 planning / sorted SHA-256 parityを固定し、focused 55、authoring manifest 17、Runtime manifest `132 / 132`、lint / diff-check、fresh code reviewをpass（confidence 0.99）したため、`CL-357-001/012`をcloseした。
+- M3 commit `89964de616e94ff5cf48182e30026298f93d2e18`でS10を確定した。S90ではprovider / dogfoodのRuntime reference 5種を現行helpへ合わせ、selection-only active、dependency-only start、thin finish、Current六種、Historical recognition、generic file importとremoved route migrationを明記した。10 docsのbyte parity、relative link broken 0、diff-checkはGreenである。H91では357側IC-1 inputとdownstream owner manifestを固定し、共同IC-1 passや後続Issue完了は主張しない。初回spec reviewのREADME / owner-destination / selector表記指摘を修正し、fresh re-review pass 0.98で`CL-357-011/013`をclosedとした。
 - PR、merge、`issue finish`はまだ実行していない。正本のlocked expectationを変える必要が生じた場合は、該当stepを停止してR/D/P amendmentとfresh reviewへ戻る。
 
 ## 承認済み正本
@@ -145,6 +146,8 @@ locked expectationの追加・変更はない。E00で見つかった通常CLI�
 | execution S09 QA review 2 | QA P2 correction re-review | qa-reviewer | fresh | pass | no | P2 correction before closure | P0/P1なし、confidence 0.95。P2: legacy active extra fieldsもread-only surfacesではraw byte exactを確認し、start / finishだけ除外する |
 | execution S09 QA review 3 | legacy active raw-byte correction re-review | qa-reviewer | fresh | pass | no | proceed to M2 / S10 | findingsなし、confidence 0.98。read-only四surfaceのraw-byte保持、start / finishの正当なwrite除外、9 mutation exact baseline、4 read入口spy、negative controlを確認 |
 | execution S10 code review 1 | unreachable module deletion / parity | code-reviewer | fresh | pass | no | proceed to M3 / S90 | findingsなし、confidence 0.99。64-file delta、E00 / DEC inventory、retained consumer不在、generic safety、Storage Core / 360 import、`132 / 132` parity、scope外3 failuresを確認 |
+| execution S90 / H91 spec review 1 | Runtime docs / downstream handoff | spec-reviewer | fresh | failed | no | S99 blocked | P1: READMEが旧workflowをCurrent入口として推奨。P1: H91 owner / destination / evidenceが抽象的で単一actorでない。P2: `issue start` selector構文が併用可能に見える |
+| execution S90 / H91 spec review 2 | corrected Runtime docs / downstream handoff | spec-reviewer | fresh | pass | no | proceed to M4 / S99 | findingsなし、confidence 0.98。READMEをStorage Core参照へ限定し、三selectorを排他的usageへ分離。全H91 rowの単一owner、exact destination、直接evidence、IC-1未主張境界を確認 |
 
 ## Workflow-Scoped Authorization
 
@@ -406,6 +409,8 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 | `tc-s08-001` | S08 | red-required | initial partial copy / meta Red 2、review 1〜3でpathname write、identity residue / cleanup、mkdir→initial identity窓を検出。two-layer deltaはcross-dirfd helper不在をRed `1 failed`、review 4 P2はunchanged shebang mode差`0640 / 0751`をRed `1 failed / 3 passed`で再現 | Initiative / Epic / Issue exact manifest、Assurance access spy、outer / payload 12-phase failure、canonical file / dir / symlink collision、concurrent same-ID、tampering、post-commit close、unchanged / rendered / shebang mode parity | pass: S08 / template 83、Fresh CLI 38 / skip 5、S09 retained 65、lint / parity / diff-check、fresh review 5 pass 0.98 |
 | `tc-s09-001` | S09 | red-required | delegated authority / EAL parserへのfile-read spy付き8 content variantsが旧実装で8 / 8失敗。QA P2補正でtoken-only assertionとread_text-only spyの検出力不足を確認し、exact比較が`updated_at`差を検出 | 9-token個別mutation、active / deps / start / finish / validate / doctorのbaseline exact process / durable state、read-only Historical raw bytes、4 content-read入口、required Report欠損negative control | pass: focused 35 / skip 1、exact lifecycle 9、doctor / spy 18、validate / deps 34、lint / parity / diff-check、fresh code review 2 pass 0.98 / QA review 3 pass 0.98 |
 | `tc-s10-001` | S10 | red-required | initial provider `application.assurance` absence failure、provider-only変更後のdogfood module残存 failure、sorted SHA-256 manifest non-zeroを順に確認 | removed 19 module / contracts / `UseCases` field absence、retained Storage Core / ChatGPT planning import、generic import port、360 source manifest、provider / dogfood Python manifest | pass: focused / wrapper / ChatGPT / generic / authoring manifest 55、authoring source manifest 17、lint、Runtime `132 / 132` parity、diff-check、fresh review pass 0.99 |
+| `tc-s90-001` | S90 | manual-required | README / github / reference_deps / reference_github / reference_namingに`active set --checkout`、provider-specific import、旧Current catalog、active-selection readiness結合が残存 | verified CLI helpと357-owned Runtime reference / migrationを照合し、relative Markdown linkとCurrent旧route語彙をscan | pass: provider / dogfood 5 pair byte parity、broken relative link 0、変更docsの旧routeはmigration説明2件だけ、diff-check、fresh spec re-review pass 0.98 |
+| `tc-h91-001` | H91 | manual-required | E00 baseline inventoryをS10後の実在`132 / 132`とdownstream destinationへ再割当し、357側IC-1 inputの欠落 / 重複 / unowned rowをinspect | retained CLI、removed graph、shared safety、Historical / Fresh、migration / data preservation、357 IC-1 inputをowner / destination / evidenceへ割当 | pass: 未割当row 0、全row単一owner / exact destination / direct evidence。共同IC-1 resultはEpic ownerとして未実施・未主張。fresh spec re-review pass 0.98 |
 
 ### Delegated Worker Evidence
 
@@ -422,6 +427,8 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 | S08 | `dev-coder` | Fresh三scopeのno-Assurance経路をfd-aware outer / payload transactionとatomic cross-dirfd publicationへ補正 | provider / dogfood Runtime各5file、`test_new.py`、`test_runtime_new_s08.py`、template / dogfood consumer tests | initial Red 2、review 1〜3 P1、two-layer Red 1、mode P2 Red 1、S08 / template 83、Fresh CLI 38 / skip 5、S09 retained 65、lint / parity / diff-check | review 1 / 2 / 3 failed、review 4 pass with P2、fresh review 5 pass 0.98 | accepted boundary: same-UID tampering / crashではidentity不明hidden orphanを許容しcompetitor保全。dead wiringはS10 owner | adopted; S08 closed |
 | S09 | `dev-coder` | validateからlegacy authority / EAL content gateだけを除去し、9-token E2E / file-read / structural negative matrixを追加 | provider / dogfood `validate_tree.py`、unit validate、CLI validate / doctor / lifecycle、shared S09 fixture | Red 8 / 8、focused 35 / skip 1、unit 10、validate / deps 34、legacy active exact lifecycle 9、lint / parity / diff-check | code review 2 pass 0.98、QA review 3 pass 0.98 | broader stale failures 3件はS01撤去済み`active set --force`期待 | adopted; S09 closed |
 | S10 | `dev-coder` | exhaustive consumer / path audit後にE00-approved unreachable graphを物理削除し、mixed / 360 testsを最小整理 | provider / dogfood各18 deleted modules、contracts / bootstrap / Current dead args / 360 default source、14 deleted tests、4 mixed / absence tests | Red absence / projection / manifest、focused 55、authoring 17、lint、Runtime `132 / 132` parity、fast lane 1284 / 2185 skip / 3 scope外fail | fresh code review pass 0.99 | stale force 1、missing Issue 334 fixture 2。いずれもS10非起因 | adopted; S10 closed |
+| S90 | `doc-writer` | verified helpを357-owned Runtime reference / migrationへ反映し、workflow / Authoring Guide ownershipを分離 | provider / dogfood `docs/{README,github,reference_deps,reference_github,reference_naming}.md` | help照合、5 pair byte parity、relative link broken 0、forbidden Current wording scan、diff-check | review 1 failed、fresh re-review pass 0.98 | scope外workflow docsは358 / 360 handoff。parser error riskを明示 | corrected docs adopted; S90 closed |
+| H91 | main orchestrator | S01〜S90 evidenceをIC-1 inputとdownstream owner manifestへ圧縮 | Issue `report.md`のみ | duplicate / missing / unowned inspection、exact path / closure evidence照合 | review 1 failed、fresh re-review pass 0.98 | 358 / Epic共同IC-1 resultは未実施・未主張 | corrected manifest adopted; H91 closed |
 
 ### Implementation Delegation Gate
 
@@ -438,6 +445,8 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 | S08 | delegated | create-node / copy / rollback / testsの複数layer変更 | `dev-coder` | No-Assurance Fresh scaffold | approved R/D/P、358-owned template tree read-only | create-node application、existing template / node repository portのbounded fd-aware extension、focused tests、dogfood projection | template prose、Profile / Assurance、installer / skill、generic import、report | `tc-s08-001`、three-scope manifest、access spy、outer / payload failure / collision / concurrency / tampering / mode parity、lint / parity | template content mismatch、新file contract、scope外dead wiring deletion | changed files、Fresh manifest、Red / Green、rollback、IC-1 input、risk、decision note | pass: two-layer + mode correction Green、fresh review 5 pass 0.98 |
 | S09 | delegated | legacy content gate除去と横断invariance testが必要 | `dev-coder` | Historical consumer invariance | approved R/D/P、S03 / S04 / S06 / S07 / S08 pass | validate / doctor structural path、必要なlegacy consumer removal、integration / unit tests、dogfood projection | fixture rewrite / delete、Historical削除、structural validation弱体化、docs / template | `tc-s09-001` mutation snapshot / file-read spy / structural negative、focused、lint / parity | data migration、meaningful structural rule変更、owner Issue不一致 | changed files、mutation matrix、negative control、risk、material decision | pass; fresh code review 2 / QA review 3、`CL-357-009` closed |
 | S10 | delegated | unreachable graphの物理削除とprojection parityが必要 | `dev-coder` | E00 Delete / Shared rowsと`DEC-357-S10-008〜010` | approved R/D/P、E00 inventory、S09 pass、M2 `daa222e` | approved removed modules / contracts / tests、mixed retained-case preservation、provider / dogfood projection、absence / parity tests | install_root、installer、358 docs / templates、shared generic safety、360 redesign | `tc-s10-001` absence / retained import / explicit manifest、focused、lint / diff-check | inventory外Delete、retained consumer、zero-diff不能 | deleted / changed files、consumer proof、Red / Green、manifest、risk | pass; fresh code review 0.99、`CL-357-001/012` closed |
+| S90 | delegated | Runtime reference / migrationの恒久docs保守 | `doc-writer` | 357-owned Runtime docs | approved R/D/P、S01〜S10 verified behavior | provider / dogfood Runtime reference / migration docs | source / tests、template / Authoring Guide、skill / installer、issue report | help照合、relative link、vocabulary、docs parity、diff-check | verified behavior矛盾、ownership外文書が必要 | changed docs、stale / link evidence、risk、decision | pass: correction後fresh spec review 0.98、S90 closed |
+| H91 | main-owned | cross-Issue handoffの正本統合 | main orchestrator | Issue report / Epic IC-1 input | Design §14、Epic IC-1、全step evidence | Issue reportのhandoff manifest | 358 / 359 / 360 canonical docs、implementation、metadata / active | missing / duplicate / unowned row inspection | material owner gap、IC-1 input不足 | machine / human manifest、risk、status | pass: correction後fresh spec review 0.98、H91 closed |
 
 ### Closure Coverage
 
@@ -448,13 +457,13 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 | `CL-357-004/014/015` | S03 | lifecycle truth table、dependency-only readiness、selector / invalid no-write | start 18、deps 43、force / order / failure spies、canonical selector identity、shared check_deps / projection、fresh review pass | closed |
 | `CL-357-005` | S04 | thin finish order / partial result / evidence non-gating | finish 10、full lifecycle 29、clear exception matrix、phase spies、file-read zero、provider / dogfood parity、fresh review pass | closed |
 | `CL-357-012` | S10 | E00 provider / dogfood parity inventory | baseline `151 / 151`からapproved deletion後`132 / 132`へ収束。sorted SHA-256 diff zero、removed absence、retained / 360 import Green | closed; fresh code review pass 0.99 |
-| `CL-357-013` | H91 | E00 owner / destination inventory | 360 handoff keepのpath / symbol / reachability / parity evidence | baseline evidence only; not closed |
+| `CL-357-013` | H91 | E00 owner / destination inventory | S10後のretained / removed / shared / Historical / migrationをowner / destination / evidenceへ再割当し、357側IC-1 inputを明示 | closed: 未割当row 0、単一owner / exact destination / direct evidence、fresh spec review pass 0.98 |
 | `CL-357-006` | S05 | Current六種とfilesystem safety matrix | 全Current type / filesystem matrix、mandatory / lint / parity、fresh review 9 pass 0.95 | closed |
 | `CL-357-010` | S06 | Historical catalog / malformed / preservation matrix | catalog / malformed / unsafe / SHA / actual repo / lint / parity、fresh review 4 pass 0.97 | closed |
 | `CL-357-007` | S07 | opaque import / failure / privacy matrix | four scopes、byte exact、source safety、collision、atomic publish / cleanup、private output、removed backend absence、lint / parity、fresh review pass 0.97 | closed |
 | `CL-357-008` | S08 | Fresh three-scope scaffold / rollback matrix | four-doc exact、Assurance access zero、fd-bound outer / payload、12-phase failure、canonical collision、concurrent same-ID、tampering boundary、mode / consumer parityがGreen | closed: fresh review 5 pass 0.98 |
 | `CL-357-009` | S09 | legacy evidence mutation invariance | 9-token baseline exact process / durable state、read-only Historical raw-byte exact、4 content-read入口 zero、required path negative、focused / lint / parityがGreen | closed; code review 2 pass 0.98 / QA review 3 pass 0.98 |
-| `CL-357-011` | S90 | docs / migration ownership | Plan S90 closure contract | not started |
+| `CL-357-011` | S90 | docs / migration ownership | 357-owned Runtime docs 5種をhelpへ同期し、5 pair parity / broken link 0 / migration wordingを確認 | closed: help / parity / links / vocabulary Green、fresh spec review pass 0.98 |
 
 ### Closure Delta
 
@@ -466,7 +475,48 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 
 | step | target | planned verification | current state |
 |---|---|---|---|
-| S90 | 357-owned Runtime reference / migration docs | help照合、relative-link scan、fresh spec review | not started |
+| S90 | 357-owned Runtime reference / migration docs | help照合、relative-link scan、fresh spec review | 10 docs changed、help / parity / links / vocabulary Green、fresh review pending |
+
+### H91 Downstream Handoff Manifest
+
+Destination IDsは次のexact canonical path / evidence sinkを示す。
+
+| destination id | accountable owner | exact destination |
+|---|---|---|
+| `DST-358` | Issue 358 owner | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/report.md` |
+| `DST-359` | Issue 359 owner | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00359-replace-managed-workflow-skills-with-specdock-skills/report.md` |
+| `DST-360` | Issue 360 owner | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/report.md` |
+| `DST-IC1` | Epic main orchestrator | Epic-local `disc` Artifact titled `ic-1-core-kit-contract` and `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/report.md` |
+
+| surface / exact inventory | observed state | exact evidence path / section | single owner | destination / required action | risk if ignored |
+|---|---|---|---|---|---|
+| 通常`spec-dock` retained root keys: `new,artifact,active,delete,close,update,uninstall,issue,worktree,workbench,sync,deps,import,validate,doctor` | Current | `tests/cli_runtime/test_storage_core_cli.py`; 本report `tc-s01-001`, `tc-s10-001` | Issue 359 owner | `DST-359`: skill / operator entryをこのinventoryとsyntaxへ限定する | removed routeをskillが再提示する |
+| `active set/show/clear`、`issue start`、`issue finish` | selection-only / dependency-only / close-clear-sync | `tests/cli_runtime/test_active.py`, `tests/cli_runtime/test_issue_lifecycle.py`; 本report `CL-357-002〜005` | Issue 359 owner | `DST-359`: skill本文とoperator guidanceをverified orderへ同期する | `active set --checkout/--force`やevidence gateが復活する |
+| removed normal routes: `assurance`、`authoring`、`guidance`、`workflow`、`delegated-authoring`、`artifact import chatgpt-output` | parser / registry / help / backend absence | 本report `### E00 Removed inventory — 到達性遮断後のDelete候補`; `tests/cli_runtime/test_storage_core_cli.py` | Issue 360 owner | `DST-360`: installed / update inventoryから対応asset / stale referenceをpruneし、aliasを追加しない | installed consumerにdead command / fileが残る |
+| removed provider / dogfood module graph | E00 Removed rowsどおり削除、Runtime Python `132 / 132` | 本report `### E00 Removed inventory — 到達性遮断後のDelete候補`, `tc-s10-001`, `CL-357-012`; commit `89964de6` | Issue 360 owner | `DST-360`: exact Removed inventoryをpackage prune / preserve判断へ採用する | provider / installed drift、orphan import |
+| shared retained primitives: explicit-file guard / publisher、structural fs / git / github adapters、node / active / deps ports、template scaffolder | retained / importable | 本report `### E00 Shared inventory — retained commandも使うprimitive`; `tests/unit/commands/test_artifact_import_file.py`, `tests/unit/commands/test_runtime_new_s08.py` | Issue 360 owner | `DST-360`: prune allowlistから除外しinstalled smokeで保持する | generic import / Fresh / lifecycle安全性が壊れる |
+| `spec-dock-chatgpt -> chatgpt_app -> chatgpt parser / registry -> issue_planning`、authoring-pack modules / direct scripts | 通常CLI外でretained | 本report `### E00 360 handoff keep — Current通常CLIの範囲外`; `tests/cli_runtime/test_chatgpt_cli.py` | Issue 360 owner | `DST-360`: installer cutover時に独立graphとして明示判断する | 通常CLI削除と誤ってplanning graphを消す |
+| Current Artifact exact six: `blank,research,interview,disc,decision-candidate,adr`; omitted positional type = `blank` | Current create | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifacts.py::CURRENT_CREATABLE_ARTIFACT_TYPES`; 本report `tc-s05-001` | Epic main orchestrator | `DST-IC1`: Issue 358 catalog inputとexact spellingをjoint fixtureへ統合する | Kitが存在しないtypeを案内する |
+| Historical timestamp typed: `pr-repair-batch,draft-requirement,draft-design,draft-plan,scratch,note`; sequential `adr,disc,note`; generic `--<basename>`; legacy Discussion | recognize / preserve only | `domain/artifacts.py::HISTORICAL_TIMESTAMP_TYPED_ARTIFACT_TYPES`; 本report `tc-s06-001`, `tc-s09-001` | Epic main orchestrator | `DST-IC1`: Issue 358 inputとCurrent / Historical境界をjoint fixtureへ統合する | existing evidence破壊または旧type再昇格 |
+| Fresh Initiative / Epic / Issue shape: `requirement.md,design.md,plan.md,report.md`各一つ、`.assurance.json`なし | 357 mechanism Green | `tests/unit/commands/test_runtime_new_s08.py`; 本report `tc-s08-001` | Epic main orchestrator | `DST-IC1`: Issue 358 template / minimal Report / docs-path inputと結合する | Core / Kit fixture mismatch |
+| Planning Level / legacy Report / EAL / delegated metadata / `.assurance.json` content | Runtime non-gating / preserved | `tests/cli_runtime/test_issue_lifecycle.py`, `tests/unit/application/test_validate.py`; 本report `tc-s09-001` | Epic main orchestrator | `DST-IC1`: Planning Levelをdocs-onlyに保つjoint negative fixtureへ採用する | cognitive gate再導入 |
+| Existing active extra fields、Historical files、heavy Report、R/D/P | no eager migration / next explicit mutationまで保持 | 本report `tc-s02-001/002`, `tc-s06-001`, `tc-s09-001` | Issue 360 owner | `DST-360`: update / install migrationでrewrite / deleteしない | user data loss / irreversible normalization |
+| stale `guide.md` | 旧provider import等のCurrent wordingが残る | provider / dogfood `docs/guide.md`; S90 forbidden vocabulary scan | Issue 358 owner | `DST-358`: Authoring Guide更新または廃止時に357 Runtime contractへ同期する | parser errorを利用者へ案内する |
+| stale workflow docs: `workflow_chatgpt_authoring_pack.md`、`workflow_spec_authoring.md`、`authoring/chatgpt-pack.md`、`workflow-tree.md`、`workflow_issue.md` | 廃止予定workflowの旧route / gate説明が残る | provider / dogfood `docs/`の同exact paths; S90 ownership scan | Issue 360 owner | `DST-360`: workflow / installed asset prune時に更新または削除し、Current入口に残さない | dead workflowがCurrent authorityに見える |
+
+#### IC-1 input from Issue 357
+
+| IC-1 field | Issue 357 input | joint status |
+|---|---|---|
+| Fresh file shape | R/D/P/Report各一つ、no-Assurance | input ready; 358 template content待ち |
+| Report | pathはscope rootの`report.md`、legacy body contentはCore gateにしない | input ready; minimal heading / empty-valid proseは358 owner |
+| Current Artifact | exact six、optional positional type、blank filenameにtype tokenなし | input ready |
+| Historical | timestamp typed / sequential / generic / legacy Discussionをpreserve-only | input ready |
+| Authoring docs path | 357は決めない | 358 input待ち |
+| Planning Level | Runtime / metadata / validation gateで参照しない | input ready |
+| provider / dogfood fixture | Runtime Python `132 / 132` byte parity、Fresh / Artifact contract tests Green | input ready |
+
+357側IC-1 inputはcompleteである。358側inputとの共同fixture実行と`DST-IC1`への記録はEpic main orchestratorが所有し、本Issueでは未実施・未主張とする。
 
 ### Milestone / Commit Candidate Gate
 
@@ -475,6 +525,8 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 | M0 / E00 | fresh `spec-reviewer` docs/spec alignment pass、findingsなし、confidence 0.99 | `docs(iss-00357): Runtime baseline inventoryを記録` / E00 report evidence | committed | `51b15905218706dcfa689c6765439aee30c785b2` | pass: `git status --short` clean |
 | M1 / S01〜S04 | S01〜S04 closed、integration 149 pass / 23 retired skip、fresh review 3 pass 0.98 | `refactor(runtime)!: Storage Core lifecycleを縮小` / S01〜S04 source・tests・report | committed | `d1c16c4dd099c94eabb6e7b2677b4dd148d6fbb6`、hook pass、32 files | pass: commit直後`git status --short` clean |
 | M2 / S05〜S09 | S05〜S09 closed、fresh code / QA gates、focused / lint / parity pass | `refactor(artifact)!: Current作成とHistorical互換を分離` / S05〜S09 source・tests・issue docs | committed | `daa222ee62e3690e97bd455362d211ba11fa20a9`、54 files | pass: commit直後`git status --short` clean |
+| M3 / S10 | fresh code review pass、findingsなし、confidence 0.99 | `refactor(runtime)!: 旧workflow到達経路を撤去` / approved unreachable graph・tests・report | committed | `89964de616e94ff5cf48182e30026298f93d2e18` | pass: commit直後`git status --short` clean |
+| M4 / S90〜H91 | fresh spec re-review pass、findingsなし、confidence 0.98 | `docs(runtime): Storage Core移行契約を確定` / 10 Runtime docs・H91 report | ready | commit pending | pending |
 | M99 / S99 | not reviewed because execution has not started | `docs(iss-00357): 最終実装証跡を確定` / final report ledger | planned | not created because execution has not started | not run |
 
 ## 残余リスクと停止条件
@@ -488,4 +540,4 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 
 ## 次のアクション
 
-S10をM3 checkpointへ確定し、S90の357-owned Runtime reference / migration docs impactを更新してH91へhandoffする。
+S90 / H91をM4 checkpointへ確定し、S99 final Issue quality gateを実行する。
