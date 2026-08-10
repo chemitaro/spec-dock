@@ -4,15 +4,15 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from spec_dock_runtime.application.contracts import CheckDepsRequest, DepsCheckResult, TargetRef
+from spec_dock_runtime.application.contracts import CheckDepsRequest, DepsCheckResult
 from spec_dock_runtime.application.github_issue_targets import (
     collect_repo_scoped_issue_view_targets,
     normalize_repo_slug,
 )
 from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
+from spec_dock_runtime.application.set_active import resolve_target_node_id as _resolve_target_node_id
 from spec_dock_runtime.application.status_context import resolve_issue_status_context
 from spec_dock_runtime.domain.deps import inspect_target_deps, validate_deps_cycles, validate_raw_node_dependency_graph
-from spec_dock_runtime.domain.ids import format_id, parse_id
 from spec_dock_runtime.domain.models import (
     DepsHighLevelStatus,
     IssueSnapshot,
@@ -52,80 +52,6 @@ def _resolve_specdock_dir(ports: Ports) -> Path:
     if ports.repo_root is not None:
         return ports.repo_root / "spec-dock"
     raise RuntimeError("specdock_dir is required")
-
-
-def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: bool) -> str | None:
-    for node_id in graph.nodes_by_id:
-        try:
-            parsed_prefix, is_local, parsed_num = parse_id(str(node_id))
-        except RuntimeError:
-            continue
-        if parsed_prefix == prefix and parsed_num == num and is_local == local:
-            return str(node_id)
-    return None
-
-
-def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo_slug: str | None = None) -> str:
-    if target.kind == "github_issue":
-        if target.github_issue_number is None:
-            raise RuntimeError("TargetRef.github_issue_number is required")
-        matches = [
-            node
-            for node in graph.nodes_by_id.values()
-            if node.github_issue_number == int(target.github_issue_number)
-            and node.kind in ("initiative", "epic", "issue")
-        ]
-        target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
-        if target_repo_slug is not None:
-            allow_current_unscoped = current_repo_slug is not None and target_repo_slug == current_repo_slug
-            scoped = [
-                node
-                for node in matches
-                if (
-                    normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
-                    or (
-                        allow_current_unscoped
-                        and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
-                    )
-                )
-            ]
-            if not scoped:
-                raise RuntimeError(
-                    "No node found for "
-                    f"github.issue_number={int(target.github_issue_number)} in repo scope ({target_repo_slug}). "
-                    "Create/link the node first."
-                )
-            if len(scoped) > 1:
-                ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in scoped))
-                raise RuntimeError(
-                    f"Ambiguous github.issue_number={int(target.github_issue_number)} in repo scope "
-                    f"({target_repo_slug}): {ids}"
-                )
-            return scoped[0].id
-        if not matches:
-            raise RuntimeError(
-                f"No node found for github.issue_number={int(target.github_issue_number)}. Create/link the node first."
-            )
-        if len(matches) > 1:
-            ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in matches))
-            raise RuntimeError(f"Ambiguous github.issue_number={int(target.github_issue_number)}: {ids}")
-        return matches[0].id
-
-    if target.kind != "node_id":
-        raise RuntimeError(f"Unsupported target kind: {target.kind}")
-
-    if target.node_id is None:
-        raise RuntimeError("TargetRef.node_id is required")
-
-    raw_id = str(target.node_id).strip().lower()
-    prefix, is_local, num = parse_id(raw_id)
-    resolved = _find_existing_id_by_num(graph, prefix=prefix, num=num, local=is_local) or format_id(
-        prefix, num, local=is_local
-    )
-    node = graph.nodes_by_id.get(resolved)
-    if node is None or node.kind not in ("initiative", "epic", "issue"):
-        raise RuntimeError(f"Node not found: {resolved}")
-    return node.id
 
 
 def _append_unique(warnings: list[str], code: str) -> None:
@@ -384,7 +310,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
 
-    target_node_id = _resolve_target_node_id(graph, req.target, current_repo_slug=current_repo_slug)
+    target_node_id = _resolve_target_node_id(graph, req.target)
     active_issue_id = None
     if ports.active_state_store is not None:
         active_issue_id = ports.active_state_store.load_active_issue_id(specdock_dir)

@@ -88,7 +88,8 @@ def _run_issue_start(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             issue_limit=typed.gh_limit,
         )
     )
-    return CommandOutcome(exit_code=0, text=render_issue_start_text(result))
+    post_sync_failed = result.post_sync is not None and result.post_sync.failed
+    return CommandOutcome(exit_code=1 if post_sync_failed else 0, text=render_issue_start_text(result))
 
 
 def _run_issue_finish(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:

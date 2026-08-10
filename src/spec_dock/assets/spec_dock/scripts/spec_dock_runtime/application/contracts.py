@@ -846,6 +846,7 @@ class IssueStartResult:
     active_set: ActiveSetResult
     forced: bool
     warnings: list[str]
+    post_sync: PostMutationSyncOutcome | None = None
 
 
 @dataclass(frozen=True)
