@@ -2,830 +2,310 @@
 種別: 要件定義書（Issue）
 ID: "iss-00358"
 タイトル: "Simplify Authoring Kit and Document Contracts"
-状態: "draft"
-作成者: "iwasawayuuta"
-最終更新: "2026-08-07"
+関連GitHub: ["#358"]
+状態: "approved"
+作成者: "ChatGPT-use-strict / main orchestrator"
+最終更新: "2026-08-10"
 親: ["epic-00356", "init-local-00003"]
+承認: "Product Owner review completed 2026-08-10"
 ---
 
-# iss-00358 Simplify Authoring Kit and Document Contracts — Issue 要件定義
+# iss-00358 Simplify Authoring Kit and Document Contracts — 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+## 1. 目的
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+特定のmodel、provider、Skill、workflow state、Assurance Profileに依存せず、利用者がFresh Initiative / Epic / Issueの仕様をMarkdownで作成・理解できるAuthoring Kitを提供する。
 
----
+本Issueはtemplateファイルの削減だけを目的としない。利用者がFresh nodeを作成し、各文書の責務を理解し、IssueのPlanning Levelに応じた完成基準を選び、Artifactの証拠をdurableな仕様へ反映できるend-to-end authoring experienceを、template、Guide、navigation、tests、dogfood projection、migration / compatibilityまで含めて成立させる。
 
-## 0. 文書の位置づけ
+## 2. 背景
 
-### この文書が定義すること
+対象baseline `2c75e0c02cb65a6e74040a72dc161d342d661091` では、次の認知的workflow policyがAuthoring assetに混在している。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+- Requirement / Design / Plan template内のGrade、reviewer gate、promotion、EAL、delegated authoring、change-set status
+- Assurance classification / composeを前提とするIssue Design / Plan placeholder
+- `templates/issue-profiles/<profile>/`と`draft-*` routing
+- 大規模なledger / gate scaffoldである`report.md`
+- phase promotion、fresh reviewer、ChatGPT authoring packをCurrent導線とするdocs
+- Current / Historical Artifact catalogの混在
+- Planning Levelを文書だけで扱うというProduct Owner承認が未反映のasset構造
 
-### この文書が定義しないこと
+この構成では、利用者が単一のR/D/Pを編集するだけでもSpecDock固有のworkflow authorityを理解する必要がある。本Issueは、Thin TemplateとDetailed Guideを分離し、Authoring Kitをprovider-neutralかつscope-awareな文書契約へ戻す。
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
+## 3. 採用済みProduct Owner判断
 
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| ID | 採用日 | 判断 |
 |---|---|---|
-| ... | ... | ... |
+| `PD-358-001` | 2026-08-08 | Runtime上のProfile / Assurance / `draft-*` routingを新規作成surfaceから完全に外す。既存証拠はHistoricalとして保持する |
+| `PD-358-002` | 2026-08-08 | 各Issueのcanonical `plan.md`は一つだけとし、共通Plan Guideと`light` / `standard` / `strict` / `critical`のCompletion Guideを用意する |
+| `PD-358-003` | 2026-08-09 | `new artifact`のtypeはoptional positionalとし、未指定時は`blank`。typeを指定するときは`research`等を明示する |
+| `PD-358-004` | 2026-08-09 | Fresh全scopeに薄い`report.md`を常設する。内容は任意、空でもvalid、Runtime gateにはしない |
+| `PD-358-005` | 2026-08-10 | Epic R/D/PとIssue 358 Draft 1を採用し、ユーザーレビュー完了とする |
 
-### 4.2 開始条件（Trigger）
+## 4. 親スコープから継承する契約
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+| Issue要件 | 親Epic要件 | 継承内容 |
+|---|---|---|
+| `RQ-358-001` | `E-RQ-001`, `E-RQ-007` | Profile / Assurance非依存のthin R/D/P/Reportを提供する |
+| `RQ-358-002` | `E-RQ-009`, Epic Authoring Kit境界 | R/D/P/Reportの責務を分離し、durableな判断の置き場を説明する |
+| `RQ-358-003` | Epic vertical slice / scope layering契約 | Initiative / Epic / Issueの責務差と継承境界を説明する |
+| `RQ-358-004` | `E-RQ-002` | Planning Levelをdocs-only conceptとして提供する |
+| `RQ-358-005` | `E-RQ-005`, `E-RQ-008` | Current六種とHistorical evidenceの意味を説明する |
+| `RQ-358-006` | `E-RQ-009` | durable decision、Artifact、Reportのauthority境界を明示する |
+| `RQ-358-007` | `E-RQ-001`, `E-RQ-008` | CurrentとHistoricalの導線を分離し、旧workflowを再推奨しない |
+| `RQ-358-008` | Epic互換性 / parity / vertical slice契約 | Existing文書の保持、provider / dogfood parity、357 / 359 / 360へのhandoffを提供する |
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+本IssueはRuntime parser / lifecycle / filename allocation、skill実装、installer prune、最終deliveryを所有しない。
 
-### 4.3 代表シナリオ
+## 5. 対象範囲
 
-#### シナリオ SC-001:
+### 5.1 対象
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+- Initiative / Epic / IssueのR/D/P/Report template
+- Authoring Overview
+- Requirement / Design / Plan / Report Guide
+- Scope Layering Guide
+- Artifact GuideとCurrent / Historical catalog
+- canonical Issue Plan一つ
+- Base Plan Guideと四つのCompletion Guide
+- Current / Historical navigation
+- provider-side Authoring assetsとdogfood projection
+- template catalog、heading、link、vocabulary、parity test
+- Existing consumer preservation fixture
+- removed / historical-only asset inventory
+- Issue 357とのIC-1、Issue 359 / 360へのhandoff
 
-#### シナリオ SC-002:
+### 5.2 対象外
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+- Runtime parser / registry / active / lifecycle / dependency / Artifact filename実装（Issue 357）
+- node scaffolderのfilesystem mechanism（Issue 357）
+- repo-local skill本文（Issue 359）
+- installer prune、fresh / update / uninstall consumerの最終移行（Issue 360）
+- Existing node-local文書の一括rewrite
+- External Intelligence
+- Runtime quality gateまたはPlanning Level parser
+- 新しいArtifact type
+- level別canonical Plan file
+- 最終release / PR / change-set handoff
 
-#### シナリオ SC-XXX:
+## 6. 文書責務要件
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+### RQ-358-001 Thin scope templates
 
----
+Fresh Initiative / Epic / Issueには、それぞれ一つの`requirement.md`、`design.md`、`plan.md`、`report.md`を生成するためのthin templateを提供する。
 
-## 5. スコープ
+templateに含めるもの:
 
-### 5.1 対象範囲（In 対象範囲（Scope））
+- 完成文書に残る見出し
+- 各sectionの目的を示す短いprompt
+- 最小限のplaceholder
+- optional sectionの明示
+- 対応するstable Guideへのlink
 
-このIssueで必ず実現することを列挙する。
+templateに含めないもの:
 
-- ...
-- ...
+- workflow state / phase promotion
+- reviewer / Grade / EAL / authority / delegated authoring
+- full example / anti-pattern catalog
+- provider、model、browser、Oracleの利用手順
+- PR / change-set status
+- Report内容を完了条件にするgate
 
-### 5.2 対象外（Out of 対象範囲（Scope））
+### RQ-358-002 Document responsibility
 
-このIssueでは実現しないことを列挙する。
+#### `requirement.md`
 
-- ...
-- ...
+- problem、why now、stakeholder / user outcome
+- scope / non-scope
+- observable behavior
+- constraints、compatibility、acceptance
+- risks、assumptions、open human decisions
 
-### 5.3 変更しないもの（Unchanged / Must Not Change）
+実装順、class / module設計、test実装詳細を置かない。
 
-関連はあるが、このIssueで変更してはいけないものを列挙する。
+#### `design.md`
 
-- ...
-- ...
+- Current / Target architecture
+- responsibility boundary
+- data / interface / failure contract
+- migration / compatibility strategy
+- testability / observability design
+- 理解に有用な図
 
-### 5.4 判断が必要な境界
+business acceptanceを再定義せず、Requirementを実現する構造を扱う。
 
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
+#### `plan.md`
 
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
+- Planning Level選択と理由
+- vertical implementation sequence
+- dependency / parallelism
+- verification strategy
+- migration / rollback
+- completion / exit criteria
+- handoff / residual risk
 
----
+未解決のdurable design decisionはPlan内で隠して決めず、DesignまたはADRへ戻す。
 
-## 6. 要求される振る舞い
+#### `report.md`
 
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
+- Outcome
+- Verification
+- Residual Risks / Follow-ups
+- optional Notes
 
-### 振る舞い BH-001:
+内容の記入は任意で、空のsectionでもvalidとする。Decision Ledger、EAL、Authoring Gate、Reviewer Status、Delegated Draft Evidence、Promotion、Completion GateをFresh templateへ含めない。
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+### RQ-358-003 Scope layering
 
-### 振る舞い BH-002:
+Authoring Guideは次の責務差を明示する。
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+- Initiative: 複数Epicにまたがる戦略的problem / outcome、投資境界、portfolio dependency、広いrisk
+- Epic: coherentなproduct / architecture outcome、vertical Issue slice、cross-Issue contract、rollout / integration
+- Issue: 一つのend-to-end observable value、具体的acceptance、implementation / tests / docs / migration、rollback / handoff
 
-### 振る舞い BH-XXX:
+Initiative / EpicにIssueの実装micro-stepやIssue Planning Levelを要求しない。Issueは親Epicの目的・分割・依存方向を再定義しない。
 
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+### RQ-358-004 Planning Level
 
----
+各Issueのcanonical Planは`plan.md`一つとする。Authoring Kitは次を提供する。
 
-## 7. 受け入れ条件
+- 共通Base Plan Guide
+- `light` Completion Guide
+- `standard` Completion Guide
+- `strict` Completion Guide
+- `critical` Completion Guide
 
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
+各Completion GuideはBase Guideへの独立差分であり、別levelの順読を要求しない。Planning Levelは通常のMarkdown本文にselected level、理由、risk factor、再評価条件として記録する。
 
-### 受け入れ条件 AC-001:
+Levelは文書量、実装工数、Priority、Severityではなく、失敗した場合の影響と回復困難性で選ぶ。dependency readiness、implementation handoff status、Runtime上の実行可否を表す状態にはしない。未指定時に`standard`を執筆上の推奨として案内してよいが、Runtime defaultや暗黙metadataにはしない。
 
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
+RuntimeはPlanning Levelをparse、persist、validate、route、enforceしない。`.meta.json`や`.assurance.json`をauthorityとしない。level変更は同じ`plan.md`のGit diffとして扱う。
 
-### 受け入れ条件 AC-002:
+| Level | 想定用途 | 完成時に強く求めるもの |
+|---|---|---|
+| `light` | 局所的、低blast radius、容易なrevert | direct AC、targeted verification、残作業なし |
+| `standard` | 通常のfeature / bug fix | end-to-end順序、主要error、regression、基本rollback |
+| `strict` | public contract、Runtime、data、migration、compatibility | As-Is / To-Be、failure mode、negative test、rollback / forward recovery |
+| `critical` | security / privacy、高blast radius、不可逆・回復困難 | threat / data、staged rollout、kill switch、backup / restore、incident response |
 
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
+### RQ-358-005 Artifact semantics
 
-### 受け入れ条件 AC-XXX:
+Current Guideは次の六種だけを新規作成surfaceとして説明する。
 
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+| Type | 目的 | durableな反映先 |
+|---|---|---|
+| `blank` | 自由形式のevidence | 必要な内容をR/D/P/accepted ADRへ再記述 |
+| `research` | 一つのsource-grounded investigation | facts / constraintsを適切な正本へ |
+| `interview` | 明示的な質問と回答 | 採用回答をR/D/P/accepted ADRへ |
+| `disc` | 複数証拠のsynthesis / trade-off | durable conclusionを正本へ |
+| `decision-candidate` | 未採用decision option | 人間判断後に正本へ |
+| `adr` | architecture decision candidate / record | accepted stateのADRのみauthorityになり得る |
 
----
+`analysis`は追加しない。一つのsource調査は`research`、複数sourceの統合は`disc`を使う。`blank`は弱いtemplateによりmodelの分析能力を妨げない自由形式surfaceとする。
 
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
+### RQ-358-006 Authority boundary
 
 ```text
-...
+Artifact evidence
+  -> 人間またはagentによるsynthesis / review
+    -> Requirement / Design / Plan または accepted ADR
+      -> implementation
+        -> thin Report result summary
 ```
 
-### 例 EX-002: 出力例
+- Artifactの存在やtypeは採用を意味しない。
+- Reportはdurable decision storeまたはRuntime gateにならない。
+- ADRは`accepted`が明示された場合だけdurable authorityになり得る。
+- 外部生成ZIP、delegated draft、ChatGPT outputはevidenceであり、自動昇格しない。
+- Current Guideはmandatory EAL schemaや特定review workflowを導入せず、このauthority境界を平易に説明する。
 
-```text
-...
-```
+### RQ-358-007 Current / Historical navigation
 
-### 例 EX-003: エラー例
+Current navigationはStorage CoreとAuthoring Kitを第一導線とし、thin R/D/P/Report、Current六種、Authoring Guideへ案内する。
 
-```text
-...
-```
+Historical navigationは、旧Profile / Assurance / workflow / draft / repair surfaceを次の意味で説明する。
 
-### 契約上の注意
+- 既存証拠として保持する。
+- 新規作成には使わない。
+- 自動削除、rename、rewriteを要求しない。
+- durableな内容は必要に応じてCurrent R/D/P/accepted ADRへ反映する。
 
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
+Currentページは旧workflowを推奨してはならない。Historicalページやfixtureが旧語を含むことは許容する。
 
----
+### RQ-358-008 Projection / compatibility / handoff
 
-## 10. 非機能要求・品質要求
+- provider sourceをAuthoring assetの正本とする。
+- dogfood projectionはproviderと同じrelative treeと期待内容を持つ。
+- user-owned node-local文書はmanaged parity対象にしない。
+- template変更はFresh nodeにだけ適用し、Existingの次のuser-owned surfaceを更新時に書き換えない。
+  - canonical R/D/P
+  - thin / heavy Report
+  - Current六種のArtifact
+  - draft / repair / scratch / note / generic importを含むHistorical Artifact
+  - Discussion
+  - accepted / candidateを含むADR
+  - `.assurance.json`
+  - Profileから作成されたnode-local文書
+- obsolete provider assetの最終pruneはIssue 360へ渡すinventoryとして確定する。
+- Issue 357へscope file名、Current六種、Report path / empty-valid / non-gating、one-plan contractを渡す。
+- Issue 359へAuthoring Guide pathとsemantic summaryを渡す。
+- Issue 360へfresh asset inventory、obsolete asset inventory、preservation list、parity expectationを渡す。
 
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
+## 7. 失敗・境界条件
 
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
+| ID | 条件 | 必須結果 |
 |---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
+| `EC-358-001` | Current template / Guideに旧workflow用語が残る | vocabulary testが失敗する |
+| `EC-358-002` | Historical page / fixtureに旧語がある | Current扱いせず許容する |
+| `EC-358-003` | levelを`.meta.json`やRuntime stateへ追加しようとする | scope違反として停止する |
+| `EC-358-004` | `plan-light.md`等を追加しようとする | one-plan契約違反として停止する |
+| `EC-358-005` | Report templateがgate / ledgerへ再肥大化する | thin Report契約testが失敗する |
+| `EC-358-006` | providerとdogfoodのmanaged assetがdriftする | parity testが失敗する |
+| `EC-358-007` | Current navigation linkが切れる | link testが失敗する |
+| `EC-358-008` | Existing consumer fixtureの文書hashが変わる | preservation testが失敗する |
+| `EC-358-009` | 357のscaffolder contractとpath / catalogが不一致 | IC-1をfailとして後続handoffを止める |
 
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
+## 8. 受け入れ条件
 
-#### `strict` 以上を検討する条件
+| ID | 観測可能な完了条件 |
+|---|---|
+| `AC-358-001` | Initiative / Epic / Issueの各Fresh template catalogがR/D/P/Report一つずつである |
+| `AC-358-002` | templateがthinで、完成文書に不要なworkflow policyや削除用commentを含まない |
+| `AC-358-003` | Authoring Overview、R/D/P/Report Guide、Scope Layering Guide、Artifact GuideがCurrent navigationから到達でき、Guide contract testとfresh spec reviewが`RQ-358-002`の四文書責務、禁止する責務混在、`RQ-358-003`の三scopeの責務差と親scope非再定義を確認する |
+| `AC-358-004` | canonical Issue Planは一つで、Base Guideと四つのCompletion Guideが独立に参照できる |
+| `AC-358-005` | Planning Level本文を変更してもRuntime behavior / metadataが変わらない |
+| `AC-358-006` | Fresh Reportが3〜4 section、内容任意、空でもvalid、non-gatingとして説明・testされる |
+| `AC-358-007` | Current Artifact六種の用途が区別され、`analysis` / repair / `draft-*`がCurrent作成・navigationにない |
+| `AC-358-008` | durable decision guidanceがR/D/Pまたはaccepted ADRを指し、Artifact / Reportの自動昇格を認めない |
+| `AC-358-009` | Current template / GuideにGrade、Assurance、promotion、EAL、delegated authoring、provider固有の必須語がない |
+| `AC-358-010` | provider / dogfood catalog、link、expected bytesまたはnormalized contentのparity testが通る |
+| `AC-358-011` | Existing consumer preservation fixtureにcanonical R/D/P、thin / heavy Report、Current六種、Historical Artifact、Discussion、ADR、`.assurance.json`、Profile由来node-local文書を含め、358-owned asset適用の前後で全byte hashが変わらない |
+| `AC-358-012` | IC-1で357のfresh scaffold outputと358のfile / catalog / Report / one-plan contractが一致する |
+| `AC-358-013` | 359向けGuide manifestと360向けretain / replace / historical-only / prune inventoryがreportへ記録される |
+| `AC-358-014` | failure impact / recovery difficultyの組合せを用いたlevel選択例と、Priority / Severity / 工数 / dependency readinessだけではlevelを決めないnegative exampleがBase GuideまたはCompletion Guide contract testで確認される |
 
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
+## 9. 非機能要件・制約
 
-#### `critical` を検討する条件
+- 日本語を本文の第一言語とし、command、path、identifier、外部固有名詞は正確性のため原文を保持する。
+- templateは最小限、Guideは具体的で丁寧にし、同じpolicyを複数fileへ複製しない。
+- Guideは人間とagentのどちらも、他levelの文書を順番に読まなくても必要な契約へ到達できる構造にする。
+- provider / dogfoodの重複はprojectionとして明示し、片側だけの編集を完了扱いにしない。
+- shared fileを変更するときはIssue 357のRuntime mechanism、Issue 359のskill、Issue 360のinstaller ownershipを侵食しない。
 
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
+## 10. 前提と未確定事項
 
-#### `lite` を検討できる条件
+- Profile撤去、one-plan、Base + Completion Guide、Current六種、thin ReportはProduct Owner承認済みであり再質問しない。
+- target provider treeの最終file名は既存pathとlink migrationを調査して確定するが、上記の意味契約を変更してはならない。
+- 新しい品質・統合・deliverable handoff Issueのnode作成は本Issueの対象外である。
+- 上位scopeへ戻す未解決の製品判断はない。実装中にcross-Issue責務またはEpic契約を変更する必要が生じた場合は、本Issue内で決めずEpicへ戻す。
 
-すべて満たす場合のみ `lite` を検討できる。
+## 11. 根拠
 
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-08-07 | 初稿（Initial draft） | ... | ... |
+- 親Epic: `../../requirement.md`、`../../design.md`、`../../plan.md`
+- 承認済みDraft 1: `artifacts/20260809t125148z-draft-requirement-strict-vertical-slice-requirement.md`
+- 設計候補: `artifacts/20260809t125149z-draft-design-strict-vertical-slice-design.md`
+- 計画候補: `artifacts/20260809t125150z-draft-plan-strict-vertical-slice-plan.md`
+- Profile / routing判断: `artifacts/20260808t083300z-interview-issue-profile-and-draft-routing.md`
+- Planning Level構造判断: `artifacts/20260808t085519z-interview-planning-level-authoring-architecture-adoption.md`
+- Report契約判断: `artifacts/20260809t025001z-interview-target-report-contract.md`
+- Epic delivery index: `../../artifacts/20260809t122849z-disc-epic-00356-strict-planning-delivery-index.md`
