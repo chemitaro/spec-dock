@@ -174,7 +174,7 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **振る舞い目標:** Overviewから四文書責務と三scope責務へ到達し、何をどこへ書くかを理解できる。
 
-**Allowed paths:** `docs/authoring/{overview,requirement,design,report,scope-layering}.md`、必要なREADME / Guide link、dogfood projection、専用contract test。
+**Allowed paths:** `docs/authoring/{overview,requirement,design,issue-plan,report,scope-layering}.md`、README / GuideのAuthoring Kit入口と直接矛盾するfirst-read / mandatory workflow表現の中立化、dogfood projection、専用contract test。`issue-plan.md`はprovider-neutralな基礎だけをS01で扱い、Planning Level / Completion Guide詳細はS03で扱う。Current / Historical catalog全体の再編はS06で扱う。
 
 **Forbidden:** Planning Level詳細、Artifact filename、skill linkの先行有効化、Runtime手順。
 
@@ -371,10 +371,10 @@ git status --short
 
 ### S01 contract — Authoring Guide foundation
 
-- Depends on: E00。Unblocks: S02 / S03 / S05。Target files: `docs/authoring/{overview,requirement,design,report,scope-layering}.md`、Design §4.1 navigation entry、dogfood projection、Guide contract tests。
-- Planned obligation: Overviewから四文書責務と三scope責務へ到達でき、禁止する責務混在を説明する。
+- Depends on: E00。Unblocks: S02 / S03 / S05。Target files: `docs/authoring/{overview,requirement,design,issue-plan,report,scope-layering}.md`、Design §4.1 navigation entry、dogfood projection、Guide contract tests。
+- Planned obligation: Overviewから四文書責務と三scope責務へ到達でき、禁止する責務混在を説明する。`issue-plan.md`はS01でprovider-neutralなPlan基礎とscope境界を確立し、Planning Level選択 / Completion Guide詳細はS03で追加する。
 - Redまたは代替証拠: `red-required`。missing link / heading / responsibility tokenとforbidden workflow wordingを先に失敗させる。
-- Bounded implementation: Guide foundationだけを追加し、Planning Level詳細 / Artifact / Runtime手順を後続へ残す。
+- Bounded implementation: Guide foundationとprovider-neutralなPlan基礎だけを追加し、Planning Level詳細 / Completion Guide / Artifact / Runtime手順を後続へ残す。
 - Green verification: `CL-358-003`のlink / meaning contractとfresh spec reviewがpassする。
 - Refactor guardrail: provider-specific agent workflowをAuthoring contractにしない。
 - Amendment trigger: 四文書 / 三scope責務またはpathを変える必要があれば停止する。
@@ -383,8 +383,8 @@ git status --short
   - delegated role: fresh `doc-writer`、asset確定後のtestだけfresh `dev-coder`。
   - input docs: `RQ-358-002/003`, `AC-358-003`; Design §4 / §6; `CL-358-003`。
   - allowed paths: 本step Target filesだけ。
-  - forbidden changes: templates、Planning Level / Artifact詳細、Runtime / skill / installer、Existing content。
-  - acceptance criteria: 全link有効、責務 / 禁止混在 / scope継承が正本どおり説明される。
+  - forbidden changes: templates、Planning Level選択 / Completion Guide / Artifact詳細、Runtime / skill / installer、Existing content。
+  - acceptance criteria: 全link有効、R/D/P/Report責務 / 禁止混在 / scope継承が正本どおり説明され、Current Plan Guideが特定agent / provider / workflowを必須にしない。
   - required verification: authoring asset testsのguide / scope cases、manual semantic review。
   - reviewer focus: 意味の正確さ、親scope非再定義、日本語first-readability。
   - stop conditions: path / responsibilityのmaterial変更、scope外assetが必要。
