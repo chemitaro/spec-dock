@@ -23,7 +23,11 @@ def test_tc_s04_001_003_default_authoring_manifest_does_not_discover_generic_art
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source_manifest, _preflight = _runtime_modules()
-    default_source = tmp_path / source_manifest.DEFAULT_SOURCE_PATHS[0]
+    default_source_relative = (
+        "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/authoring_pack/git_fetch.py"
+    )
+    assert default_source_relative in source_manifest.DEFAULT_SOURCE_PATHS
+    default_source = tmp_path / default_source_relative
     default_source.parent.mkdir(parents=True, exist_ok=True)
     default_source.write_text("provider source\n", encoding="utf-8")
     generic = (

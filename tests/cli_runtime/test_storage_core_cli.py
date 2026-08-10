@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -80,6 +81,92 @@ REMOVED_HELP_ROUTES = (
     ("artifact", "import", "chatgpt-output", "--help"),
 )
 
+REMOVED_RUNTIME_MODULES = (
+    "application.assurance",
+    "application.delegated_authoring",
+    "application.import_artifact",
+    "application.workflow",
+    "commands.assurance",
+    "commands.authoring",
+    "commands.delegated_authoring",
+    "commands.workflow",
+    "domain.artifact_composer",
+    "domain.assurance",
+    "domain.authority",
+    "domain.delegated_authoring",
+    "domain.runbook",
+    "domain.workflow_state",
+    "infra.artifact_store",
+    "infra.assurance_store",
+    "infra.runbook_store",
+    "presentation.assurance_text",
+    "presentation.workflow",
+)
+
+RETAINED_RUNTIME_MODULES = (
+    "app",
+    "application.contracts",
+    "application.create_artifact_doc",
+    "application.create_node",
+    "application.import_file_artifact",
+    "application.issue_planning",
+    "application.ports",
+    "application.sync_state",
+    "application.validate_tree",
+    "chatgpt_app",
+    "cli.bootstrap",
+    "cli.chatgpt_parser",
+    "cli.chatgpt_registry",
+    "cli.dispatch",
+    "cli.parser",
+    "cli.registry",
+    "commands.artifact_import",
+    "commands.issue_planning",
+    "domain.active",
+    "domain.artifacts",
+    "domain.authoring_pack.authority_boundary",
+    "domain.deps",
+    "domain.issue_planning_contracts",
+    "domain.validation",
+    "infra.binary_artifact_publisher",
+    "infra.issue_planning_candidate",
+    "infra.template_scaffolder",
+    "presentation.contracts",
+    "presentation.issue_planning",
+)
+
+REMOVED_APPLICATION_CONTRACT_SYMBOLS = (
+    "ArtifactImportError",
+    "ArtifactImportRequest",
+    "ArtifactImportResult",
+    "AssuranceOperation",
+    "AssuranceResult",
+    "AssuranceResultStatus",
+    "AssuranceTargetView",
+    "ClassifyAssuranceRequest",
+    "ComposeArtifactSelection",
+    "ComposeArtifactView",
+    "ComposeAssuranceRequest",
+    "RunbookProjectionResult",
+    "ShowAssuranceRequest",
+    "VerifyAssuranceRequest",
+    "WorkflowNextRequest",
+    "WorkflowResult",
+    "WorkflowStatusRequest",
+)
+
+REMOVED_USE_CASE_FIELDS = (
+    "classify_assurance",
+    "compose_assurance",
+    "import_artifact",
+    "repo_root",
+    "show_assurance",
+    "specdock_dir",
+    "verify_assurance",
+    "workflow_next",
+    "workflow_status",
+)
+
 
 def _tree_snapshot(root: Path) -> dict[str, tuple[str, str]]:
     snapshot: dict[str, tuple[str, str]] = {}
@@ -94,7 +181,64 @@ def _tree_snapshot(root: Path) -> dict[str, tuple[str, str]]:
     return snapshot
 
 
+def _runtime_python_manifest(root: Path) -> dict[str, str]:
+    return {
+        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(root.rglob("*.py"), key=lambda item: item.as_posix())
+    }
+
+
 class TestStorageCoreCli(CliRuntimeHarness):
+    @staticmethod
+    def _assert_removed_runtime_is_absent_retained_runtime_imports_and_projection_matches() -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        provider_scripts = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        dogfood_scripts = repo_root / "spec-dock" / "scripts"
+        provider_runtime = provider_scripts / "spec_dock_runtime"
+        dogfood_runtime = dogfood_scripts / "spec_dock_runtime"
+
+        for runtime_root in (provider_runtime, dogfood_runtime):
+            for module in REMOVED_RUNTIME_MODULES:
+                assert not runtime_root.joinpath(*module.split(".")).with_suffix(".py").exists(), module
+
+        smoke_script = "\n".join((
+            "from dataclasses import fields",
+            "from importlib import import_module",
+            "from importlib.util import find_spec",
+            "import sys",
+            "sys.dont_write_bytecode = True",
+            f"removed = {REMOVED_RUNTIME_MODULES!r}",
+            f"retained = {RETAINED_RUNTIME_MODULES!r}",
+            f"removed_contracts = {REMOVED_APPLICATION_CONTRACT_SYMBOLS!r}",
+            f"removed_use_cases = {REMOVED_USE_CASE_FIELDS!r}",
+            "for module in retained:",
+            "    import_module('spec_dock_runtime.' + module)",
+            "for module in removed:",
+            "    assert find_spec('spec_dock_runtime.' + module) is None, module",
+            "contracts = import_module('spec_dock_runtime.application.contracts')",
+            "ports = import_module('spec_dock_runtime.application.ports')",
+            "for symbol in removed_contracts:",
+            "    assert not hasattr(contracts, symbol), symbol",
+            "use_case_fields = {field.name for field in fields(contracts.UseCases)}",
+            "assert not use_case_fields.intersection(removed_use_cases)",
+            "assert {'planning_create', 'planning_revise', 'planning_review', 'planning_apply'} <= use_case_fields",
+            "port_fields = {field.name for field in fields(ports.Ports)}",
+            "assert {'explicit_file_source_guard', 'explicit_file_artifact_publisher'} <= port_fields",
+            "assert hasattr(ports, 'ExplicitFileSourceGuard')",
+            "assert hasattr(ports, 'ExplicitFileArtifactPublisher')",
+        ))
+        for scripts_root in (provider_scripts, dogfood_scripts):
+            result = subprocess.run(
+                [sys.executable, "-c", smoke_script],
+                cwd=repo_root,
+                env={**os.environ, "PYTHONPATH": str(scripts_root), "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            assert result.returncode == 0, (scripts_root, result.stdout, result.stderr)
+
+        assert _runtime_python_manifest(provider_runtime) == _runtime_python_manifest(dogfood_runtime)
+
     def test_root_help_registry_and_leaf_help_match_storage_core_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -194,3 +338,7 @@ class TestStorageCoreCli(CliRuntimeHarness):
             assert invalid.returncode != 0
             assert "invalid target" in invalid.stderr.lower()
             assert _tree_snapshot(target / "spec-dock") == baseline
+
+
+def test_storage_core_runtime_deletion_contract() -> None:
+    TestStorageCoreCli._assert_removed_runtime_is_absent_retained_runtime_imports_and_projection_matches()

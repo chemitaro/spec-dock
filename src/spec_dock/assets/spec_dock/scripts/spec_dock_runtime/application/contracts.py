@@ -17,7 +17,6 @@ if TYPE_CHECKING:
         PlanningReviewRequest,
         PlanningReviseRequest,
     )
-    from spec_dock_runtime.domain.assurance import AssuranceContract
     from spec_dock_runtime.domain.issue_planning_contracts import PlanningCommandResult
     from spec_dock_runtime.domain.models import (
         ActiveSelection,
@@ -33,8 +32,6 @@ if TYPE_CHECKING:
         TargetDepsInspection,
         ValidationReport,
     )
-    from spec_dock_runtime.domain.runbook import Runbook, WorkflowTarget
-    from spec_dock_runtime.domain.workflow_state import WorkflowState
     from spec_dock_runtime.infra.contracts import StoredMetaRecord
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
@@ -70,101 +67,6 @@ class ValidateTreeRequest:
 class ValidationResult:
     report: ValidationReport
     checked_node_count: int
-
-
-AssuranceOperation = Literal["show", "classify", "verify", "compose"]
-AssuranceResultStatus = Literal["valid", "missing", "invalid", "applied", "unchanged", "dry-run"]
-ComposeArtifactSelection = Literal["design", "plan", "report", "all"]
-
-
-@dataclass(frozen=True)
-class ShowAssuranceRequest:
-    issue: str | Path | None = None
-
-
-@dataclass(frozen=True)
-class ClassifyAssuranceRequest:
-    stage: Literal["requirement"]
-    issue: str | Path | None = None
-    dry_run: bool = False
-
-
-@dataclass(frozen=True)
-class VerifyAssuranceRequest:
-    issue: str | Path | None = None
-
-
-@dataclass(frozen=True)
-class ComposeAssuranceRequest:
-    artifact: ComposeArtifactSelection
-    issue: str | Path | None = None
-    dry_run: bool = False
-
-
-@dataclass(frozen=True)
-class AssuranceTargetView:
-    issue_id: str
-    repo_relative_path: str
-
-
-@dataclass(frozen=True)
-class ComposeArtifactView:
-    artifact: str
-    path: str
-    changed: bool
-    added_section_ids: tuple[str, ...] = ()
-    preserved_section_ids: tuple[str, ...] = ()
-    warnings: tuple[str, ...] = ()
-    errors: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class AssuranceResult:
-    operation: AssuranceOperation
-    ok: bool
-    status: AssuranceResultStatus
-    target: AssuranceTargetView
-    mode: str
-    reason: str
-    details: tuple[str, ...]
-    contract: AssuranceContract | None
-    dry_run: bool = False
-    written_path: Path | None = None
-    authorized_profile: str | None = None
-    lite_candidate: bool | None = None
-    changed_paths: tuple[str, ...] = ()
-    artifacts: tuple[ComposeArtifactView, ...] = ()
-    warnings: tuple[str, ...] = ()
-    errors: tuple[str, ...] = ()
-
-    @property
-    def has_contract(self) -> bool:
-        return self.contract is not None
-
-
-@dataclass(frozen=True)
-class WorkflowStatusRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class WorkflowNextRequest:
-    workflow_target: WorkflowTarget
-
-
-@dataclass(frozen=True)
-class RunbookProjectionResult:
-    written: bool
-    paths: tuple[str, ...]
-    errors: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class WorkflowResult:
-    operation: Literal["status", "next"]
-    state: WorkflowState
-    runbook: Runbook | None = None
-    projection: RunbookProjectionResult | None = None
 
 
 @dataclass(frozen=True)
@@ -1045,24 +947,6 @@ class UseCases:
     import_file_artifact: Callable[[FileArtifactImportRequest], FileArtifactImportResult] = lambda _req: (
         _ for _ in ()
     ).throw(RuntimeError("import_file_artifact is not configured"))
-    show_assurance: Callable[[ShowAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("show_assurance is not configured")
-    )
-    classify_assurance: Callable[[ClassifyAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("classify_assurance is not configured")
-    )
-    verify_assurance: Callable[[VerifyAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("verify_assurance is not configured")
-    )
-    compose_assurance: Callable[[ComposeAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("compose_assurance is not configured")
-    )
-    workflow_status: Callable[[WorkflowStatusRequest], WorkflowResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("workflow_status is not configured")
-    )
-    workflow_next: Callable[[WorkflowNextRequest], WorkflowResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("workflow_next is not configured")
-    )
     mutate_deps: Callable[[MutateDepsRequest], MutateDepsResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("mutate_deps is not configured")
     )
@@ -1108,5 +992,3 @@ class UseCases:
     planning_apply: Callable[[PlanningApplyRequest], PlanningCommandResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("planning_apply is not configured")
     )
-    repo_root: Path | None = None
-    specdock_dir: Path | None = None

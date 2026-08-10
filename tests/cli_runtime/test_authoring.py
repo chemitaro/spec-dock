@@ -4952,45 +4952,6 @@ class TestAuthoringCli(CliRuntimeHarness):
                 for forbidden in _FORBIDDEN_AUTHORITY_CLAIMS:
                     assert forbidden not in output
 
-    def test_authoring_preflight_dogfood_runtime_path_exposes_implemented_local_context(self) -> None:
-        repo_root = Path(__file__).resolve().parents[2]
-        script = repo_root / "spec-dock" / "scripts" / "spec-dock"
-
-        p = subprocess.run(
-            [
-                str(script),
-                "authoring",
-                "preflight",
-                "github-sync",
-                "--repo-root",
-                str(repo_root),
-                "--evidence-mode",
-                "local-context",
-                "--diff-summary",
-                "dogfood mirror smoke",
-                "--unsynced-reason",
-                "mirror behavior smoke",
-                "--format",
-                "json",
-            ],
-            cwd=str(repo_root),
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-            capture_output=True,
-            text=True,
-        )
-
-        payload = _json_stdout(p)
-        assert p.returncode == 0, p.stdout + p.stderr
-        assert payload["status"] == "pass"
-        assert payload["github_sync"] == "not_verified"
-        assert payload["sync_state"] == "local_context"
-        assert (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py" in payload["source_paths"]
-        )
-        assert "spec-dock/scripts/spec_dock_runtime/commands/authoring.py" in payload["source_paths"]
-        assert all("__pycache__" not in path for path in payload["source_hashes"])
-        assert all(not path.endswith(".pyc") for path in payload["source_hashes"])
-
     @pytest.mark.parametrize(
         ("case", "extra_args", "expected_status", "expected_returncode", "expected_blocker"),
         (

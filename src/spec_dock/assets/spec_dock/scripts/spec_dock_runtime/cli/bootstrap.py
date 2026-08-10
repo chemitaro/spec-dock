@@ -61,9 +61,7 @@ from spec_dock_runtime.domain.models import SpecNodeKind, SpecNodeSeed
 from spec_dock_runtime.domain.tree import build_graph
 from spec_dock_runtime.infra import (
     active_store as infra_active_store,
-    artifact_store as infra_artifact_store,
     artifact_writer as infra_artifact_writer,
-    assurance_store as infra_assurance_store,
     clock as infra_clock,
     deps_reader as infra_deps_reader,
     derived_state_reader as infra_derived_state_reader,
@@ -500,8 +498,6 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         explicit_file_source_guard=binary_artifact_publisher,
         explicit_file_artifact_publisher=binary_artifact_publisher,
     )
-    assurance_store = infra_assurance_store.AssuranceStore(resolved_repo_root)
-    artifact_store = infra_artifact_store.ArtifactStore(resolved_repo_root)
 
     def load_planning_state() -> tuple[tuple[StoredMetaRecord, ...], SpecGraph]:
         records = tuple(ports.node_reader.load_node_records())
@@ -571,12 +567,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         create_initiative=lambda req: application_create_initiative(req, ports),
         create_epic=lambda req: application_create_epic(req, ports),
         create_issue=lambda req: application_create_issue(req, ports),
-        create_artifact_doc=lambda req: application_create_artifact_doc(
-            req,
-            ports,
-            assurance_store=assurance_store,
-            artifact_store=artifact_store,
-        ),
+        create_artifact_doc=lambda req: application_create_artifact_doc(req, ports),
         import_initiative=lambda req: application_import_initiative(req, ports),
         import_epic=lambda req: application_import_epic(req, ports),
         import_issue=lambda req: application_import_issue(req, ports),
@@ -602,7 +593,5 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         planning_revise=planning_revise,
         planning_review=planning_review,
         planning_apply=planning_apply,
-        repo_root=ports.repo_root,
-        specdock_dir=ports.specdock_dir,
     )
     return BootstrapContext(use_cases=use_cases)
