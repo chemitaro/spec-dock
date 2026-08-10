@@ -1,5 +1,6 @@
 import contextlib
 import importlib
+import os
 from pathlib import Path
 import re
 import shutil
@@ -75,6 +76,19 @@ def _artifact_runtime_modules():
     return app_create_artifact_doc, app_contracts, app_ports, infra_contracts
 
 
+def _snapshot_tree(root: Path) -> list[tuple[str, str, bytes | str]]:
+    snapshot: list[tuple[str, str, bytes | str]] = []
+    for path in sorted(root.rglob("*"), key=lambda candidate: candidate.as_posix()):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            snapshot.append((relative, "symlink", path.readlink().as_posix()))
+        elif path.is_dir():
+            snapshot.append((relative, "directory", ""))
+        else:
+            snapshot.append((relative, "file", path.read_bytes()))
+    return snapshot
+
+
 def _record(
     infra_contracts,
     *,
@@ -119,6 +133,14 @@ class _StubNodeRepo:
         (dest_dir / ".meta.json").write_text(f"id={record.id}\n", encoding="utf-8")
         self._records.append(record)
 
+    def write_meta_at(self, dest_dir_fd, record):
+        meta_fd = os.open(".meta.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644, dir_fd=dest_dir_fd)
+        try:
+            os.write(meta_fd, f"id={record.id}\n".encode())
+        finally:
+            os.close(meta_fd)
+        self._records.append(record)
+
 
 class _StubTemplateScaffolder:
     def __init__(self, events=None):
@@ -152,6 +174,12 @@ class _StubTemplateScaffolder:
             dest_path.write_text(self.render_text(text, replacements), encoding="utf-8")
             created.append(dest_path)
         return created
+
+    def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+        from spec_dock_runtime.infra import template_scaffolder
+
+        self.events.append("copy_scaffolded_tree")
+        return template_scaffolder.copy_scaffolded_tree_at(src_dir, dest_dir, dest_dir_fd, replacements)
 
     def write_text(self, dest_path, text):
         self.events.append("write_text")
@@ -264,11 +292,18 @@ class TestRuntimeNewDocS09:
             encoding="utf-8",
         )
 
-    def _prepare_exhausted_artifact_slots(self, specdock_dir: Path, issue_record) -> Path:
+    def _prepare_exhausted_artifact_slots(
+        self,
+        specdock_dir: Path,
+        issue_record,
+        *,
+        include_rules: bool = True,
+    ) -> Path:
         artifacts_dir = Path(issue_record.path) / "artifacts"
         artifacts_dir.mkdir(parents=True)
-        rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
-        (artifacts_dir / "rules.md").symlink_to(rules_source)
+        if include_rules:
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
         timestamp = "20260312t010203z"
         (artifacts_dir / f"{timestamp}-existing.md").write_text("standard\n", encoding="utf-8")
         for suffix in range(1, 100):
@@ -1432,6 +1467,1032 @@ class TestRuntimeNewDocS09:
             assert result.path.name == "20260312t010203z-01-shared-slot.md"
             assert generic.read_bytes() == b"generic sentinel"
 
+    def test_new_artifact_rejects_scope_path_escape_and_symlink_without_write(self) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+
+            outside_scope = repo_root / "outside-scope"
+            outside_scope.mkdir()
+            escaped_record = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="Escaped issue",
+                path=outside_scope,
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            )
+            escaped_ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[escaped_record])
+            request = app_contracts.CreateArtifactDocRequest(
+                artifact_type="blank",
+                scope_node_id="iss-local-00001",
+                title="Unsafe scope",
+                slug="unsafe-scope",
+            )
+
+            with pytest.raises(RuntimeError, match="Scope path escapes spec-dock initiatives"):
+                app_create_artifact_doc.create_artifact_doc(request, escaped_ports)
+
+            assert not (outside_scope / "artifacts").exists()
+
+            linked_scope = (
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-login"
+                / "issues"
+                / "iss-local-00001-refresh-token"
+            )
+            linked_scope.parent.mkdir(parents=True)
+            try:
+                linked_scope.symlink_to(outside_scope, target_is_directory=True)
+            except (NotImplementedError, OSError):
+                return
+            linked_record = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="Linked issue",
+                path=linked_scope,
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            )
+            linked_ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[linked_record])
+
+            with pytest.raises(RuntimeError, match="Scope path escapes spec-dock initiatives"):
+                app_create_artifact_doc.create_artifact_doc(request, linked_ports)
+
+            assert not (outside_scope / "artifacts").exists()
+
+    def test_new_artifact_rejects_symlinked_initiatives_root_without_external_write(self) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as repo_tmp, tempfile.TemporaryDirectory() as external_tmp:
+            repo_root = Path(repo_tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+
+            external_root = Path(external_tmp) / "external-initiatives"
+            external_scope = (
+                external_root
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-login"
+                / "issues"
+                / "iss-local-00001-refresh-token"
+            )
+            external_scope.mkdir(parents=True)
+            sentinel = external_scope / "sentinel.txt"
+            sentinel.write_bytes(b"external scope sentinel\n")
+            before = _snapshot_tree(external_root)
+
+            initiatives_root = specdock_dir / "initiatives"
+            try:
+                initiatives_root.symlink_to(external_root, target_is_directory=True)
+            except (NotImplementedError, OSError):
+                return
+            try:
+                issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+                ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+                request = app_contracts.CreateArtifactDocRequest(
+                    artifact_type="blank",
+                    scope_node_id="iss-local-00001",
+                    title="Unsafe initiatives root",
+                    slug="unsafe-initiatives-root",
+                )
+
+                error: RuntimeError | None = None
+                try:
+                    app_create_artifact_doc.create_artifact_doc(request, ports)
+                except RuntimeError as exc:
+                    error = exc
+
+                after = _snapshot_tree(external_root)
+                assert after == before, f"external initiatives tree mutated: before={before!r}, after={after!r}"
+                assert error is not None
+                assert "Initiatives root is symlinked" in str(error)
+                assert sentinel.read_bytes() == b"external scope sentinel\n"
+                assert not (external_scope / "artifacts").exists()
+            finally:
+                initiatives_root.unlink(missing_ok=True)
+
+    @pytest.mark.parametrize(
+        ("failure_case", "error_pattern"),
+        (
+            ("suffix-exhaustion", "Artifact timestamp suffix exhaustion"),
+            ("malformed-candidate", "Malformed artifact filename"),
+        ),
+    )
+    def test_new_artifact_allocation_failure_does_not_materialize_missing_rules(
+        self,
+        failure_case: str,
+        error_pattern: str,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            if failure_case == "suffix-exhaustion":
+                artifacts_dir = self._prepare_exhausted_artifact_slots(
+                    specdock_dir,
+                    issue_record,
+                    include_rules=False,
+                )
+            else:
+                artifacts_dir = Path(issue_record.path) / "artifacts"
+                artifacts_dir.mkdir(parents=True)
+                (artifacts_dir / "20260312t01020x-adr-broken.md").write_text(
+                    "malformed sentinel\n",
+                    encoding="utf-8",
+                )
+            before = _snapshot_tree(artifacts_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            with pytest.raises(RuntimeError, match=error_pattern):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Rejected Allocation",
+                        slug="rejected-allocation",
+                    ),
+                    ports,
+                )
+
+            assert _snapshot_tree(artifacts_dir) == before
+            assert not (artifacts_dir / "rules.md").exists()
+            assert not (artifacts_dir / "rules.md").is_symlink()
+
+    def test_new_artifact_success_materializes_missing_rules_after_allocation(self) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            sentinel = artifacts_dir / "sentinel.bin"
+            sentinel.write_bytes(b"existing artifact sentinel")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            result = app_create_artifact_doc.create_artifact_doc(
+                app_contracts.CreateArtifactDocRequest(
+                    artifact_type="blank",
+                    scope_node_id="iss-local-00001",
+                    title="Successful Allocation",
+                    slug="successful-allocation",
+                ),
+                ports,
+            )
+
+            rules_link = artifacts_dir / "rules.md"
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            assert rules_link.is_symlink()
+            assert rules_link.resolve() == rules_source.resolve()
+            assert result.path.read_text(encoding="utf-8") == (
+                "id=20260312t010203z\ntitle=Successful Allocation\nscope=iss-local-00001\n"
+            )
+            assert sentinel.read_bytes() == b"existing artifact sentinel"
+
+    def test_new_artifact_success_materializes_missing_directory_and_rules(self) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            result = app_create_artifact_doc.create_artifact_doc(
+                app_contracts.CreateArtifactDocRequest(
+                    artifact_type="blank",
+                    scope_node_id="iss-local-00001",
+                    title="New Artifact Directory",
+                    slug="new-artifact-directory",
+                ),
+                ports,
+            )
+
+            artifacts_dir = issue_dir / "artifacts"
+            rules_link = artifacts_dir / "rules.md"
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            assert artifacts_dir.is_dir()
+            assert rules_link.is_symlink()
+            assert rules_link.resolve() == rules_source.resolve()
+            assert result.path.is_file()
+            assert not any(path.name.endswith(".tmp") for path in artifacts_dir.iterdir())
+
+    def test_new_artifact_post_mkdir_directory_replacement_is_rejected_without_mutation(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            artifacts_dir = issue_dir / "artifacts"
+            owned_backup = issue_dir / "artifacts.owned-backup"
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_open_directory = app_create_artifact_doc._open_artifacts_directory
+            competitor_before: list[tuple[str, str, bytes | str]] | None = None
+            owned_before: list[tuple[str, str, bytes | str]] | None = None
+            replaced = False
+
+            def _replace_created_directory_before_open(path, *, expected_identity):
+                nonlocal competitor_before, owned_before, replaced
+                assert path == artifacts_dir
+                replaced = True
+                artifacts_dir.rename(owned_backup)
+                artifacts_dir.mkdir()
+                (artifacts_dir / "competitor.bin").write_bytes(b"competitor directory sentinel")
+                competitor_before = _snapshot_tree(artifacts_dir)
+                owned_before = _snapshot_tree(owned_backup)
+                return original_open_directory(path, expected_identity=expected_identity)
+
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "_open_artifacts_directory",
+                _replace_created_directory_before_open,
+            )
+
+            with pytest.raises(RuntimeError, match="Artifact directory identity changed"):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Post Mkdir Replacement",
+                        slug="post-mkdir-replacement",
+                    ),
+                    ports,
+                )
+
+            assert replaced
+            assert competitor_before is not None
+            assert owned_before is not None
+            assert _snapshot_tree(artifacts_dir) == competitor_before
+            assert _snapshot_tree(owned_backup) == owned_before
+            assert not (artifacts_dir / "20260312t010203z-post-mkdir-replacement.md").exists()
+            assert not (owned_backup / "20260312t010203z-post-mkdir-replacement.md").exists()
+
+    @pytest.mark.parametrize(
+        ("failure_stage", "preexisting_artifacts", "preexisting_rules", "error_pattern"),
+        (
+            ("setup", False, False, "injected artifact rules setup failure"),
+            ("renderer", False, False, "injected artifact renderer failure"),
+            ("write-before", True, False, "injected artifact write-before failure"),
+            ("write-partial", False, False, "injected artifact write-partial failure"),
+            ("post-write-guard", True, True, "injected artifact post-write guard failure"),
+        ),
+    )
+    def test_new_artifact_failure_rolls_back_only_attempt_paths(
+        self,
+        monkeypatch,
+        failure_stage: str,
+        preexisting_artifacts: bool,
+        preexisting_rules: bool,
+        error_pattern: str,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            artifacts_dir = issue_dir / "artifacts"
+            if preexisting_artifacts:
+                artifacts_dir.mkdir()
+                (artifacts_dir / "sentinel.bin").write_bytes(b"pre-existing sentinel")
+            if preexisting_rules:
+                rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+                (artifacts_dir / "rules.md").symlink_to(rules_source)
+            before = _snapshot_tree(issue_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            if failure_stage == "setup":
+                original_symlink = os.symlink
+
+                def _fail_rules_symlink(src, dst, target_is_directory=False, *, dir_fd=None):
+                    if Path(dst).name == "rules.md":
+                        raise OSError("injected artifact rules setup failure")
+                    return original_symlink(
+                        src,
+                        dst,
+                        target_is_directory=target_is_directory,
+                        dir_fd=dir_fd,
+                    )
+
+                monkeypatch.setattr(os, "symlink", _fail_rules_symlink)
+            elif failure_stage == "renderer":
+
+                def _fail_render(_text, _replacements):
+                    raise RuntimeError("injected artifact renderer failure")
+
+                monkeypatch.setattr(ports.template_scaffolder, "render_text", _fail_render)
+            elif failure_stage in ("write-before", "write-partial"):
+
+                def _fail_write(descriptor, _text):
+                    if failure_stage == "write-partial":
+                        os.write(descriptor, b"partial artifact bytes")
+                    raise OSError(f"injected artifact {failure_stage} failure")
+
+                monkeypatch.setattr(app_create_artifact_doc, "_write_claimed_artifact_temp", _fail_write)
+            else:
+                original_scan = app_create_artifact_doc.scan_artifact_duplicate_state
+                scan_calls = 0
+
+                def _fail_post_write_guard(path):
+                    nonlocal scan_calls
+                    scan_calls += 1
+                    if scan_calls == 2:
+                        return "injected artifact post-write guard failure", set()
+                    return original_scan(path)
+
+                monkeypatch.setattr(
+                    app_create_artifact_doc,
+                    "scan_artifact_duplicate_state",
+                    _fail_post_write_guard,
+                )
+
+            with pytest.raises((OSError, RuntimeError), match=error_pattern):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Transactional Artifact",
+                        slug="transactional-artifact",
+                    ),
+                    ports,
+                )
+
+            assert _snapshot_tree(issue_dir) == before
+            assert not any(path.name.endswith(".tmp") for path in issue_dir.rglob("*"))
+
+    def test_new_artifact_atomic_publish_does_not_overwrite_or_rollback_competing_destination(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            rules_link = artifacts_dir / "rules.md"
+            rules_link.symlink_to(rules_source)
+            sentinel = artifacts_dir / "sentinel.bin"
+            sentinel.write_bytes(b"pre-existing sentinel")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_publish = app_create_artifact_doc._publish_artifact_temp_no_replace
+            competing_dest: Path | None = None
+
+            def _inject_competing_destination(*, temp_path, dest_path, **kwargs):
+                nonlocal competing_dest
+                competing_dest = dest_path
+                dest_path.write_bytes(b"competing writer bytes")
+                return original_publish(temp_path=temp_path, dest_path=dest_path, **kwargs)
+
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "_publish_artifact_temp_no_replace",
+                _inject_competing_destination,
+            )
+
+            try:
+                with pytest.raises(RuntimeError, match="Artifact already exists"):
+                    app_create_artifact_doc.create_artifact_doc(
+                        app_contracts.CreateArtifactDocRequest(
+                            artifact_type="blank",
+                            scope_node_id="iss-local-00001",
+                            title="Publish Race",
+                            slug="publish-race",
+                        ),
+                        ports,
+                    )
+
+                assert competing_dest is not None
+                assert competing_dest.read_bytes() == b"competing writer bytes"
+                assert sentinel.read_bytes() == b"pre-existing sentinel"
+                assert rules_link.is_symlink()
+                assert rules_link.resolve() == rules_source.resolve()
+                assert not any(path.name.endswith(".tmp") for path in artifacts_dir.iterdir())
+            finally:
+                if competing_dest is not None:
+                    competing_dest.unlink(missing_ok=True)
+
+    @pytest.mark.parametrize("competitor_kind", ("regular", "dangling-symlink"))
+    def test_new_artifact_temp_claim_race_preserves_competitor(
+        self,
+        monkeypatch,
+        competitor_kind: str,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            external_target = repo_root / "external-temp-target.txt"
+            competitor_path: Path | None = None
+            original_open = os.open
+            injected = False
+
+            def _inject_temp_competitor(path, flags, mode=0o777, *, dir_fd=None):
+                nonlocal competitor_path, injected
+                candidate = Path(path)
+                if not injected and candidate.name.endswith(".tmp"):
+                    injected = True
+                    competitor_path = artifacts_dir / candidate.name if dir_fd is not None else candidate
+                    if competitor_kind == "regular":
+                        competitor_path.write_bytes(b"competing temp bytes")
+                    else:
+                        competitor_path.symlink_to(external_target)
+                    raise FileExistsError("injected competing artifact temp")
+                if dir_fd is None:
+                    return original_open(path, flags, mode)
+                return original_open(path, flags, mode, dir_fd=dir_fd)
+
+            def _fail_write(_descriptor, _text):
+                raise OSError("injected claimed temp write failure")
+
+            monkeypatch.setattr(os, "open", _inject_temp_competitor)
+            monkeypatch.setattr(app_create_artifact_doc, "_write_claimed_artifact_temp", _fail_write)
+
+            with pytest.raises((OSError, RuntimeError)):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Temp Claim Race",
+                        slug="temp-claim-race",
+                    ),
+                    ports,
+                )
+
+            assert competitor_path is not None
+            if competitor_kind == "regular":
+                assert competitor_path.read_bytes() == b"competing temp bytes"
+            else:
+                assert competitor_path.is_symlink()
+                assert competitor_path.readlink() == external_target
+                assert not external_target.exists()
+
+    @pytest.mark.parametrize("replacement_kind", ("regular", "symlink"))
+    def test_new_artifact_temp_replacement_before_publish_preserves_competitor(
+        self,
+        monkeypatch,
+        replacement_kind: str,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            external_target = repo_root / "external-replacement-target.txt"
+            original_publish = app_create_artifact_doc._publish_artifact_temp_no_replace
+            competitor_path: Path | None = None
+            owned_backup: Path | None = None
+            dest_path: Path | None = None
+
+            def _replace_before_publish(*, temp_path, dest_path: Path, **kwargs):
+                nonlocal competitor_path, owned_backup
+                competitor_path = temp_path
+                owned_backup = temp_path.with_name(f"{temp_path.name}.owned-backup")
+                temp_path.rename(owned_backup)
+                if replacement_kind == "regular":
+                    temp_path.write_bytes(b"replacement temp bytes")
+                else:
+                    temp_path.symlink_to(external_target)
+                return original_publish(temp_path=temp_path, dest_path=dest_path, **kwargs)
+
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "_publish_artifact_temp_no_replace",
+                _replace_before_publish,
+            )
+
+            with pytest.raises(RuntimeError) as exc_info:
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Temp Replacement",
+                        slug="temp-replacement",
+                    ),
+                    ports,
+                )
+
+            dest_path = artifacts_dir / "20260312t010203z-temp-replacement.md"
+            assert competitor_path is not None
+            assert owned_backup is not None
+            assert owned_backup.read_bytes().startswith(b"id=20260312t010203z")
+            if replacement_kind == "regular":
+                assert competitor_path.read_bytes() == b"replacement temp bytes"
+            else:
+                assert competitor_path.is_symlink()
+                assert competitor_path.readlink() == external_target
+                assert not external_target.exists()
+            assert not dest_path.exists()
+            assert exc_info.value.__cause__ is not None
+            assert "identity changed" in str(exc_info.value.__cause__)
+
+    def test_new_artifact_directory_symlink_swap_before_temp_claim_never_publishes_external(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as external_tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            (artifacts_dir / "owned-sentinel.bin").write_bytes(b"owned sentinel")
+            owned_before = _snapshot_tree(artifacts_dir)
+            external_dir = Path(external_tmp) / "external-artifacts"
+            external_dir.mkdir()
+            (external_dir / "external-sentinel.bin").write_bytes(b"external sentinel")
+            external_rules_target = external_dir / "external-rules-target.md"
+            external_rules_target.write_bytes(b"external rules target")
+            (external_dir / "rules.md").symlink_to(external_rules_target)
+            external_before = _snapshot_tree(external_dir)
+            owned_backup = artifacts_dir.with_name("artifacts.owned-backup")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_claim = app_create_artifact_doc._claim_artifact_temp_path
+            swapped = False
+
+            def _swap_directory_before_claim(dest_path, **kwargs):
+                nonlocal swapped
+                if not swapped:
+                    swapped = True
+                    artifacts_dir.rename(owned_backup)
+                    artifacts_dir.symlink_to(external_dir, target_is_directory=True)
+                return original_claim(dest_path, **kwargs)
+
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "_claim_artifact_temp_path",
+                _swap_directory_before_claim,
+            )
+
+            with pytest.raises(RuntimeError, match="Artifact directory identity changed"):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Directory Symlink Swap",
+                        slug="directory-symlink-swap",
+                    ),
+                    ports,
+                )
+
+            assert swapped
+            assert artifacts_dir.is_symlink()
+            assert artifacts_dir.readlink() == external_dir
+            assert _snapshot_tree(external_dir) == external_before
+            assert _snapshot_tree(owned_backup) == owned_before
+            assert not (external_dir / "20260312t010203z-directory-symlink-swap.md").exists()
+
+    def test_new_artifact_directory_symlink_swap_before_rollback_preserves_external_hardlink(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as external_tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            (artifacts_dir / "owned-sentinel.bin").write_bytes(b"owned sentinel")
+            owned_before = _snapshot_tree(artifacts_dir)
+            external_dir = Path(external_tmp) / "external-artifacts"
+            external_dir.mkdir()
+            (external_dir / "external-sentinel.bin").write_bytes(b"external sentinel")
+            owned_backup = artifacts_dir.with_name("artifacts.owned-backup")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_rollback = app_create_artifact_doc._rollback_artifact_attempt
+            external_temp: Path | None = None
+            external_identity: tuple[int, int] | None = None
+
+            def _fail_write(descriptor, _text):
+                os.write(descriptor, b"owned partial temp")
+                raise OSError("injected directory swap rollback failure")
+
+            def _swap_directory_before_rollback(journal):
+                nonlocal external_temp, external_identity
+                assert journal.temp_path is not None
+                external_temp = external_dir / journal.temp_path.name
+                os.link(journal.temp_path, external_temp)
+                external_stat = os.lstat(external_temp)
+                external_identity = (external_stat.st_dev, external_stat.st_ino)
+                artifacts_dir.rename(owned_backup)
+                artifacts_dir.symlink_to(external_dir, target_is_directory=True)
+                return original_rollback(journal)
+
+            monkeypatch.setattr(app_create_artifact_doc, "_write_claimed_artifact_temp", _fail_write)
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "_rollback_artifact_attempt",
+                _swap_directory_before_rollback,
+            )
+
+            with pytest.raises(OSError, match="injected directory swap rollback failure") as exc_info:
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Directory Rollback Swap",
+                        slug="directory-rollback-swap",
+                    ),
+                    ports,
+                )
+
+            assert external_temp is not None
+            assert external_identity is not None
+            assert external_temp.read_bytes() == b"owned partial temp"
+            external_stat = os.lstat(external_temp)
+            assert (external_stat.st_dev, external_stat.st_ino) == external_identity
+            assert (external_dir / "external-sentinel.bin").read_bytes() == b"external sentinel"
+            assert artifacts_dir.is_symlink()
+            assert artifacts_dir.readlink() == external_dir
+            assert _snapshot_tree(owned_backup) == owned_before
+            assert exc_info.value.__cause__ is not None
+            assert "Artifact directory identity changed" in str(exc_info.value.__cause__)
+
+    def test_new_artifact_directory_creation_race_does_not_claim_competitor(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            artifacts_dir = issue_dir / "artifacts"
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_mkdir = Path.mkdir
+            injected = False
+
+            def _race_mkdir(path, mode=0o777, parents=False, exist_ok=False):
+                nonlocal injected
+                if path == artifacts_dir and not injected:
+                    injected = True
+                    original_mkdir(path, mode=mode, parents=parents, exist_ok=False)
+                    raise FileExistsError("injected competing artifact directory")
+                return original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+            def _fail_write(_descriptor, _text):
+                raise OSError("injected post-setup write failure")
+
+            monkeypatch.setattr(Path, "mkdir", _race_mkdir)
+            monkeypatch.setattr(app_create_artifact_doc, "_write_claimed_artifact_temp", _fail_write)
+
+            with pytest.raises((OSError, RuntimeError)):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Directory Race",
+                        slug="directory-race",
+                    ),
+                    ports,
+                )
+
+            assert artifacts_dir.is_dir()
+
+    def test_new_artifact_directory_creation_race_replacement_before_open_is_rejected(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            artifacts_dir = issue_dir / "artifacts"
+            competitor_backup = issue_dir / "artifacts.competitor-backup"
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_mkdir = Path.mkdir
+            original_open_directory = app_create_artifact_doc._open_artifacts_directory
+            competitor_before: list[tuple[str, str, bytes | str]] | None = None
+            replacement_before: list[tuple[str, str, bytes | str]] | None = None
+            injected = False
+
+            def _race_mkdir(path, mode=0o777, parents=False, exist_ok=False):
+                nonlocal injected
+                if path == artifacts_dir and not injected:
+                    injected = True
+                    original_mkdir(path, mode=mode, parents=parents, exist_ok=False)
+                    raise FileExistsError("injected competing artifact directory")
+                return original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+            def _replace_competitor_before_open(path, *, expected_identity):
+                nonlocal competitor_before, replacement_before
+                assert path == artifacts_dir
+                competitor_before = _snapshot_tree(artifacts_dir)
+                artifacts_dir.rename(competitor_backup)
+                artifacts_dir.mkdir()
+                (artifacts_dir / "competitor.bin").write_bytes(b"replacement directory sentinel")
+                replacement_before = _snapshot_tree(artifacts_dir)
+                return original_open_directory(path, expected_identity=expected_identity)
+
+            monkeypatch.setattr(Path, "mkdir", _race_mkdir)
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "_open_artifacts_directory",
+                _replace_competitor_before_open,
+            )
+
+            with pytest.raises(RuntimeError, match="Artifact directory identity changed"):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Directory Race Replacement",
+                        slug="directory-race-replacement",
+                    ),
+                    ports,
+                )
+
+            assert injected
+            assert competitor_before is not None
+            assert replacement_before is not None
+            assert _snapshot_tree(competitor_backup) == competitor_before
+            assert _snapshot_tree(artifacts_dir) == replacement_before
+            assert not (artifacts_dir / "rules.md").exists()
+            assert not any(path.name.endswith(".tmp") for path in artifacts_dir.iterdir())
+            assert not (artifacts_dir / "20260312t010203z-directory-race-replacement.md").exists()
+
+    def test_new_artifact_rules_creation_race_does_not_claim_competitor(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            rules_link = artifacts_dir / "rules.md"
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_symlink = os.symlink
+            injected = False
+
+            def _race_symlink(src, dst, target_is_directory=False, *, dir_fd=None):
+                nonlocal injected
+                if Path(dst).name == rules_link.name and dir_fd is not None and not injected:
+                    injected = True
+                    original_symlink(
+                        src,
+                        dst,
+                        target_is_directory=target_is_directory,
+                        dir_fd=dir_fd,
+                    )
+                    raise FileExistsError("injected competing artifact rules symlink")
+                return original_symlink(
+                    src,
+                    dst,
+                    target_is_directory=target_is_directory,
+                    dir_fd=dir_fd,
+                )
+
+            def _fail_write(_descriptor, _text):
+                raise OSError("injected post-setup write failure")
+
+            monkeypatch.setattr(os, "symlink", _race_symlink)
+            monkeypatch.setattr(app_create_artifact_doc, "_write_claimed_artifact_temp", _fail_write)
+
+            with pytest.raises((OSError, RuntimeError)):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Rules Race",
+                        slug="rules-race",
+                    ),
+                    ports,
+                )
+
+            assert rules_link.is_symlink()
+            assert rules_link.resolve() == rules_source.resolve()
+
+    @pytest.mark.parametrize("replaced_path", ("dest", "temp", "rules", "directory"))
+    def test_new_artifact_rollback_identity_mismatch_preserves_replacement(
+        self,
+        monkeypatch,
+        replaced_path: str,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_rollback = app_create_artifact_doc._rollback_artifact_attempt
+            replacement_path: Path | None = None
+            owned_backup: Path | None = None
+
+            def _replace_before_rollback(journal):
+                nonlocal replacement_path, owned_backup
+                if replaced_path == "dest":
+                    replacement_path = journal.dest_path
+                elif replaced_path == "temp":
+                    replacement_path = journal.temp_path
+                elif replaced_path == "rules":
+                    replacement_path = journal.rules_path
+                else:
+                    replacement_path = journal.artifacts_dir
+                assert replacement_path is not None
+                owned_backup = replacement_path.with_name(f"{replacement_path.name}.owned-backup")
+                replacement_path.rename(owned_backup)
+                if replaced_path == "directory":
+                    replacement_path.mkdir()
+                else:
+                    replacement_path.write_bytes(b"replacement competitor bytes")
+                return original_rollback(journal)
+
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "_rollback_artifact_attempt",
+                _replace_before_rollback,
+            )
+
+            if replaced_path == "dest":
+                original_scan = app_create_artifact_doc.scan_artifact_duplicate_state
+                scan_calls = 0
+
+                def _fail_post_write_guard(path):
+                    nonlocal scan_calls
+                    scan_calls += 1
+                    if scan_calls == 2:
+                        return "injected replacement rollback failure", set()
+                    return original_scan(path)
+
+                monkeypatch.setattr(
+                    app_create_artifact_doc,
+                    "scan_artifact_duplicate_state",
+                    _fail_post_write_guard,
+                )
+            else:
+
+                def _fail_write(descriptor, _text):
+                    os.write(descriptor, b"owned partial temp")
+                    raise OSError("injected replacement rollback failure")
+
+                monkeypatch.setattr(app_create_artifact_doc, "_write_claimed_artifact_temp", _fail_write)
+
+            with pytest.raises((OSError, RuntimeError), match="injected replacement rollback failure") as exc_info:
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Rollback Replacement",
+                        slug="rollback-replacement",
+                    ),
+                    ports,
+                )
+
+            assert replacement_path is not None
+            assert owned_backup is not None
+            if replaced_path == "directory":
+                assert replacement_path.is_dir()
+                assert owned_backup.is_dir()
+            else:
+                assert replacement_path.read_bytes() == b"replacement competitor bytes"
+                assert os.path.lexists(owned_backup)
+            assert exc_info.value.__cause__ is not None
+            cleanup_diagnostic = str(exc_info.value.__cause__)
+            assert "identity changed" in cleanup_diagnostic or "identity missing" in cleanup_diagnostic
+
+    def test_new_artifact_rollback_failure_keeps_body_error_primary_and_reports_cleanup(
+        self,
+        monkeypatch,
+    ) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            original_scan = app_create_artifact_doc.scan_artifact_duplicate_state
+            scan_calls = 0
+
+            def _fail_post_write_guard(path):
+                nonlocal scan_calls
+                scan_calls += 1
+                if scan_calls == 2:
+                    return "injected primary post-write guard failure", set()
+                return original_scan(path)
+
+            monkeypatch.setattr(
+                app_create_artifact_doc,
+                "scan_artifact_duplicate_state",
+                _fail_post_write_guard,
+            )
+            dest_path = artifacts_dir / "20260312t010203z-rollback-failure.md"
+            original_unlink = os.unlink
+
+            def _fail_dest_rollback(path, *, dir_fd=None):
+                if path == dest_path.name and dir_fd is not None:
+                    raise OSError("injected artifact rollback unlink failure")
+                if dir_fd is None:
+                    return original_unlink(path)
+                return original_unlink(path, dir_fd=dir_fd)
+
+            monkeypatch.setattr(os, "unlink", _fail_dest_rollback)
+
+            try:
+                with pytest.raises(RuntimeError, match="injected primary post-write guard failure") as exc_info:
+                    app_create_artifact_doc.create_artifact_doc(
+                        app_contracts.CreateArtifactDocRequest(
+                            artifact_type="blank",
+                            scope_node_id="iss-local-00001",
+                            title="Rollback Failure",
+                            slug="rollback-failure",
+                        ),
+                        ports,
+                    )
+
+                assert exc_info.value.__cause__ is not None
+                assert "Artifact rollback failed" in str(exc_info.value.__cause__)
+                assert "injected artifact rollback unlink failure" in str(exc_info.value.__cause__)
+            finally:
+                if dest_path.exists():
+                    original_unlink(dest_path)
+
     def test_new_artifact_preserves_typed_blank_suffix_exhaustion_semantics(self) -> None:
         app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -1517,6 +2578,124 @@ class TestRuntimeNewDocS09:
                 )
 
             assert str(exc_info.value.__cause__) == "injected create lock release failure"
+            assert not self._create_lock_path(specdock_dir).exists()
+
+    def test_new_artifact_body_error_remains_primary_when_directory_close_fails(self, monkeypatch) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            before = _snapshot_tree(artifacts_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_close = app_create_artifact_doc._close_artifacts_directory
+
+            def _fail_write(_descriptor, _text):
+                raise OSError("injected primary artifact write failure")
+
+            def _close_then_fail(journal):
+                original_close(journal)
+                raise OSError("injected artifact directory close failure")
+
+            monkeypatch.setattr(app_create_artifact_doc, "_write_claimed_artifact_temp", _fail_write)
+            monkeypatch.setattr(app_create_artifact_doc, "_close_artifacts_directory", _close_then_fail)
+
+            with pytest.raises(OSError, match="injected primary artifact write failure") as exc_info:
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Directory Close Failure",
+                        slug="directory-close-failure",
+                    ),
+                    ports,
+                )
+
+            assert exc_info.value.__cause__ is not None
+            assert "injected artifact directory close failure" in str(exc_info.value.__cause__)
+            assert _snapshot_tree(artifacts_dir) == before
+            assert not self._create_lock_path(specdock_dir).exists()
+
+    def test_new_artifact_committed_directory_close_failure_returns_warning(self, monkeypatch) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_close = app_create_artifact_doc._close_artifacts_directory
+
+            def _close_then_fail(journal):
+                original_close(journal)
+                raise OSError("injected committed artifact directory close failure")
+
+            monkeypatch.setattr(app_create_artifact_doc, "_close_artifacts_directory", _close_then_fail)
+
+            result = app_create_artifact_doc.create_artifact_doc(
+                app_contracts.CreateArtifactDocRequest(
+                    artifact_type="blank",
+                    scope_node_id="iss-local-00001",
+                    title="Committed Directory Close Failure",
+                    slug="committed-directory-close-failure",
+                ),
+                ports,
+            )
+
+            assert result.path.is_file()
+            assert result.path.read_text(encoding="utf-8").startswith("id=20260312t010203z")
+            assert len(result.warnings) == 1
+            assert "artifact committed" in result.warnings[0]
+            assert "directory close failed" in result.warnings[0]
+            assert "injected committed artifact directory close failure" in result.warnings[0]
+            assert "do not retry creation" in result.warnings[0]
+            assert not self._create_lock_path(specdock_dir).exists()
+
+    def test_new_artifact_committed_lock_release_failure_returns_warning(self, monkeypatch) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            issue_dir = Path(issue_record.path)
+            issue_dir.mkdir(parents=True)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+            original_release = app_create_artifact_doc._release_create_lock
+
+            def _release_then_fail(lock_path, lock_token, *, specdock_dir):
+                original_release(lock_path, lock_token, specdock_dir=specdock_dir)
+                raise RuntimeError("injected committed create lock release failure")
+
+            monkeypatch.setattr(app_create_artifact_doc, "_release_create_lock", _release_then_fail)
+
+            result = app_create_artifact_doc.create_artifact_doc(
+                app_contracts.CreateArtifactDocRequest(
+                    artifact_type="blank",
+                    scope_node_id="iss-local-00001",
+                    title="Committed Lock Release Failure",
+                    slug="committed-lock-release-failure",
+                ),
+                ports,
+            )
+
+            assert result.path.is_file()
+            assert result.path.read_text(encoding="utf-8").startswith("id=20260312t010203z")
+            assert len(result.warnings) == 1
+            assert "artifact committed" in result.warnings[0]
+            assert "create lock release failed" in result.warnings[0]
+            assert "injected committed create lock release failure" in result.warnings[0]
+            assert "do not retry creation" in result.warnings[0]
             assert not self._create_lock_path(specdock_dir).exists()
 
     def test_invalid_slug_fail_fast_no_write(self) -> None:

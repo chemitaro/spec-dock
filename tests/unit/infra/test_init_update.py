@@ -8872,6 +8872,12 @@ class _StubNodeRepo:
         Path(dest_dir).mkdir(parents=True, exist_ok=True)
         (Path(dest_dir) / ".meta.json").write_text(f"id={record.id}\\n", encoding="utf-8")
         self.records.append(record)
+    def write_meta_at(self, dest_dir_fd, record):
+        self.events.append("write_meta")
+        meta_fd = os.open(".meta.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644, dir_fd=dest_dir_fd)
+        os.write(meta_fd, f"id={record.id}\\n".encode())
+        os.close(meta_fd)
+        self.records.append(record)
 
 class _StubTemplateScaffolder:
     def __init__(self, events):
@@ -8900,6 +8906,10 @@ class _StubTemplateScaffolder:
         path = Path(dest_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
+    def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+        from spec_dock_runtime.infra import template_scaffolder
+        self.events.append("copy_scaffolded_tree")
+        return template_scaffolder.copy_scaffolded_tree_at(src_dir, dest_dir, dest_dir_fd, replacements)
 
 class _StubGitGateway:
     def origin_github_repo_slug(self, repo_root):
@@ -8909,6 +8919,9 @@ class _StubGitGateway:
 class _FailingTemplateScaffolder(_StubTemplateScaffolder):
     def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
         del src_dir, dest_dir, replacements
+        raise RuntimeError("simulated write seam failure")
+    def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+        del src_dir, dest_dir, dest_dir_fd, replacements
         raise RuntimeError("simulated write seam failure")
 
 class _BlockingIssueGateway:
@@ -9344,12 +9357,11 @@ with tempfile.TemporaryDirectory() as td:
     assert "Outcome: post_github_local_write_fail" in message, message
     assert "simulated write seam failure" in message, message
     assert "GitHub issue was created: #815" in message, message
-    assert "Create may already have succeeded" in message, message
-    assert "Do not rerun blindly" in message, message
-    assert "local node `iss-00815`" in message, message
-    assert f"{runtime_cmd} doctor" in message, message
-    assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message, message
-    assert "close/cleanup" not in message, message
+    assert "Create may already have succeeded" not in message, message
+    assert "Do not rerun blindly" not in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
+    assert "--github-issue 815" in message, message
+    assert "close/cleanup" in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert events == [], events
     assert not (epic_dir / "issues" / "iss-00815-refresh-token").exists()
@@ -9587,12 +9599,13 @@ with tempfile.TemporaryDirectory() as td:
     assert "Primary local failure: simulated write seam failure" in message, message
     assert "Cleanup failure: create lock release failed" in message, message
     assert "GitHub issue was created: #817" in message, message
-    assert "Create may already have succeeded" in message, message
-    assert "Do not rerun blindly" in message, message
-    assert "local node `iss-00817`" in message, message
+    assert "Create may have already written files" in message, message
+    assert "Do not rerun blindly" not in message, message
+    assert "local node `iss-00817`" not in message, message
     assert f"{runtime_cmd} doctor" in message, message
-    assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message, message
-    assert "close/cleanup" not in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
+    assert "--github-issue 817" in message, message
+    assert "close/cleanup" in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert events == [], events
     assert not (epic_dir / "issues" / "iss-00817-refresh-token").exists()

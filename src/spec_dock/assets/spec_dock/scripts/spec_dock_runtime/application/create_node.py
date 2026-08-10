@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import contextlib
+import ctypes
 from dataclasses import replace
 from datetime import date, datetime, timezone
+import errno
 import os
 from pathlib import Path
 import shlex
+import stat
+import sys
 import time
 from typing import TYPE_CHECKING, Literal, Protocol, cast
 import uuid
@@ -435,6 +440,12 @@ def _resolve_node_repo(ports: Ports):
                 raise RuntimeError("node_repo.write_meta is required")
             writer(dest_dir, record)
 
+        def write_meta_at(self, dest_dir_fd: int, record: StoredMetaRecord) -> None:
+            writer = getattr(self._reader, "write_meta_at", None)
+            if writer is None:
+                raise RuntimeError("node_repo.write_meta_at is required")
+            writer(dest_dir_fd, record)
+
     return _NodeRepoAdapter(ports.node_reader)
 
 
@@ -692,6 +703,43 @@ def _create_relative_symlink(link_path: Path, target_path: Path) -> None:
     link_path.parent.mkdir(parents=True, exist_ok=True)
     rel_target = os.path.relpath(target_path, start=link_path.parent)
     Path(link_path).symlink_to(rel_target)
+
+
+def _open_relative_directory_at(root_fd: int, parts: tuple[str, ...]) -> int:
+    current_fd = os.dup(root_fd)
+    try:
+        for part in parts:
+            with contextlib.suppress(FileExistsError):
+                os.mkdir(part, dir_fd=current_fd)
+            next_fd = os.open(
+                part,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=current_fd,
+            )
+            os.close(current_fd)
+            current_fd = next_fd
+        return current_fd
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.close(current_fd)
+        raise
+
+
+def _create_relative_symlink_at(
+    node_fd: int,
+    *,
+    node_dir: Path,
+    link_path: Path,
+    target_path: Path,
+) -> None:
+    _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+    relative_link_path = link_path.relative_to(node_dir)
+    parent_fd = _open_relative_directory_at(node_fd, relative_link_path.parts[:-1])
+    try:
+        rel_target = os.path.relpath(target_path, start=link_path.parent)
+        os.symlink(rel_target, relative_link_path.name, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
 
 
 def _validate_parent_dir_preflight(parent_dir: Path) -> None:
@@ -980,6 +1028,167 @@ def resolve_create_write_phase(error: Exception, *, default: CreateWritePhase = 
     return default
 
 
+def _claimed_node_tree_identity_at(parent_fd: int, name: str) -> tuple[int, int]:
+    stat_result = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if not stat.S_ISDIR(stat_result.st_mode):
+        raise RuntimeError(f"Claimed node destination is not a directory: {name}")
+    return stat_result.st_dev, stat_result.st_ino
+
+
+def _directory_path_identity(path: Path) -> tuple[int, int]:
+    stat_result = path.stat(follow_symlinks=False)
+    if not stat.S_ISDIR(stat_result.st_mode):
+        raise RuntimeError(f"Destination parent is not a directory: {path}")
+    return stat_result.st_dev, stat_result.st_ino
+
+
+def _resolve_node_tree_no_replace_rename() -> tuple[Callable[..., int], int]:
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform.startswith("linux"):
+        rename = getattr(library, "renameat2", None)
+        flag = 0x00000001
+    elif sys.platform == "darwin":
+        rename = getattr(library, "renameatx_np", None)
+        flag = 0x00000004
+    else:
+        raise NotImplementedError("atomic no-replace rename is unavailable")
+    if rename is None:
+        raise NotImplementedError("atomic no-replace rename is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    return cast("Callable[..., int]", rename), flag
+
+
+def _require_node_tree_no_replace_rename_capability() -> None:
+    _resolve_node_tree_no_replace_rename()
+
+
+def _rename_node_tree_no_replace_between_at(
+    source_parent_fd: int,
+    source_name: str,
+    destination_parent_fd: int,
+    destination_name: str,
+) -> None:
+    rename, flag = _resolve_node_tree_no_replace_rename()
+    result = rename(
+        source_parent_fd,
+        os.fsencode(source_name),
+        destination_parent_fd,
+        os.fsencode(destination_name),
+        flag,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in (errno.EEXIST, errno.ENOTEMPTY):
+        raise FileExistsError(error_number, os.strerror(error_number), destination_name)
+    raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _remove_claimed_directory_contents_at(directory_fd: int) -> None:
+    for name in os.listdir(directory_fd):
+        entry_stat = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if not stat.S_ISDIR(entry_stat.st_mode):
+            os.unlink(name, dir_fd=directory_fd)
+            continue
+
+        child_fd = os.open(
+            name,
+            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=directory_fd,
+        )
+        try:
+            child_stat = os.fstat(child_fd)
+            child_identity = child_stat.st_dev, child_stat.st_ino
+            if child_identity != (entry_stat.st_dev, entry_stat.st_ino):
+                raise RuntimeError(f"node rollback child identity changed before open: {name}")
+            _remove_claimed_directory_contents_at(child_fd)
+            current_identity = _claimed_node_tree_identity_at(directory_fd, name)
+            if current_identity != child_identity:
+                raise RuntimeError(f"node rollback child identity changed before removal: {name}")
+            os.rmdir(name, dir_fd=directory_fd)
+        finally:
+            os.close(child_fd)
+
+
+def _verified_directory_identity_at(
+    parent_fd: int,
+    name: str,
+    directory_fd: int,
+    *,
+    expected_identity: tuple[int, int] | None = None,
+) -> tuple[int, int]:
+    descriptor_stat = os.fstat(directory_fd)
+    if not stat.S_ISDIR(descriptor_stat.st_mode):
+        raise RuntimeError(f"Claimed node transaction entry is not a directory: {name}")
+    descriptor_identity = descriptor_stat.st_dev, descriptor_stat.st_ino
+    if expected_identity is not None and descriptor_identity != expected_identity:
+        raise RuntimeError(f"Claimed node transaction descriptor identity changed: {name}")
+    entry_identity = _claimed_node_tree_identity_at(parent_fd, name)
+    if entry_identity != descriptor_identity:
+        raise RuntimeError(f"Claimed node transaction entry identity changed: {name}")
+    return descriptor_identity
+
+
+def _cleanup_node_tree_transaction(
+    *,
+    parent_fd: int,
+    outer_name: str,
+    outer_created: bool,
+    outer_fd: int | None,
+    outer_identity: tuple[int, int] | None,
+    payload_created: bool,
+    payload_fd: int | None,
+    payload_identity: tuple[int, int] | None,
+) -> None:
+    if not outer_created:
+        return
+    if outer_fd is None or outer_identity is None:
+        raise RuntimeError("Claimed node outer transaction identity is unconfirmed; refusing cleanup")
+
+    outer_stat = os.fstat(outer_fd)
+    verified_outer_identity = outer_stat.st_dev, outer_stat.st_ino
+    if not stat.S_ISDIR(outer_stat.st_mode) or verified_outer_identity != outer_identity:
+        raise RuntimeError("Claimed node outer transaction descriptor identity changed")
+    if payload_created:
+        if payload_fd is None or payload_identity is None:
+            raise RuntimeError("Claimed node payload identity is unconfirmed; refusing cleanup")
+        verified_payload_identity = _verified_directory_identity_at(
+            outer_fd,
+            "payload",
+            payload_fd,
+            expected_identity=payload_identity,
+        )
+        _remove_claimed_directory_contents_at(payload_fd)
+        if _claimed_node_tree_identity_at(outer_fd, "payload") != verified_payload_identity:
+            raise RuntimeError("Claimed node payload identity changed before cleanup")
+        os.rmdir("payload", dir_fd=outer_fd)
+    if _claimed_node_tree_identity_at(parent_fd, outer_name) != verified_outer_identity:
+        raise RuntimeError("Claimed node outer transaction identity changed before cleanup")
+    os.rmdir(outer_name, dir_fd=parent_fd)
+
+
+def _cleanup_committed_outer_transaction(
+    *,
+    parent_fd: int,
+    outer_name: str,
+    outer_identity: tuple[int, int],
+) -> None:
+    if _claimed_node_tree_identity_at(parent_fd, outer_name) != outer_identity:
+        return
+    os.rmdir(outer_name, dir_fd=parent_fd)
+
+
+def _close_node_tree_parent_fd(descriptor: int) -> None:
+    os.close(descriptor)
+
+
 def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
     node_repo = _resolve_node_repo(ports)
     template_scaffolder = _resolve_template_scaffolder(ports)
@@ -997,25 +1206,118 @@ def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
     )
     for link_path, target_path in rules_scaffold_specs:
         _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+    if os.path.lexists(plan.dest_dir):
+        raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+    _require_node_tree_no_replace_rename_capability()
     _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+
+    destination_parent_fd: int | None = None
+    destination_parent_identity: tuple[int, int] | None = None
+    outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+    outer_created = False
+    outer_fd: int | None = None
+    outer_identity: tuple[int, int] | None = None
+    payload_created = False
+    payload_fd: int | None = None
+    payload_identity: tuple[int, int] | None = None
+    committed = False
     try:
-        created_paths = template_scaffolder.copy_scaffolded_tree(
+        plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+        destination_parent_fd = os.open(
+            plan.dest_dir.parent,
+            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+        )
+        parent_stat = os.fstat(destination_parent_fd)
+        destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+        os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+        outer_created = True
+        outer_fd = os.open(
+            outer_name,
+            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=destination_parent_fd,
+        )
+        outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+        os.fchmod(outer_fd, 0o700)
+        os.mkdir("payload", dir_fd=outer_fd)
+        payload_created = True
+        payload_fd = os.open(
+            "payload",
+            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=outer_fd,
+        )
+        payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+        created_paths = template_scaffolder.copy_scaffolded_tree_at(
             src_dir=template_dir,
             dest_dir=plan.dest_dir,
+            dest_dir_fd=payload_fd,
             replacements=plan.replacements,
         )
-    except Exception as exc:
-        # copy seam failures can leave partially materialized files; fail closed as partial local write.
-        raise CreatePlanExecutionError(phase="scaffold_copied", message=str(exc)) from exc
-
-    try:
         created_rule_links: list[Path] = []
         for link_path, target_path in rules_scaffold_specs:
-            _create_relative_symlink(link_path, target_path)
+            _create_relative_symlink_at(
+                payload_fd,
+                node_dir=plan.dest_dir,
+                link_path=link_path,
+                target_path=target_path,
+            )
             created_rule_links.append(link_path)
-        node_repo.write_meta(plan.dest_dir, plan.meta)
+        node_repo.write_meta_at(payload_fd, plan.meta)
+        if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
+            raise RuntimeError(f"Destination parent identity changed before publication: {plan.dest_dir.parent}")
+        _verified_directory_identity_at(
+            destination_parent_fd,
+            outer_name,
+            outer_fd,
+            expected_identity=outer_identity,
+        )
+        _verified_directory_identity_at(
+            outer_fd,
+            "payload",
+            payload_fd,
+            expected_identity=payload_identity,
+        )
+        _rename_node_tree_no_replace_between_at(
+            outer_fd,
+            "payload",
+            destination_parent_fd,
+            plan.dest_dir.name,
+        )
+        committed = True
+        with contextlib.suppress(OSError, RuntimeError):
+            _cleanup_committed_outer_transaction(
+                parent_fd=destination_parent_fd,
+                outer_name=outer_name,
+                outer_identity=outer_identity,
+            )
     except Exception as exc:
-        raise CreatePlanExecutionError(phase="scaffold_copied", message=str(exc)) from exc
+        if not committed and destination_parent_fd is not None:
+            try:
+                _cleanup_node_tree_transaction(
+                    parent_fd=destination_parent_fd,
+                    outer_name=outer_name,
+                    outer_created=outer_created,
+                    outer_fd=outer_fd,
+                    outer_identity=outer_identity,
+                    payload_created=payload_created,
+                    payload_fd=payload_fd,
+                    payload_identity=payload_identity,
+                )
+            except Exception as cleanup_exc:
+                raise CreatePlanExecutionError(
+                    phase="scaffold_copied",
+                    message=f"{exc}; node scaffold rollback failed: {cleanup_exc}",
+                ) from exc
+        raise CreatePlanExecutionError(phase="none", message=str(exc)) from exc
+    finally:
+        if payload_fd is not None:
+            with contextlib.suppress(OSError):
+                os.close(payload_fd)
+        if outer_fd is not None:
+            with contextlib.suppress(OSError):
+                os.close(outer_fd)
+        if destination_parent_fd is not None:
+            with contextlib.suppress(OSError):
+                _close_node_tree_parent_fd(destination_parent_fd)
     created_non_meta_paths = sorted([*created_paths, *created_rule_links], key=lambda path: path.as_posix())
     return [*created_non_meta_paths, Path(plan.meta.meta_path)]
 

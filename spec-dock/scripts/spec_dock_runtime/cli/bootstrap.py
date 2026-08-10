@@ -108,6 +108,9 @@ class _NodeRepository:
     def write_meta(self, dest_dir: Path, record):
         infra_fs_repo.write_meta(dest_dir, record)
 
+    def write_meta_at(self, dest_dir_fd: int, record):
+        infra_fs_repo.write_meta_at(dest_dir_fd, record)
+
     def add_issue_dependency(self, meta_path: Path, to_id: str) -> None:
         infra_fs_repo.add_issue_dependency(meta_path, to_id)
 
@@ -137,6 +140,20 @@ class _TemplateScaffolder:
 
     def copy_scaffolded_tree(self, src_dir: Path, dest_dir: Path, replacements: dict[str, str]):
         return infra_template_scaffolder.copy_scaffolded_tree(src_dir, dest_dir, replacements)
+
+    def copy_scaffolded_tree_at(
+        self,
+        src_dir: Path,
+        dest_dir: Path,
+        dest_dir_fd: int,
+        replacements: dict[str, str],
+    ):
+        return infra_template_scaffolder.copy_scaffolded_tree_at(
+            src_dir,
+            dest_dir,
+            dest_dir_fd,
+            replacements,
+        )
 
     def write_text(self, dest_path: Path, text: str) -> None:
         infra_template_scaffolder.write_text(dest_path, text)
@@ -479,8 +496,6 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         json_store=_JsonStore(),
         clock=issue_planning_dependencies.clock,
         artifact_writer=_ArtifactWriter(),
-        workbench_source_guard=binary_artifact_publisher,
-        binary_artifact_publisher=binary_artifact_publisher,
         issue_planning=issue_planning_dependencies,
         explicit_file_source_guard=binary_artifact_publisher,
         explicit_file_artifact_publisher=binary_artifact_publisher,

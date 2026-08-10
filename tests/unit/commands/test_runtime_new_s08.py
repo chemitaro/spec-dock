@@ -1,7 +1,9 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
+import importlib
 import os
 from pathlib import Path
 import shlex
+import stat
 import sys
 import tempfile
 import threading
@@ -146,6 +148,15 @@ class _StubNodeRepo:
         (dest_dir / ".meta.json").write_text(f"id={record.id}\n", encoding="utf-8")
         self._records.append(record)
 
+    def write_meta_at(self, dest_dir_fd, record):
+        self.events.append("write_meta")
+        meta_fd = os.open(".meta.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644, dir_fd=dest_dir_fd)
+        try:
+            os.write(meta_fd, f"id={record.id}\n".encode())
+        finally:
+            os.close(meta_fd)
+        self._records.append(record)
+
 
 class _RacyNodeRepo(_StubNodeRepo):
     def __init__(self, records, events=None, *, first_load_delay_seconds=0.1):
@@ -192,6 +203,32 @@ class _StubTemplateScaffolder:
             text = src_path.read_text(encoding="utf-8")
             dest_path.write_text(self.render_text(text, replacements), encoding="utf-8")
             created.append(dest_path)
+        return created
+
+    def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+        self.events.append("copy_scaffolded_tree")
+        created = []
+        for src_path in sorted(src_dir.rglob("*"), key=lambda p: p.as_posix()):
+            if src_path.is_dir():
+                continue
+            rel = src_path.relative_to(src_dir)
+            parent_fd = os.dup(dest_dir_fd)
+            try:
+                for part in rel.parts[:-1]:
+                    with suppress(FileExistsError):
+                        os.mkdir(part, dir_fd=parent_fd)
+                    next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY, dir_fd=parent_fd)
+                    os.close(parent_fd)
+                    parent_fd = next_fd
+                target_fd = os.open(rel.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644, dir_fd=parent_fd)
+                try:
+                    text = self.render_text(src_path.read_text(encoding="utf-8"), replacements)
+                    os.write(target_fd, text.encode())
+                finally:
+                    os.close(target_fd)
+            finally:
+                os.close(parent_fd)
+            created.append(dest_dir / rel)
         return created
 
     def write_text(self, dest_path, text):
@@ -318,6 +355,23 @@ class TestRuntimeNewS08:
             specdock_dir=specdock_dir,
         )
 
+    def _initiative_plan(self, app_contracts, app_create_node, ports, *, specdock_dir: Path):
+        graph = app_create_node.load_graph(ports, validate=False)
+        return app_create_node.plan_node_creation(
+            app_contracts.CreateNodeRequest(
+                title="Auth platform",
+                slug=None,
+                parent_id=None,
+                github_mode="link_existing",
+                github_issue_number=101,
+            ),
+            graph,
+            kind="initiative",
+            specdock_dir=specdock_dir,
+            today="2026-03-12",
+            current_repo_slug="example/repo",
+        )
+
     def _run_parallel_create(self, create_fn, request_a, request_b):
         node_ids = []
         errors = []
@@ -432,6 +486,447 @@ class TestRuntimeNewS08:
             assert (plan.dest_dir / "epics" / "rules.md").is_symlink()
             assert (plan.dest_dir / "artifacts" / "rules.md").is_symlink()
             assert not (plan.dest_dir / "discussions").exists()
+
+    def test_two_layer_transaction_publishes_payload_between_held_directories(self, monkeypatch) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            original_publish = app_create_node._rename_node_tree_no_replace_between_at
+            publications: list[tuple[int, str, int, str]] = []
+
+            def _record_publish(source_parent_fd, source_name, destination_parent_fd, destination_name):
+                publications.append((source_parent_fd, source_name, destination_parent_fd, destination_name))
+                assert source_parent_fd != destination_parent_fd
+                assert source_name == "payload"
+                assert stat.S_IMODE(os.fstat(source_parent_fd).st_mode) == 0o700
+                return original_publish(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+            monkeypatch.setattr(
+                app_create_node,
+                "_rename_node_tree_no_replace_between_at",
+                _record_publish,
+            )
+
+            created_paths = app_create_node.execute_create_plan(plan, ports)
+
+            assert created_paths
+            assert len(publications) == 1
+            assert publications[0][3] == plan.dest_dir.name
+            assert stat.S_IMODE(plan.dest_dir.stat().st_mode) == stat.S_IMODE(plan.dest_dir.parent.stat().st_mode)
+            assert not list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+
+    @pytest.mark.parametrize(
+        ("phase", "hidden_entry_expected"),
+        [
+            ("outer_mkdir", False),
+            ("outer_open", True),
+            ("outer_fstat", True),
+            ("outer_fstatat", True),
+            ("payload_mkdir", False),
+            ("payload_open", True),
+            ("payload_fstat", True),
+            ("payload_fstatat", True),
+            ("copy", False),
+            ("rules", False),
+            ("meta", False),
+            ("rename", False),
+        ],
+    )
+    def test_two_layer_transaction_failure_matrix(self, monkeypatch, phase, hidden_entry_expected) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        class _PhaseScaffolder(_StubTemplateScaffolder):
+            def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+                if phase != "copy":
+                    return super().copy_scaffolded_tree_at(src_dir, dest_dir, dest_dir_fd, replacements)
+                partial_fd = os.open(
+                    "partial.md",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o644,
+                    dir_fd=dest_dir_fd,
+                )
+                os.write(partial_fd, b"partial\n")
+                os.close(partial_fd)
+                raise OSError("injected copy failure")
+
+        class _PhaseNodeRepo(_StubNodeRepo):
+            def write_meta_at(self, dest_dir_fd, record):
+                if phase == "meta":
+                    raise OSError("injected meta failure")
+                return super().write_meta_at(dest_dir_fd, record)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                node_repo=_PhaseNodeRepo([]),
+                template_scaffolder=_PhaseScaffolder(),
+            )
+            plan = self._initiative_plan(app_contracts, app_create_node, ports, specdock_dir=specdock_dir)
+            original_mkdir = app_create_node.os.mkdir
+            original_open = app_create_node.os.open
+            original_fstat = app_create_node.os.fstat
+            original_entry_identity = app_create_node._claimed_node_tree_identity_at
+            fstat_calls = 0
+            entry_identity_calls = 0
+            injected = False
+
+            def _mkdir(name, *args, **kwargs):
+                nonlocal injected
+                is_outer = isinstance(name, str) and name.startswith(f".{plan.dest_dir.name}.transaction-")
+                is_payload = name == "payload" and kwargs.get("dir_fd") is not None
+                if not injected and (
+                    (phase == "outer_mkdir" and is_outer) or (phase == "payload_mkdir" and is_payload)
+                ):
+                    injected = True
+                    raise OSError(f"injected {phase} failure")
+                return original_mkdir(name, *args, **kwargs)
+
+            def _open(name, flags, *args, **kwargs):
+                nonlocal injected
+                is_outer = isinstance(name, str) and name.startswith(f".{plan.dest_dir.name}.transaction-")
+                is_payload = name == "payload" and kwargs.get("dir_fd") is not None
+                if not injected and ((phase == "outer_open" and is_outer) or (phase == "payload_open" and is_payload)):
+                    injected = True
+                    raise OSError(f"injected {phase} failure")
+                return original_open(name, flags, *args, **kwargs)
+
+            def _fstat(descriptor):
+                nonlocal fstat_calls, injected
+                fstat_calls += 1
+                target_call = 2 if phase == "outer_fstat" else 3 if phase == "payload_fstat" else None
+                if not injected and target_call == fstat_calls:
+                    injected = True
+                    raise OSError(f"injected {phase} failure")
+                return original_fstat(descriptor)
+
+            def _entry_identity(parent_fd, name):
+                nonlocal entry_identity_calls, injected
+                entry_identity_calls += 1
+                target_call = 1 if phase == "outer_fstatat" else 2 if phase == "payload_fstatat" else None
+                if not injected and target_call == entry_identity_calls:
+                    injected = True
+                    raise OSError(f"injected {phase} failure")
+                return original_entry_identity(parent_fd, name)
+
+            monkeypatch.setattr(app_create_node.os, "mkdir", _mkdir)
+            monkeypatch.setattr(app_create_node.os, "open", _open)
+            monkeypatch.setattr(app_create_node.os, "fstat", _fstat)
+            monkeypatch.setattr(app_create_node, "_claimed_node_tree_identity_at", _entry_identity)
+            if phase == "rules":
+                monkeypatch.setattr(
+                    app_create_node,
+                    "_create_relative_symlink_at",
+                    lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("injected rules failure")),
+                )
+            if phase == "rename":
+                monkeypatch.setattr(
+                    app_create_node,
+                    "_rename_node_tree_no_replace_between_at",
+                    lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("injected rename failure")),
+                )
+
+            with pytest.raises(app_create_node.CreatePlanExecutionError, match=f"injected {phase} failure"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert not os.path.lexists(plan.dest_dir)
+            hidden_entries = list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+            assert bool(hidden_entries) is hidden_entry_expected
+
+    @pytest.mark.parametrize("collision_kind", ["file", "directory", "symlink"])
+    def test_canonical_collision_preserves_existing_entry(self, collision_kind) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+            plan = self._initiative_plan(app_contracts, app_create_node, ports, specdock_dir=specdock_dir)
+            plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+            if collision_kind == "file":
+                plan.dest_dir.write_bytes(b"competitor\x00file")
+            elif collision_kind == "directory":
+                plan.dest_dir.mkdir()
+                (plan.dest_dir / "competitor.bin").write_bytes(b"competitor\x00directory")
+            else:
+                target = repo_root / "competitor-target"
+                target.mkdir()
+                (target / "competitor.bin").write_bytes(b"competitor\x00symlink")
+                plan.dest_dir.symlink_to(target, target_is_directory=True)
+            before = plan.dest_dir.lstat()
+            symlink_target = plan.dest_dir.readlink() if collision_kind == "symlink" else None
+
+            with pytest.raises(RuntimeError, match="Destination already exists"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            after = plan.dest_dir.lstat()
+            assert (after.st_dev, after.st_ino, after.st_mode) == (before.st_dev, before.st_ino, before.st_mode)
+            if collision_kind == "file":
+                assert plan.dest_dir.read_bytes() == b"competitor\x00file"
+            elif collision_kind == "directory":
+                assert (plan.dest_dir / "competitor.bin").read_bytes() == b"competitor\x00directory"
+            else:
+                assert plan.dest_dir.readlink() == symlink_target
+                assert (plan.dest_dir / "competitor.bin").read_bytes() == b"competitor\x00symlink"
+            assert not list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+
+    def test_concurrent_same_canonical_plan_publishes_one_complete_tree(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        barrier = threading.Barrier(2)
+
+        class _ConcurrentScaffolder(_StubTemplateScaffolder):
+            def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+                created = super().copy_scaffolded_tree_at(src_dir, dest_dir, dest_dir_fd, replacements)
+                barrier.wait(timeout=5.0)
+                return created
+
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            template_scaffolder = _ConcurrentScaffolder()
+            ports_a = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                template_scaffolder=template_scaffolder,
+            )
+            ports_b = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                template_scaffolder=template_scaffolder,
+            )
+            plan = self._initiative_plan(app_contracts, app_create_node, ports_a, specdock_dir=specdock_dir)
+            successes: list[list[Path]] = []
+            failures: list[Exception] = []
+            result_lock = threading.Lock()
+
+            def _run(ports):
+                try:
+                    result = app_create_node.execute_create_plan(plan, ports)
+                except Exception as exc:
+                    with result_lock:
+                        failures.append(exc)
+                else:
+                    with result_lock:
+                        successes.append(result)
+
+            threads = [threading.Thread(target=_run, args=(ports,)) for ports in (ports_a, ports_b)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=5.0)
+
+            assert all(not thread.is_alive() for thread in threads)
+            assert len(successes) == 1
+            assert len(failures) == 1
+            assert isinstance(failures[0], app_create_node.CreatePlanExecutionError)
+            assert (plan.dest_dir / "README.md").is_file()
+            assert (plan.dest_dir / "docs" / "checklist.md").is_file()
+            assert (plan.dest_dir / "epics" / "rules.md").is_symlink()
+            assert (plan.dest_dir / "artifacts" / "rules.md").is_symlink()
+            assert (plan.dest_dir / ".meta.json").is_file()
+            assert not list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+
+    def test_destination_parent_open_failure_happens_before_destination_claim(self, monkeypatch) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            original_open = app_create_node.os.open
+
+            def _fail_destination_parent_open(path, flags, *args, **kwargs):
+                if Path(path) == plan.dest_dir.parent and kwargs.get("dir_fd") is None:
+                    raise OSError("simulated destination parent open failure")
+                return original_open(path, flags, *args, **kwargs)
+
+            monkeypatch.setattr(app_create_node.os, "open", _fail_destination_parent_open)
+
+            with pytest.raises(
+                app_create_node.CreatePlanExecutionError,
+                match="simulated destination parent open failure",
+            ) as raised:
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert raised.value.phase == "none"
+            assert not os.path.lexists(plan.dest_dir)
+            assert events == []
+
+    def test_committed_destination_parent_close_failure_does_not_invert_success(self, monkeypatch) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            original_close = app_create_node._close_node_tree_parent_fd
+            close_calls: list[int] = []
+
+            def _close_then_fail(descriptor):
+                original_close(descriptor)
+                close_calls.append(descriptor)
+                raise OSError("simulated committed parent close failure")
+
+            monkeypatch.setattr(app_create_node, "_close_node_tree_parent_fd", _close_then_fail)
+
+            created_paths = app_create_node.execute_create_plan(plan, ports)
+
+            assert close_calls
+            assert created_paths[-1] == plan.dest_dir / ".meta.json"
+            assert (plan.dest_dir / ".meta.json").is_file()
+            assert (plan.dest_dir / "README.md").is_file()
+
+    def test_fresh_node_create_does_not_access_assurance_file(self, monkeypatch) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            assurance_path = specdock_dir / ".assurance.json"
+            assurance_path.write_text("sentinel\n", encoding="utf-8")
+            assurance_accesses: list[tuple[str, str]] = []
+            original_open = Path.open
+            original_exists = Path.exists
+
+            def _guarded_open(path, *args, **kwargs):
+                if path.name == ".assurance.json":
+                    assurance_accesses.append(("open", path.as_posix()))
+                return original_open(path, *args, **kwargs)
+
+            def _guarded_exists(path):
+                if path.name == ".assurance.json":
+                    assurance_accesses.append(("exists", path.as_posix()))
+                return original_exists(path)
+
+            monkeypatch.setattr(Path, "open", _guarded_open)
+            monkeypatch.setattr(Path, "exists", _guarded_exists)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+
+            result = app_create_node.create_initiative(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                ports,
+            )
+
+            assert assurance_accesses == []
+            with original_open(assurance_path, encoding="utf-8") as assurance_file:
+                assert assurance_file.read() == "sentinel\n"
+            assert not os.path.lexists(result.node.path / ".assurance.json")
 
     def test_full_candidate_set_no_write_preflight_collision(self) -> None:
         (
@@ -1611,7 +2106,7 @@ class TestRuntimeNewS08:
             assert len(issue_gateway.calls) == 1
             assert events == []
 
-    def test_issue_create_partial_copy_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
+    def test_issue_create_partial_copy_failure_rolls_back_and_reports_retry_link_guidance(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -1623,20 +2118,9 @@ class TestRuntimeNewS08:
         ) = _runtime_modules()
 
         class _PartialCopyFailureTemplateScaffolder(_StubTemplateScaffolder):
-            def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
-                self.events.append("copy_scaffolded_tree")
-                created = []
-                for src_path in sorted(src_dir.rglob("*"), key=lambda p: p.as_posix()):
-                    if src_path.is_dir():
-                        continue
-                    rel = src_path.relative_to(src_dir)
-                    dest_path = dest_dir / rel
-                    dest_path.parent.mkdir(parents=True, exist_ok=True)
-                    text = src_path.read_text(encoding="utf-8")
-                    dest_path.write_text(self.render_text(text, replacements), encoding="utf-8")
-                    created.append(dest_path)
-                    raise RuntimeError("simulated partial copy failure")
-                return created
+            def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+                super().copy_scaffolded_tree_at(src_dir, dest_dir, dest_dir_fd, replacements)
+                raise RuntimeError("simulated partial copy failure")
 
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -1671,6 +2155,10 @@ class TestRuntimeNewS08:
                 ),
             ]
             issue_gateway = _StubIssueGateway([712])
+            issues_dir = epic_dir / "issues"
+            issues_dir.mkdir(parents=True)
+            sentinel = issues_dir / "sentinel.txt"
+            sentinel.write_text("preserve\n", encoding="utf-8")
             ports = self._ports(
                 app_ports,
                 specdock_dir=specdock_dir,
@@ -1696,14 +2184,478 @@ class TestRuntimeNewS08:
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             assert "Outcome: post_github_local_write_fail" in message
             assert "simulated partial copy failure" in message
-            assert "Do not rerun blindly" in message
-            assert f"{runtime_cmd} doctor" in message
-            assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message
+            assert "Do not rerun blindly" not in message
+            assert f"{runtime_cmd} doctor" not in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" in message
+            assert "--github-issue 712" in message
             assert len(issue_gateway.calls) == 1
-            assert (epic_dir / "issues" / "iss-00712-refresh-token").exists()
-            assert not (epic_dir / "issues" / "iss-00712-refresh-token" / ".meta.json").exists()
+            assert not (epic_dir / "issues" / "iss-00712-refresh-token").exists()
+            assert sorted(path.name for path in issues_dir.iterdir()) == ["sentinel.txt"]
+            assert sentinel.read_text(encoding="utf-8") == "preserve\n"
 
-    def test_issue_create_meta_write_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
+    def test_outer_name_replacement_after_identity_preserves_competitor(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        class _OuterReplacementTemplateScaffolder(_StubTemplateScaffolder):
+            def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+                del src_dir, replacements
+                self.events.append("copy_scaffolded_tree")
+                partial_fd = os.open(
+                    "owned-partial.md",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o644,
+                    dir_fd=dest_dir_fd,
+                )
+                os.write(partial_fd, b"owned\n")
+                os.close(partial_fd)
+                outer_paths = list(dest_dir.parent.glob(f".{dest_dir.name}.transaction-*"))
+                assert len(outer_paths) == 1
+                outer_path = outer_paths[0]
+                displaced_path = outer_path.with_name(f"{outer_path.name}.displaced-owned")
+                outer_path.rename(displaced_path)
+                outer_path.mkdir(mode=0o700)
+                (outer_path / "competitor.txt").write_text("competitor\n", encoding="utf-8")
+                raise RuntimeError("simulated partial copy failure")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                events=events,
+                template_scaffolder=_OuterReplacementTemplateScaffolder(events=events),
+            )
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            with pytest.raises(
+                app_create_node.CreatePlanExecutionError,
+                match="node scaffold rollback failed: Claimed node outer transaction identity changed",
+            ) as raised:
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert raised.value.phase == "scaffold_copied"
+            transaction_paths = list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+            competitor_paths = [path for path in transaction_paths if not path.name.endswith(".displaced-owned")]
+            displaced_paths = [path for path in transaction_paths if path.name.endswith(".displaced-owned")]
+            assert len(competitor_paths) == 1
+            assert (competitor_paths[0] / "competitor.txt").read_text(encoding="utf-8") == "competitor\n"
+            assert len(displaced_paths) == 1
+            assert list(displaced_paths[0].iterdir()) == []
+            assert not plan.dest_dir.exists()
+
+    def test_outer_identity_capture_failure_preserves_unverified_hidden_entry_and_allows_retry(
+        self, monkeypatch
+    ) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            original_fstat = app_create_node.os.fstat
+            calls = 0
+
+            def _fail_child_identity_capture(descriptor):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("simulated identity capture failure")
+                return original_fstat(descriptor)
+
+            monkeypatch.setattr(app_create_node.os, "fstat", _fail_child_identity_capture)
+            with pytest.raises(app_create_node.CreatePlanExecutionError, match="simulated identity capture failure"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert not plan.dest_dir.exists()
+            hidden_entries = list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+            assert len(hidden_entries) == 1
+            assert list(hidden_entries[0].iterdir()) == []
+
+            monkeypatch.setattr(app_create_node.os, "fstat", original_fstat)
+            created = app_create_node.execute_create_plan(plan, ports)
+            assert plan.dest_dir.exists()
+            assert created
+            assert hidden_entries[0].exists()
+
+    def test_outer_replacement_before_identity_confirmation_preserves_competitor(self, monkeypatch) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            original_open = app_create_node.os.open
+            competitor_name: str | None = None
+            competitor_identity: tuple[int, int] | None = None
+            competitor_mode: int | None = None
+            injected = False
+
+            def _replace_before_outer_open(path, flags, *args, **kwargs):
+                nonlocal competitor_identity, competitor_mode, competitor_name, injected
+                if (
+                    not injected
+                    and isinstance(path, str)
+                    and path.startswith(f".{plan.dest_dir.name}.transaction-")
+                    and kwargs.get("dir_fd") is not None
+                ):
+                    injected = True
+                    competitor_name = path
+                    transaction_path = plan.dest_dir.parent / path
+                    displaced_path = transaction_path.with_name(f"{path}.displaced-owned")
+                    transaction_path.rename(displaced_path)
+                    competitor_path = plan.dest_dir.parent / competitor_name
+                    competitor_path.mkdir(mode=0o711)
+                    (competitor_path / "competitor.txt").write_text("competitor\n", encoding="utf-8")
+                    competitor_stat = competitor_path.stat(follow_symlinks=False)
+                    competitor_identity = (competitor_stat.st_dev, competitor_stat.st_ino)
+                    competitor_mode = stat.S_IMODE(competitor_stat.st_mode)
+                    raise OSError("simulated outer open failure after replacement")
+                return original_open(path, flags, *args, **kwargs)
+
+            monkeypatch.setattr(app_create_node.os, "open", _replace_before_outer_open)
+            with pytest.raises(
+                app_create_node.CreatePlanExecutionError,
+                match="simulated outer open failure after replacement",
+            ):
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert competitor_name is not None
+            competitor_path = plan.dest_dir.parent / competitor_name
+            competitor_stat = competitor_path.stat(follow_symlinks=False)
+            assert (competitor_stat.st_dev, competitor_stat.st_ino) == competitor_identity
+            assert stat.S_IMODE(competitor_stat.st_mode) == competitor_mode
+            assert (competitor_path / "competitor.txt").read_text(encoding="utf-8") == "competitor\n"
+            displaced = plan.dest_dir.parent / f"{competitor_name}.displaced-owned"
+            assert displaced.exists()
+            assert list(displaced.iterdir()) == []
+            assert not plan.dest_dir.exists()
+
+    def test_node_reader_fallback_without_fd_writer_fails_content_free(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            template_scaffolder = _StubTemplateScaffolder()
+            ports = app_ports.Ports(
+                node_reader=_DummyNodeReader(),
+                node_repo=None,
+                template_scaffolder=template_scaffolder,
+                repo_root=specdock_dir.parent,
+                specdock_dir=specdock_dir,
+            )
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+
+            with pytest.raises(app_create_node.CreatePlanExecutionError, match=r"node_repo\.write_meta_at is required"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert not plan.dest_dir.exists()
+            assert not list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+
+    def test_meta_zero_write_rolls_back_transaction_and_allows_retry(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        infra_fs_repo = importlib.import_module("spec_dock_runtime.infra.fs_repo")
+
+        class _ZeroWriteOnceNodeRepo(_StubNodeRepo):
+            def __init__(self):
+                super().__init__([])
+                self._zero_write_pending = True
+
+            def write_meta_at(self, dest_dir_fd, record):
+                if not self._zero_write_pending:
+                    infra_fs_repo.write_meta_at(dest_dir_fd, record)
+                    return
+                self._zero_write_pending = False
+                original_write = infra_fs_repo.os.write
+
+                def _zero_write(_descriptor, _payload):
+                    return 0
+
+                infra_fs_repo.os.write = _zero_write
+                try:
+                    infra_fs_repo.write_meta_at(dest_dir_fd, record)
+                finally:
+                    infra_fs_repo.os.write = original_write
+
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            node_repo = _ZeroWriteOnceNodeRepo()
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                node_repo=node_repo,
+            )
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+
+            with pytest.raises(app_create_node.CreatePlanExecutionError, match="short metadata write"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert not plan.dest_dir.exists()
+            assert not list(plan.dest_dir.parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+
+            created = app_create_node.execute_create_plan(plan, ports)
+            assert plan.dest_dir.exists()
+            assert plan.dest_dir / ".meta.json" in created
+
+    def test_missing_no_replace_capability_fails_before_destination_parent_write(self, monkeypatch) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+            graph = app_create_node.load_graph(ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            original_resolver = app_create_node._resolve_node_tree_no_replace_rename
+
+            def _unsupported_no_replace():
+                raise NotImplementedError("atomic no-replace rename is unavailable")
+
+            monkeypatch.setattr(
+                app_create_node,
+                "_resolve_node_tree_no_replace_rename",
+                _unsupported_no_replace,
+            )
+            with pytest.raises(NotImplementedError, match="atomic no-replace rename is unavailable"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            assert not plan.dest_dir.parent.exists()
+            assert events == []
+
+            monkeypatch.setattr(
+                app_create_node,
+                "_resolve_node_tree_no_replace_rename",
+                original_resolver,
+            )
+            created = app_create_node.execute_create_plan(plan, ports)
+            assert plan.dest_dir.exists()
+            assert created
+
+    @pytest.mark.parametrize("phase", ["copy", "rules", "meta"])
+    @pytest.mark.parametrize("replacement_kind", ["parent", "destination"])
+    def test_identity_bound_writes_preserve_competitor_tree_on_path_replacement(
+        self,
+        monkeypatch,
+        phase,
+        replacement_kind,
+    ) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            graph_ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+            graph = app_create_node.load_graph(graph_ports, validate=False)
+            plan = app_create_node.plan_node_creation(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
+                ),
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+                current_repo_slug="example/repo",
+            )
+            displaced_parent = plan.dest_dir.parent.with_name(f"{plan.dest_dir.parent.name}.displaced")
+            injected = False
+
+            def _replace_pathname():
+                nonlocal injected
+                if injected:
+                    return
+                injected = True
+                if replacement_kind == "parent":
+                    plan.dest_dir.parent.rename(displaced_parent)
+                    plan.dest_dir.parent.mkdir()
+                else:
+                    plan.dest_dir.mkdir()
+                competitor_root = plan.dest_dir.parent if replacement_kind == "parent" else plan.dest_dir
+                (competitor_root / "competitor.bin").write_bytes(b"competitor-byte-snapshot\x00")
+
+            class _InjectingScaffolder(_StubTemplateScaffolder):
+                def copy_scaffolded_tree_at(self, src_dir, dest_dir, dest_dir_fd, replacements):
+                    if phase == "copy":
+                        _replace_pathname()
+                    return super().copy_scaffolded_tree_at(src_dir, dest_dir, dest_dir_fd, replacements)
+
+            class _InjectingNodeRepo(_StubNodeRepo):
+                def write_meta_at(self, dest_dir_fd, record):
+                    if phase == "meta":
+                        _replace_pathname()
+                    return super().write_meta_at(dest_dir_fd, record)
+
+            if phase == "rules":
+                original_symlink_at = app_create_node._create_relative_symlink_at
+
+                def _inject_before_rules(*args, **kwargs):
+                    _replace_pathname()
+                    return original_symlink_at(*args, **kwargs)
+
+                monkeypatch.setattr(app_create_node, "_create_relative_symlink_at", _inject_before_rules)
+
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                node_repo=_InjectingNodeRepo([]),
+                template_scaffolder=_InjectingScaffolder(),
+            )
+            with pytest.raises(app_create_node.CreatePlanExecutionError):
+                app_create_node.execute_create_plan(plan, ports)
+
+            competitor_root = plan.dest_dir.parent if replacement_kind == "parent" else plan.dest_dir
+            assert sorted(path.name for path in competitor_root.iterdir()) == ["competitor.bin"]
+            assert (competitor_root / "competitor.bin").read_bytes() == b"competitor-byte-snapshot\x00"
+            owned_parent = displaced_parent if replacement_kind == "parent" else plan.dest_dir.parent
+            assert not list(owned_parent.glob(f".{plan.dest_dir.name}.transaction-*"))
+
+    def test_issue_create_meta_write_failure_rolls_back_and_reports_retry_link_guidance(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -1715,9 +2667,9 @@ class TestRuntimeNewS08:
         ) = _runtime_modules()
 
         class _MetaWriteFailureNodeRepo(_StubNodeRepo):
-            def write_meta(self, dest_dir, record):
+            def write_meta_at(self, dest_dir_fd, record):
                 self.events.append("write_meta")
-                del dest_dir, record
+                del dest_dir_fd, record
                 raise RuntimeError("simulated write_meta failure")
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1753,6 +2705,10 @@ class TestRuntimeNewS08:
                 ),
             ]
             issue_gateway = _StubIssueGateway([713])
+            issues_dir = epic_dir / "issues"
+            issues_dir.mkdir(parents=True)
+            sentinel = issues_dir / "sentinel.txt"
+            sentinel.write_text("preserve\n", encoding="utf-8")
             ports = self._ports(
                 app_ports,
                 specdock_dir=specdock_dir,
@@ -1778,12 +2734,14 @@ class TestRuntimeNewS08:
             runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             assert "Outcome: post_github_local_write_fail" in message
             assert "simulated write_meta failure" in message
-            assert "Do not rerun blindly" in message
-            assert f"{runtime_cmd} doctor" in message
-            assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message
+            assert "Do not rerun blindly" not in message
+            assert f"{runtime_cmd} doctor" not in message
+            assert f"{runtime_cmd} new issue --title 'Refresh token'" in message
+            assert "--github-issue 713" in message
             assert len(issue_gateway.calls) == 1
-            assert (epic_dir / "issues" / "iss-00713-refresh-token" / "README.md").exists()
-            assert not (epic_dir / "issues" / "iss-00713-refresh-token" / ".meta.json").exists()
+            assert not (epic_dir / "issues" / "iss-00713-refresh-token").exists()
+            assert sorted(path.name for path in issues_dir.iterdir()) == ["sentinel.txt"]
+            assert sentinel.read_text(encoding="utf-8") == "preserve\n"
 
     def test_import_partial_write_failure_reports_doctor_first_guidance(self) -> None:
         app_contracts, app_create_node, app_import_node, app_ports, domain_models, infra_contracts = (
