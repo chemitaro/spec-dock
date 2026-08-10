@@ -296,6 +296,16 @@ provider固有`chatgpt-output`のparser、command、application、Workbench cons
 - Profile / Assurance非依存
 - provider / dogfood Runtime mechanism parity
 
+publication transactionは次の二層stagingで構成する。
+
+1. no-replace rename capabilityをwrite前に確認し、canonical parentを`O_DIRECTORY | O_NOFOLLOW`で保持する。
+2. parent直下に予測不能なmode `0700`のouter transaction directoryを作成し、open-firstでfdを保持してentry identityと照合する。
+3. held outer fd内に固定名`payload`を作成し、template copy、rules link、`.meta.json`をすべてpayload fd相対で完成させる。
+4. `payload`をouter fdからcanonical parent fdへLinux `renameat2(RENAME_NOREPLACE)` / Darwin `renameatx_np(RENAME_EXCL)`で一度だけpublishする。rename成功をcommit pointとし、以後のclose / diagnostic failureでcanonicalをrollbackしない。
+5. commit前のhandled failureはheld fdからowned payloadを回収し、outer entryのidentityが保持fdと一致する場合だけouterを削除する。identity不一致やnamespace tamperingでは競合entryを削除せずfail closedにする。
+
+`mkdirat`は作成directoryのfd / inodeを同じsyscallで返さないため、同一権限の非協調processがmkdirとopenの間に名前を意図的に交換するモデルでは「競合entry絶対不変」と「全失敗でowned residue zero」を同時に証明できない。本Issueは通常の独立`spec-dock` processとhandled I/O failureをconcurrency boundaryとし、非協調same-UID tampering、SIGKILL、power loss、filesystem corruptionをsecurity / recovery境界外とする。tampering検知時はcleanupより競合entry保全を優先する。
+
 358の責務:
 
 - R/D/P/Report template本文
@@ -405,6 +415,7 @@ CLI help / registry absence、serialized active JSON、dependency projection、l
 | Artifact | Current六種、blank ambiguity、Historical grammar、malformed negative、安全性 |
 | import | root / Initiative / Epic / Issue、opaque bytes、privacy、partial publication |
 | scaffold | 三scopeのR/D/P/Report、no Assurance、copy rollback、IC-1 |
+| scaffold transaction | canonical file / dir / symlink collision不変、同時createで一完成tree、outer / payload phase failure、publish直前collision、post-commit close、tampering検知時competitor保全 |
 | compatibility | heavy Report、EAL、authority、Assurance、Historical fixtureのmutation invariance |
 | projection | provider / dogfood Runtime parity、Context Pack最小化 |
 
@@ -420,6 +431,7 @@ CLI help / registry absence、serialized active JSON、dependency projection、l
 | Historicalをすべてunknown許容 | 不採用 | 真のmalformedを検出できなくなる |
 | provider importとgeneric importを一括削除 | 不採用 | opaque file importの安全primitiveを失う |
 | finish用の新例外hierarchy | 不採用 | 既存result / phase errorで契約を表現できる |
+| 任意のsame-UID namespace改変でもresidue zeroを絶対保証 | 不採用 | directoryをatomic create-and-openするDarwin / Linux共通primitiveがなく、競合保全とidentity未取得時cleanupを同時に満たせない。通常process concurrencyは二層stagingとno-replace publishで保証し、tamperingは検知時保全を優先する |
 
 新規ADRは不要である。active checkout撤去、branch非依存guard、Historical grammarは承認済みEpic / Requirementを実装可能にするIssue-local具体化である。
 

@@ -216,6 +216,8 @@ RuntimeはAuthoring Kitが提供するdeterministicなscope templateから次を
 
 Profile選択、Assurance compose、Report本文解釈、draft routingを行わない。薄いReportと空の利用者記入欄を有効な入力として扱う。template本文の所有者はIssue 358とする。
 
+Fresh scaffoldのpublicationは、同じcanonical IDを通常手順で作成する独立した`spec-dock` processと、processが継続する通常のI/O failureを対象にする。canonical treeは完成前に可視化せず、kernelのno-replace renameをcommit pointとし、既存canonical entryを上書き・削除・一時交換しない。commit前のhandled failureはidentityを証明できるowned stagingだけを回収し、identityを証明できないnamespace entryには触れない。
+
 ### RQ-357-008 互換性
 
 - 既存`.assurance.json`はHistorical fileとして保持し、Storage Coreは通常操作で解釈しない。
@@ -262,7 +264,7 @@ Issue 357は次を後続へ渡す。
 | `AC-357-005` | `issue finish`のclose成功、already closed、close失敗、clear失敗、post-sync失敗、no-quality-gateがtestで固定される |
 | `AC-357-006` | omitted type、explicit blank、五つのtyped form、unknown / historical-only type、collision / lock / symlink / path escapeがtestで固定される |
 | `AC-357-007` | generic file importのbyte保持、安全性、privacy、partial failure testが維持される |
-| `AC-357-008` | Fresh Initiative / Epic / Issue作成が`.assurance.json`なしでR/D/P/Reportを生成する |
+| `AC-357-008` | Fresh Initiative / Epic / Issue作成が`.assurance.json`なしでR/D/P/Reportを生成し、通常の同時作成では完成treeを一つだけno-replace publishする。commit前のhandled failureはcanonical partialを残さず、identityを確認できるowned stagingを回収する |
 | `AC-357-009` | 空のthin Report、heavy Report、EAL文字列、delegated authority metadata、`.assurance.json`、Planning Level本文、legacy active fieldの有無や内容を変えてもdeps / start / finishの結果が変わらず、それらを理由に`validate` / `doctor`が失敗しない。構造破損の診断は維持する |
 | `AC-357-010` | `RQ-357-005`の各Historical形式とCurrent形式のfixtureを保持したまま`validate` / `doctor`がmalformedとしないpositive test、およびcatalog外timestamp-intent / duplicate / unsafe pathを診断するnegative testが通る |
 | `AC-357-011` | Runtime help / reference / migration notesがretained semanticsをCurrentとして説明し、removed workflowを推奨しない |
@@ -277,6 +279,8 @@ Issue 357は次を後続へ渡す。
 - provider-side実装を正本とし、dogfood Runtimeはprojection / verification対象として扱う。
 - 物理削除より先にregistrationとimport graphを切り離し、hidden dependencyをtestで検出する。
 - shared componentを変更する場合はIssue 358との所有権表に従い、template proseをIssue 357で決めない。
+- 同一権限の非協調processが予測不能なtransaction名やheld ancestryをsyscall間で意図的にrename / replaceする攻撃はRuntime command内のsecurity boundary外とする。namespace tamperingを検知した場合は競合entry保全をcleanupより優先し、identity不明entryを削除しない。
+- SIGKILL、power loss、filesystem corruptionによるhidden orphanの完全回収は本Issueのhandled failure保証外とする。将来これを保証する場合はrecovery journal / GCまたは別UID / sandbox境界を別設計する。
 
 ## 9. 前提と未確定事項
 
