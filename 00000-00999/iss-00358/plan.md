@@ -19,6 +19,8 @@ ID: "iss-00358"
 
 このPlanは実装開始を許可する正本である。PR作成、merge、Issue close、Epic完了、obsolete assetの物理pruneは別scopeであり、自動実行しない。
 
+Product Ownerの2026-08-10指示により、放棄予定の旧SpecDock workflow、`guidance issue-execution`、そのreport evaluatorは本Issueの実行authorityまたはstep closure条件にしない。fresh code / spec reviewはRequirement / Design / 本Planと現行実装の品質・整合性を評価し、旧workflow evaluatorを通すためのRuntime変更や履歴改変を要求しない。
+
 ## 2. Planning Level
 
 - Selected level: `strict`
@@ -230,13 +232,13 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **振る舞い目標:** Current六種の用途とdurable reflection先を説明し、evidenceの自動昇格を禁止する。
 
-**Allowed paths:** `templates/artifacts/`のCurrent六種、`docs/authoring/artifacts.md`、dogfood projection、catalog tests。
+**Allowed paths:** `templates/artifacts/`のCurrent六種、`docs/authoring/artifacts.md`、dogfood projection、catalog tests、`tests/cli_runtime/test_new.py`のArtifact生成content markerだけ。
 
 **Forbidden:** filename parser、Historical file削除、`analysis`、draft / repair Current route、mandatory EAL。
 
 **ケース概要（規範的なテストカードは§9）:** Current六template exact catalog、六用途 / reflection先、single-source researchとmulti-source disc、accepted ADRだけauthority、external ZIP / draft / Report no-auto-promotion、Historical physical retention。
 
-**Verification:** `uv run pytest tests/unit/infra/test_artifact_templates.py tests/unit/infra/test_authoring_kit_assets.py -k artifact`。
+**Verification:** `uv run pytest tests/unit/infra/test_artifact_templates.py tests/unit/infra/test_authoring_kit_assets.py -k artifact`と`uv run pytest --run-full-regression tests/cli_runtime/test_new.py::TestCliNew::test_new_artifact_full_direct_catalog_success -q`。
 
 **Step Closure Contract:** `CL-358-007/008`、fresh spec / code review。Commit候補: `docs(artifact): Current六種とauthority境界を明示`。
 
@@ -494,7 +496,7 @@ git status --short
 
 ### S05 contract — Artifact semantics and authority
 
-- Depends on: S01。Unblocks: S06。Target files: Current六template、`docs/authoring/artifacts.md`、dogfood projection、Artifact asset tests。
+- Depends on: S01。Unblocks: S06。Target files: Current六template、`docs/authoring/artifacts.md`、dogfood projection、Artifact asset tests、`tests/cli_runtime/test_new.py`のArtifact生成content marker。
 - Planned obligation: Current六種の用途 / reflection先とR/D/P/accepted ADRだけのdurable authorityを説明する。
 - Redまたは代替証拠: `red-required`。exact catalog、type semantics、auto-promotion禁止、Historical保持を先に失敗させる。
 - Bounded implementation: Design §4.1 pathだけを変更し、`docs/rules/**`とRuntime filename parserを触らない。
@@ -505,10 +507,10 @@ git status --short
 - Delegation contract:
   - delegated role: fresh `doc-writer`、asset確定後のtestだけfresh `dev-coder`。
   - input docs: `RQ-358-005/006`, `AC-358-003/007/008`; Design §8 / §9; `CL-358-007/008/015`。
-  - allowed paths: 本step Target filesだけ。
+  - allowed paths: 本step Target filesだけ。CLI testは既存Artifact生成caseのcontent marker更新に限定する。
   - forbidden changes: `docs/rules/**`、Runtime / parser、Historical file、Existing Artifact、new type。
   - acceptance criteria: exact six templates、用途 / reflection、accepted ADR authority、no auto-promotion。
-  - required verification: Artifact template / Authoring asset tests、manual semantic review。
+  - required verification: Artifact template / Authoring asset tests、Artifact生成full-regression一件、manual semantic review。
   - reviewer focus: single vs multi-source guidance、candidate vs accepted ADR、evidence-only boundary。
   - stop conditions: catalog / filename change、rule docsの必要、new durable authority。
   - output required: changed docs / templates / tests、Red / Green、catalog evidence、risk、material decision有無。

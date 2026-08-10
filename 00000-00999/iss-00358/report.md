@@ -18,7 +18,7 @@ ID: "iss-00358"
 - Draft 1と承認済みinterview decisionsはevidence-onlyの入力として正本`requirement.md`、`design.md`、`plan.md`へ統合し、repository factsと独立review findingsで精度を補った。
 - Requirement、Design、Planはすべてapprovedで、各phaseのfresh `spec-reviewer`がpassした。
 - 2026-08-10に`issue start iss-00358`を実行し、専用branch `iss-00358-simplify-authoring-kit-and-document-contracts`とactive contextを設定した。
-- E00 / M0とS01〜S04を完了した。三scopeのthin R/D/P/Report、Authoring foundation、one-plan、四Completion Guide、187件のasset contract testを実装し、M1 commit前の検証とfresh reviewを通過した。S05以降、PR、merge、`issue finish`はまだ実行していない。
+- E00 / M0とS01〜S06を完了した。三scopeのthin R/D/P/Report、Authoring foundation、one-plan、四Completion Guide、Current六Artifact、Current / Historical navigationを実装し、M1 `1074a4185135e3d1f915a3e3033b0632d82ffca2`をpushした。M2はpre-commit verificationまで完了し、commit / push待ちである。S07以降、PR、merge、`issue finish`はまだ実行していない。
 - E00の初回reviewで、read-only E00とS08で初めて作るpreservation fixtureのhash要求、S10より前のDesign外owner確定要求が両立しないことを検出した。Planを最小修正し、E00をcandidate inventory / no-delete routing、S08をfull fixture / hash、S10をfinal ownerへ分離した。fresh `spec-reviewer`はP0/P1なしでpassした。
 - materialな製品判断の追加はない。Profile / Assuranceを使わず、one Plan + docs-only Planning Level、thin Report、Current六種というProduct Owner承認をそのまま保持する。
 
@@ -53,6 +53,16 @@ ID: "iss-00358"
   - Affected closure: `CL-358-001/006`、`tc-s04-001`、S04。
   - Risk if wrong: Reportへ不要なpromptを再導入してempty-valid exact shapeを壊す、または一般規則との矛盾を残す。
   - Needs orchestrator decision: no。既承認のspecific contractを変えない整合化であり、fresh spec rereviewを必須とする。
+- `DEC-358-003`
+  - Status: resolved / rejected_out_of_scope。
+  - Type: user-authority / retired workflow boundary。
+  - Trigger: S05 final `spec-reviewer`がArtifact契約ではなく旧`guidance issue-execution` evaluatorのpassをstep closure条件として要求した。
+  - Observed facts: Product Ownerは2026-08-10に放棄予定の旧SpecDock workflowへ従わず、mainの推論とcanonical実装計画で進めるよう明示した。S05 final reviewはArtifact semantics自体のP0/P1を指摘せず、過去fail行を読む旧evaluatorと`execute amended plan`文字列だけをP1にした。
+  - Disposition: 旧evaluatorを満たすためのRuntime変更、review履歴削除、promotion文字列の偽装は行わない。本Planへreview scopeを明記し、Requirement / Design / PlanとS05実装だけを評価するfresh scope-correct spec reviewを行う。
+  - Evidence: Product Owner指示、Issue Planning Recovery、S05 code final review pass、S05 final spec review fail二件。
+  - Affected closure: `CL-358-007/008`、S05。
+  - Risk if wrong: 放棄対象workflowをAuthoring Kit簡素化の実装へ再導入する、または監査用fail履歴を消して旧evaluatorだけを通す。
+  - Needs orchestrator decision: no。既存の明示的なProduct Owner指示を適用する。
 - 既存のProduct Owner判断、Option A、thin Report、Current六種は変更しない。
 
 ## Objective Alignment Ledger
@@ -118,6 +128,21 @@ ID: "iss-00358"
 | S04 spec | Report exact shape / non-gating gate | spec-reviewer | fresh | fail | no | RQ / Design一般prompt規則の矛盾修正が必要 | 実装はDesign §5.4に一致するが、RQ-358-001 / Design §5.1の一行prompt一般規則とのP1矛盾を検出。confidence 0.99 |
 | S04 P2 code delta | Report forbidden vocabulary gate | code-reviewer | fresh | pass | no | P2 close | template / Guide別detector、mandatory reviewerとneutral boundary、Grade / Assurance / delegated authoring / PR status mutationを確認。findingsなし。confidence 0.97 |
 | S04 spec rereview | Report prompt exception alignment gate | spec-reviewer | fresh | pass | no | P1 close、`CL-358-001/006`のReport部分をclose | RQ-358-001 / Design §5.1へReport empty-valid例外を明記し、§5.4、DEC-358-002、assets / testsとの整合を確認。confidence 0.99 |
+| S05 code | Artifact semantics / generation regression gate | code-reviewer | fresh | fail | no | full-regression P1と二つのP2を修正してrereview | Current semanticsは概ね一致したが、CLI生成testの旧markerでfull-regression失敗。multiline mandatory検出と`draft` / `draft-*`混同も指摘。confidence 0.99 |
+| S05 spec | Artifact authority / Historical boundary gate | spec-reviewer | fresh | fail | no | code reviewと同じP1/P2を修正してrereview | Current六種、authority flow、parityは整合。生成回帰P1、multiline detector P2、Historical route表現P2を確認。confidence 0.99 |
+| S05 code rereview | Artifact repair delta gate | code-reviewer | fresh | pass | no | P1 close。explicit optional detector P2を追加修正 | full-regression 1 pass、multiline mandatory、exact `draft-*`、valid draft state、Plan amendmentを確認。P0/P1なし。optional文false positive P2のみ。confidence 0.99 |
+| S05 spec rereview | Artifact repair semantic gate | spec-reviewer | fresh | pass | no | semantic P1 close。Red / gate台帳P2をreportへ反映 | 前回三finding解消、Current / Historical / authority / CLI生成contract整合。P0/P1なし。Red代替証拠とreview履歴のP2を指摘。confidence 0.98 |
+| S05 code final | Artifact final implementation gate | code-reviewer | fresh | pass | no | code evidence accepted | optional negation guardを含む全repair、provider / dogfood parity、CLI marker、Plan / report scopeを確認。findingsなし。confidence 0.99 |
+| S05 spec final（scope逸脱） | retired workflow evaluator gate | spec-reviewer | fresh | fail | rejected: Product Ownerが旧workflowを非規範化済み | Artifact契約だけを評価するfresh scope-correct reviewへ差し替える | Artifact semanticsのP0/P1はなし。旧`guidance issue-execution` evaluatorの過去fail優先とpromotion文字列をP1扱いしたため、`DEC-358-003`でS05外として棄却。confidence 0.99 |
+| S05 scope-correct spec final | Artifact semantic closure gate | spec-reviewer | fresh | pass | no | `CL-358-007/008` close、`CL-358-015`をS06へhandoff | Plan §1 / DEC-358-003境界でCurrent六種、Historical保持、authority、Red / review evidenceを確認。P0/P1なし。must / shall detector P2を修正。confidence 0.98 |
+| S05 detector closure | mandatory / optional wording delta gate | code-reviewer | fresh | pass | no | P2 close、S06へ進む | must / shall、日本語必須、multiline、明示的否定、unrelated must、mixed clauseを確認。findingsなし。confidence 0.98 |
+| S06 code | Current / Historical navigation gate | code-reviewer | fresh | pass | no | code evidence accepted、link / vocabulary detector P2修復へ進む | Current/Historical assetsと既存分割coverageは正しい。Unicode境界とabsolute link検出のP2二件。confidence 0.98 |
+| S06 spec | Current / Historical semantic gate | spec-reviewer | fresh | pass | no | semantic evidence accepted | Current first-read、Guide / Level / Artifact到達、Historical保持、skill非live、parity、`CL-358-009/015`を確認。findingsなし。confidence 0.99 |
+| S06 code delta | inline link / ASCII boundary repair gate | code-reviewer | fresh | pass | no | reference / autolink P2/P3修復へ進む | 日本語隣接、underscore、absolute / external inline linkを修復。document-global referenceとnon-HTTP autolink P2、left boundary mutation P3。confidence 0.98 |
+| S06 code closure | reference / autolink repair gate | code-reviewer | fresh | pass | no | final parser repairへ進む | same-section reference、HTTP/root autolink、ASCII両boundaryを確認。document-global referenceとURI scheme P2。confidence 0.97 |
+| S06 final code | navigation detector final gate | code-reviewer | fresh | fail | no | reportを最終Red / Greenへ同期してrereview | assets / parser / mutation contractに別不具合なし。reportが旧57/217/271のままでStep gate P1。confidence 0.99 |
+| S06 report closure | final Red / Green evidence gate | code-reviewer | fresh | pass | no | P1 close、`CL-358-009/015` close、M2へ進む | 108/268/322、immutable HEADと段階的mutation Red、51 tests追加、review履歴を確認。Next Action同期P2を反映。confidence 0.99 |
+| M2 typing repair | pre-commit lint gate | code-reviewer | fresh | pass | no | M2 commitへ進む | contract辞書へ`TypedDict`を追加し、実行時挙動を変えずmypy 22 errorsを解消。`make lint`、322 tests、diff check pass。findingsなし。confidence 0.99 |
 
 ## Workflow-Scoped Authorization
 
@@ -257,6 +282,8 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | S02 | `CL-358-001/002`（R/D/P部分） | 9 R/D/Pを最小frontmatter / heading / 一文prompt / scope別Guide linkへ置換する | provider / dogfoodの9 R/D/Pとtemplates READMEを同時更新し、旧workflow / quality gate fieldを除外。66 focused tests、全118 tests、ruff / format / diff check pass | passed | fresh code / spec review pass。Report部分はS04でcloseする |
 | S03 | `CL-358-004/014` | one canonical Issue Plan、Base + 四独立Guide、impact / recovery選択例、Runtime / metadata非所有を成立させる | provider / dogfoodへBase + four Guidesを反映。6 Example ID、wrong-signal rejection、one Plan、独立link、Level別completion contractを22 testsで固定 | passed | critical recoveryのP1を修正。全140 tests、plan / level focused 43 tests、ruff / format / diff check、fresh code / spec review pass |
 | S04 | `CL-358-001/006`（Report部分） | 三scopeReportをexact三heading、empty-valid、non-gatingへ置換する | provider / dogfoodの3 Report templateとReport Guideを更新。最小frontmatter、scope link、empty H2、optional Notes、forbidden ledger / gate、durable decision境界を47 testsで固定 | passed | prompt一般規則P1と禁止語P2を修正。全187 tests、report focused 53 tests、ruff / format / diff check、fresh code / spec review pass |
+| S05 | `CL-358-007/008`（`CL-358-015` Guide側入力） | Current六種の用途とdurable reflection先を分離し、evidenceの自動昇格を禁止する | provider / dogfoodのArtifact Guideと六templateを更新。physical七templateを保持しつつCurrent exact six、type semantics、authority flow、Historical非削除を54 focused testsで固定。旧content markerによるfull-regression P1を現行semanticsへ同期 | passed | 全241 tests、Artifact生成full-regression 1 test、ruff / format / diff check、fresh code / scope-correct spec review pass。`CL-358-015`の最終closeはS06 |
+| S06 | `CL-358-009/015` | Current第一導線をStorage Core + Authoring Kitへ限定し、旧surfaceをHistoricalへ分離する | provider / dogfoodのREADME、guide、Overview、Historical、templates READMEを更新。Current link allowlist、Historical positive control、reserved skill非live、path-aware vocabularyを51 testsで追加固定。Unicode境界、inline / reference / autolink bypassをreview修復 | passed | navigation / vocabulary / link 108 tests、authoring全268、S05/S06 combined 322、ruff / format / diff check、fresh code / spec / report closure review pass |
 
 ### Test Contract Closure
 
@@ -269,6 +296,8 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | `tc-s03-001` | S03 | red-required | pre-S03では四Completion GuideとBaseからのlinkが未存在。level別Planはなくcanonical `plan.md`一つだけだった | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k 'plan or level' -q`、全focused suite、link / parity / Runtime no-diff inspection | pass: one `plan.md`、Baseから四Guide、各GuideからBaseだけへのlink、必須5 section、provider / dogfood 5 path parityを確認 |
 | `tc-s03-002` | S03 | red-required | pre-S03では`LEVEL-EX-POS-01`〜`03` / `NEG-01`〜`03`と選定結論tokenが未存在。critical旧曖昧文のmutationでrecovery評価をN/Aにできる欠陥を`AssertionError`で再現 | 同上。Example row、wrong-signal rejection、docs-only token、critical migration-only N/A / recovery必須をstructural assertion | pass: 6 Example ID、impact / recovery基準、standard非Runtime default、metadata非所有、critical recovery省略禁止を確認。全140 tests、focused 43 passed / 97 deselected |
 | `tc-s04-001` | S04 | red-required | HEAD旧3 Reportは`状態` / `作成者`、Decision / Evidence Ledger、EAL、各種Gate、session log、progress summaryを含み、exact三heading / empty-validを満たさなかった。mandatory reviewer / generic禁止語mutationも不足を再現 | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k report -q`、全focused suite、ruff check / format、diff check | pass: report 53 passed / 134 deselected、全187 tests。exact shape / empty body、optional Notes、scope link、4 path parity、heavy + generic禁止語、neutral reviewer境界、non-gating / durable boundaryを確認 |
+| `tc-s05-001` | S05 | red-required | testはasset確定後に委任したためpre-change実行を保持できず、immutable HEADを代替証拠にした。HEADにはArtifact Guideが存在せず`git cat-file -e`がfatal、六template全てに現行durable reflection文がなく、decision-candidateは`authority: proposed`だったためexact catalog / semantics / authority / Historical testは成立不能。加えて旧README testが`1 failed, 5 passed`、初回reviewでArtifact生成full-regressionも旧blank markerにより`1 failed`を再現 | `uv run pytest tests/unit/infra/test_artifact_templates.py tests/unit/infra/test_authoring_kit_assets.py -k artifact -q`、両file全体、指定Artifact生成full-regression、ruff check / format、diff check | pass: artifact 54 passed / 187 deselected、全241 tests、Artifact生成full-regression 1 passed。physical七 / Current六、six用途、research / disc、candidate / accepted ADR、no-auto-promotion、exact `draft-*`、multiline mandatory / explicit optional / must / shall / negated clause、provider-dogfood parityを確認 |
+| `tc-s06-001` | S06 | red-required | asset先行のためimmutable HEADを代替証拠にした。HEADでは`docs/authoring/historical.md`が存在せず`git cat-file` status 128、README / guideが旧`workflow_*` / `phase_*` live linkを持ち、OverviewはArtifact / four Completion Guide / Agent assistanceを欠いた。review mutationで`workflowを` / `workflow_route`、absolute skill / external link、document-global reference、mailto / ftp / email autolinkの未検出を順次Red再現 | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k 'navigation or vocabulary or link' -q`、authoring file全体、S05 combined、ruff check / format、diff check | pass: 108 passed / 160 deselected、authoring全268、combined 322。Current exact links、Historical別section / positive control、Overview十link、skill非live、templates catalog、ASCII両boundary、inline / reference / URI autolink、5 path parity、全relative linkを確認 |
 
 ### Delegated Worker Evidence
 
@@ -283,6 +312,11 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | S03 tests | `dev-coder` | one-plan、Guide独立性、Level completion、example / wrong-signal / metadata境界、critical recovery省略禁止を22 testsで固定 | `tests/unit/infra/test_authoring_kit_assets.py` | 全140 passed、plan / level 43 passed / 97 deselected、ruff check / format、`git diff --check` pass | fresh code / spec review pass | 意味token変更時はtest同期が必要 | evidence adopted; S03 closed |
 | S04 docs | `doc-writer` | 三scope Reportを最小frontmatter + exact result shapeへ置換し、Guideへempty-valid / non-gating境界を実装 | provider / dogfoodの3 Report templateとReport Guide（8 files） | 4 path parity、scope link、forbidden scan、nonempty、`git diff --check` pass | fresh code / spec review pass | 初回Guide更新のS01回帰をGuide側修復。prompt一般規則矛盾はcanonical RQ / Designで解消 | evidence adopted; S04 closed |
 | S04 tests | `dev-coder` | Report exact shape、empty-valid、heavy / generic禁止語、neutral reviewer境界、non-gatingを47 testsで固定 | `tests/unit/infra/test_authoring_kit_assets.py` | 全187 passed、report 53 passed / 134 deselected、ruff check / format、`git diff --check` pass | fresh code / spec review pass | 構造 / 境界token中心で表現変更は許容 | evidence adopted; S04 closed |
+| S05 docs | `doc-writer` | Current六種のArtifact templateを簡素化し、Guideへ用途、durable reflection、no-auto-promotion、Historical保持を実装。review P2後に`draft-*` routeと有効なdraft stateを分離 | provider / dogfoodの六Artifact templateとArtifact Guide（14 files） | 7 path byte parity、六template非空、Historical `pr-repair-batch.md`保持、forbidden scan、`git diff --check` pass | rereview pending | `CL-358-015`のCurrent導線はS06でclose | evidence adopted; repair complete |
+| S05 tests | `dev-coder` | physical七 / Current六、type semantics、authority flow、ADR accepted境界、Historical保持をcontract test化。review後にfull-regression marker、multiline / must / shall detector、explicit optional / negated clause guardを修復 | `tests/unit/infra/test_artifact_templates.py`、`tests/cli_runtime/test_new.py`のsix Current marker | artifact 54 passed / 187 deselected、全241 passed、Artifact生成full-regression 1 passed、ruff check / format、`git diff --check` pass | fresh code final / scope-correct spec / detector closure review pass | clause boundaryは句点 / semicolon系のbounded heuristic | evidence adopted; S05 closed |
+| S06 docs | `doc-writer` | Current第一導線をStorage Core + Authoring Kitへ縮小し、Historical / Agent assistance予約 / Current catalogを分離 | provider / dogfoodのREADME、guide、Overview、Historical、templates README（10 files） | 5 path parity、全relative link、Historical positive control、skill live link zero、`git diff --check` pass | fresh code / spec / report closure review pass | S05 templates README文を一度欠落させたが復元しcombined Green | evidence adopted; S06 closed |
+| S06 tests | `dev-coder` | path-aware Current / Historical、first-read allowlist、Overview / catalog / link / parityを51 testsで固定。review後にUnicode両boundaryとinline / reference / URI autolink bypassを修復 | `tests/unit/infra/test_authoring_kit_assets.py` | focused 108、authoring全268、S05 combined 322、ruff check / format、`git diff --check` pass | fresh code / spec / report closure review pass | Markdown destination parserは承認対象構文に限定したbounded heuristic | evidence adopted; S06 closed |
+| M2 typing repair | `dev-coder` | S02から積み上げたcontract辞書の型を明示し、mypyの`object`推論22件を解消 | `tests/unit/infra/test_authoring_kit_assets.py` | focused mypy、`make lint`、S05/S06 combined 322、ruff / format、`git diff --check` pass | fresh code review pass | `cast`は既存branch後のnon-optional invariantだけを型検査器へ伝える | evidence adopted; M2 pre-commit gate passed |
 
 ### Implementation Delegation Gate
 
@@ -297,12 +331,16 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | S03 tests | delegated | S03 contractの欠陥検出を自動化 | `dev-coder` | `tests/unit/infra/test_authoring_kit_assets.py` | S03 docs、`tc-s03-001/002` | S03 test fileだけ | docs、templates、Runtime、他tests | full / plan-level pytest、ruff、diff check | contract外behavior変更 | changed test、Red / Green、risk | complete: 22 tests追加、全140 pass |
 | S04 docs | delegated | thin Report contractをprovider / dogfoodへ一貫実装 | `doc-writer` | three Report templates + Report Guideの4 path pair | active R/D/P、S04 contract | S04 target docs / templatesだけ | Runtime / CLI、357 files、Existing Report、other docs/templates | exact shape / link / parity / forbidden scan | Runtime変更、semantics変更、Existing migration | changed docs、shape evidence、risk | complete: 8 files、4 path parity pass |
 | S04 tests | delegated | S04 contractの欠陥検出を自動化 | `dev-coder` | `tests/unit/infra/test_authoring_kit_assets.py` | S04 assets、`tc-s04-001` | S04 test fileだけ | docs、templates、Runtime、CLI / 357 tests | full / report pytest、ruff、diff check | contract外behavior変更 | changed test、Red / Green、risk | complete: 47 tests、全187 pass |
+| S05 docs | delegated | shipped Artifact semanticsとdogfood projectionの一貫編集 | `doc-writer` | Current六template + Artifact Guideの7 path pair | active R/D/P、S05 contract | S05 target docs / templatesだけ | rules、Runtime / parser、Historical file、Existing Artifact、new type | parity / catalog / authority / forbidden scan | catalog / filename / durable authority変更 | changed docs / templates、catalog evidence、risk | complete: 14 files、7 path parity pass |
+| S05 tests | delegated | S05 catalog / semantics / authority境界の欠陥検出と生成回帰同期 | `dev-coder` | `tests/unit/infra/test_artifact_templates.py`、Artifact生成full-regressionのsix Current marker | S05 assets、`tc-s05-001`、amended S05 test scope | Artifact test fileと既存生成caseのcontent markerだけ | docs、templates、Runtime、rules、他のCLI test | focused / full / specified full-regression、ruff、diff check | contract外behavior変更 | changed test、Red / Green、risk | complete: artifact 54 tests、全241 + full-regression 1 pass |
+| S06 docs | delegated | Current / Historical navigationをprovider / dogfoodへ一貫実装 | `doc-writer` | README、guide、Overview、Historical、templates READMEの5 path pair | active R/D/P、S06 contract | S06 target docsだけ | obsolete delete、skill live link、Runtime / installer / rules | parity / link / vocabulary / Historical positive control | Current allowlist、skill target、owner変更 | changed docs、link evidence、risk | complete: 10 files、5 path parity pass |
+| S06 tests | delegated | S06 navigation / vocabulary / link欠陥を自動化 | `dev-coder` | `tests/unit/infra/test_authoring_kit_assets.py` | S06 assets、`tc-s06-001` | authoring asset test fileだけ | docs、Runtime、other tests | focused / full / combined、ruff、diff check | path-aware scanがHistoricalを拒否 | changed test、Red / Green、risk | complete: 51 tests追加、combined 322 pass |
 
 ### Closure Coverage
 
 | closure range | owner steps | planning evidence | implementation evidence | state |
 |---|---|---|---|---|
-| `CL-358-001`〜`CL-358-015` | E00、S01〜S10、S90、S99 | amended `plan.md`のClosure Indexとfresh Plan review pass | E00で`CL-358-010`をcloseし、`CL-358-011/013`をS08 / S10へhandoff。S01で`CL-358-003`、S02/S04で`CL-358-001/002/006`のtemplate部分、S03で`CL-358-004/014`をclose | in progress |
+| `CL-358-001`〜`CL-358-015` | E00、S01〜S10、S90、S99 | amended `plan.md`のClosure Indexとfresh Plan review pass | E00で`CL-358-010`をcloseし、`CL-358-011/013`をS08 / S10へhandoff。S01で`CL-358-003`、S02/S04で`CL-358-001/002/006`のtemplate部分、S03で`CL-358-004/014`、S05で`CL-358-007/008`、S06で`CL-358-009/015`をclose | in progress |
 
 ### Closure Delta
 
@@ -311,6 +349,8 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | E00 plan contradiction | `CL-358-011/013` | E00はread-onlyでfull fixture hashとowner確定を要求していた | completed | completed | E00 candidate inventory、S08 fixture/hash、S10 final ownerへ分離。fresh review pass |
 | S01 / S03 Plan Guide boundary | `CL-358-003/004` | S01がOverviewからPlan Guideへ到達させる一方、旧workflow依存の`issue-plan.md`をS03まで編集禁止としていた | completed | fresh spec / code delta review pass | S01でprovider-neutralなPlan基礎、Current入口、scope-aware Plan導線を実装し、S03はPlanning Level / Completion Guide詳細を所有する。52 tests pass |
 | S04 Report prompt exception | `CL-358-001/006` | RQ-358-001 / Design §5.1の一般prompt規則とAC-358-006 / Design §5.4のempty-valid exact shapeが衝突した | completed | fresh spec rereview pass | 一行promptをR/D/Pへ限定し、Reportは三必須sectionを空本文で開始するspecific contractを維持 |
+| S05 Artifact生成full-regression | `CL-358-007/008` | S05 focused testsはGreenだが、CLI生成testが旧template本文markerを固定してP1 failureになった | completed | repair complete; fresh code / spec rereview pending | PlanのS05 allowed testへ既存Artifact生成caseのcontent markerだけを追加し、six Current markerを現行semanticsへ同期。Runtime / parserは変更せず、指定full-regression 1 passed |
+| S05 retired workflow evaluator | `CL-358-007/008` | final spec reviewがProduct Ownerにより非規範化された旧execution guidanceをclosure条件へ再導入した | completed | fresh scope-correct spec review pass | `DEC-358-003`とPlan §1でreview境界を明記。Runtime / report履歴を旧evaluatorへ合わせず、S05 content contractだけを再評価しP0/P1なし |
 
 - `CL-358-010`のprovider / dogfood baseline manifestはread-only evidenceで充足した。
 - `CL-358-011`はS08 ownerである。現HEADにないthin Report、candidate ADR、profile-derived node-local documentはS08でfixture / baseline hashをmaterializeする。
@@ -336,10 +376,13 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 
 ### Milestone / Commit Candidate Gate
 
+M2 pre-commitでは`make lint`がpassし、S05/S06 combinedは322 passed、通常fast suiteはIssue 334の既存2 testだけを除外して1747 passed / 2252 skipped / 2 deselectedだった。除外した2 testを含む`uv run pytest`は、`20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip`と`20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md`が現HEADにも存在しないため2 failedとなる。両pathは`git cat-file -e HEAD:<path>` status 128で、Issue 358差分に削除はない。このbaseline fixture欠落はM2の変更起因ではないため、失敗を残余repository test riskとして記録し、Issue 358のbounded commitは進める。
+
 | milestone / step | reviewer verdict | commit candidate / scope | closure state | commit evidence | post-commit clean check |
 |---|---|---|---|---|---|
 | M0 / E00 | amended Plan fresh `spec-reviewer` pass。P0/P1なし、P2 report同期を反映 | `docs(iss-00358): E00契約をS08/S10分離へ反映` / Plan amendment + E00 report evidence | passed | `d4ca698f0257a36d81557233b9960fd2d9a95e7e` | commit後clean、GitHub upstream同一SHAを確認済み |
-| M1 / S01〜S04 | fresh code / spec review pass。S03 critical P1、S04 prompt P1、禁止語P2を修正済み | `feat(authoring): thin document kitを導入` / Guide foundation + thin R/D/P/Report + Planning Levels + asset tests | ready to commit | not created | pre-commit verification pass、commit後check pending |
+| M1 / S01〜S04 | fresh code / spec review pass。S03 critical P1、S04 prompt P1、禁止語P2を修正済み | `feat(authoring): Issue358向けにauthoringテンプレートを簡素化し薄い文書キットへ刷新` / Guide foundation + thin R/D/P/Report + Planning Levels + asset tests | passed | `1074a4185135e3d1f915a3e3033b0632d82ffca2` | commit後clean、GitHub upstream同一SHAを確認済み |
+| M2 / S05〜S06 | fresh code / spec / report closure review pass。full-regression marker、mandatory detector、navigation link detector、typing P1を修正済み | `docs(authoring): ArtifactとCurrent導線を整理` / Current六Artifact + Artifact Guide + Current / Historical navigation + asset tests | pre-commit passed | pending | pending |
 | M99 / S99 | not reached because S05〜S90 are unfinished | `docs(iss-00358): 最終実装証跡を確定` / final report ledger | planned | not created | not run |
 
 ## 残余リスクと停止条件
@@ -352,4 +395,4 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 
 ## 次のアクション
 
-S01〜S04の実装、Green、fresh reviewを完了した。M1 commitとpost-commit checkを行い、S05のArtifact semanticsへ進む。
+S01〜S04のM1を完了し、S05 Artifact semanticsとS06 Current / Historical navigationを実装・検証・review済みとしてcloseした。M2 commit / push / post-commit check後にS07 provider / dogfood parityへ進む。
