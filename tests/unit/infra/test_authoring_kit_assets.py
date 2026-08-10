@@ -1,5 +1,7 @@
+import hashlib
 from pathlib import Path
 import re
+import shutil
 from typing import TypedDict, cast
 
 import pytest
@@ -73,6 +75,105 @@ CURRENT_ARTIFACT_TEMPLATES = (
     "decision-candidate",
     "adr",
 )
+
+S07_OWNED_ASSET_CATEGORIES = {
+    "scope-templates": (
+        "templates/initiative/requirement.md",
+        "templates/initiative/design.md",
+        "templates/initiative/plan.md",
+        "templates/initiative/report.md",
+        "templates/epic/requirement.md",
+        "templates/epic/design.md",
+        "templates/epic/plan.md",
+        "templates/epic/report.md",
+        "templates/issue/requirement.md",
+        "templates/issue/design.md",
+        "templates/issue/plan.md",
+        "templates/issue/report.md",
+    ),
+    "current-artifact-templates": (
+        "templates/artifacts/blank.md",
+        "templates/artifacts/research.md",
+        "templates/artifacts/interview.md",
+        "templates/artifacts/disc.md",
+        "templates/artifacts/decision-candidate.md",
+        "templates/artifacts/adr.md",
+    ),
+    "navigation-roots": (
+        "templates/README.md",
+        "docs/README.md",
+        "docs/guide.md",
+    ),
+    "base-authoring-guides": (
+        "docs/authoring/issue-plan.md",
+        "docs/authoring/scope-layering.md",
+    ),
+    "current-authoring-guides": (
+        "docs/authoring/overview.md",
+        "docs/authoring/requirement.md",
+        "docs/authoring/design.md",
+        "docs/authoring/report.md",
+        "docs/authoring/artifacts.md",
+        "docs/authoring/historical.md",
+    ),
+    "planning-level-guides": (
+        "docs/authoring/issue-plan-levels/light.md",
+        "docs/authoring/issue-plan-levels/standard.md",
+        "docs/authoring/issue-plan-levels/strict.md",
+        "docs/authoring/issue-plan-levels/critical.md",
+    ),
+}
+S07_OWNED_ASSET_MANIFEST = tuple(
+    path for category_paths in S07_OWNED_ASSET_CATEGORIES.values() for path in category_paths
+)
+S07_PARITY_EXCLUDED_SURFACES = (
+    "tests/unit/infra/test_authoring_kit_assets.py",
+    "tests/fixtures/authoring_kit/existing_issue/",
+)
+
+PRESERVATION_FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "authoring_kit" / "existing_issue"
+PRESERVATION_BASELINE_SHA256 = {
+    ".assurance.json": "f0f6ef47171ab67360ed7c26b8dc144e4ba588c7abe1234115c4373bebcca4c8",
+    "artifacts/adr-candidate.md": "6a73ece30ebdcec2b74294afa8f9bba698253077ff8f1368a8ac0dbf1c9e6d18",
+    "artifacts/adr.md": "45a216303a4d40ae520809de567a22fa855b12c90fddf3e3eacc64c587ceb183",
+    "artifacts/blank.md": "ca97502f2f3dfb44da9cc2b6f17d53ec178425787e5ca8f6081184e5b71e3687",
+    "artifacts/decision-candidate.md": "f21a9221303207669e9b083125cba19ecc63095f6aef31e04cb68efa214409ed",
+    "artifacts/disc.md": "69e01e33d6a4fda374e54b21153d8bb07f3f2a7f2d571bf8742a0fc701cbbd3d",
+    "artifacts/interview.md": "9292241a07bda6c3282c77ea6c3c28362bafe33408bc1501a67b97db0c05080c",
+    "artifacts/legacy/draft-requirement.md": "238a3fc61c205ba96e832214c07c21271ebb37ff3d03a8e60d31dfc5b244e1b6",
+    "artifacts/legacy/generic-import.zip": "5a0252dc24db5e718a9e328b79c6f4042312d7ded54aaddafd4c7c57f48b252a",
+    "artifacts/legacy/pr-repair.md": "63111299f7da51fe129fb288359aa86f8a4103cd737aead4473efaf1cd2bd649",
+    "artifacts/legacy/profile-derived-design.md": "a7aa51d84a2af70c969b6e791403fd3beb042f7c23cf74b804c24032c4b28ba7",
+    "artifacts/legacy/profile-derived-plan.md": "3e69c2a7776fc13cb196c18a193e80094dc682cf0aab6c5076439193e860ea5b",
+    "artifacts/research.md": "0b0c310e184ec9453fe9dfc88ffef1aa24abc9b077ca73610897858f8da020c4",
+    "design.md": "c8ce7eee921677d7b71ffff9917cc7e494d20d64ee3ae0454b3743721766388d",
+    "discussions/legacy-discussion.md": "191d3c6fe1f149cfa969981dd859a5c4b7efd7bfa69db9e4cb2fdb6f8b75f2ad",
+    "discussions/note.md": "c450806f5b1c3349dc1e1bb870a1165a0a509bbbb8aa59c640790ce3e74e14c8",
+    "discussions/scratch.md": "13d58db407ccdb170c67f0f88a915ae7c76b97e0732a3e24165ce856d0f48200",
+    "plan.md": "8d2db2a601c0d6a4459f903204f2bf1e1694fb3c1e1c31a4eb6ceb0a699c8a7a",
+    "report-heavy.md": "1602d6e382993ab9ce24c0af790c5257b32295caa350a20f0cd83f2e59675b67",
+    "report-thin.md": "4aeaaa94f889257ec5dc1e5af97b8266b523513e5f2f51c63aa687518074955c",
+    "requirement.md": "d7a943b0b568186b93957b77d07d01e2c58046f9bd8ad7e573f9c4f2e2ed0c8e",
+}
+PRESERVATION_COPIED_SOURCE_PATHS = {
+    "requirement.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/requirement.md",
+    "design.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/design.md",
+    "plan.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/plan.md",
+    "report-heavy.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/report.md",
+    "artifacts/blank.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/artifacts/20260701t145916z-dogfood-blank-artifact.md",
+    "artifacts/research.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260808t082616z-research-authoring-kit-clarification.md",
+    "artifacts/interview.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260808t083300z-interview-issue-profile-and-draft-routing.md",
+    "artifacts/disc.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260809t042432z-disc-strict-clarification-authoring-handoff-358.md",
+    "artifacts/decision-candidate.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/artifacts/20260702t071230z-decision-candidate-epic-planning-issue-draft-composition-workflow.md",
+    "artifacts/adr.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/artifacts/20260701t055644z-adr-artifacts-future-only-command-unification.md",
+    "artifacts/legacy/draft-requirement.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260809t125148z-draft-requirement-strict-vertical-slice-requirement.md",
+    "artifacts/legacy/pr-repair.md": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00344-workbench-shell-scaffolding/artifacts/20260729t141053z-disc-pr-350-repair-u001-uninstall-managed-inventory.md",
+    "artifacts/legacy/generic-import.zip": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00346-integration-distribution-and-final-quality/artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip",
+    "discussions/scratch.md": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/discussions/20260530t000000z-scratch-external-worktree-management.md",
+    "discussions/note.md": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00050-host-adapter-scaffold-and-final-parity/discussions/20260403t161053z-note-s03-triage-resolution.md",
+    "discussions/legacy-discussion.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/discussions/20260630t083605z-pr-repair-batch-pr-repair-batch.md",
+    ".assurance.json": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/.assurance.json",
+}
 
 DOCUMENT_RESPONSIBILITIES = {
     "requirement.md": {
@@ -512,6 +613,228 @@ def _render_template(content: str) -> str:
     for placeholder, value in replacements.items():
         rendered = rendered.replace(placeholder, value)
     return rendered
+
+
+def _owned_manifest_delta(candidate: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    expected = set(S07_OWNED_ASSET_MANIFEST)
+    actual = set(candidate)
+    missing = tuple(path for path in S07_OWNED_ASSET_MANIFEST if path not in actual)
+    extra = tuple(path for path in candidate if path not in expected)
+    duplicates = tuple(path for path in candidate if candidate.count(path) > 1)
+    return missing, extra, tuple(dict.fromkeys(duplicates))
+
+
+def _projection_violations(
+    manifest: tuple[str, ...],
+    provider_root: Path,
+    dogfood_root: Path,
+) -> tuple[str, ...]:
+    violations: list[str] = []
+    for relative_path in manifest:
+        provider_path = provider_root / relative_path
+        dogfood_path = dogfood_root / relative_path
+        if not provider_path.is_file():
+            violations.append(f"missing provider: {relative_path}")
+        if not dogfood_path.is_file():
+            violations.append(f"missing dogfood: {relative_path}")
+        if (
+            provider_path.is_file()
+            and dogfood_path.is_file()
+            and provider_path.read_bytes() != dogfood_path.read_bytes()
+        ):
+            violations.append(f"byte drift: {relative_path}")
+    return tuple(violations)
+
+
+def _relative_link_violations(manifest: tuple[str, ...], scaffold_root: Path) -> tuple[str, ...]:
+    violations: list[str] = []
+    for relative_path in manifest:
+        asset_path = scaffold_root / relative_path
+        if not asset_path.is_file():
+            continue
+
+        content = asset_path.read_text(encoding="utf-8")
+        path_parts = Path(relative_path).parts
+        if len(path_parts) == 3 and path_parts[0] == "templates" and path_parts[1] in SCOPE_TEMPLATE_CONTRACTS:
+            scope = path_parts[1]
+            content = _render_template(content)
+            link_base = scaffold_root.joinpath(*SCOPE_TEMPLATE_CONTRACTS[scope]["node_parts"])
+        else:
+            link_base = asset_path.parent
+
+        for target in _relative_markdown_links(content):
+            if not (link_base / target).resolve().is_file():
+                violations.append(f"broken relative link: {relative_path} -> {target}")
+    return tuple(violations)
+
+
+def _recursive_sha256_matrix(root: Path) -> dict[str, str]:
+    return {
+        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _sha256_matrix_delta(
+    expected: dict[str, str],
+    actual: dict[str, str],
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    changed = tuple(path for path in expected if path in actual and expected[path] != actual[path])
+    missing = tuple(path for path in expected if path not in actual)
+    unexpected = tuple(path for path in actual if path not in expected)
+    return changed, missing, unexpected
+
+
+def _copy_s07_owned_assets(
+    provider_root: Path,
+    consumer_root: Path,
+    manifest: tuple[str, ...] = S07_OWNED_ASSET_MANIFEST,
+) -> tuple[str, ...]:
+    if manifest != S07_OWNED_ASSET_MANIFEST:
+        raise ValueError("asset apply must use the exact S07 owned manifest")
+
+    applied: list[str] = []
+    for relative_path in manifest:
+        source = provider_root / relative_path
+        destination = consumer_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        applied.append(relative_path)
+    return tuple(applied)
+
+
+def test_s07_parity_owned_asset_manifest_is_exact_and_explicit() -> None:
+    assert {category: len(paths) for category, paths in S07_OWNED_ASSET_CATEGORIES.items()} == {
+        "scope-templates": 12,
+        "current-artifact-templates": 6,
+        "navigation-roots": 3,
+        "base-authoring-guides": 2,
+        "current-authoring-guides": 6,
+        "planning-level-guides": 4,
+    }
+    assert len(S07_OWNED_ASSET_MANIFEST) == 33
+    assert _owned_manifest_delta(S07_OWNED_ASSET_MANIFEST) == ((), (), ())
+    assert S07_PARITY_EXCLUDED_SURFACES == (
+        "tests/unit/infra/test_authoring_kit_assets.py",
+        "tests/fixtures/authoring_kit/existing_issue/",
+    )
+
+
+def test_s07_parity_manifest_rejects_missing_extra_and_duplicate_rows() -> None:
+    missing_row = S07_OWNED_ASSET_MANIFEST[1:]
+    duplicate_row = (*S07_OWNED_ASSET_MANIFEST, S07_OWNED_ASSET_MANIFEST[0])
+
+    assert _owned_manifest_delta(missing_row)[0] == (S07_OWNED_ASSET_MANIFEST[0],)
+    for extra_path in S07_PARITY_EXCLUDED_SURFACES:
+        extra_row = (*S07_OWNED_ASSET_MANIFEST, extra_path)
+        assert _owned_manifest_delta(extra_row)[1] == (extra_path,)
+    assert _owned_manifest_delta(duplicate_row)[2] == (S07_OWNED_ASSET_MANIFEST[0],)
+
+
+def test_s07_parity_owned_assets_exist_and_match_dogfood_projection_byte_exact() -> None:
+    assert not _projection_violations(
+        S07_OWNED_ASSET_MANIFEST,
+        DOCS_ROOT.parent,
+        DOGFOOD_DOCS_ROOT.parent,
+    )
+
+
+def test_s07_parity_detector_rejects_byte_drift(tmp_path: Path) -> None:
+    provider_root = tmp_path / "provider"
+    dogfood_root = tmp_path / "dogfood"
+    relative_path = "docs/authoring/example.md"
+    for root in (provider_root, dogfood_root):
+        asset_path = root / relative_path
+        asset_path.parent.mkdir(parents=True)
+        asset_path.write_bytes(b"same\n")
+    (dogfood_root / relative_path).write_bytes(b"drift\n")
+
+    assert _projection_violations((relative_path,), provider_root, dogfood_root) == (f"byte drift: {relative_path}",)
+
+
+@pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
+def test_s07_all_owned_asset_relative_links_resolve(scaffold_root: Path) -> None:
+    assert not _relative_link_violations(S07_OWNED_ASSET_MANIFEST, scaffold_root)
+
+
+def test_s07_relative_link_detector_rejects_broken_link(tmp_path: Path) -> None:
+    relative_path = "docs/authoring/example.md"
+    asset_path = tmp_path / relative_path
+    asset_path.parent.mkdir(parents=True)
+    asset_path.write_text("[missing](missing.md)\n", encoding="utf-8")
+
+    assert _relative_link_violations((relative_path,), tmp_path) == (
+        f"broken relative link: {relative_path} -> missing.md",
+    )
+
+
+def test_s08_preservation_fixture_has_exact_explicit_baseline_matrix() -> None:
+    actual = _recursive_sha256_matrix(PRESERVATION_FIXTURE_ROOT)
+
+    assert len(PRESERVATION_BASELINE_SHA256) == 21
+    assert tuple(actual) == tuple(PRESERVATION_BASELINE_SHA256)
+    assert _sha256_matrix_delta(PRESERVATION_BASELINE_SHA256, actual) == ((), (), ())
+
+
+def test_s08_preservation_copied_rows_remain_byte_exact_to_sources() -> None:
+    assert len(PRESERVATION_COPIED_SOURCE_PATHS) == 17
+    for relative_path, source_path in PRESERVATION_COPIED_SOURCE_PATHS.items():
+        fixture_bytes = (PRESERVATION_FIXTURE_ROOT / relative_path).read_bytes()
+        source_bytes = (REPO_ROOT / source_path).read_bytes()
+
+        assert fixture_bytes == source_bytes, relative_path
+        assert hashlib.sha256(source_bytes).hexdigest() == PRESERVATION_BASELINE_SHA256[relative_path]
+
+
+def test_s08_preservation_survives_s07_owned_asset_apply(tmp_path: Path) -> None:
+    consumer_root = tmp_path / "consumer" / "spec-dock"
+    node_root = consumer_root / "initiatives" / "init-existing" / "epics" / "epic-existing" / "issues" / "iss-existing"
+    shutil.copytree(PRESERVATION_FIXTURE_ROOT, node_root, copy_function=shutil.copy2)
+    before = _recursive_sha256_matrix(node_root)
+
+    applied = _copy_s07_owned_assets(DOCS_ROOT.parent, consumer_root)
+
+    assert applied == S07_OWNED_ASSET_MANIFEST
+    assert all(node_root not in (consumer_root / relative_path).parents for relative_path in applied)
+    assert _sha256_matrix_delta(before, _recursive_sha256_matrix(node_root)) == ((), (), ())
+    assert before == PRESERVATION_BASELINE_SHA256
+
+
+def test_s08_preservation_asset_apply_rejects_non_s07_manifest(tmp_path: Path) -> None:
+    reordered = (S07_OWNED_ASSET_MANIFEST[1], S07_OWNED_ASSET_MANIFEST[0], *S07_OWNED_ASSET_MANIFEST[2:])
+
+    with pytest.raises(ValueError, match="exact S07 owned manifest"):
+        _copy_s07_owned_assets(DOCS_ROOT.parent, tmp_path / "consumer", reordered)
+
+
+def test_s08_preservation_delta_detects_exact_intentional_mutation(tmp_path: Path) -> None:
+    node_root = tmp_path / "existing_issue"
+    shutil.copytree(PRESERVATION_FIXTURE_ROOT, node_root, copy_function=shutil.copy2)
+    before = _recursive_sha256_matrix(node_root)
+
+    (node_root / "artifacts" / "legacy" / "generic-import.zip").write_bytes(b"intentional mutation")
+
+    assert _sha256_matrix_delta(before, _recursive_sha256_matrix(node_root)) == (
+        ("artifacts/legacy/generic-import.zip",),
+        (),
+        (),
+    )
+
+
+def test_s08_preservation_delta_detects_missing_and_unexpected_files(tmp_path: Path) -> None:
+    node_root = tmp_path / "existing_issue"
+    shutil.copytree(PRESERVATION_FIXTURE_ROOT, node_root, copy_function=shutil.copy2)
+    before = _recursive_sha256_matrix(node_root)
+
+    (node_root / "report-thin.md").unlink()
+    (node_root / "unexpected.md").write_bytes(b"unexpected\n")
+
+    assert _sha256_matrix_delta(before, _recursive_sha256_matrix(node_root)) == (
+        (),
+        ("report-thin.md",),
+        ("unexpected.md",),
+    )
 
 
 @pytest.mark.parametrize(
