@@ -136,7 +136,7 @@ templates/issue/plan.md
 
 すべてのscope templateは次を満たす。
 
-- 完成文書に残るfrontmatter、見出し、各sectionの一行promptだけを持つ。
+- 完成文書に残るfrontmatterと見出しを持つ。R/D/Pは各sectionの一行promptを持ち、Reportは§5.4のempty-valid exact shapeを優先して三つの必須sectionを空本文で開始する。
 - placeholderは既存scaffolderが置換できる`<INIT_ID>`、`<EPIC_ID>`、`<ISS_ID>`、title、date、parent、GitHub linkageに限定する。
 - R/D/Pの`状態`初期値は`draft`とし、Reportには承認状態や完了状態を持たせない。
 - Guideの長文、full example、anti-pattern、workflow手順を複製しない。

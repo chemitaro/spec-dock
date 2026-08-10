@@ -1,14 +1,16 @@
 # 文書入口（spec-dock docs）
 
+## Authoring Kit
+
+Initiative / Epic / Issue の仕様を Markdown で作成・更新する場合は、まず [Authoring Kit 概要](authoring/overview.md) を参照してください。文書の責務、scope の境界、どこへ判断を残すかを説明します。この入口は特定の agent、provider、workflow の利用を必須にしません。
+
 このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
-Agent の operational entrypoint / first-read spine は導入済み skill です。まず skill で実行順序、停止条件、reviewer gate を確認し、docs は detail / reference layer として artifact semantics、policy detail、hard cases を調べるために参照します。
-全体像は `guide.md`、曖昧さの明確化の bridge/reference は `workflow_clarification.md`、仕様書作成の phase promotion semantics は `workflow_spec_authoring.md`、scope 固有の lifecycle / governance detail は対象 scope の `workflow_*.md` を参照してください。
-plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の scope-specific playbook を合わせて参照します。
-Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`、Issue Planning command の現行 contract は `./spec-dock/scripts/spec-dock-chatgpt ...` です。
+仕様作成の first-read は Authoring Kit です。以下の workflow、phase、skill は既存 runtime や移行の詳細を確認するための任意リファレンスであり、Current Authoring Kit の必須手順ではありません。
+Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`、Issue Planning command の現行 contract は `./spec-dock/scripts/spec-dock-chatgpt ...` です。これらの command reference は Authoring Kit の文書責務を置き換えません。
 
-## エージェント起点
+## 既存の agent / workflow リファレンス
 
-`spec-dock init/update` は次の skill を導入します。これらが operational entrypoint / first-read spine であり、docs は skill から到達する detail / reference surface です。
+`spec-dock init/update` は次の skill を導入します。これらは既存の agent 運用で参照できる詳細であり、仕様作成の開始条件や Current Authoring Kit の必須契約ではありません。
 
 - Hub: `.agents/skills/spec-dock-hub/SKILL.md`
 - Clarification: `.agents/skills/spec-dock-clarification/SKILL.md`
@@ -21,10 +23,10 @@ Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`�
 - Manual planning backups: `.agents/skills/spec-dock-initiative-planning-manual/SKILL.md`, `.agents/skills/spec-dock-epic-planning-manual/SKILL.md`, `.agents/skills/spec-dock-issue-planning-manual/SKILL.md`
 - ADR: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
 
-## 読み順
+## Authoring Kit の後に参照できる既存資料
 
 1. [guide.md](guide.md)
-2. 対象 scope の workflow
+2. 必要に応じた対象 scope の workflow
    - [workflow_spec_authoring.md](workflow_spec_authoring.md)
    - [workflow_clarification.md](workflow_clarification.md)
    - [workflow_initiative.md](workflow_initiative.md)
@@ -63,7 +65,7 @@ Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`�
 ./spec-dock/scripts/spec-dock issue start --id <issue-id>
 ./spec-dock/scripts/spec-dock issue finish
 
-# Issue Planning（外部 output directory が必須）
+# 既存 Issue Planning command reference（外部 output directory を使う）
 ./spec-dock/scripts/spec-dock-chatgpt planning create --issue <issue-id> --output <external-dir>
 ./spec-dock/scripts/spec-dock-chatgpt review planning --issue <issue-id> --mode archive-candidate --candidate <candidate.zip> --output <external-review-dir>
 ./spec-dock/scripts/spec-dock-chatgpt review planning --issue <issue-id> --mode git-bound --candidate <candidate.zip> --reviewed-head <sha> --output <external-review-dir>
@@ -103,15 +105,11 @@ Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`�
 ## 高頻度ルール
 
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
-- Requirement / design / plan 作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照して、fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
-- ChatGPT / Oracle を使う planning では `spec-dock-chatgpt-authoring` skill と [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照する。ChatGPT-first planning route が非自明な planning の正規 route であり、ChatGPT output、ZIP/tree、staged evidence、validation `pass` は evidence-only で、canonical adoption / reviewer pass / execution-ready / PR-ready ではない
-- Issue Planning は repo-local `./spec-dock/scripts/spec-dock-chatgpt` から `PATH` 上の `oracle` だけを実行依存として使う。Oracle が未導入または非対応なら personal wrapper、arbitrary backend、API fallback を使わず block し、GitHub 上で exact current repository / branch / HEAD を確認できなければ default branchへfallbackしない
+- Requirement / design / plan の文書責務は [Authoring Kit 概要](authoring/overview.md) を参照する。既存 planning skill や workflow は、必要な場合にだけ追加の運用リファレンスとして使う
+- ChatGPT / Oracle を使う場合の既存 evidence lane は [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) に記録されている。これは Current Authoring Kit の正規 route や必須手順ではなく、出力は evidence-only である
+- Issue Planning command の既存実行依存と制約は repo-local `./spec-dock/scripts/spec-dock-chatgpt` の reference として保持する。Current Authoring Kit の仕様作成はこの command を前提にしない
 - Planner と Semantic Revision は canonical `requirement.md` / `design.md` / `plan.md` と runtime-selected の exactly-one onboarding companion を含む exactly-one authoring ZIP を返し、Reviewer は closed JSON を返す。companion は第四のcanonical specificationではなく subordinate evidence である
-- Issue Planning の `planning revise` は request と同じ directory の exact `planning-review-result.json` だけを使う。archive と git-bound は別 identity であり、fresh PASS Review と exact Human approvalを満たして `planning apply` が `ready` を返すまで canonical adoption ではない。PR、Issue finish、merge は別 workflow である
-- archive と git-bound の Review/apply は、`planning create` が生成した exact same Candidate を必須とする。Human approval 前に managed write は行わない
-- manual planning backups は hard / unrecoverable ChatGPT route failure と human-approved emergency backup evidence がある場合だけ使う。queued tabs、retryable timeout、recoverable browser/backend setup は wait / retry / recover の対象であり、自動 fallback ではない
-- 仕様書作成前後の曖昧さ、用語衝突、責務境界、正式質問は `spec-dock-clarification` skill を operational entrypoint にし、`workflow_clarification.md` を bridge/reference として一問ずつ扱う
-- plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む
+- `planning revise`、Review/apply、manual backup、clarification、phase playbook の記述は既存 workflow reference として保持する。Current Authoring Kit の仕様作成に特定の provider、review、phase 順序を必須化しない
 - `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作る。node create/import で local-only create へ自動フォールバックしない
 - `new issue --create-github-issue` は default create の explicit alias
 - node creation で既存 Issue へ紐づける場合は `--github-issue <n>` を使う。`--no-github` は node creation option ではない
@@ -132,5 +130,5 @@ Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`�
 - explicit generic import の publication は platform safety boundary を持ちます。Linux は anonymous `O_TMPFILE` staging を使い、named-temp success fallback を持ちません。macOS は destination-side named stage と検証済み staged descriptor からの `fclonefileat` no-replace publication を使い、commit 後 cleanup の不確実性は unsafe unlink ではなく warning になります。same-UID actor が final check と unlink の間に置換する事象は accepted exclusion のままです。詳細は [guide.md](guide.md) を参照してください
 - ordinary `uv run pytest` は default full-regression skip を適用する fast lane です。full-regression body は別の explicit lane であり、`uv run pytest --run-full-regression` を実行します
 - root `spec-dock/.workbench/` は日付 bucket と必要 file の手動選択だけを使い、root 一括 copy command は持ちません。Initiative / Epic / Issue scope の copy は、同一 repository の linked worktree へ明示実行する source-wins の one-shot copy であり、自動 sync も copy-back も行いません。Workbench copy は directory をそのまま扱い、言語、拡張子、MIME、内容による file classifier を持ちません。update は既存 Workbench を unmanaged local content として保持し、migration、normalize、delete、promotion しません
-- Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の detail/reference は `workflow_issue.md`
+- Issue plan の既存 runtime / execution detail は `workflow_issue.md` に残るが、Current Authoring Kit の Plan 基礎契約は [Issue Plan Guide](authoring/issue-plan.md) を参照する
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する
