@@ -4,18 +4,32 @@ ID: "<ISS_ID>"
 タイトル: "<ISS_TITLE>"
 関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
 状態: "draft"
-作成者: "<YOUR_NAME>"
 最終更新: "YYYY-MM-DD"
 依存: ["requirement.md", "design.md"]
 親: ["<EPIC_ID>", "<INIT_ID>"]
-artifact_state: awaiting-assurance-compose
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装計画 placeholder
+# <ISS_ID> <ISS_TITLE> — 実装計画
 
-このファイルはまだ合成されていません。
+詳細: [Issue Plan Guide](../../../../../../docs/authoring/issue-plan.md)
 
-先に `requirement.md` を具体化し、`assurance classify --stage requirement` を実行してください。
-その後、`assurance compose --artifact all` を実行して、この Issue の分類に応じた実装計画テンプレートを合成してください。
+## Planning Level
+選んだ level、理由、risk factor、再評価条件を記述する。
 
-この状態のまま実装計画本文を書き始めないでください。
+## 目標
+この Issue で達成する観測可能な成果を記述する。
+
+## 順序・依存
+実装順、依存、並行可能な作業を記述する。
+
+## 実装step
+実装、tests、docs、migration の手順を記述する。
+
+## 検証
+受け入れ条件と regression を確認する方法を記述する。
+
+## rollback
+問題時の rollback または forward recovery を記述する。
+
+## exit / handoff
+完了条件、残余リスク、引き渡しを記述する。

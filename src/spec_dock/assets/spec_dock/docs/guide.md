@@ -1,15 +1,19 @@
 # 全体ガイド（guide）
 
+## Authoring Kit
+
+Initiative / Epic / Issue の仕様を書くときの入口は [Authoring Kit 概要](authoring/overview.md) です。Requirement、Design、Issue Plan、Report、scope layering の役割を確認してから、必要な作業手順や参照を選びます。特定の agent、provider、workflow はこの文書契約の前提ではありません。
+
 spec-dock の docs レイヤ、概念、生成物を最短で把握するための入口です。
-Agent の operational entrypoint / first-read spine は skill が所有します。docs は skill から到達する detail / reference surface として、field semantics、policy detail、hard cases、生成物の読み方を説明します。
-scope 固有の詳細手順は `workflow_*.md`、曖昧さの明確化の bridge/reference は `workflow_clarification.md`、仕様書作成の phase promotion semantics は `workflow_spec_authoring.md`、shared な requirement / design の作法は `phase_*.md`、plan は `phase_plan.md` と `phase_plan_<scope>.md` の二段構成、コマンドや制約は `reference_*.md` を参照します。
+仕様作成の first-read は Authoring Kit です。skill、workflow、phase は既存 runtime や移行の詳細を確認する任意リファレンスであり、Current Authoring Kit の必須手順ではありません。
+scope 固有の既存手順は `workflow_*.md`、既存の明確化資料は `workflow_clarification.md`、既存の仕様作成資料は `workflow_spec_authoring.md`、phase playbook は `phase_*.md`、コマンドや制約は `reference_*.md` を参照します。
 runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` です。
 
 ## 文書の読み分け（docs）
 
-- `workflow_*.md`: Initiative / Epic / Issue / ADR の scope 固有 workflow
-- `workflow_clarification.md`: source-grounded な一問一答、質問 artifact、docs synthesis、ADR triage の workflow
-- `workflow_spec_authoring.md`: Initiative / Epic / Issue 共通の requirement / design / plan 作成 workflow
+- `workflow_*.md`: Initiative / Epic / Issue / ADR の既存 scope 固有 workflow reference
+- `workflow_clarification.md`: source-grounded な一問一答、質問 artifact、docs synthesis、ADR triage の既存 reference
+- `workflow_spec_authoring.md`: Initiative / Epic / Issue 共通の既存 authoring reference
 - `phase_*.md`: shared phase playbook（共通の作り方）
 - `phase_plan_<scope>.md`: scope 固有の plan authoring rule
 - `reference_*.md`: GitHub / naming / deps / sync などの参照仕様
@@ -31,7 +35,7 @@ detail / reference 入口:
 - Epic detail: [workflow_epic.md](workflow_epic.md)
 - Issue detail: [workflow_issue.md](workflow_issue.md)
 - ADR detail: [workflow_adr.md](workflow_adr.md)
-- ChatGPT authoring evidence lane: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md), [reference_authoring_pack_backend.md](reference_authoring_pack_backend.md), [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md)
+- ChatGPT authoring evidence lane（既存 reference）: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md), [reference_authoring_pack_backend.md](reference_authoring_pack_backend.md), [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md)
 
 ## 基本概念
 
@@ -133,8 +137,8 @@ spec-dock/
 
 1. 既存ノードに収まるか確認し、必要なら `new` / `import` する
 2. Issue 実行では `issue start <target>` で作業対象を固定し、対象ブランチへ checkout する
-3. 仕様書作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照する。未解決の曖昧さは `spec-dock-clarification` skill と `workflow_clarification.md` の bridge/reference で一問ずつ解消してから、対象 scope の `workflow_*.md`、requirement / design の shared playbook、`phase_plan.md` → `phase_plan_<scope>.md` の順で書く
-4. ChatGPT / Oracle を使う場合は evidence lane として扱い、ZIP/tree/staged evidence や validation `pass` を canonical adoption、reviewer pass、execution-ready、PR-ready と混同しない
+3. 仕様書作成は [Authoring Kit 概要](authoring/overview.md) から始める。既存 planning skill、workflow、phase playbook は必要な場合にだけ追加の運用リファレンスとして参照する
+4. ChatGPT / Oracle を使う場合の既存 evidence lane は optional reference であり、出力を canonical authority と混同しない
 5. Initiative は Epic 分解、Epic は Issue 分割、Issue は agent-native / behavior-slice based execution contract を plan に落とす
 6. reviewed Epic plan が final delivery Issue を明示している場合だけ、中間 Issue は relay-style に実装し、最後の delivery Issue で Epic 品質ゲートと mergeable PR をまとめる。それ以外は通常の PR Delivery / Merge Preparation Gate に従う
 7. `validate` / `sync` で整合性と生成物を更新し、Issue lifecycle を閉じる場合は `issue finish` を使う
@@ -165,8 +169,8 @@ spec-dock/
 ## 次に読む
 
 - 実務導線: [README.md](README.md)
-- 仕様書作成 workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
-- 明確化 workflow: [workflow_clarification.md](workflow_clarification.md)
-- 作業対象別 workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
+- 既存 authoring reference: [workflow_spec_authoring.md](workflow_spec_authoring.md)
+- 既存 clarification reference: [workflow_clarification.md](workflow_clarification.md)
+- 既存 scope workflow reference: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - 参照仕様: [reference_github.md](reference_github.md), [reference_naming.md](reference_naming.md), [reference_deps.md](reference_deps.md), [reference_sync.md](reference_sync.md)
-- ChatGPT authoring pack: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md)
+- ChatGPT authoring pack（既存 reference）: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md)

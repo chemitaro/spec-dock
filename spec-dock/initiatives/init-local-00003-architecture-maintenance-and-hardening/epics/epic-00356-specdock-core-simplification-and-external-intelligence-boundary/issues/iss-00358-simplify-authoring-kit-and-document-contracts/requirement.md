@@ -97,7 +97,7 @@ Fresh Initiative / Epic / Issueには、それぞれ一つの`requirement.md`、
 templateに含めるもの:
 
 - 完成文書に残る見出し
-- 各sectionの目的を示す短いprompt
+- R/D/Pでは各sectionの目的を示す短いprompt。Reportは`AC-358-006`のempty-valid契約を優先し、三つの必須sectionを空本文で開始する
 - 最小限のplaceholder
 - optional sectionの明示
 - 対応するstable Guideへのlink
