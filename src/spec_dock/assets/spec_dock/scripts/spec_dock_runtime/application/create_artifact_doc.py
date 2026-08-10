@@ -64,11 +64,7 @@ class PathIdentity:
 def create_artifact_doc(
     req: CreateArtifactDocRequest,
     ports: Ports,
-    *,
-    assurance_store: object | None = None,
-    artifact_store: object | None = None,
 ) -> CreateArtifactDocResult:
-    del assurance_store, artifact_store
     template_scaffolder = _resolve_template_scaffolder(ports)
     specdock_dir = _resolve_specdock_dir(ports)
     graph = load_graph(ports, validate=False)
