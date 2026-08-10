@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Epic 00356 縦スライス計画ガイド — Evidence Only</title>
+<style>
+:root {
+  --ink:#18212b; --muted:#5b6570; --line:#cbd3da; --paper:#ffffff; --soft:#f4f6f8;
+  --accent:#154c79; --accent2:#6b3f86; --warn:#7c4a03; --danger:#7a2727; --ok:#245d3a;
+}
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; color:var(--ink); background:var(--soft); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; line-height:1.72; }
+a { color:var(--accent); }
+header { background:linear-gradient(135deg,#102d46,#37214b); color:#fff; padding:2.2rem max(1.2rem,calc((100vw - 1180px)/2)); }
+header h1 { margin:.2rem 0 .55rem; font-size:clamp(1.7rem,3vw,2.6rem); line-height:1.25; }
+header p { max-width:950px; margin:.45rem 0; }
+.status-line { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:1rem; }
+.badge { display:inline-flex; align-items:center; gap:.35rem; border:1px solid currentColor; border-radius:999px; padding:.22rem .65rem; font-size:.9rem; font-weight:700; background:#fff; color:var(--ink); }
+header .badge { background:rgba(255,255,255,.1); color:#fff; }
+.badge::before { font-weight:900; }
+.adopted::before { content:"◆"; } .candidate::before { content:"□"; } .action::before { content:"△"; } .blocked::before { content:"!"; }
+.layout { max-width:1180px; margin:0 auto; display:grid; grid-template-columns:260px minmax(0,1fr); gap:1.25rem; padding:1.25rem; }
+nav { position:sticky; top:1rem; align-self:start; background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:1rem; max-height:calc(100vh - 2rem); overflow:auto; }
+nav h2 { font-size:1rem; margin:0 0 .6rem; }
+nav ol { margin:0; padding-left:1.35rem; }
+nav li { margin:.28rem 0; }
+main { min-width:0; }
+section { background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:1.35rem 1.55rem; margin-bottom:1.2rem; box-shadow:0 2px 10px rgba(20,30,40,.04); }
+h2 { margin-top:0; padding-bottom:.35rem; border-bottom:2px solid var(--line); }
+h3 { margin-top:1.45rem; }
+.notice { border-left:6px solid var(--warn); background:#fff8e8; padding:.85rem 1rem; border-radius:8px; }
+.evidence { border-left-color:var(--accent2); background:#f8f3fb; }
+.current { border-left-color:var(--danger); background:#fff5f5; }
+.target { border-left-color:var(--ok); background:#f2fbf5; }
+.grid2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.9rem; }
+.card { border:1px solid var(--line); border-radius:10px; padding:1rem; background:#fff; }
+.card h3 { margin:.05rem 0 .45rem; font-size:1.05rem; }
+table { width:100%; border-collapse:collapse; margin:.8rem 0 1.2rem; font-size:.94rem; }
+th,td { border:1px solid var(--line); padding:.55rem .65rem; vertical-align:top; text-align:left; }
+th { background:#eaf0f5; }
+code { background:#eef1f4; padding:.08rem .28rem; border-radius:4px; }
+pre { overflow:auto; background:#17212b; color:#eef5fb; padding:1rem; border-radius:8px; }
+.figure { border:1px solid var(--line); border-radius:10px; padding:.7rem; background:#fcfdfe; margin:1rem 0; overflow:auto; }
+.figure figcaption { font-size:.9rem; color:var(--muted); margin-top:.45rem; }
+svg { width:100%; min-width:720px; height:auto; display:block; }
+.legend { display:flex; flex-wrap:wrap; gap:.8rem; font-size:.9rem; margin:.5rem 0; }
+.legend span { display:inline-flex; align-items:center; gap:.3rem; }
+.shape-circle::before { content:"●"; } .shape-square::before { content:"■"; } .shape-diamond::before { content:"◆"; } .shape-triangle::before { content:"▲"; }
+.checks li { margin:.3rem 0; }
+small,.muted { color:var(--muted); }
+footer { max-width:1180px; margin:0 auto 2rem; padding:0 1.25rem; color:var(--muted); }
+@media (max-width:900px) { .layout { grid-template-columns:1fr; } nav { position:static; max-height:none; } .grid2 { grid-template-columns:1fr; } }
+@media print {
+  body { background:#fff; font-size:10.5pt; } header { background:#fff !important; color:#000; padding:0 0 1rem; }
+  .layout { display:block; max-width:none; padding:0; } nav { display:none; } section { box-shadow:none; break-inside:avoid; border-color:#999; }
+  a { color:#000; text-decoration:none; } .badge { color:#000; background:#fff; }
+  svg { min-width:0; } @page { size:A4; margin:14mm; }
+}
+</style>
+</head>
+<body>
+<header>
+  <p><strong>Epic 00356 / SpecDock Core Simplification and External Intelligence Boundary</strong></p>
+  <h1>縦スライス計画ガイド</h1>
+  <p>2026-08-09に、repository <code>chemitaro/spec-dock</code>、branch <code>main</code>、source SHA <code>2c75e0c02cb65a6e74040a72dc161d342d661091</code>を基準に作成したhuman-facing evidenceです。正本ではありません。</p>
+  <div class="status-line">
+    <span class="badge adopted">Source decisions: adopted</span>
+    <span class="badge candidate">Bundle reflection: unreviewed</span>
+    <span class="badge action">Canonical action: human-controlled</span>
+  </div>
+</header>
+<div class="layout">
+<nav aria-label="ページ内ナビゲーション">
+  <h2>Navigation</h2>
+  <ol>
+    <li><a href="#position">位置づけ</a></li>
+    <li><a href="#background">背景</a></li>
+    <li><a href="#current-target">Current → Target</a></li>
+    <li><a href="#decisions">採用済み判断</a></li>
+    <li><a href="#non-scope">非スコープ</a></li>
+    <li><a href="#boundaries">設計境界</a></li>
+    <li><a href="#slices">縦スライス</a></li>
+    <li><a href="#dependencies">依存・並行性</a></li>
+    <li><a href="#issues">Issue詳細</a></li>
+    <li><a href="#procedure">実施手順</a></li>
+    <li><a href="#acceptance">AcceptanceとTest</a></li>
+    <li><a href="#migration">MigrationとRollback</a></li>
+    <li><a href="#risks">Risk</a></li>
+    <li><a href="#terms">用語</a></li>
+    <li><a href="#human-decisions">次の人間判断</a></li>
+  </ol>
+</nav>
+<main>
+<section id="position">
+  <h2>1. 位置づけ</h2>
+  <div class="notice evidence"><strong>Evidence-only:</strong> 本HTMLは新メンバーが背景と計画を理解するための補助資料です。Epic／Issueのcanonical Requirement、Design、Planではなく、review pass、implementation readiness、PR readiness、merge readiness、Issue finish、Epic completionを表しません。</div>
+  <p>Source上でProduct Ownerが採用した判断は未決へ戻しません。一方、このbundleによる再構成は未レビューです。正本への反映、Issue作成、dependency mutation、実装、PR、mergeは別のHuman-controlled workflowで行います。</p>
+  <div class="grid2">
+    <div class="card"><h3>Repository authority</h3><p><code>chemitaro/spec-dock</code> / <code>main</code> / <code>2c75e0c02cb65a6e74040a72dc161d342d661091</code></p></div>
+    <div class="card"><h3>Bundle metadata</h3><p><code>authority=evidence_only</code><br><code>adoption_status=unreviewed</code><br><code>bundle_generation_not_promotion=true</code></p></div>
+  </div>
+</section>
+
+<section id="background">
+  <h2>2. 背景</h2>
+  <p>SpecDockの長期価値は、Initiative／Epic／Issueのidentity、GitHub linkage、R/D/P、Artifact、dependency DAG、active selection、sync／validateなど、モデルが変わっても安定する構造にあります。しかしCurrent productにはPlanning、Review、Assurance、Profile、provider固有import、ChatGPT authoring、PR workflow等の変化の速い責務がRuntime、Docs、Skills、Installerへ分散しています。</p>
+  <div class="cards">
+    <article class="card"><h3>保守負担</h3><p>一つのpolicy変更がparser、registry、domain、lifecycle、templates、docs、skills、tests、installerへ連鎖します。</p></article>
+    <article class="card"><h3>Authority混在</h3><p>Evidence、Report、Reviewer、promotion record、canonical docsの役割が重なり、構造操作と品質判断が結合しています。</p></article>
+    <article class="card"><h3>Provider lock-in</h3><p>特定provider／browser／Oracleの導線がproduct contractに入り、外部環境の変化をCoreが受けます。</p></article>
+    <article class="card"><h3>Migration risk</h3><p>単純削除では既存R/D/P、heavy Report、Artifact、profile data、managed assetsを壊す可能性があります。</p></article>
+  </div>
+</section>
+
+<section id="current-target">
+  <h2>3. CurrentからTarget</h2>
+  <div class="grid2">
+    <div class="notice current"><strong>Current:</strong> workflow-heavy Runtime、Assurance／Profile、large Report ledger、many managed skills、phase／reviewer／provider-specific docs。</div>
+    <div class="notice target"><strong>Target:</strong> Storage Core、thin Authoring Kit、two repo-local skills、replaceable external intelligence、historical preservation。</div>
+  </div>
+  <figure class="figure">
+    <svg viewBox="0 0 1120 420" role="img" aria-labelledby="svg1-title svg1-desc">
+      <title id="svg1-title">CurrentからTargetへの責務分離</title>
+      <desc id="svg1-desc">左のworkflow-heavy productから、右のStorage Core、Authoring Kit、外部Intelligenceへ責務を分離する図。</desc>
+      <defs>
+        <pattern id="pStripe" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#7a2727" stroke-width="3"/></pattern>
+        <pattern id="pDots" width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.5" fill="#245d3a"/></pattern>
+        <marker id="arrow1" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#18212b"/></marker>
+      </defs>
+      <rect x="25" y="45" width="325" height="320" rx="18" fill="url(#pStripe)" stroke="#7a2727" stroke-width="2"/>
+      <rect x="42" y="62" width="291" height="286" rx="14" fill="#fff" opacity=".93"/>
+      <text x="187" y="92" text-anchor="middle" font-size="22" font-weight="700">CURRENT</text>
+      <text x="65" y="130" font-size="16">■ Storage + structure</text>
+      <text x="65" y="163" font-size="16">■ Assurance / Profile</text>
+      <text x="65" y="196" font-size="16">■ Planning / Review workflow</text>
+      <text x="65" y="229" font-size="16">■ Provider-specific import</text>
+      <text x="65" y="262" font-size="16">■ Large Report ledgers</text>
+      <text x="65" y="295" font-size="16">■ Many managed skills</text>
+      <text x="65" y="328" font-size="16">■ PR workflow / adapters</text>
+      <line x1="370" y1="205" x2="525" y2="205" stroke="#18212b" stroke-width="4" marker-end="url(#arrow1)"/>
+      <text x="447" y="184" text-anchor="middle" font-size="15" font-weight="700">separate responsibility</text>
+      <rect x="555" y="45" width="540" height="320" rx="18" fill="url(#pDots)" stroke="#245d3a" stroke-width="2"/>
+      <rect x="575" y="65" width="235" height="125" rx="12" fill="#fff" stroke="#154c79" stroke-width="2"/>
+      <text x="692" y="96" text-anchor="middle" font-size="20" font-weight="700">Storage Core</text>
+      <text x="595" y="128" font-size="14">node / linkage / deps</text>
+      <text x="595" y="153" font-size="14">active / lifecycle / Artifact</text>
+      <text x="595" y="178" font-size="14">sync / validate / deterministic CLI</text>
+      <rect x="835" y="65" width="235" height="125" rx="12" fill="#fff" stroke="#6b3f86" stroke-width="2"/>
+      <text x="952" y="96" text-anchor="middle" font-size="20" font-weight="700">Authoring Kit</text>
+      <text x="855" y="128" font-size="14">thin R / D / P / Report</text>
+      <text x="855" y="153" font-size="14">Base + 4 Level Guides</text>
+      <text x="855" y="178" font-size="14">Artifact semantics</text>
+      <rect x="705" y="225" width="235" height="105" rx="52" fill="#fff" stroke="#245d3a" stroke-width="2" stroke-dasharray="8 5"/>
+      <text x="822" y="258" text-anchor="middle" font-size="19" font-weight="700">External Intelligence</text>
+      <text x="822" y="284" text-anchor="middle" font-size="14">replaceable / operator-owned</text>
+      <text x="822" y="308" text-anchor="middle" font-size="14">no Runtime authority</text>
+      <line x1="740" y1="225" x2="705" y2="190" stroke="#18212b" stroke-width="2" marker-end="url(#arrow1)"/>
+      <text x="675" y="218" font-size="13">uses CLI</text>
+      <line x1="900" y1="225" x2="955" y2="190" stroke="#18212b" stroke-width="2" marker-end="url(#arrow1)"/>
+      <text x="945" y="218" font-size="13">reads guides</text>
+    </svg>
+    <figcaption>図1。斜線のCurrent混在から、矩形の製品責務と破線楕円の外部clientへ分離する。形状とラベルでも状態を区別する。</figcaption>
+  </figure>
+</section>
+
+<section id="decisions">
+  <h2>4. 採用済み判断</h2>
+  <table>
+    <thead><tr><th>ID</th><th>◆ Source-adopted decision</th><th>Target implication</th></tr></thead>
+    <tbody>
+      <tr><td>AD-001</td><td>Runtime workflow／Profile／Assurance削除</td><td>parser、registry、lifecycle、docs、skills、tests、installerからCurrent routeを除去</td></tr>
+      <tr><td>AD-002</td><td>Planning Level docs-only、一つのIssue plan、Base + 4 Guides</td><td>Runtime metadata／routing／gateなし</td></tr>
+      <tr><td>AD-003</td><td>finishはclose → clear → post-sync、quality gateなし</td><td>failure orderingとretryabilityだけをCoreが所有</td></tr>
+      <tr><td>AD-004</td><td>active set selection-only、startだけがguard＋dependency check、readyはdependency-only</td><td>planning selectionとimplementation startを分離</td></tr>
+      <tr><td>AD-005</td><td>optional positional type、blank default、Current 6種、no analysis、historical preserve</td><td>create catalogとrecognition catalogを分離</td></tr>
+      <tr><td>AD-006</td><td>import file-only</td><td>provider-specific importを削除</td></tr>
+      <tr><td>AD-007</td><td>Fresh thin Report常設、空valid、non-gating、Existing body preserve</td><td>scaffold pathは安定、内容はresult summaryだけ</td></tr>
+      <tr><td>AD-008</td><td>repair badge／draft Current surface削除</td><td>historical evidenceは残すが新規作成とnavigationは終了</td></tr>
+      <tr><td>AD-009</td><td>durable decisionはR/D/Pまたはaccepted ADR</td><td>Artifact／Report／Skill outputはevidence</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="non-scope">
+  <h2>5. 非スコープ</h2>
+  <ul>
+    <li>新しいmodel／provider／browser／OracleをSpecDock product dependencyとして実装すること。</li>
+    <li>Planning LevelをRuntime分類、authority、quality gate、ready stateにすること。</li>
+    <li>既存R/D/P、Report、Artifact、Discussion、ADR、profile dataの一括rewrite／rename／delete。</li>
+    <li>GitHubとlocal Spec Graphの二重正本化。</li>
+    <li>このbundleからcanonical file、Issue、dependency、PRを直接変更すること。</li>
+    <li>proposed final candidateへnumeric IDを推測で割り当てること。</li>
+  </ul>
+</section>
+
+<section id="boundaries">
+  <h2>6. 設計境界</h2>
+  <table>
+    <thead><tr><th>Boundary</th><th>Inside</th><th>Outside</th></tr></thead>
+    <tbody>
+      <tr><td>Storage Core</td><td>identity、hierarchy、linkage、deps、active、thin lifecycle、Artifact、sync／validate／doctor</td><td>Planning／Review／Assurance／Profile／quality／PR workflow</td></tr>
+      <tr><td>Authoring Kit</td><td>document meaning、thin templates、guides、docs-only level、Artifact semantics</td><td>Runtime enforcement、canonical adoption verdict</td></tr>
+      <tr><td>Repo-local skills</td><td>navigation、explicit CLI、one evidence Artifact</td><td>hidden state machine、model authority、automatic R/D/P write</td></tr>
+      <tr><td>External Intelligence</td><td>analysis／authoring／implementation assistance</td><td>Core adapter、persistent provider state、automatic authority</td></tr>
+    </tbody>
+  </table>
+  <figure class="figure">
+    <svg viewBox="0 0 1120 430" role="img" aria-labelledby="svg2-title svg2-desc">
+      <title id="svg2-title">Issue責務とhandoff</title>
+      <desc id="svg2-desc">357から360およびproposed finalまでの責務所有とhandoffをレーンで示す。</desc>
+      <defs><marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#18212b"/></marker></defs>
+      <text x="18" y="36" font-size="18" font-weight="700">Owner lane</text>
+      <line x1="18" y1="52" x2="1090" y2="52" stroke="#cbd3da"/>
+      <rect x="40" y="90" width="185" height="210" rx="10" fill="#eef5fb" stroke="#154c79" stroke-width="2"/>
+      <text x="132" y="122" text-anchor="middle" font-size="18" font-weight="700">iss-00357</text>
+      <text x="132" y="148" text-anchor="middle" font-size="14">Runtime mechanism</text>
+      <text x="60" y="185" font-size="13">• CLI / lifecycle</text><text x="60" y="210" font-size="13">• Artifact safety</text><text x="60" y="235" font-size="13">• historical read</text>
+      <rect x="255" y="90" width="185" height="210" rx="10" fill="#f8f3fb" stroke="#6b3f86" stroke-width="2"/>
+      <text x="347" y="122" text-anchor="middle" font-size="18" font-weight="700">iss-00358</text>
+      <text x="347" y="148" text-anchor="middle" font-size="14">Authoring semantics</text>
+      <text x="275" y="185" font-size="13">• templates / guides</text><text x="275" y="210" font-size="13">• level docs</text><text x="275" y="235" font-size="13">• report meaning</text>
+      <rect x="470" y="90" width="185" height="210" rx="10" fill="#f3f8ed" stroke="#4e6b29" stroke-width="2"/>
+      <text x="562" y="122" text-anchor="middle" font-size="18" font-weight="700">iss-00359</text>
+      <text x="562" y="148" text-anchor="middle" font-size="14">Skill integration</text>
+      <text x="490" y="185" font-size="13">• two skills</text><text x="490" y="210" font-size="13">• no hidden workflow</text><text x="490" y="235" font-size="13">• one evidence output</text>
+      <rect x="685" y="90" width="185" height="210" rx="10" fill="#fff8e8" stroke="#7c4a03" stroke-width="2"/>
+      <text x="777" y="122" text-anchor="middle" font-size="18" font-weight="700">iss-00360</text>
+      <text x="777" y="148" text-anchor="middle" font-size="14">Distribution migration</text>
+      <text x="705" y="185" font-size="13">• fresh / update</text><text x="705" y="210" font-size="13">• uninstall / prune</text><text x="705" y="235" font-size="13">• preservation</text>
+      <polygon points="1000,80 1080,195 1000,310 920,195" fill="#fff" stroke="#7a2727" stroke-width="3" stroke-dasharray="8 5"/>
+      <text x="1000" y="165" text-anchor="middle" font-size="16" font-weight="700">Proposed</text><text x="1000" y="190" text-anchor="middle" font-size="14">final quality</text><text x="1000" y="215" text-anchor="middle" font-size="14">integration</text><text x="1000" y="240" text-anchor="middle" font-size="14">PR delivery</text>
+      <line x1="225" y1="330" x2="470" y2="330" stroke="#18212b" stroke-width="2" marker-end="url(#arrow2)"/><text x="347" y="353" text-anchor="middle" font-size="13">Runtime contract + tests</text>
+      <line x1="440" y1="375" x2="470" y2="375" stroke="#18212b" stroke-width="2" marker-end="url(#arrow2)"/><text x="455" y="397" text-anchor="middle" font-size="13">Guide paths</text>
+      <line x1="655" y1="330" x2="685" y2="330" stroke="#18212b" stroke-width="2" marker-end="url(#arrow2)"/><text x="670" y="353" text-anchor="middle" font-size="13">Skill inventory</text>
+      <line x1="870" y1="330" x2="950" y2="300" stroke="#18212b" stroke-width="2" marker-end="url(#arrow2)"/><text x="925" y="355" text-anchor="middle" font-size="13">consumer evidence</text>
+    </svg>
+    <figcaption>図2。矩形は既存Issue owner、破線の菱形はID未割当のproposed final candidate。矢印ラベルはhandoff内容。</figcaption>
+  </figure>
+</section>
+
+<section id="slices">
+  <h2>7. 縦スライス方針</h2>
+  <p>各IssueはRequirement、Design、Implementation、Test、Docs、Migration／Compatibilityを同じIssueで閉じます。単なる「Runtime layer」「Docs layer」の横断作業ではなく、利用者が確認できるjourneyをacceptanceの中心にします。</p>
+  <div class="cards">
+    <article class="card"><h3>357 — Storage Core journey</h3><p>Fresh／historical fixtureでCLIを操作し、selection、start、finish、Artifact、file importのtarget behaviorを確認。</p></article>
+    <article class="card"><h3>358 — Authoring journey</h3><p>Fresh nodeにthin R/D/P/Reportが生成され、Base + selected Level Guideで文書を作成できる。</p></article>
+    <article class="card"><h3>359 — Skill journey</h3><p>二つのskillからCore／Kitへ到達し、hidden workflowやautomatic canonical writeを行わない。</p></article>
+    <article class="card"><h3>360 — Distribution journey</h3><p>Fresh／update／uninstallでTarget inventoryへ移行し、existing user contentを守る。</p></article>
+    <article class="card"><h3>Proposed final</h3><p>全sliceを統合し、full verification、defect-only repair、diff audit、PR handoff evidenceを独立に閉じる。</p></article>
+  </div>
+</section>
+
+<section id="dependencies">
+  <h2>8. 依存順と並行可否</h2>
+  <p><strong>357と358は並行可</strong>ですが、IC-0でownershipを固定し、shared fixture／help／scaffold contractをIC-1で統合します。359は357と358に依存し、360は357、358、359に依存します。Proposed finalは全implementation Issue後です。</p>
+  <figure class="figure">
+    <svg viewBox="0 0 1120 390" role="img" aria-labelledby="svg3-title svg3-desc">
+      <title id="svg3-title">縦スライス依存グラフ</title>
+      <desc id="svg3-desc">357と358が並行し、359、360、proposed finalへ順に依存する。</desc>
+      <defs><marker id="arrow3" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#18212b"/></marker></defs>
+      <rect x="35" y="65" width="180" height="85" rx="12" fill="#eef5fb" stroke="#154c79" stroke-width="2"/><text x="125" y="100" text-anchor="middle" font-size="18" font-weight="700">iss-00357</text><text x="125" y="127" text-anchor="middle" font-size="14">Storage Core</text>
+      <rect x="35" y="235" width="180" height="85" rx="12" fill="#f8f3fb" stroke="#6b3f86" stroke-width="2"/><text x="125" y="270" text-anchor="middle" font-size="18" font-weight="700">iss-00358</text><text x="125" y="297" text-anchor="middle" font-size="14">Authoring Kit</text>
+      <circle cx="330" cy="192" r="52" fill="#fff" stroke="#18212b" stroke-width="2"/><text x="330" y="187" text-anchor="middle" font-size="17" font-weight="700">IC-1</text><text x="330" y="211" text-anchor="middle" font-size="13">Core ↔ Kit</text>
+      <rect x="445" y="150" width="180" height="85" rx="12" fill="#f3f8ed" stroke="#4e6b29" stroke-width="2"/><text x="535" y="185" text-anchor="middle" font-size="18" font-weight="700">iss-00359</text><text x="535" y="212" text-anchor="middle" font-size="14">Two skills</text>
+      <circle cx="710" cy="192" r="45" fill="#fff" stroke="#18212b" stroke-width="2"/><text x="710" y="187" text-anchor="middle" font-size="17" font-weight="700">IC-2</text><text x="710" y="211" text-anchor="middle" font-size="13">skills</text>
+      <rect x="795" y="150" width="180" height="85" rx="12" fill="#fff8e8" stroke="#7c4a03" stroke-width="2"/><text x="885" y="185" text-anchor="middle" font-size="18" font-weight="700">iss-00360</text><text x="885" y="212" text-anchor="middle" font-size="14">Distribution</text>
+      <polygon points="1050,125 1110,192 1050,259 990,192" fill="#fff" stroke="#7a2727" stroke-width="3" stroke-dasharray="8 5"/><text x="1050" y="183" text-anchor="middle" font-size="14" font-weight="700">Proposed</text><text x="1050" y="205" text-anchor="middle" font-size="13">final</text>
+      <line x1="215" y1="108" x2="285" y2="165" stroke="#18212b" stroke-width="3" marker-end="url(#arrow3)"/><text x="248" y="112" font-size="12">contract</text>
+      <line x1="215" y1="278" x2="285" y2="220" stroke="#18212b" stroke-width="3" marker-end="url(#arrow3)"/><text x="242" y="285" font-size="12">assets</text>
+      <line x1="382" y1="192" x2="445" y2="192" stroke="#18212b" stroke-width="3" marker-end="url(#arrow3)"/><text x="414" y="175" text-anchor="middle" font-size="12">both pass handoff</text>
+      <line x1="625" y1="192" x2="665" y2="192" stroke="#18212b" stroke-width="3" marker-end="url(#arrow3)"/>
+      <line x1="755" y1="192" x2="795" y2="192" stroke="#18212b" stroke-width="3" marker-end="url(#arrow3)"/>
+      <line x1="975" y1="192" x2="990" y2="192" stroke="#18212b" stroke-width="3" marker-end="url(#arrow3)"/>
+      <path d="M125 150 L125 205" stroke="#18212b" stroke-dasharray="6 5"/><text x="145" y="184" font-size="13">parallel</text>
+      <text x="35" y="360" font-size="13">Legend: rectangles = existing Issues; circles = integration checkpoints; dashed diamond = no numeric ID / human decision required.</text>
+    </svg>
+    <figcaption>図3。形状で既存Issue、checkpoint、proposed candidateを区別。357と358のみparallel foundation。</figcaption>
+  </figure>
+</section>
+
+<section id="issues">
+  <h2>9. 各Issueの詳細</h2>
+  <h3>iss-00357 — Reduce Runtime to Storage Core</h3>
+  <table><tbody>
+    <tr><th>Goal</th><td>Runtimeから認知workflowを除き、構造操作のend-to-end CLIを成立させる。</td></tr>
+    <tr><th>Acceptance</th><td>active set selection-only、start guard＋dependency、finish close-clear-sync、six Artifact types、blank default、file-only import、thin Report non-gating。</td></tr>
+    <tr><th>Tests</th><td>parser／registry absence、lifecycle partial failure、dependency force boundary、collision／symlink／path escape、historical recognition。</td></tr>
+    <tr><th>Compatibility</th><td>Existing assurance／profile／draft／repair／heavy Reportを破壊せず、旧gateを再実行しない。</td></tr>
+  </tbody></table>
+
+  <h3>iss-00358 — Simplify Authoring Kit and Document Contracts</h3>
+  <table><tbody>
+    <tr><th>Goal</th><td>thin templatesとdetailed guidesで、provider-neutral authoring journeyを成立させる。</td></tr>
+    <tr><th>Acceptance</th><td>one Issue plan、Base + 4 guides、thin Report、Current／Historical Artifact docs、Current navigation。</td></tr>
+    <tr><th>Tests</th><td>file inventory、links、forbidden current vocabulary、provider／dogfood parity、fresh scaffold、existing hash preservation。</td></tr>
+    <tr><th>Compatibility</th><td>Existing R/D/P／Report／Artifact bodyはrewriteしない。</td></tr>
+  </tbody></table>
+
+  <h3>iss-00359 — Replace Managed Workflow Skills with SpecDock Skills</h3>
+  <table><tbody>
+    <tr><th>Goal</th><td>二つのrepo-local skillでCore／Kitを使うoperator journeyを成立させる。</td></tr>
+    <tr><th>Acceptance</th><td>navigation、explicit CLI、selected Guide、explicit grill、one evidence Artifact、no canonical write、clear failure。</td></tr>
+    <tr><th>Tests</th><td>skill contract、missing capability、ambiguous scope、Artifact failure、removed command fallback absence、Guide link。</td></tr>
+    <tr><th>Compatibility</th><td>Legacy skill inventoryを360へ渡し、このIssueではinstaller pruneを行わない。</td></tr>
+  </tbody></table>
+
+  <h3>iss-00360 — Cut Over Distribution and Retire Legacy Workflow Surfaces</h3>
+  <table><tbody>
+    <tr><th>Goal</th><td>Fresh／update／uninstall consumerをTarget distributionへ安全に移行。</td></tr>
+    <tr><th>Acceptance</th><td>Target payload、obsolete managed prune、user-owned preservation、generated regeneration、partial failure recovery。</td></tr>
+    <tr><th>Tests</th><td>consumer matrix、modified managed path、uninstall retry、provider／dogfood／installed parity、removed surface scan。</td></tr>
+    <tr><th>Rollback</th><td>Package／inventory changeをrevertし、user contentへ破壊的rollbackをかけない。</td></tr>
+  </tbody></table>
+
+  <h3>Proposed Final Quality, Integration, and Mergeable PR Delivery</h3>
+  <table><tbody>
+    <tr><th>Status</th><td>△ Candidate only。Numeric IDとGitHub linkageなし。</td></tr>
+    <tr><th>Goal</th><td>全implementation sliceのfull verification、defect-only repair、diff／package audit、PR handoff evidence。</td></tr>
+    <tr><th>Guardrail</th><td>Feature scopeを拡大しない。Humanが作成するまでexecution itemではない。</td></tr>
+  </tbody></table>
+</section>
+
+<section id="procedure">
+  <h2>10. 実施手順</h2>
+  <ol class="checks">
+    <li><strong>T0 / Human review:</strong> exact source identity、AD-001–009、Epic／Issue candidate、proposed final candidateを確認。</li>
+    <li><strong>Canonical planning:</strong> 採用したwhole-file R/D/PだけをHuman-controlled processで正本へ反映し、必要なfresh reviewを別途実行。</li>
+    <li><strong>T1:</strong> ownershipを固定して357と358を並行実装。各Issue内でtargeted tests、docs、compatibilityを閉じる。</li>
+    <li><strong>IC-1:</strong> fresh scaffold、Artifact、Report、help／docs contractを統合。契約不一致をfeature scope外へ先送りしない。</li>
+    <li><strong>T2:</strong> 359で二つのskillを実装し、no-hidden-workflowとfailure behaviorを検証。</li>
+    <li><strong>IC-2:</strong> managed skill inventory、Guide links、removed fallback absenceを固定。</li>
+    <li><strong>T3:</strong> 360でfresh／update／uninstall、migration、recovery、consumer matrixを実装。</li>
+    <li><strong>IC-3:</strong> Provider／dogfood／installed／historical consumerを照合。</li>
+    <li><strong>T4 candidate:</strong> HumanがIssue化した場合だけ、full regression、defect-only repair、diff audit、PR handoffを実行。</li>
+    <li><strong>Final human action:</strong> Review／PR／merge／Issue close／Epic completionは、それぞれ別の明示判断で扱う。</li>
+  </ol>
+</section>
+
+<section id="acceptance">
+  <h2>11. AcceptanceとTest</h2>
+  <h3>Epic-level acceptance themes</h3>
+  <ul>
+    <li>Removed workflow surfaceがparser、registry、Runtime modules、help、docs、skills、installer payloadから消え、alias fallbackもない。</li>
+    <li>Retained Core behaviorがnode、deps、active、lifecycle、Artifact、import、worktree／workbench、sync／validate／doctorで回帰しない。</li>
+    <li>Fresh nodeがone R/D/P + thin Reportを持ち、Report emptyでもvalid。</li>
+    <li>Planning Levelの記述変更がRuntime behaviorへ影響しない。</li>
+    <li>Historical dataが存在してもvalidationを壊さず、old workflow gateを再開しない。</li>
+    <li>Provider、dogfood、fresh installed、updated existingのinventoryとbehaviorが説明可能。</li>
+  </ul>
+  <h3>Test layers</h3>
+  <table>
+    <thead><tr><th>Layer</th><th>Examples</th><th>Owner</th></tr></thead>
+    <tbody>
+      <tr><td>Domain／unit</td><td>Artifact parsing、dependency、active shape、ownership classification</td><td>357／360</td></tr>
+      <tr><td>CLI integration</td><td>help absence、start／finish failure ordering、file import、fresh scaffold</td><td>357</td></tr>
+      <tr><td>Asset／docs</td><td>inventory、link validity、vocabulary、template structure、parity</td><td>358</td></tr>
+      <tr><td>Skill contract</td><td>explicit invocation、one output、no canonical write、missing capability</td><td>359</td></tr>
+      <tr><td>Consumer matrix</td><td>fresh、existing clean、existing modified、historical-heavy、uninstall partial failure</td><td>360</td></tr>
+      <tr><td>Full integration</td><td>cross-slice smoke、full suite、package build、diff audit</td><td>Proposed final</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="migration">
+  <h2>12. Migration、Rollback、Recovery</h2>
+  <table>
+    <thead><tr><th>Scenario</th><th>Migration behavior</th><th>Rollback／Recovery</th></tr></thead>
+    <tbody>
+      <tr><td>Fresh install</td><td>Target managed inventoryだけを配置</td><td>Package／installer changeをrevertし、partial installを診断</td></tr>
+      <tr><td>Existing clean managed repo</td><td>Target refresh + known obsolete managed prune + generated regeneration</td><td>Retry可能なcheckpoint、user specsは不変</td></tr>
+      <tr><td>Modified managed asset</td><td>ownership policyに従いpreserve-and-warnまたはfail-fast。silent delete禁止</td><td>Human resolution後retry</td></tr>
+      <tr><td>Historical workflow data</td><td>node-local evidenceとして保持し、Current navigation／gateから除外</td><td>rewriteしないためcontent rollback不要</td></tr>
+      <tr><td>Uninstall partial failure</td><td>bounded cleanupとrecovery marker／diagnostic</td><td>idempotent retry、scope外fileに触れない</td></tr>
+      <tr><td>Issue finish partial failure</td><td>close失敗ならactive維持、clear失敗ならpartial success診断、post-syncは薄い</td><td>same commandまたはexplicit active recovery</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="risks">
+  <h2>13. Risk</h2>
+  <table>
+    <thead><tr><th>Risk</th><th>Signal</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Hidden workflow resurrection</td><td>Skill／docs／aliasがremoved gateを再現</td><td>absence matrixとnegative tests</td></tr>
+      <tr><td>Historical data loss</td><td>update／uninstallがnode-local contentをdelete</td><td>ownership classes、fixture hashes、fail-safe behavior</td></tr>
+      <tr><td>357／358 shared-file conflict</td><td>Template bodyとRuntime mechanismが同時編集</td><td>owner rule、IC-1、small integration commits</td></tr>
+      <tr><td>Planning Level drift</td><td>4 Guideが共通規則を複製</td><td>Baseへのindependent delta、link／parity tests</td></tr>
+      <tr><td>Provider re-coupling</td><td>specialized import、browser state、provider nameがCore contractへ入る</td><td>file-only import、external client boundary、forbidden current vocabulary</td></tr>
+      <tr><td>360 becoming catch-all</td><td>cross-slice defects／PR workがdistribution scopeへ混入</td><td>proposed final candidateを独立させる</td></tr>
+      <tr><td>False status claim</td><td>evidence-only outputがready／pass／completeと表現</td><td>metadata、status legend、Human action boundary</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="terms">
+  <h2>14. 用語</h2>
+  <dl>
+    <dt><strong>Storage Core</strong></dt><dd>Spec structureとdeterministic mutationを所有するRuntime。</dd>
+    <dt><strong>Authoring Kit</strong></dt><dd>thin templates、detailed guides、document semanticsの集合。</dd>
+    <dt><strong>Planning Level</strong></dt><dd>Issue planの完成基準を選ぶdocumentation-only概念。Runtime Profileではない。</dd>
+    <dt><strong>Current creatable</strong></dt><dd>Freshに作成できるsix Artifact type。</dd>
+    <dt><strong>Historical recognizable</strong></dt><dd>新規作成はしないがexisting evidenceとして認識・保持するtype／filename。</dd>
+    <dt><strong>Ready</strong></dt><dd>Runtimeではdependency-only。Planningやimplementationの品質状態ではない。</dd>
+    <dt><strong>Report</strong></dt><dd>常設pathを持つoptional-content result summary。空でもvalid、non-gating。</dd>
+    <dt><strong>Durable decision</strong></dt><dd>長期に効く判断。Canonical R/D/Pまたはaccepted ADRに置く。</dd>
+    <dt><strong>Vertical slice</strong></dt><dd>利用者が確認できるoutcomeまでRequirement、Design、Implementation、Test、Docs、Migrationを一つのIssueで閉じる単位。</dd>
+    <dt><strong>Proposed candidate</strong></dt><dd>Numeric ID／GitHub linkageなし。Human採用前はexecution work itemではない。</dd>
+  </dl>
+</section>
+
+<section id="human-decisions">
+  <h2>15. 次の人間判断</h2>
+  <ol>
+    <li>Epic R/D/P candidateをwhole-fileで採用、修正、棄却のどれにするか。</li>
+    <li>357–360のvertical-slice責務とacceptanceを採用するか。</li>
+    <li>Proposed final candidateを正式Issueとして作るか。作る場合だけnumeric ID、GitHub linkage、dependencyを割り当てる。</li>
+    <li>357と358の並行実装をIC-0後に許可するか。</li>
+    <li>Ambiguous modified managed assetsのupdate／uninstall policyをpreserve-and-warn、fail-fast、explicit overrideのどれで固定するか。</li>
+    <li>External grill capabilityをoptional external prerequisiteとしてどのように検出・説明するか。</li>
+  </ol>
+  <div class="notice"><strong>Stop condition:</strong> このHTMLを読了してもcanonical promotionは発生しません。次工程は、exact source identityの再確認と、Humanによる明示的な採否判断から始まります。</div>
+</section>
+</main>
+</div>
+<footer>
+  <p>Generated evidence package / UTF-8 / self-contained HTML / no external CSS, JavaScript, CDN, or remote image.</p>
+</footer>
+</body>
+</html>

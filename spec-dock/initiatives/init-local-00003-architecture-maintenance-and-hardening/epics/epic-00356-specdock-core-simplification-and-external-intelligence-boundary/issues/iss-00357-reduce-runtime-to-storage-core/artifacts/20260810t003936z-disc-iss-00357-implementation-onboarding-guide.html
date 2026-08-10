@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Issue 357 Storage Core 実装オンボーディング資料</title>
+  <style>
+    :root{--ink:#172433;--muted:#4f6274;--blue:#075e9c;--pale:#eef7fc;--line:#cbd8e4;--warn:#fff4d7;--good:#e8f7ef;--dark:#123852}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fffdf8;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;font-size:16px;line-height:1.82}header,footer{padding:3rem max(1.25rem,calc((100% - 1120px)/2));background:linear-gradient(135deg,#123852,#087a92);color:#fff}header p{max-width:950px;color:#e4f3f8}main{width:min(1120px,calc(100% - 2.4rem));margin:0 auto 5rem}h1{margin:0;line-height:1.28;font-size:clamp(2rem,4.4vw,3.35rem);text-wrap:balance}h2{margin:3.1rem 0 1rem;padding-bottom:.45rem;border-bottom:3px solid #93c8e6;line-height:1.35}h3{margin:2rem 0 .6rem;color:var(--dark);line-height:1.4}p{margin:.75rem 0}a{color:var(--blue);overflow-wrap:anywhere}.skip{position:absolute;left:-9999px}.skip:focus{left:1rem;top:1rem;z-index:9;padding:.7rem;background:#111827;color:#fff}.box,.warning,.good,nav,details,figure{margin:1.1rem 0;padding:1rem 1.2rem;border:1px solid var(--line);border-radius:.65rem;background:#fff}.box{background:var(--pale);border-left:5px solid #1977b6}.warning{background:var(--warn);border-left:5px solid #bd760a}.good{background:var(--good);border-left:5px solid #24835f}.table{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:.6rem;margin:1rem 0}table{width:100%;min-width:710px;border-collapse:collapse;background:#fff}th,td{padding:.72rem .8rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{background:#eaf4fb;color:var(--dark)}tr:last-child td{border-bottom:0}code{padding:.1rem .3rem;background:#fff0d8;color:#623b08;border-radius:.25rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}.badge{display:inline-block;margin:.1rem .28rem .1rem 0;padding:.1rem .55rem;border-radius:99px;background:#dceefa;color:#124d78;font-weight:700;font-size:.85rem}.columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.columns>div{padding:1rem;background:#f5f8fa;border-radius:.5rem}figure{overflow-x:auto;-webkit-overflow-scrolling:touch}svg{display:block;width:100%;min-width:820px;height:auto;min-height:215px}figcaption{margin:.8rem .2rem 0;color:#465565}.figure-note{margin:.8rem .2rem 0;padding:.75rem 1rem;background:#f4f7fa;border-left:4px solid #93c8e6}.figure-note p{margin:0 0 .3rem}.figure-note ul{margin:.25rem 0 0}summary{cursor:pointer;color:var(--blue);font-weight:700}pre{overflow:auto;padding:1rem;border-radius:.4rem;background:#102533;color:#edf8ff;line-height:1.55;font-size:.82rem;white-space:pre-wrap}.checklist li{list-style:"□  "}.compact li{margin:.3rem 0}@media(max-width:720px){body{font-size:15.5px}.columns{grid-template-columns:1fr}svg{min-width:700px}nav ol{columns:1}}@media print{body{font-size:10.5pt;background:#fff}header,footer{background:#fff;color:#000;padding:1.2rem}header p{color:#000}main{width:100%}a{color:#000;text-decoration:none}figure,.table,.box,.warning,.good{break-inside:avoid}}
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">本文へ移動</a>
+<header>
+  <p>SpecDock / Epic 00356 / Issue 357 / 新規参加メンバー向け</p>
+  <h1>Runtimeを「Storage Core」へ縮小する</h1>
+  <p>Issue 357 <code>Reduce Runtime to Storage Core</code> の背景、設計上の境界、実装の順番、失敗時の扱いを、実装を担当するメンバーが一つの資料で理解できるようにまとめた解説です。</p>
+</header>
+<main id="main">
+<section id="authority"><h2>1. この資料の位置付けと現在地</h2>
+<p>このHTMLは<strong>人間向けの補助Artifact</strong>です。長期的な判断・実装契約の正本は、このIssueの<a href="../requirement.md">要件定義書</a>、<a href="../design.md">設計書</a>、<a href="../plan.md">実装計画書</a>（以下、R/D/P）と、採用済みADRです。<a href="../report.md">Report</a>は実施した証拠、進捗、結果の要約を残す場所であり、計画や品質を自動判定する正本ではありません。この資料が正本と異なる場合は、必ず正本を優先します。</p>
+<div class="good"><strong>現在の状態：</strong><span class="badge">planning-ready</span> R/D/Pは承認済みです。ただし実装、テスト変更、commit、push、PR、merge、<code>issue finish</code>は未実施です。「ready」はE00から着手できることだけを示し、実装完了や終了許可を意味しません。</div>
+<p>ここでの「推論」は、正本の複数箇所を分かりやすくつなげるための説明です。新しい製品判断を追加するものではありません。</p></section>
+<nav aria-label="目次"><strong>目次</strong><ol>
+<li><a href="#summary">5分で分かる全体像</a></li><li><a href="#scope">対象・対象外とEpic内の役割</a></li><li><a href="#target">CurrentからTargetへの変化</a></li><li><a href="#cli">残すCLIと撤去する面</a></li><li><a href="#active">activeとissue start</a></li><li><a href="#finish">issue finishと部分失敗</a></li><li><a href="#artifact">Artifactとgeneric import</a></li><li><a href="#scaffold">Fresh scaffold・validate・doctor</a></li><li><a href="#architecture">モジュール所有権</a></li><li><a href="#plan">実行順、gate、commit候補</a></li><li><a href="#recovery">失敗と復旧</a></li><li><a href="#onboarding">最初の1日・チェックリスト・用語</a></li><li><a href="#sources">正本へのリンク</a></li>
+</ol></nav>
+<section id="summary"><h2>2. 5分で分かる全体像</h2>
+<p>SpecDockには、ノード、依存関係、GitHub Issue、現在選択中の対象、成果物を安全に扱うという<strong>構造的で決定的な仕事</strong>があります。一方、workflow、Profile、Assurance、レビュー合格、Evidence Adoption Ledger（EAL）、特定提供元のAI取込といった<strong>組織や案件で変わる認知的な仕事</strong>もRuntimeに混在しています。</p>
+<p>Issue 357は後者をRuntimeのCurrent surfaceから外し、前者だけを確実に実行するStorage Coreへ縮小します。AI、レビュー、品質評価そのものを禁止するのではありません。それらをRuntimeの必須状態機械から外し、チームが文書と外部の道具を使って選べる仕事へ戻します。</p>
+<div class="columns"><div><strong>残すもの</strong><br>ノード、依存DAG、active選択、薄い開始・終了、安全なArtifact保存、同期、構造検証、診断。</div><div><strong>外すもの</strong><br>workflow、Profile、Assurance、reviewer/EAL/promotion gate、draft routing、provider固有ChatGPT取込。</div></div>
+<figure><svg viewBox="0 0 980 280" role="img" aria-labelledby="fig-core-title fig-core-desc"><title id="fig-core-title">Storage Coreへの縮小</title><desc id="fig-core-desc">現在のRuntimeから認知的workflowを外し、構造管理だけをStorage Coreとして残す関係図。</desc><defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8z" fill="#276b94"/></marker></defs><rect x="35" y="45" width="400" height="180" rx="16" fill="#eef7fc" stroke="#2877a7" stroke-width="3"/><text x="235" y="80" text-anchor="middle" font-size="22" font-weight="700" fill="#123852">Current Runtime</text><text x="70" y="120" font-size="17" fill="#172433">構造: node / deps / active / lifecycle / Artifact</text><text x="70" y="153" font-size="17" fill="#172433">認知: workflow / Profile / Assurance / review</text><text x="70" y="186" font-size="17" fill="#172433">提供元固有 import / draft routing</text><path d="M455 135 H570" stroke="#276b94" stroke-width="4" marker-end="url(#arrow)"/><text x="512" y="115" text-anchor="middle" font-size="16" fill="#275672">分離</text><rect x="595" y="45" width="350" height="180" rx="16" fill="#e8f7ef" stroke="#2d8562" stroke-width="3"/><text x="770" y="84" text-anchor="middle" font-size="23" font-weight="700" fill="#174f3b">Target: Storage Core</text><text x="630" y="125" font-size="17" fill="#172433">構造操作を決定的に実行</text><text x="630" y="158" font-size="17" fill="#172433">外部の知的作業はArtifactとして保存可</text><text x="630" y="191" font-size="17" fill="#172433">ただし自動で正本・gateにはしない</text></svg><figcaption>図1：縮小は「機能を雑に捨てる」ことではなく、変わりやすい判断を構造基盤の必須条件から分離することです。</figcaption><div class="figure-note"><p><strong>文字で読む要点：</strong>Targetでは構造に必要な操作だけがRuntimeに残り、品質・レビュー・AI選定はRuntimeの開始/終了条件ではなくなります。</p></div></figure>
+<details><summary>図1のPlantUML原文を表示</summary><pre>@startuml
+rectangle "Current Runtime\n構造 + workflow/Profile/Assurance/review\n+ provider-specific import" as Current
+rectangle "Target: Storage Core\nnode/deps/active/lifecycle/Artifact\n外部知能は非必須" as Target
+Current --> Target : 認知的責務を分離
+@enduml</pre></details>
+</section>
+<section id="scope"><h2>3. 対象・対象外と、Epic内での役割</h2>
+<p>Issue 357はRuntimeの<strong>mechanism（機構）</strong>を所有します。テンプレートの文章やAuthoring Guideの本文を決める仕事はIssue 358の所有です。こう分けることで、357と358を同時に進めても「同じファイルをそれぞれの意図で書き換える」衝突を避けます。</p>
+<div class="table"><table><thead><tr><th>対象</th><th>このIssueで行うこと</th><th>対象外・所有者</th></tr></thead><tbody>
+<tr><td>Runtime CLI / registry / bootstrap</td><td>Current surfaceをStorage Coreに限定する</td><td>repo-local skill本文は359、installer pruneは360</td></tr>
+<tr><td>active、start、finish、deps</td><td>selection-only、dependency-only、close→clear→syncを実現する</td><td>新しいquality/review/evidence gateは作らない</td></tr>
+<tr><td>Artifact / import</td><td>Current六種、Historical認識、generic file importの安全性を守る</td><td>テンプレート本文・Guide本文は358</td></tr>
+<tr><td>Fresh node scaffold</td><td>R/D/P/ReportをAssuranceなしで一つずつ生成する機構</td><td>R/D/P/Reportの中身は358</td></tr>
+<tr><td>互換性</td><td>既存Report、Artifact、Discussion、ADR、<code>.assurance.json</code>を通常操作で壊さない</td><td>既存資料の一括削除・rename・rewriteはしない</td></tr>
+</tbody></table></div>
+<figure><svg viewBox="0 0 1000 300" role="img" aria-labelledby="fig-epic-title fig-epic-desc"><title id="fig-epic-title">Epic 356のIssue依存と並行関係</title><desc id="fig-epic-desc">Issue 357と358は並行可能で、359が両方に依存し、360が357、358、359に依存する図。</desc><defs><marker id="arr2" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8z" fill="#276b94"/></marker></defs><g font-family="sans-serif"><rect x="35" y="55" width="190" height="78" rx="12" fill="#e8f7ef" stroke="#2d8562" stroke-width="3"/><text x="130" y="87" text-anchor="middle" font-size="19" font-weight="700">357</text><text x="130" y="113" text-anchor="middle" font-size="15">Storage Core</text><rect x="35" y="170" width="190" height="78" rx="12" fill="#eef7fc" stroke="#2877a7" stroke-width="3"/><text x="130" y="202" text-anchor="middle" font-size="19" font-weight="700">358</text><text x="130" y="228" text-anchor="middle" font-size="15">Authoring Kit</text><rect x="405" y="112" width="190" height="78" rx="12" fill="#fff4d7" stroke="#bd760a" stroke-width="3"/><text x="500" y="144" text-anchor="middle" font-size="19" font-weight="700">359</text><text x="500" y="170" text-anchor="middle" font-size="15">repo-local skills</text><rect x="755" y="112" width="190" height="78" rx="12" fill="#f4f7fa" stroke="#657889" stroke-width="3"/><text x="850" y="144" text-anchor="middle" font-size="19" font-weight="700">360</text><text x="850" y="170" text-anchor="middle" font-size="15">Distribution</text><path d="M225 94 H400" stroke="#276b94" stroke-width="4" marker-end="url(#arr2)"/><path d="M225 209 C310 209,310 181,400 165" stroke="#276b94" stroke-width="4" fill="none" marker-end="url(#arr2)"/><path d="M595 151 H750" stroke="#276b94" stroke-width="4" marker-end="url(#arr2)"/><path d="M225 88 C440 25,650 45,770 112" stroke="#91a9bb" stroke-width="3" fill="none" stroke-dasharray="9 7" marker-end="url(#arr2)"/><path d="M225 210 C460 275,670 250,770 190" stroke="#91a9bb" stroke-width="3" fill="none" stroke-dasharray="9 7" marker-end="url(#arr2)"/></g></svg><figcaption>図2：357と358は依存関係上は並行可能です。359は両者の成果を利用し、360は配布へ反映します。破線は既存の後続依存を示します。</figcaption><div class="figure-note"><p><strong>文字で読む要点：</strong>並行可能でも共有ファイルまで自由という意味ではありません。357は機構、358はテンプレート/Guide本文を単一所有します。統合点はIC-1です。</p></div></figure>
+<details><summary>図2のPlantUML原文を表示</summary><pre>@startuml
+component "357\nStorage Core" as I357
+component "358\nAuthoring Kit" as I358
+component "359\nrepo-local skills" as I359
+component "360\nDistribution" as I360
+I357 --> I359
+I358 --> I359
+I359 --> I360
+I357 ..> I360 : existing dependency
+I358 ..> I360 : existing dependency
+@enduml</pre></details>
+</section>
+<section id="target"><h2>4. CurrentからTargetへの変化</h2>
+<div class="table"><table><thead><tr><th>観点</th><th>Current（変える前）</th><th>Target（357完了後）</th></tr></thead><tbody>
+<tr><td>active</td><td>authority、grants、promotion等を含むworkflow寄りの状態</td><td>IDとrepo-relative pathだけを持つ選択状態。選択とreadinessを分離</td></tr>
+<tr><td>開始</td><td>workflow周辺の判断が結び付き得る</td><td>unfinished guard → dependencies → checkout → active → sync</td></tr>
+<tr><td>終了</td><td>R/D/P、review、Report、EAL等を判定し得る</td><td>GitHub close → active clear → post-syncだけ。品質は判定しない</td></tr>
+<tr><td>Artifact</td><td>多様な種別、provider固有取込、draft routing</td><td>Current六種を新規作成。既存旧形式は履歴として認識</td></tr>
+<tr><td>新規ノード</td><td>Assurance/Profileを前提にしたscaffold</td><td>R/D/P/Reportを一つずつ作り、内容解釈はしない</td></tr>
+<tr><td>validate / doctor</td><td>構造以外の旧gateに引きずられ得る</td><td>構造の妥当性だけを検査。文書内容・review品質は検査しない</td></tr>
+</tbody></table></div>
+</section>
+<section id="cli"><h2>5. CLI surface：何を残し、何を撤去するか</h2>
+<p>Targetの正本inventoryはR/D/Pに固定されています。実装中に「便利そう」という理由で新しいtop-level command、互換alias、hidden fallbackを足してはいけません。物理ファイルを先に消すのではなく、parser / registry / bootstrap / import graphから到達不能であることを先に証明します。</p>
+<div class="table"><table><thead><tr><th>保持する主要surface</th><th>Targetでの意味</th></tr></thead><tbody>
+<tr><td><code>new initiative|epic|issue|artifact</code></td><td>構造ノードまたはArtifactを安全に作る</td></tr><tr><td><code>artifact import file</code></td><td>一つの明示regular fileをopaque bytesのまま取り込む</td></tr><tr><td><code>active set|show|clear</code></td><td>現在見る対象を選択・確認・解除する</td></tr><tr><td><code>issue start|finish</code></td><td>依存を確認して開始し、GitHub close後に選択を解除する</td></tr><tr><td><code>deps check|add|remove</code>、<code>sync|validate|doctor</code></td><td>依存、投影、構造検証、診断を扱う</td></tr><tr><td><code>import</code>、<code>worktree</code>、<code>workbench copy</code>、<code>delete|close|update|uninstall</code></td><td>既存の構造管理に必要な範囲で保持する</td></tr>
+</tbody></table></div>
+<div class="warning"><strong>撤去対象：</strong><code>assurance</code>、<code>authoring</code>、<code>guidance</code>、<code>workflow</code>、<code>delegated-authoring</code>、<code>artifact import chatgpt-output</code>。Profile/Grade分類、reviewer/EAL/promotion gate、draft routingもCurrent Runtimeの到達面から外します。旧backendへfallbackする互換動作も置きません。</div>
+</section>
+<section id="active"><h2>6. activeは「選択のみ」、開始は「依存を確認してから」</h2>
+<h3>6.1 <code>active set</code> はselection-only</h3><p><code>active set</code>は、validなInitiative / Epic / IssueをIDまたはrepo-relative pathで選び、選択chainを保存する操作です。GitHub照会、dependency判定、unfinished guard、R/D/P、review、Report、authorityを読みません。したがって依存でblockedなIssueでも、調査・計画のためにactiveにできます。</p>
+<p>Targetの<code>ActiveManifestEntry</code>は<code>id</code>と<code>path</code>だけです。legacy JSONの余剰fieldは読めますが、読むだけでは書き換えず、明示的なactive mutationのときだけminimal schemaへ正規化します。</p>
+<h3>6.2 <code>issue start</code> の真理値表</h3><p>開始は、target解決後に「別のunfinished active Issueがあるか」をactive manifestとlinked GitHub stateで判断します。現在のbranchは診断情報であり、判定を変えません。<code>--force</code>が迂回できるのはunfinished guardだけで、dependency、invalid target、checkout失敗、active write失敗は迂回できません。</p>
+<div class="table"><table><thead><tr><th>active Issue</th><th>GitHub state</th><th>targetとの関係</th><th>forceなし</th><th>forceあり</th></tr></thead><tbody>
+<tr><td>なし</td><td>該当なし</td><td>任意</td><td>dependency確認へ</td><td>dependency確認へ</td></tr><tr><td>あり</td><td>任意</td><td>同じIssue</td><td>dependency確認へ</td><td>dependency確認へ</td></tr><tr><td>あり</td><td><code>CLOSED</code></td><td>別Issue</td><td>dependency確認へ</td><td>dependency確認へ</td></tr><tr><td>あり</td><td><code>OPEN</code></td><td>別Issue</td><td>guardで停止</td><td>guardのみ迂回しdependency確認へ</td></tr><tr><td>あり</td><td><code>UNKNOWN</code>、linkなし、取得失敗、解決不能</td><td>別Issue</td><td>finishedと推測せず停止</td><td>guardのみ迂回しdependency確認へ</td></tr>
+</tbody></table></div>
+<figure><svg viewBox="0 0 1050 300" role="img" aria-labelledby="fig-start-title fig-start-desc"><title id="fig-start-title">issue startの順序と停止境界</title><desc id="fig-start-desc">対象解決、unfinished guard、dependency確認、checkout、active設定、syncの順序と、forceがguardだけを迂回することを示す図。</desc><defs><marker id="arr3" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8z" fill="#276b94"/></marker></defs><g font-family="sans-serif" font-size="16"><rect x="25" y="105" width="135" height="65" rx="10" fill="#eef7fc" stroke="#2877a7" stroke-width="2"/><text x="92" y="144" text-anchor="middle">target解決</text><rect x="195" y="105" width="145" height="65" rx="10" fill="#fff4d7" stroke="#bd760a" stroke-width="2"/><text x="267" y="135" text-anchor="middle">unfinished</text><text x="267" y="156" text-anchor="middle">guard</text><rect x="375" y="105" width="145" height="65" rx="10" fill="#eef7fc" stroke="#2877a7" stroke-width="2"/><text x="447" y="135" text-anchor="middle">dependency</text><text x="447" y="156" text-anchor="middle">確認</text><rect x="555" y="105" width="120" height="65" rx="10" fill="#eef7fc" stroke="#2877a7" stroke-width="2"/><text x="615" y="144" text-anchor="middle">checkout</text><rect x="710" y="105" width="130" height="65" rx="10" fill="#e8f7ef" stroke="#2d8562" stroke-width="2"/><text x="775" y="144" text-anchor="middle">active設定</text><rect x="875" y="105" width="120" height="65" rx="10" fill="#e8f7ef" stroke="#2d8562" stroke-width="2"/><text x="935" y="144" text-anchor="middle">post-sync</text><path d="M160 137H190 M340 137H370 M520 137H550 M675 137H705 M840 137H870" stroke="#276b94" stroke-width="3" marker-end="url(#arr3)"/><text x="267" y="70" text-anchor="middle" fill="#8a5500">--force が越えられるのはここだけ</text><path d="M267 78V99" stroke="#bd760a" stroke-width="2" marker-end="url(#arr3)"/><text x="447" y="218" text-anchor="middle" fill="#4f6274">blocker、invalid target、checkout/active write失敗は停止</text></g></svg><figcaption>図3：開始は状態を先に書かない順序です。checkoutが成功するまでactiveを変えず、active保存に失敗すればsnapshotへ戻します。</figcaption><div class="figure-note"><p><strong>文字で読む要点：</strong>dependency readinessは<code>deps check</code>と同じdomain経路を再利用します。direct / inherited blockerのどちらかが未解決、またはgraphが不正なら開始しません。</p></div></figure>
+<details><summary>図3のPlantUML原文を表示</summary><pre>@startuml
+start
+:Issue targetを解決;
+:unfinished active guard;
+if (guardを通過?) then (yes)
+  :dependency DAGを確認;
+  if (ready?) then (yes)
+    :branch checkout;
+    :selection-only active set;
+    :post-mutation sync;
+  else (no)
+    stop
+  endif
+else (no)
+  stop
+endif
+note right: --forceはguardだけを迂回\n他の停止条件は迂回しない
+@enduml</pre></details>
+</section>
+<section id="finish"><h2>7. <code>issue finish</code> はclose → clear → syncの便利操作</h2>
+<p>終了時にRuntimeが品質を判定してはいけません。R/D/P、テスト、review、Report、EAL、authority、promotion recordは読まず、active IssueとGitHub linkageを解決して、順番に操作します。</p>
+<ol><li>linked GitHub Issueをcloseする（すでにclosedなら成功扱い）。</li><li>close成功後にだけactiveをclearする。</li><li>clear後にpost-syncする。</li></ol>
+<div class="table"><table><thead><tr><th>失敗地点</th><th>結果</th><th>復旧の考え方</th></tr></thead><tbody><tr><td>GitHub close失敗</td><td>activeを保持、close未完了</td><td>原因を直してcloseを再試行</td></tr><tr><td>すでにclosed</td><td>成功としてclearへ進む</td><td>手作業で閉じた場合も二重失敗にしない</td></tr><tr><td>close成功後のclear失敗</td><td>GitHub close済み、active残存、sync未実行というpartial success</td><td>active clearを回復してからsync</td></tr><tr><td>clear成功後のsync失敗</td><td>active clear済み、projection stale</td><td>同期を再実行する</td></tr></tbody></table></div>
+<p>これは「終了の品質を弱める」判断ではありません。品質の判断はチームの正本・レビュー・実装運用で行い、Runtimeは外部状態を壊さず部分成功を隠さない、という責務分離です。</p>
+</section>
+<section id="artifact"><h2>8. Artifact：新規作成、履歴認識、ファイル取込を分ける</h2>
+<h3>8.1 Currentで新しく作れる六種</h3><p><code>new artifact [type]</code>のtypeはoptional positionalです。省略と明示<code>blank</code>は同じ契約で、<code>--type</code>構文は増やしません。新規作成可能なのは次の六種だけです。</p>
+<div class="columns"><div><span class="badge">blank</span>型を先に決めない作業メモ。filenameに<code>blank</code> tokenは入れない。</div><div><span class="badge">research</span>根拠付き調査。事実、推測、未検証を分ける。</div><div><span class="badge">interview</span>重要判断を一問一答で残す。</div><div><span class="badge">disc</span>統合・中間報告・論点整理。</div><div><span class="badge">decision-candidate</span>正本/ADRへ採用前の判断候補。</div><div><span class="badge">adr</span>意思決定記録。acceptedになるまで非正本。</div></div>
+<h3>8.2 Historicalは「読めるが新規に作らない」</h3><p>既存の<code>pr-repair-batch</code>、<code>draft-requirement</code>、<code>draft-design</code>、<code>draft-plan</code>、<code>scratch</code>、<code>note</code>、連番のADR/disc/note、generic imported Artifact、legacy <code>discussions/</code>はHistorical catalogとして認識します。これらを新規候補へ戻したり、Current navigationやworkflow routingへ自動昇格させたりはしません。一方で、catalog外のtimestamp-intent、duplicate、broken timestamp、symlink、path escapeは引き続き診断します。</p>
+<h3>8.3 generic file importだけを残す</h3><p><code>artifact import file</code>は、一つの明示regular fileを対象scopeへ安全に保存します。bytesは解釈・変換せずopaqueのまま扱い、path traversal、symlink、unsafe source、collisionを拒否します。外部sourceに失敗した診断でもabsolute path、内容、hashを漏らしません。<code>artifact import chatgpt-output</code>と提供元固有routingは撤去します。</p>
+<figure><svg viewBox="0 0 1000 285" role="img" aria-labelledby="fig-art-title fig-art-desc"><title id="fig-art-title">Artifactの作成と認識の分離</title><desc id="fig-art-desc">Currentの六種を新規作成し、Historical形式は認識だけを行い、generic file importはopaqueに保存する関係図。</desc><defs><marker id="arr4" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8z" fill="#276b94"/></marker></defs><g font-family="sans-serif"><rect x="35" y="45" width="270" height="80" rx="12" fill="#e8f7ef" stroke="#2d8562" stroke-width="3"/><text x="170" y="78" text-anchor="middle" font-size="19" font-weight="700">Current create</text><text x="170" y="105" text-anchor="middle" font-size="15">blank / research / interview / disc /</text><text x="170" y="124" text-anchor="middle" font-size="15">decision-candidate / adr</text><rect x="365" y="45" width="270" height="80" rx="12" fill="#fff4d7" stroke="#bd760a" stroke-width="3"/><text x="500" y="78" text-anchor="middle" font-size="19" font-weight="700">Historical recognize</text><text x="500" y="106" text-anchor="middle" font-size="15">既存形式を保持。新規作成しない</text><rect x="695" y="45" width="270" height="80" rx="12" fill="#eef7fc" stroke="#2877a7" stroke-width="3"/><text x="830" y="78" text-anchor="middle" font-size="19" font-weight="700">generic file import</text><text x="830" y="106" text-anchor="middle" font-size="15">一件・regular file・opaque bytes</text><rect x="315" y="185" width="370" height="60" rx="12" fill="#f4f7fa" stroke="#657889" stroke-width="2"/><text x="500" y="221" text-anchor="middle" font-size="17">scope-local Artifact保存面（安全性・collision保護）</text><path d="M170 125V180 M500 125V180 M830 125V180" stroke="#276b94" stroke-width="3" marker-end="url(#arr4)"/></g></svg><figcaption>図4：作成可能性と既存ファイルの認識を分けることで、履歴を壊さずCurrentの導線を小さく保ちます。</figcaption><div class="figure-note"><p><strong>文字で読む要点：</strong>「既存で見つかった」ことは「今後も作るべき」の意味ではありません。ImportもMarkdown生成ではなく、外部証拠の安全な保管です。</p></div></figure>
+<details><summary>図4のPlantUML原文を表示</summary><pre>@startuml
+rectangle "Current create\n6 types only" as Create
+rectangle "Historical recognize\nreadable, not creatable" as History
+rectangle "generic file import\none regular file, opaque bytes" as Import
+database "scope-local Artifact storage\nsafety + collision protection" as Store
+Create --> Store
+History --> Store : existing identity only
+Import --> Store
+@enduml</pre></details>
+</section>
+<section id="scaffold"><h2>9. Fresh scaffoldと、validate / doctorの境界</h2>
+<p>新しいInitiative / Epic / Issueは、既存のcopy mechanismを用いて<code>requirement.md</code>、<code>design.md</code>、<code>plan.md</code>、<code>report.md</code>を各一つ作ります。Profile選択、Assurance compose、Report本文解釈、draft routingは行いません。薄いReportや空の利用者記入欄も構造上は有効です。</p>
+<div class="table"><table><thead><tr><th>357が保証するもの</th><th>357が検査しない/決めないもの</th></tr></thead><tbody><tr><td>scope template選択、deterministic copy、collision preflight、部分copy rollback、<code>.meta.json</code>とrules linkの構造</td><td>R/D/P/Reportテンプレート本文、Guide link、Artifactの意味の文章（358所有）</td></tr><tr><td>node ID、親chain、GitHub linkage、dependency graph/cycle、必須構造path、filename、symlink、再生成可能性</td><td>R/D/P本文の品質、Planning Level、reviewer、promotion、EAL、authority、Assurance</td></tr></tbody></table></div>
+<p>つまり<code>validate</code>と<code>doctor</code>は構造検証です。empty thin Report、heavy Report、EAL文字列、legacy authority metadata、<code>.assurance.json</code>の有無や内容だけで結果を変えてはいけません。ただし、同じfixtureに独立した構造破損があれば通常どおり診断します。</p>
+</section>
+<section id="architecture"><h2>10. モジュール境界と所有権</h2>
+<p>実装はprovider-side Runtimeを正本として変更し、dogfood Runtimeはprojectionとして同期・検証します。主な対象は<code>src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/</code>配下です。新しいRuntime layerやcompatibility adapterを増やさず、既存layerへ最小変更を入れます。</p>
+<div class="table"><table><thead><tr><th>層</th><th>責務</th><th>代表候補</th></tr></thead><tbody><tr><td>cli</td><td>構文とdispatchのみ</td><td><code>cli/parser.py</code>、<code>cli/registry.py</code>、<code>cli/bootstrap.py</code></td></tr><tr><td>commands</td><td>request/result変換、presentation選択</td><td><code>active.py</code>、<code>issue.py</code>、<code>new.py</code>、<code>artifact_import.py</code></td></tr><tr><td>application</td><td>mutation順序、rollback、port呼出し</td><td><code>set_active.py</code>、<code>issue_lifecycle.py</code>、<code>check_deps.py</code>等</td></tr><tr><td>domain</td><td>ID、DAG、Artifact grammar、構造不変条件</td><td><code>active.py</code>、<code>artifacts.py</code>、<code>deps.py</code></td></tr><tr><td>infra / presentation</td><td>filesystem/Git/GitHub/serialization と privacy-safe表示</td><td><code>contracts.py</code>、<code>active_store.py</code>、template scaffolder等</td></tr></tbody></table></div>
+<div class="warning"><strong>削除の条件：</strong><code>application/import_artifact.py</code>やworkflow/Assurance/authoring/delegated module群は、E00でretained consumerがないことをinventoryとimport graphで証明できたものだけがDelete候補です。generic importのexplicit-file safety port / publisherはshared primitiveとして保持します。</div>
+</section>
+<section id="plan"><h2>11. 実装順、各gate、commit候補</h2>
+<p>以下は承認済み計画の順序です。E00以外は実装作業であり、ここに書いたcommit名は<strong>候補</strong>です。現在は一つも実施・commitされていません。未完stepを「同じmilestoneだから」とまとめてcommitしてはいけません。</p>
+<div class="table"><table><thead><tr><th>step</th><th>目的</th><th>主なclosure / gate</th><th>commit候補</th></tr></thead><tbody>
+<tr><td>E00</td><td>retained / removed / sharedのexact inventory</td><td>read-only。全rowにpath、symbol、consumer、Action、owner。曖昧ならS01へ進まない</td><td>M0: <code>docs(iss-00357): Runtime baseline inventoryを記録</code></td></tr>
+<tr><td>S01</td><td>Storage Core CLI surface</td><td>help、removed invocation no-write、selector matrix、fresh code review</td><td><code>refactor(runtime): Storage Core CLI surfaceに限定</code></td></tr>
+<tr><td>S02</td><td>selection-only active</td><td>minimal manifest、blocked selection、rollback、port spy</td><td><code>refactor(active): selection-only stateへ縮小</code></td></tr>
+<tr><td>S03</td><td>startとdependency-only readiness</td><td>truth table全row、mutation order、deps/projection一致</td><td><code>refactor(issue): startをdependency-only lifecycleへ変更</code></td></tr>
+<tr><td>S04</td><td>thin finish</td><td>close/clear/syncの全phase、no-gate spy</td><td><code>refactor(issue): finishをclose clear syncへ縮小</code></td></tr>
+<tr><td>S05 / S06</td><td>Current Artifact作成 / Historical認識</td><td>六種、安全性、positive/negative fixture</td><td><code>feat(artifact): Current六種の作成契約へ統一</code> / <code>fix(artifact): Historical recognitionを明示catalog化</code></td></tr>
+<tr><td>S07</td><td>generic file importだけを保持</td><td>scope/binary/privacy/partial failureとprovider route absence</td><td><code>refactor(artifact): generic file importだけを保持</code></td></tr>
+<tr><td>S08 / S09</td><td>No-Assurance scaffold / Historical consumer invariance</td><td>三scope四文書、copy rollback、構造以外の旧gate非依存</td><td><code>refactor(scaffold): Assurance非依存の四文書生成へ変更</code> 等</td></tr>
+<tr><td>S10</td><td>unreachable module削除とRuntime parity</td><td>no retained consumer、absence、provider/dogfood manifest差分ゼロ</td><td><code>refactor(runtime): 到達不能なworkflow moduleを削除</code></td></tr>
+<tr><td>S90 / H91</td><td>Runtime docsと358/359/360 handoff</td><td>help/links/spec review、IC-1入力、owner/destination/evidence</td><td><code>docs(runtime): Storage Core移行契約を確定</code></td></tr>
+<tr><td>S99</td><td>Issue-wide final quality gate</td><td>CL-357-001〜015、QA/code/spec review、open Ledger Noteなし</td><td>M99: <code>docs(iss-00357): 最終実装証跡を確定</code></td></tr>
+</tbody></table></div>
+<p>特にE00は「削除前の在庫確認」です。sourceを変更せず、registry / import / shared consumerを相互照合してReportへ記録します。そこでpublic CLI inventoryの変更、動的到達経路、owner不明が見つかれば停止して正本へ戻ります。</p>
+</section>
+<section id="recovery"><h2>12. 失敗・復旧をどう読むか</h2>
+<div class="table"><table><thead><tr><th>状況</th><th>守る不変条件</th><th>観測・復旧</th></tr></thead><tbody>
+<tr><td>invalid active/start target</td><td>stateを変えない</td><td>targetと期待kindを示して修正後に再実行</td></tr><tr><td>blocked Issueをactive set</td><td>selectionは可能</td><td>調査目的のactive選択を拒否しない</td></tr><tr><td>dependency blocked start</td><td><code>--force</code>でも開始しない</td><td>direct/inherited blockerを表示し解消後に再試行</td></tr><tr><td>unknown active Issue</td><td>finishedと推測しない</td><td>actionableに停止。必要時だけforceでguardを迂回し、依存は別途確認</td></tr><tr><td>checkout失敗</td><td>activeを変えない</td><td>Git要約を見て原因を直す</td></tr><tr><td>active保存失敗</td><td>旧snapshotへ復元</td><td>branch side effectとrollback結果を明示し、状態を確認して回復</td></tr><tr><td>Artifact collision/symlink/escape</td><td>partial Artifactを残さない</td><td>deterministic rejection。安全な入力に直して再試行</td></tr><tr><td>generic import publication失敗</td><td>committed/not committedを混同しない</td><td>publication/cleanup/retry dispositionを確認し、必要な一回だけ再実行</td></tr><tr><td>sync失敗</td><td>成功済みclose/clearを巻き戻したように見せない</td><td>projection staleを表示し、manual syncで前進復旧</td></tr>
+</tbody></table></div>
+<p>rollbackはregistration、active/lifecycle、Artifact、scaffold、module deletion、docsの境界ごとに行います。ユーザー所有のnode文書やmetadataをmigration対象にしないため、rollbackでそれらを書き戻そうとはしません。</p>
+</section>
+<section id="onboarding"><h2>13. 最初の1日：読む順番と担当者チェックリスト</h2>
+<h3>推奨する読む順番</h3><ol><li>本資料の「5分で分かる全体像」と「CurrentからTarget」を読む。</li><li><a href="../requirement.md">Requirement</a> の目的、RQ-357-001〜009、EC、ACを読む。</li><li><a href="../design.md">Design</a> のcomponent boundary、active/start/finish、Artifact、migrationを読む。</li><li><a href="../plan.md">Plan</a> のClosure Indexと§7/§8の自分のstep contractを読む。</li><li><a href="../report.md">Report</a> で「未着手」とE00の開始契約を確認する。</li><li>実装開始時だけE00をread-onlyで行い、inventoryと正本の差を明確にする。</li></ol>
+<h3>開始前チェックリスト</h3><ul class="checklist"><li>自分の変更が357のmechanism所有か、358のtemplate/Guide本文所有ではないかを確認した。</li><li>対象stepのRQ / EC / AC / Closure ID、Red/Green、停止条件をPlanで確認した。</li><li>E00より前に削除・registration変更・metadata/deps/active変更をしていない。</li><li>provider-side sourceを正本として扱い、dogfoodはprojection検証にとどめる。</li><li>部分失敗で「全部失敗」または「全部成功」と誤表示しないresultを確認する。</li><li>旧Artifact・Report・Discussion・ADR・<code>.assurance.json</code>を削除、移動、rename、rewriteしない。</li><li>実施後は該当stepのReport evidence、レビュー、検証結果を実際の観測に基づいて残す。</li></ul>
+<h3>用語集</h3><div class="table"><table><thead><tr><th>用語</th><th>このIssueでの意味</th></tr></thead><tbody><tr><td>Storage Core</td><td>構造を決定的に管理する小さなRuntime中核。</td></tr><tr><td>Current surface</td><td>新規利用者に公開し、新しく使えるCLI/Artifactの導線。</td></tr><tr><td>Historical</td><td>既存証跡として読めるが、Current作成・routingへ戻さない形式。</td></tr><tr><td>selection-only</td><td>active選択時にreadinessや品質を判定しないこと。</td></tr><tr><td>dependency-only readiness</td><td>依存グラフとGitHub/cacheの既存fail-closed状態だけで開始可能性を判定すること。</td></tr><tr><td>partial success</td><td>close成功・clear失敗など、phaseごとの確定結果を隠さず表すこと。</td></tr><tr><td>opaque bytes</td><td>取込ファイルの内容を解釈・変換せず、そのまま保存すること。</td></tr><tr><td>IC-1</td><td>357のmechanismと358のtemplate/Guide contractを一致させるEpic統合確認点。</td></tr><tr><td>Closure</td><td>要件を実装・検証・記録まで閉じるためのPlan上の完了単位。未実施のものを完了扱いにしない。</td></tr></tbody></table></div>
+</section>
+<section id="sources"><h2>14. 正本・関連資料へのリンク</h2>
+<p>実装判断の前に、ここではなく次の正本へ戻ってください。</p><ul class="compact"><li>Issue 357: <a href="../requirement.md">Requirement</a> / <a href="../design.md">Design</a> / <a href="../plan.md">Plan</a> / <a href="../report.md">Report</a></li><li>親Epic 356: <a href="../../../requirement.md">Requirement</a> / <a href="../../../design.md">Design</a> / <a href="../../../plan.md">Plan</a> / <a href="../../../report.md">Report</a></li><li>Artifact運用ルール: <a href="rules.md">artifacts/rules.md</a></li><li>Epic全体の人間向け資料: <a href="../../../artifacts/20260809t135756z-disc-epic-00356-detailed-onboarding-guide.html">Epic 00356 詳細オンボーディング資料</a></li></ul>
+<div class="box"><strong>最後に：</strong>このHTMLは説明を助けるためのArtifactであり、正本ではありません。Scope、制約、受け入れ条件、実装順、停止条件を変える必要が生じたときは、本資料を編集して既成事実にせず、Issue/Epic R/D/Pとaccepted ADRの更新・reviewへ戻ります。</div>
+</section>
+</main>
+<footer><strong>Issue 357 Human-readable implementation onboarding guide</strong><br>補助Artifact。正本はIssue/EpicのR/D/Pおよびaccepted ADR、Reportは進捗・証拠・結果要約です。作成時点ではplanning-ready、実装未着手です。</footer>
+</body>
+</html>

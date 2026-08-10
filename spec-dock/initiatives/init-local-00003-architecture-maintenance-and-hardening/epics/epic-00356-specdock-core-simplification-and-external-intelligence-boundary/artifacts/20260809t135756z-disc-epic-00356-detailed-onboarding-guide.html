@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Epic 00356 詳細オンボーディング資料</title>
+<style>
+:root{--ink:#1f2937;--muted:#526170;--blue:#075d99;--pale:#eef6fc;--line:#cdd8e2;--warn:#fff4d9;--good:#eaf7f1}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:#fffdf8;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;line-height:1.82;font-size:16px}header,footer{padding:3rem max(1.25rem,calc((100% - 1120px)/2));background:linear-gradient(135deg,#12385b,#176b8b);color:#fff}header p{max-width:900px;color:#e5f3fb}main{width:min(1120px,calc(100% - 2.4rem));margin:0 auto 5rem}h1{font-size:clamp(2rem,4.5vw,3.25rem);line-height:1.3;margin:0;text-wrap:balance}h2{margin:3rem 0 1rem;padding-bottom:.4rem;border-bottom:3px solid #93c7e7;line-height:1.35}h3{margin:2rem 0 .6rem;color:#12385b;line-height:1.4}p{margin:.75rem 0}a{color:var(--blue);overflow-wrap:anywhere}nav,.box,.warning,.good,details,figure,.issue{margin:1.15rem 0;padding:1rem 1.2rem;border:1px solid var(--line);border-radius:.65rem;background:#fff}nav{background:#f4f7fa}.box{border-left:5px solid #1877b5;background:var(--pale)}.warning{border-left:5px solid #c07a0b;background:var(--warn)}.good{border-left:5px solid #23815e;background:var(--good)}.issue{border-left:5px solid #1877b5}ol,ul{padding-left:1.45rem}li{margin:.33rem 0}.table{overflow-x:auto;border:1px solid var(--line);border-radius:.6rem;margin:1rem 0}table{min-width:720px;width:100%;border-collapse:collapse;background:#fff}th,td{padding:.7rem .8rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{background:#eaf4fb;color:#12385b}tr:last-child td{border-bottom:0}code{padding:.1rem .3rem;background:#fff0d5;border-radius:.25rem;color:#5a3200;font-family:ui-monospace,monospace;font-size:.9em}.badge{display:inline-block;padding:.12rem .52rem;margin:0 .3rem .2rem 0;border-radius:99px;background:#dceefa;color:#124c76;font-weight:700;font-size:.85rem}figure{padding:1rem;overflow-x:auto;-webkit-overflow-scrolling:touch}svg{display:block;width:100%;min-width:820px;height:auto;min-height:220px}figcaption{margin:.8rem .2rem 0;color:#465465}.figure-note{margin:.8rem .2rem 0;padding:.75rem 1rem;background:#f4f7fa;border-left:4px solid #93c7e7}.figure-note p{margin:0 0 .35rem}.figure-note ul{margin:.3rem 0 0}summary{cursor:pointer;color:var(--blue);font-weight:700}pre.plantuml{overflow:auto;padding:1rem;background:#102333;color:#eef8ff;border-radius:.4rem;line-height:1.55;font-size:.82rem;white-space:pre-wrap}.columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.columns>div{padding:1rem;background:#f4f7fa;border-radius:.5rem}.skip{position:absolute;left:-9999px}.skip:focus{left:1rem;top:1rem;z-index:2;padding:.6rem;background:#111827;color:#fff}@media(max-width:720px){body{font-size:15.5px}.columns{grid-template-columns:1fr}nav ol{columns:1}}@media print{body{font-size:10.5pt;background:#fff}header{background:#fff;color:#000;padding:1.2rem}header p{color:#000}main{width:100%}a{color:#000;text-decoration:none}figure,.issue,.table{break-inside:avoid}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へ移動</a>
+<header><p>SpecDock Epic 00356／新規参加メンバー向け詳細資料</p>
+<h1>SpecDockを、扱いやすい構造基盤へ戻すために</h1>
+<p>この資料は、複雑になった作業手順を取り除き、構造保管中核（Storage Core）と文書作成キット（Authoring Kit）を中心に再設計するEpicの背景、設計、実装順、検証、移行上の注意を一つの読み物として説明します。</p></header>
+<main id="main">
+<section id="purpose"><h2>1. この資料の目的と、正本との関係</h2>
+<p>本資料は、今日チームに参加したメンバーが、Epic 00356で「なぜ変えるのか」「何が残り、何が外へ出るのか」「どのIssueをどの順に進めるのか」を理解するための補助資料です。実装上の長期判断と契約を決める正本は、Epicの<a href="../requirement.md">要件定義書</a>、<a href="../design.md">設計書</a>、<a href="../plan.md">実装計画書</a>、および採用済みADRです。ここでは三文書を要件・設計・計画の各正本文書（R/D/P）と呼びます。<a href="../report.md">結果報告書（Report）</a>は進捗、観測証跡、結果要約の参照先であり、作業手順や適合性の権限を持つ正本ではありません。本資料に説明を加えても、正本の判断を置き換えるものではありません。</p>
+<div class="box">
+<strong>現在の状態：</strong>Epicの要件・設計・計画は新しい担当者による仕様レビューを通過しています。ただし、これは実装が終わった、実装開始できる、プルリクエストを出せる、またはマージできるという意味ではありません。Issue 357〜360は存在し、依存関係も登録済みですが、個別の正本文書はこれからIssueごとの計画作成で具体化します。</div>
+<p>この詳細版は、現在の正本R/D/PをCodexの主担当が直接読み直して作成したものであり、ChatGPTおよびOracleは使用していません。厳密照合で参照したGitHub上のソース識別子<code>2c75e0c02cb65a6e74040a72dc161d342d661091</code>は、その分析時点の履歴事実に限られます。この資料は分析成果物の再掲ではなく、現在のリポジトリ正本を読み直した説明資料です。分からない用語は、先に<a href="#terms">用語集と階層</a>を確認してください。</p></section>
+<nav aria-label="目次"><strong>目次</strong><ol>
+<li><a href="#summary">5分で分かる要約</a></li>
+<li><a href="#progress">現在の進捗</a></li>
+<li><a href="#why">軽量化の理由</a></li>
+<li><a href="#future">完了後の姿</a></li>
+<li><a href="#keep">残す・外へ出す・履歴保持</a></li>
+<li><a href="#terms">用語集</a></li>
+<li><a href="#boundary">製品境界と権限</a></li>
+<li><a href="#lifecycle">薄いライフサイクル</a></li>
+<li><a href="#artifact">成果物と取込</a></li>
+<li><a href="#authoring">文書作成キット</a></li>
+<li><a href="#slices">縦スライスとIssue</a></li>
+<li><a href="#parallel">並行作業と依存</a></li>
+<li><a href="#tranches">実施区分</a></li>
+<li><a href="#mapping">要件・受け入れ条件</a></li>
+<li><a href="#verify">テストと移行</a></li>
+<li><a href="#onboarding">参加者の行動</a></li>
+<li><a href="#decision">残る人間判断</a></li>
+<li><a href="#links">正本とドラフト</a></li>
+</ol></nav>
+<section id="summary"><h2>2. 5分で分かる要約</h2>
+<p>SpecDockは本来、仕様の置き場、Issue同士の依存関係、GitHub Issueとの対応、現在選択している作業対象、成果物の保存場所を安定して扱うための道具です。しかし現状には、計画、レビュー、実装の進め方、保証段階、プロファイル、特定のAIやブラウザーへの接続、プルリクエストの進行判断までが入り込んでいます。これらは組織や案件によって変わりやすく、構造を扱う道具の中に固定すると、利用者が別の方法を採りにくくなります。</p>
+<p>このEpicはSpecDockを二つの中核に絞ります。第一は、ID、親子関係、依存グラフ、GitHub連携、現在の選択状態、薄い開始・終了操作、成果物の安全な保存を決定的に処理する<strong>構造保管中核</strong>です。第二は、要件・設計・計画・結果報告の意味と雛形、作業規模に応じた計画の書き方を提供する<strong>文書作成キット</strong>です。</p>
+<p>AI、レビュー手順、実装手法、プルリクエスト運用は消えるのではありません。SpecDock製品の内部から外へ出て、操作者が選び替えられる外部の知的作業として扱います。外部の出力は成果物として残せますが、自動的に正本になることはありません。長く残す判断は要件・設計・計画、または採用済みADRに人が反映します。</p>
+<div class="good">
+<strong>利用者にとっての変化：</strong>「この作業手順を通さないとIssueを終了できない」ではなく、「構造はSpecDockで安全に扱い、考え方と品質判断はチームが文書で決める」へ変わります。</div></section>
+<section id="progress"><h2>3. 現在の進捗</h2>
+<p>現時点は<strong>Epicの計画段階</strong>です。Epicの正本3文書はレビュー済みで、Issue 357〜360のID、GitHub Issue番号、親子関係、依存関係はすでに存在します。一方、各Issue直下の正本文書は雛形であり、厳密照合で作成した参考ドラフトは「Issueごとの計画作成で検討する入力」です。参考ドラフトだけで実装へ進めることはできません。</p>
+<div class="table"><table>
+<thead><tr>
+<th>項目</th>
+<th>状態</th>
+<th>意味</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Epic要件・設計・計画</td>
+<td>レビュー通過</td>
+<td>方向、境界、実施順を合意した段階です。</td>
+</tr>
+<tr>
+<td>Issue 357〜360のノードと依存</td>
+<td>作成済み</td>
+<td>作業の受け皿と順序はあるが、実装着手の許可ではありません。</td>
+</tr>
+<tr>
+<td>Issueごとの厳密照合ドラフト</td>
+<td>成果物として保存済み</td>
+<td>個別計画作成で採否・修正を判断する参考資料です。</td>
+</tr>
+<tr>
+<td>品質・統合・引き渡し用の最終Issue</td>
+<td>候補のみ</td>
+<td>人間の承認前なのでノードも番号も作成しません。</td>
+</tr>
+<tr>
+<td>製品コード</td>
+<td>未変更</td>
+<td>本Epicはまだ計画を完了した段階です。</td>
+</tr>
+</tbody>
+</table></div></section>
+<section id="why"><h2>4. なぜ軽量化するのか</h2>
+<p>複雑さそのものが悪いのではありません。問題は、変更頻度も責任者も異なる二種類の仕組みを、一つの製品の必須状態として混ぜてしまったことです。たとえば、依存関係が解消されているかは機械的に判定できます。一方で、設計レビューが十分か、どのモデルに相談するか、どの粒度で実装計画を書くかは、案件のリスク、人員、組織の方針に依存します。後者を実行時機構の必須判定条件にすると、判断を変えるたびに製品の状態機械を変える必要があります。</p>
+<p>現状では、保証、プロファイル、レビュー昇格、委任作成、提供元固有の取込、修復バッジ、ドラフトの導線などがCLIや配布スキル、文書案内に現れます。その結果、新しいチームメンバーは「何が構造上必須か」と「過去に採用した運用手順」を区別しにくくなります。軽量化の目的は機能を雑に削ることではなく、安定した構造上の不変条件を守りながら、運用の自由度を取り戻すことです。</p></section>
+<section id="future"><h2>5. 完了後の姿</h2>
+<div class="columns">
+<div>
+<strong>構造を安全に扱える</strong><br>上位イニシアティブ、Epic、Issueの位置、親子関係、GitHub Issue番号、依存関係、現在作業する対象を一貫して扱えます。</div>
+<div>
+<strong>文書を迷わず書ける</strong><br>要件・設計・計画の正本文書/結果報告書の役割が明確になり、Issueには一つの計画書だけを置きます。作業規模の違いは文書ガイドで扱います。</div>
+<div>
+<strong>外部知能を選べる</strong><br>AI、レビュー、実装、プルリクエスト運用は操作者が選びます。外部出力は自動採用されず、必要な判断だけを正本へ反映します。</div>
+<div>
+<strong>既存の証跡を壊さない</strong><br>更新しても既存ノードの文書、成果物、議論記録、ADR、過去の保証情報を一括で書き換えません。</div>
+</div></section>
+<section id="keep"><h2>6. 残すもの・外へ出すもの・履歴として保持するもの</h2>
+<div class="table"><table>
+<thead><tr>
+<th>区分</th>
+<th>内容</th>
+<th>理由</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>SpecDock内に残す</td>
+<td>ノードID、親子関係、GitHub連携、依存関係グラフ、選択状態、開始・終了の薄い操作、成果物の安全な保存、同期・検証・診断</td>
+<td>これらは構造的で、誰が使っても同じ結果になる必要があります。</td>
+</tr>
+<tr>
+<td>SpecDock内に残す</td>
+<td>要件・設計・計画の正本文書/結果報告書の雛形、文書の責務、成果物種別の意味、計画レベルの説明</td>
+<td>チームが同じ文書を読むための共通言語を提供します。</td>
+</tr>
+<tr>
+<td>外へ出す</td>
+<td>計画・レビュー・実装の手順、AIやブラウザーの選択、品質判定条件、プルリクエスト状態機械、提供元固有の取込</td>
+<td>案件ごとに変わる認知的な仕事であり、製品の必須状態にしません。</td>
+</tr>
+<tr>
+<td>履歴として保持</td>
+<td>旧結果報告書、旧成果物、議論記録、ADR、プロファイル由来文書、<code>.assurance.json</code>、旧種別</td>
+<td>過去の意思決定や検証を失わないためです。新規作成の導線からは外します。</td>
+</tr>
+</tbody>
+</table></div></section>
+<section id="terms"><h2>7. 用語集とSpecDockの階層</h2>
+<p>SpecDockでは、仕事の粒度と文書の置き場所を次の階層で整理します。まずこの関係を押さえると、EpicとIssueの資料を混同しません。</p>
+<div class="box"><strong>Initiative（長期目的）</strong> → <strong>Epic（まとまり）</strong> → <strong>Issue（実装単位）</strong> → <strong>要件・設計・計画の正本文書と成果物</strong><br>Initiativeは長い期間で達成したい目的、Epicはその目的を実現するためのまとまり、Issueは実装・検証・文書化を完結させる最小の作業単位です。ノードはInitiative、Epic、Issueをまとめて指す構造単位であり、各ノードに親子関係、ID、依存関係、文書を置けます。</div>
+<div class="table"><table>
+<thead><tr>
+<th>用語</th>
+<th>このEpicでの意味</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>構造保管中核</td>
+<td>仕様ノードと依存関係、選択状態、成果物、GitHub連携を決定的なルールで扱う小さな中核です。</td>
+</tr>
+<tr>
+<td>文書作成キット</td>
+<td>要件・設計・計画・結果報告の役割、雛形、ガイドを提供する文書面の仕組みです。実行時機構の状態遷移は持ちません。</td>
+</tr>
+<tr>
+<td>正本</td>
+<td>長く残る判断を置く文書です。Epic/Issueの要件・設計・計画の正本文書と、採用済みADRが該当します。</td>
+</tr>
+<tr>
+<td>成果物（Artifact）</td>
+<td>調査、インタビュー、議論、判断候補などの根拠を対象範囲内に残すファイルです。単独では正本ではありません。</td>
+</tr>
+<tr>
+<td>依存関係グラフ（<code>DAG</code>）</td>
+<td>Issue間に循環がない依存関係グラフです。前提Issueが終わるまで開始できない関係を表します。</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td>操作者がコマンドでSpecDockを操作する入口です。構造を安全に扱うための決定的な操作を提供します。</td>
+</tr>
+<tr>
+<td>準備完了状態（<code>ready</code>）</td>
+<td>依存関係など、機械的に確認できる開始条件が満たされた状態です。チームが実装を始めてよいという人間の判断とは別です。</td>
+</tr>
+<tr>
+<td>選択状態（<code>active</code>）</td>
+<td>現在選択している対象範囲です。選択しただけでは、依存解消や実装許可を意味しません。</td>
+</tr>
+<tr>
+<td>薄いライフサイクル</td>
+<td>開始時は未完了の選択状態と依存関係だけを確認し、終了時はGitHub Issueの終了、選択状態の解除、同期だけを行う、品質判断を持たない操作です。</td>
+</tr>
+<tr>
+<td>縦スライス</td>
+<td>レイヤー別の仕事ではなく、利用者が確認できる一連の価値をIssue単位で完結させる分け方です。</td>
+</tr>
+<tr>
+<td>統合確認点（IC）</td>
+<td>複数Issueの受け渡し契約を文書で確認する地点です。実行時機構の判定条件でも、Issueノードでもありません。</td>
+</tr>
+<tr>
+<td>文書のみの扱い（文書のみ）</td>
+<td>情報を実行時機構のメタデータや状態遷移に入れず、文書本文とGit履歴だけで扱う方針です。</td>
+</tr>
+<tr>
+<td>提供元・自家利用環境・導入済み環境</td>
+<td>提供元はSpecDockを配布する側のソース、自家利用環境はこのリポジトリ自身でSpecDockを利用して確認する投影、導入済み環境は新規導入または更新された外部利用者の環境です。360は三者で配布内容が矛盾しないことを確認します。</td>
+</tr>
+<tr>
+<td>E-RQ・E-AC</td>
+<td>E-RQはEpicの要件識別子、E-ACは受け入れ条件の識別子です。どの作業がどの約束を満たすかを追跡するために使います。</td>
+</tr>
+</tbody>
+</table></div></section>
+<section id="boundary"><h2>8. 製品境界と、どこに権限を置くか</h2>
+<p>次の図では、人が外部の知的作業を依頼しつつ、構造操作はSpecDockに任せる関係を示します。外部のAIやレビュー担当は役に立ちますが、SpecDockの内部接続部や正本の権限者にはなりません。成果物を読んだ人が、必要な内容を要件・設計・計画の正本文書またはADRに書き直した時点で初めて、長期判断になります。</p>
+<figure><svg viewbox="0 0 1040 360" role="img" aria-labelledby="boundary-title boundary-desc"><title id="boundary-title">製品境界の図</title>
+<desc id="boundary-desc">人が外部の知的作業またはリポジトリ内スキルを選び、スキルが構造保管中核と文書作成キットへつながり、構造保管中核がローカル仕様グラフとGitHubを扱う関係を示す。</desc><defs><marker id="a1" markerwidth="10" markerheight="10" refx="9" refy="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#42667f"></path></marker></defs><rect x="25" y="135" width="160" height="72" rx="12" fill="#dceefa" stroke="#1877b5"></rect><text x="105" y="165" text-anchor="middle" font-size="20">人・操作者</text><text x="105" y="190" text-anchor="middle" font-size="14">判断と操作を行う</text><rect x="245" y="45" width="220" height="96" rx="12" fill="#fff3d9" stroke="#c07a0b"></rect><text x="355" y="78" text-anchor="middle" font-size="19">外部の知的作業</text><text x="355" y="103" text-anchor="middle" font-size="14">AI・レビュー・実装手法</text><text x="355" y="124" text-anchor="middle" font-size="13">操作者が選び替える</text><rect x="245" y="213" width="220" height="96" rx="12" fill="#eaf7f1" stroke="#23815e"></rect><text x="355" y="246" text-anchor="middle" font-size="19">リポジトリ内スキル</text><text x="355" y="271" text-anchor="middle" font-size="14">入口と明示操作を案内</text><text x="355" y="292" text-anchor="middle" font-size="13">正本を自動変更しない</text><rect x="535" y="32" width="230" height="118" rx="12" fill="#e8f3fc" stroke="#1877b5"></rect><text x="650" y="67" text-anchor="middle" font-size="19">構造保管中核</text><text x="650" y="93" text-anchor="middle" font-size="14">ID・依存・選択状態・安全操作</text><text x="650" y="116" text-anchor="middle" font-size="14">GitHub連携・成果物保存</text><rect x="535" y="205" width="230" height="104" rx="12" fill="#eaf7f1" stroke="#23815e"></rect><text x="650" y="240" text-anchor="middle" font-size="19">文書作成キット</text><text x="650" y="266" text-anchor="middle" font-size="14">要件・設計・計画・結果報告の意味と雛形</text><text x="650" y="287" text-anchor="middle" font-size="14">文書ガイドを提供</text><rect x="835" y="45" width="175" height="96" rx="12" fill="#f5f7fb" stroke="#677687"></rect><text x="922" y="78" text-anchor="middle" font-size="18">ローカル仕様グラフ</text><text x="922" y="104" text-anchor="middle" font-size="14">ノード・要件・設計・計画・成果物</text><text x="922" y="125" text-anchor="middle" font-size="14">依存関係</text><rect x="835" y="218" width="175" height="70" rx="12" fill="#f5f7fb" stroke="#677687"></rect><text x="922" y="247" text-anchor="middle" font-size="18">GitHub Issue</text><text x="922" y="270" text-anchor="middle" font-size="14">連携と終了状態</text><path d="M185 155 L245 105 M185 185 L245 258 M465 105 L535 94 M465 258 L535 257 M765 90 L835 92 M765 120 L835 245 M765 255 L835 108" stroke="#42667f" stroke-width="2" marker-end="url(#a1)"></path></svg><figcaption>図1：構造の正しさはSpecDockが扱い、外部の知的作業は操作者の管理下で利用する。外部出力は、正本へ反映されるまで補助資料です。</figcaption><div class="figure-note"><p><strong>図を読めない場合の要点：</strong></p><ul><li>人は外部の知的作業とリポジトリ内スキルを選んで使います。</li><li>スキルは構造保管中核と文書作成キットへつながり、構造保管中核がローカル仕様グラフとGitHubを扱います。</li><li>外部出力は補助資料であり、人が正本文書またはADRへ採用するまで長期判断にはなりません。</li></ul></div></figure><details><summary>PlantUML原文を表示</summary><pre class="plantuml">@startuml
+title Epic 00356 - 製品の境界
+left to right direction
+actor "人・操作者" as Human
+cloud "外部の知的作業\nAI・レビュー・実装手法\n操作者が選び替える" as External
+package "リポジトリ内の案内" { component "リポジトリ内スキル\n入口と明示操作" as Skill }
+package "SpecDock製品" { component "構造保管中核\nID・依存・選択状態・安全操作" as Core; component "文書作成キット\n要件・設計・計画・結果報告の意味と雛形" as Kit }
+database "ローカル仕様グラフ\nノード・要件・設計・計画・成果物・依存" as Graph
+cloud "GitHub Issue\n連携と終了状態" as GH
+Human --&gt; External : 知的作業を依頼
+Human --&gt; Skill : 構造操作を選択
+External --&gt; Kit : 文書契約を読む
+Skill --&gt; Core : 決定的なCLI操作
+Core --&gt; Graph : 構造を保存・検証
+Core --&gt; GH : 連携を解決しIssueを終了
+Kit --&gt; Graph : 雛形内容を定義
+@enduml</pre></details><h3>正本の優先順位</h3>
+<p>要件は「なぜ・何を・どこまで」、設計は「責務分担・構造・失敗時の契約」、計画は「順序・検証・完了条件」を決めます。採用済みADRは長期の設計判断を残します。成果物は調査や対話の証拠、結果報告書は結果の要約です。依存関係だけは<code>.meta.json.depends_on</code>が機械的な読み取り元であり、選択状態は選択したIDとファイルパスを覚えるだけです。</p></section>
+<section id="lifecycle"><h2>9. 薄いライフサイクルの具体的な挙動</h2>
+<p>軽量化後も「何でも自由にしてよい」わけではありません。構造上危険な操作は守ります。ただし、品質の十分性やレビューの可否までCLIが推測することはやめます。<code>active set</code>は有効な対象範囲を「今見ている対象」として選び、依存が未解消でも調査や計画のために選択できます。<code>issue start</code>は、未完了の選択状態が残っていないことと依存が解消されていることだけを確認します。<code>--force</code>で回避できるのは未完了の選択状態を保護する確認だけで、未解消の依存関係は回避できません。</p>
+<p><code>issue finish</code>は、GitHub Issueを終了し、成功後に選択状態を解除し、その後に同期します。計画書、レビュー、テスト、結果報告書、証拠採否台帳を読んで終了可否を判定しません。これは品質を軽視するためではなく、品質の判断をチームの正本と人間の責任へ正しく戻すためです。</p>
+<figure><svg viewbox="0 0 1040 330" role="img" aria-labelledby="life-title life-desc"><title id="life-title">薄いライフサイクルの順序</title>
+<desc id="life-desc">対象を選択して保存し、開始時には未完了の選択状態と依存を確認し、終了時にはGitHub Issueの終了、選択状態の解除、同期を順に行い、失敗時にどの状態を保持するかを示す。</desc><defs><marker id="a2" markerwidth="10" markerheight="10" refx="9" refy="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#42667f"></path></marker></defs><text x="80" y="35" font-size="18">操作者</text><text x="275" y="35" font-size="18">選択・開始操作</text><text x="495" y="35" font-size="18">依存・選択状態</text><text x="735" y="35" font-size="18">終了・GitHub・同期</text><path d="M110 85 L335 85 M335 115 L565 115 M110 155 L335 155 M335 185 L565 185 M565 215 L850 215" stroke="#42667f" stroke-width="2" marker-end="url(#a2)"></path><text x="220" y="76" text-anchor="middle" font-size="14">対象範囲を選択</text><text x="450" y="106" text-anchor="middle" font-size="14">IDとファイルパスだけ保存</text><text x="220" y="146" text-anchor="middle" font-size="14">開始を依頼</text><text x="450" y="176" text-anchor="middle" font-size="14">未完了の選択状態と依存を確認</text><text x="708" y="206" text-anchor="middle" font-size="14">終了 → 解除 → 同期</text><rect x="650" y="240" width="310" height="58" rx="8" fill="#fff3d9" stroke="#c07a0b"></rect><text x="805" y="264" text-anchor="middle" font-size="14">GitHubでの終了失敗：選択状態を保持</text><text x="805" y="286" text-anchor="middle" font-size="14">解除・同期の失敗：部分成功として診断</text></svg><figcaption>図2：終了処理は順序を守るが、品質の判定は行わない。終了後の解除失敗と、解除後の同期失敗は異なる部分失敗として扱います。</figcaption><div class="figure-note"><p><strong>図を読めない場合の要点：</strong></p><ul><li>対象を選択し、開始時には未完了の選択状態と依存関係だけを確認します。</li><li>終了時はGitHub Issueの終了、選択状態の解除、同期の順に処理します。</li><li>終了、解除、同期のどこで失敗したかを区別し、成功済みの処理を盲目的に繰り返しません。</li></ul></div></figure><details><summary>PlantUML原文を表示</summary><pre class="plantuml">@startuml
+title Epic 00356 - 薄いライフサイクルと補助資料の境界
+actor 操作者
+participant "対象の選択\nactive set" as Select
+participant "Issue開始\nissue start" as Start
+participant "依存DAG" as Deps
+participant "選択状態の保存先" as Active
+participant "Issue終了\nissue finish" as Finish
+participant "GitHub Issue" as GH
+participant "同期" as Sync
+操作者 -&gt; Select : 有効な対象範囲を選択
+Select -&gt; Active : IDとファイルパスだけ保存
+操作者 -&gt; Start : 実装開始を依頼
+Start -&gt; Active : 未完了の選択状態を確認
+Start -&gt; Deps : 依存だけを確認
+操作者 -&gt; Finish : 終了を依頼
+Finish -&gt; GH : 連携済みIssueを終了
+GH --&gt; Finish : 終了結果
+Finish -&gt; Active : 成功後だけ解除
+Finish -&gt; Sync : 解除後に再同期
+note right of Finish
+計画・レビュー・テスト・結果報告書・成果物を
+終了判定には使わない
+end note
+@enduml</pre></details><div class="warning">
+<strong>失敗時の読み方：</strong>GitHub 終了に失敗したなら選択状態は残り、再試行の対象が明確です。終了後に選択状態解除が失敗したならGitHub側は閉じている可能性があるため、同じ終了を盲目的に繰り返さず状態を確認します。同期だけが失敗したなら、終了と解除は成功しているが投影表示が古い、という区別を診断します。</div></section>
+<section id="artifact"><h2>10. 成果物と取込の新しい契約</h2>
+<p>成果物は、正本に書く前の調査根拠や対話記録を対象範囲内へ残すためのものです。種別は位置引数で任意です。種別を省略した場合と明示的に<code>blank</code>を指定した場合は、どちらも自由形式の成果物になります。これは厳格なテンプレートが不要な状況で、分析内容を柔軟に残すためです。</p>
+<div class="table"><table>
+<thead><tr>
+<th>新規に作れる種別</th>
+<th>使う場面</th>
+<th>長く残す判断の反映先</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>blank</code></td>
+<td>決まった型に当てはまらない自由形式の根拠</td>
+<td>必要な結論だけを要件・設計・計画の正本文書またはADRへ書き直します。</td>
+</tr>
+<tr>
+<td><code>research</code></td>
+<td>一つの問いに対する根拠付きの調査</td>
+<td>事実・制約を要件、設計、計画の該当箇所へ反映します。</td>
+</tr>
+<tr>
+<td><code>interview</code></td>
+<td>質問と回答を残す聞き取り</td>
+<td>採用した回答を正本またはADRへ反映します。</td>
+</tr>
+<tr>
+<td><code>disc</code></td>
+<td>複数の証拠を比べる議論</td>
+<td>合意した結論を正本へ反映します。</td>
+</tr>
+<tr>
+<td><code>decision-candidate</code></td>
+<td>まだ採用していない判断案</td>
+<td>人の採否後に要件・設計・計画の正本文書またはADRへ反映します。</td>
+</tr>
+<tr>
+<td><code>adr</code></td>
+<td>長期の設計判断の候補・記録</td>
+<td>採用済みADRだけが長期の正本になります。</td>
+</tr>
+</tbody>
+</table></div>
+<p>過去の<code>draft-requirement</code>、<code>draft-design</code>、<code>draft-plan</code>、修復用の種別などは既存履歴として読むことはできます。しかし、新しく作る経路には出しません。これは「新規に作れない」ことと「既存ファイルを壊す」ことを混同しないためです。また、<code>analysis</code>という種別は追加しません。取込は、一つの内容未分類ファイルを扱う汎用の取込だけにします。特定の提供元専用だったコマンド、モジュール、文書、テストは、現在の製品面から外します。</p></section>
+<section id="authoring"><h2>11. 文書作成キットと、4段階の計画を文書だけで扱う方針</h2>
+<p>Issueには計画書を複数作りません。常に一つの<code>plan.md</code>を置き、その中で選んだ作業レベルと理由、検証、復旧を説明します。共通の計画ガイドと、軽量・標準・厳格・重要の4種類の完了ガイドは、何を丁寧に書くかを示す参考資料です。レベルをメタデータ、選択状態、依存関係、実行時機構の判定条件に保存しないため、チームが後から運用を変えても構造は複雑になりません。</p>
+<div class="table"><table>
+<thead><tr>
+<th>計画レベル</th>
+<th>想定する仕事</th>
+<th>計画書で重視する完了像</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>軽量（<code>light</code>）</td>
+<td>局所的で影響範囲が小さく、戻しやすい変更</td>
+<td>直接の受け入れ条件、狙いを絞った検証、残作業なしを明記します。</td>
+</tr>
+<tr>
+<td>標準（<code>standard</code>）</td>
+<td>通常の機能追加・不具合修正</td>
+<td>利用者の一連の流れ、主要な失敗、回帰確認、基本的な戻し方を記します。</td>
+</tr>
+<tr>
+<td>厳格（<code>strict</code>）</td>
+<td>公開契約、実行時機構、データ、移行、互換性に触れる変更</td>
+<td>現状と目標、失敗モード、否定検証、戻し方または前進復旧を具体化します。</td>
+</tr>
+<tr>
+<td>重要（<code>critical</code>）</td>
+<td>セキュリティ、プライバシー、高い影響範囲、不可逆に近い変更</td>
+<td>脅威・データ、段階導入、停止手段、バックアップ・復元、障害対応まで扱います。</td>
+</tr>
+</tbody>
+</table></div>
+<p>本Epicの各Issueは実行時機構や配布、移行に関わるため、個別計画作成では少なくとも厳格相当の考慮が必要になる可能性があります。ただし、これは今回の正本で確定した実行時機構状態ではなく、Issueごとに根拠を書いて選ぶ文書上の判断です。</p>
+<h3>正本文書と結果報告書の役割</h3>
+<p><strong>要件定義書</strong>は利用者価値、対象範囲、対象外、受け入れ条件を決めます。<strong>設計書</strong>は責務の置き場所、データやファイルの契約、失敗時の挙動、互換性を決めます。<strong>実装計画書</strong>は作業順、テスト、移行、完了条件を決めます。<strong>結果報告書</strong>は結果、検証、残るリスクとフォローアップの最小見出しを持つ結果要約であり、空でも有効です。結果報告書が空だから開始・終了できないという判定条件は持ちません。</p></section>
+<section id="slices"><h2>12. なぜ縦スライスで進めるのか</h2>
+<p>「CLIを先に全部直す」「ドキュメントを後でまとめて直す」といった横方向の分け方では、途中で利用者が何を得られるかが分かりにくくなります。このEpicでは、各Issueがコード、テスト、文書、移行または互換性の説明までを含む、確認可能な利用者の流れを閉じます。これが縦スライスです。</p>
+<p>Issue 357は構造操作の流れ、358は文書を書く流れ、359はスキルを使う流れ、360は利用者へ配布・更新・削除する流れを閉じます。順番に依存はありますが、357と358は最初から並行でき、個別の価値を持ちます。</p>
+<div class="issue" id="issue357">
+<h3>Issue 357：実行時機構を構造保管中核へ絞る</h3>
+<span class="badge">GitHub #357</span><span class="badge">依存なし</span><p><strong>利用者物語：</strong>操作者として、計画やレビューの方式に縛られず、ノード、依存、選択状態、開始・終了、成果物を安全に扱いたい。そうすれば、チーム独自の進め方を採っても仕様構造を壊さずに済みます。</p>
+<p><strong>前後関係：</strong>357は358と同時に開始できます。完了後は358と合流してIC-1を通り、359が安定した構造保管中核の操作契約を利用します。また360は357が整理した実行時機構を配布対象へ含めます。</p>
+<p><strong>対象と対象外：</strong>構文解析器、登録表、業務規則層、アプリケーション層、基盤層、表示層にある作業手順、プロファイル、保証情報、提供元固有の取込を撤去します。同時に、現在対象の選択、Issue開始操作、簡素なIssue終了操作、成果物作成・取込、ノード雛形の機械契約を整えます。文書の文章内容、計画レベルの説明、スキル契約、配布物の最終的な安全な除去は他Issueの責務です。</p>
+<p><strong>変更面・受け入れ・テスト：</strong>実行時機構の実装と契約の検証用データは357が所有し、雛形の文章は358が所有します。現在対象の選択操作が選択だけを行い、依存未解消のIssueも選択できること、開始操作が未完の現在対象と依存だけを見ること、終了操作がGitHub終了→現在対象解除→同期の順で動くことを確認します。種別省略と<code>blank</code>が両方動き、現行6種は作成でき、歴史的種別は新規作成できなくても認識できること、汎用一ファイル取込が動き、提供元固有経路が不在であることも正・負の両面で検証します。</p>
+<p><strong>互換性・引き渡し・実演：</strong>既存ID、親子関係、GitHub番号、依存、既存の正本文書と結果報告書、成果物、議論記録、ADRを保持します。実演では依存未解消のIssueを選択し、開始は拒否されること、GitHub終了の失敗時に現在対象が残ること、歴史的種別を壊さず読めることを示します。IC-1へ実行時機構の契約、撤去対象一覧、ノード雛形の機構を渡します。</p>
+</div>
+<div class="issue" id="issue358">
+<h3>Issue 358：文書作成キットと文書契約を単純化する</h3>
+<span class="badge">GitHub #358</span><span class="badge">依存なし</span><p><strong>利用者物語：</strong>新しいIssueを扱う人として、一つの要件・設計・計画の正本文書と薄い結果報告書、読みやすいガイドだけで、何を書くべきかを理解したい。そうすれば複雑なワークフローの知識がなくても、必要な仕様を残せます。</p>
+<p><strong>前後関係：</strong>358は357と並行に始められます。357がノード雛形を生成する機構を、358が雛形の文章内容を担当し、IC-1で合流させます。その結果を359のスキルと360の配布に渡します。</p>
+<p><strong>対象と対象外：</strong>正本文書と結果報告書の雛形およびガイド、対象範囲の階層化、成果物の種別の説明、現行と履歴の案内、共通の計画ガイド、4つの完了ガイド、内部リンクと禁止語彙の検証、提供元と自家利用環境の投影、既存文書のバイト列保持を扱います。構文解析器や登録表、依存アルゴリズム、ライフサイクル実装、導入機構による安全な除去の実行は持ちません。</p>
+<p><strong>変更面・受け入れ・テスト：</strong>358は雛形とガイドの文章、案内、成果物の意味づけを所有します。新規ノードに一組の要件・設計・計画文書と、空でも有効な簡素な結果報告書があることを確認します。Issueの計画書が一つで共通ガイドと4つの完了ガイドへ辿れること、6種の現行成果物の用途と正本反映先が説明されること、現行の案内が旧作業手順、段階昇格、プロファイル、証拠採否台帳を標準導線にしないことを検証します。リンク、用語、提供元と自家利用環境の同等性、既存文書の非変更も確認します。</p>
+<p><strong>互換性・引き渡し・実演：</strong>既存ノード内の重い結果報告書や過去の文書は書き換えません。実演では新しいIssueを作り、要件・設計・計画の正本文書と結果報告書を読み、計画レベルを計画書本文で選ぶ流れを見せます。IC-1へ雛形の形、結果報告書見出し、成果物カタログ、ガイドのファイルパスを渡します。</p>
+</div>
+<div class="issue" id="issue359">
+<h3>Issue 359：製品が配布する多数の作業手順スキルを、二つのSpecDockスキルへ置き換える</h3>
+<span class="badge">GitHub #359</span><span class="badge">357・358に依存</span><p><strong>利用者物語：</strong>エージェントまたは操作者として、現在の対象範囲、正本文書、成果物、依存関係、CLIのヘルプを一貫した入口から見つけ、必要なときだけ確認・整理を行いたい。そうすればスキルが勝手に正本を変えたり、特定の提供元が所有するAIを必須にしたりしません。</p>
+<p><strong>前後関係：</strong>357の構造保管中核操作と358のガイド・雛形が安定してから着手します。IC-1で両方の契約を確認してから359が二つのスキルの案内を実装します。完了後にIC-2を通り、360へ配布対象のスキル一覧を渡します。</p>
+<p><strong>対象と対象外：</strong><code>spec-dock</code>スキルは、対象範囲、親子関係、正本、成果物、依存関係、CLIのヘルプへの入口を案内します。<code>spec-dock-grill-with-docs</code>スキルは、明示的な呼び出し時だけローカル文書を読み、必要なら外部能力を利用して確認・整理用の成果物を正確に1件作ります。要件・設計・計画の正本文書の自動編集、品質の判定条件、特定の提供元が所有するAIの呼び出し、プルリクエスト作業手順の再実装は行いません。</p>
+<p><strong>変更面・受け入れ・テスト：</strong>359は、スキルの契約と旧スキルからの移行一覧を所有します。配布物の存在、リンク、禁止された参照、対象範囲を読む利用者シナリオ、確認・整理が補助資料を1件だけ作るシナリオ、外部能力がない場合に書き込まず停止するシナリオを検証します。成果物は用途別に<code>research</code>、<code>interview</code>、<code>disc</code>、<code>decision-candidate</code>、<code>adr</code>、<code>blank</code>を選び、<code>analysis</code>は作りません。</p>
+<p><strong>互換性・引き渡し・実演：</strong>旧スキルが残っていても、新スキルはそれを呼び出しません。実演では、スキルが文書の場所を案内し、明示的に文書を用いた確認が補助成果物だけを残して正本を変えないことを確認します。IC-2へ、二つのスキルの入出力、禁止行為、ガイドへのリンク、旧スキルの撤去一覧を渡します。</p>
+</div>
+<div class="issue" id="issue360">
+<h3>Issue 360：配布を切り替え、旧作業手順面を退役させる</h3>
+<span class="badge">GitHub #360</span><span class="badge">357・358・359に依存</span><p><strong>利用者物語：</strong>新規利用者としては必要な資産だけを受け取り、既存利用者としては更新しても自分の仕様と履歴を失わず、削除時にも製品管理下だけを安全に片付けたい。そうすれば、軽量化が既存利用者にとって破壊的な移行になりません。</p>
+<p><strong>前後関係：</strong>実行時機構、文書、スキルの目標一覧が確定した後に取り組みます。357〜359とIC-2の受け渡しを消費し、IC-3で利用環境移行の証拠をまとめます。</p>
+<p><strong>対象と対象外：</strong>導入機構、製品管理下の配布物一覧、初期化、更新、削除、提供元・自家利用環境・導入済み利用環境の整合、旧版の製品管理下配布物の安全な除去、既存データの保持、停止した更新の診断と再試行、移行文書と利用環境の検証一覧を扱います。利用者所有のノード文書や成果物を整理のために削除すること、所有権が曖昧なファイルを黙って上書きまたは削除すること、外部ツールを消すことは対象外です。</p>
+<p><strong>変更面・受け入れ・テスト：</strong>360は、配布と安全な除去の実行、利用環境の検証一覧を所有します。空の新規導入では目標の一覧だけを配置すること、未変更の旧版を更新する際は旧版の製品管理下配布物を安全に除去しつつノードデータを保持することを確認します。変更済みの製品管理下配布物、履歴証跡、危険なシンボリックリンク、途中中断、反復実行に対して保守的に振る舞うことも確認します。削除時は製品管理下の配布物だけを除去し、仕様証跡を残します。</p>
+<p><strong>互換性・引き渡し・実演：</strong>既存ID、GitHub連携、要件・設計・計画の正本文書、結果報告書、成果物、議論記録、ADR、<code>.assurance.json</code>は保護します。実演では新規導入、既存更新、削除の三つの利用者状況を用意し、それぞれのファイル差分と再試行手順を示します。IC-3へ、導入、安全な除去、保持、削除、同等性、復旧の結果を渡します。</p>
+</div></section>
+<section id="parallel"><h2>13. 357と358の並行作業、依存関係、統合確認点</h2>
+<p>357と358は依存しないため、並行で始められます。ただし、「同じファイルを同時に直して後で解決する」進め方は避けます。357は実行時機構と契約用の検証データを、358は雛形・ガイドの内容と利用者向けの用語を所有します。357は雛形の文章を決めず、358は構文解析器や登録表を直接変更しません。</p>
+<ol>
+<li>開始前に各Issueの正確なファイル一覧を対象ブランチ上で固定します。</li>
+<li>共通になる新規ノードの要件・設計・計画の正本文書、結果報告書、成果物の一覧、任意の種別、ガイドのファイルパス、提供元・自家利用環境の検証用データを一覧にします。</li>
+<li>各担当は自分の所有面で狭いテストを通します。</li>
+<li>IC-1で、機械契約と文章契約が同じ利用者体験を指すか確認します。</li>
+<li>齟齬が出たら359へ進まず、357または358の所有者へ戻します。</li>
+</ol>
+<p>これは新しい作業手順の状態機械ではありません。誰がどのファイルを編集するか、どの利用者契約を共有するかを計画書で明確にし、衝突を減らすための作業上の約束です。</p>
+<figure><svg viewbox="0 0 1040 360" role="img" aria-labelledby="dep-title dep-desc"><title id="dep-title">Issue依存関係と引き渡し</title>
+<desc id="dep-desc">357と358が並行し、IC-1を経て359へ、IC-2を経て360へ進む順序と、人間が承認した最終候補が357、358、359、360のすべてへ直接依存する関係を示す。</desc><defs><marker id="a3" markerwidth="10" markerheight="10" refx="9" refy="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#42667f"></path></marker></defs><rect x="45" y="50" width="185" height="72" rx="10" fill="#e8f3fc" stroke="#1877b5"></rect><text x="138" y="79" text-anchor="middle" font-size="18">Issue 357</text><text x="138" y="103" text-anchor="middle" font-size="13">構造操作の利用者流れ</text><rect x="45" y="205" width="185" height="72" rx="10" fill="#eaf7f1" stroke="#23815e"></rect><text x="138" y="234" text-anchor="middle" font-size="18">Issue 358</text><text x="138" y="258" text-anchor="middle" font-size="13">文書作成の利用者流れ</text><rect x="310" y="123" width="160" height="72" rx="10" fill="#fff3d9" stroke="#c07a0b"></rect><text x="390" y="151" text-anchor="middle" font-size="18">IC-1</text><text x="390" y="175" text-anchor="middle" font-size="13">構造中核と文書キットの契約</text><rect x="550" y="123" width="185" height="72" rx="10" fill="#e8f3fc" stroke="#1877b5"></rect><text x="642" y="151" text-anchor="middle" font-size="18">Issue 359</text><text x="642" y="175" text-anchor="middle" font-size="13">スキルの利用者流れ</text><rect x="780" y="123" width="160" height="72" rx="10" fill="#fff3d9" stroke="#c07a0b"></rect><text x="860" y="151" text-anchor="middle" font-size="18">IC-2</text><text x="860" y="175" text-anchor="middle" font-size="13">スキルの契約</text><rect x="550" y="265" width="185" height="72" rx="10" fill="#eaf7f1" stroke="#23815e"></rect><text x="642" y="293" text-anchor="middle" font-size="18">Issue 360</text><text x="642" y="317" text-anchor="middle" font-size="13">配布・移行の利用者流れ</text><rect x="795" y="256" width="210" height="84" rx="10" fill="#fff0f0" stroke="#b74747"></rect><text x="900" y="283" text-anchor="middle" font-size="17">IC-3 → 最終候補</text><text x="900" y="307" text-anchor="middle" font-size="13">利用環境移行を確認後</text><text x="900" y="328" text-anchor="middle" font-size="12">人間承認がある場合だけ</text><path d="M230 85 L310 140 M230 240 L310 178 M470 159 L550 159 M735 159 L780 159 M860 195 L735 280 M735 302 L795 302" stroke="#42667f" stroke-width="2" marker-end="url(#a3)"></path><path d="M795 270 L735 150 M795 280 L230 85 M795 300 L230 240 M795 320 L735 300" stroke="#b74747" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a3)"></path></svg><figcaption>図3：実線は実施順の引き渡し、破線は人間が承認した最終候補が357〜360すべてへ直接依存する関係を示します。357と358は並行、359は両方の契約に依存し、360は357〜359すべてに依存します。</figcaption><div class="figure-note"><p><strong>図を読めない場合の要点：</strong></p><ul><li>357と358は並行して進め、IC-1で両者の契約を合わせてから359へ渡します。</li><li>359のスキル契約をIC-2で確認し、360は357〜359の成果を受け取って配布・移行を扱います。</li><li>最終候補は人間が承認した場合だけ作成し、357、358、359、360の四つすべてへ直接依存します。</li></ul></div></figure><details><summary>PlantUML原文を表示</summary><pre class="plantuml">@startuml
+title Epic 00356 - 縦スライスの依存関係と引き渡し
+left to right direction
+component "Issue 357\n構造操作の利用者流れ" as I357
+component "Issue 358\n文書作成の利用者流れ" as I358
+component "IC-1\n構造保管中核と文書作成キットの契約" as IC1
+component "Issue 359\nスキルの利用者流れ" as I359
+component "IC-2\nスキルの契約" as IC2
+component "Issue 360\n配布・移行の利用者流れ" as I360
+component "IC-3\n利用環境移行の契約" as IC3
+component "人間承認後の最終候補\n品質・統合・引き渡し" as Final
+I357 --&gt; IC1 : 実行時機構の契約
+I358 --&gt; IC1 : 雛形・ガイドの契約
+IC1 --&gt; I359 : 安定した入力
+I359 --&gt; IC2 : スキルの契約
+IC2 --&gt; I360 : 配布対象
+I357 --&gt; I360 : 互換性義務
+I358 --&gt; I360 : 文書保持義務
+I360 --&gt; IC3 : 利用環境移行の証拠
+IC3 --&gt; Final : 承認後に進む
+I357 --&gt; Final : 直接依存
+I358 --&gt; Final : 直接依存
+I359 --&gt; Final : 直接依存
+I360 --&gt; Final : 直接依存
+@enduml</pre></details><div class="table"><table>
+<thead><tr>
+<th>確認点</th>
+<th>いつ行うか</th>
+<th>担当</th>
+<th>確認する内容</th>
+<th>証拠の保存先</th>
+<th>通らない場合</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>IC-0</td>
+<td>Epic計画作成時</td>
+<td>Epicの主担当</td>
+<td>ソース識別子、IDと連携、縦スライス、責務境界、候補の扱い</td>
+<td>Epic結果報告書の証拠採否台帳・仕様作成ゲート</td>
+<td>正本化を止め、証拠または正本を修正します。</td>
+</tr>
+<tr>
+<td>IC-1</td>
+<td>357・358の計画作成と実装の受け渡し後</td>
+<td>Epicの主担当。357と358の担当が入力を提供</td>
+<td>新規ノード、結果報告書、成果物の一覧、任意の種別、ガイドのファイルパス、検証用データ</td>
+<td>Epic配下の議論成果物<code>ic-1-core-kit-contract</code>とEpic結果報告書</td>
+<td>359への引き渡しを止め、357または358へ戻します。</td>
+</tr>
+<tr>
+<td>IC-2</td>
+<td>359のスキル証拠後</td>
+<td>359の担当とEpicの主担当</td>
+<td>二つのスキルの契約、ガイドへのリンク、不在時の挙動、旧スキルの一覧</td>
+<td>Epic配下の議論成果物<code>ic-2-skill-contract</code>とEpic結果報告書</td>
+<td>360への引き渡しを止め、359へ戻します。</td>
+</tr>
+<tr>
+<td>IC-3</td>
+<td>360の利用環境検証後</td>
+<td>360の担当とEpicの主担当</td>
+<td>導入、安全な除去、保持、削除、同等性、復旧</td>
+<td>Epic配下の議論成果物<code>ic-3-consumer-contract</code>とEpic結果報告書</td>
+<td>最終引き渡しを止め、原因スライスへ戻します。</td>
+</tr>
+<tr>
+<td>IC-4</td>
+<td>最終Issueを人間が承認した後</td>
+<td>人間承認済み最終Issueの担当とEpicの主担当</td>
+<td>全体テスト一式、利用環境の検証一覧、差分、文書、残る欠陥、独立したレビュー</td>
+<td>最終Issueの結果報告書、必要な対象範囲内の成果物、Epic結果報告書</td>
+<td>提出・マージ・終了判断を止め、欠陥担当へ戻します。</td>
+</tr>
+</tbody>
+</table></div><p><strong>重要：</strong>ICは実行時機構の判定条件ではありません。通らない場合も、CLIのメタデータや依存関係を勝手に変えず、文書上の引き渡しだけを止め、原因となったIssueの担当者が正本文書または成果物を直します。</p></section>
+<section id="tranches"><h2>14. 実施区分T0〜T4</h2>
+<div class="table"><table>
+<thead><tr>
+<th>区分</th>
+<th>目的</th>
+<th>並行性</th>
+<th>抜ける条件</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>T0：契約準備</td>
+<td>Epic/Issue候補、責務、依存、共有ファイルを固定する</td>
+<td>文書中心</td>
+<td>レビュー証拠、ソース識別子、所有範囲の対応表が揃うこと</td>
+</tr>
+<tr>
+<td>T1：並行基盤</td>
+<td>357と358で構造保管中核と文書作成キットの利用者流れを成立させる</td>
+<td>357・358は並行可</td>
+<td>狙いを絞ったテスト、一覧、IC-1入力が揃うこと</td>
+</tr>
+<tr>
+<td>T2：スキル統合</td>
+<td>359で二つのリポジトリ内スキルから構造保管中核と文書作成キットを使えるようにする</td>
+<td>T1後</td>
+<td>スキルのテスト、書込みなしの否定検証、旧版の一覧が揃うこと</td>
+</tr>
+<tr>
+<td>T3：配布切替</td>
+<td>360で新規導入・更新・削除を目標の配布内容へ切り替える</td>
+<td>T2後</td>
+<td>利用環境の検証一覧、移行・復旧の証拠、IC-3への入力が揃うこと</td>
+</tr>
+<tr>
+<td>T4：最終候補</td>
+<td>品質、統合、不具合だけを対象とする修正、引き渡し証拠を独立に扱う</td>
+<td>357〜360後</td>
+<td>人間の承認、全回帰テスト、スライス横断の簡易動作確認、差分監査が揃うこと</td>
+</tr>
+</tbody>
+</table></div></section>
+<section id="mapping"><h2>15. 要件と受け入れ条件の対応表</h2>
+<h3>採用済み要件（E-RQ-001〜009）</h3>
+<div class="table"><table>
+<thead><tr>
+<th>要件</th>
+<th>日本語での意味</th>
+<th>主な担当</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>E-RQ-001</td>
+<td>実行時機構の作業手順、プロファイル、保証情報を現在の製品面から撤去する</td>
+<td>357、359、360</td>
+</tr>
+<tr>
+<td>E-RQ-002</td>
+<td>計画レベルは文書だけで扱い、実行時機構の状態にしない</td>
+<td>358、359、360</td>
+</tr>
+<tr>
+<td>E-RQ-003</td>
+<td>Issue終了操作を、GitHub Issueの終了、選択状態の解除、同期だけを行う薄い便利操作にする</td>
+<td>357、360</td>
+</tr>
+<tr>
+<td>E-RQ-004</td>
+<td>選択状態は選択だけ、依存解消済みは依存だけの意味に限定する</td>
+<td>357、360</td>
+</tr>
+<tr>
+<td>E-RQ-005</td>
+<td>成果物の種別を任意の位置引数と6種の現行種別へ単純化する</td>
+<td>357、358、360</td>
+</tr>
+<tr>
+<td>E-RQ-006</td>
+<td>取込を一ファイルの汎用取込だけにする</td>
+<td>357、360</td>
+</tr>
+<tr>
+<td>E-RQ-007</td>
+<td>新規ノードに簡素な結果報告書を常設し、空でも有効にする</td>
+<td>357、358、360</td>
+</tr>
+<tr>
+<td>E-RQ-008</td>
+<td>修復の表示印とドラフトを現在の作成・案内から外し、履歴は残す</td>
+<td>357、358、359、360</td>
+</tr>
+<tr>
+<td>E-RQ-009</td>
+<td>長期判断は要件・設計・計画の正本文書または採用済みADRへ置く</td>
+<td>358、359</td>
+</tr>
+</tbody>
+</table></div>
+<h3>受け入れ条件（E-AC-001〜010）</h3>
+<div class="table"><table>
+<thead><tr>
+<th>条件</th>
+<th>何を確認するか</th>
+<th>主な証拠</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>E-AC-001</td>
+<td>撤去対象のコマンド、登録表、モジュール、現行の文書、製品管理下のスキル、別名が残っていない</td>
+<td>357/359/360の不在検証とIC-2/IC-3</td>
+</tr>
+<tr>
+<td>E-AC-002</td>
+<td>薄いライフサイクルの順序と部分失敗が正しい</td>
+<td>357の失敗行列、360の導入済み環境の簡易動作確認</td>
+</tr>
+<tr>
+<td>E-AC-003</td>
+<td>6種の現行成果物、履歴認識、汎用取込が正しい</td>
+<td>357の挙動、358のカタログ、IC-1/IC-3</td>
+</tr>
+<tr>
+<td>E-AC-004</td>
+<td>新規文書作成契約と既存文書保持が成り立つ</td>
+<td>357の機構、358の配布物、IC-1とIC-3</td>
+</tr>
+<tr>
+<td>E-AC-005</td>
+<td>共通ガイドと4種類のガイドがあり、実行時機構やメタデータにレベルがない</td>
+<td>358の文書テスト、359の案内、360の同等性</td>
+</tr>
+<tr>
+<td>E-AC-006</td>
+<td>二つのスキルが正本の自動変更や特定提供元の必須化をしない</td>
+<td>359の結果、IC-2、360の導入済み環境の簡易動作確認</td>
+</tr>
+<tr>
+<td>E-AC-007</td>
+<td>新規導入・更新・削除がデータ保持を含めて安全に動く</td>
+<td>360の利用環境検証一覧、IC-3</td>
+</tr>
+<tr>
+<td>E-AC-008</td>
+<td>提供元・自家利用環境・導入済み環境の同等性、リンク、禁止語彙、撤去面の不在</td>
+<td>358/359/360の各検証</td>
+</tr>
+<tr>
+<td>E-AC-009</td>
+<td>各Issueがコード・テスト・文書・互換性を自分の範囲で閉じる</td>
+<td>各Issue結果とIC-1〜3</td>
+</tr>
+<tr>
+<td>E-AC-010</td>
+<td>人間が最終Issueを採用した場合の統合品質・引き渡し</td>
+<td>最終Issueの結果報告書と成果物、IC-4</td>
+</tr>
+</tbody>
+</table></div></section>
+<section id="verify"><h2>16. テスト、否定検証、導入・更新・削除</h2>
+<p>このEpicでは「できること」だけでなく、「してはいけないことができない」ことを確認します。たとえば旧コマンドがヘルプに出ないこと、旧種別を新規作成できないこと、外部能力がない時にスキルが正本を変更しないこと、更新が利用者所有ファイルを消さないことが重要です。これは否定検証であり、軽量化で誤って旧作業手順を再導入しないための防波堤です。</p>
+<div class="table"><table>
+<thead><tr>
+<th>検証の種類</th>
+<th>例</th>
+<th>主な担当</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>単体・業務規則層</td>
+<td>依存関係グラフ、種別分類、所有権、状態遷移の局所ルール</td>
+<td>357、360</td>
+</tr>
+<tr>
+<td>CLI/構文解析器/登録表</td>
+<td>現行のコマンドと撤去済み対象面の不在、エラー文</td>
+<td>357、360</td>
+</tr>
+<tr>
+<td>ライフサイクル失敗</td>
+<td>終了失敗、解除失敗、同期失敗、依存による遮断、危険なファイルパス</td>
+<td>357</td>
+</tr>
+<tr>
+<td>雛形/リンク/用語</td>
+<td>要件・設計・計画の正本文書と結果報告書、ガイドへのリンク、現行案内に旧語彙が戻らないこと</td>
+<td>358、359、360</td>
+</tr>
+<tr>
+<td>スキル挙動</td>
+<td>正本を自動変更しない、補助成果物は1件、外部能力がない場合は書き込まない</td>
+<td>359</td>
+</tr>
+<tr>
+<td>利用環境移行</td>
+<td>新規導入・更新・削除、保存、安全な除去、復旧、反復実行</td>
+<td>360</td>
+</tr>
+<tr>
+<td>統合・全体</td>
+<td>全回帰テスト、配布パッケージのビルド、スライス横断の簡易動作確認、差分監査</td>
+<td>最終候補</td>
+</tr>
+</tbody>
+</table></div>
+<p>各Issueは狭いテストから開始します。通常のテスト実行は<code>uv run pytest</code>で、全回帰テストは明示的な<code>uv run pytest --run-full-regression</code>を使います。<code>-m full_regression</code>だけを重いテストの実行許可として扱いません。</p>
+<h3>配布と履歴保持</h3>
+<p>配布は空の新規利用者だけを基準にできません。既存リポジトリにはノードごとの仕様、過去の成果物、議論記録、ADR、古い結果報告書、保証情報があり、それらは利用者の履歴です。360は、製品が所有する製品管理下の配布物と、利用者が所有する仕様証跡を明確に分けます。</p>
+<figure><svg viewbox="0 0 1040 360" role="img" aria-labelledby="mig-title mig-desc"><title id="mig-title">利用環境移行の図</title>
+<desc id="mig-desc">新規導入では目標の製品管理下配布物を配置し、既存更新では旧配布物だけを安全に除去して利用者の証跡を保持し、削除では製品管理の境界内だけを扱う順序を示す。</desc><defs><marker id="a4" markerwidth="10" markerheight="10" refx="9" refy="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#42667f"></path></marker></defs><rect x="40" y="55" width="250" height="235" rx="12" fill="#e8f3fc" stroke="#1877b5"></rect><text x="165" y="88" text-anchor="middle" font-size="20">新規導入</text><text x="165" y="122" text-anchor="middle" font-size="14">目標の製品管理下配布物だけを配置</text><text x="165" y="152" text-anchor="middle" font-size="14">単一要件・設計・計画・簡素な結果報告・ガイド</text><text x="165" y="182" text-anchor="middle" font-size="14">二つのリポジトリ内スキル</text><text x="165" y="222" text-anchor="middle" font-size="14">旧作業手順面は配布しない</text><rect x="395" y="55" width="250" height="235" rx="12" fill="#eaf7f1" stroke="#23815e"></rect><text x="520" y="88" text-anchor="middle" font-size="20">既存リポジトリの更新</text><text x="520" y="122" text-anchor="middle" font-size="14">旧版の製品管理下配布物を安全に除去</text><text x="520" y="152" text-anchor="middle" font-size="14">ノード文書・成果物・ADRを保持</text><text x="520" y="182" text-anchor="middle" font-size="14">生成投影は再生成</text><text x="520" y="222" text-anchor="middle" font-size="14">不明な所有権では停止して診断</text><rect x="750" y="55" width="250" height="235" rx="12" fill="#fff3d9" stroke="#c07a0b"></rect><text x="875" y="88" text-anchor="middle" font-size="20">削除</text><text x="875" y="122" text-anchor="middle" font-size="14">製品管理の境界内だけを除去</text><text x="875" y="152" text-anchor="middle" font-size="14">仕様・履歴証跡は保持</text><text x="875" y="182" text-anchor="middle" font-size="14">外部ツールには触れない</text><text x="875" y="222" text-anchor="middle" font-size="14">途中失敗は再試行可能にする</text><path d="M290 172 L395 172 M645 172 L750 172" stroke="#42667f" stroke-width="3" marker-end="url(#a4)"></path></svg><figcaption>図4：配布の更新では、製品管理下の配布物だけを入れ替え、利用者の仕様と履歴を保護します。</figcaption><div class="figure-note"><p><strong>図を読めない場合の要点：</strong></p><ul><li>新規導入では目標の製品管理下配布物だけを配置します。</li><li>既存更新では旧配布物を安全に除去しつつ、ノード文書、成果物、ADRを保持します。</li><li>削除時も製品管理の境界内だけを扱い、利用者の仕様と外部ツールには触れません。</li></ul></div></figure><details><summary>PlantUML原文を表示</summary><pre class="plantuml">@startuml
+title Epic 00356 - 利用環境の移行と履歴保持
+left to right direction
+rectangle "新規導入" as Fresh { [目標の製品管理下配布物だけを配置] [要件・設計・計画・簡素な結果報告・ガイド・二つのスキル] [旧作業手順面は配布しない] }
+rectangle "既存リポジトリの更新" as Update { [旧版の製品管理下配布物を安全に除去] [ノード文書・成果物・議論記録・ADRを保持] [生成投影を再生成] [所有権が不明なら停止して診断] }
+rectangle "削除" as Uninstall { [製品管理の境界内だけを除去] [仕様・履歴証跡を保持] [外部ツールに触れない] [部分失敗は再試行可能] }
+Fresh --&gt; Update : 更新
+Update --&gt; Uninstall : 削除
+@enduml</pre></details><div class="table"><table>
+<thead><tr>
+<th>ファイル区分</th>
+<th>更新時</th>
+<th>削除時</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>目標製品管理下</td>
+<td>作成または更新する</td>
+<td>除去する</td>
+</tr>
+<tr>
+<td>旧製品管理下の配布物</td>
+<td>所有権と安全性を確かめた後に安全に除去する</td>
+<td>除去する</td>
+</tr>
+<tr>
+<td>利用者所有仕様</td>
+<td>保持する</td>
+<td>保持する</td>
+</tr>
+<tr>
+<td>生成物</td>
+<td>安全に再生成する</td>
+<td>安全に消す</td>
+</tr>
+<tr>
+<td>変更済みの製品管理下の配布物で曖昧</td>
+<td>黙って上書き・削除せず、失敗または保持して診断する</td>
+<td>境界を絞って扱う</td>
+</tr>
+<tr>
+<td>外部</td>
+<td>触らない</td>
+<td>触らない</td>
+</tr>
+</tbody>
+</table></div></section>
+<section id="recovery"><h2>17. 巻き戻し・再試行・部分失敗</h2>
+<p>安全な移行は、失敗しないことを前提にしません。どこまで成功したかを区別し、次に何を確認するかを示すことが必要です。357の実行時機構変更は提供元側を戻せますが、利用者データを変換しないことを検証用データで確認します。358の配布物変更は、製品管理下の雛形や文書のソースを戻しても、既存ノード文書を上書きしません。359は360の配布切替前に限り、旧提供元のスキル一覧を復元できます。360は所有権が曖昧な削除の前に停止し、一覧と診断に基づいて再実行します。</p>
+<p>最終候補で見つかった問題は、機能追加に広げず不具合だけを対象とする修正として扱います。戻せない場合は、黙って「巻き戻し済み」とは言わず、前進復旧だけが可能であることと必要な操作を残します。</p></section>
+<section id="risks"><h2>18. 主なリスクと保護策</h2>
+<div class="table"><table>
+<thead><tr>
+<th>リスク</th>
+<th>なぜ起こるか</th>
+<th>保護策</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>作業手順を消す際に構造の安全性まで失う</td>
+<td>旧機能と構造保管中核の責務が混在しているため</td>
+<td>保持対象と撤去対象の一覧を分け、正・負のテストを置きます。</td>
+</tr>
+<tr>
+<td>357と358が共有ファイルで衝突する</td>
+<td>雛形、成果物、結果報告書、ガイドが接点になるため</td>
+<td>機構と文章の所有を分け、IC-1で統合します。</td>
+</tr>
+<tr>
+<td>歴史的種別を未知扱いして壊す</td>
+<td>現行作成可否と既存認識を混同しやすいため</td>
+<td>二つの集合を別のプログラム上の接点・別テストで確認します。</td>
+</tr>
+<tr>
+<td>更新がユーザーデータを消す</td>
+<td>製品管理下と利用者所有の境界が曖昧になるため</td>
+<td>一覧、事前確認、保持確認用の検証データ、再試行時の診断を用意します。</td>
+</tr>
+<tr>
+<td>計画レベルが実行時機構に再侵入する</td>
+<td>便利な分類をメタデータへ足したくなるため</td>
+<td>禁止対象のコードとメタデータの走査、挙動が変わらないことのテストを行います。</td>
+</tr>
+<tr>
+<td>最終品質が360に埋没する</td>
+<td>配布作業の完了と全体品質を混同するため</td>
+<td>人間承認後の独立した最終Issue候補として扱います。</td>
+</tr>
+</tbody>
+</table></div></section>
+<section id="onboarding"><h2>19. 新規参加者の初日と最初の1週間</h2>
+<h3>初日に行うこと</h3>
+<ol>
+<li>まず「目的と正本との関係」「現在の進捗」を読み、次に<a href="#terms">用語集と階層</a>、5分要約、製品境界、Issue 357〜360、並行作業と依存関係の順に読みます。</li>
+<li>その後で<a href="#links">正本文書と参考ドラフトへのリンク</a>を開きます。この順番にすると、用語を知らないまま個別文書を読んで迷うことを避けられます。</li>
+<li>Epicの正本要件・設計・計画の正本文書を読みます。疑問が出たら、まず正本に答えがあるか確認します。</li>
+<li>選択状態は「今見ている対象」であり、実装許可ではないことを理解します。</li>
+<li>成果物と正本の違いを理解します。調査の結論を残したい時は、必要な部分を要件・設計・計画の正本文書またはADRへ反映します。</li>
+</ol>
+<h3>具体例：Issue 358を担当する場合</h3>
+<ol>
+<li>この資料の目的、現在の進捗、用語集を読み、358が「文書作成キットと文書契約」を担当する縦スライスであることを確認します。</li>
+<li>358のIssueノード、<code>.meta.json</code>、依存関係を確認します。358には前提Issueがないため、構造上は357と並行に計画を始められます。</li>
+<li>Epicの要件・設計・計画の正本文書を読み、続いて358の参考ドラフトを読みます。参考ドラフトは提案と根拠であり、そのまま仕様にはしません。</li>
+<li>357の担当者と、正確なファイル一覧と共有ファイルの所有を固定します。358は雛形・ガイドの文章と利用者向け用語を担当し、357は実行時機構と契約用の検証データを担当します。</li>
+<li>358の要件・設計・計画の正本文書を、対象範囲、対象外、受け入れ条件、検証、引き渡し条件まで具体化します。外部分析を使った場合は成果物として残し、採用する判断だけを正本文書またはADRへ人が反映します。</li>
+<li>IC-1へ渡す雛形の形、結果報告書の見出し、成果物の一覧、ガイドのファイルパスを準備します。依存が未解消なら<code>issue start</code>は開始を止めますが、これは機械的な構造確認です。チームとして実装を引き渡すかは、文書と人間の判断で別に確認します。</li>
+</ol>
+<div class="good"><strong>この例での成功：</strong>358の正本文書が具体化され、357との共有面が明確で、IC-1へ渡す内容を説明できます。<strong>止まる例：</strong>共有ファイルの所有が未確定なら、実装へ進まず担当者間で固定します。<strong>自動採用しない例：</strong>外部分析の成果物がもっともらしくても、それだけで正本文書を更新したことにはなりません。</div>
+<h3>最初の1週間に行うこと</h3>
+<ol>
+<li>担当Issueの厳密照合で作成した参考ドラフトを読み、Issueの要件・設計・計画の正本文書に採用する前提と未確定事項を整理します。</li>
+<li>正確なファイル一覧と共有ファイルの所有を、Issueごとの計画作成で固定します。</li>
+<li>狭い利用者シナリオを一つ選び、成功と失敗の両方をテストとして書ける状態にします。</li>
+<li>依存先がある場合は、ICで必要な受け渡し証拠を確認してから実装に入ります。</li>
+<li>外部AIやレビューを使う場合も、出力をそのまま正本扱いせず、採用した判断を自分の言葉で正本へ反映します。</li>
+</ol></section>
+<section id="checklist"><h2>20. 実装開始前のチェックリスト</h2>
+<ul>
+<li>担当Issueの要件・設計・計画の正本文書が未記入の雛形ではなく、Issue固有の内容になっている。</li>
+<li>Issue ID、GitHub Issue番号、親子関係、依存関係が正しい。</li>
+<li>対象・対象外、利用者の完了像、失敗時の挙動が書かれている。</li>
+<li>コード、テスト、文書、移行または互換性が同じIssueの範囲に入っている。</li>
+<li>所有するファイルと、他Issueに任せる共有面が明確である。</li>
+<li>受け入れ条件、否定検証、復旧方法、履歴保持を確認できる。</li>
+<li>計画作成のレベルは計画書本文に理由とともに書かれ、実行時機構の状態に追加しない。</li>
+<li>厳密照合ドラフトを参考にしただけで計画作成完了と誤認していない。</li>
+<li>未決の人間判断が開始を妨げるか開始を妨げないか、誰が決めるかを明記している。</li>
+</ul></section>
+<section id="decision"><h2>21. 残る人間の判断</h2>
+<div class="warning">
+<strong>未決の重要事項：</strong>品質、統合、成果物の引き渡しを独立した最終Issueとして作成するかどうかは、人間の明示承認が必要です。承認する場合は新しい番号とGitHub連携を割り当て、Issue 357、358、359、360のすべてへ直接依存を登録します。承認前にノードを自動作成してはいけません。T4または最終Issueを不採用にする場合、E-AC-010を未達のままEpicを完了にはできません。Product Ownerが要件定義書を変更し、最終統合条件の扱いを正本で改める必要があります。IC-3後のEpic終了レビューはその判断を行う地点であり、自動完了を意味しません。</div>
+<p>さらに357と358を実際に並行開始する前に、各Issueの正確なファイル一覧と共有ファイルの所有者を個別計画作成で決めます。これはEpicレベルの方針を実際のブランチとファイルに落とし込む最後の作業です。</p></section>
+<section id="links"><h2>22. 正本とIssueドラフトへのリンク</h2>
+<p>作業判断では、次の要件・設計・計画の正本文書を優先してください。</p>
+<ul>
+<li><a href="../requirement.md">Epic要件定義書</a></li>
+<li><a href="../design.md">Epic設計書</a></li>
+<li><a href="../plan.md">Epic実装計画書</a></li>
+</ul>
+<h3>進捗・証拠・結果の参照先</h3>
+<p><a href="../report.md">Epic結果報告書</a>は、進捗、観測証跡、結果要約を読むための参照先です。作業手順や適合性の判断を決める正本ではありません。</p>
+<p>Issueごとの計画作成の参考入力は、各Issue配下の次のドラフトです。これらは証拠であり、採用は個別Issueの要件・設計・計画の正本文書で判断します。</p>
+<div class="table"><table>
+<thead><tr>
+<th>Issue</th>
+<th>要件ドラフト</th>
+<th>設計ドラフト</th>
+<th>計画ドラフト</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>357</td>
+<td><a href="../issues/iss-00357-reduce-runtime-to-storage-core/artifacts/20260809t125145z-draft-requirement-strict-vertical-slice-requirement.md">要件</a></td>
+<td><a href="../issues/iss-00357-reduce-runtime-to-storage-core/artifacts/20260809t125146z-draft-design-strict-vertical-slice-design.md">設計</a></td>
+<td><a href="../issues/iss-00357-reduce-runtime-to-storage-core/artifacts/20260809t125147z-draft-plan-strict-vertical-slice-plan.md">計画</a></td>
+</tr>
+<tr>
+<td>358</td>
+<td><a href="../issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260809t125148z-draft-requirement-strict-vertical-slice-requirement.md">要件</a></td>
+<td><a href="../issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260809t125149z-draft-design-strict-vertical-slice-design.md">設計</a></td>
+<td><a href="../issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260809t125150z-draft-plan-strict-vertical-slice-plan.md">計画</a></td>
+</tr>
+<tr>
+<td>359</td>
+<td><a href="../issues/iss-00359-replace-managed-workflow-skills-with-specdock-skills/artifacts/20260809t125151z-draft-requirement-strict-vertical-slice-requirement.md">要件</a></td>
+<td><a href="../issues/iss-00359-replace-managed-workflow-skills-with-specdock-skills/artifacts/20260809t125152z-draft-design-strict-vertical-slice-design.md">設計</a></td>
+<td><a href="../issues/iss-00359-replace-managed-workflow-skills-with-specdock-skills/artifacts/20260809t125153z-draft-plan-strict-vertical-slice-plan.md">計画</a></td>
+</tr>
+<tr>
+<td>360</td>
+<td><a href="../issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/artifacts/20260809t125154z-draft-requirement-strict-vertical-slice-requirement.md">要件</a></td>
+<td><a href="../issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/artifacts/20260809t125155z-draft-design-strict-vertical-slice-design.md">設計</a></td>
+<td><a href="../issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/artifacts/20260809t125156z-draft-plan-strict-vertical-slice-plan.md">計画</a></td>
+</tr>
+</tbody>
+</table></div>
+<p>この資料は外部の配信網、実行用スクリプト、画像、通信を利用しない自己完結型の文書です。表示時点の判断に迷った場合は、本資料ではなく上記の正本を確認してください。</p></section>
+</main><footer>Epic 00356 詳細オンボーディング資料／補助成果物。正本はEpicの要件・設計・計画の正本文書および採用済みADRです。結果報告書は進捗・証拠・結果要約の参照先です。</footer>
+</body>
+</html>
