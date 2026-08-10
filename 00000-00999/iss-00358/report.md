@@ -19,7 +19,7 @@ ID: "iss-00358"
 - Requirement、Design、Planはすべてapprovedで、各phaseのfresh `spec-reviewer`がpassした。
 - 2026-08-10に`issue start iss-00358`を実行し、専用branch `iss-00358-simplify-authoring-kit-and-document-contracts`とactive contextを設定した。
 - 承認済みPlanのE00を開始し、asset / link / preservation baselineをread-onlyで収集した。S01以降のasset / test変更、PR、merge、`issue finish`はまだ実行していない。
-- E00 fresh `spec-reviewer`はfailした。read-only E00とS08で初めて作るpreservation fixtureのhash要求、S10より前のDesign外owner確定要求が両立しないため、S01へ進まずIssue planningへ戻す。
+- E00の初回reviewで、read-only E00とS08で初めて作るpreservation fixtureのhash要求、S10より前のDesign外owner確定要求が両立しないことを検出した。Planを最小修正し、E00をcandidate inventory / no-delete routing、S08をfull fixture / hash、S10をfinal ownerへ分離した。fresh `spec-reviewer`はP0/P1なしでpassした。
 - materialな製品判断の追加はない。Profile / Assuranceを使わず、one Plan + docs-only Planning Level、thin Report、Current六種というProduct Owner承認をそのまま保持する。
 
 ## 承認済み正本
@@ -33,16 +33,16 @@ ID: "iss-00358"
 ## Spec Interpretation / Decision Ledger
 
 - `DEC-358-001`
-  - Status: open
+  - Status: resolved / promoted_to_plan
   - Type: plan contradiction / execution ordering gap
   - Trigger: E00 read-only baseline実行とfresh `spec-reviewer` review。
   - Observed facts: E00はExisting full fixtureの全preservation bytes/hashとDesign外ownerの確定を要求する。一方、full fixture/testのmaterializationはS08だけに許可され、Design外handoff manifestはS10で作る計画である。現HEADにはthin Report、candidate ADR、profile-derived node-local documentを含むfull fixtureがない。
   - Options Considered: preservation baselineをS08へ移す / E00前にfixture materialization stepを追加する / 現状のままsynthetic `ABSENT`をpass扱いする。
-  - Proposed disposition: `promoted_to_plan`。E00はcandidate inventoryまで、fixture bytes/hashはS08へ移し、Design外ownerは`no-delete / owner pending S10`として扱う案をplanningでreviewする。synthetic `ABSENT`をbaseline passにはしない。
-  - Evidence: E00 `repo-analyst` follow-up、fresh E00 `spec-reviewer` fail（P1 x2、P2、P3、confidence 0.99）。
+  - Disposition: `promoted_to_plan`。E00はcandidate inventoryまで、fixture bytes/hashはS08へ移し、Design外ownerは`no-delete / owner pending S10`として扱う。synthetic `ABSENT`をpreservation baseline passにはしない。
+  - Evidence: E00 `repo-analyst` follow-up、初回E00 review fail（P1 x2、P2、P3）、amended Plan fresh `spec-reviewer` pass（P0/P1なし、P2はreport同期のみ、confidence 0.99）。
   - Affected closure: `CL-358-011/013`、E00、S08、S10、M0。
   - Risk if wrong: Existing preservationを証明せずS01へ進む、またはE00で禁止されたfixture mutationを行う。
-  - Needs orchestrator decision: yes。Issue planningでPlan amendmentとfresh reviewが必要。
+  - Needs orchestrator decision: no。Plan amendmentとfresh reviewを完了した。
 - 既存のProduct Owner判断、Option A、thin Report、Current六種は変更しない。
 
 ## Objective Alignment Ledger
@@ -70,7 +70,7 @@ ID: "iss-00358"
 |---|---|---|---|---|---|---|
 | requirement | 親Epic R/D/P、承認済みDraft 1、三つのinterview decisions、現行template / docs / preservation surfaceを照合した | none | adopted | pass | no | execute approved plan |
 | design | 承認済みRequirement、provider / dogfood asset tree、copy mechanism、Guide / template / Historical ownershipを照合した | none | adopted | pass | no | execute approved plan |
-| plan | 承認済みR/D、Strict Plan Guide、全RQ / EC / AC、Design file-change contract、Issue 357とのIC-1境界を照合した | none | adopted | pass | no | execute approved plan |
+| plan | 承認済みR/D、全RQ / EC / AC、Design file-change contract、Issue 357とのIC-1境界、E00 / S08 / S10 ownershipを照合した | none | amended and adopted | pass | no | execute amended plan |
 
 ## Delegated Draft Evidence
 
@@ -92,8 +92,8 @@ ID: "iss-00358"
 |---|---|---|---|---|---|---|---|
 | requirement | requirement phase gate | spec-reviewer | fresh | pass | no | execute approved plan | parent trace、Planning Level selection、Guide semantics、full preservation surfaceを確認 |
 | design | design phase gate | spec-reviewer | fresh | pass | no | execute approved plan | exact paths、Report shape、Level examples、handoff timing、file-change contractを確認 |
-| plan | final plan phase gate | spec-reviewer | fresh | pass | no | execute approved plan | findingsなし、overall confidence 0.98、全closure / step contract / test card / ownershipを確認 |
-| E00 | E00 docs/spec alignment gate | spec-reviewer | fresh | fail | no | E00を閉じずbounded follow-upへ戻す | P1: synthetic / ABSENT preservation bytesとNon-Delete owner未確定。P2: active symlink source。P3: Closure Delta状態。overall confidence 0.99 |
+| plan | amended plan alignment gate | spec-reviewer | fresh | pass | no | execute amended plan | E00 candidate inventory、S08 fixture/hash、S10 final ownerの一意性を確認。P0/P1なし、overall confidence 0.99 |
+| E00 | E00 docs/spec alignment gate | spec-reviewer | fresh | pass | no | E00 / M0を閉じてS01へ進む | Design §4.1 baseline、preservation candidate category、Design §4外no-delete / owner pending S10を確認。初回fail事項はPlan amendmentでrouting済み |
 
 ## Workflow-Scoped Authorization
 
@@ -106,7 +106,7 @@ ID: "iss-00358"
 
 | 最初のstep | 担当 | 入力 | 完了条件 |
 |---|---|---|---|
-| E00 | `repo-analyst` | approved R/D/P、baseline SHA、Design §4.1 asset / link / preservation surface | 全rowにAction、owner、before hash、planned testがあり、暗黙Deleteがない |
+| E00 | `repo-analyst` | approved R/D/P、baseline SHA、Design §4.1 asset / link / preservation surface | Design §4.1 rowにAction / 358 owner / 既存hash / planned testがあり、preservation candidateはS08、Design §4外はno-delete / owner pending S10で、暗黙Deleteがない |
 | S01以降 | stepごとのfresh `doc-writer` / `dev-coder` | `plan.md` §9の該当contract | Redまたはdocs-only代替証拠、Green、report更新、fresh reviewer passをstep単位で満たす |
 
 Issue 357とは同時に進められる。358はtemplate prose / Authoring Guideのsingle writerであり、Runtime / parser / scaffold mechanismを編集しない。両者の実生成契約はS09 / IC-1で照合する。
@@ -222,49 +222,49 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | `src/spec_dock/assets/install_root/.agents/skills/**`とinstalled counterparts | no delete。skill contract / contentは359、distribution / pruneは360。single owner assignmentはS10 / 360 planningへ保留 |
 | `src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md`、`src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md`、`src/spec_dock/assets/spec_dock/docs/rules/**`、`src/spec_dock/assets/spec_dock/docs/reference_*.md`、`src/spec_dock/assets/spec_dock/docs/phase_*.md`、`src/spec_dock/assets/spec_dock/docs/workflow_*.md`、`src/spec_dock/assets/spec_dock/templates/.workbench/**`とdogfood counterparts | Design §4外。no delete。exact classification / ownerは未確定で、S10 / 360 planningへ保留 |
 
-暗黙Delete rowは0である。一方、thin Report、candidate ADR、profile-derived documentの実在baseline bytesと、Design §4外surfaceのsingle ownerは未確定であり、E00 stop conditionに該当する。実行したread-only commandは`git status --short`、`git branch --show-current`、`git rev-parse`、`git cat-file`、`git show`、`find`、`rg`、`sed`、`nl`、`shasum -a 256`。`No material implementation decisions beyond the approved plan.`
+暗黙Delete rowは0である。thin Report、candidate ADR、profile-derived documentの実在baseline bytesはS08 materialization input、Design §4外surfaceのsingle ownerはS10 handoff inputとして明示されており、amended E00のstop conditionには該当しない。実行したread-only commandは`git status --short`、`git branch --show-current`、`git rev-parse`、`git cat-file`、`git show`、`find`、`rg`、`sed`、`nl`、`shasum -a 256`。`No material implementation decisions beyond the approved plan.`
 
 ### Step Contract Closure
 
 | step | closure ids | planned close condition | observed evidence | result | notes |
 |---|---|---|---|---|---|
-| E00 | `CL-358-010/011/013` | Design §4.1全rowにAction、owner、before hash、planned testがあり、暗黙Deleteがない | managed asset baselineは収集済み。preservationのsynthetic / ABSENT rowとNon-Delete ownerがfresh reviewで未確定と判定された | failed | bounded read-only follow-up中。解消不能ならplanningへ戻す |
+| E00 | `CL-358-010`（`CL-358-011/013` candidate evidence） | Design §4.1 rowを固定し、preservation候補をS08、Design §4外no-delete rowをS10へroutingする | managed asset baseline、21 preservation candidate row、Design §4外no-delete / owner pending S10を収集済み | passed | `CL-358-011/013`はS08 / S10でcloseする |
 
 ### Test Contract Closure
 
 | test id | step | evidence level | pre-implementation evidence | verification path | observed result |
 |---|---|---|---|---|---|
-| `tc-e00-001` | E00 | inspect-only | baseline `2c75e0c0`とcurrent `e16e9751`のasset / hash / link / copy-depthを比較 | Plan §9 E00のtree / link / hash / copy-depth inspection | fail: synthetic / ABSENT preservation bytesと未確定ownerが残り、full baselineを固定できていない |
+| `tc-e00-001` | E00 | inspect-only | baseline `2c75e0c0`とcurrent `e16e9751`のasset / hash / link / copy-depthを比較 | amended Plan §9 E00のtree / link / existing hash / S08-S10 routing inspection | pass: Design §4.1 baselineを固定し、未materialize categoryとpending ownerを後続へ一意にroutingした |
 
 ### Delegated Worker Evidence
 
 | step | delegated role | worker summary | changed files | tests or docs-only verification | reviewer verdict | unresolved risks | integration decision |
 |---|---|---|---|---|---|---|---|
-| E00 | `repo-analyst` | 35 managed/test row、21 preservation candidate row、copy-depth / link、Historical / obsolete ownershipをread-onlyで調査 | none | SHA-256 / parity / link / source-path inspectionを実施 | fail | full fixture bytesとDesign外single ownerが未確定 | evidence adopted; canonical Plan gapとしてIssue planningへ戻す |
+| E00 | `repo-analyst` | 35 managed/test row、21 preservation candidate row、copy-depth / link、Historical / obsolete ownershipをread-onlyで調査 | none | SHA-256 / parity / link / source-path inspectionを実施 | pass under amended E00 contract | full fixture bytesはS08、Design外single ownerはS10のremaining obligation | evidence adopted; E00 complete and S01 unblocked |
 
 ### Implementation Delegation Gate
 
 | step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| E00 | delegated | asset / link / preservation baselineの横断read-only分析が必要 | `repo-analyst` | Design §4.1 asset / hash / link inventory | approved `requirement.md` / `design.md` / `plan.md` | read-only repository inspectionとmainによるreport統合 | asset / source / tests / user content / metadata / deps / active / Git mutation | `tc-e00-001` inspect evidence | action / owner不明、Design外path、baseline drift | manifest、hash、link evidence、risk、next action | delegation complete / E00 failed: canonical Plan gapを検出しplanningへ戻す |
+| E00 | delegated | asset / link / preservation baselineの横断read-only分析が必要 | `repo-analyst` | Design §4.1 asset / hash / link inventory | approved `requirement.md` / `design.md` / amended `plan.md` | read-only repository inspectionとmainによるreport統合 | asset / source / tests / user content / metadata / deps / active / Git mutation | `tc-e00-001` inspect evidence | Design §4.1 action / 358 owner不明、baseline drift、Design §4外Delete分類 | manifest、hash、link evidence、risk、next action | delegation complete / E00 passed: S08 / S10 inputを明示しS01をunblock |
 
 ### Closure Coverage
 
 | closure range | owner steps | planning evidence | implementation evidence | state |
 |---|---|---|---|---|
-| `CL-358-001`〜`CL-358-015` | E00、S01〜S10、S90、S99 | `plan.md`のClosure Indexと最終fresh Plan review pass | E00で`CL-358-010/011/013`のbaseline / pre-implementation evidenceを収集。各closureの最終closeはowner stepで行う | in progress |
+| `CL-358-001`〜`CL-358-015` | E00、S01〜S10、S90、S99 | amended `plan.md`のClosure Indexとfresh Plan review pass | E00で`CL-358-010`をcloseし、`CL-358-011/013`のcandidate evidenceをS08 / S10へhandoffした | in progress |
 
 ### Closure Delta
 
 | change | closure ids | reason | plan amendment required | re-review required | current result |
 |---|---|---|---|---|---|
-| E00 plan contradiction | `CL-358-011/013` | E00はread-onlyでfull fixture hashとowner確定を要求するが、fixture materializationはS08、handoff owner確定はS10に配置されている | yes | yes | fresh review fail。S01未着手、Issue planningへ戻す |
+| E00 plan contradiction | `CL-358-011/013` | E00はread-onlyでfull fixture hashとowner確定を要求していた | completed | completed | E00 candidate inventory、S08 fixture/hash、S10 final ownerへ分離。fresh review pass |
 
 - `CL-358-010`のprovider / dogfood baseline manifestはread-only evidenceで充足した。
-- `CL-358-011`のE00 baselineは未充足である。現HEADにthin Report、candidate ADR、profile-derived node-local documentを含むExisting full fixtureがなく、E00ではfixture / test作成が禁止されている。
+- `CL-358-011`はS08 ownerである。現HEADにないthin Report、candidate ADR、profile-derived node-local documentはS08でfixture / baseline hashをmaterializeする。
 - generic importは既存tracked ZIPのSHA-256で補完したが、他の不足カテゴリは解消しない。
 - `CL-358-013`に関係するDesign外surfaceは暗黙Deleteしない。Historical recognition、skill contract、distribution pruneが複数Issueに跨り、exact single-owner manifestはS10より前には確定していない。
-- 再開条件: canonical Planを改訂し、preservation fixture / hash baselineをS08へ移すか、E00前のfixture materialization stepを追加する。Design外inventoryのowner確定時点もS10または360 planningへ明示し、fresh spec reviewをpassする。
+- 再開条件は充足した。Plan amendmentとfresh spec review passによりS01へ進める。
 
 ### Issue Planning Recovery
 
@@ -274,6 +274,7 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 - canonical三文書は`関連GitHub`と`承認`を持つが、Issue planning runtimeのstrict front matter schemaは両keyを受理しない。この非互換はcontext manifestやmanaged Chromeより前のhard preflight failureである。
 - `関連GitHub` / `承認`を黙って削除する案は承認・traceability情報を変更し、runtime schemaを358で拡張する案はIssue scopeを越えるため採用しない。
 - ChatGPT-first routeは現行canonical bytesでは継続不能。manual backupを使う場合は、hard failure evidence、recovery attempt、explicit human approval、implementation-planner evidence、fresh spec-reviewer gateを満たしてからPlanを採用する。
+- 2026-08-10、Product Ownerはこれらを放棄予定の旧workflowとして使用しないことを明示し、main orchestrator自身の推論とcanonical実装計画に沿った直接修正・実装継続を指示した。以後ChatGPT-first / manual-backup planning workflowを本Issueの進行条件にしない。
 
 ### Docs Impact Resolution
 
@@ -285,7 +286,7 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 
 | milestone / step | reviewer verdict | commit candidate / scope | closure state | commit evidence | post-commit clean check |
 |---|---|---|---|---|---|
-| M0 / E00 | fresh `spec-reviewer` fail。P1/P2/P3 findings未解決 | `docs(iss-00358): Authoring asset baselineを記録` / E00 report evidence | failed | not created | not run |
+| M0 / E00 | amended Plan fresh `spec-reviewer` pass。P0/P1なし、P2 report同期を反映 | `docs(iss-00358): E00契約を修正してbaselineを確定` / Plan amendment + E00 report evidence | passed | current commit candidate | pending commit後に実施 |
 | M99 / S99 | not reviewed because execution has not started | `docs(iss-00358): 最終実装証跡を確定` / final report ledger | planned | not created because execution has not started | not run |
 
 ## 残余リスクと停止条件
@@ -298,4 +299,4 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 
 ## 次のアクション
 
-E00の禁止変更とpreservation fixture hash要求、Design外owner確定順序の矛盾をcanonical planning gapとしてIssue planningへ戻す。ChatGPT-first preflightはcanonical front matter非互換でhard failureとなったため、manual backupへの明示承認を得てPlan amendmentとfresh spec reviewを完了するまでM0 commitとS01へ進まない。
+M0のPlan amendment / E00 evidenceをcommitし、post-commit clean check後にS01のAuthoring Guide foundation実装へ進む。
