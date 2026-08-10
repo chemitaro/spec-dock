@@ -266,6 +266,15 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 - `CL-358-013`に関係するDesign外surfaceは暗黙Deleteしない。Historical recognition、skill contract、distribution pruneが複数Issueに跨り、exact single-owner manifestはS10より前には確定していない。
 - 再開条件: canonical Planを改訂し、preservation fixture / hash baselineをS08へ移すか、E00前のfixture materialization stepを追加する。Design外inventoryのowner確定時点もS10または360 planningへ明示し、fresh spec reviewをpassする。
 
+### Issue Planning Recovery
+
+- 2026-08-10、E00で検出したPlan gapを修正するため、repo-local `./spec-dock/scripts/spec-dock-chatgpt planning create`をexact GitHub-synced HEAD `ab1fc6d2b403c685bfb050d32479a59355e9b621`で実行した。
+- external context manifestを付けた実行と外した実行はいずれも、ChatGPT送信前に`status=rejected`、`reason=planning_context_rejected`で停止した。重複submission、Candidate、Review、canonical adoptionは発生していない。
+- runtimeの`parse_current_front_matter_baseline()`でexact canonical `requirement.md` / `design.md` / `plan.md`を検証した結果、`ValueError: front matter key set is invalid`を再現した。
+- canonical三文書は`関連GitHub`と`承認`を持つが、Issue planning runtimeのstrict front matter schemaは両keyを受理しない。この非互換はcontext manifestやmanaged Chromeより前のhard preflight failureである。
+- `関連GitHub` / `承認`を黙って削除する案は承認・traceability情報を変更し、runtime schemaを358で拡張する案はIssue scopeを越えるため採用しない。
+- ChatGPT-first routeは現行canonical bytesでは継続不能。manual backupを使う場合は、hard failure evidence、recovery attempt、explicit human approval、implementation-planner evidence、fresh spec-reviewer gateを満たしてからPlanを採用する。
+
 ### Docs Impact Resolution
 
 | step | target | planned verification | current state |
@@ -289,4 +298,4 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 
 ## 次のアクション
 
-E00の禁止変更とpreservation fixture hash要求、Design外owner確定順序の矛盾をcanonical planning gapとしてIssue planningへ戻す。Plan amendmentとfresh spec reviewがpassするまでM0 commitとS01へ進まない。
+E00の禁止変更とpreservation fixture hash要求、Design外owner確定順序の矛盾をcanonical planning gapとしてIssue planningへ戻す。ChatGPT-first preflightはcanonical front matter非互換でhard failureとなったため、manual backupへの明示承認を得てPlan amendmentとfresh spec reviewを完了するまでM0 commitとS01へ進まない。
