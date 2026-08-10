@@ -11,6 +11,20 @@
 - [Issue Plan Guide](issue-plan.md): Issue の実装順序、検証、移行、残るリスクを実行可能な形にする。
 - [Report Guide](report.md): 実装後の結果、検証、残るリスクを短く残す。
 - [Scope Layering Guide](scope-layering.md): Initiative / Epic / Issue の責務と、親子間で再定義しない境界を確認する。
+- [Artifact Guide](artifacts.md): Current の evidence と、durable な内容の反映先を確認する。
+
+## Planning Level
+
+Issue の canonical `plan.md` は一つです。完成基準は選んだ一つの Guide を参照します。
+
+- [light Completion Guide](issue-plan-levels/light.md)
+- [standard Completion Guide](issue-plan-levels/standard.md)
+- [strict Completion Guide](issue-plan-levels/strict.md)
+- [critical Completion Guide](issue-plan-levels/critical.md)
+
+## Agent assistance
+
+Agent assistance の導線は Issue 359 の handoff 後に追加できます。`.agents/skills/spec-dock/SKILL.md` と `.agents/skills/spec-dock-grill-with-docs/SKILL.md` が実在し、link 解決を確認するまでは、この節に live Markdown link を置きません。
 
 ## 基本原則
 
