@@ -160,15 +160,15 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 ### E00 — Asset / link / preservation baseline
 
-**振る舞い目標:** 変更前のprovider / dogfood asset、Current / Historical候補、Existing保存fixtureのhashを固定する。
+**振る舞い目標:** 変更前のprovider / dogfood assetとCurrent / Historical / Existing保存対象の候補inventoryを固定し、後続stepがmaterialize / ownership確定すべき入力を明示する。
 
 **許可:** read-only tree / link / content / hash調査、main orchestratorのreport記録。
 
 **禁止:** asset、node content、metadata、active、depsの変更。
 
-**ケース概要（規範的なテストカードは§9）:** Design §4.1のAdd / Modify action、provider / dogfood現行parity、scope templateの実際のcopy depth、保存対象全fileのhash、obsolete asset候補とownerを一覧化する。
+**ケース概要（規範的なテストカードは§9）:** Design §4.1のAdd / Modify action、provider / dogfood現行parity、scope templateの実際のcopy depth、保存対象候補と既存source / hash、obsolete asset候補を一覧化する。現存しない保存fixtureのbytes / hashはS08でmaterializeして確定する。Design §4外のsurfaceは削除せず`owner pending S10`として記録する。
 
-**Step Closure Contract:** path、baseline Action、owner、before hash、planned testが全rowにあり、report差分がfresh `spec-reviewer`のdocs/spec alignment reviewをpassする。曖昧な物理削除rowがない。M0 commit候補は`docs(iss-00358): Authoring asset baselineを記録`。
+**Step Closure Contract:** Design §4.1の各rowにpath、baseline Action、358 owner、既存時のbefore hash、planned testがあり、preservation候補はS08のmaterialization input、Design §4外surfaceはno-delete / `owner pending S10`として明示される。E00は`CL-358-010`のbaseline evidenceだけを閉じ、`CL-358-011/013`はS08 / S10で閉じる。曖昧な物理削除rowがない。M0 commit候補は`docs(iss-00358): Authoring asset baselineを記録`。
 
 ### S01 — Authoring Guide foundationとscope responsibility
 
@@ -276,11 +276,11 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **Forbidden:** installer migration実装、fixtureの正規化、node-local content rewrite。
 
-**ケース概要（規範的なテストカードは§9）:** canonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、Profile由来文書のbefore / after SHA-256一致。
+**ケース概要（規範的なテストカードは§9）:** E00 candidate inventoryからcanonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、Profile由来文書を含むfull fixtureをmaterializeし、materialization直後のbaseline SHA-256とasset適用simulation後のSHA-256一致を固定する。
 
 **Verification:** `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k preservation`。
 
-**Step Closure Contract:** `CL-358-011`、全fixture row不変、negative controlで意図的変更を検出、fresh QA / code review。Commit候補: `test(authoring): Existing文書保持を固定`。
+**Step Closure Contract:** `CL-358-011`、E00 candidate inventoryの全categoryが実在fixture / baseline SHA-256へ解決され、全fixture row不変、negative controlで意図的変更を検出、fresh QA / code review。Commit候補: `test(authoring): Existing文書保持を固定`。
 
 ### S09 — IC-1 Core / Kit contract
 
@@ -302,7 +302,9 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **360 handoff:** Fresh asset manifest、obsolete asset manifest、retain / replace / historical-only / prune分類、全preservation list、provider / dogfood parity、installed consumer再検証義務。
 
-**Step Closure Contract:** `CL-358-013`、重複 / 欠落 / owner未設定rowなし、fresh spec review。Commit候補: S90 docs commitへ同梱可能。
+E00で`owner pending S10`としたDesign §4外surfaceは、ここで359 / 360またはretain-onlyへ一意に割り当てる。S10より前に物理削除ownerを推測しない。
+
+**Step Closure Contract:** `CL-358-013`、E00のpending rowを含め重複 / 欠落 / owner未設定rowなし、fresh spec review。Commit候補: S90 docs commitへ同梱可能。
 
 ### S90 — Docs impact resolution
 
@@ -337,14 +339,14 @@ git status --short
 
 §8は成果の概要である。実装委任、Red / Green、docs-only代替証拠、停止判断、review、report更新は本節を規範とする。`doc-writer`と`dev-coder`は同一stepを同時編集せず、文書asset確定後にcontract testを追加する。
 
-### E00 contract — Asset / link / preservation baseline
+### E00 contract — Asset / link / preservation candidate baseline
 
 - Depends on: 承認済みR/D/Pとbaseline `2c75e0c02cb65a6e74040a72dc161d342d661091`。Unblocks: S01〜S08。
-- Target files: Design §4.1対象のread-only inventoryとIssue `report.md` E00 evidence。
-- Planned obligation: Add / Modify、provider / dogfood hash、link、copy depth、preservation hash、obsolete ownerを固定する。
+- Target files: Design §4.1対象のread-only inventory、preservation / Design §4外candidate inventory、Issue `report.md` E00 evidence。
+- Planned obligation: Add / Modify、provider / dogfood hash、link、copy depth、preservation候補、Design §4外no-delete rowを固定する。未作成fixtureのbytes / hashとpending ownerをE00完了条件にしない。
 - Redまたは代替証拠: `inspect-only`。behavior変更なしのためtestは不要で、before manifest / hash / link scanを代替証拠とする。
 - Bounded implementation: assetやuser contentを変えずreportだけを更新する。
-- Green verification: 全Design §4.1 rowにAction / owner / before hash / test ownerがある。
+- Green verification: 全Design §4.1 rowにAction / 358 owner / 既存時のbefore hash / test ownerがあり、preservation候補はS08 input、Design §4外rowはno-delete / `owner pending S10`である。
 - Refactor guardrail: obsolete候補を358のDeleteへ分類しない。
 - Amendment trigger: Design §4.1外の変更、user-owned rewrite、Runtime / installer変更が必要なら停止する。
 - Report destination: `report.md`のE00 `Step Contract Closure` / `Delegated Worker Evidence`。
@@ -353,18 +355,18 @@ git status --short
   - input docs: Requirement §5〜§9、Design §4 / §11 / §14、Plan Closure Index。
   - allowed paths: repositoryのread-only調査、Issue reportへのmain orchestrator転記。
   - forbidden changes: asset、source、tests、user content、metadata / deps / active / Git state。
-  - acceptance criteria: Design manifest完全性、baseline parity、preservation対象完全性。
+  - acceptance criteria: Design manifest完全性、baseline parity、preservation candidate category完全性、Design §4外surfaceのno-delete明示。
   - required verification: tree / link / hash / copy-depth inspection。
   - reviewer focus: Historical / `.workbench` / rules / flat referencesの暗黙Deleteがないこと。
-  - stop conditions: action / owner不明、Design外path、baseline drift。
+  - stop conditions: Design §4.1 rowのaction / 358 owner不明、baseline drift、Design §4外surfaceをDeleteへ分類した場合。preservation fixture未materializeとS10 owner pendingは停止条件ではない。
   - output required: manifest、hash、link evidence、risk、material decision有無。
-- `tc-e00-001` inspect: baseline asset and preservation manifest
-  - 前提: provider / dogfood assetとExisting full-fixtureがある。
-  - 操作: Design §4.1 path、relative links、scope copy depth、全preservation対象のSHA-256を収集する。
-  - 期待結果: 各rowにAction / owner / hash / planned testがあり、provider / dogfoodの現行差分が説明できる。
-  - 失敗検出: 未収集path、未割当owner、Existing対象欠落、暗黙Delete。
-  - 検証方法: explicit manifest、relative-link scan、SHA-256一覧をreportへ保存する。
-  - 関連 closure id: `CL-358-010`, `CL-358-011`, `CL-358-013`。
+- `tc-e00-001` inspect: baseline asset and preservation candidate manifest
+  - 前提: provider / dogfood assetと、既存repositoryから収集可能なpreservation候補がある。
+  - 操作: Design §4.1 path、relative links、scope copy depth、preservation categoryごとのcandidate source / 既存SHA-256、Design §4外surfaceを収集する。
+  - 期待結果: Design §4.1 rowにAction / 358 owner / 既存hash / planned testがあり、preservation未materialize rowはS08へ、Design §4外rowはno-delete / S10へ明示的にroutingされる。
+  - 失敗検出: Design §4.1未収集path、provider / dogfood説明不能差分、preservation category欠落、暗黙Delete。
+  - 検証方法: explicit manifest、relative-link scan、既存SHA-256一覧、S08 / S10 routingをreportへ保存する。
+  - 関連 closure id: `CL-358-010`。`CL-358-011/013`のcandidate evidenceは収集するがcloseしない。
 - Step gate: mainがreportを更新し、曖昧rowゼロを確認する。fresh `spec-reviewer`がE00 report evidenceとapproved R/D/Pのdocs/spec alignmentをpassした後、M0 commit候補`docs(iss-00358): Authoring asset baselineを記録`を作成し、`git status --short`で意図しない残差がないことを確認してからS01へ進む。report差分があるため`approved-no-op`は使わない。
 
 ### S01 contract — Authoring Guide foundation
@@ -581,25 +583,25 @@ git status --short
 
 - Depends on: S07 / E00。Unblocks: S09。Target files: preservation fixture / tests、358-owned asset copy simulation、bounded test helper。
 - Planned obligation: Authoring asset変更が既存user-owned contentを一byteも変更しないことを証明する。
-- Redまたは代替証拠: `red-required`。全preservation surfaceと意図的mutation negative controlを先に固定する。
-- Bounded implementation: test / fixtureだけを変更し、migration / rewriteを実装しない。
-- Green verification: `CL-358-011`の全SHA-256 row不変、negative control検出。
+- Redまたは代替証拠: `red-required`。E00 candidate inventoryから全preservation surfaceをmaterializeし、asset適用前baseline SHA-256と意図的mutation negative controlを先に固定する。
+- Bounded implementation: test / fixtureだけを変更し、thin Report、candidate ADR、profile-derived文書を含む不足categoryはfixtureとして明示生成する。migration / rewriteは実装しない。
+- Green verification: `CL-358-011`の全categoryが実在fixtureとbaseline SHA-256を持ち、simulation後も全row不変でnegative controlを検出する。
 - Refactor guardrail: fixture normalizationやhash対象省略を禁止する。
 - Amendment trigger: Existing content変更が必要、または360 migration proofを358へ持ち込む場合は停止する。
 - Report destination: `report.md`のS08 closure / Test Contract Closure / Reviewer Gate Status。
 - Delegation contract:
   - delegated role: fresh `dev-coder`。
-  - input docs: `RQ-358-008`, `EC-358-008`, `AC-358-011`; Design §14 / §15; `CL-358-011`、E00 hash manifest。
+  - input docs: `RQ-358-008`, `EC-358-008`, `AC-358-011`; Design §14 / §15; `CL-358-011`、E00 preservation candidate manifest。
   - allowed paths: 本step Target filesだけ。
   - forbidden changes: installer / update behavior、node-local content、fixture normalization、Runtime。
-  - acceptance criteria: canonical docs / Reports / all Artifact / Discussion / ADR / Assurance / profile-derived docs byte不変。
+  - acceptance criteria: canonical docs / thin and heavy Reports / all Artifact / Discussion / accepted and candidate ADR / Assurance / profile-derived docsがfixtureとbaseline SHA-256を持ち、byte不変。
   - required tests: preservation matrix + negative control。
   - reviewer focus: full surface、hash timing、simulation fidelity、360との境界。
   - stop conditions: user data mutation、test-onlyで証明不能、scope外update実装。
   - output required: changed tests / fixtures、hash matrix、negative control、risk、material decision有無。
 - `tc-s08-001` compatibility: full Existing preservation surface
-  - 前提: canonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、profile-derived docsを含むfixtureがある。
-  - 操作: 358-owned asset適用simulationの前後で全file SHA-256を比較し、一件を意図的に変えるnegative controlも実行する。
+  - 前提: E00 candidate inventoryがcategory / candidate source / synthetic-requiredを区別している。
+  - 操作: canonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、profile-derived docsを含むfixtureをmaterializeし、直後のbaselineと358-owned asset適用simulation後の全file SHA-256を比較する。一件を意図的に変えるnegative controlも実行する。
   - 期待結果: 通常simulationは全hash一致、negative controlだけが確実に失敗する。
   - 失敗検出: hash差、対象欠落、mutation見逃し。
   - 検証方法: explicit path / SHA-256 matrixとfresh QA / code review。
@@ -648,7 +650,7 @@ git status --short
 - Planned obligation: exact path / semantic / owner / retain-replace-historical-prune分類を後続へ渡す。
 - Redまたは代替証拠: `manual-required`。implementation test不要の理由はhandoff evidenceのみのstepであるため。duplicate / missing / unowned row inspectionを代替証拠とする。
 - Bounded implementation: handoff manifestだけを作り、skill本文 / installer / pruneを実行しない。
-- Green verification: `CL-358-013`が重複 / 欠落 / owner未設定ゼロでpassする。
+- Green verification: `CL-358-013`がE00の全`owner pending S10` rowを消化し、重複 / 欠落 / owner未設定ゼロでpassする。
 - Refactor guardrail: reserved linkを359実装前にliveにしない。
 - Amendment trigger: skill target、360分類、preservation ownerの変更が必要なら停止する。
 - Report destination: Issue `report.md`のS10 closure / HandoffとEpic report。
@@ -657,14 +659,14 @@ git status --short
   - input docs: `RQ-358-008`, `AC-358-013`; Design §13 / §14; `CL-358-013`; IC-1 pass evidence。
   - allowed paths: 本step Target filesだけ。
   - forbidden changes: skill / installer / Runtime、obsolete delete、359 / 360 canonical docs。
-  - acceptance criteria: 359 exact Guide / skill targets、360 full asset classification / preservation / parity obligation。
+  - acceptance criteria: 359 exact Guide / skill targets、360 full asset classification / preservation / parity obligation、retain-onlyを含むDesign §4外surfaceの一意owner。
   - required verification: duplicate / gap / ownership inspection、fresh spec review。
   - reviewer focus: downstreamがrepo再調査不要な具体性、reserved link timing。
   - stop conditions: IC-1未pass、owner未確定、path / classificationのmaterial変更。
   - output required: handoff manifest、inspection evidence、risk、material decision有無。
 - `tc-s10-001` manual: 359 / 360 handoff completeness
   - 前提: IC-1 pass、Design §13 / §14 exact contracts、S01〜S09 evidenceがある。
-  - 操作: 359のGuide / semantic / exact skill targetと、360のretain / replace / historical-only / prune全assetをowner / destinationへ割り当てる。
+  - 操作: 359のGuide / semantic / exact skill targetと、E00 pending inventoryを含む360のretain / replace / historical-only / prune全assetをowner / destinationへ割り当てる。
   - 期待結果: 重複・欠落・未割当ゼロで、各rowがverified evidenceへlinkし、skill linkは予約状態である。
   - 失敗検出:曖昧path、ownerなし、IC evidenceなし、live link先行。
   - 検証方法: manifest inspectionとfresh spec review。
