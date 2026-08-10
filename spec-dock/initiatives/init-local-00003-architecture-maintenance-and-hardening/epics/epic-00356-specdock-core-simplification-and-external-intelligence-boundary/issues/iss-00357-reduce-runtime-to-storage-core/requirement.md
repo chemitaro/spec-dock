@@ -2,830 +2,293 @@
 種別: 要件定義書（Issue）
 ID: "iss-00357"
 タイトル: "Reduce Runtime to Storage Core"
-状態: "draft"
-作成者: "iwasawayuuta"
-最終更新: "2026-08-07"
+関連GitHub: ["#357"]
+状態: "approved"
+作成者: "ChatGPT-use-strict / main orchestrator"
+最終更新: "2026-08-10"
 親: ["epic-00356", "init-local-00003"]
+承認: "Product Owner review completed 2026-08-10"
 ---
 
-# iss-00357 Reduce Runtime to Storage Core — Issue 要件定義
+# iss-00357 Reduce Runtime to Storage Core — 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+## 1. 目的
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+SpecDockのRuntimeを、認知的なworkflow、Profile、Assurance、reviewer gateから切り離し、構造管理だけを決定的に実行するStorage Coreへ縮小する。
 
----
+本IssueはRuntime内部のモジュール削除だけを目的としない。利用者が次の一連の操作を、外部モデルや品質判定の仕組みなしで最後まで実行できる状態を成果とする。
 
-## 0. 文書の位置づけ
+1. Initiative / Epic / Issueと依存関係を読む。
+2. 調査または計画対象をactiveに選択する。
+3. 依存関係が解決したIssueを開始する。
+4. scope-local Artifactを作成または単一ファイルからimportする。
+5. linked GitHub Issueをcloseし、成功後にactiveをclearする。
+6. `sync` / `validate` / `doctor`で構造状態を確認する。
 
-### この文書が定義すること
+## 2. 背景
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+対象baseline `2c75e0c02cb65a6e74040a72dc161d342d661091` では、構造操作と次の認知的責務がRuntime内で結合している。
 
-### この文書が定義しないこと
+- `assurance`、`authoring`、`guidance`、`workflow`、`delegated-authoring`のcommand登録
+- active entryのauthority、grants、promotion record
+- `issue finish`におけるRequirement / Design / Plan、review、Report、Evidence Adoption Ledgerの判定
+- Assurance Profileに基づく`draft-design` / `draft-plan` routing
+- provider固有の`artifact import chatgpt-output`
+- repair / draft用ArtifactのCurrent作成経路
+- workflow authorityを含むActive Manifest / Context Pack
+- Assurance composeを前提とするfresh node scaffold
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
+この状態では、nodeや依存関係を管理するだけの利用者も、SpecDock固有の計画・review・証跡規約に従う必要がある。本Issueはこの密結合を解消し、Epic 356のStorage Core境界をRuntimeで成立させる。
 
----
+## 3. 親スコープから継承する契約
 
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| Issue要件 | 親Epic要件 | 継承内容 |
 |---|---|---|
-| ... | ... | ... |
+| `RQ-357-001` | `E-RQ-001` | Runtime workflow、Profile、AssuranceをCurrent surfaceから撤去する |
+| `RQ-357-002` | `E-RQ-004` | active selectionをreadinessと分離し、selection-onlyにする |
+| `RQ-357-003` | `E-RQ-004` | `issue start`だけがunfinished guardとdependency-only readinessを判定する |
+| `RQ-357-004` | `E-RQ-003` | `issue finish`をGitHub close、active clear、post-syncだけの便利操作にする |
+| `RQ-357-005` | `E-RQ-005`, `E-RQ-008` | ArtifactのCurrent作成型とHistorical認識型を分離する |
+| `RQ-357-006` | `E-RQ-006` | generic file importだけを残す |
+| `RQ-357-007` | `E-RQ-007` | AssuranceなしでR/D/Pと薄いReportを作るscaffold mechanismを提供する |
+| `RQ-357-008` | Epic互換性契約 | 既存データを保持し、旧workflowを再起動しない |
+| `RQ-357-009` | Epic vertical slice契約 | 358 / 359 / 360へ安定したhandoffを提供する |
 
-### 4.2 開始条件（Trigger）
+本Issueは親Epicの目的、Issue分割、依存方向、最終品質Issue候補の採否を再定義しない。
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+## 4. 対象範囲
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+### 4.1 対象
 
-### 4.3 代表シナリオ
+- Runtime parser / registry / bootstrap
+- retained commandのcommand adapterとapplication use case
+- active state model、serialization、Active Manifest、Context Pack
+- dependency readinessとIssue start
+- Issue finishとGitHub close / active clear / post-sync
+- Artifact domain、type catalog、filename allocation、template resolution
+- generic `artifact import file`とprovider固有importの分離
+- Initiative / Epic / Issue scaffolderのRuntime mechanism
+- `sync`、`validate`、`doctor`への影響
+- filesystem / Git / GitHub部分失敗とprivacy-safe diagnostics
+- provider Runtime sourceとdogfood Runtime projection
+- CLI help、Runtime reference、migration notes
+- unit、application、CLI、negative、historical compatibility、projection tests
+- Issue 358 / 359 / 360へ渡すcontractとinventory
 
-#### シナリオ SC-001:
+### 4.2 対象外
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+- R/D/P/Report template本文、Authoring Guide、Planning Level Guideの執筆（Issue 358）
+- repo-local skillの実装（Issue 359）
+- installerの最終prune、fresh / update / uninstall consumer migration（Issue 360）
+- release全体のfull regression、最終PR、deliverable handoff（人間承認待ちの最終Issue候補）
+- 既存ユーザー文書、Report、Artifact、Discussion、ADRの一括削除・rename・rewrite
+- External Intelligenceの実装
+- 新しいquality / review / evidence gate
+- `analysis` Artifact type
 
-#### シナリオ SC-002:
+## 5. 機能要件
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### RQ-357-001 Storage Core command surface
 
-#### シナリオ SC-XXX:
+`spec-dock --help`とRuntime registryには、構造管理に必要なcommandだけをCurrent surfaceとして公開する。Targetのtop-level commandとsubcommandは次を正本inventoryとする。
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+| Top-level command | Targetで保持するsubcommand / leaf |
+|---|---|
+| `new` | `initiative`、`epic`、`issue`、`artifact` |
+| `artifact` | `import file`だけ |
+| `active` | `set`、`show`、`clear` |
+| `issue` | `start`、`finish` |
+| `deps` | `check`、`add`、`remove` |
+| `import` | `initiative`、`epic`、`issue` |
+| `worktree` | `create`、`list`、`show`、`remove` |
+| `workbench` | `copy` |
+| standalone | `delete`、`close`、`update`、`uninstall`、`sync`、`validate`、`doctor` |
 
----
+保持するcommandの既存引数と正常系・失敗系は、本要件または親Epicが明示的に変更するものを除いて維持する。明示変更は次の二点である。
 
-## 5. スコープ
+- `active set`はtarget positional、`--id`、`--github-issue`による選択だけを保持する。`--checkout`、`--no-checkout`、`--github`、`--no-github`、`--gh-limit`、`--force`は撤去し、branch操作、GitHub state取得、dependency迂回を行わない。
+- `issue start`はtarget positional、`--id`、`--github-issue`、unfinished guardだけを迂回する`--force`、GitHub照会件数の既存上限指定を保持する。branch checkoutは`issue start`だけが所有する。
 
-### 5.1 対象範囲（In 対象範囲（Scope））
+次の認知的command group、leaf、到達可能なalias / fallbackを撤去する。
 
-このIssueで必ず実現することを列挙する。
+- `assurance`
+- `authoring`
+- `guidance`
+- `workflow`
+- `delegated-authoring`
+- provider固有のChatGPT import
+- Profile / Grade classification、reviewer / EAL / promotion gate、draft routing
 
-- ...
-- ...
+具体的には`assurance`、`authoring`、`guidance`、`workflow`、`delegated-authoring`、`artifact import chatgpt-output`をCurrent parser / registry / helpから除く。物理ファイル名だけで削除を判断せず、上記のretained / removed / shared inventoryとimport graphに基づいて到達性を確認する。正本inventoryにない新しいtop-level command、subcommand、互換aliasを実装判断だけで追加しない。
 
-### 5.2 対象外（Out of 対象範囲（Scope））
+### RQ-357-002 active selection
 
-このIssueでは実現しないことを列挙する。
+`active set`はvalidなInitiative / Epic / IssueのIDとrepo-relative pathを選択する構造操作とする。
 
-- ...
-- ...
+- dependency、unfinished Issue、Requirement / Design / Plan、review、Report、authorityを評価しない。
+- dependencyでblockedなIssueも、調査・計画のためactiveにできる。
+- Active Manifest / Context Packはnavigationに必要な構造情報だけを出力する。
+- authority、grants、promotion record、Planning Level、review status、quality status、evidence adoption statusをtarget writeへ含めない。
 
-### 5.3 変更しないもの（Unchanged / Must Not Change）
+### RQ-357-003 Issue start
 
-関連はあるが、このIssueで変更してはいけないものを列挙する。
+`issue start <target>`は次の順序と境界を守る。
 
-- ...
-- ...
+1. targetがIssueとして解決できる。
+2. 別のunfinished active Issueがある場合は停止する。ただし`--force`はこのguardだけを迂回できる。
+3. dependency DAGのdirect / inherited blockerを確認し、dependency-readyでなければ停止する。
+4. branch checkoutを実行する。
+5. checkout成功後にactiveを設定する。
+6. 必要なpost-mutation syncを行う。
 
-### 5.4 判断が必要な境界
+`--force`はdependency blocker、invalid target、checkout失敗、active persistence失敗を迂回してはならない。
 
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
+unfinished active guardは、現在branchではなくactive manifestとactive Issueのlinked GitHub stateを基準にする。現在branchは診断情報であり、guardの成否を変えない。
 
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
+| Active状態 | Active IssueのGitHub state | targetとの関係 | `--force`なし | `--force`あり |
+|---|---|---|---|---|
+| active Issueなし | 該当なし | 任意 | dependency確認へ進む | dependency確認へ進む |
+| active Issueあり | 任意 | 同じIssue | dependency確認へ進む | dependency確認へ進む |
+| active Issueあり | `CLOSED` | 別Issue | finishedとしてdependency確認へ進む | dependency確認へ進む |
+| active Issueあり | `OPEN` | 別Issue | unfinished guardで停止 | guardだけを迂回しdependency確認へ進む |
+| active Issueあり | `UNKNOWN`、linkなし、取得失敗、active node解決不能 | 別Issue | finishedと推測せずactionableに停止 | guardだけを迂回しdependency確認へ進む |
 
----
+main、non-Issue branch、detached HEAD、active Issueとは異なるbranchでもこの表を適用する。guard通過後のdependency blocker、checkout失敗、active write失敗は`--force`の有無にかかわらず停止する。
 
-## 6. 要求される振る舞い
+### RQ-357-004 Issue finish
 
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
+`issue finish`は次の順序で実行する。
 
-### 振る舞い BH-001:
+1. active IssueとGitHub linkageを解決する。
+2. linked GitHub Issueをcloseする。already closedは成功として扱う。
+3. close成功後にだけactiveをclearする。
+4. clear後にpost-syncする。
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+`issue finish`はRequirement / Design / Plan、test、review、Report、EAL、authority、promotion recordを読まず、完了品質を判定しない。
 
-### 振る舞い BH-002:
+### RQ-357-005 Artifact creation
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+`new artifact`のtypeはoptional positionalとし、省略時とexplicit `blank`を同じCurrent契約として扱う。
 
-### 振る舞い BH-XXX:
+Currentの新規作成可能型は次の六つに限定する。
 
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+- `blank`
+- `research`
+- `interview`
+- `disc`
+- `decision-candidate`
+- `adr`
 
----
+`analysis`、`pr-repair-batch`、`draft-requirement`、`draft-design`、`draft-plan`などはCurrent作成候補に出さない。ただしHistorical認識契約に含まれる既存ファイルは、その理由だけでmalformedにしない。
+
+Targetで認識するHistorical catalogは次を最低限のbaseline-valid形式とする。
+
+| Historical形式 | 例 / grammar | Targetの扱い |
+|---|---|---|
+| 旧typed Artifact | timestamp形式の`pr-repair-batch`、`draft-requirement`、`draft-design`、`draft-plan`、`scratch`、`note` | 既存fileを認識するが新規作成しない |
+| grandfathered sequential Artifact | `NNN-adr-<slug>.md`、`NNN-disc-<slug>.md`、`NNN-note-<slug>.md` | 既存fileを認識するが新規作成しない |
+| generic imported Artifact | `YYYYMMDDtHHMMSSz[-NN]--<original-basename>` | opaqueな既存identityとして認識する |
+| legacy Discussion | `discussions/`配下でbaseline parserが受理するtimestamp形式とsequential形式 | 履歴証跡として保持する |
+
+Current六種の既存Artifact、blank filename、上表のHistorical形式は、形式がcatalogに属することだけを理由に`validate` / `doctor`でmalformedにしない。一方、duplicate slot / ID、path escape、symlink、壊れたtimestamp、catalog外のtimestamp-intent typeは従来どおり診断する。Historical fileをCurrent navigation、作成候補、workflow routingへ自動昇格しない。
+
+### RQ-357-006 Generic file import
+
+`artifact import file`だけをCurrent import surfaceとして保持し、`artifact import chatgpt-output`とそのprovider固有routingを撤去する。
+
+generic importは次を維持する。
+
+- 明示指定された一つのregular file
+- opaque bytesの保持
+- scope検証とdestination-side collision protection
+- path traversal、symlink、unsafe sourceの拒否
+- source pathや機密情報を漏らさない出力
+- publication失敗時のcommitted / not committed区別と回復手順
+
+### RQ-357-007 Fresh node scaffold mechanism
+
+RuntimeはAuthoring Kitが提供するdeterministicなscope templateから次を一つずつ作成できる。
+
+- `requirement.md`
+- `design.md`
+- `plan.md`
+- `report.md`
+
+Profile選択、Assurance compose、Report本文解釈、draft routingを行わない。薄いReportと空の利用者記入欄を有効な入力として扱う。template本文の所有者はIssue 358とする。
+
+### RQ-357-008 互換性
+
+- 既存`.assurance.json`はHistorical fileとして保持し、Storage Coreは通常操作で解釈しない。
+- 既存Report bytesとcanonical R/D/Pを通常操作で変更・再合成しない。
+- 既存Historical Artifact filenameを`RQ-357-005`の明示catalogに従って認識する。
+- 既存generic imported Artifactのidentityとbyte semanticsを保持する。
+- node / dependency metadata formatは、本Issue内で別途正当化された可逆migrationがない限り維持する。
+- generated active / index / tree viewは再生成してよいが、source metadataとuser documentsは保持する。
+- removed commandは明示的に拒否し、legacy backendやaliasへfallbackしない。
+
+### RQ-357-009 Cross-Issue handoff
+
+Issue 357は次を後続へ渡す。
+
+- Issue 358: scope file名、六つのCurrent Artifact type、Report path / non-gating、one-plan contractを検証できるIC-1入力
+- Issue 359: retained CLI inventory、Current command syntax、removed command absence
+- Issue 360: removed Runtime / provider asset inventory、historical preservation obligation、migration上の注意
+
+## 6. 失敗・境界条件
+
+| ID | 条件 | 必須結果 |
+|---|---|---|
+| `EC-357-001` | invalid active / start target | 明確なerror、state変更なし |
+| `EC-357-002` | dependency blocked Issueを`active set` | selectionは可能 |
+| `EC-357-003` | dependency blocked Issueを`issue start --force` | blockerを表示して停止、state変更なし |
+| `EC-357-004` | existing active IssueのGitHub state不明 | finishedと推測せずactionableに停止 |
+| `EC-357-005` | checkout失敗 | active変更なし |
+| `EC-357-006` | active persistence失敗 | 直前stateを復元し、部分変更を明示 |
+| `EC-357-007` | GitHub close失敗 | active保持、retry guidance |
+| `EC-357-008` | close成功後のactive clear失敗 | GitHub close済み / active残存を区別したpartial success |
+| `EC-357-009` | close / clear成功後のpost-sync失敗 | close済み / active clear済み / projection staleを区別 |
+| `EC-357-010` | Historical-only / unknown Artifact typeを作成 | Current六種を示して拒否、file作成なし |
+| `EC-357-011` | collision exhaustion、symlink、path escape、scope mismatch | deterministic rejection、partial artifactなし |
+| `EC-357-012` | existing heavy ReportやAssurance fixture | Core operationが旧gateを再開しない |
 
 ## 7. 受け入れ条件
 
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-08-07 | 初稿（Initial draft） | ... | ... |
+| ID | 観測可能な完了条件 |
+|---|---|
+| `AC-357-001` | parser / registry / helpにretained commandだけがあり、removed groupとprovider固有importに到達できない |
+| `AC-357-002` | Active Manifest / Context Packのtarget outputからauthority / grants / promotion / reviewer / EAL情報が除かれる |
+| `AC-357-003` | `active set`がselection-onlyで、blocked Issueを選択できるpositive / negative testが通る |
+| `AC-357-004` | `RQ-357-003`の全truth-table rowをmain / Issue / non-Issue branchの代表ケースで検証し、unfinished guard、dependency blocker、`--force`境界、checkout / persistence失敗が順序付きtestで固定される |
+| `AC-357-005` | `issue finish`のclose成功、already closed、close失敗、clear失敗、post-sync失敗、no-quality-gateがtestで固定される |
+| `AC-357-006` | omitted type、explicit blank、五つのtyped form、unknown / historical-only type、collision / lock / symlink / path escapeがtestで固定される |
+| `AC-357-007` | generic file importのbyte保持、安全性、privacy、partial failure testが維持される |
+| `AC-357-008` | Fresh Initiative / Epic / Issue作成が`.assurance.json`なしでR/D/P/Reportを生成する |
+| `AC-357-009` | 空のthin Report、heavy Report、EAL文字列、delegated authority metadata、`.assurance.json`、Planning Level本文、legacy active fieldの有無や内容を変えてもdeps / start / finishの結果が変わらず、それらを理由に`validate` / `doctor`が失敗しない。構造破損の診断は維持する |
+| `AC-357-010` | `RQ-357-005`の各Historical形式とCurrent形式のfixtureを保持したまま`validate` / `doctor`がmalformedとしないpositive test、およびcatalog外timestamp-intent / duplicate / unsafe pathを診断するnegative testが通る |
+| `AC-357-011` | Runtime help / reference / migration notesがretained semanticsをCurrentとして説明し、removed workflowを推奨しない |
+| `AC-357-012` | provider sourceとdogfood Runtime projectionのexpected parityが検証される |
+| `AC-357-013` | IC-1入力、359向けretained inventory、360向けremoved inventoryがIssue-local reportへ記録される |
+| `AC-357-014` | `deps check`とsync projectionがdirect / inheritedの未解決blockerを列挙して`ready=false`を返し、全blocker解決後は`ready=true`を返す正負testが通る。R/D/P/Report、review、authorityの内容はreadyを変えない |
+
+## 8. 非機能要件・制約
+
+- 既存のfilesystem safety、atomic publication、rollback、privacy-safe outputを弱めない。
+- retained commandの正常系だけでなく、順序依存の部分失敗を型または明確なresultとして区別する。
+- provider-side実装を正本とし、dogfood Runtimeはprojection / verification対象として扱う。
+- 物理削除より先にregistrationとimport graphを切り離し、hidden dependencyをtestで検出する。
+- shared componentを変更する場合はIssue 358との所有権表に従い、template proseをIssue 357で決めない。
+
+## 9. 前提と未確定事項
+
+- Product semantics、Current Artifact六種、lifecycle順序、one-plan / thin-report contractは親EpicとProduct Owner承認により確定済みである。
+- 新しい品質・統合・deliverable handoff Issueのnode作成は本Issueの判断対象ではない。
+- retained / removed moduleの正確な物理一覧は、`RQ-357-001`のCLI inventoryを変えない機械的inventoryとして実装Stepで確定してよい。
+- 上位scopeへ戻す未解決の製品判断はない。実装中に境界を変える必要が生じた場合は、本Issueのplanを拡張せずEpicへ戻す。
+
+## 10. 根拠
+
+- 親Epic: `../../requirement.md`、`../../design.md`、`../../plan.md`
+- 承認済みDraft 1: `artifacts/20260809t125145z-draft-requirement-strict-vertical-slice-requirement.md`
+- 設計候補: `artifacts/20260809t125146z-draft-design-strict-vertical-slice-design.md`
+- 計画候補: `artifacts/20260809t125147z-draft-plan-strict-vertical-slice-plan.md`
+- Epic delivery index: `../../artifacts/20260809t122849z-disc-epic-00356-strict-planning-delivery-index.md`
