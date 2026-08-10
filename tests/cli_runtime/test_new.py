@@ -829,7 +829,8 @@ class TestCliNew(CliRuntimeHarness):
                     (
                         "種別: artifact",
                         'template: "blank"',
-                        "型を先に決めず",
+                        "自由形式で事実、メモ、図、リンク、検討",
+                        "Requirement / Design / Plan または accepted ADR",
                     ),
                 ),
                 (
@@ -839,8 +840,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-01-research-research-title.md",
                     (
                         "種別: research",
-                        "調査目的",
-                        "source-grounded research evidence surface",
+                        "一つの source-grounded investigation",
+                        "複数の証拠を統合",
+                        "`disc` を使います",
                     ),
                 ),
                 (
@@ -850,8 +852,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-02-interview-interview-title.md",
                     (
                         "種別: interview",
-                        "正式質問として扱う理由",
-                        "one essential question",
+                        "明示的な質問と回答",
+                        "## Question",
+                        "## Answer",
                     ),
                 ),
                 (
@@ -861,8 +864,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-03-disc-disc-title.md",
                     (
                         "種別: disc",
-                        "対象論点",
-                        "synthesis / reflection proposal",
+                        "複数の証拠を統合",
+                        "trade-off",
+                        "`research` を使います",
                     ),
                 ),
                 (
@@ -872,8 +876,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-04-decision-candidate-decision-candidate-title.md",
                     (
                         "種別: decision-candidate",
-                        "判断候補",
-                        "proposed decision",
+                        "未採用の decision option",
+                        "durable authority ではありません",
+                        "明示的な判断後",
                     ),
                 ),
                 (
@@ -894,8 +899,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-06-adr-adr-title.md",
                     (
                         "種別: ADR（Architecture Decision Record）",
-                        "ADR 化基準",
-                        "accepted authority fields",
+                        'authority: "draft"',
+                        "mirror_eligible: false",
+                        "明示的に `accepted`",
                     ),
                 ),
             )

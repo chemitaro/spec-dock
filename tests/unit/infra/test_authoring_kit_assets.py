@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+from typing import TypedDict, cast
 
 import pytest
 
@@ -16,6 +17,61 @@ OVERVIEW_LINK_TARGETS = (
     "issue-plan.md",
     "report.md",
     "scope-layering.md",
+    "artifacts.md",
+)
+
+STORAGE_CORE_REFERENCE_TARGETS = frozenset({
+    "reference_naming.md",
+    "reference_deps.md",
+    "reference_sync.md",
+    "reference_github.md",
+})
+CURRENT_FIRST_READ_DESTINATIONS = frozenset({
+    *STORAGE_CORE_REFERENCE_TARGETS,
+    "authoring/overview.md",
+})
+REFERENCE_USE_DESTINATION_PREFIX = "reference-use:"
+
+S06_CURRENT_ASSET_PATHS = (
+    "docs/README.md",
+    "docs/guide.md",
+    "docs/authoring/overview.md",
+    "templates/README.md",
+)
+S06_HISTORICAL_ASSET_PATH = "docs/authoring/historical.md"
+S06_MANAGED_ASSET_PATHS = (*S06_CURRENT_ASSET_PATHS, S06_HISTORICAL_ASSET_PATH)
+
+
+def _ascii_identifier_pattern(token_pattern: str) -> re.Pattern[str]:
+    return re.compile(
+        rf"(?<![A-Za-z0-9])(?:{token_pattern})(?![A-Za-z0-9])",
+        flags=re.IGNORECASE,
+    )
+
+
+CURRENT_LEGACY_VOCABULARY_PATTERNS = {
+    "workflow": _ascii_identifier_pattern("workflow"),
+    "phase": _ascii_identifier_pattern("phase"),
+    "profile": _ascii_identifier_pattern("profile"),
+    "assurance": _ascii_identifier_pattern("assurance"),
+    "grade": _ascii_identifier_pattern("grade"),
+    "promotion": _ascii_identifier_pattern("promotion"),
+    "eal": _ascii_identifier_pattern("eal"),
+    "delegated-authoring": _ascii_identifier_pattern(r"delegated[ _-]+authoring"),
+}
+
+RESERVED_SKILL_PATHS = (
+    ".agents/skills/spec-dock/SKILL.md",
+    ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+)
+
+CURRENT_ARTIFACT_TEMPLATES = (
+    "blank",
+    "research",
+    "interview",
+    "disc",
+    "decision-candidate",
+    "adr",
 )
 
 DOCUMENT_RESPONSIBILITIES = {
@@ -134,7 +190,22 @@ TEMPLATE_HEADINGS = {
     ),
 }
 
-SCOPE_TEMPLATE_CONTRACTS = {
+
+class ScopeTemplateContract(TypedDict):
+    id: str
+    title: str
+    parent: str | None
+    guide_prefix: str
+    node_parts: tuple[str, ...]
+
+
+class DocumentTemplateContract(TypedDict):
+    kind: str
+    dependencies: str | None
+    guide: str | None
+
+
+SCOPE_TEMPLATE_CONTRACTS: dict[str, ScopeTemplateContract] = {
     "initiative": {
         "id": "<INIT_ID>",
         "title": "<INIT_TITLE>",
@@ -165,7 +236,7 @@ SCOPE_TEMPLATE_CONTRACTS = {
     },
 }
 
-DOCUMENT_TEMPLATE_CONTRACTS = {
+DOCUMENT_TEMPLATE_CONTRACTS: dict[str, DocumentTemplateContract] = {
     "requirement": {
         "kind": "要件定義書",
         "dependencies": None,
@@ -303,11 +374,48 @@ def _section_list(content: str, heading: str) -> str:
     return "\n".join(line for line in _section(content, heading).splitlines() if line.startswith("- "))
 
 
+def _normalize_markdown_destination(raw_destination: str) -> str:
+    raw_destination = raw_destination.strip()
+    if raw_destination.startswith("<") and ">" in raw_destination:
+        return raw_destination[1 : raw_destination.index(">")]
+    return raw_destination.split(maxsplit=1)[0]
+
+
+def _markdown_link_destinations(content: str) -> tuple[str, ...]:
+    inline_destinations = (
+        _normalize_markdown_destination(raw_destination)
+        for raw_destination in re.findall(r"\[[^\]]*\]\(([^)]+)\)", content)
+    )
+    reference_uses = (
+        f"{REFERENCE_USE_DESTINATION_PREFIX}{match.group('identifier') or match.group('label')}"
+        for match in re.finditer(
+            r"\[(?P<label>[^\]\n]+)\]\[(?P<identifier>[^\]\n]*)\]",
+            content,
+        )
+    )
+    reference_destinations = (
+        _normalize_markdown_destination(match.group("destination"))
+        for match in re.finditer(
+            r"^[ \t]{0,3}\[[^\]]+\]:[ \t]*(?P<destination><[^>\n]+>|[^\s]+)",
+            content,
+            flags=re.MULTILINE,
+        )
+    )
+    autolink_destinations = (
+        match.group("destination")
+        for match in re.finditer(
+            r"<(?P<destination>(?:[A-Za-z][A-Za-z0-9+.-]*:[^>\s]+|/[^>\s]+|[^<>\s@]+@[^<>\s@]+))>",
+            content,
+        )
+    )
+    return (*inline_destinations, *reference_uses, *reference_destinations, *autolink_destinations)
+
+
 def _relative_markdown_links(content: str) -> tuple[str, ...]:
-    destinations = re.findall(r"\[[^\]]*\]\(([^)]+)\)", content)
     relative_paths: list[str] = []
-    for destination in destinations:
-        destination = destination.strip().strip("<>").split(maxsplit=1)[0]
+    for destination in _markdown_link_destinations(content):
+        if destination.startswith(REFERENCE_USE_DESTINATION_PREFIX):
+            continue
         path_without_fragment = destination.split("#", maxsplit=1)[0]
         if not path_without_fragment:
             continue
@@ -317,8 +425,22 @@ def _relative_markdown_links(content: str) -> tuple[str, ...]:
     return tuple(relative_paths)
 
 
+def _has_exact_current_first_read_destinations(content: str) -> bool:
+    return set(_markdown_link_destinations(content)) == CURRENT_FIRST_READ_DESTINATIONS
+
+
 def _requires_specific_workflow(content: str) -> bool:
     return any(pattern.search(content) is not None for pattern in MANDATORY_WORKFLOW_PATTERNS)
+
+
+def _current_vocabulary_violations(relative_path: str, content: str) -> tuple[str, ...]:
+    if relative_path not in S06_CURRENT_ASSET_PATHS:
+        return ()
+
+    violations = tuple(name for name, pattern in CURRENT_LEGACY_VOCABULARY_PATTERNS.items() if pattern.search(content))
+    if _requires_specific_workflow(content):
+        violations = (*violations, "provider-specific-mandatory")
+    return violations
 
 
 def _report_template_has_forbidden_contract(content: str) -> bool:
@@ -439,6 +561,201 @@ def test_current_navigation_roots_link_to_authoring_overview(name: str) -> None:
 
     assert "authoring/overview.md" in relative_links
     assert (navigation_path.parent / "authoring/overview.md").is_file()
+
+
+@pytest.mark.parametrize("name", ("README.md", "guide.md"))
+def test_current_navigation_first_read_route_is_storage_core_and_authoring_kit(name: str) -> None:
+    content = (DOCS_ROOT / name).read_text(encoding="utf-8")
+    current = _section(content, "## Current")
+    historical = _section(content, "## Historical")
+
+    assert content.index("## Current") < content.index("## Historical")
+    assert _has_exact_current_first_read_destinations(current)
+    assert "authoring/historical.md" not in _markdown_link_destinations(current)
+    assert _markdown_link_destinations(historical) == ("authoring/historical.md",)
+    assert "Current の新規作成手順ではありません" in historical
+
+
+@pytest.mark.parametrize(
+    "extra_link",
+    (
+        "[absolute workflow](/workflow_issue.md)",
+        "[external workflow](https://example.com/workflow_issue.md)",
+        "[reserved skill][skill]\n[skill]: </.agents/skills/spec-dock/SKILL.md>",
+        "<https://example.com/current-authoring>",
+        "<mailto:author@example.com>",
+        "<ftp://example.com/current-authoring>",
+        "<author@example.com>",
+        "[Current recommendation][current]\n[current]: ../overview.md",
+    ),
+)
+def test_current_navigation_first_read_destination_detector_rejects_non_allowlisted_mutations(
+    extra_link: str,
+) -> None:
+    current = "\n".join((
+        *(f"[{destination}]({destination})" for destination in CURRENT_FIRST_READ_DESTINATIONS),
+        extra_link,
+    ))
+
+    assert not _has_exact_current_first_read_destinations(current)
+
+
+def test_current_navigation_first_read_rejects_reference_use_when_definition_is_outside_section() -> None:
+    current = "\n".join((
+        *(f"[{destination}]({destination})" for destination in CURRENT_FIRST_READ_DESTINATIONS),
+        "[external][x]",
+    ))
+    definition_outside_section = "[x]: <https://example.com/external>"
+
+    assert f"{REFERENCE_USE_DESTINATION_PREFIX}x" in _markdown_link_destinations(current)
+    assert "https://example.com/external" in _markdown_link_destinations(definition_outside_section)
+    assert not _has_exact_current_first_read_destinations(current)
+
+
+def test_authoring_overview_navigation_links_to_all_current_guides() -> None:
+    overview_path = AUTHORING_ROOT / "overview.md"
+    links = set(_markdown_link_destinations(overview_path.read_text(encoding="utf-8")))
+    expected_links = {
+        *OVERVIEW_LINK_TARGETS,
+        *(f"issue-plan-levels/{level}.md" for level in PLANNING_LEVELS),
+    }
+
+    assert links == expected_links
+    for relative_path in links:
+        assert (overview_path.parent / relative_path).is_file(), f"broken overview link: {relative_path}"
+
+
+def test_authoring_overview_agent_assistance_reserves_plain_text_skill_paths_without_live_links() -> None:
+    overview = _read_authoring_doc("overview.md")
+    assistance = _section(overview, "## Agent assistance")
+    live_links = set(_markdown_link_destinations(assistance))
+
+    for reserved_path in RESERVED_SKILL_PATHS:
+        assert assistance.count(reserved_path) == 1
+        assert reserved_path not in live_links
+    assert not live_links
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        "[skill](/.agents/skills/spec-dock/SKILL.md)",
+        "[skill](https://example.com/.agents/skills/spec-dock/SKILL.md)",
+        "[Current recommendation](../overview.md)",
+        "[skill][reserved]\n[reserved]: </.agents/skills/spec-dock/SKILL.md>",
+        "<https://example.com/current-authoring>",
+        "<mailto:author@example.com>",
+        "<ftp://example.com/current-authoring>",
+        "<author@example.com>",
+        "</.agents/skills/spec-dock/SKILL.md>",
+        "[Current recommendation][current]\n[current]: ../overview.md",
+    ),
+)
+def test_no_live_link_detector_rejects_absolute_external_and_relative_mutations(content: str) -> None:
+    assert _markdown_link_destinations(content)
+
+
+def test_relative_link_resolver_includes_reference_style_destination() -> None:
+    content = "[Current recommendation][current]\n[current]: <../overview.md>"
+
+    assert _relative_markdown_links(content) == ("../overview.md",)
+
+
+@pytest.mark.parametrize("relative_path", S06_CURRENT_ASSET_PATHS)
+def test_current_navigation_vocabulary_excludes_legacy_authoring_contracts(relative_path: str) -> None:
+    content = (DOCS_ROOT.parent / relative_path).read_text(encoding="utf-8")
+
+    assert not _current_vocabulary_violations(relative_path, content)
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        "workflow を参照します。",
+        "phase の順序に従います。",
+        "Profile と Assurance を使います。",
+        "Grade を EAL で promotion します。",
+        "delegated authoring を使います。",
+        "Codex を必須とします。",
+        "workflowを使います。",
+        "workflow_route を使います。",
+        "phaseを進めます。",
+        "phase_gate を通します。",
+        "Profileを選びます。",
+        "profile_name を記録します。",
+        "Assuranceを確認します。",
+        "assurance_level を記録します。",
+        "Gradeを付けます。",
+        "grade_value を記録します。",
+        "promotionを行います。",
+        "promotion_route を使います。",
+        "EALを記録します。",
+        "eal_schema を使います。",
+        "delegated authoringを使います。",
+        "delegated_authoring_route を使います。",
+    ),
+)
+def test_current_navigation_vocabulary_detector_rejects_legacy_mutations(content: str) -> None:
+    assert _current_vocabulary_violations("docs/guide.md", content)
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        "workflowing",
+        "phased",
+        "profiles",
+        "assurances",
+        "grader",
+        "promotional",
+        "ealing",
+        "delegated authoringx",
+        "reworkflow",
+        "metaphase",
+        "subprofile",
+        "reassurance",
+        "retrograde",
+        "prepromotion",
+        "predelegated authoring",
+    ),
+)
+def test_current_navigation_vocabulary_detector_allows_ascii_word_infixes(content: str) -> None:
+    assert not _current_vocabulary_violations("docs/guide.md", content)
+
+
+def test_historical_navigation_is_a_positive_control_outside_current_vocabulary_scan() -> None:
+    historical_path = DOCS_ROOT.parent / S06_HISTORICAL_ASSET_PATH
+    historical = historical_path.read_text(encoding="utf-8")
+
+    assert historical.strip()
+    for token in ("Profile", "Assurance", "workflow", "draft", "repair", "provider"):
+        assert token in historical
+    for token in ("保持", "新規作成には使いません", "削除", "rename", "rewrite"):
+        assert token in historical
+    for token in ("`requirement.md`", "`design.md`", "`plan.md`", "accepted ADR"):
+        assert token in historical
+    assert "Current の推奨手順を示しません" in historical
+    assert not _markdown_link_destinations(historical)
+
+    assert CURRENT_LEGACY_VOCABULARY_PATTERNS["workflow"].search(historical)
+    assert not _current_vocabulary_violations(S06_HISTORICAL_ASSET_PATH, historical)
+    assert _current_vocabulary_violations("docs/guide.md", historical)
+
+
+@pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
+@pytest.mark.parametrize("relative_path", S06_MANAGED_ASSET_PATHS)
+def test_s06_navigation_asset_relative_links_resolve(scaffold_root: Path, relative_path: str) -> None:
+    asset_path = scaffold_root / relative_path
+
+    assert asset_path.is_file()
+    assert asset_path.read_text(encoding="utf-8").strip()
+    for target in _relative_markdown_links(asset_path.read_text(encoding="utf-8")):
+        assert (asset_path.parent / target).is_file(), f"broken relative link in {relative_path}: {target}"
+
+
+@pytest.mark.parametrize("relative_path", S06_MANAGED_ASSET_PATHS)
+def test_s06_navigation_assets_match_dogfood_projection(relative_path: str) -> None:
+    assert (DOCS_ROOT.parent / relative_path).read_bytes() == (DOGFOOD_DOCS_ROOT.parent / relative_path).read_bytes()
 
 
 @pytest.mark.parametrize("relative_path", S01_OWNED_DOC_PATHS)
@@ -584,13 +901,29 @@ def test_template_scope_catalog_rejects_extra_rdp_like_alias(extra_filename: str
     assert not _has_exact_scope_template_catalog(mutated_catalog)
 
 
-def test_template_rdp_catalog_readme_lists_only_the_nine_rdp_templates() -> None:
+def test_template_readme_navigation_catalogs_exact_scope_docs_and_current_artifacts() -> None:
     content = (TEMPLATES_ROOT / "README.md").read_text(encoding="utf-8")
+    links = set(_markdown_link_destinations(content))
 
     for scope in SCOPES:
-        assert content.count(f"`{scope}/{{requirement,design,plan}}.md`") == 1
-    assert "report.md" not in content.casefold()
-    assert "artifact" not in content.casefold()
+        assert content.count(f"`{scope}/{{requirement,design,plan,report}}.md`") == 1
+        assert f"`{scope}/{{requirement,design,plan}}.md`" not in content
+
+    artifact_catalog = f"`artifacts/{{{','.join(CURRENT_ARTIFACT_TEMPLATES)}}}.md`"
+    assert content.count(artifact_catalog) == 1
+    for retired_route in ("analysis", "repair", "draft-"):
+        assert retired_route not in content.casefold()
+
+    assert links == {
+        "../docs/authoring/overview.md",
+        "../docs/authoring/requirement.md",
+        "../docs/authoring/design.md",
+        "../docs/authoring/issue-plan.md",
+        "../docs/authoring/report.md",
+        "../docs/authoring/artifacts.md",
+    }
+    for relative_path in links:
+        assert (TEMPLATES_ROOT / relative_path).is_file(), f"broken template catalog link: {relative_path}"
 
 
 @pytest.mark.parametrize(
@@ -685,6 +1018,7 @@ def test_template_rdp_guide_link_resolves_from_rendered_node_location(
     guide = document_contract["guide"]
     if document == "plan":
         guide = "issue-plan.md" if scope == "issue" else "scope-layering.md"
+    guide = cast("str", guide)
     expected_link = f"{scope_contract['guide_prefix']}{guide}"
 
     for template_root in (TEMPLATES_ROOT, DOGFOOD_TEMPLATES_ROOT):
