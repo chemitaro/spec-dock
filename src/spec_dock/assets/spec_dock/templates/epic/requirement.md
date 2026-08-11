@@ -3,130 +3,32 @@
 ID: "<EPIC_ID>"
 タイトル: "<EPIC_TITLE>"
 関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
+状態: "draft"
 最終更新: "YYYY-MM-DD"
 親: ["<INIT_ID>"]
 ---
 
-# <EPIC_ID> <EPIC_TITLE> — 要件定義（何を、なぜ行うか）
+# <EPIC_ID> <EPIC_TITLE> — 要件定義
 
-## 作成方針
-- この文書は Epic が束ねる能力、モデル境界、受け入れ条件、後続 Issue への seed を固定する。
-- 日本語ファーストで作成し、ファイルパス、コマンド、コード識別子、SpecDock 固定語は原文のまま扱ってよい。
-- 既存プロダクトでは、現行のアーキテクチャ、設計指針、用語、境界に合わせて整理する。方針が不明または新規開発の場合は、コード・既存資料・ユーザー確認に基づいて方針を明確化してから進める。
-- Issue-level の実装手順や private implementation design はここで必須化しない。
+詳細: [Requirement Guide](../../../../docs/authoring/requirement.md)
 
-## 目的（Initiative との紐づき）
-- Initiative 目標 / 指標:
-  - ...
-- この epic が提供する能力:
-  - ...
+## 目的
+この Epic が提供する一貫した成果を記述する。
 
-## 能力 / モデル envelope（capability / model envelope）
-- 対象 capability:
-  - ...
-- model / lifecycle boundary:
-  - ...
-- cross-Issue invariant の seed:
-  - ...
-- 対象外の model / capability:
-  - ...
+## 背景
+親 Initiative との関係、問題、関係者を記述する。
 
-## ユースケース
-- 正常系:
-  - ...
-- 例外 / 運用シナリオ:
-  - ...
-
-## エピック要件（Epic requirements）
-- E-RQ-001:
-  - ...
-- E-RQ-002:
-  - ...
-
-## エピック受け入れ条件（Epic acceptance criteria）
-- E-AC-001:
-  - 前提:
-  - 操作:
-  - 期待結果:
-  - 観測点:
-- E-AC-002:
-  - ...
-
-## 証跡の権限境界（artifact authority）
-- raw evidence として扱うもの:
-  - `artifacts/`:
-    - ...
-- canonical authority として扱うもの:
-  - `requirement.md`:
-    - ...
-  - `design.md`:
-    - ...
-  - `plan.md`:
-    - ...
-  - accepted ADR:
-    - ...
-  - `report.md` Evidence Adoption Ledger:
-    - ...
+## 観測可能な要件
+複数 Issue を通じて観測できる振る舞いと契約を記述する。
 
 ## スコープ
-- 必須:
-  - ...
-- 禁止:
-  - ...
-- 対象外:
-  - ...
+Epic の対象、対象外、Issue へ渡す境界を記述する。
 
-## 境界
-- 常に行う:
-  - ...
-- 判断が必要:
-  - ...
-- 行わない:
-  - ...
+## 失敗・境界条件
+横断的なリスク、依存、境界条件を記述する。
 
-## 非機能要件
-- 性能:
-  - ...
-- 信頼性 / 一貫性:
-  - ...
-- セキュリティ:
-  - ...
-- 運用:
-  - ...
+## 受け入れ条件
+Epic の成果を確認する条件を記述する。
 
-## 依存 / 影響範囲
-- 影響する component:
-  - ...
-- 外部依存:
-  - ...
-- 互換性:
-  - ...
-
-## 後続 Issue seed
-- parent requirement trace:
-  - ...
-- acceptance seed:
-  - ...
-- allowed local delta:
-  - ...
-- forbidden parent boundary changes:
-  - ...
-- expected evidence:
-  - ...
-- suggested grade:
-  - ...
-
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+## 制約・前提
+守る制約と前提を記述する。

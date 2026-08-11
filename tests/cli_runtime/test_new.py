@@ -53,7 +53,7 @@ class TestCliNew(CliRuntimeHarness):
                 snapshot.append((rel, "file", path.read_text(encoding="utf-8")))
         return tuple(snapshot)
 
-    def test_new_nodes_create_exact_four_document_manifest_without_assurance(self) -> None:
+    def test_new_issue_creates_thin_design_and_plan_templates_without_assurance_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -79,6 +79,41 @@ class TestCliNew(CliRuntimeHarness):
 
             validation = self._run_runtime_capture(target, ["validate"])
             assert validation.returncode == 0, validation.stdout + validation.stderr
+            expected_headings = {
+                "design.md": (
+                    "設計目標",
+                    "Current / Target",
+                    "責務・Interface",
+                    "data / failure",
+                    "変更対象",
+                    "移行・互換性・rollback",
+                    "testability",
+                    "risk",
+                ),
+                "plan.md": (
+                    "Planning Level",
+                    "目標",
+                    "順序・依存",
+                    "実装step",
+                    "検証",
+                    "rollback",
+                    "exit / handoff",
+                ),
+            }
+            expected_kinds = {
+                "design.md": "設計書（Issue）",
+                "plan.md": "実装計画書（Issue）",
+            }
+            for filename in ("design.md", "plan.md"):
+                text = (issue_dir / filename).read_text(encoding="utf-8")
+                assert f"種別: {expected_kinds[filename]}" in text
+                assert '状態: "draft"' in text
+                assert "artifact_state:" not in text
+                assert "assurance classify" not in text
+                assert "assurance compose" not in text
+                for heading in expected_headings[filename]:
+                    assert f"## {heading}" in text
+                assert "spec-dock:managed-section begin" not in text
 
     def _write_runtime_clock(self, target: Path, *, now_iso: str, today: str) -> None:
         runtime_clock = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "clock.py"
@@ -737,7 +772,8 @@ class TestCliNew(CliRuntimeHarness):
                     (
                         "種別: artifact",
                         'template: "blank"',
-                        "型を先に決めず",
+                        "自由形式で事実、メモ、図、リンク、検討",
+                        "Requirement / Design / Plan または accepted ADR",
                     ),
                 ),
                 (
@@ -747,8 +783,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-01-research-research-title.md",
                     (
                         "種別: research",
-                        "調査目的",
-                        "source-grounded research evidence surface",
+                        "一つの source-grounded investigation",
+                        "複数の証拠を統合",
+                        "`disc` を使います",
                     ),
                 ),
                 (
@@ -758,8 +795,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-02-interview-interview-title.md",
                     (
                         "種別: interview",
-                        "正式質問として扱う理由",
-                        "one essential question",
+                        "明示的な質問と回答",
+                        "## Question",
+                        "## Answer",
                     ),
                 ),
                 (
@@ -769,8 +807,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-03-disc-disc-title.md",
                     (
                         "種別: disc",
-                        "対象論点",
-                        "synthesis / reflection proposal",
+                        "複数の証拠を統合",
+                        "trade-off",
+                        "`research` を使います",
                     ),
                 ),
                 (
@@ -780,8 +819,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-04-decision-candidate-decision-candidate-title.md",
                     (
                         "種別: decision-candidate",
-                        "判断候補",
-                        "proposed decision",
+                        "未採用の decision option",
+                        "durable authority ではありません",
+                        "明示的な判断後",
                     ),
                 ),
                 (
@@ -791,8 +831,9 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z-05-adr-adr-title.md",
                     (
                         "種別: ADR（Architecture Decision Record）",
-                        "ADR 化基準",
-                        "accepted authority fields",
+                        'authority: "draft"',
+                        "mirror_eligible: false",
+                        "明示的に `accepted`",
                     ),
                 ),
             )
