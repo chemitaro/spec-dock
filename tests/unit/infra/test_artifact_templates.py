@@ -1,42 +1,205 @@
 from pathlib import Path
+import re
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ASSET_ROOT = REPO_ROOT / "src/spec_dock/assets/spec_dock"
-ARTIFACT_TEMPLATES = ASSET_ROOT / "templates/artifacts"
+PROVIDER_ASSET_ROOT = REPO_ROOT / "src/spec_dock/assets/spec_dock"
+DOGFOOD_ASSET_ROOT = REPO_ROOT / "spec-dock"
+ARTIFACT_TEMPLATE_DIRECTORY = Path("templates/artifacts")
+ARTIFACT_GUIDE = Path("docs/authoring/artifacts.md")
 
-
-DIRECT_ARTIFACT_TEMPLATES = {
-    "blank.md",
-    "research.md",
-    "interview.md",
-    "disc.md",
-    "decision-candidate.md",
+CURRENT_ARTIFACT_TYPES = (
+    "blank",
+    "research",
+    "interview",
+    "disc",
+    "decision-candidate",
+    "adr",
+)
+PHYSICAL_ARTIFACT_TEMPLATES = {
+    *(f"{artifact_type}.md" for artifact_type in CURRENT_ARTIFACT_TYPES),
     "pr-repair-batch.md",
-    "adr.md",
 }
+HISTORICAL_ROUTE_MARKERS = {
+    "`analysis`": "`analysis`",
+    "`draft-*`": "`draft-*`",
+    "`repair`": "`repair`",
+    "`pr-repair`": "`pr-repair`",
+    "`profile`": "`profile`",
+}
+MANDATORY_WORKFLOW_PATTERNS = (
+    re.compile(
+        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)"
+        r".{0,40}(?:必須|使用してください|使ってください|前提とします|前提にします)",
+        flags=re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"(?:必ず|必須で).{0,40}"
+        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)",
+        flags=re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"(?:mandatory|required).{0,40}"
+        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)",
+        flags=re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)"
+        r".{0,40}(?:mandatory|required)",
+        flags=re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)"
+        r".{0,40}\b(?:must|shall)\b",
+        flags=re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"\b(?:must|shall)\b.{0,40}"
+        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)",
+        flags=re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)"
+        r".{0,40}必ず.{0,20}(?:使用|利用|使う|用いる)",
+        flags=re.IGNORECASE | re.DOTALL,
+    ),
+)
+WORKFLOW_TERM_PATTERN = re.compile(
+    r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)",
+    flags=re.IGNORECASE,
+)
+NON_MANDATORY_PHRASES = re.compile(
+    r"必須\s*で\s*(?:は\s*(?:ありません|ない|なく)|ない)"
+    r"|not\s+(?:required|mandatory)"
+    r"|\b(?:must|shall)\s+not\b",
+    flags=re.IGNORECASE | re.DOTALL,
+)
+CLAUSE_BOUNDARY_PATTERN = re.compile(r"[.;。；]+")
 
 
-def _read_asset(relative_path: str) -> str:
-    return (ASSET_ROOT / relative_path).read_text(encoding="utf-8")
+def _read_asset(root: Path, relative_path: Path | str) -> str:
+    return (root / relative_path).read_text(encoding="utf-8")
 
 
-def test_provider_artifact_template_catalog_is_direct_only_for_supported_types() -> None:
-    artifact_template_names = {path.name for path in ARTIFACT_TEMPLATES.glob("*.md")}
+def _section(content: str, heading: str) -> str:
+    match = re.search(
+        rf"^{re.escape(heading)}\n(?P<body>.*?)(?=^## |\Z)",
+        content,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    assert match is not None, f"missing section: {heading}"
+    return match.group("body")
 
-    assert artifact_template_names == DIRECT_ARTIFACT_TEMPLATES
+
+def _frontmatter(content: str) -> str:
+    match = re.match(r"\A---\n(?P<body>.*?)\n---\n", content, flags=re.DOTALL)
+    assert match is not None, "missing YAML frontmatter"
+    return match.group("body")
 
 
-def test_blank_artifact_template_records_identity_without_filename_token() -> None:
-    blank = _read_asset("templates/artifacts/blank.md")
+def _current_catalog_types(guide: str) -> tuple[str, ...]:
+    section = _section(guide, "## Current creation catalog")
+    return tuple(re.findall(r"^\| `([^`]+)` \|", section, flags=re.MULTILINE))
+
+
+def _relative_markdown_links(content: str) -> tuple[str, ...]:
+    destinations = re.findall(r"\[[^\]]*\]\(([^)]+)\)", content)
+    relative_paths: list[str] = []
+    for destination in destinations:
+        path_without_fragment = destination.strip().strip("<>").split(maxsplit=1)[0].split("#", 1)[0]
+        if path_without_fragment and not path_without_fragment.startswith("/") and "://" not in path_without_fragment:
+            relative_paths.append(path_without_fragment)
+    return tuple(relative_paths)
+
+
+def _requires_mandatory_workflow(content: str) -> bool:
+    for clause in CLAUSE_BOUNDARY_PATTERN.split(content):
+        if WORKFLOW_TERM_PATTERN.search(clause) and NON_MANDATORY_PHRASES.search(clause):
+            continue
+        if any(pattern.search(clause) for pattern in MANDATORY_WORKFLOW_PATTERNS):
+            return True
+    return False
+
+
+def test_physical_catalog_retains_existing_template_while_current_catalog_is_exact_six() -> None:
+    physical_template_names = {path.name for path in (PROVIDER_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY).glob("*.md")}
+    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
+
+    assert physical_template_names == PHYSICAL_ARTIFACT_TEMPLATES
+    current_catalog_types = _current_catalog_types(guide)
+    assert len(current_catalog_types) == len(CURRENT_ARTIFACT_TYPES)
+    assert set(current_catalog_types) == set(CURRENT_ARTIFACT_TYPES)
+
+
+@pytest.mark.parametrize("artifact_type", CURRENT_ARTIFACT_TYPES)
+def test_current_artifact_templates_exist_are_nonempty_and_match_dogfood(
+    artifact_type: str,
+) -> None:
+    relative_path = ARTIFACT_TEMPLATE_DIRECTORY / f"{artifact_type}.md"
+    provider_bytes = (PROVIDER_ASSET_ROOT / relative_path).read_bytes()
+
+    assert provider_bytes.strip()
+    assert provider_bytes == (DOGFOOD_ASSET_ROOT / relative_path).read_bytes()
+
+
+def test_artifact_guide_exists_is_nonempty_and_matches_dogfood() -> None:
+    provider_bytes = (PROVIDER_ASSET_ROOT / ARTIFACT_GUIDE).read_bytes()
+
+    assert provider_bytes.strip()
+    assert provider_bytes == (DOGFOOD_ASSET_ROOT / ARTIFACT_GUIDE).read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("artifact_type", "expected_tokens"),
+    (
+        ("blank", ("自由形式", "事実、メモ、図、リンク", "## Evidence")),
+        (
+            "research",
+            ("一つの source-grounded investigation", "## Source", "複数の証拠", "`disc`"),
+        ),
+        ("interview", ("明示的な質問と回答", "## Question", "## Answer", "自動で採用されません")),
+        ("disc", ("複数の証拠", "trade-off", "一つの source", "`research`")),
+        ("decision-candidate", ("未採用", "durable authority ではありません", "## Candidate")),
+        ("adr", ("architecture / contract / migration", "明示的に `accepted`", "durable authority")),
+    ),
+)
+def test_current_artifact_templates_distinguish_type_semantics(
+    artifact_type: str,
+    expected_tokens: tuple[str, ...],
+) -> None:
+    content = _read_asset(
+        PROVIDER_ASSET_ROOT,
+        ARTIFACT_TEMPLATE_DIRECTORY / f"{artifact_type}.md",
+    )
+
+    for token in expected_tokens:
+        assert token in content
+
+
+def test_blank_template_identity_does_not_constrain_filename_or_format() -> None:
+    blank = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_TEMPLATE_DIRECTORY / "blank.md")
 
     assert 'template: "blank"' in blank
     assert "filename token ではありません" in blank
     assert "`blank` を含める必要はありません" in blank
 
 
-def test_adr_artifact_template_supports_accepted_authority_and_mirror_surfaces() -> None:
-    adr = _read_asset("templates/artifacts/adr.md")
-    frontmatter = adr.split("---", 2)[1]
+@pytest.mark.parametrize("artifact_type", CURRENT_ARTIFACT_TYPES[:-1])
+def test_non_adr_artifacts_route_adopted_content_to_durable_authority(
+    artifact_type: str,
+) -> None:
+    content = _read_asset(
+        PROVIDER_ASSET_ROOT,
+        ARTIFACT_TEMPLATE_DIRECTORY / f"{artifact_type}.md",
+    )
+
+    assert "Requirement / Design / Plan または accepted ADR に再記述" in content
+
+
+def test_adr_defaults_to_draft_and_preserves_accepted_mirror_fields() -> None:
+    adr = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_TEMPLATE_DIRECTORY / "adr.md")
+    frontmatter = _frontmatter(adr)
 
     for expected in (
         '状態: "draft"',
@@ -48,46 +211,176 @@ def test_adr_artifact_template_supports_accepted_authority_and_mirror_surfaces()
     ):
         assert expected in frontmatter
 
-    for expected in (
+    for accepted_field in (
         '状態: "accepted"',
         '`authority: "accepted"`',
         '`accepted_authority: "accepted ADR"`',
         '`accepted_at: "YYYY-MM-DD"`',
         '`accepted_by: "<DECISION_OWNER>"`',
         "`mirror_eligible: true`",
-        "accepted_authority",
-        "artifacts/",
-        "discussions/",
     ):
-        assert expected in adr
+        assert accepted_field in adr
+    assert "accepted ADR の mirror source" in adr
+    assert "artifacts/" in adr
+    assert "discussions/" in adr
 
 
-def test_templates_readme_documents_future_artifact_catalog_and_legacy_routing() -> None:
-    readme = _read_asset("templates/README.md")
+def test_artifact_guide_fixes_type_meanings_and_research_disc_boundary() -> None:
+    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
+    current_catalog = _section(guide, "## Current creation catalog")
 
-    for expected in (
+    expected_meanings = {
+        "blank": ("自由形式", "Requirement / Design / Plan", "accepted ADR"),
+        "research": ("一つの source-grounded investigation", "facts / constraints"),
+        "interview": ("明示的な質問と回答", "採用する回答"),
+        "disc": ("複数の evidence", "trade-off"),
+        "decision-candidate": ("未採用", "明示的な判断後"),
+        "adr": ("architecture decision candidate / record", "accepted", "durable authority"),
+    }
+    for artifact_type, tokens in expected_meanings.items():
+        row = next(line for line in current_catalog.splitlines() if line.startswith(f"| `{artifact_type}` |"))
+        for token in tokens:
+            assert token in row
+
+    assert "`research` は一つの source" in current_catalog
+    assert "複数の source や回答を統合" in current_catalog
+    assert "`disc` を使います" in current_catalog
+
+
+def test_artifact_guide_preserves_durable_authority_flow() -> None:
+    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
+    authority_flow = _section(guide, "## Authority flow")
+    flow_block = re.search(r"```text\n(?P<flow>.*?)\n```", authority_flow, flags=re.DOTALL)
+
+    assert flow_block is not None
+    assert flow_block.group("flow").splitlines() == [
+        "Artifact evidence",
+        "  -> 人間または agent による synthesis / review",
+        "    -> Requirement / Design / Plan または accepted ADR",
+        "      -> implementation",
+        "        -> thin Report result summary",
+    ]
+
+
+def test_artifact_guide_rejects_automatic_promotion_of_evidence_and_report() -> None:
+    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
+    authority_flow = _section(guide, "## Authority flow")
+
+    for evidence_source in ("Artifact", "外部 ZIP", "delegated draft", "ChatGPT output", "Report"):
+        assert evidence_source in authority_flow
+    assert "自動で durable authority に昇格せず" in authority_flow
+    assert "Report は durable decision store でもありません" in authority_flow
+    assert "正本へ明示的に再記述" in authority_flow
+
+
+def test_historical_routes_are_not_current_and_existing_template_is_retained() -> None:
+    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
+    current_catalog = _section(guide, "## Current creation catalog")
+    historical_retention = _section(guide, "## Historical retention")
+
+    for current_marker, historical_marker in HISTORICAL_ROUTE_MARKERS.items():
+        assert current_marker not in current_catalog
+        assert historical_marker in historical_retention
+    assert "draft-" not in current_catalog
+    assert "Current creation route ではありません" in historical_retention
+    assert "削除、rename、rewrite を指示しません" in historical_retention
+    assert (PROVIDER_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").is_file()
+    assert (DOGFOOD_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").is_file()
+
+
+def test_draft_document_state_and_adr_draft_authority_are_not_historical_routes() -> None:
+    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
+
+    assert "初期状態としての `draft`" in _section(guide, "## Historical retention")
+    for artifact_type in CURRENT_ARTIFACT_TYPES:
+        content = _read_asset(
+            PROVIDER_ASSET_ROOT,
+            ARTIFACT_TEMPLATE_DIRECTORY / f"{artifact_type}.md",
+        )
+        assert '状態: "draft"' in _frontmatter(content)
+    assert 'authority: "draft"' in _frontmatter(
+        _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_TEMPLATE_DIRECTORY / "adr.md")
+    )
+
+
+def test_current_artifact_assets_do_not_require_eal_provider_model_or_reviewer_workflow() -> None:
+    current_assets = [
+        _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_TEMPLATE_DIRECTORY / f"{artifact_type}.md")
+        for artifact_type in CURRENT_ARTIFACT_TYPES
+    ]
+    current_assets.append(_read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE))
+
+    for content in current_assets:
+        assert not _requires_mandatory_workflow(content)
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        "EAL schema を必須とします。",
+        "EAL schema は\n必須です。",
+        "指定 reviewer workflow を使ってください。",
+        "指定 reviewer workflow は\n複数行の説明を挟んでも\n必須です。",
+        "ChatGPT is required for promotion.",
+        "A mandatory provider model must be selected.",
+        "ChatGPT must be used.",
+        "reviewer approval shall be obtained.",
+        "An approved model must be used.",
+        "A provider shall be selected.",
+        "ChatGPTを必ず使用する。",
+        "指定 model を必ず利用する。",
+        "EAL schema は必須ではありません。\n指定 reviewer workflow は必須です。",
+        "ChatGPT is not required; reviewer approval must be obtained.",
+    ),
+)
+def test_mandatory_workflow_detector_rejects_required_tools(content: str) -> None:
+    assert _requires_mandatory_workflow(content)
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        "EAL schema は必須ではありません。",
+        "EAL schema は必須で\nはありません。",
+        "A provider is not required.",
+        "A provider is\nnot required.",
+        "model の利用は optional です。",
+        "reviewer workflow は任意です。",
+        "ChatGPT must not be used as authority.",
+        "ChatGPT is not required; the report must be complete.",
+    ),
+)
+def test_mandatory_workflow_detector_allows_explicitly_optional_tools(content: str) -> None:
+    assert not _requires_mandatory_workflow(content)
+
+
+@pytest.mark.parametrize("root", (PROVIDER_ASSET_ROOT, DOGFOOD_ASSET_ROOT))
+def test_relative_links_in_artifact_guide_resolve_when_present(root: Path) -> None:
+    guide_path = root / ARTIFACT_GUIDE
+
+    for relative_path in _relative_markdown_links(guide_path.read_text(encoding="utf-8")):
+        assert (guide_path.parent / relative_path).is_file(), f"broken relative link: {relative_path}"
+
+
+def test_templates_readme_stays_thin_without_restoring_legacy_artifact_workflow() -> None:
+    readme = _read_asset(PROVIDER_ASSET_ROOT, "templates/README.md")
+
+    assert "各テンプレートは対応する Guide を参照して記入する" in readme
+    for legacy_marker in (
         "future `new artifact` catalog",
-        "templates/artifacts",
         "draft-requirement",
         "draft-design",
         "draft-plan",
-        "templates/issue-profiles/<profile>/design.md",
-        "plan.md` を source として render",
-        "Issue scope only",
-        "unsupported",
+        "templates/issue-profiles/<profile>",
         "no-write fail-closed",
-        "scratch` は legacy-only",
-        "future artifact catalog には追加しません",
-        "filename に `blank` token を要求しません",
-        "legacy `discussions/`",
-        "preservation / legacy surface",
+        "future artifact catalog",
     ):
-        assert expected in readme
+        assert legacy_marker not in readme
 
 
-def test_initiative_and_epic_artifact_rules_document_issue_only_draft_fail_closed_boundary() -> None:
+def test_historical_initiative_and_epic_artifact_rules_remain_available() -> None:
     for scope in ("initiative", "epic"):
-        rules = _read_asset(f"docs/rules/{scope}/artifacts.md")
+        rules = _read_asset(PROVIDER_ASSET_ROOT, f"docs/rules/{scope}/artifacts.md")
 
         for expected in (
             "artifacts/",
@@ -111,8 +404,8 @@ def test_initiative_and_epic_artifact_rules_document_issue_only_draft_fail_close
         assert "templates/issue-profiles/<profile>" not in rules
 
 
-def test_issue_artifact_rules_document_profile_aware_draft_fail_closed_routing() -> None:
-    rules = _read_asset("docs/rules/issue/artifacts.md")
+def test_historical_issue_artifact_rules_remain_available() -> None:
+    rules = _read_asset(PROVIDER_ASSET_ROOT, "docs/rules/issue/artifacts.md")
 
     for expected in (
         "Routing-only issue-only artifact types",
