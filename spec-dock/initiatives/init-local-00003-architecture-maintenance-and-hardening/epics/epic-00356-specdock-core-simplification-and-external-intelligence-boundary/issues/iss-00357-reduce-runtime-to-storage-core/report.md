@@ -5,7 +5,7 @@ ID: "iss-00357"
 関連GitHub: ["#357"]
 状態: "approved"
 作成者: "main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-08-11"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -55,6 +55,7 @@ ID: "iss-00357"
 | `DEC-357-S10-008` | resolved | E00 inventory omission | S10 exhaustive consumer / path-string逆引きでremoved module専用test三件と、removed / retained・360 caseが同居するmixed test三件のE00 test inventory不備が判明した | inventory外のまま削除 / absence testへ全面改変 / E00 omissionとして正本へ追加後に削除・分割修正 | adopted: `test_runbook_store.py`、`test_authority.py`、`test_artifact_composer.py`はRemovedへ追加する。mixed testはremoved case / pathだけを除き、`delete_node` safetyと360 authoring-pack / skill / docs selector checksを保持する | 各testのstatic import / assertion / installed path list、E00 workflow / runbook / authority / assurance / delegated / authoring Delete rows、repository-wide consumer逆引き、M2 clean commit `daa222e` | S10を再委任し、削除後のretained import smoke / removed absence / provider-dogfood parityをfresh reviewする |
 | `DEC-357-S10-009` | resolved | dependent contract inventory omission | approved `domain.assurance`削除後のlintで`application/contracts.py`に未列挙のAssurance result familyが残り、削除済み`AssuranceContract`参照がundefinedになった | obsolete contractを`object`へ弱めて残す / assurance application contractの従属symbolとして削除 | adopted: `AssuranceOperation`、`AssuranceResultStatus`、`ComposeArtifactSelection`、`AssuranceTargetView`、`ComposeArtifactView`、`AssuranceResult`はmodule内自己参照以外のconsumerがなく、removed assurance wiringの従属contractとしてDelete rowへ追加する | repository-wide exact symbol逆引き、removed `application.assurance` / `domain.assurance`、ruff / mypy undefined-name | S10 correction後にlint、retained contract import、360 planning importを再確認する |
 | `DEC-357-S10-010` | resolved | 360 handoff deletion coherence | S10 final path scanで360-owned `authoring_pack/source_manifest.py::DEFAULT_SOURCE_PATHS`が削除済みprovider / dogfood `commands/authoring.py`を二項保持し、missing pathとして暗黙skipしていた | dangling default inputをH91 / 360へ先送り / 357削除に従属する二項だけ除去し既存360 fixtureをretained file pathへ更新 | adopted: 360 module / behavior / APIは保持し、357が削除した二pathだけをprovider / dogfood定数から除く。default manifest fixtureは保持中の既定fileを選ぶよう最小更新し、authoring-packの意味や範囲は変更しない | `DEFAULT_SOURCE_PATHS` exact path scan、`build_source_manifest` missing-path skip、`test_authoring_source_manifest_workbench.py`、E00 removed authoring module | focused 360 manifest / issue-planning import、provider-dogfood parity、H91 handoff inventoryでcoherenceを確認する |
+| `DEC-357-RECOVERY-001` | recorded | operational recovery | 2026-08-10 12:03:24 UTC、`GIT_INDEX_FILE`と`GIT_DIR`を上書きした`git commit -m "test"`が`[main a0774bb9] test`を作成し、直後のsymbolic-refが`refs/heads/main`を返した。後続の`commit-tree` / `update-ref`はIssue 357 branchへ別途反映された | 事故を実装変更として扱う / recovery-only Artifactと短いledgerで事実・復旧・停止条件を固定する | adopted: Artifact `20260811t055647z-disc-main-ref-accident-recovery-iss-00357.md`へ確定時系列、根本原因、影響、復旧、preflight / postflight、環境blocker停止を記録。誤更新はlocal mainだけで、`origin/main`とlive remote mainは一貫して`e16e97517ea3ab7287eaf6143fab2df943d71b2d`、backup refを保全し、Issue357の既存未コミットtest 1件を変更していない | 指定Codex session / rollout記録、current worktree read-only確認、main / remote / recovery refの実測 | commit skill / global guardrailの実装は別担当。Issue357ではstage / commit / pushを行わない |
 
 locked expectationの追加・変更はない。E00で見つかった通常CLI外の到達経路は、承認済みDesign §14 / H91のhandoff inventoryへ割り当てた。
 
