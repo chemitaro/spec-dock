@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import shutil
+import stat
 from typing import Any
 
 from spec_dock_runtime.infra.clock import now_iso
@@ -32,6 +33,21 @@ _ACTIVE_MANAGED_NAMES = (
 )
 _ACTIVE_GENERATED_FILE_NAMES = {"context-pack.md", "current-runbook.json", "current-runbook.md"}
 _MANAGED_AGENT_NAMES = ("index-all.json", "tree-all.json", "index.json", "tree.json")
+
+
+def _reject_hard_linked_managed_json(specdock_dir: Path) -> None:
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    managed_paths = (agent_dir / "active.json", *(agent_dir / name for name in _MANAGED_AGENT_NAMES))
+    for path in managed_paths:
+        try:
+            path_stat = path.stat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISREG(path_stat.st_mode) and path_stat.st_nlink > 1:
+            managed_path = path.relative_to(specdock_dir).as_posix()
+            raise RuntimeError(
+                f"Refusing active state transaction: managed JSON has multiple hard links: {managed_path}"
+            )
 
 
 def _normalize_entry(entry: Any) -> ActiveManifestEntry | None:
@@ -420,6 +436,7 @@ def _restore_path(path: Path, state: PathState) -> None:
 
 
 def snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot:
+    _reject_hard_linked_managed_json(specdock_dir)
     agent_dir = specdock_dir / _AGENT_DIRNAME
     legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     active_json_path = agent_dir / "active.json"
