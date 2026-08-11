@@ -34,7 +34,7 @@ class TestCliSmoke(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
-            result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00003", "--force"])
+            result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00003"])
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
 

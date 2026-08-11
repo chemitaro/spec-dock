@@ -1757,11 +1757,11 @@ class TestCliValidate(CliRuntimeHarness):
 
             active_by_url = self._run_runtime_capture(
                 target,
-                ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
+                ["active", "set", "https://github.com/current/repo/issues/123"],
             )
             assert active_by_url.returncode == 0, active_by_url.stdout + active_by_url.stderr
 
-            active_by_id = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00123", "--force"])
+            active_by_id = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00123"])
             assert active_by_id.returncode == 0, active_by_id.stdout + active_by_id.stderr
 
             ambiguous_number = self._run_runtime_capture(target, ["deps", "check", "123"])
