@@ -426,7 +426,7 @@ E00開始時点のスナップショットとして、source / test変更を伴�
 | `tc-s10-001` | S10 | red-required | initial provider `application.assurance` absence failure、provider-only変更後のdogfood module残存 failure、sorted SHA-256 manifest non-zeroを順に確認 | removed 19 module / contracts / `UseCases` field absence、retained Storage Core / ChatGPT planning import、generic import port、360 source manifest、provider / dogfood Python manifest | pass: focused / wrapper / ChatGPT / generic / authoring manifest 55、authoring source manifest 17、lint、Runtime `132 / 132` parity、diff-check、fresh review pass 0.99 |
 | `tc-s90-001` | S90 | manual-required | README / github / reference_deps / reference_github / reference_namingに`active set --checkout`、provider-specific import、旧Current catalog、active-selection readiness結合が残存 | verified CLI helpと357-owned Runtime reference / migrationを照合し、relative Markdown linkとCurrent旧route語彙をscan | pass: provider / dogfood 5 pair byte parity、broken relative link 0、変更docsの旧routeはmigration説明2件だけ、diff-check、fresh spec re-review pass 0.98 |
 | `tc-h91-001` | H91 | manual-required | E00 baseline inventoryをS10後の実在`132 / 132`とdownstream destinationへ再割当し、357側IC-1 inputの欠落 / 重複 / unowned rowをinspect | retained CLI、removed graph、shared safety、Historical / Fresh、migration / data preservation、357 IC-1 inputをowner / destination / evidenceへ割当 | pass: 未割当row 0、全row単一owner / exact destination / direct evidence。共同IC-1 resultはEpic ownerとして未実施・未主張。fresh spec re-review pass 0.98 |
-| `tc-s99-001` | S99 | red-required + delta | 初回fresh三者reviewでS99未実施、stale active-set test、dirty worktreeをP1検出。追加の全テストでIssue 334 Artifact依存テスト2件を特定し、ユーザー判断により削除した。修正後にtargeted / ordinary、主要Issue-local regression、lint、validate、doctor、diff-checkを再実行し、DEC-357-S03-011 / DEC-357-S99-002をledgerへ確定 | §7 Verification sequence、obsolete external-artifact test removal、fresh三者再レビュー、全テストGreen | 最終の通常`uv run pytest -q`は`1637 passed, 2185 skipped`、`tests/unit/domain/test_issue_planning_candidate.py`は`53 passed`、authoring-kit focusedは`304 passed`、Issue-local commandは`188 passed, 35 skipped`。`make lint`、validate `nodes=221`、doctor `findings=0`、diff-check、current-boundary Codex observationもpass |
+| `tc-s99-001` | S99 | red-required + delta | 初回fresh三者reviewでS99未実施、stale active-set test、dirty worktreeをP1検出。追加の全テストでIssue 334 Artifact依存テスト2件を特定し、ユーザー判断により削除した。PR #362の最終Codex reviewでhard-link rollback破損をP1検出し、修正前3ケースをRed再現した | §7 Verification sequence、obsolete external-artifact test removal、managed JSON hard-link fail-closed、fresh三者再レビュー、全テストGreen | 最終の通常`uv run pytest -q`は`1642 passed, 2185 skipped`。hard-link focused `5 passed`、`tests/unit/domain/test_issue_planning_candidate.py`は`53 passed`、authoring-kit focusedは`304 passed`、Issue-local commandは`188 passed, 35 skipped`。`make lint`、validate `nodes=221`、doctor `findings=0`、provider/dogfood parity、diff-check、fresh code/QA/spec reviewもpass |
 
 ### Delegated Worker Evidence
 
@@ -474,7 +474,7 @@ E00開始時点のスナップショットとして、source / test変更を伴�
 | `CL-357-005` | S04 | thin finish order / partial result / evidence non-gating | finish 10、full lifecycle 29、clear exception matrix、phase spies、file-read zero、provider / dogfood parity、fresh review pass | closed |
 | `CL-357-012` | S10 | E00 provider / dogfood parity inventory | baseline `151 / 151`からapproved deletion後`132 / 132`へ収束。sorted SHA-256 diff zero、removed absence、retained / 360 import Green | closed; fresh code review pass 0.99 |
 | `CL-357-013` | H91 | E00 owner / destination inventory | S10後のretained / removed / shared / Historical / migrationをowner / destination / evidenceへ再割当し、357側IC-1 inputを明示 | closed: 未割当row 0、単一owner / exact destination / direct evidence、fresh spec review pass 0.98 |
-| `CL-357-006` | S05 | Current六種とfilesystem safety matrix | 全Current type / filesystem matrix、mandatory / lint / parity、fresh review 9 pass 0.95 | closed |
+| `CL-357-006` | S05 / R357-HL1 | Current六種とfilesystem safety matrix、active state外部alias不変 | 全Current type / filesystem matrixに加え、active manifest / managed index / symlink target hard-linkをmutation前に拒否。focused 5、fast 1642、lint / parity、fresh code/QA/spec review pass | closed |
 | `CL-357-010` | S06 | Historical catalog / malformed / preservation matrix | catalog / malformed / unsafe / SHA / actual repo / lint / parity、fresh review 4 pass 0.97 | closed |
 | `CL-357-007` | S07 | opaque import / failure / privacy matrix | four scopes、byte exact、source safety、collision、atomic publish / cleanup、private output、removed backend absence、lint / parity、fresh review pass 0.97 | closed |
 | `CL-357-008` | S08 | Fresh three-scope scaffold / rollback matrix | four-doc exact、Assurance access zero、fd-bound outer / payload、12-phase failure、canonical collision、concurrent same-ID、tampering boundary、mode / consumer parityがGreen | closed: fresh review 5 pass 0.98 |
@@ -556,13 +556,22 @@ Destination IDsは次のexact canonical path / evidence sinkを示す。
 | `uv run pytest tests/unit/domain/test_issue_planning_candidate.py -q` | `53 passed` after removing the two external-Artifact tests; synthetic validator contract coverage remains |
 | `uv run pytest tests/unit` | 初期 / 履歴観測: `1285 passed, 572 skipped` |
 | `uv run pytest` | 初期 / 履歴観測: `1285 passed, 2185 skipped` |
-| `uv run pytest -q` | 最終: `1637 passed, 2185 skipped` |
+| `uv run pytest -q` | PR hard-link P1修正後の最終: `1642 passed, 2185 skipped` |
+| `uv run pytest -q tests/unit/application/test_set_active.py -k 'hard_linked_managed_json or single_link_managed_json'` | `5 passed, 42 deselected` |
 | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -q` | 最終 focused: `304 passed` |
 | `make lint` | ruff check / format and mypy pass |
 | `./spec-dock/scripts/spec-dock validate` / `doctor` | `validate nodes=221`; `doctor findings=0` |
 | `git diff --check` | pass |
 
 Issue 334のArtifact実体に依存する2テストは、ユーザー判断によりIssue 357のテスト対象から削除した。`validate_onboarding_companion`の合成payload契約テスト53件は保持しており、Storage Core Runtimeの挙動・API・正本R/D/Pは変更していない。main同期ではmerge commit `42b617ae8b4d4f8d36e1e76de6e27099865db55c`（parents: `685ac4f...`、`3e166d4...`）を取り込み、Provider CIはtrailing-space正規化後にpreservation SHA driftのみを初期に検出した。続く`5f4366ecdcf7fc11e1ab33528c99398a6b3f5798`で二つのcanonical source、Issue 358 report hashes、test baseline hashesを同期し、最終のlocal verification、`make lint`、diff-check、current-boundary Codex observationはpassした。
+
+### PR #362 hard-link P1 repair
+
+- head `83f636de5c29c222c7d8855cdffa159bfc8aee12` のCodex reviewで、`.agent/active.json`またはmanaged index/tree JSONが外部pathnameとhard linkを共有すると、rollback後も外部aliasに変更済みbytesが残るP1を検出した。
+- repair unit `20260811t155719z-disc-pr-repair-unit-active-rollback-hardlink.md` にvalidity、Strict ChatGPT consultation、Option B採用、`STRAT-357-HL1`、残余TOCTOUを記録した。
+- provider/dogfood `active_store.py`は、snapshot開始時かつ最初のdurable mutation前に、5つのmanaged JSONとsymlink targetを`st_nlink`で検査し、multiple hard linksを管理対象relative pathだけの診断でfail-closedに拒否する。
+- active manifest、managed index、symlink targetの3ケースは修正前に`DID NOT RAISE RuntimeError`でRed、修正後はsingle-link非回帰2ケースと合わせて`5 passed`。外部alias bytesとtransaction全体のsnapshot不変を確認した。
+- fresh code review `pass` 0.96、QA review `pass` 0.97、spec review `pass` 0.94。P0/P1なし。
 
 ### Milestone / Commit Candidate Gate
 
@@ -573,7 +582,7 @@ Issue 334のArtifact実体に依存する2テストは、ユーザー判断に�
 | M2 / S05〜S09 | S05〜S09 closed、fresh code / QA gates、focused / lint / parity pass | `refactor(artifact)!: Current作成とHistorical互換を分離` / S05〜S09 source・tests・issue docs | committed | `daa222ee62e3690e97bd455362d211ba11fa20a9`、54 files | pass: commit直後`git status --short` clean |
 | M3 / S10 | fresh code review pass、findingsなし、confidence 0.99 | `refactor(runtime)!: 旧workflow到達経路を撤去` / approved unreachable graph・tests・report | committed | `89964de616e94ff5cf48182e30026298f93d2e18` | pass: commit直後`git status --short` clean |
 | M4 / S90〜H91 | fresh spec re-review pass、findingsなし、confidence 0.98 | `docs(runtime): Storage Core移行契約を確定` / 10 Runtime docs・H91 report | committed | `c0f908374811e63721125a6548920e4170523010` | pass: commit直後のpost-commit clean check |
-| M99 / S99 | pre-M99 content review、Provider CI / validate、current-boundary Codex observationがpass | `docs(iss-00357): 最終実装証跡を確定` / final report ledger + two contract-aligned tests | committed / synchronized | `51470580ddc245c5446898ac887ec4db1f6765dd`、`685ac4f...`、`42b617ae8b4d4f8d36e1e76de6e27099865db55c`、`5f4366ecdcf7fc11e1ab33528c99398a6b3f5798` | pass: final clean status、PR #362 OPEN / mergeable / pushed。Issue 358はmainへmerge済み、Issue 357のmergeと`issue finish`は未実行 |
+| M99 / S99 | pre-M99 content review、Provider CI / validate、hard-link P1 correction後のfresh三者reviewがpass | `docs(iss-00357): 最終実装証跡を確定`および`R357-HL1` / final report ledger、contract-aligned tests、hard-link guard | correction ready for commit | `51470580...`〜`83f636de...`、R357-HL1 correction commitはpending | local pass: fast 1642、focused 5、lint / parity / diff-check。PR #362再観測はcorrection push後に実施する。Issue 357のmergeと`issue finish`は未実行 |
 
 ## 残余リスクと停止条件
 
@@ -586,4 +595,4 @@ Issue 334のArtifact実体に依存する2テストは、ユーザー判断に�
 
 ## 完了済み実装ハンドオフ
 
-Provider CI / validateとhead `5f4366ecdcf7fc11e1ab33528c99398a6b3f5798`に対するcurrent-boundary Codex observationはpassした。PR #362はOPEN / mergeableであり、残るアクションは人手のreview / mergeのみである。`issue finish`は実行しない。
+head `83f636de5c29c222c7d8855cdffa159bfc8aee12`のProvider CIはpassしたが、Codex reviewのhard-link P1をR357-HL1として修正した。local fast / focused / lint / parity / fresh三者reviewはpass済みであり、correction commit / push後にPR #362のexact new headを再観測する。`issue finish`は実行しない。
