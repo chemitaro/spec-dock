@@ -148,7 +148,7 @@ class TestCliNew(CliRuntimeHarness):
             assert after == before
         assert self._canonical_design_plan_snapshot(issue_dir) == canonical_before
 
-    def test_new_issue_creates_assurance_compose_placeholders_for_design_and_plan(self) -> None:
+    def test_new_issue_creates_thin_design_and_plan_templates_without_assurance_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -165,11 +165,40 @@ class TestCliNew(CliRuntimeHarness):
                 / "iss-00003-add-refresh-token"
             )
 
+            expected_headings = {
+                "design.md": (
+                    "設計目標",
+                    "Current / Target",
+                    "責務・Interface",
+                    "data / failure",
+                    "変更対象",
+                    "移行・互換性・rollback",
+                    "testability",
+                    "risk",
+                ),
+                "plan.md": (
+                    "Planning Level",
+                    "目標",
+                    "順序・依存",
+                    "実装step",
+                    "検証",
+                    "rollback",
+                    "exit / handoff",
+                ),
+            }
+            expected_kinds = {
+                "design.md": "設計書（Issue）",
+                "plan.md": "実装計画書（Issue）",
+            }
             for filename in ("design.md", "plan.md"):
                 text = (issue_dir / filename).read_text(encoding="utf-8")
-                assert "artifact_state: awaiting-assurance-compose" in text
-                assert "assurance classify --stage requirement" in text
-                assert "assurance compose --artifact all" in text
+                assert f"種別: {expected_kinds[filename]}" in text
+                assert '状態: "draft"' in text
+                assert "artifact_state:" not in text
+                assert "assurance classify" not in text
+                assert "assurance compose" not in text
+                for heading in expected_headings[filename]:
+                    assert f"## {heading}" in text
                 assert "spec-dock:managed-section begin" not in text
 
     def _write_runtime_clock(self, target: Path, *, now_iso: str, today: str) -> None:
@@ -933,7 +962,7 @@ class TestCliNew(CliRuntimeHarness):
             created_names = sorted(path.name for path in (issue_dir / "artifacts").glob("*.md"))
             assert created_names == sorted(["rules.md", *(filename for _, _, _, filename, _ in cases)])
 
-    def test_new_artifact_issue_draft_requirement_uses_issue_requirement_template(self) -> None:
+    def test_new_artifact_issue_draft_requirement_uses_thin_issue_requirement_template(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -949,8 +978,21 @@ class TestCliNew(CliRuntimeHarness):
             created = sorted((issue_dir / "artifacts").glob("*-draft-requirement-issue-requirement.md"))
             assert len(created) == 1
             content = created[0].read_text(encoding="utf-8")
-            assert "Issue 要件定義" in content
-            assert "artifact_state: awaiting-assurance-compose" not in content
+            assert "種別: 要件定義書（Issue）" in content
+            assert '状態: "draft"' in content
+            for heading in (
+                "目的",
+                "背景",
+                "観測可能な要件",
+                "スコープ",
+                "失敗・境界条件",
+                "受け入れ条件",
+                "制約・前提",
+            ):
+                assert f"## {heading}" in content
+            assert "artifact_state:" not in content
+            assert "assurance classify" not in content
+            assert "assurance compose" not in content
             assert "Issue 設計書" not in content
 
     def test_new_artifact_issue_design_and_plan_use_authorized_profile_templates(self) -> None:

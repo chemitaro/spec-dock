@@ -5,7 +5,7 @@ ID: "iss-00358"
 関連GitHub: ["#358"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-08-11"
 依存: ["requirement.md"]
 親: ["epic-00356", "init-local-00003"]
 承認: "Product Owner review completed 2026-08-10"
@@ -17,7 +17,7 @@ ID: "iss-00358"
 
 Thin TemplateとDetailed Guideを分離し、Fresh Initiative / Epic / Issueの仕様を、特定のmodel、provider、workflow state、Assurance Profileに依存せず作成できるAuthoring Kitへ置き換える。
 
-本設計が所有するのは文書の内容、配置、導線、検証契約である。Runtime parser、node copy mechanism、Artifact filename allocation、skill、installer pruneは所有しない。この境界によりIssue 357と並行実装し、IC-1でmechanismとcontentを統合できる。
+本設計が所有するのは文書の内容、配置、導線、検証契約である。Runtime parser、node copy mechanism、Artifact filename allocation、skill、installer pruneは所有しない。358はこの契約とEpic-level統合入力を独立に完了し、後続Epic統合でmechanismとcontentを照合できる。
 
 ## 2. Requirement trace
 
@@ -54,7 +54,7 @@ folder "Detailed Authoring Guide" as Guide
 database "R/D/P or accepted ADR" as Canonical
 folder "Artifact evidence" as Evidence
 file "thin report.md" as Report
-component "Storage Core\n(Issue 357)" as Core
+component "Epic-level integration\n(follow-up)" as Integration
 
 Author --> Template : Fresh文書を開始
 Template --> Guide : scope別の相対link
@@ -62,9 +62,8 @@ Author --> Evidence : 調査・面談・議論
 Evidence --> Canonical : 内容をレビューして再記述
 Template --> Canonical : R/D/Pを作成
 Canonical --> Report : 実装後の結果を要約
-Core --> Template : deterministic copy
-Core ..> Canonical : 内容を解釈しない
-Core ..> Report : gateにしない
+Integration ..> Template : contractを後続照合
+Integration ..> Canonical : Runtime gateにしない
 @enduml
 ```
 
@@ -286,18 +285,20 @@ Artifact、外部ZIP、delegated draft、ChatGPT outputは存在だけで採用�
 | 比較 | 契約 |
 |---|---|
 | provider ↔ dogfood managed authoring asset | 358-owned manifestに対してbyte-exact |
-| provider template ↔ Fresh scaffold | placeholder置換後のfile catalog、heading、link、内容構造 |
+| provider template ↔ Fresh scaffold | placeholder置換後のfile catalog、heading、link、内容構造（Epic-level後続統合で実施。358のS09完了条件ではない） |
 | installed consumer | Issue 360で検証 |
 | Existing node-local docs | parity対象外。byte hash preservation対象 |
 
 358-owned manifestは§4のfileを列挙し、directory全体の曖昧な比較を行わない。environment-specific generated fileはmanifestへ含めない。
 
-## 12. 357とのIC-1 contract
+## 12. Epic-level IC-1 contract input
 
-358は次の値をDesignから供給し、357がmachine-readable fixtureを実装する。
+358は次の値をmachine-readableな契約入力として提供する。Epic orchestratorは、358と関係するRuntime / scaffold Issueが完了した後にこの入力を消費し、実生成との照合を別のEpic-level統合確認として行う。358のIssue完了は、その後続確認に依存しない。
 
 ```text
 scope_files = [requirement.md, design.md, plan.md, report.md]
+contract_version = s09-2026-08-11
+consumer = epic-00356-authoring-integration
 report_required_headings = [Outcome, Verification, Residual Risks / Follow-ups]
 report_optional_heading = Notes
 report_empty_content_valid = true
@@ -309,7 +310,7 @@ level_guides = docs/authoring/issue-plan-levels/{light,standard,strict,critical}
 planning_level_runtime_owned = false
 ```
 
-IC-1はEpic orchestratorが行う文書上の統合確認であり、Runtime gateではない。content mismatchは358へ、copy / parser / filename mismatchは357へ戻す。
+IC-1はEpic orchestratorが後続で行う文書上の統合確認であり、358のRuntime gateではない。content / Guide / heading mismatchは358へ、copy / parser / filename mismatchは該当Runtime Issueへroutingする。統合確認が未実施でも、358-owned contract入力と本Issueの品質ゲートがpassすれば358は完了できる。
 
 ## 13. Ownershipと変更境界
 
@@ -322,7 +323,7 @@ IC-1はEpic orchestratorが行う文書上の統合確認であり、Runtime gat
 | installer inventory / prune | no edit | 360 owns |
 | obsolete assetの物理削除 | inventoryだけ | 360 owns |
 
-`docs/guide.md`は358をsingle editorとする。357は確定したCore help factsをhandoffし、同じfileを並行編集しない。`docs/authoring/overview.md`は358完了後、359が予約済み`Agent assistance`節の二linkだけを追加でき、それ以外の変更は358またはEpicへ戻す。
+`docs/guide.md`は358をsingle editorとする。Runtime IssueのCore help factsは後続Epic統合で参照し、同じfileを並行編集しない。`docs/authoring/overview.md`は358完了後、359が予約済み`Agent assistance`節の二linkだけを追加でき、それ以外の変更は358またはEpicへ戻す。
 
 ## 14. Migration、compatibility、rollback
 
@@ -330,7 +331,7 @@ IC-1はEpic orchestratorが行う文書上の統合確認であり、Runtime gat
 2. dogfood projectionへ同じbytesを反映する。
 3. Current navigationをTargetへ切り替える。
 4. Historical pathと360向けobsolete inventoryを確定する。
-5. IC-1で357のFresh scaffoldと照合する。
+5. Epic-level IC-1用のcontract inputを固定し、後続統合でFresh scaffoldと照合できる状態にする。
 
 本Issueは既存node-local content migration、`.assurance.json`変換、legacy rename、obsolete assetの物理pruneを行わない。rollbackはnavigation → Artifact docs → Guide / templateの逆順とし、providerとdogfoodを同じ変更単位で戻す。
 
@@ -351,7 +352,7 @@ IC-1はEpic orchestratorが行う文書上の統合確認であり、Runtime gat
 
 - `tests/unit/infra/test_authoring_kit_assets.py`を専用contract testの候補とする。
 - `tests/unit/infra/test_artifact_templates.py`はCurrent六種とHistorical保持を分けて検証する。
-- Fresh scaffold / IC-1は357のmechanism fixtureを消費する。
+- Fresh scaffoldとの実生成比較はEpic-level統合が消費する。358内では358-owned manifest、render後link、Report / Artifact / Planning Levelの契約fixtureを検証する。
 - Planning Level example contractは`LEVEL-EX-POS-01`〜`03`と`LEVEL-EX-NEG-01`〜`03`の存在、結論token、Runtime非依存を検証する。
 - `tests/unit/infra/test_init_update.py`には358-local意味契約を集中させず、360のconsumer migrationだけを残す。
 
@@ -372,6 +373,7 @@ IC-1はEpic orchestratorが行う文書上の統合確認であり、Runtime gat
 - `RQ-358-001`〜`RQ-358-008`の責務と検証先が一意である。
 - 357 / 359 / 360のownershipを侵食する変更がない。
 - Current / Historical、Fresh / Existing、provider / dogfood / installedの比較軸が混同されていない。
+- 358-owned contract inputでIssue単独の完了を判定でき、Epic-level IC-1は後続統合確認として明示されている。
 - Requirementと本Designに対するfresh spec reviewがpassしてからPlanへ進む。
 
 ## 18. 根拠
