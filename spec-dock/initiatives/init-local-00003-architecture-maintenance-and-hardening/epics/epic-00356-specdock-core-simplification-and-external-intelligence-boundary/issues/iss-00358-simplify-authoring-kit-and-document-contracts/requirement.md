@@ -5,7 +5,7 @@ ID: "iss-00358"
 関連GitHub: ["#358"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-08-11"
 親: ["epic-00356", "init-local-00003"]
 承認: "Product Owner review completed 2026-08-10"
 ---
@@ -53,9 +53,9 @@ ID: "iss-00358"
 | `RQ-358-005` | `E-RQ-005`, `E-RQ-008` | Current六種とHistorical evidenceの意味を説明する |
 | `RQ-358-006` | `E-RQ-009` | durable decision、Artifact、Reportのauthority境界を明示する |
 | `RQ-358-007` | `E-RQ-001`, `E-RQ-008` | CurrentとHistoricalの導線を分離し、旧workflowを再推奨しない |
-| `RQ-358-008` | Epic互換性 / parity / vertical slice契約 | Existing文書の保持、provider / dogfood parity、357 / 359 / 360へのhandoffを提供する |
+| `RQ-358-008` | Epic互換性 / parity / vertical slice契約 | Existing文書の保持、provider / dogfood parity、Epic-level統合入力、359 / 360へのhandoffを提供する |
 
-本IssueはRuntime parser / lifecycle / filename allocation、skill実装、installer prune、最終deliveryを所有しない。
+本IssueはRuntime parser / lifecycle / filename allocation、skill実装、installer prune、Epic全体のreleaseを所有しない。Issue 358自身のcommit、push、main向けPR作成は本Issueのdeliveryに含める。
 
 ## 5. 対象範囲
 
@@ -73,7 +73,7 @@ ID: "iss-00358"
 - template catalog、heading、link、vocabulary、parity test
 - Existing consumer preservation fixture
 - removed / historical-only asset inventory
-- Issue 357とのIC-1、Issue 359 / 360へのhandoff
+- Epic-level IC-1契約入力、Issue 359 / 360へのhandoff
 
 ### 5.2 対象外
 
@@ -86,7 +86,7 @@ ID: "iss-00358"
 - Runtime quality gateまたはPlanning Level parser
 - 新しいArtifact type
 - level別canonical Plan file
-- 最終release / PR / change-set handoff
+- Epic全体のrelease、merge、legacy prune
 
 ## 6. 文書責務要件
 
@@ -97,7 +97,7 @@ Fresh Initiative / Epic / Issueには、それぞれ一つの`requirement.md`、
 templateに含めるもの:
 
 - 完成文書に残る見出し
-- 各sectionの目的を示す短いprompt
+- R/D/Pでは各sectionの目的を示す短いprompt。Reportは`AC-358-006`のempty-valid契約を優先し、三つの必須sectionを空本文で開始する
 - 最小限のplaceholder
 - optional sectionの明示
 - 対応するstable Guideへのlink
@@ -247,7 +247,7 @@ Currentページは旧workflowを推奨してはならない。Historicalペー�
   - `.assurance.json`
   - Profileから作成されたnode-local文書
 - obsolete provider assetの最終pruneはIssue 360へ渡すinventoryとして確定する。
-- Issue 357へscope file名、Current六種、Report path / empty-valid / non-gating、one-plan contractを渡す。
+- Epic-level統合入力としてscope file名、Current六種、Report path / empty-valid / non-gating、one-plan contractを記録する。Issue 357との実生成比較は後続Epic統合で行い、本Issueの完了条件にしない。
 - Issue 359へAuthoring Guide pathとsemantic summaryを渡す。
 - Issue 360へfresh asset inventory、obsolete asset inventory、preservation list、parity expectationを渡す。
 
@@ -263,7 +263,7 @@ Currentページは旧workflowを推奨してはならない。Historicalペー�
 | `EC-358-006` | providerとdogfoodのmanaged assetがdriftする | parity testが失敗する |
 | `EC-358-007` | Current navigation linkが切れる | link testが失敗する |
 | `EC-358-008` | Existing consumer fixtureの文書hashが変わる | preservation testが失敗する |
-| `EC-358-009` | 357のscaffolder contractとpath / catalogが不一致 | IC-1をfailとして後続handoffを止める |
+| `EC-358-009` | 後続Epic統合でmechanismとAuthoring contractが不一致 | mismatchを358-owned contentと他Issue-owned mechanismへ明示的にroutingし、本Issueの完了を遡及して取り消さない |
 
 ## 8. 受け入れ条件
 
@@ -280,7 +280,7 @@ Currentページは旧workflowを推奨してはならない。Historicalペー�
 | `AC-358-009` | Current template / GuideにGrade、Assurance、promotion、EAL、delegated authoring、provider固有の必須語がない |
 | `AC-358-010` | provider / dogfood catalog、link、expected bytesまたはnormalized contentのparity testが通る |
 | `AC-358-011` | Existing consumer preservation fixtureにcanonical R/D/P、thin / heavy Report、Current六種、Historical Artifact、Discussion、ADR、`.assurance.json`、Profile由来node-local文書を含め、358-owned asset適用の前後で全byte hashが変わらない |
-| `AC-358-012` | IC-1で357のfresh scaffold outputと358のfile / catalog / Report / one-plan contractが一致する |
+| `AC-358-012` | 358-owned file / catalog / Report / one-plan / Planning Level contractと、後続Epic統合が消費できるIC-1入力（manifest、期待値、mismatch routing）が記録されている。357のfresh scaffold outputとの実生成比較は本Issueの完了条件ではない |
 | `AC-358-013` | 359向けGuide manifestと360向けretain / replace / historical-only / prune inventoryがreportへ記録される |
 | `AC-358-014` | failure impact / recovery difficultyの組合せを用いたlevel選択例と、Priority / Severity / 工数 / dependency readinessだけではlevelを決めないnegative exampleがBase GuideまたはCompletion Guide contract testで確認される |
 

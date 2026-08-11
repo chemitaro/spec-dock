@@ -3,188 +3,30 @@
 ID: "<EPIC_ID>"
 タイトル: "<EPIC_TITLE>"
 関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
+状態: "draft"
 最終更新: "YYYY-MM-DD"
 依存: ["requirement.md", "design.md"]
 親: ["<INIT_ID>"]
 ---
 
-# <EPIC_ID> <EPIC_TITLE> — 計画（Issue と実施順序）
+# <EPIC_ID> <EPIC_TITLE> — 計画
 
-## 作成方針
-- この文書は Epic から後続 Issue へ渡す handoff package、実施順序、依存、統合ゲートを固定する。
-- 日本語ファーストで作成し、ファイルパス、コマンド、コード識別子、SpecDock 固定語は原文のまま扱ってよい。
-- Scope ownership と authority flow は `docs/authoring/scope-layering.md` を参照し、この template には責務表を複製しない。
-- Issue-level の実装・検証の詳細手順や private implementation design は必須前提にせず、必要な場合だけ各 Issue の grade とスコープに応じて扱う。
+詳細: [Scope Layering Guide](../../../../docs/authoring/scope-layering.md)
 
-## この計画で閉じる E-RQ / E-AC
-- E-RQ:
-  - ...
-- E-AC:
-  - ...
+## 目標
+Epic として達成する一貫した成果を記述する。
 
-## 課題分割方針（Issue slicing policy）
-- 分割原則:
-  - ...
-- 例外:
-  - ...
-- Epic classification:
-  - multi-issue implementation | single-issue | docs-only | no-op
-- final quality Issue policy:
-  - required: yes | no
-  - final quality issue id:
-    - ...
-  - skip rationale:
-    - ...
-  - skip eligibility:
-    - single-Issue | docs-only | no-op | accepted-exception
-  - completion evidence:
-    - ...
-  - dependency-on-all-implementation-Issues:
-    - final quality Issue depends on:
-      - iss-...
-      - iss-...
-    - command evidence:
-      - `./spec-dock/scripts/spec-dock deps add --from <final-quality-issue-id> --to <implementation-issue-id>`
-  - intermediate deferred PR delivery policy:
-    - intermediate Issues do not create per-Issue PRs when reviewed Epic plan intentionally relays PR delivery to the final quality Issue.
-    - each intermediate Issue report records deferred PR delivery gate evidence: final quality Issue id, dependency edge, no-per-Issue-PR rationale, no merge-prepared claim before final PR delivery, and remaining final PR Delivery / Merge Preparation Gate.
-    - final quality Issue cannot use deferred PR delivery gate; it owns the Epic-level quality gate, repair loop, manual test summary, push, and mergeable PR preparation.
+## 順序・依存
+Issue 分割、統合する順序、cross-Issue の依存を記述する。
 
-## 課題引き渡しパッケージ（Issue handoff package）
-- parent trace:
-  - requirement:
-    - ...
-  - design:
-    - ...
-  - plan:
-    - ...
-- allowed local delta:
-  - ...
-- forbidden parent boundary changes:
-  - ...
-- acceptance seed:
-  - ...
-- constraints:
-  - ...
-- expected evidence:
-  - ...
-- Issue-local draft path index:
-  - iss-xxxx:
-    - draft-requirement:
-      - ...
-    - `draft-design`:
-      - ...
-    - `draft-plan`:
-      - ...
-  - iss-yyyy:
-    - draft-requirement:
-      - ...
-    - `draft-design`:
-      - ...
-    - `draft-plan`:
-      - ...
-- draft lifecycle:
-  - handoff-ready:
-    - ...
-  - execution-ready:
-    - Issue planning が current repository state、prior completed Issues、Evidence Adoption Ledger、canonical rewrite、fresh `spec-reviewer` pass を揃えた後だけ成立する。
-  - drift repair:
-    - ...
-- skip / fallback evidence:
-  - ...
-- pre-start canonical Issue boundary:
-  - canonical Issue `design.md` / `plan.md` は pre-start で本文化せず、Issue planning で正式化する。
-- suggested grade:
-  - ...
-- dependencies:
-  - ...
-- escalation triggers:
-  - ...
-- relevant artifacts / ADRs:
-  - ...
+## 実装step
+Issue ごとの価値と引き渡し順を記述する。
 
-## 課題一覧（Issue list / 順序 / tranche 付き）
-- iss-xxxx-...:
-  - 目的:
-    - ...
-  - 成果物:
-    - ...
-  - tranche:
-    - ...
-  - closes:
-    - ...
-  - 依存:
-    - ...
-- iss-xxxx-...:
-  - ...
+## 検証
+横断的な検証と統合確認を記述する。
 
-## 課題リレー依存（Issue relay dependency）
-- dependency graph:
-  - ...
-- parallelizable lanes:
-  - ...
-- blocker / gate:
-  - ...
+## rollback
+問題時に戻す範囲と判断を記述する。
 
-## 統合チェックポイント
-- G1 分解レビュー:
-  - ...
-- G2 統合準備確認:
-  - ...
-- G3 ロールアウト / docs 影響:
-  - ...
-- G9 最終 Epic spec review:
-  - ...
-
-## 品質ゲート
-- test / observability / migration / docs:
-  - ...
-
-## 最終品質ゲート（final quality gate）
-- full verification:
-  - ...
-- manual test summary:
-  - ...
-- reviewer repair loop:
-  - ...
-- PR readiness:
-  - ...
-
-## ロールアウト / ドキュメント影響
-- ロールアウト順序:
-  - ...
-- 契約 / docs 更新:
-  - ...
-
-## 課題準備完了条件（Issue readiness criteria）
-- Issue に要求する最低条件:
-  - ...
-
-## 最終完了条件
-- E-AC 完了:
-  - ...
-- 統合 / ロールアウト完了:
-  - ...
-- docs 影響解決:
-  - ...
-
-## 依存 / ブロッカー
-- D-001:
-  - ...
-- D-002:
-  - ...
-
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 選択肢:
-    - A:
-      - ...
-    - B:
-      - ...
-  - 推奨案:
-    - ...
-  - 影響範囲:
-    - ...
+## exit / handoff
+Issue への引き渡しと Epic 完了条件を記述する。
