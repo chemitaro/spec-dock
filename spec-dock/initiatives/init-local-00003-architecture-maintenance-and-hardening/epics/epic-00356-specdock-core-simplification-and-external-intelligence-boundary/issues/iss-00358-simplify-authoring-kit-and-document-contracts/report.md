@@ -21,9 +21,9 @@ ID: "iss-00358"
 - E00 / M0とS01〜S08を完了した。三scopeのthin R/D/P/Report、Authoring foundation、one-plan、四Completion Guide、Current六Artifact、Current / Historical navigation、33-path parity、21-file Existing preservationを実装した。M1 `1074a4185135e3d1f915a3e3033b0632d82ffca2`、M2 `156afd1984c33b5712e98421c08f28b7117b09a2`、M3 `da3b0c6ba2b6946dad343948eb413ee62d612e3b`をpushし、各milestoneでpost-commit clean / upstream同一SHAを確認した。
 - 2026-08-11、Product Ownerの明示判断により、Issue 357は358の直接依存ではないと確定した。S09は358-ownedのEpic-level IC-1 contract inputを固定する独立stepへ再定義し、357のRuntime / Fresh scaffold / commit / reviewをentry・closure条件から外した。実生成との比較は後続Epic統合確認へ残す。
 - S09以降は358-owned contract input、359 / 360 handoff、S90 docs impact、S99 final quality gate、Issue 358自身のcommit / push / main向けmergeable PR作成を実行する。merge、`issue finish`、Epic完了は実行しない。
-- S99ではAuthoring asset 304件、Artifact 54件、asset + artifact combined 358件、thin Issue生成full-regression 45 passed / 5 skipped、lint、SpecDock validate、差分検査を確認した。通常suiteの2失敗はHEAD / origin/main双方にないIssue 334 fixture不足であり、358差分ではない。
+- S99ではAuthoring asset 304件、Artifact 54件、asset + artifact combined 358件、thin Issue生成full-regression 45 passed / 5 skipped、lint、SpecDock validate、差分検査を確認した。PR前のローカル再検証では通常suiteが`1785 passed / 2252 skipped`となった。Issue 334の放棄済み`init-00322`資料を参照していた2テストは、旧資料をCurrentへ復元せず退役境界（現行ツリーに存在しないこと）を検証するテストへ置換した。
 - S09/S10/S90/S99のfresh code・spec・QA gateはすべてpassし、357 Runtime非変更、Epic-level IC-1後続統合境界、S10 handoffの実消費条件をreportへ同期した。Issue 358の最終commit、push、main向けmergeable PR作成まで完了した。
-- PR #361の初回Provider CIでS09のactive symlink依存5件を検出し、tracked canonical pathへ修正した。修正後CIはIssue 334のfixture欠落2件のみで、PR metadataは`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（既存ベースラインCI失敗）となっている。
+- PR #361の初回Provider CIでS09のactive symlink依存5件を検出し、tracked canonical pathへ修正した。修正後CIはIssue 334のfixture欠落2件のみで、PR metadataは`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（既存ベースラインCI失敗）となっていた。ローカル再検証でこの2件の残存テストを整理し、358のRuntime / 357のRuntimeを変更せずに通常Provider gateをgreenへ戻した。
 - E00の初回reviewで、read-only E00とS08で初めて作るpreservation fixtureのhash要求、S10より前のDesign外owner確定要求が両立しないことを検出した。Planを最小修正し、E00をcandidate inventory / no-delete routing、S08をfull fixture / hash、S10をfinal ownerへ分離した。fresh `spec-reviewer`はP0/P1なしでpassした。
 - materialな製品判断の追加はない。Profile / Assuranceを使わず、one Plan + docs-only Planning Level、thin Report、Current六種というProduct Owner承認をそのまま保持する。
 
@@ -84,8 +84,8 @@ ID: "iss-00358"
   - Type: clean-checkout test portability / baseline separation。
   - Trigger: PR #361のProvider CIで、S09 canonical Design binding testがローカルactive symlinkを参照して5件失敗した。
   - Observed facts: `spec-dock/active/issue/design.md`はローカルdogfoodingのactive contextには存在するが、GitHubのclean checkoutではmaterializeされない。一方、358のcanonical Issue `design.md`はtracked pathとして存在する。別の2件はIssue 334のZIP / Guide fixtureがHEADとorigin/main双方に存在せず、358差分外の既存failureだった。
-  - Disposition: S09 testの参照先をtracked canonical Issue pathへ変更し、active symlinkへの暗黙依存を除去した。Issue 334 fixtureの新規作成・他Issue testの変更は行わない。
-  - Evidence: Provider CI run `31473318523`の7 failures、修正後run `31473764291`の2 Issue 334 fixture failures、修正後のS09 23 passed / asset 304 passed / lint / diff check pass、`git cat-file -e HEAD:<Issue 334 path>` status 128。
+  - Disposition: S09 testの参照先をtracked canonical Issue pathへ変更し、active symlinkへの暗黙依存を除去した。Issue 334の`init-00322`資料は別コミットで放棄済みのため復元せず、その資料だけをCurrentとして要求する2テストを退役境界のnegative contractへ置換した。Issue 358のRuntime / Issue 357のRuntimeは変更しない。
+  - Evidence: Provider CI run `31473318523`の7 failures、修正後run `31473764291`の2 Issue 334 fixture failures、`git cat-file -e HEAD:<Issue 334 path>` status 128、修正後の`uv run pytest -q`（`1785 passed / 2252 skipped`）、S09 23 passed / asset 304 passed / lint / diff check pass。
   - Affected closure: `tc-s09-001`、S99 CI portability、PR #361。
   - Risk if wrong: clean checkoutとlocal dogfoodingでテスト対象のcanonical sourceが分岐する。
   - Needs orchestrator decision: no。tracked pathへの限定修正で、357 Runtime / Issue 334 artifactを変更しない。
@@ -452,7 +452,7 @@ Audit result: 6 categories、代表pathの重複なし、E00 pending rowの欠�
 
 ### Milestone / Commit Candidate Gate
 
-M2 pre-commitでは`make lint`がpassし、S05/S06 combinedは322 passed、通常fast suiteはIssue 334の既存2 testだけを除外して1747 passed / 2252 skipped / 2 deselectedだった。除外した2 testを含む`uv run pytest`は、`20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip`と`20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md`が現HEADにも存在しないため2 failedとなる。両pathは`git cat-file -e HEAD:<path>` status 128で、Issue 358差分に削除はない。このbaseline fixture欠落はM2の変更起因ではないため、失敗を残余repository test riskとして記録し、Issue 358のbounded commitは進める。
+M2 pre-commitでは`make lint`がpassし、S05/S06 combinedは322 passed、通常fast suiteはIssue 334の既存2 testだけを除外して1747 passed / 2252 skipped / 2 deselectedだった。除外した2 testを含む`uv run pytest`は、`20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip`と`20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md`が現HEADにも存在しないため2 failedとなった。両pathは`git cat-file -e HEAD:<path>` status 128で、Issue 358差分に削除はない。PR前の再検証では、放棄済み資料をCurrentへ復元せず資料依存の2テストを退役境界negative contractへ置換し、`uv run pytest -q`を`1785 passed / 2252 skipped`へ収束させた。`uv run pytest --run-full-regression tests/cli_runtime/test_assurance_compose.py -q`は旧Assurance compose契約（薄いIssue template導入前のplaceholder）を要求する9件が失敗したため、357-owned Runtimeを変更せず、S99の通常Provider gateとは別の後続統合リスクとして記録する。
 
 | milestone / step | reviewer verdict | commit candidate / scope | closure state | commit evidence | post-commit clean check |
 |---|---|---|---|---|---|
@@ -461,7 +461,7 @@ M2 pre-commitでは`make lint`がpassし、S05/S06 combinedは322 passed、通�
 | M2 / S05〜S06 | fresh code / spec / report closure review pass。full-regression marker、mandatory detector、navigation link detector、typing P1を修正済み | `docs(authoring): ArtifactとCurrent導線を整理` / Current六Artifact + Artifact Guide + Current / Historical navigation + asset tests | passed | `156afd1984c33b5712e98421c08f28b7117b09a2` | commit後clean、GitHub upstream同一SHAを確認済み |
 | M3 / S07〜S08 | fresh S07 code review、S08 QA / code review pass | `test(authoring): parityと既存文書保持を固定` / 33-path parity + 21-file preservation fixture / test + report evidence | passed | `da3b0c6ba2b6946dad343948eb413ee62d612e3b` | commit後clean、GitHub upstream同一SHAを確認済み |
 | M4 / S09〜S90 | S09 plan/code gate、S10 handoff、S90 docs audit pass | `docs(authoring): Epic統合入力と後続handoffを確定` / S09 input + S10 handoff + S90 no-op audit | passed | `021ba0175098d71dd2be20772c635c4f5719fe40`、CI portability補正 `5590db352bc0c322c05b0e9ce5dcd5422989b91a` | commit / push / PR #361作成済み |
-| M99 / S99 | focused / lint / validate pass; targeted `test_new` full-regression 45 passed / 5 skipped; ordinary suiteは1783 passed / 2 pre-existing Issue 334 fixture failures / 2252 skipped | `docs(iss-00358): 最終実装証跡を確定` / final report ledger | passed | `021ba0175098d71dd2be20772c635c4f5719fe40`、CI portability補正 `5590db352bc0c322c05b0e9ce5dcd5422989b91a` | commit / push / PR #361作成済み。PR metadataは`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE` |
+| M99 / S99 | focused / lint / validate pass; targeted `test_new` full-regression 45 passed / 5 skipped; ordinary suiteは`1785 passed / 2252 skipped`; 旧Assurance compose full-regressionは9 failures（357-owned legacy route） | `docs(iss-00358): 最終実装証跡を確定` / final report ledger | passed（通常Provider gate） / legacy full-regressionは後続統合待ち | `021ba0175098d71dd2be20772c635c4f5719fe40`、CI portability補正 `5590db352bc0c322c05b0e9ce5dcd5422989b91a` | commit / push / PR #361作成済み。PR metadataは`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE` |
 
 ## 残余リスクと停止条件
 
