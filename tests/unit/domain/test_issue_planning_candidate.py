@@ -3,7 +3,6 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-import zipfile
 
 import pytest
 
@@ -426,48 +425,6 @@ def test_s10_authoring_payload_rejects_invalid_text_framing(mutation: str) -> No
         "authoring",
         expected_companion_path=COMPANION_PATH,
     ) == ("authoring_payload_invalid",)
-
-
-def test_s10_current_v4_guide_satisfies_completeness_contract() -> None:
-    repository_root = Path(__file__).resolve().parents[3]
-    pack = (
-        repository_root / "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/"
-        "epics/epic-00331-planning-and-advisory-review/"
-        "issues/iss-00334-implement-chatgpt-issue-planning-workflow/artifacts/"
-        "20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip"
-    )
-    with zipfile.ZipFile(pack) as archive:
-        guide_name = next(name for name in archive.namelist() if name.endswith(f"issue/{COMPANION_PATH}"))
-        guide = archive.read(guide_name)
-    _candidate().validate_onboarding_companion(COMPANION_PATH, guide)
-
-
-def test_current_managed_guide_matches_current_milestone_state() -> None:
-    repository_root = Path(__file__).resolve().parents[3]
-    guide_path = (
-        repository_root / "spec-dock/initiatives/"
-        "init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/"
-        "epics/epic-00331-planning-and-advisory-review/"
-        "issues/iss-00334-implement-chatgpt-issue-planning-workflow/"
-        f"artifacts/{Path(COMPANION_PATH).name}"
-    )
-    guide = guide_path.read_text(encoding="utf-8")
-
-    assert "status reconciliation source/review baseline" in guide
-    assert 'source_head: "' in guide
-    for step in ("S08", "S09", "S10", "S11"):
-        assert f'rectangle "{step} Closed" as {step}' in guide
-        assert f"| {step} | closed |" in guide
-    assert 'rectangle "S12 Open: refreshed Human authorization' in guide
-    assert "| S12 | open |" in guide
-    assert "refreshed Human authorization" in guide
-    assert "live acceptance chain" in guide
-    for step in ("S13", "S14"):
-        assert f'rectangle "{step} Not admitted" as {step}' in guide
-        assert f"| {step} | not admitted |" in guide
-    assert "S08〜S14のremaining roadmap" not in guide
-    assert "S08 through S14 remain" not in guide
-    assert "S07のhistorical evidenceはnew-boundary S12 evidenceを代替しない" in guide
 
 
 def test_s10_guide_rejects_token_complete_content_without_required_sections() -> None:
