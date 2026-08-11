@@ -22,7 +22,7 @@ ID: "iss-00358"
 - 2026-08-11、Product Ownerの明示判断により、Issue 357は358の直接依存ではないと確定した。S09は358-ownedのEpic-level IC-1 contract inputを固定する独立stepへ再定義し、357のRuntime / Fresh scaffold / commit / reviewをentry・closure条件から外した。実生成との比較は後続Epic統合確認へ残す。
 - S09以降は358-owned contract input、359 / 360 handoff、S90 docs impact、S99 final quality gate、Issue 358自身のcommit / push / main向けmergeable PR作成を実行する。merge、`issue finish`、Epic完了は実行しない。
 - S99ではAuthoring asset 304件、Artifact 54件、asset + artifact combined 358件、thin Issue生成full-regression 45 passed / 5 skipped、lint、SpecDock validate、差分検査を確認した。PR前のローカル再検証では通常suiteが`1785 passed / 2252 skipped`となった。Issue 334の放棄済み`init-00322`資料を参照していた2テストは、旧資料をCurrentへ復元せず退役境界（現行ツリーに存在しないこと）を検証するテストへ置換した。
-- 最新PR reviewで、完成Planの実行可能判定に使われるRuntime markerとIssue templateの`## 実装step`が不一致であるP1を検出した。Runtimeは変更せず、provider / dogfoodの三scope Plan template、契約テスト、正本Designを`## 実装ステップ`へ同期し、同じ通常suite・lint・validateを再実行してGreenを確認した。
+- 最新PR reviewで、完成Planの実行可能判定に使われる旧Runtime markerとIssue templateの`## 実装step`が不一致であるP1を検出した。この判定は358が所有しない旧Issue 357 Runtime／放棄済みexecution evaluatorの契約であるため、Runtimeやcanonical thin templateを変更して再導入しない。358の正本Design §5.3、provider / dogfood template、契約テストは`実装step`を維持し、旧Runtimeとの実生成比較はEpic-level後続統合へ送る。
 - S09/S10/S90/S99のfresh code・spec・QA gateはすべてpassし、357 Runtime非変更、Epic-level IC-1後続統合境界、S10 handoffの実消費条件をreportへ同期した。Issue 358の最終commit、push、main向けmergeable PR作成まで完了した。
 - PR #361の初回Provider CIでS09のactive symlink依存5件を検出し、tracked canonical pathへ修正した。修正後CIはIssue 334のfixture欠落2件のみで、PR metadataは`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（既存ベースラインCI失敗）となっていた。ローカル再検証でこの2件の残存テストを整理し、358のRuntime / 357のRuntimeを変更せずに通常Provider gateをgreenへ戻した。
 - E00の初回reviewで、read-only E00とS08で初めて作るpreservation fixtureのhash要求、S10より前のDesign外owner確定要求が両立しないことを検出した。Planを最小修正し、E00をcandidate inventory / no-delete routing、S08をfull fixture / hash、S10をfinal ownerへ分離した。fresh `spec-reviewer`はP0/P1なしでpassした。
@@ -91,15 +91,15 @@ ID: "iss-00358"
   - Risk if wrong: clean checkoutとlocal dogfoodingでテスト対象のcanonical sourceが分岐する。
   - Needs orchestrator decision: no。tracked pathへの限定修正で、357 Runtime / Issue 334 artifactを変更しない。
 - `DEC-358-006`
-  - Status: resolved / promoted_to_test_contract。
-  - Type: thin-template / readiness-classifier alignment。
-  - Trigger: PR #361の最新Codex reviewで、完成したIssue Planが`## 実装step`を含む場合にRuntimeの`_classify_plan_text()`が実行可能markerを見つけられず、`plan-not-executable`へ倒れるP1を検出した。
-  - Observed facts: Runtime classifierは`実装ステップ`を認識するが、provider / dogfoodのInitiative / Epic / Issue Plan templateは`実装step`を出力していた。
-  - Disposition: RuntimeやIssue 357の実装は変更せず、三scopeのprovider / dogfood template、template契約テスト、CLI生成テスト、canonical Designの見出しを`実装ステップ`へ同期した。
-  - Evidence: focused `304 passed / 50 skipped`、ordinary `1785 passed / 2252 skipped`、`make lint` pass、`spec-dock validate` pass、`git diff --check` pass。
+  - Status: resolved / rejected_out_of_scope。
+  - Type: retired-workflow / thin-template boundary。
+  - Trigger: PR #361の最新Codex reviewで、旧Runtimeのreadiness classifierとAssurance composeを新しいthin templateへ再適用するP1が検出された。
+  - Observed facts: Issue 358の正本Requirement / Design / PlanはProfile / Assurance非依存のthin R/D/P、旧workflow非規範、Runtime parser / lifecycle非所有を固定している。現在のprovider / dogfood templateはDesign §5.3の`実装step`とdraft frontmatterを出力し、旧Runtimeの`実装ステップ` markerや`artifact_state: awaiting-assurance-compose`を出力しない。
+  - Disposition: 旧Runtimeのclassifier / composer、`docs/workflow_issue.md`の旧execution contract、Issue 357 Runtimeを358へ取り込まない。旧workflowとの実生成比較はEpic-level後続統合で扱い、358のCurrent templateを旧authorityへ戻さない。
+  - Evidence: `uv run pytest -q` `1785 passed / 2252 skipped`、`make lint` pass、`spec-dock validate` pass、`git diff --check` pass。旧Assurance compose full-regressionの9 failuresは357-owned legacy routeとして別記録済み。
   - Affected closure: `tc-s99-001`、S99 final quality gate、PR #361。
-  - Risk if wrong: 新規Planが内容を埋めても実行可能判定されず、Issue handoffが不必要に停止する。
-  - Needs orchestrator decision: no。既存Runtime markerとの整合に必要な9行のtemplate / test / spec同期であり、Runtimeの責務境界は維持した。
+  - Risk if wrong: 放棄済みProfile / Assurance workflowが新規Authoring Kitへ再導入され、358と357の責務境界が崩れる。
+  - Needs orchestrator decision: no。Product Ownerの旧workflow非規範・357 Runtime非変更指示をcanonical scopeへ適用した。
 - 既存のProduct Owner判断、Option A、thin Report、Current六種は変更しない。
 
 ## Objective Alignment Ledger
