@@ -31,6 +31,10 @@ ID: "iss-00357"
 - S09で`validate_tree.py`からdelegated authority / Evidence Adoption Ledgerのcontent gateだけを除去し、thin / heavy Report、EAL、delegated metadata、Assurance、Planning Level、legacy active extra fields、draft / repair Artifactの9-token mutationをactive / deps / start / finish / validate / doctorで内容非依存にした。各mutationの独立baselineに対するprocess / durable state完全比較、read-only surfaceのHistorical raw-byte保持、4 content-read入口のcall-zero、required Report欠損negative controlを固定した。focused `35 passed / 1 skipped`、unit file-read `10 passed`、validate / deps use-case `34 passed`、lint / parity / diff-check、fresh code review 2 / QA review 3をpassしたため、`CL-357-009`をcloseした。
 - M2 commit `daa222ee62e3690e97bd455362d211ba11fa20a9`でS05〜S09を確定した。S10ではE00 exhaustive auditでtest / contract / 360 default sourceのinventory omissionを検出して`DEC-357-S10-008〜010`へ明示採用し、retained / 360 casesを保持したままprovider / dogfood各18 moduleと専用test 14fileを削除した。absence / retained import / generic port / 360 planning / sorted SHA-256 parityを固定し、focused 55、authoring manifest 17、Runtime manifest `132 / 132`、lint / diff-check、fresh code reviewをpass（confidence 0.99）したため、`CL-357-001/012`をcloseした。
 - M3 commit `89964de616e94ff5cf48182e30026298f93d2e18`でS10を確定した。S90ではprovider / dogfoodのRuntime reference 5種を現行helpへ合わせ、selection-only active、dependency-only start、thin finish、Current六種、Historical recognition、generic file importとremoved route migrationを明記した。10 docsのbyte parity、relative link broken 0、diff-checkはGreenである。H91では357側IC-1 inputとdownstream owner manifestを固定し、共同IC-1 passや後続Issue完了は主張しない。初回spec reviewのREADME / owner-destination / selector表記指摘を修正し、fresh re-review pass 0.98で`CL-357-011/013`をclosedとした。
+- M4 commit `c0f908374811e63721125a6548920e4170523010`でS90/H91のRuntime docsとhandoff evidenceを確定した。S99初回fresh spec/code/QA reviewは、M4/M99台帳のstale state、撤去済み`active set --force`を呼ぶ旧テスト、未ステージの同契約修正をP1として検出した。
+- S99 P1修正として、`tests/cli_runtime/test_validate.py`のURL / ID形式から`active set --force`を除去し、既存の`tests/unit/cli/test_cli_smoke.py`の同修正を保持した。局所Red→Greenはvalidate `1 passed`、CLI smoke `1 passed`である。
+- S99主要full-regressionは`188 passed, 35 skipped`、`make lint`、`validate`（nodes=221）、`doctor`（findings=0）、`git diff --check`がpassした。`tests/unit`と通常`uv run pytest`はIssue 334の欠落Artifactを参照する既存2テストのみが失敗し、Issue 357外のbaseline failureとして記録する。
+- S99のbounded fresh content reviewは、code-reviewerがP0/P1/P2なしでpassし、spec-reviewer / qa-reviewerも実装・仕様・テスト内容のP0/P1/P2を検出しなかった。両者が示した「最終レビュー結果とM99がpending」という手続き上の状態は、本節とReviewer Gateへ反映して解消した。S99はM99 commit前のcontent gateを通過し、残る作業はM99 commitとpost-commit clean evidenceだけである。
 - PR、merge、`issue finish`はまだ実行していない。正本のlocked expectationを変える必要が生じた場合は、該当stepを停止してR/D/P amendmentとfresh reviewへ戻る。
 
 ## 承認済み正本
@@ -56,6 +60,8 @@ ID: "iss-00357"
 | `DEC-357-S10-009` | resolved | dependent contract inventory omission | approved `domain.assurance`削除後のlintで`application/contracts.py`に未列挙のAssurance result familyが残り、削除済み`AssuranceContract`参照がundefinedになった | obsolete contractを`object`へ弱めて残す / assurance application contractの従属symbolとして削除 | adopted: `AssuranceOperation`、`AssuranceResultStatus`、`ComposeArtifactSelection`、`AssuranceTargetView`、`ComposeArtifactView`、`AssuranceResult`はmodule内自己参照以外のconsumerがなく、removed assurance wiringの従属contractとしてDelete rowへ追加する | repository-wide exact symbol逆引き、removed `application.assurance` / `domain.assurance`、ruff / mypy undefined-name | S10 correction後にlint、retained contract import、360 planning importを再確認する |
 | `DEC-357-S10-010` | resolved | 360 handoff deletion coherence | S10 final path scanで360-owned `authoring_pack/source_manifest.py::DEFAULT_SOURCE_PATHS`が削除済みprovider / dogfood `commands/authoring.py`を二項保持し、missing pathとして暗黙skipしていた | dangling default inputをH91 / 360へ先送り / 357削除に従属する二項だけ除去し既存360 fixtureをretained file pathへ更新 | adopted: 360 module / behavior / APIは保持し、357が削除した二pathだけをprovider / dogfood定数から除く。default manifest fixtureは保持中の既定fileを選ぶよう最小更新し、authoring-packの意味や範囲は変更しない | `DEFAULT_SOURCE_PATHS` exact path scan、`build_source_manifest` missing-path skip、`test_authoring_source_manifest_workbench.py`、E00 removed authoring module | focused 360 manifest / issue-planning import、provider-dogfood parity、H91 handoff inventoryでcoherenceを確認する |
 | `DEC-357-RECOVERY-001` | recorded | operational recovery | 2026-08-10 12:03:24 UTC、`GIT_INDEX_FILE`と`GIT_DIR`を上書きした`git commit -m "test"`が`[main a0774bb9] test`を作成し、直後のsymbolic-refが`refs/heads/main`を返した。後続の`commit-tree` / `update-ref`はIssue 357 branchへ別途反映された | 事故を実装変更として扱う / recovery-only Artifactと短いledgerで事実・復旧・停止条件を固定する | adopted: Artifact `20260811t055647z-disc-main-ref-accident-recovery-iss-00357.md`へ確定時系列、根本原因、影響、復旧、preflight / postflight、環境blocker停止を記録。誤更新はlocal mainだけで、`origin/main`とlive remote mainは一貫して`e16e97517ea3ab7287eaf6143fab2df943d71b2d`、backup refを保全し、Issue357の既存未コミットtest 1件を変更していない | 指定Codex session / rollout記録、current worktree read-only確認、main / remote / recovery refの実測 | commit skill / global guardrailの実装は別担当。Issue357ではstage / commit / pushを行わない |
+| `DEC-357-S03-011` | resolved | selector compatibility boundary | repo-qualified GitHub selectorにscoped metadataとunscoped legacy metadataが混在し、S02 / S03で解決規則を統一する必要があった | repo scope不一致を常に拒否する / exact scopedを優先し、一意なunscoped legacyだけを互換fallbackする | adopted: exact scoped候補を優先し、該当しない場合だけ一意なunscoped legacy候補へfallbackする。0件、複数件、foreign scoped-onlyは明示errorかつno-writeとし、network / Git portは参照しない。これは既存unscoped linkageを壊さず、foreign scoped nodeを誤選択しないためのS02/S03共通境界である | `tests/unit/application/test_set_active.py::test_repo_scoped_github_target_infers_single_unscoped_legacy_node_without_git`、`tests/unit/application/test_set_active.py::test_repo_scoped_github_target_reports_not_found_or_ambiguous_without_writing`、CLI repo-scope matrix、S03 `18 passed` / deps `43 passed`、provider / dogfood parity | S99でselector matrixとfail-closed / no-writeを再確認済み。追加amendmentなし |
+| `DEC-357-S99-001` | resolved | baseline failure disposition | S99の`tests/unit`と通常`uv run pytest`で、Issue 334の既存Artifact欠落を参照する同一2テストが失敗した | Issue 357で外部Artifactを補完する / `covered-existing + explicit out-of-scope`としてIssue 334 ownerへ追跡する | adopted as an explicit orchestrator-approved S99 exception: `tests/unit/domain/test_issue_planning_candidate.py::test_s10_current_v4_guide_satisfies_completeness_contract` と `::test_current_managed_guide_matches_current_milestone_state`はIssue 357差分・Runtime変更と無関係なbaseline failureであり、Issue 357では修正しない。これは2テストをpass扱いするのではなく、Plan S99の`covered-existing + delta`としてIssue-local gateから除外する明示的なcross-Issue dispositionである。Issue 334 ownerがGitHub Issue #334でArtifact復旧を追跡する | `uv run pytest tests/unit`: `1285 passed, 572 skipped, 2 failed`; `uv run pytest`: `1285 passed, 2185 skipped, 2 failed`; major S99 suiteは`188 passed, 35 skipped` | Issue 334 ownerが欠落Artifactを復旧後に両suiteを再実行する。S99は例外をopen Ledger Noteにせず、残余リスクとしてhandoffする |
 
 locked expectationの追加・変更はない。E00で見つかった通常CLI外の到達経路は、承認済みDesign §14 / H91のhandoff inventoryへ割り当てた。
 
@@ -149,6 +155,12 @@ locked expectationの追加・変更はない。E00で見つかった通常CLI�
 | execution S10 code review 1 | unreachable module deletion / parity | code-reviewer | fresh | pass | no | proceed to M3 / S90 | findingsなし、confidence 0.99。64-file delta、E00 / DEC inventory、retained consumer不在、generic safety、Storage Core / 360 import、`132 / 132` parity、scope外3 failuresを確認 |
 | execution S90 / H91 spec review 1 | Runtime docs / downstream handoff | spec-reviewer | fresh | failed | no | S99 blocked | P1: READMEが旧workflowをCurrent入口として推奨。P1: H91 owner / destination / evidenceが抽象的で単一actorでない。P2: `issue start` selector構文が併用可能に見える |
 | execution S90 / H91 spec review 2 | corrected Runtime docs / downstream handoff | spec-reviewer | fresh | pass | no | proceed to M4 / S99 | findingsなし、confidence 0.98。READMEをStorage Core参照へ限定し、三selectorを排他的usageへ分離。全H91 rowの単一owner、exact destination、直接evidence、IC-1未主張境界を確認 |
+| execution S99 initial spec review | final Issue quality gate | spec-reviewer | fresh | failed | no | correction required | P1: M4/M99台帳のstale state、S99未実施、未ステージtest。P2 provenance findingはRecovery taskの明示要件と衝突するため不採用 |
+| execution S99 initial code review | final Issue quality gate | code-reviewer | fresh | failed | no | correction required | Runtime実装のP0/P1なし。P1: M4台帳、S99未実施、契約修正test未commit |
+| execution S99 initial QA review | final Issue quality gate | qa-reviewer | fresh | failed | no | correction required | P1: stale `active set --force` test、S99 evidence欠落、dirty worktree。P2: Issue 334外部failureのowner / disposition欠落 |
+| execution S99 final content spec review | final Issue quality gate (pre-M99) | spec-reviewer | fresh | pass | no | proceed to M99 commit | 最新R/D/P/report、M4、DEC-357-S03-011、DEC-357-S99-001、tc-s99-001を照合。内容上のP0/P1/P2なし。M99 pendingはレビュー後の後段条件として扱った。confidence 0.99 |
+| execution S99 final content code review | final Issue quality gate (pre-M99) | code-reviewer | fresh | pass | no | proceed to M99 commit | selector exact / unique legacy fallback、fail-closed/no-write、active-set test correction、provider/dogfood parity、unplanned source diffを確認。findingsなし、confidence 0.95 |
+| execution S99 final content QA review | final Issue quality gate (pre-M99) | qa-reviewer | fresh | pass | no | proceed to M99 commit | Plan §7 command evidence、skip内訳、Issue 334明示例外、lint / validate / doctor / diff-checkを確認。内容上のP0/P1/P2なし。M99 pendingはレビュー後の後段条件として扱った。confidence 0.99 |
 
 ## Workflow-Scoped Authorization
 
@@ -181,7 +193,7 @@ Issue 358とは同時に進められる。ただしparser / registry / Runtime�
 
 ## 実装記録
 
-E00のread-only inventoryを開始した。source / test変更を伴うS01以降の実装は未着手である。
+E00開始時点のスナップショットとして、source / test変更を伴うS01以降の実装は未着手であった。現行状態は本節冒頭の結論とS99節を正本とする。
 
 ### E00 実行コンテキスト
 
@@ -320,7 +332,7 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 - 補助Green: `tests/cli_runtime/test_chatgpt_cli.py`は`13 passed`、`tests/cli_runtime/test_artifact_import_file.py`は`7 passed`、`make lint`はruff / format / mypy pass。
 - removed 6 routeとinvalid active targetは実行前後の`spec-dock/` file / symlink tree SHA-256 snapshotが一致し、no-writeを確認した。
 - provider / dogfoodの変更4ファイルはbyte一致し、`git diff --check`もpassした。
-- `No material implementation decisions beyond the approved plan.`
+- S02〜S03のrepo-qualified GitHub selectorは、DEC-357-S03-011でexact scoped候補を優先し、一意なunscoped legacy候補だけを互換fallbackする境界を明示採用した。0件 / 複数件とforeign scoped-onlyはfail-closedである。
 
 ### S02 Selection-only active
 
@@ -412,6 +424,7 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 | `tc-s10-001` | S10 | red-required | initial provider `application.assurance` absence failure、provider-only変更後のdogfood module残存 failure、sorted SHA-256 manifest non-zeroを順に確認 | removed 19 module / contracts / `UseCases` field absence、retained Storage Core / ChatGPT planning import、generic import port、360 source manifest、provider / dogfood Python manifest | pass: focused / wrapper / ChatGPT / generic / authoring manifest 55、authoring source manifest 17、lint、Runtime `132 / 132` parity、diff-check、fresh review pass 0.99 |
 | `tc-s90-001` | S90 | manual-required | README / github / reference_deps / reference_github / reference_namingに`active set --checkout`、provider-specific import、旧Current catalog、active-selection readiness結合が残存 | verified CLI helpと357-owned Runtime reference / migrationを照合し、relative Markdown linkとCurrent旧route語彙をscan | pass: provider / dogfood 5 pair byte parity、broken relative link 0、変更docsの旧routeはmigration説明2件だけ、diff-check、fresh spec re-review pass 0.98 |
 | `tc-h91-001` | H91 | manual-required | E00 baseline inventoryをS10後の実在`132 / 132`とdownstream destinationへ再割当し、357側IC-1 inputの欠落 / 重複 / unowned rowをinspect | retained CLI、removed graph、shared safety、Historical / Fresh、migration / data preservation、357 IC-1 inputをowner / destination / evidenceへ割当 | pass: 未割当row 0、全row単一owner / exact destination / direct evidence。共同IC-1 resultはEpic ownerとして未実施・未主張。fresh spec re-review pass 0.98 |
+| `tc-s99-001` | S99 | red-required + covered-existing | 初回fresh三者reviewでS99未実施、stale active-set test、dirty worktreeをP1検出。修正後にPlan §7のtargeted / ordinary、主要Issue-local regression、lint、validate、doctor、diff-checkを再実行し、DEC-357-S03-011 / DEC-357-S99-001をledgerへ確定 | §7 Verification sequence、closure audit、fresh三者再レビュー、Issue 334外部failureの明示的orchestrator-approved baseline exception | Plan §7の通常laneはstorage core `4 skipped`、active/lifecycle `75 skipped`、new/import `50 skipped`、validate/doctor `94 skipped`（full-regression policy skip）。追加の明示的Issue-local command `uv run pytest --run-full-regression -rs tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_active.py tests/cli_runtime/test_issue_lifecycle.py tests/cli_runtime/test_new.py tests/cli_runtime/test_artifact_import_file.py tests/cli_runtime/test_validate.py tests/cli_runtime/test_doctor.py` は`188 passed, 35 skipped`（S05 covered 22、S06 replacement 5、S04 covered 6、S01 removed 1、macOS EILSEQ capability 1）。unit / ordinaryの同一Issue 334 2 failureはDEC-357-S99-001で明示処分済み。fresh三者再レビューとM99 commit待ち |
 
 ### Delegated Worker Evidence
 
@@ -476,7 +489,7 @@ E00のread-only inventoryを開始した。source / test変更を伴うS01以降
 
 | step | target | planned verification | current state |
 |---|---|---|---|
-| S90 | 357-owned Runtime reference / migration docs | help照合、relative-link scan、fresh spec review | 10 docs changed、help / parity / links / vocabulary Green、fresh review pending |
+| S90 | 357-owned Runtime reference / migration docs | help照合、relative-link scan、fresh spec review | 10 docs changed、help / parity / links / vocabulary Green、fresh spec re-review pass 0.98、M4 commit `c0f90837` |
 
 ### H91 Downstream Handoff Manifest
 
@@ -519,6 +532,33 @@ Destination IDsは次のexact canonical path / evidence sinkを示す。
 
 357側IC-1 inputはcompleteである。358側inputとの共同fixture実行と`DST-IC1`への記録はEpic main orchestratorが所有し、本Issueでは未実施・未主張とする。
 
+## S99 Final Issue quality gate
+
+### Initial review and correction
+
+- fresh `spec-reviewer`、`code-reviewer`、`qa-reviewer`は全員、S99未実施、M4/M99台帳のstale state、撤去済み`active set --force`を呼ぶtest、未ステージtestをP1としてfail判定した。
+- `tests/cli_runtime/test_validate.py`のURL / ID形式から撤去済み`active set --force`を除去した。`tests/unit/cli/test_cli_smoke.py`の既存同修正も意図された契約修正として保持した。
+- Recovery Artifactの`derived_from`にあるsession ID / rollout filenameは、事故復旧時にユーザーが明示した識別要件のため保持し、P2指摘は不採用とした。
+
+### Verification evidence
+
+| command | observed result |
+|---|---|
+| `uv run pytest --run-full-regression tests/cli_runtime/test_validate.py -k sync_github_keeps_already_normalized_current_repo_linkage_no_origin_continuity` | `1 passed, 83 deselected` |
+| `uv run pytest --run-full-regression tests/unit/cli/test_cli_smoke.py -k test_active_set_by_id_succeeds_through_runtime_subprocess` | `1 passed, 1 deselected` |
+| `uv run pytest --run-full-regression -rs tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_active.py tests/cli_runtime/test_issue_lifecycle.py tests/cli_runtime/test_new.py tests/cli_runtime/test_artifact_import_file.py tests/cli_runtime/test_validate.py tests/cli_runtime/test_doctor.py` | `188 passed, 35 skipped` / 223 collected。skip内訳はS05 covered 22、S06 replacement 5、S04 covered 6、S01 removed 1、macOS EILSEQ capability 1 |
+| `uv run pytest tests/cli_runtime/test_storage_core_cli.py` | `4 skipped`（通常laneのfull-regression policy skip） |
+| `uv run pytest tests/cli_runtime/test_active.py tests/cli_runtime/test_issue_lifecycle.py` | `75 skipped`（通常laneのfull-regression policy skip） |
+| `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_artifact_import_file.py` | `50 skipped`（通常laneのfull-regression policy skip） |
+| `uv run pytest tests/cli_runtime/test_validate.py tests/cli_runtime/test_doctor.py` | `94 skipped`（通常laneのfull-regression policy skip） |
+| `uv run pytest tests/unit` | `1285 passed, 572 skipped, 2 failed`; both failures are Issue 334 missing-Artifact references in `tests/unit/domain/test_issue_planning_candidate.py` and are outside Issue 357 |
+| `uv run pytest` | `1285 passed, 2185 skipped, 2 failed`; same two Issue 334 missing-Artifact failures, no additional failure |
+| `make lint` | ruff check / format and mypy pass |
+| `./spec-dock/scripts/spec-dock validate` / `doctor` | `validate nodes=221`; `doctor findings=0` |
+| `git diff --check` | pass |
+
+Issue 334の2件は変更対象外の既存failureであり、DEC-357-S99-001で明示的なcross-Issue exceptionとしてowner / follow-upを固定した。S99 content gateはfresh三者passであり、M99 commit後にclean statusとrefs不変を確認する。
+
 ### Milestone / Commit Candidate Gate
 
 | milestone / step | reviewer verdict | commit candidate / scope | closure state | commit evidence | post-commit clean check |
@@ -527,8 +567,8 @@ Destination IDsは次のexact canonical path / evidence sinkを示す。
 | M1 / S01〜S04 | S01〜S04 closed、integration 149 pass / 23 retired skip、fresh review 3 pass 0.98 | `refactor(runtime)!: Storage Core lifecycleを縮小` / S01〜S04 source・tests・report | committed | `d1c16c4dd099c94eabb6e7b2677b4dd148d6fbb6`、hook pass、32 files | pass: commit直後`git status --short` clean |
 | M2 / S05〜S09 | S05〜S09 closed、fresh code / QA gates、focused / lint / parity pass | `refactor(artifact)!: Current作成とHistorical互換を分離` / S05〜S09 source・tests・issue docs | committed | `daa222ee62e3690e97bd455362d211ba11fa20a9`、54 files | pass: commit直後`git status --short` clean |
 | M3 / S10 | fresh code review pass、findingsなし、confidence 0.99 | `refactor(runtime)!: 旧workflow到達経路を撤去` / approved unreachable graph・tests・report | committed | `89964de616e94ff5cf48182e30026298f93d2e18` | pass: commit直後`git status --short` clean |
-| M4 / S90〜H91 | fresh spec re-review pass、findingsなし、confidence 0.98 | `docs(runtime): Storage Core移行契約を確定` / 10 Runtime docs・H91 report | ready | commit pending | pending |
-| M99 / S99 | not reviewed because execution has not started | `docs(iss-00357): 最終実装証跡を確定` / final report ledger | planned | not created because execution has not started | not run |
+| M4 / S90〜H91 | fresh spec re-review pass、findingsなし、confidence 0.98 | `docs(runtime): Storage Core移行契約を確定` / 10 Runtime docs・H91 report | committed | `c0f908374811e63721125a6548920e4170523010` | pass: commit直後のpost-commit clean check |
+| M99 / S99 | fresh final content spec/code/QA review pass、P1 corrections and verification completed、cross-Issue baseline exception ledgered | `docs(iss-00357): 最終実装証跡を確定` / final report ledger + two contract-aligned tests | ready for commit | pending M99 commit SHA | post-commit clean / refs invariant check pending |
 
 ## 残余リスクと停止条件
 
@@ -541,4 +581,4 @@ Destination IDsは次のexact canonical path / evidence sinkを示す。
 
 ## 次のアクション
 
-S90 / H91をM4 checkpointへ確定し、S99 final Issue quality gateを実行する。
+M99 final commit候補を通常のgit add / git commitで作成し、commit後にbranch、parent、refs、git diff --check、clean statusを検証する。PR、merge、Issue finishは実行しない。
