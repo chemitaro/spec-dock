@@ -285,7 +285,7 @@ TEMPLATE_HEADINGS = {
     "plan": (
         "目標",
         "順序・依存",
-        "実装step",
+        "実装ステップ",
         "検証",
         "rollback",
         "exit / handoff",
