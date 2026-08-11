@@ -22,6 +22,7 @@ ID: "iss-00358"
 - 2026-08-11、Product Ownerの明示判断により、Issue 357は358の直接依存ではないと確定した。S09は358-ownedのEpic-level IC-1 contract inputを固定する独立stepへ再定義し、357のRuntime / Fresh scaffold / commit / reviewをentry・closure条件から外した。実生成との比較は後続Epic統合確認へ残す。
 - S09以降は358-owned contract input、359 / 360 handoff、S90 docs impact、S99 final quality gate、Issue 358自身のcommit / push / main向けmergeable PR作成を実行する。merge、`issue finish`、Epic完了は実行しない。
 - S99ではAuthoring asset 304件、Artifact 54件、asset + artifact combined 358件、thin Issue生成full-regression 45 passed / 5 skipped、lint、SpecDock validate、差分検査を確認した。PR前のローカル再検証では通常suiteが`1785 passed / 2252 skipped`となった。Issue 334の放棄済み`init-00322`資料を参照していた2テストは、旧資料をCurrentへ復元せず退役境界（現行ツリーに存在しないこと）を検証するテストへ置換した。
+- 最新PR reviewで、完成Planの実行可能判定に使われるRuntime markerとIssue templateの`## 実装step`が不一致であるP1を検出した。Runtimeは変更せず、provider / dogfoodの三scope Plan template、契約テスト、正本Designを`## 実装ステップ`へ同期し、同じ通常suite・lint・validateを再実行してGreenを確認した。
 - S09/S10/S90/S99のfresh code・spec・QA gateはすべてpassし、357 Runtime非変更、Epic-level IC-1後続統合境界、S10 handoffの実消費条件をreportへ同期した。Issue 358の最終commit、push、main向けmergeable PR作成まで完了した。
 - PR #361の初回Provider CIでS09のactive symlink依存5件を検出し、tracked canonical pathへ修正した。修正後CIはIssue 334のfixture欠落2件のみで、PR metadataは`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（既存ベースラインCI失敗）となっていた。ローカル再検証でこの2件の残存テストを整理し、358のRuntime / 357のRuntimeを変更せずに通常Provider gateをgreenへ戻した。
 - E00の初回reviewで、read-only E00とS08で初めて作るpreservation fixtureのhash要求、S10より前のDesign外owner確定要求が両立しないことを検出した。Planを最小修正し、E00をcandidate inventory / no-delete routing、S08をfull fixture / hash、S10をfinal ownerへ分離した。fresh `spec-reviewer`はP0/P1なしでpassした。
@@ -89,6 +90,16 @@ ID: "iss-00358"
   - Affected closure: `tc-s09-001`、S99 CI portability、PR #361。
   - Risk if wrong: clean checkoutとlocal dogfoodingでテスト対象のcanonical sourceが分岐する。
   - Needs orchestrator decision: no。tracked pathへの限定修正で、357 Runtime / Issue 334 artifactを変更しない。
+- `DEC-358-006`
+  - Status: resolved / promoted_to_test_contract。
+  - Type: thin-template / readiness-classifier alignment。
+  - Trigger: PR #361の最新Codex reviewで、完成したIssue Planが`## 実装step`を含む場合にRuntimeの`_classify_plan_text()`が実行可能markerを見つけられず、`plan-not-executable`へ倒れるP1を検出した。
+  - Observed facts: Runtime classifierは`実装ステップ`を認識するが、provider / dogfoodのInitiative / Epic / Issue Plan templateは`実装step`を出力していた。
+  - Disposition: RuntimeやIssue 357の実装は変更せず、三scopeのprovider / dogfood template、template契約テスト、CLI生成テスト、canonical Designの見出しを`実装ステップ`へ同期した。
+  - Evidence: focused `304 passed / 50 skipped`、ordinary `1785 passed / 2252 skipped`、`make lint` pass、`spec-dock validate` pass、`git diff --check` pass。
+  - Affected closure: `tc-s99-001`、S99 final quality gate、PR #361。
+  - Risk if wrong: 新規Planが内容を埋めても実行可能判定されず、Issue handoffが不必要に停止する。
+  - Needs orchestrator decision: no。既存Runtime markerとの整合に必要な9行のtemplate / test / spec同期であり、Runtimeの責務境界は維持した。
 - 既存のProduct Owner判断、Option A、thin Report、Current六種は変更しない。
 
 ## Objective Alignment Ledger
@@ -361,7 +372,7 @@ Audit result: 6 categories、代表pathの重複なし、E00 pending rowの欠�
 | `tc-s08-001` | S08 | red-required | fixture rootとpreservation testが存在せず、pre-change selectionは275 deselected。17 source copy後も`report-thin.md`、`artifacts/adr-candidate.md`、`artifacts/legacy/profile-derived-design.md`、`profile-derived-plan.md`の4 category欠落を段階的に検出 | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k preservation -q`、authoring file全体、S05 combined、`make lint`、diff check | pass: 6 passed / 275 deselected、authoring全281、combined 335。21 path / hash exact、17 source bytes、S07 exact 33 asset apply後delta空、intentional ZIP mutationは一pathだけchanged、missing / unexpectedも個別検出 |
 | `tc-s09-001` | S09 | red-required | 358-owned contract inputが未定義で、scope / Report / Current six / one-plan / Guide pathの期待値が分散していた | `S09_IC1_CONTRACT`、contract_version=`s09-2026-08-11`、consumer=`epic-00356-authoring-integration`、provider / dogfood parity、scope / catalog / routing mutation tests、canonical Design §12 binding | pass: 23 S09 tests、combined asset suite 358 passed。missing / duplicate / owner / direct-357 routing / consumer / version / canonical contract driftを検出し、Epic後続統合のrouting入力を固定 |
 | `tc-s09-002` | S09 | red-required | Planning LevelをRuntime metadataへ流用する余地があった | docs-only mutation、`.meta.json` / `.assurance.json` / Runtime symbol scan | pass: metadata_fields / parser_symbols / assurance_fields mutationを検出し、現行Runtimeにplanning-level参照がないことを確認 |
-| `tc-s99-001` | S99 | covered-existing + delta | S09/S10/S90のcontract input、handoff、docs auditが揃い、358-owned failureと既存Issue 334 fixture欠落を分離する必要があった | §8 Verification sequence、S99 test-only sync、fresh QA / issue-wide code / spec review、closure audit、Provider CI portability repair | pass: focused / lint / validate / diff。`uv run pytest --run-full-regression tests/cli_runtime/test_new.py -q` は45 passed / 5 skipped。ordinary suiteは1783 passed / 2 pre-existing fixture failures / 2252 skipped。Provider CIはrun `31473318523`のS09 5 failuresを修正後run `31473764291`で解消し、Issue 334 fixture不足2件のみ。fresh QA / code / spec gate pass |
+| `tc-s99-001` | S99 | covered-existing + delta | S09/S10/S90のcontract input、handoff、docs auditが揃い、358-owned failureと既存Issue 334 fixture欠落を分離する必要があった | §8 Verification sequence、S99 test-only sync、fresh QA / issue-wide code / spec review、closure audit、Provider CI portability repair、latest plan-heading repair | pass: focused / lint / validate / diff。`uv run pytest --run-full-regression tests/cli_runtime/test_new.py -q` は45 passed / 5 skipped。Issue 334の退役境界negative contractとPlan heading repair後のordinary suiteは1785 passed / 2252 skipped。旧Assurance compose full-regressionは357-owned legacy routeの9 failuresを別統合リスクとして記録。 |
 
 ### Delegated Worker Evidence
 
@@ -472,8 +483,8 @@ M2 pre-commitでは`make lint`がpassし、S05/S06 combinedは322 passed、通�
 - S09は358-owned contract inputとして実行し、Issue 357のRuntime / scaffold / H91を待たない。実生成比較はEpic-level後続統合へroutingする。
 - Issue 357のRuntime / parser / scaffold mechanismは358から変更しない。mechanism mismatchは後続Epic統合から該当Runtime Issueへ戻す。
 - Issue 358のPR作成は本Issueのdeliveryに含める。merge、Issue close、Epic完了は実行しない。
-- S99 verification: `tests/unit/infra/test_authoring_kit_assets.py` 304 passed、`tests/unit/infra/test_artifact_templates.py` 54 passed、asset + artifact combined 358 passed、`tests/cli_runtime/test_new.py` 50 skipped、`tests/cli_runtime/test_validate.py` 45 skipped、`tests/unit/infra/test_init_update.py` 5 passed / 570 skipped、`uv run pytest --run-full-regression tests/cli_runtime/test_new.py -q` 45 passed / 5 skipped、`make lint` pass、`./spec-dock/scripts/spec-dock validate` pass (`nodes=221`)、`git diff --check` pass。
-- Ordinary `uv run pytest`: 1783 passed / 2 failed / 2252 skipped。失敗はIssue 334のZIPとGuide fixtureがHEADに存在しないためで、`git cat-file -e HEAD:<path>` は両方status 128、Issue 358差分による削除・変更はない。358-owned checkはこの既存repository riskから分離してGreenとする。
+- S99 verification: `tests/unit/infra/test_authoring_kit_assets.py` 304 passed、`tests/unit/infra/test_artifact_templates.py` 54 passed、asset + artifact combined 358 passed、`tests/cli_runtime/test_new.py` 50 skipped、`tests/cli_runtime/test_validate.py` 45 skipped、`tests/unit/infra/test_init_update.py` 5 passed / 570 skipped、`uv run pytest --run-full-regression tests/cli_runtime/test_new.py -q` 45 passed / 5 skipped、Plan heading repair後の`uv run pytest -q` 1785 passed / 2252 skipped、`make lint` pass、`./spec-dock/scripts/spec-dock validate` pass (`nodes=221`)、`git diff --check` pass。
+- Ordinary `uv run pytest`: Issue 334の旧資料をCurrentへ戻さず、退役境界negative contractへ置換して1785 passed / 2252 skipped。旧Assurance compose full-regressionは薄いIssue template導入前のplaceholderを要求する9件が失敗するため、357-owned Runtimeを変更せず後続統合リスクとして分離した。
 
 ## 次のアクション
 

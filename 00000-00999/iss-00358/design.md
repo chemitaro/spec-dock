@@ -160,7 +160,7 @@ Provider template自体の置き場所ではなく、scaffold後のnode pathを�
 |---|---|---|---|
 | Requirement | 種別、ID、タイトル、状態=`draft`、最終更新、parent | 目的、背景、観測可能な要件、スコープ、失敗・境界条件、受け入れ条件、制約・前提 | `authoring/requirement.md` |
 | Design | 種別、ID、タイトル、状態=`draft`、最終更新、依存=`requirement.md`、parent | 設計目標、Current / Target、責務・Interface、data / failure、変更対象、移行・互換性・rollback、testability、risk | `authoring/design.md` |
-| Plan | 種別、ID、タイトル、状態=`draft`、最終更新、依存=`requirement.md, design.md`、parent | 目標、順序・依存、実装step、検証、rollback、exit / handoff。IssueだけPlanning Levelを追加 | Initiative / Epicはscope layering、Issueは`authoring/issue-plan.md` |
+| Plan | 種別、ID、タイトル、状態=`draft`、最終更新、依存=`requirement.md, design.md`、parent | 目標、順序・依存、実装ステップ、検証、rollback、exit / handoff。IssueだけPlanning Levelを追加 | Initiative / Epicはscope layering、Issueは`authoring/issue-plan.md` |
 | Report | 種別、ID、タイトル、最終更新、依存=`requirement.md, design.md, plan.md`、parent | `Outcome`、`Verification`、`Residual Risks / Follow-ups`。`Notes`はoptional | `authoring/report.md` |
 
 Initiative / EpicのR/D/Pは同じ名前でも§6の責務差を反映する。Reportは全scopeで同じ結果要約契約とする。
