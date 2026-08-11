@@ -2,7 +2,7 @@
 種別: disc
 ID: "20260811t155719z-disc"
 タイトル: "PR Repair Unit R357-HL1"
-状態: "implemented"
+状態: "completed"
 作成者: "Issue 357 implementation session"
 最終更新: "2026-08-12"
 親: ["iss-00357"]
@@ -115,7 +115,12 @@ PR #362 の最終レビューで検出された hard-link rollback 破損を、�
 
 ## Commit and re-observation evidence
 
-- pending
+- correction commit: `e9da43c89a18ae40f0f50a316d9954762ff884df`（parent `83f636de5c29c222c7d8855cdffa159bfc8aee12`）。
+- commit message: `fix(runtime): active-set hard-link問題をmutation前で検知`。
+- push: `origin/iss-00357-reduce-runtime-to-storage-core`へ成功。
+- GitHub Actions: exact head `e9da43c89a18ae40f0f50a316d9954762ff884df` のCI / Provider CIを含む3 workflow runがすべてsuccess。
+- Codex review: `Didn't find any major issues`、reviewed commit `e9da43c89a`。
+- observation: `overall_status=passed`、`recommended_next_action=merge_prepared`、head match、current-boundary actionable P0/P1 0。
 
 ## Reflection
 
