@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 import hashlib
 from pathlib import Path
 import re
@@ -1736,3 +1737,302 @@ def test_standard_is_authoring_guidance_not_a_runtime_default() -> None:
     assert "Runtime の default や metadata にはしません" in base_selection
     assert "執筆を始める目安" in standard
     assert "Runtime default ではありません" in standard
+
+
+class S09Contract(TypedDict):
+    consumer: str
+    version: str
+    scope_files: tuple[str, ...]
+    scope_paths: tuple[str, ...]
+    report_required_headings: tuple[str, ...]
+    report_optional_heading: str
+    report_empty_content_valid: bool
+    report_runtime_gate: bool
+    current_artifact_types: tuple[str, ...]
+    issue_plan_files: tuple[str, ...]
+    issue_plan_paths: tuple[str, ...]
+    base_plan_guide: str
+    level_guides: tuple[str, ...]
+    planning_level_runtime_owned: bool
+    planning_level_runtime_coupling: dict[str, tuple[str, ...]]
+    owned_asset_manifest: tuple[str, ...]
+    mismatch_routing: dict[str, str]
+
+
+S09_SCOPE_FILE_NAMES = ("requirement.md", "design.md", "plan.md", "report.md")
+S09_SCOPE_PATHS = tuple(f"templates/{scope}/{document}" for scope in SCOPES for document in S09_SCOPE_FILE_NAMES)
+S09_ISSUE_PLAN_PATHS = ("templates/issue/plan.md",)
+S09_LEVEL_GUIDE_PATHS = tuple(f"docs/authoring/issue-plan-levels/{level}.md" for level in PLANNING_LEVELS)
+S09_CONTENT_OWNER = "Issue 358"
+S09_RUNTIME_OWNER = "Epic downstream Runtime Issue"
+S09_MISMATCH_ROUTING = {
+    "content": S09_CONTENT_OWNER,
+    "Guide": S09_CONTENT_OWNER,
+    "heading": S09_CONTENT_OWNER,
+    "copy": S09_RUNTIME_OWNER,
+    "parser": S09_RUNTIME_OWNER,
+    "filename": S09_RUNTIME_OWNER,
+    "runtime": S09_RUNTIME_OWNER,
+}
+S09_RUNTIME_COUPLING: dict[str, tuple[str, ...]] = {
+    "metadata_fields": (),
+    "parser_symbols": (),
+    "assurance_fields": (),
+}
+S09_CONTRACT_CONSUMER = "epic-00356-authoring-integration"
+S09_CONTRACT_VERSION = "s09-2026-08-11"
+S09_DESIGN_PATH = REPO_ROOT / "spec-dock" / "active" / "issue" / "design.md"
+S09_DESIGN_CONTRACT_TOKENS = (
+    "scope_files = [requirement.md, design.md, plan.md, report.md]",
+    f"contract_version = {S09_CONTRACT_VERSION}",
+    f"consumer = {S09_CONTRACT_CONSUMER}",
+    "report_required_headings = [Outcome, Verification, Residual Risks / Follow-ups]",
+    "report_optional_heading = Notes",
+    "report_empty_content_valid = true",
+    "report_runtime_gate = false",
+    "current_artifact_types = [blank, research, interview, disc, decision-candidate, adr]",
+    "issue_plan_files = [plan.md]",
+    "base_plan_guide = docs/authoring/issue-plan.md",
+    "level_guides = docs/authoring/issue-plan-levels/{light,standard,strict,critical}.md",
+    "planning_level_runtime_owned = false",
+    "content / Guide / heading mismatchは358へ",
+    "copy / parser / filename mismatchは該当Runtime Issueへrouting",
+)
+S09_IC1_CONTRACT: S09Contract = {
+    "consumer": S09_CONTRACT_CONSUMER,
+    "version": S09_CONTRACT_VERSION,
+    "scope_files": S09_SCOPE_FILE_NAMES,
+    "scope_paths": S09_SCOPE_PATHS,
+    "report_required_headings": REPORT_REQUIRED_HEADINGS,
+    "report_optional_heading": "Notes",
+    "report_empty_content_valid": True,
+    "report_runtime_gate": False,
+    "current_artifact_types": CURRENT_ARTIFACT_TEMPLATES,
+    "issue_plan_files": ("plan.md",),
+    "issue_plan_paths": S09_ISSUE_PLAN_PATHS,
+    "base_plan_guide": "docs/authoring/issue-plan.md",
+    "level_guides": S09_LEVEL_GUIDE_PATHS,
+    "planning_level_runtime_owned": False,
+    "planning_level_runtime_coupling": S09_RUNTIME_COUPLING,
+    "owned_asset_manifest": S07_OWNED_ASSET_MANIFEST,
+    "mismatch_routing": S09_MISMATCH_ROUTING,
+}
+
+
+def _s09_contract_violations(contract: Mapping[str, object]) -> tuple[str, ...]:
+    expected: dict[str, object] = {
+        "consumer": S09_CONTRACT_CONSUMER,
+        "version": S09_CONTRACT_VERSION,
+        "scope_files": S09_SCOPE_FILE_NAMES,
+        "scope_paths": S09_SCOPE_PATHS,
+        "report_required_headings": REPORT_REQUIRED_HEADINGS,
+        "report_optional_heading": "Notes",
+        "report_empty_content_valid": True,
+        "report_runtime_gate": False,
+        "current_artifact_types": CURRENT_ARTIFACT_TEMPLATES,
+        "issue_plan_files": ("plan.md",),
+        "issue_plan_paths": S09_ISSUE_PLAN_PATHS,
+        "base_plan_guide": "docs/authoring/issue-plan.md",
+        "level_guides": S09_LEVEL_GUIDE_PATHS,
+        "planning_level_runtime_owned": False,
+        "planning_level_runtime_coupling": S09_RUNTIME_COUPLING,
+        "owned_asset_manifest": S07_OWNED_ASSET_MANIFEST,
+        "mismatch_routing": S09_MISMATCH_ROUTING,
+    }
+    violations = [f"{key} mismatch" for key, expected_value in expected.items() if contract.get(key) != expected_value]
+
+    for key in ("scope_files", "scope_paths", "current_artifact_types", "owned_asset_manifest"):
+        value = contract.get(key)
+        if isinstance(value, tuple) and len(value) != len(set(value)):
+            violations.append(f"{key} duplicate")
+
+    routing = contract.get("mismatch_routing")
+    if isinstance(routing, dict):
+        if set(routing) != set(S09_MISMATCH_ROUTING):
+            violations.append("mismatch routing owner missing or extra")
+        if any("357" in owner for owner in routing.values()):
+            violations.append("direct Issue 357 dependency")
+    else:
+        violations.append("mismatch routing owner missing")
+
+    return tuple(dict.fromkeys(violations))
+
+
+def _s09_design_contract_violations(design_section: str) -> tuple[str, ...]:
+    return tuple(
+        f"missing Design §12 token: {token}" for token in S09_DESIGN_CONTRACT_TOKENS if token not in design_section
+    )
+
+
+def test_s09_ic1_contract_input_is_exact_and_provider_dogfood_complete() -> None:
+    assert _s09_contract_violations(S09_IC1_CONTRACT) == ()
+    assert S09_IC1_CONTRACT["consumer"] == S09_CONTRACT_CONSUMER
+    assert S09_IC1_CONTRACT["version"] == S09_CONTRACT_VERSION
+    manifest = S09_IC1_CONTRACT["owned_asset_manifest"]
+    assert manifest == S07_OWNED_ASSET_MANIFEST
+    assert not _projection_violations(manifest, DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent)
+
+    for relative_path in S09_SCOPE_PATHS + S09_ISSUE_PLAN_PATHS + S09_LEVEL_GUIDE_PATHS:
+        assert relative_path in manifest
+
+
+def test_s09_contract_input_binds_to_canonical_design_section() -> None:
+    design = S09_DESIGN_PATH.read_text(encoding="utf-8")
+    design_section = _section(design, "## 12. Epic-level IC-1 contract input")
+
+    assert _s09_design_contract_violations(design_section) == ()
+    assert f"contract_version = {S09_CONTRACT_VERSION}" in design_section
+    assert f"consumer = {S09_CONTRACT_CONSUMER}" in design_section
+
+
+@pytest.mark.parametrize(
+    ("token", "replacement"),
+    (
+        (f"contract_version = {S09_CONTRACT_VERSION}", "contract_version = stale"),
+        (f"consumer = {S09_CONTRACT_CONSUMER}", "consumer = stale"),
+        (
+            "scope_files = [requirement.md, design.md, plan.md, report.md]",
+            "scope_files = [plan.md]",
+        ),
+        ("content / Guide / heading mismatchは358へ", "content mismatchはruntimeへ"),
+    ),
+)
+def test_s09_design_binding_rejects_canonical_contract_mutations(token: str, replacement: str) -> None:
+    design = S09_DESIGN_PATH.read_text(encoding="utf-8")
+    design_section = _section(design, "## 12. Epic-level IC-1 contract input")
+    mutated_section = design_section.replace(token, replacement, 1)
+
+    assert f"missing Design §12 token: {token}" in _s09_design_contract_violations(mutated_section)
+
+
+def test_s09_scope_manifest_covers_requirement_design_plan_report_for_each_scope() -> None:
+    expected = tuple(f"templates/{scope}/{document}" for scope in SCOPES for document in S09_SCOPE_FILE_NAMES)
+    assert S09_IC1_CONTRACT["scope_paths"] == expected
+    assert tuple(path for path in S09_IC1_CONTRACT["owned_asset_manifest"] if path in expected) == expected
+
+
+@pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
+def test_s09_report_contract_is_exact_empty_valid_and_non_gating(scaffold_root: Path) -> None:
+    for scope in SCOPES:
+        report_path = scaffold_root / "templates" / scope / "report.md"
+        content = report_path.read_text(encoding="utf-8")
+        assert tuple(re.findall(r"^## ([^\n]+)$", content, flags=re.MULTILINE)) == REPORT_REQUIRED_HEADINGS
+        for heading in REPORT_REQUIRED_HEADINGS:
+            assert not _template_section_body(content, heading).strip()
+        assert "## Notes" not in content
+
+    guide = (scaffold_root / "docs" / "authoring" / "report.md").read_text(encoding="utf-8")
+    assert "空でも有効" in guide
+    assert "実行可否や完了の機械的な判定には使いません" in guide
+    assert "## Notes" in guide
+
+
+@pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
+def test_s09_artifact_and_one_plan_catalogs_are_exact(scaffold_root: Path) -> None:
+    artifact_dir = scaffold_root / "templates" / "artifacts"
+    guide = (scaffold_root / "docs" / "authoring" / "artifacts.md").read_text(encoding="utf-8")
+    current_catalog = _section(guide, "## Current creation catalog")
+    assert tuple(re.findall(r"^\| `([^`]+)` \|", current_catalog, flags=re.MULTILINE)) == CURRENT_ARTIFACT_TEMPLATES
+    for artifact_type in CURRENT_ARTIFACT_TEMPLATES:
+        assert (artifact_dir / f"{artifact_type}.md").is_file()
+
+    issue_dir = scaffold_root / "templates" / "issue"
+    assert tuple(sorted(path.name for path in issue_dir.glob("plan*.md"))) == ("plan.md",)
+
+    base_guide = scaffold_root / S09_IC1_CONTRACT["base_plan_guide"]
+    assert base_guide.is_file()
+    assert tuple(
+        path.relative_to(scaffold_root).as_posix()
+        for path in sorted((scaffold_root / "docs/authoring/issue-plan-levels").glob("*.md"))
+    ) == tuple(sorted(S09_LEVEL_GUIDE_PATHS))
+    assert base_guide.read_bytes() == (AUTHORING_ROOT / "issue-plan.md").read_bytes()
+
+
+def test_s09_planning_level_is_docs_only_without_runtime_metadata_parser_or_assurance_coupling() -> None:
+    assert S09_IC1_CONTRACT["planning_level_runtime_owned"] is False
+    assert S09_IC1_CONTRACT["planning_level_runtime_coupling"] == {
+        "metadata_fields": (),
+        "parser_symbols": (),
+        "assurance_fields": (),
+    }
+
+    runtime_root = REPO_ROOT / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    runtime_references = tuple(
+        path.relative_to(runtime_root).as_posix()
+        for path in sorted(runtime_root.rglob("*.py"))
+        if re.search(r"planning[_ -]level", path.read_text(encoding="utf-8"), flags=re.IGNORECASE)
+    )
+    assert runtime_references == ()
+
+
+def test_s09_mismatch_routing_assigns_content_to_358_and_mechanism_to_downstream_runtime_issue() -> None:
+    routing = S09_IC1_CONTRACT["mismatch_routing"]
+    for key in ("content", "Guide", "heading"):
+        assert routing[key] == S09_CONTENT_OWNER
+    for key in ("copy", "parser", "filename", "runtime"):
+        assert routing[key] == S09_RUNTIME_OWNER
+    assert all("357" not in owner for owner in routing.values())
+
+
+def test_s09_contract_rejects_missing_scope_path_mutation() -> None:
+    variant = {**S09_IC1_CONTRACT, "scope_paths": S09_SCOPE_PATHS[1:]}
+    violations = _s09_contract_violations(variant)
+    assert "scope_paths mismatch" in violations
+
+
+def test_s09_contract_rejects_missing_consumer_or_version_mutations() -> None:
+    for field in ("consumer", "version"):
+        variant = {key: value for key, value in S09_IC1_CONTRACT.items() if key != field}
+        assert f"{field} mismatch" in _s09_contract_violations(variant)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("consumer", "epic-00356-runtime-integration"),
+        ("version", "s09-2026-08-10"),
+    ),
+)
+def test_s09_contract_rejects_wrong_consumer_or_version_mutations(field: str, value: str) -> None:
+    variant = {**S09_IC1_CONTRACT, field: value}
+    assert f"{field} mismatch" in _s09_contract_violations(variant)
+
+
+def test_s09_contract_rejects_duplicate_scope_path_mutation() -> None:
+    variant = {**S09_IC1_CONTRACT, "scope_paths": (*S09_SCOPE_PATHS, S09_SCOPE_PATHS[0])}
+    violations = _s09_contract_violations(variant)
+    assert "scope_paths duplicate" in violations
+
+
+def test_s09_contract_rejects_missing_owner_mutation() -> None:
+    routing = dict(S09_IC1_CONTRACT["mismatch_routing"])
+    del routing["heading"]
+    violations = _s09_contract_violations({**S09_IC1_CONTRACT, "mismatch_routing": routing})
+    assert "mismatch routing owner missing or extra" in violations
+
+
+def test_s09_contract_rejects_wrong_owner_and_direct_357_routing_mutations() -> None:
+    routing = dict(S09_IC1_CONTRACT["mismatch_routing"])
+    routing["content"] = S09_RUNTIME_OWNER
+    routing["parser"] = "Issue 357"
+    violations = _s09_contract_violations({**S09_IC1_CONTRACT, "mismatch_routing": routing})
+    assert "mismatch_routing mismatch" in violations
+    assert "direct Issue 357 dependency" in violations
+
+
+@pytest.mark.parametrize(
+    ("coupling_key", "coupling_value"),
+    (
+        ("metadata_fields", (".meta.json",)),
+        ("parser_symbols", ("parse_planning_level",)),
+        ("assurance_fields", ("planning_level",)),
+    ),
+)
+def test_s09_contract_rejects_planning_level_runtime_coupling_mutations(
+    coupling_key: str,
+    coupling_value: tuple[str, ...],
+) -> None:
+    coupling = dict(S09_IC1_CONTRACT["planning_level_runtime_coupling"])
+    coupling[coupling_key] = coupling_value
+    variant = {**S09_IC1_CONTRACT, "planning_level_runtime_coupling": coupling}
+    assert "planning_level_runtime_coupling mismatch" in _s09_contract_violations(variant)

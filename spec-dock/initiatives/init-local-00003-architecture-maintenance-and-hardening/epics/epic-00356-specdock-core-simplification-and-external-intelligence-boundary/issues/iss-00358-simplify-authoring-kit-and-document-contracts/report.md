@@ -5,7 +5,7 @@ ID: "iss-00358"
 関連GitHub: ["#358"]
 状態: "approved"
 作成者: "main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-08-11"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -18,7 +18,11 @@ ID: "iss-00358"
 - Draft 1と承認済みinterview decisionsはevidence-onlyの入力として正本`requirement.md`、`design.md`、`plan.md`へ統合し、repository factsと独立review findingsで精度を補った。
 - Requirement、Design、Planはすべてapprovedで、各phaseのfresh `spec-reviewer`がpassした。
 - 2026-08-10に`issue start iss-00358`を実行し、専用branch `iss-00358-simplify-authoring-kit-and-document-contracts`とactive contextを設定した。
-- E00 / M0とS01〜S08を完了した。三scopeのthin R/D/P/Report、Authoring foundation、one-plan、四Completion Guide、Current六Artifact、Current / Historical navigation、33-path parity、21-file Existing preservationを実装した。M1 `1074a4185135e3d1f915a3e3033b0632d82ffca2`とM2 `156afd1984c33b5712e98421c08f28b7117b09a2`をpushし、それぞれpost-commit clean / upstream同一SHAを確認した。M3はpre-commit verificationまで完了した。S09はIssue 357の実装済みIC-1 inputがないためentry blockedである。PR、merge、`issue finish`はまだ実行していない。
+- E00 / M0とS01〜S08を完了した。三scopeのthin R/D/P/Report、Authoring foundation、one-plan、四Completion Guide、Current六Artifact、Current / Historical navigation、33-path parity、21-file Existing preservationを実装した。M1 `1074a4185135e3d1f915a3e3033b0632d82ffca2`、M2 `156afd1984c33b5712e98421c08f28b7117b09a2`、M3 `da3b0c6ba2b6946dad343948eb413ee62d612e3b`をpushし、各milestoneでpost-commit clean / upstream同一SHAを確認した。
+- 2026-08-11、Product Ownerの明示判断により、Issue 357は358の直接依存ではないと確定した。S09は358-ownedのEpic-level IC-1 contract inputを固定する独立stepへ再定義し、357のRuntime / Fresh scaffold / commit / reviewをentry・closure条件から外した。実生成との比較は後続Epic統合確認へ残す。
+- S09以降は358-owned contract input、359 / 360 handoff、S90 docs impact、S99 final quality gate、Issue 358自身のcommit / push / main向けmergeable PR作成を実行する。merge、`issue finish`、Epic完了は実行しない。
+- S99ではAuthoring asset 304件、Artifact 54件、asset + artifact combined 358件、thin Issue生成full-regression 45 passed / 5 skipped、lint、SpecDock validate、差分検査を確認した。通常suiteの2失敗はHEAD / origin/main双方にないIssue 334 fixture不足であり、358差分ではない。
+- S09/S10/S90/S99のfresh code・spec・QA gateはすべてpassし、357 Runtime非変更、Epic-level IC-1後続統合境界、S10 handoffの実消費条件をreportへ同期した。次はIssue 358の最終commit、push、main向けmergeable PR作成へ進む。
 - E00の初回reviewで、read-only E00とS08で初めて作るpreservation fixtureのhash要求、S10より前のDesign外owner確定要求が両立しないことを検出した。Planを最小修正し、E00をcandidate inventory / no-delete routing、S08をfull fixture / hash、S10をfinal ownerへ分離した。fresh `spec-reviewer`はP0/P1なしでpassした。
 - materialな製品判断の追加はない。Profile / Assuranceを使わず、one Plan + docs-only Planning Level、thin Report、Current六種というProduct Owner承認をそのまま保持する。
 
@@ -27,8 +31,8 @@ ID: "iss-00358"
 | 文書 | 状態 | 主な固定内容 |
 |---|---|---|
 | `requirement.md` | approved | thin R/D/P/Report、文書責務、scope layering、Planning Level、Artifact / authority、Current / Historical、preservation / handoff |
-| `design.md` | approved | exact asset tree / Add-Modify contract、template / Guide link、Report exact shape、Level examples、IC-1、ownership / rollback |
-| `plan.md` | approved | E00〜S99の縦スライス、`CL-358-001`〜`CL-358-015`、step-local delegation、docs-only alternative evidence、具体テストカード、review gate |
+| `design.md` | amended | exact asset tree / Add-Modify contract、template / Guide link、Report exact shape、Level examples、Epic-level IC-1 input、ownership / rollback |
+| `plan.md` | amended | E00〜S99の縦スライス、`CL-358-001`〜`CL-358-015`、step-local delegation、358-owned contract evidence、review gate、PR delivery |
 
 ## Spec Interpretation / Decision Ledger
 
@@ -63,13 +67,24 @@ ID: "iss-00358"
   - Affected closure: `CL-358-007/008`、S05。
   - Risk if wrong: 放棄対象workflowをAuthoring Kit簡素化の実装へ再導入する、または監査用fail履歴を消して旧evaluatorだけを通す。
   - Needs orchestrator decision: no。既存の明示的なProduct Owner指示を適用する。
+- `DEC-358-004`
+  - Status: resolved / promoted_to_plan。
+  - Type: cross-Issue dependency boundary / completion scope。
+  - Trigger: Product Ownerの2026-08-11再開指示と、現行Requirement / Design / PlanのS09 entry・closure監査。
+  - Observed facts: 現行S09はIssue 357のFresh scaffold / Artifact mechanism / H91 inputを必須化し、358-owned contentを超えて別IssueのRuntime実装・review・commitを待つ構造になっていた。一方、358の責務はAuthoring asset内容・配置・導線・検証契約であり、357 Runtimeを変更しないことが明記されている。
+  - Options Considered: 357完了まで358を停止する / 358から357 Runtimeを代替実装する / 358-owned contract inputをS09で固定し、実生成比較をEpic後続統合へ移す。
+  - Disposition: `promoted_to_plan`。S09を358-ownedのmanifest・期待値・mismatch routing・docs-only Level検証へ再定義し、Issue 357を直接依存から外す。S10 / S90 / S99はこの入力を受けて358単独で閉じ、357との実生成比較はEpic-level IC-1後続確認とする。
+  - Evidence: amended `requirement.md` / `design.md` / `plan.md`、S01〜S08の既存pass evidence、358 Runtime変更なしのownership確認。
+  - Affected closure: `CL-358-005/012/013`、S09 / S10 / S90 / S99、M4 / M99。
+  - Risk if wrong: 358の完了が別IssueのRuntime実装状態に不必要に拘束される、またはRuntime変更を358へ誤って取り込む。
+  - Needs orchestrator decision: no。ユーザーが直接指定したスコープ境界をcanonical docsへ反映した。
 - 既存のProduct Owner判断、Option A、thin Report、Current六種は変更しない。
 
 ## Objective Alignment Ledger
 
 | target | primary objective evidence | secondary requirement evidence | inversion risk | reviewer verdict |
 |---|---|---|---|---|
-| planning adoption | `requirement.md`のAuthoring Kit簡素化を`design.md`のthin asset contractと`plan.md`の利用者flowへ直接追跡した | preservation、parity、IC-1、359 / 360 handoffをprimary contractへ従属させた | none | pass |
+| planning adoption | `requirement.md`のAuthoring Kit簡素化を`design.md`のthin asset contractと`plan.md`の利用者flowへ直接追跡した | preservation、parity、Epic-level IC-1 input、359 / 360 handoffをprimary contractへ従属させた | 357実装待ちをIssue完了条件にしない | pass |
 
 ## Evidence Adoption Ledger
 
@@ -90,7 +105,7 @@ ID: "iss-00358"
 |---|---|---|---|---|---|---|
 | requirement | 親Epic R/D/P、承認済みDraft 1、三つのinterview decisions、現行template / docs / preservation surfaceを照合した | none | adopted | pass | no | execute approved plan |
 | design | 承認済みRequirement、provider / dogfood asset tree、copy mechanism、Guide / template / Historical ownershipを照合した | none | adopted | pass | no | execute approved plan |
-| plan | 承認済みR/D、全RQ / EC / AC、Design file-change contract、Issue 357とのIC-1境界、E00 / S08 / S10 ownershipを照合した | none | amended and adopted | pass | no | execute amended plan |
+| plan | 承認済みR/D、全RQ / EC / AC、Design file-change contract、Epic-level IC-1 input境界、E00 / S08 / S10 ownership、PR deliveryを照合した | none | amended and adopted | pass | no | execute approved plan |
 
 ## Delegated Draft Evidence
 
@@ -104,7 +119,7 @@ ID: "iss-00358"
 
 | Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |
 |---|---|---|---|---|---|
-| strict | system-architect and implementation-planner | used | system-architectのexact authoring tree / thin shape / empty-valid Report / parity / preservation / IC-1境界を`design.md`へ統合し、implementation-plannerのE00・S01〜S10・S90・S99 slicingを`plan.md`へ統合した | pass | ready |
+| strict | system-architect and implementation-planner | used | system-architectのexact authoring tree / thin shape / empty-valid Report / parity / preservation / Epic-level IC-1 input境界を`design.md`へ統合し、implementation-plannerのE00・S01〜S10・S90・S99 slicingとPR deliveryを`plan.md`へ統合した | pass | ready |
 
 ## Reviewer Gate Status
 
@@ -112,7 +127,7 @@ ID: "iss-00358"
 |---|---|---|---|---|---|---|---|
 | requirement | requirement phase gate | spec-reviewer | fresh | pass | no | execute approved plan | parent trace、Planning Level selection、Guide semantics、full preservation surfaceを確認 |
 | design | design phase gate | spec-reviewer | fresh | pass | no | execute approved plan | exact paths、Report shape、Level examples、handoff timing、file-change contractを確認 |
-| plan | amended plan alignment gate | spec-reviewer | fresh | pass | no | execute amended plan | E00 candidate inventory、S08 fixture/hash、S10 final ownerの一意性を確認。P0/P1なし、overall confidence 0.99 |
+| plan | amended plan alignment gate | spec-reviewer | fresh | pass | no | execute approved plan | E00 candidate inventory、S08 fixture/hash、S10 final owner、358-independent S09 / Epic-level IC-1 boundaryを確認。P0/P1なし、overall confidence 0.99 |
 | E00 | E00 docs/spec alignment gate | spec-reviewer | fresh | pass | no | E00 / M0を閉じてS01へ進む | Design §4.1 baseline、preservation candidate category、Design §4外no-delete / owner pending S10を確認。初回fail事項はPlan amendmentでrouting済み |
 | S01 code | S01 docs / test gate | code-reviewer | fresh | pass | no | `CL-358-003` code evidence accepted、fresh spec reviewへ進む | findingsなし。provider / dogfood projection、責務、scope、link、provider-neutral contract、49 tests / ruff / format / diff checkを確認。confidence 0.99 |
 | S01 spec | S01 semantic / scope gate | spec-reviewer | fresh | pass | no | S01 semantic evidence accepted、P2を修正してcode delta reviewへ進む | P0/P1なし。四文書責務、三scope、親scope非再定義、provider-neutral入口、parityを確認。P2 scope-aware Plan導線は修正・回帰test追加済み。confidence 0.98 |
@@ -146,13 +161,21 @@ ID: "iss-00358"
 | S07 code | provider / dogfood parity gate | code-reviewer | fresh | pass | no | `CL-358-010` close、S08へ進む | Design §4.1の33 path explicit manifest、byte-exact parity、render後scope link、missing / extra / duplicate / drift / broken-link mutationを確認。findingsなし。confidence 0.97 |
 | S08 QA | Existing document preservation gate | qa-reviewer | fresh | pass | no | code reviewへ進む | 21 path / hash、17 source copy、4 synthetic fixture、S07 33 asset simulation、changed / missing / unexpected negative control、binary ZIPを確認。findingsなし。confidence 0.99 |
 | S08 code | Existing document preservation closure gate | code-reviewer | fresh | pass | no | `CL-358-011` close、S09へ進む | preservation helper、21-file fixture、SHA-256 matrix、copy provenance、S07 exact 33-asset simulation、negative control、report evidenceを確認。findingsなし。confidence 0.98 |
+| S09 plan delta | independent Issue completion boundary | spec-reviewer | fresh | pass | no | S09 contract input implementation | 2026-08-11 canonical amendment reviewed independently: 357 direct dependency removed; S09 becomes 358-owned Epic-level IC-1 contract input; actual Fresh scaffold comparison is Epic follow-up; PR delivery remains in scope. No P0/P1; P2 wording clarified in Design §4.1 parity row and Plan S10 downstream-consumption boundary. |
+| S09 code | Epic-level IC-1 contract input test gate | code-reviewer | fresh | pass | no | `CL-358-005/012` close、S10へ進む | 23 S09 tests、manifest/parity、Report non-gating、Current six、one plan、Guide paths、docs-only Level、consumer/version、canonical Design §12 binding、routing mutationを確認。P0/P1/P2なし。confidence 0.95 |
+| S10 spec | 359 / 360 handoff semantic gate | spec-reviewer | fresh | pass | no | `CL-358-013` close、S90へ進む | 6カテゴリのowner / destination / classification、reserved link timing、Epic IC-1後の実消費を確認。P0/P1/P2なし |
+| S90 docs | final authoring asset impact gate | qa-reviewer | fresh | pass | no | S99 final auditへ進む | 358-owned 33 assetsのparity / link / Current-Historical / Report / Artifact / reserved handoff audit、296 tests、変更なし。Fresh scaffold比較はEpic後続。confidence 0.95 |
+| S90 spec | docs impact semantic gate | spec-reviewer | fresh | pass | no | S99 final auditへ進む | Plan / Design / Reportのdocs-only最終化、Current/Historical、reserved handoff、Fresh scaffold比較のEpic後続境界を確認。P0/P1/P2なし |
+| S99 code | issue-wide diff / test gate | code-reviewer | fresh | pass | no | full-regression test sync後に最終QAへ | canonical docs + S09 test delta + thin `test_new` assertion syncのscope、consumer/version repair、Runtime / Issue357非変更を確認。P0/P1なし。P2なし |
+| S99 spec rereview | stale dependency / handoff boundary | spec-reviewer | fresh | pass | no | S99 final report syncへ | `S09 readiness (superseded)`、Epic-level contract input、S10 consumption gate、S90 audit alignmentを確認。P0/P1/P2なし |
+| S99 QA final | issue-wide quality / evidence gate | qa-reviewer | fresh | pass | no | M4/M99 commitへ進む | focused 304/54、targeted full-regression 45 passed / 5 skipped、lint、validate、diff check、Issue 334 baseline、S09/S10/S90 evidence、Runtime / Issue357非変更を再確認。P0/P1/P2なし。confidence 0.99 |
 
 ## Workflow-Scoped Authorization
 
 | authorization source | repo / worktree | active scope | named roles | boundary | result |
 |---|---|---|---|---|---|
 | ユーザーによるSpecDock workflow利用依頼と2026-08-10の文書承認 | current `spec-dock` checkout | iss-00358 planning | system-architect、implementation-planner、spec-reviewer | current repo / scope / session内のread-only planning / review。実装、外部公開、PR、mergeは含まない | pass |
-| ユーザーによる2026-08-10の`issue start`と実装開始依頼 | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/4bc6/spec-dock` | active `iss-00358` execution | repo-analyst、doc-writer、dev-coder、spec-reviewer、code-reviewer、qa-reviewer | approved Planのstep-local scope内の実装・検証・review。scope拡張、外部公開、PR、merge、`issue finish`は含まない | pass |
+| ユーザーによる2026-08-11の再開・独立完了・PR作成指示 | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/4bc6/spec-dock` | active `iss-00358` execution | repo-analyst、doc-writer、dev-coder、spec-reviewer、code-reviewer、qa-reviewer、github-pr-creator、github-pr-observation | amended Planのstep-local scope内の実装・検証・review、Issue 358のcommit / push / main向けPR作成。Issue 357 Runtime、merge、`issue finish`、Epic完了は含まない | pass |
 
 ## 実装開始契約
 
@@ -172,7 +195,7 @@ Issue 357とは同時に進められる。358はtemplate prose / Authoring Guide
 - `git diff --check`: pass。
 - SpecDock `workflow status --format json`: `state=ready`、`reason_code=strict-legacy-missing-assurance`、`artifact_readiness=substantive`。
 - SpecDock `deps check --no-github`: `ready=true`、blockerなし。cacheは`stale=true`の警告を返したため、実装開始時に必要ならGitHub同期を更新する。
-- SpecDock `validate`: pass、`nodes=221`。
+- `./spec-dock/scripts/spec-dock validate`: pass、`nodes=221`。（このworktreeでは裸の`spec-dock` executableは提供されない）
 - `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py`: 72 passed、44 skipped。
 - `docs/rules/**`はPlanの許可変更から除外し、S04はIssue 357 evidenceなしでthin Report assetだけを完了できる。
 - 正本とDraft / interview artifactsは別物として保持し、evidenceをauthorityへ自動昇格していない。
@@ -200,9 +223,9 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | Modify | `templates/epic/design.md` | `d3a33eaa61bc5fe5c80538681028929420ed8070ce3aaaab1ae0d2de9201eee5` | 358 S02 | 同上 |
 | Modify | `templates/epic/plan.md` | `5adb68c4469c2ae59ccfa8bb653205fd6171cc842bcbde12714c7023b46fe8d4` | 358 S02 | 同上 |
 | Modify | `templates/epic/report.md` | `60526a51ca964021e8288eabcf500dbf749d0b547e7a70f002bcb812d913e170` | 358 S04 | report contract test |
-| Modify | `templates/issue/requirement.md` | `baa26eaeea94a383c5b00ac21d02ecea156949ade96dc5bfec4f0b30c6d9aa8e` | 358 S02 | kit test + 357 IC-1 |
+| Modify | `templates/issue/requirement.md` | `baa26eaeea94a383c5b00ac21d02ecea156949ade96dc5bfec4f0b30c6d9aa8e` | 358 S02 | kit test + Epic-level IC-1 input |
 | Modify | `templates/issue/design.md` | `4838f34660ae63bf587f4cef1b7fd4e275dd4ebc6807395e4a50593629bf00a9` | 358 S02 | 同上 |
-| Modify | `templates/issue/plan.md` | `6f0ea3b721089b494a4272da1317896ff5f547daf97c851ca125c2346ea0200e` | 358 S02/S03 | kit test + 357 IC-1 |
+| Modify | `templates/issue/plan.md` | `6f0ea3b721089b494a4272da1317896ff5f547daf97c851ca125c2346ea0200e` | 358 S02/S03 | kit test + Epic-level IC-1 input |
 | Modify | `templates/issue/report.md` | `b32dfe412048ce02cc9bb7c7ee5ab78b134b0456a37aab3e531655fb292b09e3` | 358 S04 | report contract test |
 | Modify | `templates/artifacts/blank.md` | `9016ecc30e70a6eabf4724ed65321dab103413a088249e089ec7727a3a6c4c1d` | 358 S05 | `test_artifact_templates.py` |
 | Modify | `templates/artifacts/research.md` | `6c1aefd91f117e0c7349fd4697796a92ac3f4d41f80ba5941e0437662aae1f7b` | 358 S05 | 同上 |
@@ -213,7 +236,7 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | Modify | `templates/README.md` | `f66e45f17217f6ab70ac7ecfae86e233028ebbe85e4e1d922f7412ca2abc5204` | 358 S05/S06 | catalog / navigation test |
 | Modify | `docs/README.md` | `314bccd5ad0b68aaab31445864279db8083e391e40131e621cf0dbd8c4473d18` | 358 S06 | navigation / link test |
 | Modify | `docs/guide.md` | `21fca9bcf9edc0a90185095ab0510fbaf6946c49dba9dcf8822ec326c09045cf` | 358 S06 single editor | navigation / link test |
-| Modify | `docs/authoring/issue-plan.md` | `bc6f633c47143d8acac7d3714198f3ce73b09c4f8e38c1d55d9365205c171909` | 358 S03 | level / link + 357 IC-1 |
+| Modify | `docs/authoring/issue-plan.md` | `bc6f633c47143d8acac7d3714198f3ce73b09c4f8e38c1d55d9365205c171909` | 358 S03 | level / link + Epic-level IC-1 input |
 | Modify | `docs/authoring/scope-layering.md` | `3fd724638107f4334f52761297decaaa9e777d42dbe53a576a9377f2359a6167` | 358 S01 | Guide contract test |
 | Add | `docs/authoring/overview.md` | `ABSENT` | 358 S01 | `test_authoring_kit_assets.py` |
 | Add | `docs/authoring/requirement.md` | `ABSENT` | 358 S01 | 同上 |
@@ -276,6 +299,21 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 
 暗黙Delete rowは0である。thin Report、candidate ADR、profile-derived documentの実在baseline bytesはS08 materialization input、Design §4外surfaceのsingle ownerはS10 handoff inputとして明示されており、amended E00のstop conditionには該当しない。実行したread-only commandは`git status --short`、`git branch --show-current`、`git rev-parse`、`git cat-file`、`git show`、`find`、`rg`、`sed`、`nl`、`shasum -a 256`。`No material implementation decisions beyond the approved plan.`
 
+### S10 Handoff Manifest
+
+S09の358-owned contract inputを前提に、E00で`owner pending S10`としたDesign §4外surfaceを6つの一意なcategoryへ整理した。以下は後続Issue / Epicが消費する入力であり、358ではskill実装、installer変更、Runtime変更、物理pruneを行わない。
+
+| candidate category | representative paths | owner | destination / next consumer | classification | 358 action |
+|---|---|---|---|---|---|
+| historical artifact repair | `src/spec_dock/assets/spec_dock/templates/artifacts/pr-repair-batch.md` とdogfood counterpart | 357（Historical recognition） | 360（managed distribution / prune planning） | retain now; historical-only candidate | no edit |
+| historical discussions | `templates/discussions/{adr,disc,interview,pr-repair-batch,research,scratch}.md` とdogfood counterparts | 357（Historical recognition） | 360（managed distribution / prune planning） | retain now; historical-only candidate | no edit |
+| profile / assurance mechanism | `templates/assurance/profile-sections.json` とdogfood counterpart | 357（mechanism） | 360（distribution / prune planning） | retain now; obsolete candidate | no edit |
+| issue profile routing | `templates/issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` とdogfood counterparts | 357（profile routing） | 360（distribution / prune planning） | retain now; obsolete candidate | no edit |
+| installed skill surface | `src/spec_dock/assets/install_root/.agents/skills/**` とinstalled counterparts | 359（skill contract / content） | 360（distribution / prune planning） | retain now; replace / prune only after downstream contract | no edit; reserved links remain non-live |
+| Design §4外 docs / workbench surfaces | `docs/authoring/chatgpt-pack.md`、`decision-routing.md`、`rules/**`、`reference_*.md`、`phase_*.md`、`workflow_*.md`、`templates/.workbench/**` とdogfood counterparts | Epic-level follow-up（retain-only classification） | Epic report / 360 planning | no-delete; owner confirmation required before any prune | no edit |
+
+Audit result: 6 categories、代表pathの重複なし、E00 pending rowの欠落なし、全rowにowner / destination / classificationがある。359 / 360がこのinputを実消費する条件はEpic-level IC-1 follow-upのpassであり、Issue 358のS10記録完了とは分離する。`No material implementation decisions beyond the approved plan.`
+
 ### Step Contract Closure
 
 | step | closure ids | planned close condition | observed evidence | result | notes |
@@ -289,7 +327,10 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | S06 | `CL-358-009/015` | Current第一導線をStorage Core + Authoring Kitへ限定し、旧surfaceをHistoricalへ分離する | provider / dogfoodのREADME、guide、Overview、Historical、templates READMEを更新。Current link allowlist、Historical positive control、reserved skill非live、path-aware vocabularyを51 testsで追加固定。Unicode境界、inline / reference / autolink bypassをreview修復 | passed | navigation / vocabulary / link 108 tests、authoring全268、S05/S06 combined 322、ruff / format / diff check、fresh code / spec / report closure review pass |
 | S07 | `CL-358-010` | Design §4.1の358-owned assetをexplicit manifestで固定し、provider / dogfood bytesとrender後linkを一致させる | 33 pathを6 categoryで列挙し、全path存在、byte-exact parity、全relative linkを検証。scope templateはFresh nodeへrender後に解決し、test sourceとS08 preservation fixtureは明示的に除外 | passed | parity / link 56 tests、authoring全275、S05 combined 329、ruff / format / mypy / diff check、fresh code review pass。projection drift zero |
 | S08 | `CL-358-011` | E00の全21 categoryを実在fixture / baseline SHA-256へ解決し、358-owned asset適用後もExisting bytesを保持する | 17 existing sourceをbyte copyし、thin Report / candidate ADR / profile-derived design / planの4 synthetic fixtureをmaterialize。tmp consumerへS07 exact 33 assetsだけを適用し、node-local 21 pathのbefore / after hash matrix差分ゼロを確認 | passed | preservation 6 tests、authoring全281、S05 combined 335、`make lint` / diff check、fresh QA / code review pass |
-| S09 | `CL-358-005/012` | Issue 357の実生成を358の四文書 / Report / Artifact / one-plan / Guide contractとIC-1照合する | 357 reportは実装未着手、全closure not started。現Runtimeは`pr-repair-batch` / `draft-*`とAssurance依存Fresh scaffoldを保持し、357 S05/S06/S08/H91のmachine-readable evidenceが存在しない | entry blocked | 358からRuntimeを代替実装せず停止。357の実装・fresh review・commit SHA・fixture / test path受領後に再開 |
+| S09 | `CL-358-005/012` | 358-ownedの四文書 / Report / Artifact / one-plan / Guide contractをEpic-level IC-1 inputとして固定する | `S09_IC1_CONTRACT`と23 mutation-sensitive testsでscope manifest、contract_version=`s09-2026-08-11`、consumer=`epic-00356-authoring-integration`、Report exact shape / non-gating、Current six、one Plan、Guide paths、docs-only Level、content/mechanism routing、canonical Design §12 bindingをprovider / dogfoodへ照合 | passed | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -q -k s09` 23 passed、asset + artifact combined suite 358 passed、ruff / format / mypy / diff check pass。357 Runtime / Fresh scaffoldを変更せず、実生成比較は後続Epic統合へ残す |
+| S10 | `CL-358-013` | 359 / 360向けGuide・retain / replace / historical-only / prune inventoryをowner / destination付きで記録する | E00のDesign §4外 no-delete rows、S01〜S09のasset manifest / preservation / contract inputを参照し、359 / 360への消費条件をEpic-level IC-1後続確認として明示する | passed | owner / destination / classificationの重複・欠落なし。handoff inputは記録済みだが、359 / 360の実消費・実装開始はEpic-level IC-1確認後に限定する |
+| S90 | — | 358-owned docsの導線・用語・Historical・reserved handoffを最終監査する | doc-writerのno-op auditでS07 33資産のprovider / dogfood parity、全relative link、Current/Historical、Report non-gating、Artifact Current six、Planning Level docs-only、Agent assistance非live、S10 handoff整合を確認 | passed | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py` 296 passed（S09 binding追加前の監査スナップショット）。変更不要。Fresh scaffold実生成比較はEpic-level後続統合へ残す |
+| S99 | `CL-358-001`〜`CL-358-015` | Issue 358の最終品質ゲートとPR-ready差分を確認する | focused assets / Artifact / installer checks、thin Issue template生成回帰、lint、SpecDock validate、ordinary suite、diff auditを実行し、既存Issue 334 fixture欠落を358差分と分離 | passed | fresh QA / issue-wide code / spec review pass。M4/M99 commit・push・main向けPRへ進む |
 
 ### Test Contract Closure
 
@@ -306,7 +347,9 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | `tc-s06-001` | S06 | red-required | asset先行のためimmutable HEADを代替証拠にした。HEADでは`docs/authoring/historical.md`が存在せず`git cat-file` status 128、README / guideが旧`workflow_*` / `phase_*` live linkを持ち、OverviewはArtifact / four Completion Guide / Agent assistanceを欠いた。review mutationで`workflowを` / `workflow_route`、absolute skill / external link、document-global reference、mailto / ftp / email autolinkの未検出を順次Red再現 | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k 'navigation or vocabulary or link' -q`、authoring file全体、S05 combined、ruff check / format、diff check | pass: 108 passed / 160 deselected、authoring全268、combined 322。Current exact links、Historical別section / positive control、Overview十link、skill非live、templates catalog、ASCII両boundary、inline / reference / URI autolink、5 path parity、全relative linkを確認 |
 | `tc-s07-001` | S07 | red-required | 既存fragmented parity / link testsは53 passedだったが、Design §4.1全体を一つのexplicit manifestとして固定しておらずmissing / extra rowを検出できなかった。synthetic mutationでmissing / extra / duplicate row、byte drift、broken relative linkを各々検出し、初回rendered-node testでは未resolve pathをRed再現 | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k 'parity or link' -q`、authoring file全体、S05 combined、ruff check / format、mypy、diff check | pass: 56 passed / 219 deselected、authoring全275、combined 329。33 pathの存在 / byte-exact parity、provider / dogfood全relative link、scope別render後Guide link、明示除外を確認。projection drift zero |
 | `tc-s08-001` | S08 | red-required | fixture rootとpreservation testが存在せず、pre-change selectionは275 deselected。17 source copy後も`report-thin.md`、`artifacts/adr-candidate.md`、`artifacts/legacy/profile-derived-design.md`、`profile-derived-plan.md`の4 category欠落を段階的に検出 | `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k preservation -q`、authoring file全体、S05 combined、`make lint`、diff check | pass: 6 passed / 275 deselected、authoring全281、combined 335。21 path / hash exact、17 source bytes、S07 exact 33 asset apply後delta空、intentional ZIP mutationは一pathだけchanged、missing / unexpectedも個別検出 |
-| `tc-s09-001/002` | S09 | red-required | 357のFresh scaffold / Artifact mechanism / H91 IC-1 inputが未実装。現Runtime / testsは旧Artifact typeとAssurance compose placeholderを要求し、358 contractとのmechanism mismatchが確定 | shared Fresh scaffold / non-gating / Planning Level Runtime-independent fixture | not run: S09 entry condition未充足。358 ownership外のRuntime修正を避け、357 evidence待ち |
+| `tc-s09-001` | S09 | red-required | 358-owned contract inputが未定義で、scope / Report / Current six / one-plan / Guide pathの期待値が分散していた | `S09_IC1_CONTRACT`、contract_version=`s09-2026-08-11`、consumer=`epic-00356-authoring-integration`、provider / dogfood parity、scope / catalog / routing mutation tests、canonical Design §12 binding | pass: 23 S09 tests、combined asset suite 358 passed。missing / duplicate / owner / direct-357 routing / consumer / version / canonical contract driftを検出し、Epic後続統合のrouting入力を固定 |
+| `tc-s09-002` | S09 | red-required | Planning LevelをRuntime metadataへ流用する余地があった | docs-only mutation、`.meta.json` / `.assurance.json` / Runtime symbol scan | pass: metadata_fields / parser_symbols / assurance_fields mutationを検出し、現行Runtimeにplanning-level参照がないことを確認 |
+| `tc-s99-001` | S99 | covered-existing + delta | S09/S10/S90のcontract input、handoff、docs auditが揃い、358-owned failureと既存Issue 334 fixture欠落を分離する必要があった | §8 Verification sequence、S99 test-only sync、fresh QA / issue-wide code / spec review、closure audit | pass: focused / lint / validate / diff。`uv run pytest --run-full-regression tests/cli_runtime/test_new.py -q` は45 passed / 5 skipped。ordinary suiteは1783 passed / 2 pre-existing fixture failures / 2252 skipped。fresh QA / code / spec gate pass |
 
 ### Delegated Worker Evidence
 
@@ -321,14 +364,16 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | S03 tests | `dev-coder` | one-plan、Guide独立性、Level completion、example / wrong-signal / metadata境界、critical recovery省略禁止を22 testsで固定 | `tests/unit/infra/test_authoring_kit_assets.py` | 全140 passed、plan / level 43 passed / 97 deselected、ruff check / format、`git diff --check` pass | fresh code / spec review pass | 意味token変更時はtest同期が必要 | evidence adopted; S03 closed |
 | S04 docs | `doc-writer` | 三scope Reportを最小frontmatter + exact result shapeへ置換し、Guideへempty-valid / non-gating境界を実装 | provider / dogfoodの3 Report templateとReport Guide（8 files） | 4 path parity、scope link、forbidden scan、nonempty、`git diff --check` pass | fresh code / spec review pass | 初回Guide更新のS01回帰をGuide側修復。prompt一般規則矛盾はcanonical RQ / Designで解消 | evidence adopted; S04 closed |
 | S04 tests | `dev-coder` | Report exact shape、empty-valid、heavy / generic禁止語、neutral reviewer境界、non-gatingを47 testsで固定 | `tests/unit/infra/test_authoring_kit_assets.py` | 全187 passed、report 53 passed / 134 deselected、ruff check / format、`git diff --check` pass | fresh code / spec review pass | 構造 / 境界token中心で表現変更は許容 | evidence adopted; S04 closed |
-| S05 docs | `doc-writer` | Current六種のArtifact templateを簡素化し、Guideへ用途、durable reflection、no-auto-promotion、Historical保持を実装。review P2後に`draft-*` routeと有効なdraft stateを分離 | provider / dogfoodの六Artifact templateとArtifact Guide（14 files） | 7 path byte parity、六template非空、Historical `pr-repair-batch.md`保持、forbidden scan、`git diff --check` pass | rereview pending | `CL-358-015`のCurrent導線はS06でclose | evidence adopted; repair complete |
+| S05 docs | `doc-writer` | Current六種のArtifact templateを簡素化し、Guideへ用途、durable reflection、no-auto-promotion、Historical保持を実装。review P2後に`draft-*` routeと有効なdraft stateを分離 | provider / dogfoodの六Artifact templateとArtifact Guide（14 files） | 7 path byte parity、六template非空、Historical `pr-repair-batch.md`保持、forbidden scan、`git diff --check` pass | fresh final / scope-correct rereview pass | `CL-358-015`のCurrent導線はS06でclose | evidence adopted; repair complete |
 | S05 tests | `dev-coder` | physical七 / Current六、type semantics、authority flow、ADR accepted境界、Historical保持をcontract test化。review後にfull-regression marker、multiline / must / shall detector、explicit optional / negated clause guardを修復 | `tests/unit/infra/test_artifact_templates.py`、`tests/cli_runtime/test_new.py`のsix Current marker | artifact 54 passed / 187 deselected、全241 passed、Artifact生成full-regression 1 passed、ruff check / format、`git diff --check` pass | fresh code final / scope-correct spec / detector closure review pass | clause boundaryは句点 / semicolon系のbounded heuristic | evidence adopted; S05 closed |
 | S06 docs | `doc-writer` | Current第一導線をStorage Core + Authoring Kitへ縮小し、Historical / Agent assistance予約 / Current catalogを分離 | provider / dogfoodのREADME、guide、Overview、Historical、templates README（10 files） | 5 path parity、全relative link、Historical positive control、skill live link zero、`git diff --check` pass | fresh code / spec / report closure review pass | S05 templates README文を一度欠落させたが復元しcombined Green | evidence adopted; S06 closed |
 | S06 tests | `dev-coder` | path-aware Current / Historical、first-read allowlist、Overview / catalog / link / parityを51 testsで固定。review後にUnicode両boundaryとinline / reference / URI autolink bypassを修復 | `tests/unit/infra/test_authoring_kit_assets.py` | focused 108、authoring全268、S05 combined 322、ruff check / format、`git diff --check` pass | fresh code / spec / report closure review pass | Markdown destination parserは承認対象構文に限定したbounded heuristic | evidence adopted; S06 closed |
 | M2 typing repair | `dev-coder` | S02から積み上げたcontract辞書の型を明示し、mypyの`object`推論22件を解消 | `tests/unit/infra/test_authoring_kit_assets.py` | focused mypy、`make lint`、S05/S06 combined 322、ruff / format、`git diff --check` pass | fresh code review pass | `cast`は既存branch後のnon-optional invariantだけを型検査器へ伝える | evidence adopted; M2 pre-commit gate passed |
 | S07 tests | `dev-coder` | Design §4.1のprovider / dogfood対象を33 path manifestへ固定し、parity / rendered linkとfailure mutationを追加 | `tests/unit/infra/test_authoring_kit_assets.py` | focused 56、authoring全275、S05 combined 329、ruff check / format / mypy、`git diff --check` pass | fresh code review pass | explicit manifestはDesign §4.1変更時に意図的同期が必要 | evidence adopted; S07 closed |
 | S08 tests / fixtures | `dev-coder` | E00 candidate 21 rowsを実在fixtureへmaterializeし、SHA-256 matrixとmanifest-only asset apply simulationを追加 | `tests/fixtures/authoring_kit/existing_issue/**`、`tests/unit/infra/test_authoring_kit_assets.py` | preservation 6、authoring全281、S05 combined 335、`make lint`、`git diff --check` pass | fresh QA / code review pass | 17 provenance sourceはuser-owned historical evidenceのため変更時に意図的fixture判断が必要 | evidence adopted; S08 closed |
-| S09 readiness | `repo-analyst` | 357 canonical / branches / Runtime / testsをread-only照合し、IC-1 entry inputの有無を判定 | none | 357 report / refs / `domain/artifacts.py` / Fresh issue test / shared fixture scan | entry blocked by confirmed dependency | 357実装を358から代替しない | evidence adopted; wait for 357 S05/S06/S08/H91 |
+| S09 contract input | `dev-coder` | 358-owned manifest / expected-value / mismatch-routing fixtureを追加し、Planning Level docs-onlyとRuntime非所有を再確認。canonical Design §12との契約bindingも固定 | `tests/unit/infra/test_authoring_kit_assets.py` | S09 23 tests、provider / dogfood parity、Report / catalog / one-plan / Guide scan、consumer/version、canonical Design §12 binding、ruff / format / mypy / diff check | fresh code review pass; no findings | Runtime parser/scaffolder実生成は検証せず、Epic統合が後続で消費する | delegated after fresh plan review; implementation complete |
+| S99 test sync | `dev-coder` | thin Issue template契約へ同期し、旧Assurance markerを期待しない生成回帰テストへ更新 | `tests/cli_runtime/test_new.py`（2 assertion hunks） | targeted full-regression 45 passed / 5 skipped、asset + artifact combined 358、ruff / format / mypy / diff check pass | fresh code rereview pass; no findings | `pr-repair-batch` とfull-regression許可ブロックは変更せず、Runtime / Issue 357は未変更 | delegated; test-only contract synchronization |
+| S10 handoff | `main orchestrator` | 359 / 360向けGuide / inventory / preservation / reserved-link handoffをowner / destination付きで記録 | Issue reportのS10 closure / handoff evidence | duplicate / missing / owner inspection、Epic-level IC-1後続消費条件、`git diff --check` | fresh semantic rereview pass | 359 / 360 canonical docsやskill / installerを変更しない | S09 input complete; handoff recorded; downstream consumption gated by Epic IC-1 |
 
 ### Implementation Delegation Gate
 
@@ -349,13 +394,16 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | S06 tests | delegated | S06 navigation / vocabulary / link欠陥を自動化 | `dev-coder` | `tests/unit/infra/test_authoring_kit_assets.py` | S06 assets、`tc-s06-001` | authoring asset test fileだけ | docs、Runtime、other tests | focused / full / combined、ruff、diff check | path-aware scanがHistoricalを拒否 | changed test、Red / Green、risk | complete: 51 tests追加、combined 322 pass |
 | S07 tests | delegated | explicit owned-manifestでprovider / dogfood parityとrender後linkを固定 | `dev-coder` | `tests/unit/infra/test_authoring_kit_assets.py` | Design §4.1 / §11、S07 contract、`tc-s07-001` | S07 manifest / parity / rendered-link testだけ | Existing node、installed consumer、Runtime / installer、manifest外asset | focused / full / combined、ruff / format / mypy、diff check | Design外projection差、normalized比較、source authority逆転 | changed test、manifest / Red / Green、risk | complete: 33 path、projection drift zero、combined 329 pass |
 | S08 tests / fixtures | delegated | Existing user-owned bytesの不変性をexplicit hash matrixで固定 | `dev-coder` | 21-file preservation fixture + `test_authoring_kit_assets.py` | Design §14 / §15、E00 candidate table、S08 contract、`tc-s08-001` | fixture / preservation helper / S07 manifest-only simulation | Runtime / installer / checked-in Existing node / normalization / rename / delete | focused / full / combined、ruff / format / mypy、diff check | installer変更、S07外asset、Existing rewriteが必要 | changed fixtures / tests、hash matrix / Red / Green、risk | complete: 21 path、before / after delta zero、fresh QA / code pass |
-| S09 readiness | delegated read-only | 357のverified IC inputが利用可能かを判定 | `repo-analyst` | sibling 357 canonical / refs / Runtime / tests | S09 entry contract | read-only inspectionだけ | 358 test/evidence、357 Runtime、Epic IC evidence mutation | exact report / ref / symbol / test evidence | 357 evidence不足、mechanism mismatch | confirmed facts、blocker、safe next action | blocked: 357 implementation not started、H91 input absent |
+| S09 readiness (superseded) | delegated read-only | 旧execution evaluatorが357のverified IC inputをS09前提にしていたため、現行契約との矛盾を記録 | `repo-analyst` | historical sibling 357 readiness evidence | DEC-358-004 / amended R-D-P | read-only inspectionだけ | 358 test/evidence、357 Runtime、Epic IC evidence mutation | stale evaluator resultの保存 | 357 evidence不足を358の停止条件にしない | historical evidence only; superseded by S09 contract input. Current result: 358-owned S09 pass |
 
 ### Closure Coverage
 
 | closure range | owner steps | planning evidence | implementation evidence | state |
 |---|---|---|---|---|
-| `CL-358-001`〜`CL-358-015` | E00、S01〜S10、S90、S99 | amended `plan.md`のClosure Indexとfresh Plan review pass | E00で`CL-358-011/013`をS08 / S10へhandoff。S01で`CL-358-003`、S02/S04で`CL-358-001/002/006`のtemplate部分、S03で`CL-358-004/014`、S05で`CL-358-007/008`、S06で`CL-358-009/015`、S07で`CL-358-010`、S08で`CL-358-011`をclose | in progress |
+| `CL-358-001`〜`CL-358-015` | E00、S01〜S10、S90、S99 | amended `plan.md`のClosure Indexとfresh Plan review pass | E00で`CL-358-011/013`をS08 / S10へhandoff。S01で`CL-358-003`、S02/S04で`CL-358-001/002/006`のtemplate部分、S03で`CL-358-004/014`、S05で`CL-358-007/008`、S06で`CL-358-009/015`、S07で`CL-358-010`、S08で`CL-358-011`をcloseし、S99でIssue-wide gateを完了 | passed |
+| `CL-358-005` | S03 / S09 / S99 | docs-only Planning Level | S03 examples、provider / dogfood Level guides、S09 contract input、canonical Design §12 binding、S99 no-Runtime scan | passed: S09 input、S99 final scan、fresh QA / code / spec review |
+| `CL-358-012` | S09 | Epic-level IC-1 input | 358-owned scope / Report / Artifact / one-plan / Guide manifest、expected values、consumer、contract version、canonical Design §12 binding、mismatch routing | passed: S09 contract tests 23、combined 358、fresh spec pass。実生成比較はEpic後続 |
+| `CL-358-013` | S10 | 359 / 360 handoff | owner / destination付きGuide・retain / replace / historical-only / prune manifest | passed: owner / destination / classification gapなし。実消費はEpic IC-1後 |
 
 ### Closure Delta
 
@@ -364,14 +412,14 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 | E00 plan contradiction | `CL-358-011/013` | E00はread-onlyでfull fixture hashとowner確定を要求していた | completed | completed | E00 candidate inventory、S08 fixture/hash、S10 final ownerへ分離。fresh review pass |
 | S01 / S03 Plan Guide boundary | `CL-358-003/004` | S01がOverviewからPlan Guideへ到達させる一方、旧workflow依存の`issue-plan.md`をS03まで編集禁止としていた | completed | fresh spec / code delta review pass | S01でprovider-neutralなPlan基礎、Current入口、scope-aware Plan導線を実装し、S03はPlanning Level / Completion Guide詳細を所有する。52 tests pass |
 | S04 Report prompt exception | `CL-358-001/006` | RQ-358-001 / Design §5.1の一般prompt規則とAC-358-006 / Design §5.4のempty-valid exact shapeが衝突した | completed | fresh spec rereview pass | 一行promptをR/D/Pへ限定し、Reportは三必須sectionを空本文で開始するspecific contractを維持 |
-| S05 Artifact生成full-regression | `CL-358-007/008` | S05 focused testsはGreenだが、CLI生成testが旧template本文markerを固定してP1 failureになった | completed | repair complete; fresh code / spec rereview pending | PlanのS05 allowed testへ既存Artifact生成caseのcontent markerだけを追加し、six Current markerを現行semanticsへ同期。Runtime / parserは変更せず、指定full-regression 1 passed |
+| S05 Artifact生成full-regression | `CL-358-007/008` | S05 focused testsはGreenだが、CLI生成testが旧template本文markerを固定してP1 failureになった | completed | repair complete; fresh code / spec rereview pass | PlanのS05 allowed testへ既存Artifact生成caseのcontent markerだけを追加し、six Current markerを現行semanticsへ同期。Runtime / parserは変更せず、指定full-regression 1 passed |
 | S05 retired workflow evaluator | `CL-358-007/008` | final spec reviewがProduct Ownerにより非規範化された旧execution guidanceをclosure条件へ再導入した | completed | fresh scope-correct spec review pass | `DEC-358-003`とPlan §1でreview境界を明記。Runtime / report履歴を旧evaluatorへ合わせず、S05 content contractだけを再評価しP0/P1なし |
 
 - `CL-358-010`はS07で33 pathのexplicit manifest、byte-exact parity、rendered relative link、fresh code reviewを満たしてcloseした。
 - `CL-358-011`はS08で21-file fixture、baseline hash、asset apply simulation、negative control、fresh QA / code reviewを満たしてcloseした。
 - generic importは既存tracked ZIPのSHA-256で補完したが、他の不足カテゴリは解消しない。
 - `CL-358-013`に関係するDesign外surfaceは暗黙Deleteしない。Historical recognition、skill contract、distribution pruneが複数Issueに跨り、exact single-owner manifestはS10より前には確定していない。
-- 再開条件は充足した。Plan amendmentとfresh spec review passによりS01へ進める。
+- 再開条件は充足した。2026-08-11のRequirement / Design / Plan amendmentにより、S09を358-owned contract inputとして開始できる。
 
 ### Issue Planning Recovery
 
@@ -387,7 +435,7 @@ E00を開始し、`repo-analyst`へ承認済みPlan §9のread-only baseline調�
 
 | step | target | planned verification | current state |
 |---|---|---|---|
-| S90 | Design §4.1で358-ownedのREADME / Guide / authoring docs / templates | link / vocabulary / wording inspection、fresh spec review | not started |
+| S90 | Design §4.1で358-ownedのREADME / Guide / authoring docs / templates | link / vocabulary / wording inspection、fresh spec review | passed; no-op audit 296 tests、provider / dogfood 33 path parity、relative link / Current-Historical / reserved handoff確認 |
 
 ### Milestone / Commit Candidate Gate
 
@@ -398,8 +446,9 @@ M2 pre-commitでは`make lint`がpassし、S05/S06 combinedは322 passed、通�
 | M0 / E00 | amended Plan fresh `spec-reviewer` pass。P0/P1なし、P2 report同期を反映 | `docs(iss-00358): E00契約をS08/S10分離へ反映` / Plan amendment + E00 report evidence | passed | `d4ca698f0257a36d81557233b9960fd2d9a95e7e` | commit後clean、GitHub upstream同一SHAを確認済み |
 | M1 / S01〜S04 | fresh code / spec review pass。S03 critical P1、S04 prompt P1、禁止語P2を修正済み | `feat(authoring): Issue358向けにauthoringテンプレートを簡素化し薄い文書キットへ刷新` / Guide foundation + thin R/D/P/Report + Planning Levels + asset tests | passed | `1074a4185135e3d1f915a3e3033b0632d82ffca2` | commit後clean、GitHub upstream同一SHAを確認済み |
 | M2 / S05〜S06 | fresh code / spec / report closure review pass。full-regression marker、mandatory detector、navigation link detector、typing P1を修正済み | `docs(authoring): ArtifactとCurrent導線を整理` / Current六Artifact + Artifact Guide + Current / Historical navigation + asset tests | passed | `156afd1984c33b5712e98421c08f28b7117b09a2` | commit後clean、GitHub upstream同一SHAを確認済み |
-| M3 / S07〜S08 | fresh S07 code review、S08 QA / code review pass | `test(authoring): parityと既存文書保持を固定` / 33-path parity + 21-file preservation fixture / test + report evidence | pre-commit passed | pending | pending |
-| M99 / S99 | not reached because S05〜S90 are unfinished | `docs(iss-00358): 最終実装証跡を確定` / final report ledger | planned | not created | not run |
+| M3 / S07〜S08 | fresh S07 code review、S08 QA / code review pass | `test(authoring): parityと既存文書保持を固定` / 33-path parity + 21-file preservation fixture / test + report evidence | passed | `da3b0c6ba2b6946dad343948eb413ee62d612e3b` | commit後clean、GitHub upstream同一SHAを確認済み |
+| M4 / S09〜S90 | S09 plan/code gate、S10 handoff、S90 docs audit pass | `docs(authoring): Epic統合入力と後続handoffを確定` / S09 input + S10 handoff + S90 no-op audit | ready for commit | not created | pre-commit checks pass |
+| M99 / S99 | focused / lint / validate pass; targeted `test_new` full-regression 45 passed / 5 skipped; ordinary suiteは1783 passed / 2 pre-existing Issue 334 fixture failures / 2252 skipped | `docs(iss-00358): 最終実装証跡を確定` / final report ledger | ready for commit | not created | fresh QA / code / spec review pass |
 
 ## 残余リスクと停止条件
 
@@ -407,9 +456,12 @@ M2 pre-commitでは`make lint`がpassし、S05/S06 combinedは322 passed、通�
 - Planning LevelをRuntime state / metadataへ追加せず、level別canonical Planを作らない。
 - Issue 357のRuntime / parser / scaffold mechanismを358から修正しない。IC-1 mismatchはcontentとmechanismへ一意にroutingする。
 - Skill本文、installer inventory、obsolete assetの物理pruneは359 / 360へ渡し、本Issueで先行しない。
-- S09は357 S05/S06 Artifact mechanism、S08 No-Assurance Fresh scaffold、H91 machine-readable IC inputが揃うまで開始しない。358からRuntimeを代替修正しない。
-- PR、merge、Issue close、Epic完了は別workflowであり、本報告では許可・実行しない。
+- S09は358-owned contract inputとして実行し、Issue 357のRuntime / scaffold / H91を待たない。実生成比較はEpic-level後続統合へroutingする。
+- Issue 357のRuntime / parser / scaffold mechanismは358から変更しない。mechanism mismatchは後続Epic統合から該当Runtime Issueへ戻す。
+- Issue 358のPR作成は本Issueのdeliveryに含める。merge、Issue close、Epic完了は実行しない。
+- S99 verification: `tests/unit/infra/test_authoring_kit_assets.py` 304 passed、`tests/unit/infra/test_artifact_templates.py` 54 passed、asset + artifact combined 358 passed、`tests/cli_runtime/test_new.py` 50 skipped、`tests/cli_runtime/test_validate.py` 45 skipped、`tests/unit/infra/test_init_update.py` 5 passed / 570 skipped、`uv run pytest --run-full-regression tests/cli_runtime/test_new.py -q` 45 passed / 5 skipped、`make lint` pass、`./spec-dock/scripts/spec-dock validate` pass (`nodes=221`)、`git diff --check` pass。
+- Ordinary `uv run pytest`: 1783 passed / 2 failed / 2252 skipped。失敗はIssue 334のZIPとGuide fixtureがHEADに存在しないためで、`git cat-file -e HEAD:<path>` は両方status 128、Issue 358差分による削除・変更はない。358-owned checkはこの既存repository riskから分離してGreenとする。
 
 ## 次のアクション
 
-S07 / S08のM3をcommit / push / post-commit checkする。その後はIssue 357がS05/S06 Artifact mechanism、S08 No-Assurance Fresh scaffold、H91 IC-1 inputを実装・検証し、commit SHAとfixture / test pathを提示するまでS09を再開しない。358側のcontent mismatchだけを修正し、copy / parser / filename / Runtime mismatchは357へ返す。
+S09 contract input、S10 handoff、S90 docs impact、S99のfocused / full-regression / lint / validate検証、fresh QA / issue-wide code / spec reviewまで完了した。次はM4/M99のIssue 358 commit、push、main向けmergeable PRを作成する。357との実生成比較と359/360 handoff消費はEpic-level後続統合へ引き渡す。
