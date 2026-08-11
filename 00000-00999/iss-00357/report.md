@@ -572,6 +572,7 @@ Issue 334のArtifact実体に依存する2テストは、ユーザー判断に�
 - provider/dogfood `active_store.py`は、snapshot開始時かつ最初のdurable mutation前に、5つのmanaged JSONとsymlink targetを`st_nlink`で検査し、multiple hard linksを管理対象relative pathだけの診断でfail-closedに拒否する。
 - active manifest、managed index、symlink targetの3ケースは修正前に`DID NOT RAISE RuntimeError`でRed、修正後はsingle-link非回帰2ケースと合わせて`5 passed`。外部alias bytesとtransaction全体のsnapshot不変を確認した。
 - fresh code review `pass` 0.96、QA review `pass` 0.97、spec review `pass` 0.94。P0/P1なし。
+- correction commit `e9da43c89a18ae40f0f50a316d9954762ff884df`をpushし、exact headのGitHub Actions 3 runはすべてsuccess。Codex reviewは`Didn't find any major issues`、観測結果は`passed / merge_prepared`だった。
 
 ### Milestone / Commit Candidate Gate
 
@@ -582,7 +583,7 @@ Issue 334のArtifact実体に依存する2テストは、ユーザー判断に�
 | M2 / S05〜S09 | S05〜S09 closed、fresh code / QA gates、focused / lint / parity pass | `refactor(artifact)!: Current作成とHistorical互換を分離` / S05〜S09 source・tests・issue docs | committed | `daa222ee62e3690e97bd455362d211ba11fa20a9`、54 files | pass: commit直後`git status --short` clean |
 | M3 / S10 | fresh code review pass、findingsなし、confidence 0.99 | `refactor(runtime)!: 旧workflow到達経路を撤去` / approved unreachable graph・tests・report | committed | `89964de616e94ff5cf48182e30026298f93d2e18` | pass: commit直後`git status --short` clean |
 | M4 / S90〜H91 | fresh spec re-review pass、findingsなし、confidence 0.98 | `docs(runtime): Storage Core移行契約を確定` / 10 Runtime docs・H91 report | committed | `c0f908374811e63721125a6548920e4170523010` | pass: commit直後のpost-commit clean check |
-| M99 / S99 | pre-M99 content review、Provider CI / validate、hard-link P1 correction後のfresh三者reviewがpass | `docs(iss-00357): 最終実装証跡を確定`および`R357-HL1` / final report ledger、contract-aligned tests、hard-link guard | correction ready for commit | `51470580...`〜`83f636de...`、R357-HL1 correction commitはpending | local pass: fast 1642、focused 5、lint / parity / diff-check。PR #362再観測はcorrection push後に実施する。Issue 357のmergeと`issue finish`は未実行 |
+| M99 / S99 | pre-M99 content review、Provider CI / validate、hard-link P1 correction後のfresh三者reviewとCodex再観測がpass | `docs(iss-00357): 最終実装証跡を確定`および`R357-HL1` / final report ledger、contract-aligned tests、hard-link guard | committed / synchronized | `51470580...`〜`83f636de...`、R357-HL1 correction `e9da43c89a18ae40f0f50a316d9954762ff884df` | pass: fast 1642、focused 5、lint / parity / diff-check、GitHub Actions 3 run、Codex `no major issues`、observation `merge_prepared`。Issue 357のmergeと`issue finish`は未実行 |
 
 ## 残余リスクと停止条件
 
@@ -595,4 +596,4 @@ Issue 334のArtifact実体に依存する2テストは、ユーザー判断に�
 
 ## 完了済み実装ハンドオフ
 
-head `83f636de5c29c222c7d8855cdffa159bfc8aee12`のProvider CIはpassしたが、Codex reviewのhard-link P1をR357-HL1として修正した。local fast / focused / lint / parity / fresh三者reviewはpass済みであり、correction commit / push後にPR #362のexact new headを再観測する。`issue finish`は実行しない。
+head `83f636de5c29c222c7d8855cdffa159bfc8aee12`のCodex reviewで検出したhard-link P1は、R357-HL1 correction `e9da43c89a18ae40f0f50a316d9954762ff884df`で修正した。local fast / focused / lint / parity / fresh三者review、exact correction headのGitHub Actions、Codex再レビューがすべてpassし、PR #362は`merge_prepared`である。人間がmergeを実行し、`issue finish`は本Issue実装セッションでは実行しない。
