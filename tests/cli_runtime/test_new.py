@@ -180,7 +180,7 @@ class TestCliNew(CliRuntimeHarness):
                     "Planning Level",
                     "目標",
                     "順序・依存",
-                    "実装ステップ",
+                    "実装step",
                     "検証",
                     "rollback",
                     "exit / handoff",
