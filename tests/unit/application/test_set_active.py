@@ -723,6 +723,129 @@ class TestSetActiveApplication:
 
         assert _snapshot_paths(watched) == before
 
+    @pytest.mark.parametrize(
+        ("managed_name", "via_symlink"),
+        [
+            ("active.json", False),
+            ("index.json", False),
+            ("tree.json", True),
+        ],
+    )
+    def test_commit_active_state_rejects_hard_linked_managed_json_before_mutation(
+        self, tmp_path, managed_name, via_symlink
+    ) -> None:
+        _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        from spec_dock_runtime.infra import active_store as infra_active_store
+
+        specdock_dir = tmp_path / "spec-dock"
+        for layer in ("initiative", "epic", "issue"):
+            (specdock_dir / "system" / "active-none" / layer).mkdir(parents=True)
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        active_bytes = b'{"schema_version":2,"initiative":null,"epic":null,"issue":null}\n'
+        (agent_dir / "active.json").write_bytes(active_bytes)
+        managed_bytes = b'{"active":null,"nodes":{"iss-00001":{"status":"done"}}}\n'
+        for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
+            (agent_dir / name).write_bytes(managed_bytes)
+        infra_active_store.apply_active_pointers(specdock_dir, None, "# old context\n")
+
+        managed_path = agent_dir / managed_name
+        external_dir = tmp_path / "outside"
+        external_dir.mkdir()
+        if via_symlink:
+            target_path = external_dir / "managed-target.json"
+            target_path.write_bytes(managed_path.read_bytes())
+            managed_path.unlink()
+            managed_path.symlink_to(target_path)
+        else:
+            target_path = managed_path
+        external_alias = external_dir / "external-alias.json"
+        external_alias.hardlink_to(target_path)
+
+        watched = [
+            agent_dir / "active.json",
+            *(agent_dir / name for name in ("index-all.json", "tree-all.json", "index.json", "tree.json")),
+            specdock_dir / "active",
+            *(specdock_dir / "active" / name for name in ("initiative", "epic", "issue", "context-pack.md")),
+            external_alias,
+        ]
+        before = _snapshot_paths(watched)
+        alias_bytes = external_alias.read_bytes()
+        new_manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(id="iss-00002", path="spec-dock/issues/iss-00002-new"),
+        )
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader([]),
+            repo_root=tmp_path,
+            specdock_dir=specdock_dir,
+            active_state_store=infra_active_store,
+        )
+
+        with pytest.raises(RuntimeError) as exc_info:
+            app_set_active.commit_active_state(
+                persisted_manifest=new_manifest,
+                patch_manifest=new_manifest,
+                ports=ports,
+                context_pack_text="# new context\n",
+            )
+
+        diagnostic = str(exc_info.value)
+        assert "multiple hard links" in diagnostic
+        assert f".agent/{managed_name}" in diagnostic
+        assert external_alias.as_posix() not in diagnostic
+        assert external_dir.as_posix() not in diagnostic
+        assert external_alias.read_bytes() == alias_bytes
+        assert _snapshot_paths(watched) == before
+
+    @pytest.mark.parametrize("managed_kind", ["single_link_file", "single_link_symlink"])
+    def test_commit_active_state_accepts_single_link_managed_json(self, tmp_path, managed_kind) -> None:
+        _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
+        from spec_dock_runtime.infra import active_store as infra_active_store
+
+        specdock_dir = tmp_path / "spec-dock"
+        for layer in ("initiative", "epic", "issue"):
+            (specdock_dir / "system" / "active-none" / layer).mkdir(parents=True)
+        agent_dir = specdock_dir / ".agent"
+        agent_dir.mkdir(parents=True)
+        active_path = agent_dir / "active.json"
+        active_target = agent_dir / "active-target.json"
+        active_bytes = b'{"schema_version":2,"initiative":null,"epic":null,"issue":null}\n'
+        if managed_kind == "single_link_file":
+            active_path.write_bytes(active_bytes)
+        else:
+            active_target.write_bytes(active_bytes)
+            active_path.symlink_to(active_target.name)
+        for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
+            (agent_dir / name).write_text('{"active":null}\n', encoding="utf-8")
+        infra_active_store.apply_active_pointers(specdock_dir, None, "# old context\n")
+
+        new_manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(id="iss-00002", path="spec-dock/issues/iss-00002-new"),
+        )
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader([]),
+            repo_root=tmp_path,
+            specdock_dir=specdock_dir,
+            active_state_store=infra_active_store,
+        )
+
+        written = app_set_active.commit_active_state(
+            persisted_manifest=new_manifest,
+            patch_manifest=new_manifest,
+            ports=ports,
+            context_pack_text="# new context\n",
+        )
+
+        assert written.issue is not None
+        assert written.issue.id == "iss-00002"
+        assert infra_active_store.load_active_manifest(specdock_dir).manifest == new_manifest
+        if managed_kind == "single_link_symlink":
+            assert active_path.is_symlink()
+
     @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
     def test_commit_active_state_rolls_back_root_symlink_and_external_projection(self, tmp_path, fail_phase) -> None:
         _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
