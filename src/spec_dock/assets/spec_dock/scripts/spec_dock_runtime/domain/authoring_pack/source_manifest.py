@@ -11,13 +11,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 DEFAULT_SOURCE_PATHS: tuple[str, ...] = (
-    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/authoring_pack/git_fetch.py",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/authoring_pack/preflight_receipt_writer.py",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/authoring_pack",
-    "spec-dock/scripts/spec_dock_runtime/commands/authoring.py",
     "spec-dock/scripts/spec_dock_runtime/application/authoring_pack",
     "spec-dock/scripts/spec_dock_runtime/domain/authoring_pack",
     "spec-dock/scripts/spec_dock_runtime/infra/authoring_pack/git_fetch.py",

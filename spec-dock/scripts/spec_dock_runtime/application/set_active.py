@@ -3,10 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from spec_dock_runtime.application.check_deps import (
-    load_cached_high_level_github_state_by_id,
-    resolve_high_level_status_context,
-)
 from spec_dock_runtime.application.contracts import (
     ActiveClearResult,
     ActiveSetResult,
@@ -17,25 +13,8 @@ from spec_dock_runtime.application.contracts import (
     ShowActiveRequest,
     TargetRef,
 )
-from spec_dock_runtime.application.github_issue_targets import (
-    collect_repo_scoped_issue_view_targets,
-    normalize_repo_slug,
-)
-from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
-from spec_dock_runtime.application.status_context import resolve_issue_status_context
+from spec_dock_runtime.application.github_issue_targets import normalize_repo_slug
 from spec_dock_runtime.domain.active import resolve_branch_decision
-from spec_dock_runtime.domain.authority import (
-    AUTHORITY_APPROVED,
-    GRANT_IMPLEMENTATION_START,
-    GRANT_ISSUE_FINISH,
-    approved_runtime_grants,
-    approved_runtime_promotion_record,
-    evaluate_authority_gate,
-    evaluate_evidence_adoption_ledger_gate,
-    load_evidence_adoption_ledger_entries,
-    validate_delegated_authority_artifact,
-)
-from spec_dock_runtime.domain.deps import evaluate_readiness, validate_deps_cycles, validate_raw_node_dependency_graph
 from spec_dock_runtime.domain.ids import format_id, parse_id
 from spec_dock_runtime.domain.models import (
     ActiveSelection,
@@ -109,7 +88,7 @@ def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: 
     return None
 
 
-def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo_slug: str | None = None) -> str:
+def resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
     if target.kind == "github_issue":
         if target.github_issue_number is None:
             raise RuntimeError("TargetRef.github_issue_number is required")
@@ -121,18 +100,15 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo
         ]
         target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
         if target_repo_slug is not None:
-            allow_current_unscoped = current_repo_slug is not None and target_repo_slug == current_repo_slug
-            scoped = [
+            exact_scoped = [
                 node
                 for node in matches
-                if (
-                    normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
-                    or (
-                        allow_current_unscoped
-                        and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
-                    )
-                )
+                if normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
             ]
+            unscoped = [
+                node for node in matches if normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+            ]
+            scoped = exact_scoped or unscoped
             if not scoped:
                 raise RuntimeError(
                     "No node found for "
@@ -192,41 +168,8 @@ def _append_unique(warnings: list[str], warning: str) -> None:
         warnings.append(warning)
 
 
-def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
-    if ports.derived_state_reader is None:
-        return {}
-    loader = getattr(ports.derived_state_reader, "load_cached_issue_last_sync_at_by_id", None)
-    if not callable(loader):
-        return {}
-    loaded = loader(specdock_dir)
-    if not isinstance(loaded, dict):
-        return {}
-    out: dict[str, str | None] = {}
-    for issue_id, value in loaded.items():
-        if not isinstance(issue_id, str):
-            continue
-        if value is None:
-            out[issue_id] = None
-            continue
-        if isinstance(value, str):
-            normalized = value.strip()
-            out[issue_id] = normalized or None
-    return out
-
-
-def _validate_raw_node_dependency_preflight(ports: Ports, specdock_dir: Path, graph: SpecGraph) -> None:
-    load_node_resolutions = getattr(ports.deps_topology_reader, "load_node_dependency_resolutions", None)
-    if not callable(load_node_resolutions):
-        return
-
-    raw_node_depends_on_map = {
-        src_id: [resolution.resolved_node_id for resolution in resolutions]
-        for src_id, resolutions in load_node_resolutions(specdock_dir, graph).items()
-    }
-    validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
-
-
 def build_context_pack_text(manifest: ActiveManifest, *, repo_root: Path | None = None) -> str:
+    del repo_root
     has_init = manifest.initiative is not None
     has_epic = manifest.epic is not None
     has_issue = manifest.issue is not None
@@ -241,47 +184,6 @@ def build_context_pack_text(manifest: ActiveManifest, *, repo_root: Path | None 
     lines.append(f"- initiative: {init_id}")
     lines.append(f"- epic: {epic_id}")
     lines.append(f"- issue: {issue_id}")
-    lines.append("")
-    lines.append("## Authority")
-    lines.append("- source: `spec-dock/.agent/active.json`")
-    lines.append(
-        "- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion."
-    )
-    for label, entry in (
-        ("initiative", manifest.initiative if has_init else None),
-        ("epic", manifest.epic if has_epic else None),
-        ("issue", manifest.issue if has_issue else None),
-    ):
-        if entry is None:
-            lines.append(f"- {label}: authority=(none), grants=[]")
-            continue
-        authority = entry.authority or "missing"
-        grants = ", ".join(entry.grants) if entry.grants else ""
-        lines.append(f"- {label}: authority={authority}, grants=[{grants}]")
-        implementation_result = evaluate_authority_gate(
-            authority=entry.authority,
-            grants=entry.grants,
-            promotion_record=entry.promotion_record,
-            required_grant=GRANT_IMPLEMENTATION_START,
-            purpose="context_pack_implementation",
-        )
-        finish_result = evaluate_authority_gate(
-            authority=entry.authority,
-            grants=entry.grants,
-            promotion_record=entry.promotion_record,
-            required_grant=GRANT_ISSUE_FINISH,
-            purpose="context_pack_finish",
-        )
-        downstream_blocks = _context_pack_scope_downstream_blocks(label, entry, repo_root=repo_root)
-        if implementation_result.ok and finish_result.ok and not downstream_blocks:
-            lines.append(f"- {label}: authoritative_input=implementation,finish")
-        else:
-            reasons = _ordered_unique(
-                reason
-                for reason in (implementation_result.reason, finish_result.reason, *downstream_blocks)
-                if reason != "ok"
-            )
-            lines.append(f"- {label}: authoritative_input=none, downstream_block={','.join(reasons)}")
     lines.append("")
     lines.append("## Generated state")
     lines.append("- entry: `spec-dock/.agent/active.json`")
@@ -330,44 +232,6 @@ def _build_context_pack_text(manifest: ActiveManifest, *, repo_root: Path | None
     return build_context_pack_text(manifest, repo_root=repo_root)
 
 
-def _context_pack_scope_downstream_blocks(
-    label: str,
-    entry: ActiveManifestEntry,
-    *,
-    repo_root: Path | None,
-) -> tuple[str, ...]:
-    del label
-    if repo_root is None or entry.path is None:
-        return ()
-    scope_dir = repo_root / entry.path
-    blocks: list[str] = []
-    for artifact_name in ("design.md", "plan.md"):
-        artifact_path = scope_dir / artifact_name
-        for purpose in ("context_pack_implementation", "context_pack_finish"):
-            result = validate_delegated_authority_artifact(artifact_path, purpose=purpose)
-            if result.ok:
-                continue
-            blocks.append(result.reason)
-    ledger_result = evaluate_evidence_adoption_ledger_gate(
-        load_evidence_adoption_ledger_entries(scope_dir / "report.md"),
-        target_artifact="*",
-        purpose="context_pack",
-    )
-    if not ledger_result.ok:
-        blocks.append(ledger_result.reason)
-        if ledger_result.blocking_entry_id is not None:
-            blocks.append(f"blocking_entry_id={ledger_result.blocking_entry_id}")
-    return tuple(blocks)
-
-
-def _ordered_unique(values) -> list[str]:
-    out: list[str] = []
-    for value in values:
-        if value not in out:
-            out.append(value)
-    return out
-
-
 def show_active(req: ShowActiveRequest, ports: Ports) -> ActiveViewResult:
     del req
     if ports.active_state_store is None:
@@ -395,9 +259,6 @@ def build_active_manifest(selection: ActiveSelection, graph: SpecGraph, *, repo_
         return ActiveManifestEntry(
             id=node.id,
             path=_to_repo_relative_specdock_path(node.path, repo_root=repo_root),
-            authority=AUTHORITY_APPROVED,
-            grants=approved_runtime_grants(),
-            promotion_record=approved_runtime_promotion_record(node_id=node.id),
         )
 
     return ActiveManifest(
@@ -431,7 +292,7 @@ def commit_active_state(
         raise
 
 
-def _checkout_before_write(
+def checkout_active_target(
     *,
     graph: SpecGraph,
     target_id: str,
@@ -463,14 +324,11 @@ def _checkout_before_write(
 def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if ports.active_state_store is None:
         raise RuntimeError("active_state_store is required")
-    if ports.deps_topology_reader is None:
-        raise RuntimeError("deps_topology_reader is required")
 
     records = ports.node_reader.load_node_records()
     if not records:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
     graph = build_graph([_to_spec_node_seed(record) for record in records])
-    current_repo_slug = resolve_current_repo_slug(ports)
     specdock_dir = _resolve_specdock_dir(ports)
     warnings: list[str] = []
 
@@ -478,117 +336,19 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     for warning in current.warnings:
         _append_unique(warnings, warning)
 
-    target_id = _resolve_target_node_id(graph, req.target, current_repo_slug=current_repo_slug)
-    target_node = graph.nodes_by_id.get(target_id)
-    if target_node is None:
-        raise RuntimeError(f"Node not found: {target_id}")
-    _validate_raw_node_dependency_preflight(ports, specdock_dir, graph)
-    topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
-    issue_depends_on_map = dict(topology.issue_depends_on_map)
-    for warning in topology.warnings:
-        _append_unique(warnings, warning)
-    validate_deps_cycles(issue_depends_on_map)
-
-    issue_snapshots = None
-    if req.use_github:
-        if ports.issue_gateway is None:
-            raise RuntimeError("issue_gateway is required when --github is enabled")
-        issue_snapshots = []
-        issue_index_snapshots = []
-        try:
-            issue_index_snapshots = ports.issue_gateway.issue_index(
-                _resolve_repo_root(ports),
-                limit=int(req.issue_limit),
-            )
-        except RuntimeError:
-            _append_unique(warnings, "gh_fetch_failed")
-        else:
-            issue_snapshots.extend(issue_index_snapshots)
-        repo_scoped_targets = collect_repo_scoped_issue_view_targets(
-            graph,
-            issue_index_snapshots=issue_index_snapshots,
-            current_repo_slug=current_repo_slug,
-        )
-        for repo_slug, issue_number in repo_scoped_targets:
-            try:
-                snapshot = ports.issue_gateway.issue_view_snapshot(
-                    _resolve_repo_root(ports),
-                    issue_number,
-                    repo_slug=repo_slug,
-                )
-            except RuntimeError:
-                _append_unique(warnings, "gh_fetch_failed")
-                continue
-            issue_snapshots.append(snapshot)
-
-    cached_issue_status_by_id: dict[str, str] = {}
-    cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
-    cached_high_level_github_state_by_id: dict[str, str] = {}
-    if ports.derived_state_reader is not None:
-        cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
-        cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
-        if not req.use_github:
-            cached_high_level_github_state_by_id = load_cached_high_level_github_state_by_id(specdock_dir)
-
-    status_context = resolve_issue_status_context(
-        graph,
-        github_enabled=req.use_github,
-        issue_snapshots=issue_snapshots,
-        cached_issue_status_by_id=cached_issue_status_by_id,
-        cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
-        current_repo_slug=current_repo_slug,
-    )
-    for warning in status_context.warnings:
-        _append_unique(warnings, warning)
-
-    deps = evaluate_readiness(
-        graph,
-        issue_depends_on_map=issue_depends_on_map,
-        target_id=NodeId(target_id),
-        issue_statuses=status_context.issue_statuses,
-        dependency_contexts_by_issue_id=topology.dependency_contexts_by_issue_id,
-        high_level_statuses_by_node_id=resolve_high_level_status_context(
-            graph,
-            issue_statuses=status_context.issue_statuses,
-            cached_high_level_github_state_by_id=cached_high_level_github_state_by_id,
-        ),
-    )
-    blockers = list(deps.blockers)
-    guard_ready = deps.ready
-    if not guard_ready:
-        if deps.node_blockers or not req.force:
-            lines = [
-                (
-                    "active set blocked: "
-                    f"target={target_id} ready=false guard_reason={deps.guard_reason} blockers={len(blockers)}"
-                )
-            ]
-            for blocker in blockers:
-                lines.append(f"- {blocker}")
-            for blocker in deps.node_blockers:
-                lines.append(
-                    "- node_blocker: "
-                    f"{blocker.node_id} reason={blocker.reason} "
-                    f"state={blocker.state} source={blocker.state_source} "
-                    f"dependency_disposition={blocker.dependency_disposition or '-'} "
-                    f"disposition_basis={blocker.disposition_basis or '-'}"
-                )
-            raise RuntimeError("\n".join(lines))
-        _append_unique(
-            warnings,
-            (
-                "deps_blocked: active set target is blocked; continuing due to --force: "
-                f"target={target_id} guard_reason={deps.guard_reason} blockers={len(blockers)}"
-            ),
-        )
-        for blocker in blockers:
-            _append_unique(warnings, f"blocker: {blocker}")
+    target_id = resolve_target_node_id(graph, req.target)
 
     selection = select_active_chain(graph, NodeId(target_id))
-
-    branch: BranchDecision | None = None
-    if req.checkout:
-        branch = _checkout_before_write(graph=graph, target_id=target_id, ports=ports, warnings=warnings)
+    branch = (
+        checkout_active_target(
+            graph=graph,
+            target_id=target_id,
+            ports=ports,
+            warnings=warnings,
+        )
+        if req.checkout
+        else None
+    )
 
     manifest = build_active_manifest(selection, graph, repo_root=_resolve_repo_root(ports))
     context_pack_text = _build_context_pack_text(manifest, repo_root=_resolve_repo_root(ports))

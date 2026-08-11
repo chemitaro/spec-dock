@@ -211,7 +211,7 @@ def _validate_artifact_filenames(graph: SpecGraph, *, repo_root: Path | None = N
     )
     for scope in scopes:
         artifacts_dir = scope.path / "artifacts"
-        if not artifacts_dir.exists():
+        if not artifacts_dir.exists() and not artifacts_dir.is_symlink():
             continue
         error, _artifact_ids = scan_artifact_duplicate_state(artifacts_dir)
         if error is None:

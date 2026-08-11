@@ -71,29 +71,6 @@ def _add_active_set_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--id", help="Explicit node id target (e.g. iss-00123 / epic-local-00001)")
     parser.add_argument("--github-issue", type=int, help="Explicit GitHub issue number target (e.g. 123)")
-    checkout_group = parser.add_mutually_exclusive_group()
-    checkout_group.add_argument(
-        "--checkout",
-        action="store_true",
-        help="After setting active, create/switch to the desired branch (<id>-<slug>, fallback: <id>).",
-    )
-    checkout_group.add_argument(
-        "--no-checkout",
-        dest="checkout",
-        action="store_false",
-        help="Set active only and skip branch operations (default).",
-    )
-    parser.set_defaults(checkout=False)
-    github_group = parser.add_mutually_exclusive_group()
-    github_group.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI (deps guard)")
-    github_group.add_argument("--no-github", action="store_true", help="Use cached issue states without calling gh CLI")
-    parser.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
-    parser.add_argument(
-        "-f",
-        "--force",
-        action="store_true",
-        help="Ignore deps guard and set active anyway (prints blockers as warnings)",
-    )
 
 
 def _add_active_show_arguments(parser: argparse.ArgumentParser) -> None:

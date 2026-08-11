@@ -8,9 +8,9 @@
 ./spec-dock/scripts/spec-dock deps check --github-issue <n> [--github|--no-github] [--gh-limit N] [--json]
 ./spec-dock/scripts/spec-dock deps add --from <node-id> --to <node-id>
 ./spec-dock/scripts/spec-dock deps remove --from <node-id> --to <node-id>
-./spec-dock/scripts/spec-dock active set <target> [--github|--no-github] [--gh-limit N] [--force|-f] [--checkout]
-./spec-dock/scripts/spec-dock active set --id <node-id> [--github|--no-github] [--gh-limit N] [--force|-f] [--checkout]
-./spec-dock/scripts/spec-dock active set --github-issue <n> [--github|--no-github] [--gh-limit N] [--force|-f] [--checkout]
+./spec-dock/scripts/spec-dock issue start <target> [--force|-f] [--gh-limit N]
+./spec-dock/scripts/spec-dock issue start --id <node-id> [--force|-f] [--gh-limit N]
+./spec-dock/scripts/spec-dock issue start --github-issue <n> [--force|-f] [--gh-limit N]
 ./spec-dock/scripts/spec-dock sync [--github|--no-github] [--gh-limit N] [--no-update-active] [--force]
 ```
 
@@ -141,8 +141,8 @@ unknown は fail-closed です。unknown high-level target や unknown descendan
 
 ## 6. 下流境界メモ（downstream boundary note）
 
-- `deps check`、`active set`、`validate`、`sync`、`delete` は compiled dependency result を消費する downstream consumer です。
-- `deps check` / `active set` / `issue start` / `sync` の readiness interpretation は、issue blockers、node blockers、satisfied dependencies、unknown fail-closed を含む同じ readiness evaluation に基づきます。
+- `deps check`、`issue start`、`sync`、`validate`、`delete` は compiled dependency result を消費する downstream consumer です。
+- `deps check` / `issue start` / `sync` の readiness interpretation は、issue blockers、node blockers、satisfied dependencies、unknown fail-closed を含む同じ readiness evaluation に基づきます。`active set` は selection-only であり、dependency を評価しません。
 - `.agent/deps-issues.json` は schema v2 の readiness / blocker context artifact です。`projection` は `issue-readiness-with-dependency-context`、`source.sync_state` は `readiness_evaluation` です。
 - `deps-issues` には typed issue blockers、typed node blockers、satisfied dependencies が含まれます。todo-only `index.json` の再パース結果ではありません。
 - `.agent/deps-issues.json` の `nodes` / `edges` は active readiness graph です。done / closed / satisfied-only context は active graph から省かれることがあります。

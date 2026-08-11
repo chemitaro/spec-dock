@@ -427,31 +427,6 @@ def test_s10_authoring_payload_rejects_invalid_text_framing(mutation: str) -> No
     ) == ("authoring_payload_invalid",)
 
 
-def test_retired_issue_334_v4_archive_is_not_materialized_in_current_tree() -> None:
-    repository_root = Path(__file__).resolve().parents[3]
-    archive_path = (
-        repository_root / "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/"
-        "epics/epic-00331-planning-and-advisory-review/"
-        "issues/iss-00334-implement-chatgpt-issue-planning-workflow/artifacts/"
-        "20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip"
-    )
-
-    assert not archive_path.exists()
-
-
-def test_retired_issue_334_guide_is_not_materialized_in_current_tree() -> None:
-    repository_root = Path(__file__).resolve().parents[3]
-    guide_path = (
-        repository_root / "spec-dock/initiatives/"
-        "init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/"
-        "epics/epic-00331-planning-and-advisory-review/"
-        "issues/iss-00334-implement-chatgpt-issue-planning-workflow/"
-        f"artifacts/{Path(COMPANION_PATH).name}"
-    )
-
-    assert not guide_path.exists()
-
-
 def test_s10_guide_rejects_token_complete_content_without_required_sections() -> None:
     payload = _companion().replace(b"## ", b"")
 

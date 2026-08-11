@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib
+import os
 from pathlib import Path
+import stat
 import sys
 
 
@@ -65,3 +67,35 @@ def test_copy_scaffolded_tree_exact_copy_is_path_agnostic(tmp_path: Path) -> Non
 
     assert {path.relative_to(destination) for path in created} == set(relative_paths)
     assert all((destination / relative_path).read_bytes() == source_bytes for relative_path in relative_paths)
+
+
+def test_copy_scaffolded_tree_at_preserves_legacy_mode_semantics(tmp_path: Path) -> None:
+    scaffolder = _template_scaffolder()
+    source = tmp_path / "source"
+    legacy_destination = tmp_path / "legacy"
+    fd_destination = tmp_path / "fd"
+    fixtures = {
+        "unchanged.txt": "ordinary\n",
+        "unchanged-script": "#!/bin/sh\necho ok\n",
+        "rendered.txt": "id=<ISS_ID>\n",
+        "rendered-script": "#!/bin/sh\nid=<ISS_ID>\n",
+    }
+    for name, content in fixtures.items():
+        path = source / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        path.chmod(0o640)
+
+    replacements = {"<ISS_ID>": "iss-00001"}
+    scaffolder.copy_scaffolded_tree(source, legacy_destination, replacements)
+    fd_destination.mkdir()
+    destination_fd = os.open(fd_destination, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        scaffolder.copy_scaffolded_tree_at(source, fd_destination, destination_fd, replacements)
+    finally:
+        os.close(destination_fd)
+
+    for name in fixtures:
+        legacy_mode = stat.S_IMODE((legacy_destination / name).stat().st_mode)
+        fd_mode = stat.S_IMODE((fd_destination / name).stat().st_mode)
+        assert fd_mode == legacy_mode, name

@@ -1,4 +1,6 @@
 import contextlib
+import errno
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,8 +15,329 @@ from tests.cli_runtime.harness import (
     main,
 )
 
+_S06_HISTORICAL_POSITIVE_FILENAMES = (
+    ("artifacts", "20260810t010101z-pr-repair-batch-review-fix.md"),
+    ("artifacts", "20260810t010102z-draft-requirement-requirement.md"),
+    ("artifacts", "20260810t010103z-draft-design-design.md"),
+    ("artifacts", "20260810t010104z-draft-plan-plan.md"),
+    ("artifacts", "20260810t010105z-scratch-capture.md"),
+    ("artifacts", "20260810t010106z-note-handoff.md"),
+    ("artifacts", "001-adr-token-rotation.md"),
+    ("artifacts", "002-disc-api-options.md"),
+    ("artifacts", "003-note-kickoff-memo.md"),
+    ("artifacts", "20260810t010107z--Report FINAL.PDF"),
+    ("artifacts", "20260810t010108z-07--opaque.md"),
+    ("artifacts", "20260810t010109z-notes.md"),
+    ("artifacts", "20260810t010110z-research-research.md"),
+    ("artifacts", "20260810t010111z-interview-hearing.md"),
+    ("artifacts", "20260810t010112z-disc-options.md"),
+    ("artifacts", "20260810t010113z-decision-candidate-choice.md"),
+    ("artifacts", "20260810t010114z-adr-decision.md"),
+    ("discussions", "20260810t010115z-disc-legacy.md"),
+    ("discussions", "20260810t010116z-01-note-legacy.md"),
+    ("discussions", "001-adr-legacy.md"),
+    ("discussions", "002-disc-legacy.md"),
+    ("discussions", "003-research-legacy.md"),
+    ("discussions", "004-note-legacy.md"),
+)
+
+_S06_MALFORMED_ARTIFACT_FILENAMES = (
+    "20260810t010101z-analysis-unknown.md",
+    "20260810T010101z-adr-upper-t.md",
+    "20260810t01010z-adr-short-time.md",
+    "20261340t256199z-adr-impossible-time.md",
+    "20260810t010101z-00-note-bad-slot.md",
+    "001-scratch-not-in-sequential-catalog.md",
+)
+
+
+def _path_sha256_snapshot(root: Path) -> dict[str, tuple[str, str]]:
+    snapshot: dict[str, tuple[str, str]] = {}
+    for path in sorted(root.rglob("*"), key=lambda candidate: candidate.as_posix()):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            snapshot[relative] = ("symlink", path.readlink().as_posix())
+        elif path.is_file():
+            snapshot[relative] = ("file", hashlib.sha256(path.read_bytes()).hexdigest())
+        elif path.is_dir():
+            snapshot[relative] = ("dir", "")
+    return snapshot
+
+
+def _raw_directory_entries(root: Path) -> tuple[bytes, ...]:
+    with os.scandir(os.fsencode(root)) as entries:
+        return tuple(sorted(os.fsencode(entry.name) for entry in entries))
+
+
+def _s06_issue_dir(target: Path) -> Path:
+    return (
+        target
+        / "spec-dock"
+        / "initiatives"
+        / "init-00001-auth-platform"
+        / "epics"
+        / "epic-00002-jwt-auth"
+        / "issues"
+        / "iss-00003-add-refresh-token"
+    )
+
 
 class TestCliValidate(CliRuntimeHarness):
+    @pytest.mark.skipif(os.name != "posix", reason="raw non-UTF-8 filename fixture requires POSIX bytes paths")
+    def test_validate_and_doctor_diagnose_raw_non_utf8_generic_basename_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            artifacts_dir = _s06_issue_dir(target) / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            raw_filename = b"20260810t010101z--invalid-\xff.bin"
+            artifacts_fd = os.open(artifacts_dir, os.O_RDONLY)
+            try:
+                sentinel_filename = b"raw-filename-capability-sentinel"
+                sentinel_fd = os.open(
+                    sentinel_filename,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=artifacts_fd,
+                )
+                os.close(sentinel_fd)
+                os.unlink(sentinel_filename, dir_fd=artifacts_fd)
+                try:
+                    raw_fd = os.open(
+                        raw_filename,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        0o600,
+                        dir_fd=artifacts_fd,
+                    )
+                except OSError as exc:
+                    if exc.errno in (errno.EILSEQ, errno.EPERM):
+                        errno_name = errno.errorcode[exc.errno]
+                        pytest.skip(
+                            "filesystem rejects raw non-UTF-8 filename bytes after normal sentinel creation: "
+                            f"errno={errno_name}"
+                        )
+                    raise
+                try:
+                    os.write(raw_fd, b"raw non-utf8 artifact\n")
+                finally:
+                    os.close(raw_fd)
+                before_entries = _raw_directory_entries(artifacts_dir)
+                read_fd = os.open(raw_filename, os.O_RDONLY, dir_fd=artifacts_fd)
+                try:
+                    before_content = os.read(read_fd, 4096)
+                finally:
+                    os.close(read_fd)
+            finally:
+                os.close(artifacts_fd)
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            diagnosed = self._run_runtime_capture(target, ["doctor"])
+
+            assert validated.returncode != 0, validated.stdout + validated.stderr
+            assert "Malformed artifact filename" in validated.stderr
+            assert "Traceback" not in validated.stderr
+            assert diagnosed.returncode != 0, diagnosed.stdout + diagnosed.stderr
+            assert "[malformed_artifact]" in diagnosed.stderr
+            assert "Traceback" not in diagnosed.stderr
+            artifacts_fd = os.open(artifacts_dir, os.O_RDONLY)
+            try:
+                assert _raw_directory_entries(artifacts_dir) == before_entries
+                read_fd = os.open(raw_filename, os.O_RDONLY, dir_fd=artifacts_fd)
+                try:
+                    assert os.read(read_fd, 4096) == before_content
+                finally:
+                    os.close(read_fd)
+            finally:
+                os.close(artifacts_fd)
+
+    @pytest.mark.parametrize(
+        "malformed_name",
+        (
+            None,
+            "20260810t010101z-analysis-direct-control.md",
+            "20260230t120000z--capture.html",
+        ),
+    )
+    def test_validate_and_doctor_preserve_timestamp_intent_authoring_pack_directory_without_accept_all(
+        self,
+        malformed_name: str | None,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            artifacts_dir = _s06_issue_dir(target) / "artifacts"
+            authoring_pack = artifacts_dir / "20260707t164532z-chatgpt-final-authoring-pack"
+            (authoring_pack / "epic").mkdir(parents=True)
+            (authoring_pack / "issues" / "01-slice").mkdir(parents=True)
+            (authoring_pack / "README.md").write_bytes(b"authoring pack\n")
+            (authoring_pack / "manifest.json").write_bytes(b'{"kind":"authoring-pack"}\n')
+            (authoring_pack / "epic" / "requirement.md").write_bytes(b"# Requirement\n")
+            (authoring_pack / "issues" / "01-slice" / "plan.md").write_bytes(b"# Plan\n")
+            attachment = artifacts_dir / "20260807t155105z-disc-new-member-onboarding-guide.html"
+            attachment.write_bytes(b"<html><body>out-of-band attachment</body></html>\n")
+            generic_html = artifacts_dir / "20260807t155106z--new-member-onboarding-guide.html"
+            generic_html.write_bytes(b"<html><body>generic import</body></html>\n")
+            if malformed_name is not None:
+                (artifacts_dir / malformed_name).write_bytes(b"direct malformed control\n")
+            before = _path_sha256_snapshot(target)
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            diagnosed = self._run_runtime_capture(target, ["doctor"])
+
+            if malformed_name is not None:
+                assert validated.returncode != 0, validated.stdout + validated.stderr
+                assert "Malformed artifact filename" in validated.stderr
+                assert malformed_name in validated.stderr
+                assert diagnosed.returncode != 0, diagnosed.stdout + diagnosed.stderr
+                assert "[malformed_artifact]" in diagnosed.stderr
+                assert malformed_name in diagnosed.stderr
+            else:
+                assert validated.returncode == 0, validated.stdout + validated.stderr
+                assert diagnosed.returncode == 0, diagnosed.stdout + diagnosed.stderr
+            assert _path_sha256_snapshot(target) == before
+
+    @pytest.mark.parametrize(("surface", "filename"), _S06_HISTORICAL_POSITIVE_FILENAMES)
+    def test_validate_and_doctor_preserve_explicit_historical_catalog(
+        self,
+        surface: str,
+        filename: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = _s06_issue_dir(target)
+            destination_dir = issue_dir / surface
+            destination_dir.mkdir(parents=True, exist_ok=True)
+            (destination_dir / filename).write_bytes(f"historical:{surface}:{filename}\n".encode())
+            before = _path_sha256_snapshot(target)
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            diagnosed = self._run_runtime_capture(target, ["doctor"])
+
+            assert validated.returncode == 0, validated.stdout + validated.stderr
+            assert diagnosed.returncode == 0, diagnosed.stdout + diagnosed.stderr
+            assert _path_sha256_snapshot(target) == before
+
+    @pytest.mark.parametrize("filename", _S06_MALFORMED_ARTIFACT_FILENAMES)
+    def test_validate_and_doctor_diagnose_only_explicit_malformed_artifact_controls_without_mutation(
+        self,
+        filename: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            artifacts_dir = _s06_issue_dir(target) / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            (artifacts_dir / filename).write_bytes(b"malformed historical control\n")
+            before = _path_sha256_snapshot(target)
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            diagnosed = self._run_runtime_capture(target, ["doctor"])
+
+            assert validated.returncode != 0, validated.stdout + validated.stderr
+            assert "Malformed artifact filename" in validated.stderr
+            assert filename in validated.stderr
+            assert diagnosed.returncode != 0, diagnosed.stdout + diagnosed.stderr
+            assert "[malformed_artifact]" in diagnosed.stderr
+            assert filename in diagnosed.stderr
+            assert _path_sha256_snapshot(target) == before
+
+    @pytest.mark.parametrize(
+        ("filenames", "expected"),
+        (
+            (
+                ("20260810t010101z-note-first.md", "20260810t010101z-note-second.md"),
+                "Duplicate artifact id detected",
+            ),
+            (
+                ("20260810t010101z-scratch-first.md", "20260810t010101z-draft-plan-second.md"),
+                "Duplicate artifact timestamp slot detected",
+            ),
+            (
+                ("001-adr-first.md", "001-adr-second.md"),
+                "Duplicate artifact id detected",
+            ),
+        ),
+    )
+    def test_validate_and_doctor_preserve_duplicate_artifacts_while_reporting_actionable_diagnostic(
+        self,
+        filenames: tuple[str, str],
+        expected: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            artifacts_dir = _s06_issue_dir(target) / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            for filename in filenames:
+                (artifacts_dir / filename).write_bytes(filename.encode())
+            before = _path_sha256_snapshot(target)
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            diagnosed = self._run_runtime_capture(target, ["doctor"])
+
+            assert validated.returncode != 0, validated.stdout + validated.stderr
+            assert expected in validated.stderr
+            assert diagnosed.returncode != 0, diagnosed.stdout + diagnosed.stderr
+            assert "[duplicate_artifact]" in diagnosed.stderr
+            assert expected in diagnosed.stderr
+            assert _path_sha256_snapshot(target) == before
+
+    @pytest.mark.parametrize(
+        "unsafe_kind",
+        (
+            "artifact-file-symlink",
+            "artifacts-directory-symlink",
+            "dangling-artifacts-directory-symlink",
+        ),
+    )
+    def test_validate_and_doctor_preserve_unsafe_artifact_paths_while_reporting_actionable_diagnostic(
+        self,
+        unsafe_kind: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = _s06_issue_dir(target)
+            artifacts_dir = issue_dir / "artifacts"
+            external = target / "external-artifacts"
+            if unsafe_kind != "dangling-artifacts-directory-symlink":
+                external.mkdir()
+            external_file = external / "outside.md"
+            if external.exists():
+                external_file.write_bytes(b"external artifact\n")
+            if unsafe_kind == "artifact-file-symlink":
+                artifacts_dir.mkdir(parents=True, exist_ok=True)
+                (artifacts_dir / "20260810t010101z-note-external.md").symlink_to(external_file)
+            else:
+                shutil.rmtree(artifacts_dir)
+                artifacts_dir.symlink_to(external, target_is_directory=True)
+            if unsafe_kind == "dangling-artifacts-directory-symlink":
+                assert artifacts_dir.is_symlink()
+                assert artifacts_dir.readlink() == external
+                assert not external.exists()
+            before = _path_sha256_snapshot(target)
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            diagnosed = self._run_runtime_capture(target, ["doctor"])
+
+            assert validated.returncode != 0, validated.stdout + validated.stderr
+            assert "Unsafe artifact" in validated.stderr
+            assert diagnosed.returncode != 0, diagnosed.stdout + diagnosed.stderr
+            assert "[unsafe_artifact]" in diagnosed.stderr
+            assert "Unsafe artifact" in diagnosed.stderr
+            assert _path_sha256_snapshot(target) == before
+            if unsafe_kind == "dangling-artifacts-directory-symlink":
+                assert artifacts_dir.is_symlink()
+                assert artifacts_dir.readlink() == external
+                assert not external.exists()
+
     def test_validate_rejects_missing_or_invalid_required_meta_identity_fields(self) -> None:
         cases = (
             ("type", None, "field=type"),
@@ -679,7 +1002,7 @@ class TestCliValidate(CliRuntimeHarness):
             assert "id=20260701t010101z-adr" in p.stderr
             assert "Duplicate discussion" not in p.stderr
 
-    def test_validate_blocks_proposed_or_missing_metadata_delegated_draft_artifacts(self) -> None:
+    def test_validate_legacy_delegated_authority_metadata_is_content_invariant(self) -> None:
         cases = (
             (
                 "proposed delegated draft",
@@ -748,12 +1071,11 @@ class TestCliValidate(CliRuntimeHarness):
 
                 p = self._run_runtime_capture(target, ["validate"])
 
-                assert p.returncode != 0, p.stdout + p.stderr
-                assert "Delegated draft authority incomplete/blocked" in p.stderr
-                assert expected_reason in p.stderr
-                assert "design.md" in p.stderr
+                assert p.returncode == 0, f"{expected_reason}: {p.stdout}{p.stderr}"
+                assert "spec-dock: ok (validate)" in p.stdout
+                assert "Delegated draft authority" not in p.stderr
 
-    def test_validate_blocks_scope_local_evidence_adoption_ledger_entries(self) -> None:
+    def test_validate_legacy_evidence_adoption_ledger_is_content_invariant(self) -> None:
         cases = (
             ("blocked", "EAL-021", "blocked", "EAL-021"),
             ("stale", "EAL-022", "stale", "EAL-022"),
@@ -790,10 +1112,9 @@ class TestCliValidate(CliRuntimeHarness):
 
                 p = self._run_runtime_capture(target, ["validate"])
 
-                assert p.returncode != 0, p.stdout + p.stderr
-                assert "Evidence Adoption Ledger incomplete/blocked" in p.stderr
-                assert f"evidence_ledger_{expected_status}" in p.stderr
-                assert expected_entry_id in p.stderr
+                assert p.returncode == 0, f"{expected_status}/{expected_entry_id}: {p.stdout}{p.stderr}"
+                assert "spec-dock: ok (validate)" in p.stdout
+                assert "Evidence Adoption Ledger incomplete/blocked" not in p.stderr
 
     def test_validate_rejects_legacy_sequence_for_new_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1436,11 +1757,11 @@ class TestCliValidate(CliRuntimeHarness):
 
             active_by_url = self._run_runtime_capture(
                 target,
-                ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
+                ["active", "set", "https://github.com/current/repo/issues/123"],
             )
             assert active_by_url.returncode == 0, active_by_url.stdout + active_by_url.stderr
 
-            active_by_id = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00123", "--force"])
+            active_by_id = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00123"])
             assert active_by_id.returncode == 0, active_by_id.stdout + active_by_id.stderr
 
             ambiguous_number = self._run_runtime_capture(target, ["deps", "check", "123"])

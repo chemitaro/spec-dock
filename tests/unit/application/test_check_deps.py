@@ -1,3 +1,4 @@
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -295,6 +296,71 @@ class TestCheckDepsApplication:
             labels=[],
             updated_at=updated_at,
             url=f"https://github.com/example/repo/issues/{issue_number}",
+        )
+
+    @pytest.mark.parametrize(
+        ("case", "repo_owner", "repo_name", "expected_id", "expected_error"),
+        [
+            ("exact_over_legacy", "example", "repo", "iss-00302", None),
+            ("foreign_legacy_fallback", "foreign", "repo", "iss-00302", None),
+            ("missing", "foreign", "repo", None, "No node found"),
+            ("ambiguous_legacy", "foreign", "repo", None, "Ambiguous"),
+        ],
+    )
+    def test_repo_scoped_target_resolution_matches_set_active_without_ports(
+        self,
+        case,
+        repo_owner,
+        repo_name,
+        expected_id,
+        expected_error,
+    ) -> None:
+        app_check_deps, app_contracts, _app_ports, _domain_models, infra_contracts = _runtime_modules()
+        records = self._records(infra_contracts)
+        if case == "exact_over_legacy":
+            records = [
+                replace(record, github_issue_number=302)
+                if record.id == "iss-00301"
+                else replace(record, github_repo_owner="example", github_repo_name="repo")
+                if record.id == "iss-00302"
+                else record
+                for record in records
+            ]
+            issue_number = 302
+        elif case == "ambiguous_legacy":
+            records = [
+                replace(record, github_issue_number=302) if record.id in {"iss-00301", "iss-00302"} else record
+                for record in records
+            ]
+            issue_number = 302
+        elif case == "missing":
+            issue_number = 999
+        else:
+            issue_number = 302
+
+        graph = app_check_deps.build_graph([app_check_deps._to_spec_node_seed(record) for record in records])
+        target = app_contracts.TargetRef(
+            kind="github_issue",
+            node_id=None,
+            github_issue_number=issue_number,
+            github_repo_owner=repo_owner,
+            github_repo_name=repo_name,
+        )
+
+        if expected_error is not None:
+            with pytest.raises(RuntimeError, match=expected_error):
+                app_check_deps._resolve_target_node_id(
+                    graph,
+                    target,
+                )
+            return
+
+        assert (
+            app_check_deps._resolve_target_node_id(
+                graph,
+                target,
+            )
+            == expected_id
         )
 
     def test_no_github_uses_cached_status_and_last_sync_without_fetching_github(self) -> None:
