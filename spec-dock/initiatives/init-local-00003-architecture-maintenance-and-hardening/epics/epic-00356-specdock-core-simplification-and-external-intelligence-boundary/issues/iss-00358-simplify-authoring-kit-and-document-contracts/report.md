@@ -78,6 +78,16 @@ ID: "iss-00358"
   - Affected closure: `CL-358-005/012/013`、S09 / S10 / S90 / S99、M4 / M99。
   - Risk if wrong: 358の完了が別IssueのRuntime実装状態に不必要に拘束される、またはRuntime変更を358へ誤って取り込む。
   - Needs orchestrator decision: no。ユーザーが直接指定したスコープ境界をcanonical docsへ反映した。
+- `DEC-358-005`
+  - Status: resolved / promoted_to_test_contract。
+  - Type: clean-checkout test portability / baseline separation。
+  - Trigger: PR #361のProvider CIで、S09 canonical Design binding testがローカルactive symlinkを参照して5件失敗した。
+  - Observed facts: `spec-dock/active/issue/design.md`はローカルdogfoodingのactive contextには存在するが、GitHubのclean checkoutではmaterializeされない。一方、358のcanonical Issue `design.md`はtracked pathとして存在する。別の2件はIssue 334のZIP / Guide fixtureがHEADとorigin/main双方に存在せず、358差分外の既存failureだった。
+  - Disposition: S09 testの参照先をtracked canonical Issue pathへ変更し、active symlinkへの暗黙依存を除去した。Issue 334 fixtureの新規作成・他Issue testの変更は行わない。
+  - Evidence: Provider CI run `31473318523`の7 failures、修正後のS09 23 passed / asset 304 passed / lint / diff check pass、`git cat-file -e HEAD:<Issue 334 path>` status 128。
+  - Affected closure: `tc-s09-001`、S99 CI portability、PR #361。
+  - Risk if wrong: clean checkoutとlocal dogfoodingでテスト対象のcanonical sourceが分岐する。
+  - Needs orchestrator decision: no。tracked pathへの限定修正で、357 Runtime / Issue 334 artifactを変更しない。
 - 既存のProduct Owner判断、Option A、thin Report、Current六種は変更しない。
 
 ## Objective Alignment Ledger
