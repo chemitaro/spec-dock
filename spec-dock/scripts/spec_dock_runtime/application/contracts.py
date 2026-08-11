@@ -17,7 +17,6 @@ if TYPE_CHECKING:
         PlanningReviewRequest,
         PlanningReviseRequest,
     )
-    from spec_dock_runtime.domain.assurance import AssuranceContract
     from spec_dock_runtime.domain.issue_planning_contracts import PlanningCommandResult
     from spec_dock_runtime.domain.models import (
         ActiveSelection,
@@ -33,8 +32,6 @@ if TYPE_CHECKING:
         TargetDepsInspection,
         ValidationReport,
     )
-    from spec_dock_runtime.domain.runbook import Runbook, WorkflowTarget
-    from spec_dock_runtime.domain.workflow_state import WorkflowState
     from spec_dock_runtime.infra.contracts import StoredMetaRecord
 
 POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
@@ -70,101 +67,6 @@ class ValidateTreeRequest:
 class ValidationResult:
     report: ValidationReport
     checked_node_count: int
-
-
-AssuranceOperation = Literal["show", "classify", "verify", "compose"]
-AssuranceResultStatus = Literal["valid", "missing", "invalid", "applied", "unchanged", "dry-run"]
-ComposeArtifactSelection = Literal["design", "plan", "report", "all"]
-
-
-@dataclass(frozen=True)
-class ShowAssuranceRequest:
-    issue: str | Path | None = None
-
-
-@dataclass(frozen=True)
-class ClassifyAssuranceRequest:
-    stage: Literal["requirement"]
-    issue: str | Path | None = None
-    dry_run: bool = False
-
-
-@dataclass(frozen=True)
-class VerifyAssuranceRequest:
-    issue: str | Path | None = None
-
-
-@dataclass(frozen=True)
-class ComposeAssuranceRequest:
-    artifact: ComposeArtifactSelection
-    issue: str | Path | None = None
-    dry_run: bool = False
-
-
-@dataclass(frozen=True)
-class AssuranceTargetView:
-    issue_id: str
-    repo_relative_path: str
-
-
-@dataclass(frozen=True)
-class ComposeArtifactView:
-    artifact: str
-    path: str
-    changed: bool
-    added_section_ids: tuple[str, ...] = ()
-    preserved_section_ids: tuple[str, ...] = ()
-    warnings: tuple[str, ...] = ()
-    errors: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class AssuranceResult:
-    operation: AssuranceOperation
-    ok: bool
-    status: AssuranceResultStatus
-    target: AssuranceTargetView
-    mode: str
-    reason: str
-    details: tuple[str, ...]
-    contract: AssuranceContract | None
-    dry_run: bool = False
-    written_path: Path | None = None
-    authorized_profile: str | None = None
-    lite_candidate: bool | None = None
-    changed_paths: tuple[str, ...] = ()
-    artifacts: tuple[ComposeArtifactView, ...] = ()
-    warnings: tuple[str, ...] = ()
-    errors: tuple[str, ...] = ()
-
-    @property
-    def has_contract(self) -> bool:
-        return self.contract is not None
-
-
-@dataclass(frozen=True)
-class WorkflowStatusRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class WorkflowNextRequest:
-    workflow_target: WorkflowTarget
-
-
-@dataclass(frozen=True)
-class RunbookProjectionResult:
-    written: bool
-    paths: tuple[str, ...]
-    errors: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class WorkflowResult:
-    operation: Literal["status", "next"]
-    state: WorkflowState
-    runbook: Runbook | None = None
-    projection: RunbookProjectionResult | None = None
 
 
 @dataclass(frozen=True)
@@ -428,54 +330,9 @@ class WorkbenchFilesystemError(RuntimeError):
 
 BinaryArtifactCleanupState = Literal["not_created", "removed", "retained"]
 BinaryArtifactPublishWarning = Literal[
-    "create_lock_release_failed",
     "directory_fsync_failed",
-    "destination_mismatch",
-    "destination_read_failed",
     "temp_cleanup_retained",
 ]
-
-
-@dataclass(frozen=True)
-class WorkbenchSourceGuardRequest:
-    repo_root: Path
-    specdock_dir: Path
-    scope_directories: tuple[Path, ...]
-    source_path: Path
-
-
-@dataclass(frozen=True)
-class GuardedWorkbenchSource:
-    source_path: Path
-    workbench_root: Path
-    device: int
-    inode: int
-    mode: int
-
-
-@dataclass(frozen=True)
-class BinaryArtifactPublishRequest:
-    source: WorkbenchSourceGuardRequest
-    destination_path: Path
-
-
-@dataclass(frozen=True)
-class BinaryArtifactPublishResult:
-    source_path: Path
-    destination_path: Path
-    source_sha256: str
-    stream_sha256: str
-    staged_sha256: str
-    destination_sha256: str
-    source_byte_count: int
-    stream_byte_count: int
-    staged_byte_count: int
-    destination_byte_count: int
-    source_inode: int
-    staged_inode: int
-    cleanup_state: BinaryArtifactCleanupState
-    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
-    committed: bool = True
 
 
 class BinaryArtifactPublishError(RuntimeError):
@@ -486,45 +343,6 @@ class BinaryArtifactPublishError(RuntimeError):
         self.cleanup_state = cleanup_state
         self.committed = False
         super().__init__(f"binary artifact publication failed: {code}")
-
-
-ArtifactImportKind = Literal["chatgpt-output"]
-ArtifactStorageIdentity = Literal["blank"]
-
-
-@dataclass(frozen=True)
-class ArtifactImportRequest:
-    import_kind: ArtifactImportKind
-    scope_node_id: str
-    scope_kind: Literal["initiative", "epic", "issue"]
-    source_path: Path
-    title: str
-    slug: str | None
-
-
-@dataclass(frozen=True)
-class ArtifactImportResult:
-    import_kind: ArtifactImportKind
-    storage_identity: ArtifactStorageIdentity
-    artifact_id: str
-    scope_id: str
-    source_path: Path
-    destination_path: Path
-    sha256: str
-    byte_count: int
-    committed: bool
-    cleanup_state: BinaryArtifactCleanupState
-    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
-
-
-class ArtifactImportError(RuntimeError):
-    """Stable content-free failure for the public artifact import command."""
-
-    def __init__(self, *, code: str, cleanup_state: BinaryArtifactCleanupState) -> None:
-        self.code = code
-        self.cleanup_state = cleanup_state
-        self.committed = False
-        super().__init__(f"artifact import failed: {code}")
 
 
 FileArtifactTargetKind = Literal["root", "initiative", "epic", "issue"]
@@ -846,6 +664,7 @@ class IssueStartResult:
     active_set: ActiveSetResult
     forced: bool
     warnings: list[str]
+    post_sync: PostMutationSyncOutcome | None = None
 
 
 @dataclass(frozen=True)
@@ -1125,30 +944,9 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
-    import_artifact: Callable[[ArtifactImportRequest], ArtifactImportResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("import_artifact is not configured")
-    )
     import_file_artifact: Callable[[FileArtifactImportRequest], FileArtifactImportResult] = lambda _req: (
         _ for _ in ()
     ).throw(RuntimeError("import_file_artifact is not configured"))
-    show_assurance: Callable[[ShowAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("show_assurance is not configured")
-    )
-    classify_assurance: Callable[[ClassifyAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("classify_assurance is not configured")
-    )
-    verify_assurance: Callable[[VerifyAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("verify_assurance is not configured")
-    )
-    compose_assurance: Callable[[ComposeAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("compose_assurance is not configured")
-    )
-    workflow_status: Callable[[WorkflowStatusRequest], WorkflowResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("workflow_status is not configured")
-    )
-    workflow_next: Callable[[WorkflowNextRequest], WorkflowResult] = lambda _req: (_ for _ in ()).throw(
-        RuntimeError("workflow_next is not configured")
-    )
     mutate_deps: Callable[[MutateDepsRequest], MutateDepsResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("mutate_deps is not configured")
     )
@@ -1194,5 +992,3 @@ class UseCases:
     planning_apply: Callable[[PlanningApplyRequest], PlanningCommandResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("planning_apply is not configured")
     )
-    repo_root: Path | None = None
-    specdock_dir: Path | None = None

@@ -3,28 +3,51 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import shutil
+import stat
 from typing import Any
 
-from spec_dock_runtime.domain.authority import (
-    GRANT_IMPLEMENTATION_START,
-    GRANT_ISSUE_FINISH,
-    evaluate_authority_gate,
-    evaluate_evidence_adoption_ledger_gate,
-    load_evidence_adoption_ledger_entries,
-    validate_delegated_authority_artifact,
-)
 from spec_dock_runtime.infra.clock import now_iso
 from spec_dock_runtime.infra.contracts import (
     ActiveManifest,
     ActiveManifestEntry,
     ActiveManifestLoadResult,
     ActiveStateSnapshot,
+    PathState,
+    ProjectionTreeState,
 )
 from spec_dock_runtime.infra.json_store import load_json, write_json
 
 _AGENT_DIRNAME = ".agent"
 _LEGACY_WORK_DIRNAME = ".work"
 _ACTIVE_DIRNAME = "active"
+_ACTIVE_MANAGED_NAMES = (
+    "initiative",
+    "epic",
+    "issue",
+    "context-pack.md",
+    "current-runbook.json",
+    "current-runbook.md",
+    "initiative.path",
+    "epic.path",
+    "issue.path",
+)
+_ACTIVE_GENERATED_FILE_NAMES = {"context-pack.md", "current-runbook.json", "current-runbook.md"}
+_MANAGED_AGENT_NAMES = ("index-all.json", "tree-all.json", "index.json", "tree.json")
+
+
+def _reject_hard_linked_managed_json(specdock_dir: Path) -> None:
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    managed_paths = (agent_dir / "active.json", *(agent_dir / name for name in _MANAGED_AGENT_NAMES))
+    for path in managed_paths:
+        try:
+            path_stat = path.stat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISREG(path_stat.st_mode) and path_stat.st_nlink > 1:
+            managed_path = path.relative_to(specdock_dir).as_posix()
+            raise RuntimeError(
+                f"Refusing active state transaction: managed JSON has multiple hard links: {managed_path}"
+            )
 
 
 def _normalize_entry(entry: Any) -> ActiveManifestEntry | None:
@@ -35,22 +58,9 @@ def _normalize_entry(entry: Any) -> ActiveManifestEntry | None:
         return None
     raw_path = entry.get("path")
     path_value = raw_path if isinstance(raw_path, str) and raw_path.strip() else None
-    raw_authority = entry.get("authority")
-    authority = raw_authority.strip() if isinstance(raw_authority, str) and raw_authority.strip() else None
-    raw_grants = entry.get("grants")
-    grants: tuple[str, ...] = ()
-    if isinstance(raw_grants, list):
-        normalized_grants = [grant.strip() for grant in raw_grants if isinstance(grant, str) and grant.strip()]
-        if len(normalized_grants) == len(raw_grants):
-            grants = tuple(normalized_grants)
-    raw_promotion_record = entry.get("promotion_record")
-    promotion_record = raw_promotion_record if isinstance(raw_promotion_record, dict) else None
     return ActiveManifestEntry(
         id=raw_id.strip(),
         path=path_value,
-        authority=authority,
-        grants=grants,
-        promotion_record=promotion_record,
     )
 
 
@@ -74,12 +84,6 @@ def _manifest_to_json_obj(manifest: ActiveManifest | None) -> dict[str, Any]:
         out: dict[str, Any] = {"id": entry.id}
         if entry.path:
             out["path"] = entry.path
-        if entry.authority:
-            out["authority"] = entry.authority
-        if entry.grants:
-            out["grants"] = list(entry.grants)
-        if entry.promotion_record is not None:
-            out["promotion_record"] = entry.promotion_record
         return out
 
     return {
@@ -146,6 +150,7 @@ def _write_pathfile(active_dir: Path, name: str, target: Path) -> None:
 
 
 def _render_context_pack(manifest: ActiveManifest | None, *, repo_root: Path | None = None) -> str:
+    del repo_root
     initiative = manifest.initiative if manifest is not None else None
     epic = manifest.epic if manifest is not None else None
     issue = manifest.issue if manifest is not None else None
@@ -160,47 +165,6 @@ def _render_context_pack(manifest: ActiveManifest | None, *, repo_root: Path | N
     lines.append(f"- initiative: {init_id}")
     lines.append(f"- epic: {epic_id}")
     lines.append(f"- issue: {issue_id}")
-    lines.append("")
-    lines.append("## Authority")
-    lines.append("- source: `spec-dock/.agent/active.json`")
-    lines.append(
-        "- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion."
-    )
-    for label, entry in (
-        ("initiative", initiative),
-        ("epic", epic),
-        ("issue", issue),
-    ):
-        if entry is None:
-            lines.append(f"- {label}: authority=(none), grants=[]")
-            continue
-        authority = entry.authority or "missing"
-        grants = ", ".join(entry.grants) if entry.grants else ""
-        lines.append(f"- {label}: authority={authority}, grants=[{grants}]")
-        implementation_result = evaluate_authority_gate(
-            authority=entry.authority,
-            grants=entry.grants,
-            promotion_record=entry.promotion_record,
-            required_grant=GRANT_IMPLEMENTATION_START,
-            purpose="context_pack_implementation",
-        )
-        finish_result = evaluate_authority_gate(
-            authority=entry.authority,
-            grants=entry.grants,
-            promotion_record=entry.promotion_record,
-            required_grant=GRANT_ISSUE_FINISH,
-            purpose="context_pack_finish",
-        )
-        downstream_blocks = _context_pack_scope_downstream_blocks(entry, repo_root=repo_root)
-        if implementation_result.ok and finish_result.ok and not downstream_blocks:
-            lines.append(f"- {label}: authoritative_input=implementation,finish")
-        else:
-            reasons = _ordered_unique(
-                reason
-                for reason in (implementation_result.reason, finish_result.reason, *downstream_blocks)
-                if reason != "ok"
-            )
-            lines.append(f"- {label}: authoritative_input=none, downstream_block={','.join(reasons)}")
     lines.append("")
     lines.append("## Generated state")
     lines.append("- entry: `spec-dock/.agent/active.json`")
@@ -243,42 +207,6 @@ def _render_context_pack(manifest: ActiveManifest | None, *, repo_root: Path | N
     lines.append("- validate: `./spec-dock/scripts/spec-dock validate`")
     lines.append("")
     return "\n".join(lines) + "\n"
-
-
-def _context_pack_scope_downstream_blocks(
-    entry: ActiveManifestEntry,
-    *,
-    repo_root: Path | None,
-) -> tuple[str, ...]:
-    if repo_root is None or entry.path is None:
-        return ()
-    scope_dir = repo_root / entry.path
-    blocks: list[str] = []
-    for artifact_name in ("design.md", "plan.md"):
-        artifact_path = scope_dir / artifact_name
-        for purpose in ("context_pack_implementation", "context_pack_finish"):
-            result = validate_delegated_authority_artifact(artifact_path, purpose=purpose)
-            if result.ok:
-                continue
-            blocks.append(result.reason)
-    ledger_result = evaluate_evidence_adoption_ledger_gate(
-        load_evidence_adoption_ledger_entries(scope_dir / "report.md"),
-        target_artifact="*",
-        purpose="context_pack",
-    )
-    if not ledger_result.ok:
-        blocks.append(ledger_result.reason)
-        if ledger_result.blocking_entry_id is not None:
-            blocks.append(f"blocking_entry_id={ledger_result.blocking_entry_id}")
-    return tuple(blocks)
-
-
-def _ordered_unique(values) -> list[str]:
-    out: list[str] = []
-    for value in values:
-        if value not in out:
-            out.append(value)
-    return out
 
 
 def load_active_manifest(specdock_dir: Path) -> ActiveManifestLoadResult:
@@ -336,19 +264,8 @@ def apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, r
     active_dir = specdock_dir / _ACTIVE_DIRNAME
     active_dir.mkdir(parents=True, exist_ok=True)
 
-    generated_file_names = {"context-pack.md", "current-runbook.json", "current-runbook.md"}
-    for name in (
-        "initiative",
-        "epic",
-        "issue",
-        "context-pack.md",
-        "current-runbook.json",
-        "current-runbook.md",
-        "initiative.path",
-        "epic.path",
-        "issue.path",
-    ):
-        _unlink_any(active_dir / name, allow_directory=name not in generated_file_names)
+    for name in _ACTIVE_MANAGED_NAMES:
+        _unlink_any(active_dir / name, allow_directory=name not in _ACTIVE_GENERATED_FILE_NAMES)
 
     def _target_dir(layer: str) -> Path:
         if manifest is None:
@@ -373,7 +290,7 @@ def apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, r
 def patch_agent_state_active_fields(specdock_dir: Path, manifest: ActiveManifest | None) -> None:
     agent_dir = specdock_dir / _AGENT_DIRNAME
     active_obj = _manifest_to_json_obj(manifest)
-    for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
+    for name in _MANAGED_AGENT_NAMES:
         path = agent_dir / name
         if not path.is_file():
             continue
@@ -384,62 +301,257 @@ def patch_agent_state_active_fields(specdock_dir: Path, manifest: ActiveManifest
         write_json(path, loaded)
 
 
+def _snapshot_tree_entry(
+    path: Path,
+    relative: str,
+    state: ProjectionTreeState,
+) -> None:
+    if path.is_symlink():
+        state[relative] = ("symlink", str(path.readlink()))
+        return
+    if path.is_file():
+        state[relative] = ("file", path.read_bytes())
+        return
+    if path.is_dir():
+        state[relative] = ("directory", None)
+        for child in sorted(path.iterdir(), key=lambda item: item.name):
+            child_relative = child.name if relative == "." else f"{relative}/{child.name}"
+            _snapshot_tree_entry(child, child_relative, state)
+
+
+def _snapshot_projection_tree(
+    root: Path,
+) -> ProjectionTreeState:
+    state: ProjectionTreeState = {}
+    _snapshot_tree_entry(root, ".", state)
+    return state
+
+
+def _restore_projection_entries(
+    root: Path,
+    state: ProjectionTreeState,
+) -> None:
+    for relative in sorted(state, key=lambda value: (value.count("/"), value)):
+        kind, payload = state[relative]
+        path = root if relative == "." else root / relative
+        if kind == "directory":
+            path.mkdir(parents=True, exist_ok=True)
+        elif kind == "file":
+            if not isinstance(payload, bytes):
+                raise RuntimeError(f"Invalid active projection file snapshot: {relative}")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+        elif kind == "symlink":
+            if not isinstance(payload, str):
+                raise RuntimeError(f"Invalid active projection symlink snapshot: {relative}")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.symlink_to(payload)
+        else:
+            raise RuntimeError(f"Invalid active projection snapshot kind: {relative}: {kind}")
+
+
+def _restore_projection_tree(
+    root: Path,
+    state: ProjectionTreeState,
+) -> None:
+    _unlink_any(root)
+    _restore_projection_entries(root, state)
+
+
+def _resolve_symlink_target(path: Path, target: str) -> Path:
+    parsed = Path(target)
+    if not parsed.is_absolute():
+        parsed = path.parent / parsed
+    return parsed.resolve(strict=False)
+
+
+def _snapshot_managed_projection_tree(
+    root: Path,
+) -> ProjectionTreeState:
+    state: ProjectionTreeState = {}
+    for name in _ACTIVE_MANAGED_NAMES:
+        _snapshot_tree_entry(root / name, name, state)
+    return state
+
+
+def _restore_managed_projection_tree(
+    root: Path,
+    state: ProjectionTreeState,
+) -> None:
+    if not root.is_dir() or root.is_symlink():
+        raise RuntimeError(f"Active projection symlink target is no longer a directory: {root}")
+    for name in _ACTIVE_MANAGED_NAMES:
+        _unlink_any(root / name)
+    _restore_projection_entries(root, state)
+
+
+def _snapshot_path(path: Path) -> PathState:
+    if path.is_symlink():
+        return ("symlink", str(path.readlink()))
+    if path.is_file():
+        return ("file", path.read_bytes())
+    if path.is_dir():
+        return ("directory", _snapshot_projection_tree(path))
+    return ("missing", None)
+
+
+def _snapshot_path_symlink_target(
+    path: Path,
+    state: PathState,
+) -> tuple[str, PathState] | None:
+    kind, payload = state
+    if kind != "symlink":
+        return None
+    if not isinstance(payload, str):
+        raise RuntimeError(f"Invalid symlink snapshot: {path}")
+    target_path = _resolve_symlink_target(path, payload)
+    target_state = _snapshot_path(target_path)
+    if target_state[0] == "directory":
+        return None
+    return (str(target_path), target_state)
+
+
+def _restore_path(path: Path, state: PathState) -> None:
+    _unlink_any(path)
+    kind, payload = state
+    if kind == "missing":
+        return
+    if kind == "directory":
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"Invalid directory snapshot: {path}")
+        _restore_projection_entries(path, payload)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if kind == "file":
+        if not isinstance(payload, bytes):
+            raise RuntimeError(f"Invalid file snapshot: {path}")
+        path.write_bytes(payload)
+        return
+    if kind == "symlink":
+        if not isinstance(payload, str):
+            raise RuntimeError(f"Invalid symlink snapshot: {path}")
+        path.symlink_to(payload)
+        return
+    raise RuntimeError(f"Invalid path snapshot kind: {path}: {kind}")
+
+
 def snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot:
+    _reject_hard_linked_managed_json(specdock_dir)
     agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     active_json_path = agent_dir / "active.json"
+    legacy_active_json_path = legacy_work_dir / "active.json"
+    legacy_current_json_path = legacy_work_dir / "current.json"
     context_pack_path = specdock_dir / _ACTIVE_DIRNAME / "context-pack.md"
 
-    active_json_text = active_json_path.read_text(encoding="utf-8") if active_json_path.exists() else None
     context_pack_text = context_pack_path.read_text(encoding="utf-8") if context_pack_path.exists() else None
     manifest = load_active_manifest(specdock_dir).manifest
+    active_json_state = _snapshot_path(active_json_path)
+    active_projection_state = _snapshot_projection_tree(specdock_dir / _ACTIVE_DIRNAME)
+    active_projection_symlink_target_state = None
+    projection_root = active_projection_state.get(".")
+    if projection_root is not None and projection_root[0] == "symlink":
+        projection_target = projection_root[1]
+        if not isinstance(projection_target, str):
+            raise RuntimeError("Invalid active projection root symlink snapshot")
+        projection_target_path = _resolve_symlink_target(specdock_dir / _ACTIVE_DIRNAME, projection_target)
+        if projection_target_path.is_dir():
+            active_projection_symlink_target_state = (
+                str(projection_target_path),
+                _snapshot_managed_projection_tree(projection_target_path),
+            )
 
-    managed_agent_state: dict[str, str | None] = {}
-    for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
+    managed_agent_path_states = {}
+    managed_agent_symlink_target_states = {}
+    for name in _MANAGED_AGENT_NAMES:
         path = agent_dir / name
-        if not path.exists():
-            managed_agent_state[name] = None
-            continue
-        loaded = load_json(path)
-        if not isinstance(loaded, dict):
-            raise RuntimeError(f"invalid JSON shape (expected object): {path}")
-        managed_agent_state[name] = path.read_text(encoding="utf-8")
+        path_state = _snapshot_path(path)
+        managed_agent_path_states[name] = path_state
+        symlink_target_state = _snapshot_path_symlink_target(path, path_state)
+        if symlink_target_state is not None:
+            managed_agent_symlink_target_states[name] = symlink_target_state
+        if path.is_file():
+            loaded = load_json(path)
+            if not isinstance(loaded, dict):
+                raise RuntimeError(f"invalid JSON shape (expected object): {path}")
 
     return ActiveStateSnapshot(
         manifest=manifest,
         context_pack_text=context_pack_text,
-        active_json_text=active_json_text,
-        managed_agent_state=managed_agent_state,
+        active_json_text=None,
+        managed_agent_state={},
+        active_projection_state=active_projection_state,
+        legacy_active_json_state=_snapshot_path(legacy_active_json_path),
+        legacy_current_json_state=_snapshot_path(legacy_current_json_path),
+        active_json_state=active_json_state,
+        active_json_symlink_target_state=_snapshot_path_symlink_target(active_json_path, active_json_state),
+        active_projection_symlink_target_state=active_projection_symlink_target_state,
+        managed_agent_path_states=managed_agent_path_states,
+        managed_agent_symlink_target_states=managed_agent_symlink_target_states,
     )
 
 
 def restore_previous_state(specdock_dir: Path, snapshot: ActiveStateSnapshot) -> None:
     agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     active_dir = specdock_dir / _ACTIVE_DIRNAME
     active_json_path = agent_dir / "active.json"
+    legacy_active_json_path = legacy_work_dir / "active.json"
+    legacy_current_json_path = legacy_work_dir / "current.json"
     context_pack_path = active_dir / "context-pack.md"
 
-    if snapshot.active_json_text is None:
-        active_json_path.unlink(missing_ok=True)
+    if snapshot.active_json_symlink_target_state is not None:
+        target_path, target_state = snapshot.active_json_symlink_target_state
+        _restore_path(Path(target_path), target_state)
+    if snapshot.active_json_state is not None:
+        _restore_path(active_json_path, snapshot.active_json_state)
+    elif snapshot.active_json_text is None:
+        _unlink_any(active_json_path)
     else:
         active_json_path.parent.mkdir(parents=True, exist_ok=True)
         active_json_path.write_text(snapshot.active_json_text, encoding="utf-8")
 
-    if snapshot.context_pack_text is None:
-        context_pack_path.unlink(missing_ok=True)
-    else:
-        context_pack_path.parent.mkdir(parents=True, exist_ok=True)
-        context_pack_path.write_text(snapshot.context_pack_text, encoding="utf-8")
-
-    for name, previous_text in snapshot.managed_agent_state.items():
-        path = agent_dir / name
-        if previous_text is None:
-            path.unlink(missing_ok=True)
+    for path, previous_state in (
+        (legacy_active_json_path, snapshot.legacy_active_json_state),
+        (legacy_current_json_path, snapshot.legacy_current_json_state),
+    ):
+        if previous_state is None:
+            _unlink_any(path)
         else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(previous_text, encoding="utf-8")
+            _restore_path(path, previous_state)
 
-    restored_manifest = snapshot.manifest
-    restored_context_pack = snapshot.context_pack_text
-    if restored_context_pack is None:
-        restored_context_pack = _render_context_pack(restored_manifest, repo_root=specdock_dir.parent)
-    apply_active_pointers(specdock_dir, restored_manifest, restored_context_pack)
+    if snapshot.active_projection_state is None:
+        if snapshot.context_pack_text is None:
+            context_pack_path.unlink(missing_ok=True)
+        else:
+            context_pack_path.parent.mkdir(parents=True, exist_ok=True)
+            context_pack_path.write_text(snapshot.context_pack_text, encoding="utf-8")
+
+    if snapshot.managed_agent_path_states is not None:
+        target_states = snapshot.managed_agent_symlink_target_states or {}
+        for name, previous_state in snapshot.managed_agent_path_states.items():
+            target_state = target_states.get(name)
+            if target_state is not None:
+                target_path, target_path_state = target_state
+                _restore_path(Path(target_path), target_path_state)
+            _restore_path(agent_dir / name, previous_state)
+    else:
+        for name, previous_text in snapshot.managed_agent_state.items():
+            path = agent_dir / name
+            if previous_text is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(previous_text, encoding="utf-8")
+
+    if snapshot.active_projection_state is not None:
+        if snapshot.active_projection_symlink_target_state is not None:
+            target_path, target_state = snapshot.active_projection_symlink_target_state
+            _restore_managed_projection_tree(Path(target_path), target_state)
+        _restore_projection_tree(active_dir, snapshot.active_projection_state)
+    else:
+        restored_manifest = snapshot.manifest
+        restored_context_pack = snapshot.context_pack_text
+        if restored_context_pack is None:
+            restored_context_pack = _render_context_pack(restored_manifest, repo_root=specdock_dir.parent)
+        apply_active_pointers(specdock_dir, restored_manifest, restored_context_pack)

@@ -14,7 +14,7 @@
 
 - `new {initiative,epic,issue}`
 - `import {initiative,epic,issue}`
-- `new artifact <type>`（current catalog: `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch` / issue-only `draft-requirement` / `draft-design` / `draft-plan`）
+- `new artifact [type]`（Current catalog: `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate`）
 
 補足:
 - `new artifact <type>` は explicit basename / `artifact_id` override（`--id` / `--seq` など）を提供しません。
@@ -24,9 +24,8 @@
 
 - `issue start <target>`
 - `issue start <target> -f`
-- `active set <target> --checkout`
-  - デフォルト（`active set <target>`）は no-checkout のため、ブランチ操作は行いません
-  - `issue start` は issue node 専用です。initiative / epic / issue の target kind を問わないのは `active set <target> --checkout` のみです
+  - `issue start` は issue node 専用で、branch checkout を所有します
+  - `active set` は branch を変更しません
 
 ---
 
@@ -88,11 +87,10 @@
 
 ### 4.1 文書種別と保存先（doc family）
 
-- new creation の artifact doc family は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch` / issue-only `draft-requirement` / `draft-design` / `draft-plan` です。
-- `scratch` / `note` は retired です。既存 `scratch` / `note` artifact は grandfathered として validation 対象に残りますが、新規作成 catalog ではありません。
+- Current で新規作成する artifact doc family は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` です。type 省略は `blank` と同じです。
+- `pr-repair-batch`、`draft-requirement`、`draft-design`、`draft-plan`、`scratch`、`note` は Historical です。既存 file は validation でその type だけを理由に malformed にしませんが、新規作成 catalog には含めません。
 - original/source file は、対象 Initiative / Epic / Issue ノード配下の `artifacts/` に作成されます。
-- ADR original は future `artifacts/` または legacy `discussions/` 配下にありえます。generated ADR mirror / sync 対象は `adr` のみで、`pr-repair-batch` や他の artifact type へ広げません。
-- `draft-requirement` / `draft-design` / `draft-plan` は issue-only routing type です。Initiative / Epic scope では unsupported です。
+- Historical の ADR original は `artifacts/` または legacy `discussions/` 配下にありえます。Historical を Current 作成候補や workflow routing へ自動昇格しません。
 - この節の basename 形式は validation / allocation contract の参照です。新規作成時に手で `<ts>-...` filename を組み立てず、`new artifact <type>` が返す generated path を使います。
 
 ### 4.2 ベース名契約（basename contract）
@@ -112,7 +110,7 @@ same-second collision 形:
 - `nn = 01..99`
   - 同一 `artifacts/` directory 内で同じ秒を共有した artifact doc family collision の safety fallback suffix です
   - runtime は同じ timestamp slot が使われている場合、短い wait / retry で次の timestamp slot を優先し、bounded wait で解消できないときだけ suffix を使います
-- `type = adr|disc|research|interview|decision-candidate|pr-repair-batch|draft-requirement|draft-design|draft-plan`
+- Current `type = adr|disc|research|interview|decision-candidate`
 - `blank` は filename token を使わず、front matter の `template: "blank"` で template identity を示します。
 - grandfathered existing `scratch` / `note` filenames may also appear in validation.
 - `slug` は kebab-case です
@@ -122,10 +120,8 @@ same-second collision 形:
 - `20260329t123456z-adr-token-rotation.md`
 - `20260329t123456z-disc-api-options.md`
 - `20260329t123456z-decision-candidate-token-options.md`
-- `20260329t123456z-pr-repair-batch-review-fixes.md`
 - `20260329t123456z-01-research-benchmark-summary.md`
 - `20260329t123456z-02-interview-rollout-policy.md`
-- `20260329t123457z-draft-plan-step-slicing.md`
 
 ### 4.3 `artifact_id` と filename stem の境界
 
@@ -149,8 +145,6 @@ collision 形の `artifact_id`:
   - `artifact_id`: `20260329t123456z-adr`
 - filename: `20260329t123456z-01-disc-api-options.md`
   - `artifact_id`: `20260329t123456z-01-disc`
-- filename: `20260329t123456z-pr-repair-batch-review-fixes.md`
-  - `artifact_id`: `20260329t123456z-pr-repair-batch`
 - filename: `20260329t123455z-kickoff-memo.md`
   - `artifact_id`: `20260329t123455z`
 
@@ -179,13 +173,7 @@ validation / allocation の扱い:
 - malformed discussion filename candidate は fail-closed で reject します
 - grandfathered なのは既存 legacy sequential docs だけであり、legacy contract 全体の forced compatibility を意味しません
 
-### 4.5 `artifact import chatgpt-output` の命名境界
-
-`artifact import chatgpt-output` は、approved Workbenchにある単一 `.md` fileのbytesをblank Artifact identityで保存します。`chatgpt-output`はimport kindであり、この節のtyped Artifact `type` tokenには追加しません。Blank Artifactのtitle/slugに`chatgpt-output`を使うことは予約・禁止せず、`new artifact`のcatalogとimport commandは独立して共存します。
-
-Import先basenameはblank grammarと既存collision allocationを使い、slugだけに`chatgpt-output-` prefixを含めます。Source本文、encoding、改行、frontmatterは変更せず、source fileも削除しません。FilenameがArtifact規則へ適合することと、imported bodyがcanonical authorityを持つことは別です。
-
-### 4.6 `artifact import file` の generic identity
+### 4.5 `artifact import file` のgeneric identityと移行
 
 `artifact import file --file <path>` は `--root`、`--initiative`、`--epic`、`--issue` の一つを destination として指定し、title / slug / type token を受け取りません。一件の explicit regular file の basename から runtime が generic identity を生成します。
 
@@ -202,22 +190,22 @@ Import先basenameはblank grammarと既存collision allocationを使い、slug�
 
 generic identity は typed / blank Artifact grammar と別であり、拡張子、Markdown、本文 encoding、frontmatter を要求しません。`rules.md` は generic Artifact ではありません。generic filename が valid であることは、body が canonical authority、review 済み、または採用済みであることを意味しません。
 
+`artifact import chatgpt-output` は撤去済みです。旧 command は実行せず、取り込みたい一件の regular file を `artifact import file` へ渡してください。generic import は source bytes を opaque に保持し、source file を変更しません。
+
 ---
 
-## 5. `issue start` / `active set --checkout` のブランチ命名（日本語ブランチを避ける）
+## 5. `issue start` のブランチ命名（日本語ブランチを避ける）
 
 ### 5.1 目的
 
-`issue start` と `active set --checkout` では、ブランチ名を **ASCII かつ git 的に妥当**な形式へ寄せます。
+`issue start` では、ブランチ名を **ASCII かつ git 的に妥当**な形式へ寄せます。
 これにより、非ASCII名や不正ref名による運用トラブルを避けます。
 
 ### 5.2 対象
 
 - `issue start <target>` / `issue start <target> -f`
   - issue node のみを受け付けます
-- `active set <target> --checkout` を明示した場合
-  - target の node 種別（initiative / epic / issue）や GitHub 紐づき有無は問いません
-- `active set` で `--checkout` を付けない場合は **ブランチ操作しません**
+- `active set` は branch 操作を行いません
 
 ### 5.3 望ましいブランチ名（desired）
 

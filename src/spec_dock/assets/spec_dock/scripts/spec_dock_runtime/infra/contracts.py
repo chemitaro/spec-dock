@@ -3,6 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+ProjectionEntryState = tuple[Literal["directory", "file", "symlink"], bytes | str | None]
+ProjectionTreeState = dict[str, ProjectionEntryState]
+PathState = tuple[
+    Literal["missing", "directory", "file", "symlink"],
+    bytes | str | ProjectionTreeState | None,
+]
+
 
 @dataclass(frozen=True)
 class StoredMetaRecord:
@@ -48,9 +55,6 @@ class DirectDependencyResolution:
 class ActiveManifestEntry:
     id: str
     path: str | None
-    authority: str | None = None
-    grants: tuple[str, ...] = field(default_factory=tuple)
-    promotion_record: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -73,3 +77,11 @@ class ActiveStateSnapshot:
     context_pack_text: str | None
     active_json_text: str | None
     managed_agent_state: dict[str, str | None]
+    active_projection_state: ProjectionTreeState | None = None
+    legacy_active_json_state: PathState | None = None
+    legacy_current_json_state: PathState | None = None
+    active_json_state: PathState | None = None
+    active_json_symlink_target_state: tuple[str, PathState] | None = None
+    active_projection_symlink_target_state: tuple[str, ProjectionTreeState] | None = None
+    managed_agent_path_states: dict[str, PathState] | None = None
+    managed_agent_symlink_target_states: dict[str, tuple[str, PathState]] | None = None

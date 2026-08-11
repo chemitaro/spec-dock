@@ -644,3 +644,30 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert p.returncode != 0
             assert "runtime module missing" in p.stderr
             assert "spec-dock update" in p.stderr
+
+    def test_chatgpt_and_authoring_pack_handoff_wrappers_remain_installed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            chatgpt_wrapper = target / "spec-dock" / "scripts" / "spec-dock-chatgpt"
+            top_help = self._run_wrapper_capture(chatgpt_wrapper, ["--help"], cwd=target)
+            assert top_help.returncode == 0
+            assert "{planning,review}" in top_help.stdout
+
+            create_help = self._run_wrapper_capture(
+                chatgpt_wrapper,
+                ["planning", "create", "--help"],
+                cwd=target,
+            )
+            assert create_help.returncode == 0
+            assert "--issue" in create_help.stdout
+            assert "--output" in create_help.stdout
+
+            authoring_pack = target / "spec-dock" / "scripts" / "authoring-pack"
+            for filename in (
+                "prepare_chatgpt_authoring_pack.py",
+                "review_chatgpt_authoring_pack.py",
+                "stage_chatgpt_authoring_pack.py",
+            ):
+                assert (authoring_pack / filename).is_file()

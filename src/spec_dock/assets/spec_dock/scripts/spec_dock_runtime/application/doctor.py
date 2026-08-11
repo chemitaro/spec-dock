@@ -106,6 +106,33 @@ def _finding_from_error(error_message: str) -> DoctorFinding:
                 "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
             ],
         )
+    if "Duplicate artifact " in error_message:
+        return DoctorFinding(
+            code="duplicate_artifact",
+            message=error_message,
+            guidance=[
+                "対象 scope の artifacts 配下で重複している Artifact identity / slot を整理してください。",
+                "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
+            ],
+        )
+    if "Malformed artifact filename under " in error_message:
+        return DoctorFinding(
+            code="malformed_artifact",
+            message=error_message,
+            guidance=[
+                "対象 scope の artifacts 配下で明示 catalog に属さない Artifact filename を整理してください。",
+                "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
+            ],
+        )
+    if "Unsafe artifact " in error_message:
+        return DoctorFinding(
+            code="unsafe_artifact",
+            message=error_message,
+            guidance=[
+                "対象 scope の artifacts path を regular directory / regular file だけで構成してください。",
+                "symlink や scope 外参照を除去してから `spec-dock/scripts/spec-dock validate` を再実行してください。",
+            ],
+        )
     if "Create in-progress state detected" in error_message:
         return DoctorFinding(
             code="stale_create_lock",

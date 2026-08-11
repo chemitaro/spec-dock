@@ -20,32 +20,6 @@ class _NodeReader:
         return []
 
 
-def test_binary_artifact_publisher_adapter_satisfies_narrow_application_ports(tmp_path):
-    contracts, ports, publisher_type = _runtime_modules()
-    publisher = publisher_type()
-
-    source_request = contracts.WorkbenchSourceGuardRequest(
-        repo_root=tmp_path,
-        specdock_dir=tmp_path / "spec-dock",
-        scope_directories=(),
-        source_path=Path("spec-dock/.workbench/source.md"),
-    )
-    publish_request = contracts.BinaryArtifactPublishRequest(
-        source=source_request,
-        destination_path=tmp_path / "spec-dock" / "artifacts" / "result.md",
-    )
-    wired = ports.Ports(
-        node_reader=_NodeReader(),
-        repo_root=tmp_path,
-        workbench_source_guard=publisher,
-        binary_artifact_publisher=publisher,
-    )
-
-    assert publish_request.source is source_request
-    assert wired.workbench_source_guard is publisher
-    assert wired.binary_artifact_publisher is publisher
-
-
 def test_explicit_file_guard_and_publisher_use_separate_narrow_ports(tmp_path):
     contracts, ports, publisher_type = _runtime_modules()
     publisher = publisher_type()

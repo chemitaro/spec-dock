@@ -10,24 +10,14 @@ from spec_dock_runtime.application.contracts import (
     UseCases,
 )
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.domain.artifacts import CURRENT_CREATABLE_ARTIFACT_TYPES
 from spec_dock_runtime.presentation.cli_text import render_new_artifact_text, render_new_node_text
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
     import argparse
 
-_artifact_types = (
-    "blank",
-    "research",
-    "interview",
-    "disc",
-    "decision-candidate",
-    "pr-repair-batch",
-    "adr",
-    "draft-requirement",
-    "draft-design",
-    "draft-plan",
-)
+_artifact_types = CURRENT_CREATABLE_ARTIFACT_TYPES
 
 
 @dataclass(frozen=True)
@@ -151,6 +141,8 @@ def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_new_artifact_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "artifact_type",
+        nargs="?",
+        default="blank",
         metavar="type",
         help=(f"Artifact type: {', '.join(_artifact_types)}."),
     )

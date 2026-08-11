@@ -1,6 +1,9 @@
+import builtins
 from pathlib import Path
 import sys
 import tempfile
+
+import pytest
 
 
 def _runtime_modules():
@@ -216,6 +219,140 @@ class TestValidateApplication:
             assert f"kind={node_kind} id={target.id}" in result.report.errors[0], case
             assert ".meta.json" in result.report.errors[0], case
             assert Path(target.meta_path).relative_to(repo_root).as_posix() in result.report.errors[0], case
+
+    @pytest.mark.parametrize(
+        ("label", "filename", "content"),
+        (
+            ("thin_report", "report.md", ""),
+            ("heavy_report", "report.md", "# Report\n\n" + ("historical detail\n" * 64)),
+            (
+                "evidence_adoption_ledger",
+                "report.md",
+                "# Report\n\n## Evidence Adoption Ledger\n\n"
+                "| ID | adoption_status | target_artifact | next_action |\n"
+                "|---|---|---|---|\n"
+                "| EAL-S09 | blocked | design.md | historical only |\n",
+            ),
+            (
+                "delegated_authority",
+                "design.md",
+                "---\nstatus: draft\nauthority: proposed\ngrants: [implementation_start]\n"
+                "approval: pending-main-promotion\n---\n# Design\n",
+            ),
+            (
+                "planning_level",
+                "plan.md",
+                "# Plan\n\nPlanning Level: critical\nReviewer gate: blocked\n",
+            ),
+            ("assurance", ".assurance.json", '{"authorized_profile":"critical","grade":"blocked"}\n'),
+            (
+                "draft_artifact",
+                "artifacts/20260810t010101z-draft-plan-historical.md",
+                "---\nauthority: proposed\n---\n# Historical draft\n",
+            ),
+            (
+                "repair_artifact",
+                "artifacts/20260810t010102z-pr-repair-batch-historical.md",
+                "# Historical repair batch\n\nreviewer: blocked\n",
+            ),
+        ),
+    )
+    def test_validate_tree_legacy_evidence_invariance_does_not_read_content(
+        self,
+        monkeypatch,
+        label: str,
+        filename: str,
+        content: str,
+    ) -> None:
+        (
+            app_contracts,
+            app_ports,
+            app_validate_tree,
+            _domain_models,
+            _domain_tree,
+            _domain_validation,
+            infra_contracts,
+        ) = _runtime_modules()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp) / "repo"
+            records = self._records(infra_contracts, repo_root)
+            self._materialize_artifacts(records)
+            issue_dir = Path(records[-1].path)
+            mutated_path = issue_dir / filename
+            mutated_path.parent.mkdir(parents=True, exist_ok=True)
+            mutated_path.write_text(content, encoding="utf-8")
+            original_read_text = Path.read_text
+            original_read_bytes = Path.read_bytes
+            original_path_open = Path.open
+            original_builtin_open = builtins.open
+            forbidden_reads: list[Path] = []
+
+            def is_legacy_evidence(path_like: object) -> Path | None:
+                try:
+                    path = Path(path_like)  # type: ignore[arg-type]
+                except (TypeError, ValueError):
+                    return None
+                if path == mutated_path or path.name in {
+                    "requirement.md",
+                    "design.md",
+                    "plan.md",
+                    "report.md",
+                    ".assurance.json",
+                    mutated_path.name,
+                }:
+                    return path
+                return None
+
+            def reject_legacy_evidence(path_like: object) -> None:
+                path = is_legacy_evidence(path_like)
+                if path is not None:
+                    forbidden_reads.append(path)
+                    raise AssertionError(f"legacy evidence content must not be read: {path}")
+
+            def fail_on_legacy_evidence_text(path: Path, *args, **kwargs):
+                reject_legacy_evidence(path)
+                return original_read_text(path, *args, **kwargs)
+
+            def fail_on_legacy_evidence_bytes(path: Path, *args, **kwargs):
+                reject_legacy_evidence(path)
+                return original_read_bytes(path, *args, **kwargs)
+
+            def fail_on_legacy_evidence_path_open(path: Path, *args, **kwargs):
+                reject_legacy_evidence(path)
+                return original_path_open(path, *args, **kwargs)
+
+            def fail_on_legacy_evidence_builtin_open(file, *args, **kwargs):
+                reject_legacy_evidence(file)
+                return original_builtin_open(file, *args, **kwargs)
+
+            monkeypatch.setattr(Path, "read_text", fail_on_legacy_evidence_text)
+            monkeypatch.setattr(Path, "read_bytes", fail_on_legacy_evidence_bytes)
+            monkeypatch.setattr(Path, "open", fail_on_legacy_evidence_path_open)
+            monkeypatch.setattr(builtins, "open", fail_on_legacy_evidence_builtin_open)
+
+            def attempt_builtin_open():
+                return builtins.open(mutated_path, "rb")  # noqa: PTH123
+
+            for read_attempt in (
+                lambda: mutated_path.read_text(encoding="utf-8"),
+                mutated_path.read_bytes,
+                lambda: mutated_path.open("rb"),
+                attempt_builtin_open,
+            ):
+                with pytest.raises(AssertionError, match="legacy evidence content must not be read"):
+                    read_attempt()
+            assert len(forbidden_reads) == 4
+            forbidden_reads.clear()
+
+            result = app_validate_tree.validate_tree(
+                app_contracts.ValidateTreeRequest(),
+                app_ports.Ports(node_reader=_StubNodeReader(records), repo_root=repo_root),
+            )
+
+        assert result.checked_node_count == 3, label
+        assert result.report.errors == [], label
+        assert forbidden_reads == [], label
 
     def test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli(self) -> None:
         (

@@ -4,10 +4,16 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+from types import SimpleNamespace
 
 import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
+from tests.cli_runtime.s09_invariance import (
+    S09_LEGACY_EVIDENCE_MUTATIONS,
+    apply_s09_legacy_evidence_mutation,
+    normalize_s09_process_result,
+)
 
 
 def _runtime_modules():
@@ -32,44 +38,9 @@ class _StubNodeReader:
 
 
 class _StubActiveStateStore:
-    def __init__(
-        self,
-        infra_contracts,
-        *,
-        issue_authority="approved",
-        issue_grants=None,
-        promotion_record=None,
-        fail_write=False,
-    ) -> None:
+    def __init__(self, infra_contracts) -> None:
         self._infra_contracts = infra_contracts
-        self.issue_authority = issue_authority
-        self.issue_grants = (
-            tuple(issue_grants)
-            if issue_grants is not None
-            else (
-                "review_input",
-                "planning_input",
-                "design_baseline",
-                "implementation_start",
-                "issue_ready",
-                "issue_finish",
-                "phase_completion",
-            )
-        )
-        self.promotion_record = promotion_record or {
-            "status": "approved",
-            "authority": "approved",
-            "source_revision": "active:iss-00101",
-            "approved_revision": "active:iss-00101",
-            "approved_hash": "active:iss-00101",
-            "reviewer_target_hash": "active:iss-00101",
-            "promotion_decision": "main_orchestrator_promotion",
-        }
-        self.fail_write = fail_write
         self.write_calls = []
-        self.restore_calls = []
-        self.pointer_calls = []
-        self.patch_calls = []
 
     def load_active_manifest(self, specdock_dir: Path):
         del specdock_dir
@@ -80,530 +51,460 @@ class _StubActiveStateStore:
                 issue=self._infra_contracts.ActiveManifestEntry(
                     id="iss-00101",
                     path="spec-dock/initiatives/init-00001/epics/epic-00002/issues/iss-00101",
-                    authority=self.issue_authority,
-                    grants=self.issue_grants,
-                    promotion_record=self.promotion_record,
                 ),
             ),
             source="agent.active",
             warnings=[],
         )
 
-    def snapshot_current_state(self, specdock_dir: Path):
-        return self._infra_contracts.ActiveStateSnapshot(
-            manifest=self.load_active_manifest(specdock_dir).manifest,
-            context_pack_text="previous context",
-            active_json_text="{}",
-            managed_agent_state={},
-        )
-
     def write_active_manifest(self, specdock_dir: Path, manifest):
         del specdock_dir
         self.write_calls.append(manifest)
-        if self.fail_write:
-            raise RuntimeError("write active failed")
-        self.issue_authority = manifest.issue.authority if manifest.issue is not None else None
-        self.issue_grants = manifest.issue.grants if manifest.issue is not None else ()
-        self.promotion_record = manifest.issue.promotion_record if manifest.issue is not None else None
         return manifest
-
-    def apply_active_pointers(self, specdock_dir: Path, manifest, rendered_context_pack: str):
-        del specdock_dir
-        self.pointer_calls.append((manifest, rendered_context_pack))
-
-    def patch_agent_state_active_fields(self, specdock_dir: Path, manifest):
-        del specdock_dir
-        self.patch_calls.append(manifest)
-
-    def restore_previous_state(self, specdock_dir: Path, snapshot) -> None:
-        del specdock_dir
-        self.restore_calls.append(snapshot)
 
 
 class TestIssueLifecycleApplication:
-    def test_issue_finish_blocks_proposed_or_missing_grant_active_issue_before_close(self) -> None:
-        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        close_calls = []
-        try:
+    def test_issue_start_orders_guard_deps_checkout_active_write_and_sync_once(self, monkeypatch) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
+        events: list[str] = []
+        requested = SimpleNamespace(id="iss-00102", kind="issue")
+        active_node = SimpleNamespace(
+            id="iss-00101",
+            github_issue_number=101,
+            github_repo_owner=None,
+            github_repo_name=None,
+        )
+        graph = SimpleNamespace(nodes_by_id={"iss-00101": active_node, "iss-00102": requested})
 
-            def fake_close_node(req, ports):
-                close_calls.append((req, ports))
-                raise AssertionError("close_node must not run when authority gate fails")
-
-            app_issue_lifecycle.close_node = fake_close_node
-
-            cases = (
-                (
-                    "proposed",
-                    "proposed",
-                    (
-                        "review_input",
-                        "planning_input",
-                        "design_baseline",
-                        "implementation_start",
-                        "issue_ready",
-                        "issue_finish",
-                        "phase_completion",
+        class ActiveStore:
+            def load_active_manifest(self, specdock_dir: Path):
+                del specdock_dir
+                return infra_contracts.ActiveManifestLoadResult(
+                    manifest=infra_contracts.ActiveManifest(
+                        initiative=None,
+                        epic=None,
+                        issue=infra_contracts.ActiveManifestEntry(id="iss-00101", path="spec-dock/old"),
                     ),
-                    "authority_not_approved",
-                ),
-                (
-                    "missing grant",
-                    "approved",
-                    ("review_input", "planning_input"),
-                    "missing_required_grant",
-                ),
-                ("missing metadata", None, (), "missing_authority"),
+                    source="agent.active",
+                    warnings=[],
+                )
+
+        class GitGateway:
+            def current_branch_or_none(self, repo_root: Path) -> str:
+                del repo_root
+                return "maintenance-check"
+
+        requested_target = app_contracts.TargetRef(
+            kind="github_issue",
+            node_id=None,
+            github_issue_number=102,
+            github_repo_owner="foreign",
+            github_repo_name="repo",
+        )
+
+        def resolve_target(graph_arg, target_arg, **kwargs):
+            del kwargs
+            events.append("target")
+            assert graph_arg is graph
+            assert target_arg == requested_target
+            return requested
+
+        def github_state(*args, **kwargs):
+            del args, kwargs
+            events.append("guard")
+            return "CLOSED"
+
+        def check_deps(req, ports):
+            del ports
+            events.append("deps")
+            assert req.target == app_contracts.TargetRef(
+                kind="node_id",
+                node_id="iss-00102",
+                github_issue_number=None,
             )
-            for _label, authority, grants, reason in cases:
-                close_calls.clear()
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    ports = app_ports.Ports(
-                        node_reader=_StubNodeReader(),
-                        repo_root=repo_root,
-                        specdock_dir=repo_root / "spec-dock",
-                        active_state_store=_StubActiveStateStore(
-                            infra_contracts,
-                            issue_authority=authority,
-                            issue_grants=grants,
-                        ),
+            assert req.use_github
+            assert req.issue_limit == 37
+            return SimpleNamespace(
+                inspection=SimpleNamespace(
+                    evaluation=SimpleNamespace(
+                        ready=True,
+                        guard_reason="ready",
+                        blockers=[],
+                        node_blockers=[],
                     )
-                    with pytest.raises(RuntimeError) as raised:
-                        app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
-
-                message = str(raised.value)
-                assert "issue finish blocked: authority gate failed" in message
-                assert reason in message
-                assert "required_grant: issue_finish" in message
-                assert close_calls == []
-        finally:
-            app_issue_lifecycle.close_node = original_close_node
-
-    def test_issue_finish_blocks_promotion_record_for_different_issue_before_close(self) -> None:
-        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        close_calls = []
-        try:
-
-            def fake_close_node(req, ports):
-                close_calls.append((req, ports))
-                raise AssertionError("close_node must not run when promotion record is stale")
-
-            app_issue_lifecycle.close_node = fake_close_node
-            stale_record = {
-                "status": "approved",
-                "authority": "approved",
-                "source_revision": "active:iss-00999",
-                "approved_revision": "active:iss-00999",
-                "approved_hash": "active:iss-00999",
-                "reviewer_target_hash": "active:iss-00999",
-                "promotion_decision": "main_orchestrator_promotion",
-            }
-            with tempfile.TemporaryDirectory() as tmp:
-                repo_root = Path(tmp)
-                ports = app_ports.Ports(
-                    node_reader=_StubNodeReader(),
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                    active_state_store=_StubActiveStateStore(
-                        infra_contracts,
-                        promotion_record=stale_record,
-                    ),
-                )
-                with pytest.raises(RuntimeError) as raised:
-                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
-
-            message = str(raised.value)
-            assert "issue finish blocked: authority gate failed" in message
-            assert "promotion_record_not_bound_to_active_entry" in message
-            assert "expected_revision=active:iss-00101" in message
-            assert close_calls == []
-        finally:
-            app_issue_lifecycle.close_node = original_close_node
-
-    def test_issue_finish_blocks_unresolved_evidence_adoption_ledger_before_close(self) -> None:
-        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        close_calls = []
-        runtime_record = {
-            "status": "approved",
-            "authority": "approved",
-            "source_revision": "active:iss-00101",
-            "approved_revision": "active:iss-00101",
-            "approved_hash": "active:iss-00101",
-            "reviewer_target_hash": "active:iss-00101",
-            "promotion_decision": "runtime_active_selection",
-        }
-        try:
-
-            def fake_close_node(req, ports):
-                close_calls.append((req, ports))
-                raise AssertionError("close_node must not run when EAL gate fails")
-
-            app_issue_lifecycle.close_node = fake_close_node
-            with tempfile.TemporaryDirectory() as tmp:
-                repo_root = Path(tmp)
-                issue_dir = (
-                    repo_root
-                    / "spec-dock"
-                    / "initiatives"
-                    / "init-00001"
-                    / "epics"
-                    / "epic-00002"
-                    / "issues"
-                    / "iss-00101"
-                )
-                issue_dir.mkdir(parents=True)
-                (issue_dir / "report.md").write_text(
-                    "\n".join([
-                        "## 証跡採用台帳（Evidence Adoption Ledger）",
-                        "",
-                        "| ID | adoption_status | target_artifact | next_action |",
-                        "|---|---|---|---|",
-                        "| EAL-009 | blocked | design.md | resolve reviewer evidence |",
-                        "",
-                        "## Other",
-                    ])
-                    + "\n",
-                    encoding="utf-8",
-                )
-                store = _StubActiveStateStore(infra_contracts, promotion_record=runtime_record)
-                ports = app_ports.Ports(
-                    node_reader=_StubNodeReader(),
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                    active_state_store=store,
-                )
-                with pytest.raises(RuntimeError) as raised:
-                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
-
-            message = str(raised.value)
-            assert "issue finish blocked: Evidence Adoption Ledger" in message
-            assert "blocking_entry_id: EAL-009" in message
-            assert "resolve reviewer evidence" in message
-            assert close_calls == []
-            assert store.write_calls == []
-            assert store.promotion_record["promotion_decision"] == "runtime_active_selection"
-        finally:
-            app_issue_lifecycle.close_node = original_close_node
-
-    def test_issue_finish_blocks_localized_eal_header_before_close(self) -> None:
-        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        close_calls = []
-        try:
-
-            def fake_close_node(req, ports):
-                close_calls.append((req, ports))
-                raise AssertionError("close_node must not run when localized EAL gate fails")
-
-            app_issue_lifecycle.close_node = fake_close_node
-            with tempfile.TemporaryDirectory() as tmp:
-                repo_root = Path(tmp)
-                issue_dir = (
-                    repo_root
-                    / "spec-dock"
-                    / "initiatives"
-                    / "init-00001"
-                    / "epics"
-                    / "epic-00002"
-                    / "issues"
-                    / "iss-00101"
-                )
-                issue_dir.mkdir(parents=True)
-                (issue_dir / "report.md").write_text(
-                    "\n".join([
-                        "## 証跡採用台帳（Evidence Adoption Ledger）",
-                        "",
-                        "| ID | 採用状態（adoption_status） | 対象（target） | 次アクション（next_action） |",
-                        "|---|---|---|---|",
-                        "| EAL-011 | stale | plan.md | refresh localized evidence |",
-                        "",
-                        "## Other",
-                    ])
-                    + "\n",
-                    encoding="utf-8",
-                )
-                ports = app_ports.Ports(
-                    node_reader=_StubNodeReader(),
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                    active_state_store=_StubActiveStateStore(infra_contracts),
-                )
-                with pytest.raises(RuntimeError) as raised:
-                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
-
-            message = str(raised.value)
-            assert "issue finish blocked: Evidence Adoption Ledger" in message
-            assert "blocking_entry_id: EAL-011" in message
-            assert "evidence_ledger_stale" in message
-            assert "refresh localized evidence" in message
-            assert close_calls == []
-        finally:
-            app_issue_lifecycle.close_node = original_close_node
-
-    def test_issue_finish_blocks_proposed_or_missing_metadata_delegated_artifacts_before_close(self) -> None:
-        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        close_calls = []
-        runtime_record = {
-            "status": "approved",
-            "authority": "approved",
-            "source_revision": "active:iss-00101",
-            "approved_revision": "active:iss-00101",
-            "approved_hash": "active:iss-00101",
-            "reviewer_target_hash": "active:iss-00101",
-            "promotion_decision": "runtime_active_selection",
-        }
-        try:
-
-            def fake_close_node(req, ports):
-                close_calls.append((req, ports))
-                raise AssertionError("close_node must not run when delegated artifact gate fails")
-
-            app_issue_lifecycle.close_node = fake_close_node
-            cases = (
-                (
-                    "proposed",
-                    "---\n"
-                    "status: draft\n"
-                    "authority: proposed\n"
-                    "grants: [review_input, planning_input]\n"
-                    "owner_role: main-orchestrator\n"
-                    "draft_author_role: system-architect\n"
-                    "approval: pending-main-promotion\n"
-                    "source_revision: rev-1\n"
-                    "approved_revision: rev-1\n"
-                    "approved_hash: hash-1\n"
-                    "manifest_hash: manifest-hash\n"
-                    "permission_profile_name: spec-dock-da\n"
-                    "permission_profile_hash: profile-hash\n"
-                    "write_session_invocation_hash: session-hash\n"
-                    "probe_run_id: probe-1\n"
-                    "positive_probe_result: pass\n"
-                    "---\n# Design\n",
-                    "authority_not_approved",
                 ),
-                (
-                    "missing metadata",
-                    "---\nauthority: approved\nmanifest_hash: manifest-hash\n---\n# Design\n",
-                    "incomplete_draft_metadata",
-                ),
+                warnings=["deps-warning"],
             )
-            for _label, artifact_text, expected_reason in cases:
-                close_calls.clear()
-                with tempfile.TemporaryDirectory() as tmp:
-                    repo_root = Path(tmp)
-                    issue_dir = (
-                        repo_root
-                        / "spec-dock"
-                        / "initiatives"
-                        / "init-00001"
-                        / "epics"
-                        / "epic-00002"
-                        / "issues"
-                        / "iss-00101"
-                    )
-                    issue_dir.mkdir(parents=True)
-                    (issue_dir / "design.md").write_text(artifact_text, encoding="utf-8")
-                    store = _StubActiveStateStore(infra_contracts, promotion_record=runtime_record)
-                    ports = app_ports.Ports(
-                        node_reader=_StubNodeReader(),
-                        repo_root=repo_root,
-                        specdock_dir=repo_root / "spec-dock",
-                        active_state_store=store,
-                    )
-                    with pytest.raises(RuntimeError) as raised:
-                        app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
 
-                message = str(raised.value)
-                assert "issue finish blocked: delegated artifact authority gate failed" in message
-                assert expected_reason in message
-                assert "design.md" in message
-                assert close_calls == []
-                assert store.write_calls == []
-                assert store.promotion_record["promotion_decision"] == "runtime_active_selection"
-        finally:
-            app_issue_lifecycle.close_node = original_close_node
+        checkout = domain_models.BranchDecision(
+            desired="iss-00102-second-issue",
+            candidates=("iss-00102-second-issue", "issue/iss-00102-second-issue"),
+            warnings=(),
+        )
 
-    def test_active_issue_lifecycle_gate_blocks_unresolved_eal_for_non_finish_purposes(self) -> None:
-        _app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        def checkout_target(*args, **kwargs):
+            del args, kwargs
+            events.append("checkout")
+            return checkout
+
+        def persist_active(req, ports):
+            del ports
+            events.append("active")
+            assert req.target == app_contracts.TargetRef(
+                kind="node_id",
+                node_id="iss-00102",
+                github_issue_number=None,
+            )
+            assert not req.checkout
+            return app_contracts.ActiveSetResult(
+                selection=domain_models.ActiveSelection(
+                    initiative_id="init-00001",
+                    epic_id="epic-00002",
+                    issue_id="iss-00102",
+                ),
+                branch=None,
+                manifest_written=True,
+                pointer_updated=True,
+                warnings=["active-warning"],
+            )
+
+        post_sync = app_contracts.PostMutationSyncOutcome.skipped("test sync")
+
+        def sync_once(ports):
+            del ports
+            events.append("sync")
+            return post_sync
+
+        monkeypatch.setattr(app_issue_lifecycle, "_build_graph", lambda ports: graph)
+        monkeypatch.setattr(app_issue_lifecycle, "_resolve_target_node", resolve_target)
+        monkeypatch.setattr(app_issue_lifecycle, "_github_state_for_node", github_state)
+        monkeypatch.setattr(app_issue_lifecycle, "check_deps", check_deps)
+        monkeypatch.setattr(app_issue_lifecycle, "checkout_active_target", checkout_target)
+        monkeypatch.setattr(app_issue_lifecycle, "set_active", persist_active)
+        monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", sync_once)
+
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
-            issue_dir = (
-                repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
-            )
-            issue_dir.mkdir(parents=True)
-            (issue_dir / "report.md").write_text(
-                "\n".join([
-                    "## Evidence Adoption Ledger",
-                    "",
-                    "| id | adoption_status | target_artifact | next_action |",
-                    "|---|---|---|---|",
-                    "| EAL-010 | stale | plan.md | refresh adopted evidence |",
-                    "",
-                    "## Other",
-                ])
-                + "\n",
-                encoding="utf-8",
-            )
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(),
                 repo_root=repo_root,
                 specdock_dir=repo_root / "spec-dock",
-                active_state_store=_StubActiveStateStore(infra_contracts),
+                active_state_store=ActiveStore(),
+                git_gateway=GitGateway(),
+            )
+            result = app_issue_lifecycle.issue_start(
+                app_contracts.IssueStartRequest(
+                    target=requested_target,
+                    force=False,
+                    issue_limit=37,
+                ),
+                ports,
             )
 
-            cases = (
-                ("implementation_start", "implementation start"),
-                ("issue_ready", "issue ready"),
-                ("phase_completion", "phase completion"),
-            )
-            for required_grant, command_label in cases:
-                with pytest.raises(RuntimeError) as raised:
-                    app_issue_lifecycle.require_active_issue_lifecycle_gate(
-                        ports,
-                        required_grant=required_grant,
-                        purpose=required_grant,
-                        command_label=command_label,
-                    )
-                message = str(raised.value)
-                assert f"{command_label} blocked: Evidence Adoption Ledger" in message
-                assert "blocking_entry_id: EAL-010" in message
-                assert "refresh adopted evidence" in message
+        assert events == ["target", "guard", "deps", "checkout", "active", "sync"]
+        assert result.active_set.branch is checkout
+        assert result.post_sync is post_sync
+        assert result.warnings == ["deps-warning", "active-warning"]
 
-    def test_issue_finish_transition_persistence_failure_rolls_back_before_close(self) -> None:
+    def test_issue_start_checkout_failure_does_not_write_active_or_sync(self, monkeypatch) -> None:
         app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        close_calls = []
-        runtime_record = {
-            "status": "approved",
-            "authority": "approved",
-            "source_revision": "active:iss-00101",
-            "approved_revision": "active:iss-00101",
-            "approved_hash": "active:iss-00101",
-            "reviewer_target_hash": "active:iss-00101",
-            "promotion_decision": "runtime_active_selection",
-        }
-        try:
+        events: list[str] = []
+        requested = SimpleNamespace(id="iss-00102", kind="issue")
+        graph = SimpleNamespace(nodes_by_id={"iss-00102": requested})
 
-            def fake_close_node(req, ports):
-                close_calls.append((req, ports))
-                raise AssertionError("close_node must not run when transition persistence fails")
+        class ActiveStore:
+            def load_active_manifest(self, specdock_dir: Path):
+                del specdock_dir
+                return infra_contracts.ActiveManifestLoadResult(
+                    manifest=infra_contracts.ActiveManifest(initiative=None, epic=None, issue=None),
+                    source="none",
+                    warnings=[],
+                )
 
-            app_issue_lifecycle.close_node = fake_close_node
+        class GitGateway:
+            def current_branch_or_none(self, repo_root: Path) -> str:
+                del repo_root
+                return "main"
+
+        monkeypatch.setattr(app_issue_lifecycle, "_build_graph", lambda ports: graph)
+        monkeypatch.setattr(app_issue_lifecycle, "_resolve_target_node", lambda *args, **kwargs: requested)
+        monkeypatch.setattr(
+            app_issue_lifecycle,
+            "check_deps",
+            lambda *args, **kwargs: SimpleNamespace(
+                inspection=SimpleNamespace(
+                    evaluation=SimpleNamespace(
+                        ready=True,
+                        guard_reason="ready",
+                        blockers=[],
+                        node_blockers=[],
+                    )
+                ),
+                warnings=[],
+            ),
+        )
+
+        def fail_checkout(*args, **kwargs):
+            del args, kwargs
+            events.append("checkout")
+            raise RuntimeError("checkout failed")
+
+        def unexpected_active(*args, **kwargs):
+            del args, kwargs
+            events.append("active")
+            raise AssertionError("active write must not run")
+
+        def unexpected_sync(*args, **kwargs):
+            del args, kwargs
+            events.append("sync")
+            raise AssertionError("sync must not run")
+
+        monkeypatch.setattr(app_issue_lifecycle, "checkout_active_target", fail_checkout)
+        monkeypatch.setattr(app_issue_lifecycle, "set_active", unexpected_active)
+        monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", unexpected_sync)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                active_state_store=ActiveStore(),
+                git_gateway=GitGateway(),
+            )
+            with pytest.raises(RuntimeError) as raised:
+                app_issue_lifecycle.issue_start(
+                    app_contracts.IssueStartRequest(
+                        target=app_contracts.TargetRef(
+                            kind="node_id",
+                            node_id="iss-00102",
+                            github_issue_number=None,
+                        ),
+                        force=False,
+                        issue_limit=100,
+                    ),
+                    ports,
+                )
+
+        assert events == ["checkout"]
+        message = str(raised.value)
+        assert "issue start failed during branch checkout" in message
+        assert "Active selection was not changed" in message
+        assert "Post-mutation sync was not run" in message
+        assert "checkout failed" in message
+
+    def test_issue_start_active_write_failure_reports_branch_side_effect_and_skips_sync(self, monkeypatch) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
+        events: list[str] = []
+        requested = SimpleNamespace(id="iss-00102", kind="issue")
+        graph = SimpleNamespace(nodes_by_id={"iss-00102": requested})
+
+        class ActiveStore:
+            def load_active_manifest(self, specdock_dir: Path):
+                del specdock_dir
+                return infra_contracts.ActiveManifestLoadResult(
+                    manifest=infra_contracts.ActiveManifest(initiative=None, epic=None, issue=None),
+                    source="none",
+                    warnings=[],
+                )
+
+        class GitGateway:
+            branch = "main"
+
+            def current_branch_or_none(self, repo_root: Path) -> str:
+                del repo_root
+                return self.branch
+
+        git_gateway = GitGateway()
+
+        monkeypatch.setattr(app_issue_lifecycle, "_build_graph", lambda ports: graph)
+        monkeypatch.setattr(app_issue_lifecycle, "_resolve_target_node", lambda *args, **kwargs: requested)
+        monkeypatch.setattr(
+            app_issue_lifecycle,
+            "check_deps",
+            lambda *args, **kwargs: SimpleNamespace(
+                inspection=SimpleNamespace(
+                    evaluation=SimpleNamespace(
+                        ready=True,
+                        guard_reason="ready",
+                        blockers=[],
+                        node_blockers=[],
+                    )
+                ),
+                warnings=[],
+            ),
+        )
+
+        def checkout_target(*args, **kwargs):
+            del args, kwargs
+            events.append("checkout")
+            git_gateway.branch = "iss-00102-second-issue"
+            return domain_models.BranchDecision(
+                desired=git_gateway.branch,
+                candidates=(git_gateway.branch, "issue/iss-00102-second-issue"),
+                warnings=(),
+            )
+
+        def fail_active(*args, **kwargs):
+            del args, kwargs
+            events.append("active")
+            raise RuntimeError("write active failed")
+
+        def unexpected_sync(*args, **kwargs):
+            del args, kwargs
+            events.append("sync")
+            raise AssertionError("sync must not run")
+
+        monkeypatch.setattr(app_issue_lifecycle, "checkout_active_target", checkout_target)
+        monkeypatch.setattr(app_issue_lifecycle, "set_active", fail_active)
+        monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", unexpected_sync)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                active_state_store=ActiveStore(),
+                git_gateway=git_gateway,
+            )
+            with pytest.raises(RuntimeError) as raised:
+                app_issue_lifecycle.issue_start(
+                    app_contracts.IssueStartRequest(
+                        target=app_contracts.TargetRef(
+                            kind="node_id",
+                            node_id="iss-00102",
+                            github_issue_number=None,
+                        ),
+                        force=False,
+                        issue_limit=100,
+                    ),
+                    ports,
+                )
+
+        assert events == ["checkout", "active"]
+        message = str(raised.value)
+        assert "issue start failed while persisting active selection after checkout" in message
+        assert "branch side effect: main -> iss-00102-second-issue" in message
+        assert "active rollback: restored" in message
+        assert "Post-mutation sync was not run" in message
+        assert "write active failed" in message
+
+    def test_issue_finish_orders_close_clear_sync_and_returns_phase_state(self, monkeypatch) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
+
+        for already_closed in (False, True):
+            events: list[str] = []
+            post_sync = app_contracts.PostMutationSyncOutcome.skipped("test lifecycle sync")
+
+            def fake_close_node(req, ports, *, events=events, already_closed=already_closed):
+                del ports
+                events.append("close")
+                assert not req.run_post_sync
+                return app_contracts.CloseNodeResult(
+                    node_id="iss-00101",
+                    node_kind="issue",
+                    github_issue_number=101,
+                    issue_snapshot=domain_models.IssueSnapshot(
+                        issue_number=101,
+                        state="CLOSED",
+                        title="First issue",
+                        labels=[],
+                        updated_at="2026-05-05T00:00:00Z",
+                        url="https://github.com/example/repo/issues/101",
+                    ),
+                    already_closed=already_closed,
+                    warnings=[],
+                )
+
+            def fake_clear_active(req, ports, *, events=events):
+                del req, ports
+                events.append("clear")
+                return app_contracts.ActiveClearResult(cleared=True, previous=None, warnings=[])
+
+            def fake_post_mutation_sync(ports, *, events=events, post_sync=post_sync):
+                del ports
+                events.append("sync")
+                return post_sync
+
+            monkeypatch.setattr(app_issue_lifecycle, "close_node", fake_close_node)
+            monkeypatch.setattr(app_issue_lifecycle, "clear_active", fake_clear_active)
+            monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", fake_post_mutation_sync)
+
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
-                store = _StubActiveStateStore(infra_contracts, promotion_record=runtime_record, fail_write=True)
+                store = _StubActiveStateStore(infra_contracts)
                 ports = app_ports.Ports(
                     node_reader=_StubNodeReader(),
                     repo_root=repo_root,
                     specdock_dir=repo_root / "spec-dock",
                     active_state_store=store,
                 )
-                with pytest.raises(RuntimeError) as raised:
-                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+                result = app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
 
-            message = str(raised.value)
-            assert "issue finish failed while persisting finish transition" in message
-            assert "write active failed" in message
-            assert len(store.write_calls) == 1
-            assert len(store.restore_calls) == 1
-            assert close_calls == []
-            assert store.promotion_record["promotion_decision"] == "runtime_active_selection"
-        finally:
-            app_issue_lifecycle.close_node = original_close_node
+            assert events == ["close", "clear", "sync"]
+            assert store.write_calls == []
+            assert result.issue_id == "iss-00101"
+            assert result.github_issue_number == 101
+            assert result.already_closed is already_closed
+            assert result.active_cleared
+            assert result.post_sync is post_sync
 
-    def test_lifecycle_authority_gate_blocks_non_finish_purposes(self) -> None:
-        _app_contracts, app_issue_lifecycle, _app_ports, _domain_models, infra_contracts = _runtime_modules()
-        issue_entry = infra_contracts.ActiveManifestEntry(
-            id="iss-00101",
-            path="spec-dock/initiatives/init-00001/epics/epic-00002/issues/iss-00101",
-            authority="proposed",
-            grants=(
-                "review_input",
-                "planning_input",
-                "design_baseline",
-                "implementation_start",
-                "issue_ready",
-                "issue_finish",
-                "phase_completion",
-            ),
-            promotion_record={
-                "status": "approved",
-                "authority": "approved",
-                "source_revision": "active:iss-00101",
-                "approved_revision": "active:iss-00101",
-                "approved_hash": "active:iss-00101",
-                "reviewer_target_hash": "active:iss-00101",
-                "promotion_decision": "main_orchestrator_promotion",
-            },
-        )
+    def test_issue_finish_close_failure_preserves_active_and_reports_retry(self, monkeypatch) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        events: list[str] = []
 
-        cases = (
-            ("implementation_start", "implementation start"),
-            ("issue_ready", "issue ready"),
-            ("phase_completion", "phase completion"),
-        )
-        for required_grant, command_label in cases:
-            with pytest.raises(RuntimeError) as raised:
-                app_issue_lifecycle.require_lifecycle_authority(
-                    issue_entry,
-                    required_grant=required_grant,
-                    purpose=required_grant,
-                    command_label=command_label,
-                )
-            message = str(raised.value)
-            assert f"{command_label} blocked: authority gate failed" in message
-            assert "authority_not_approved" in message
-            assert f"required_grant: {required_grant}" in message
+        def fake_close_node(req, ports):
+            del req, ports
+            events.append("close")
+            raise RuntimeError("close failed")
 
-    def test_lifecycle_authority_gate_uses_requested_non_finish_grant(self) -> None:
-        _app_contracts, app_issue_lifecycle, _app_ports, _domain_models, infra_contracts = _runtime_modules()
-        issue_entry = infra_contracts.ActiveManifestEntry(
-            id="iss-00101",
-            path="spec-dock/initiatives/init-00001/epics/epic-00002/issues/iss-00101",
-            authority="approved",
-            grants=("review_input", "planning_input", "issue_finish"),
-            promotion_record={
-                "status": "approved",
-                "authority": "approved",
-                "source_revision": "active:iss-00101",
-                "approved_revision": "active:iss-00101",
-                "approved_hash": "active:iss-00101",
-                "reviewer_target_hash": "active:iss-00101",
-                "promotion_decision": "runtime_active_selection",
-            },
-        )
+        def unexpected_clear(req, ports):
+            del req, ports
+            events.append("clear")
+            raise AssertionError("clear must not run")
 
-        with pytest.raises(RuntimeError) as raised:
-            app_issue_lifecycle.require_lifecycle_authority(
-                issue_entry,
-                required_grant="phase_completion",
-                purpose="phase_completion",
-                command_label="phase completion",
+        def unexpected_sync(ports):
+            del ports
+            events.append("sync")
+            raise AssertionError("sync must not run")
+
+        monkeypatch.setattr(app_issue_lifecycle, "close_node", fake_close_node)
+        monkeypatch.setattr(app_issue_lifecycle, "clear_active", unexpected_clear)
+        monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", unexpected_sync)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            store = _StubActiveStateStore(infra_contracts)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                active_state_store=store,
             )
+            with pytest.raises(RuntimeError) as raised:
+                app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
 
+        assert events == ["close"]
+        assert store.write_calls == []
         message = str(raised.value)
-        assert "phase completion blocked: authority gate failed" in message
-        assert "missing_required_grant" in message
-        assert "required_grant: phase_completion" in message
+        assert "issue finish failed while closing GitHub issue" in message
+        assert "github_closed=false" in message
+        assert "active_cleared=false" in message
+        assert "post_sync=not_run" in message
+        assert "spec-dock/scripts/spec-dock issue finish" in message
+        assert "close failed" in message
 
-    def test_issue_finish_clear_active_failure_includes_recovery_guidance(self) -> None:
+    def test_issue_finish_clear_failure_reports_confirmed_partial_state_and_skips_sync(self, monkeypatch) -> None:
         app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        original_clear_active = app_issue_lifecycle.clear_active
-        original_post_mutation_sync = app_issue_lifecycle.post_mutation_sync
-        try:
-            for already_closed in (False, True):
-                close_calls = []
-                sync_calls = []
 
-                def fake_close_node(req, ports, *, close_calls=close_calls, already_closed=already_closed):
-                    close_calls.append((req, ports))
-                    assert not req.run_post_sync
+        for already_closed in (False, True):
+            for error_type in (RuntimeError, PermissionError, OSError):
+                events: list[str] = []
+
+                def fake_close_node(req, ports, *, events=events, already_closed=already_closed):
+                    del req, ports
+                    events.append("close")
                     return app_contracts.CloseNodeResult(
                         node_id="iss-00101",
                         node_kind="issue",
@@ -620,108 +521,212 @@ class TestIssueLifecycleApplication:
                         warnings=[],
                     )
 
-                def fake_clear_active(req, ports):
+                def fake_clear_active(req, ports, *, events=events, error_type=error_type):
                     del req, ports
-                    raise RuntimeError("clear active failed")
+                    events.append("clear")
+                    raise error_type("clear active failed")
 
-                def fake_post_mutation_sync(ports, *, sync_calls=sync_calls):
-                    sync_calls.append(ports)
-                    return app_contracts.PostMutationSyncOutcome.skipped("test")
+                def unexpected_sync(ports, *, events=events):
+                    del ports
+                    events.append("sync")
+                    raise AssertionError("sync must not run")
 
-                app_issue_lifecycle.close_node = fake_close_node
-                app_issue_lifecycle.clear_active = fake_clear_active
-                app_issue_lifecycle.post_mutation_sync = fake_post_mutation_sync
+                monkeypatch.setattr(app_issue_lifecycle, "close_node", fake_close_node)
+                monkeypatch.setattr(app_issue_lifecycle, "clear_active", fake_clear_active)
+                monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", unexpected_sync)
 
                 with tempfile.TemporaryDirectory() as tmp:
                     repo_root = Path(tmp)
+                    store = _StubActiveStateStore(infra_contracts)
                     ports = app_ports.Ports(
                         node_reader=_StubNodeReader(),
                         repo_root=repo_root,
                         specdock_dir=repo_root / "spec-dock",
-                        active_state_store=_StubActiveStateStore(infra_contracts),
+                        active_state_store=store,
                     )
                     with pytest.raises(RuntimeError) as raised:
                         app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
 
+                assert events == ["close", "clear"]
+                assert store.write_calls == []
+                active_load = store.load_active_manifest(repo_root / "spec-dock")
+                assert active_load.manifest is not None
+                assert active_load.manifest.issue is not None
+                assert active_load.manifest.issue.id == "iss-00101"
                 message = str(raised.value)
-                assert len(close_calls) == 1
-                assert sync_calls == []
-                assert "issue finish failed after GitHub close/already-closed step" in message
-                assert "GitHub issue #101 may have been closed successfully" in message
-                assert "may already have been closed" in message
-                assert "Active selection was not cleared." in message
-                assert "Derived artifacts may remain stale" in message
+                assert "github_issue_number=101" in message
+                assert "github_closed=true" in message
+                assert f"already_closed={'true' if already_closed else 'false'}" in message
+                assert "active_cleared=false" in message
+                assert "post_sync=not_run" in message
+                assert "Active selection remains set." in message
                 assert "spec-dock/scripts/spec-dock active show" in message
                 assert "spec-dock/scripts/spec-dock issue finish" in message
-                assert "spec-dock/scripts/spec-dock active set <issue-id> --checkout" in message
-                assert "manual active recovery" in message
+                assert "spec-dock/scripts/spec-dock active set <issue-id>" in message
                 assert "clear active failed" in message
-        finally:
-            app_issue_lifecycle.close_node = original_close_node
-            app_issue_lifecycle.clear_active = original_clear_active
-            app_issue_lifecycle.post_mutation_sync = original_post_mutation_sync
 
-    def test_issue_finish_suppresses_internal_close_sync_and_runs_lifecycle_sync_once(self) -> None:
+    def test_issue_finish_sync_failure_returns_closed_cleared_stale_result(self, monkeypatch) -> None:
         app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
-        original_close_node = app_issue_lifecycle.close_node
-        original_clear_active = app_issue_lifecycle.clear_active
-        original_post_mutation_sync = app_issue_lifecycle.post_mutation_sync
-        close_calls = []
-        clear_calls = []
-        sync_calls = []
-        post_sync = app_contracts.PostMutationSyncOutcome.skipped("test lifecycle sync")
+        events: list[str] = []
+        post_sync = app_contracts.PostMutationSyncOutcome.from_exception(RuntimeError("sync failed"))
+
+        def fake_close_node(req, ports):
+            del req, ports
+            events.append("close")
+            return app_contracts.CloseNodeResult(
+                node_id="iss-00101",
+                node_kind="issue",
+                github_issue_number=101,
+                issue_snapshot=domain_models.IssueSnapshot(
+                    issue_number=101,
+                    state="CLOSED",
+                    title="First issue",
+                    labels=[],
+                    updated_at="2026-05-05T00:00:00Z",
+                    url="https://github.com/example/repo/issues/101",
+                ),
+                already_closed=False,
+                warnings=[],
+            )
+
+        def fake_clear_active(req, ports):
+            del req, ports
+            events.append("clear")
+            return app_contracts.ActiveClearResult(cleared=True, previous=None, warnings=[])
+
+        def fake_post_mutation_sync(ports):
+            del ports
+            events.append("sync")
+            return post_sync
+
+        monkeypatch.setattr(app_issue_lifecycle, "close_node", fake_close_node)
+        monkeypatch.setattr(app_issue_lifecycle, "clear_active", fake_clear_active)
+        monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", fake_post_mutation_sync)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            store = _StubActiveStateStore(infra_contracts)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                active_state_store=store,
+            )
+            result = app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+        assert events == ["close", "clear", "sync"]
+        assert store.write_calls == []
+        assert result.already_closed is False
+        assert result.active_cleared is True
+        assert result.post_sync is post_sync
+        assert result.post_sync.failed
+        assert any("derived artifacts may be stale" in line for line in result.post_sync.guidance)
+
+    def test_issue_finish_does_not_read_quality_evidence(self, monkeypatch) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
+        original_read_text = Path.read_text
+        forbidden_reads: list[Path] = []
+        observations: list[tuple[list[str], tuple[object, ...]]] = []
+
+        def fail_on_quality_evidence(path: Path, *args, **kwargs):
+            if path.name in {"report.md", "design.md", "plan.md", ".assurance.json"}:
+                forbidden_reads.append(path)
+                raise AssertionError(f"quality evidence must not be read: {path.name}")
+            return original_read_text(path, *args, **kwargs)
+
+        variants = (
+            ("thin", ""),
+            ("heavy", "## Evidence Adoption Ledger\n| id | adoption_status |\n|---|---|\n| EAL-1 | blocked |\n"),
+        )
+        variant_roots: list[Path] = []
+        temp_dirs = [tempfile.TemporaryDirectory() for _ in variants]
         try:
-
-            def fake_close_node(req, ports):
-                close_calls.append((req, ports))
-                assert not req.run_post_sync
-                return app_contracts.CloseNodeResult(
-                    node_id="iss-00101",
-                    node_kind="issue",
-                    github_issue_number=101,
-                    issue_snapshot=domain_models.IssueSnapshot(
-                        issue_number=101,
-                        state="CLOSED",
-                        title="First issue",
-                        labels=[],
-                        updated_at="2026-05-05T00:00:00Z",
-                        url="https://github.com/example/repo/issues/101",
-                    ),
-                    already_closed=False,
-                    warnings=[],
+            for temporary, (label, report_text) in zip(temp_dirs, variants, strict=True):
+                repo_root = Path(temporary.name)
+                variant_roots.append(repo_root)
+                issue_dir = (
+                    repo_root
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001"
+                    / "epics"
+                    / "epic-00002"
+                    / "issues"
+                    / "iss-00101"
                 )
+                issue_dir.mkdir(parents=True)
+                for name, content in (
+                    ("report.md", report_text),
+                    ("design.md", f"---\nauthority: proposed\n---\n# {label}\n"),
+                    ("plan.md", f"# {label}\n"),
+                    (".assurance.json", '{"profile":"critical"}\n'),
+                ):
+                    (issue_dir / name).write_text(content, encoding="utf-8")
 
-            def fake_clear_active(req, ports):
-                clear_calls.append((req, ports))
-                return app_contracts.ActiveClearResult(cleared=True, previous=None, warnings=[])
+            monkeypatch.setattr(Path, "read_text", fail_on_quality_evidence)
 
-            def fake_post_mutation_sync(ports):
-                sync_calls.append(ports)
-                return post_sync
+            for repo_root in variant_roots:
+                events: list[str] = []
 
-            app_issue_lifecycle.close_node = fake_close_node
-            app_issue_lifecycle.clear_active = fake_clear_active
-            app_issue_lifecycle.post_mutation_sync = fake_post_mutation_sync
+                def fake_close_node(req, ports, *, events=events):
+                    del req, ports
+                    events.append("close")
+                    return app_contracts.CloseNodeResult(
+                        node_id="iss-00101",
+                        node_kind="issue",
+                        github_issue_number=101,
+                        issue_snapshot=domain_models.IssueSnapshot(
+                            issue_number=101,
+                            state="CLOSED",
+                            title="First issue",
+                            labels=[],
+                            updated_at="2026-05-05T00:00:00Z",
+                            url="https://github.com/example/repo/issues/101",
+                        ),
+                        already_closed=False,
+                        warnings=[],
+                    )
 
-            with tempfile.TemporaryDirectory() as tmp:
-                repo_root = Path(tmp)
+                def fake_clear_active(req, ports, *, events=events):
+                    del req, ports
+                    events.append("clear")
+                    return app_contracts.ActiveClearResult(cleared=True, previous=None, warnings=[])
+
+                def fake_post_mutation_sync(ports, *, events=events):
+                    del ports
+                    events.append("sync")
+                    return app_contracts.PostMutationSyncOutcome.skipped("test")
+
+                monkeypatch.setattr(app_issue_lifecycle, "close_node", fake_close_node)
+                monkeypatch.setattr(app_issue_lifecycle, "clear_active", fake_clear_active)
+                monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", fake_post_mutation_sync)
+
+                store = _StubActiveStateStore(infra_contracts)
                 ports = app_ports.Ports(
                     node_reader=_StubNodeReader(),
                     repo_root=repo_root,
                     specdock_dir=repo_root / "spec-dock",
-                    active_state_store=_StubActiveStateStore(infra_contracts),
+                    active_state_store=store,
                 )
                 result = app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
 
-            assert len(close_calls) == 1
-            assert len(clear_calls) == 1
-            assert len(sync_calls) == 1
-            assert result.post_sync is post_sync
-            assert result.active_cleared
+                observations.append((
+                    events,
+                    (
+                        result.issue_id,
+                        result.github_issue_number,
+                        result.already_closed,
+                        result.active_cleared,
+                        result.post_sync.skipped_reason if result.post_sync is not None else None,
+                    ),
+                ))
+                assert store.write_calls == []
         finally:
-            app_issue_lifecycle.close_node = original_close_node
-            app_issue_lifecycle.clear_active = original_clear_active
-            app_issue_lifecycle.post_mutation_sync = original_post_mutation_sync
+            for temporary in temp_dirs:
+                temporary.cleanup()
+
+        assert observations[0] == observations[1]
+        assert forbidden_reads == []
 
 
 class TestCliIssueLifecycle(CliRuntimeHarness):
@@ -828,19 +833,77 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             return path_file.read_text(encoding="utf-8").strip()
         return ""
 
-    def _active_issue_promotion_decision(self, target: Path) -> str | None:
+    def _s09_core_durable_state(self, target: Path, bin_dir: Path) -> dict[str, object]:
         active_path = target / "spec-dock" / ".agent" / "active.json"
-        if not active_path.exists():
-            return None
-        active = json.loads(active_path.read_text(encoding="utf-8"))
-        issue = active.get("issue")
-        if not isinstance(issue, dict):
-            return None
-        promotion_record = issue.get("promotion_record")
-        if not isinstance(promotion_record, dict):
-            return None
-        value = promotion_record.get("promotion_decision")
-        return value if isinstance(value, str) else None
+        active = json.loads(active_path.read_text(encoding="utf-8")) if active_path.is_file() else None
+        if isinstance(active, dict) and isinstance(active.get("updated_at"), str):
+            active["updated_at"] = "<timestamp>"
+        state_path = bin_dir / "gh-state.json"
+        gh_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.is_file() else None
+        log_path = bin_dir / "gh-calls.log"
+        gh_calls = log_path.read_text(encoding="utf-8").splitlines() if log_path.is_file() else []
+        index_path = target / "spec-dock" / ".agent" / "index-all.json"
+        issue_status = None
+        if index_path.is_file():
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            issue_status = index.get("nodes", {}).get("iss-00101", {}).get("status")
+        return {
+            "active_manifest": active,
+            "active_pointer": self._active_issue_pointer_text(target),
+            "branch": self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip(),
+            "gh_state": gh_state,
+            "gh_calls": gh_calls,
+            "issue_status": issue_status,
+        }
+
+    def _capture_s09_core_sequence(
+        self,
+        target: Path,
+        bin_dir: Path,
+        *,
+        mutation: str | None,
+    ) -> dict[str, dict[str, object]]:
+        target.mkdir(parents=True)
+        self._prepare_clean_repo_with_two_issues(target)
+        self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
+        mutated_paths = (
+            apply_s09_legacy_evidence_mutation(target, mutation, issue_id="iss-00101") if mutation is not None else ()
+        )
+        mutation_bytes = {path: path.read_bytes() for path in mutated_paths}
+        self._commit_all(target, "S09 invariance input")
+
+        bin_dir.mkdir(parents=True)
+        self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
+        test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+        surfaces = (
+            ("active", ["active", "show"], None, True),
+            ("deps", ["deps", "check", "--id", "iss-00101", "--no-github"], None, True),
+            ("validate", ["validate"], None, True),
+            ("doctor", ["doctor"], None, True),
+            ("start", ["issue", "start", "--id", "iss-00101"], test_env, False),
+            ("finish", ["issue", "finish"], test_env, False),
+        )
+        observations: dict[str, dict[str, object]] = {}
+        for name, args, env, read_only in surfaces:
+            before_state = self._s09_core_durable_state(target, bin_dir)
+            result = self._run_runtime_capture(target, args, env=env)
+            after_state = self._s09_core_durable_state(target, bin_dir)
+            if read_only:
+                assert after_state == before_state, f"{mutation or 'baseline'}:{name} mutated Core durable state"
+                durable_effect: object = "unchanged"
+            else:
+                durable_effect = after_state
+            observations[name] = {
+                "process": normalize_s09_process_result(result, repo_root=target, bin_root=bin_dir),
+                "durable_effect": durable_effect,
+            }
+
+            if read_only or mutation != "legacy_active_extra_fields":
+                assert {path: path.read_bytes() for path in mutated_paths} == mutation_bytes, (
+                    f"{mutation or 'baseline'}:{name} rewrote Historical evidence"
+                )
+
+        return observations
 
     def test_issue_start_sets_active_and_checks_out_issue_branch(self) -> None:
         if os.name == "nt":
@@ -863,13 +926,11 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert self._active_issue_id(target) == "iss-00101"
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             issue = active["issue"]
-            assert issue["authority"] == "approved"
-            assert "issue_finish" in issue["grants"]
-            assert issue["promotion_record"]["approved_hash"] == issue["promotion_record"]["reviewer_target_hash"]
+            assert set(issue) == {"id", "path"}
+            assert issue["id"] == "iss-00101"
             context_pack = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
-            assert "- issue: authority=approved" in context_pack
-            assert "issue ready" in context_pack
-            assert "issue_finish" in context_pack
+            assert "authority" not in context_pack.lower()
+            assert "issue_finish" not in context_pack
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00101-first-issue"
 
@@ -891,6 +952,40 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert "issue start only accepts issue nodes" in p.stderr
             assert self._active_issue_id(target) is None
 
+    def test_issue_start_force_cannot_bypass_invalid_target_for_any_selector(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
+            target = Path(tmp)
+            self._prepare_clean_repo_with_two_issues(target)
+            bin_dir = Path(bin_tmp)
+            self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            active_path = target / "spec-dock" / ".agent" / "active.json"
+            before_active = active_path.read_bytes() if active_path.exists() else None
+            before_pointer = self._active_issue_pointer_text(target)
+            before_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+
+            cases = (
+                ["issue", "start", "iss-00999", "--force"],
+                ["issue", "start", "--id", "iss-00999", "--force"],
+                ["issue", "start", "--github-issue", "999", "--force"],
+            )
+            for args in cases:
+                p = self._run_runtime_capture(target, args, env=test_env)
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "issue start forced=true" not in p.stderr
+                assert self._active_issue_id(target) is None
+
+            after_active = active_path.read_bytes() if active_path.exists() else None
+            assert after_active == before_active
+            assert self._active_issue_pointer_text(target) == before_pointer
+            assert self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip() == before_branch
+            assert not (bin_dir / "gh-calls.log").exists()
+
     def test_issue_start_blocks_different_open_issue_from_active_issue_branch(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
@@ -909,19 +1004,19 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["issue", "start", "102"], env=test_env)
             assert p.returncode != 0, p.stdout + p.stderr
-            assert "issue start blocked: unfinished active issue branch" in p.stderr
+            assert "issue start blocked: unfinished active issue" in p.stderr
             assert "current active issue: iss-00101" in p.stderr
             assert "current branch: iss-00101-first-issue" in p.stderr
             assert "requested issue: iss-00102" in p.stderr
             assert "github state: OPEN" in p.stderr
             assert "issue finish" in p.stderr
             assert "issue start iss-00102 -f" in p.stderr
-            assert "active set iss-00102 --checkout" in p.stderr
+            assert "active set iss-00102" in p.stderr
             assert (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8") == before
             after_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert after_branch == before_branch
 
-    def test_direct_active_set_checkout_bypasses_issue_lifecycle_guard(self) -> None:
+    def test_direct_active_set_checkout_is_parser_error_without_writes(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
         if shutil.which("git") is None:
@@ -930,38 +1025,35 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
             target = Path(tmp)
             self._prepare_clean_repo_with_two_issues(target)
-            issue_meta = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00102-second-issue"
-                / ".meta.json"
-            )
-            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
-            meta.pop("github", None)
-            self._write_json_force(issue_meta, meta)
-            self._commit_all(target, "make second issue locally ready")
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
             self._run_runtime(target, ["issue", "start", "101"], env=test_env)
             self._commit_all(target, "active first issue")
-            active_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            assert active_branch == "iss-00101-first-issue"
+            active_path = target / "spec-dock" / ".agent" / "active.json"
+            before_active = active_path.read_bytes()
+            before_pointer = self._active_issue_pointer_text(target)
+            before_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            before_status = self._run_git(target, ["status", "--porcelain=v1"]).stdout
+            gh_log = bin_dir / "gh-calls.log"
+            before_gh_log = gh_log.read_bytes()
+            assert before_branch == "iss-00101-first-issue"
             assert self._active_issue_id(target) == "iss-00101"
 
-            p = self._run_runtime_capture(target, ["active", "set", "iss-00102", "--checkout"])
+            p = self._run_runtime_capture(
+                target,
+                ["active", "set", "iss-00102", "--checkout"],
+                env=test_env,
+            )
 
-            assert p.returncode == 0, p.stdout + p.stderr
-            assert "spec-dock: ok (active set)" in p.stdout
-            assert "issue start blocked" not in p.stderr
-            assert self._active_issue_id(target) == "iss-00102"
-            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            assert current == "iss-00102-second-issue"
+            assert p.returncode != 0
+            assert "unrecognized arguments: --checkout" in p.stderr
+            assert active_path.read_bytes() == before_active
+            assert self._active_issue_id(target) == "iss-00101"
+            assert self._active_issue_pointer_text(target) == before_pointer
+            assert self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip() == before_branch
+            assert self._run_git(target, ["status", "--porcelain=v1"]).stdout == before_status
+            assert gh_log.read_bytes() == before_gh_log
 
     def test_issue_start_allows_different_issue_from_closed_active_issue_branch(self) -> None:
         if os.name == "nt":
@@ -1013,15 +1105,83 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["issue", "start", "102"], env=test_env)
 
             assert p.returncode != 0, p.stdout + p.stderr
-            assert "issue start blocked: unfinished active issue branch" in p.stderr
+            assert "issue start blocked: unfinished active issue" in p.stderr
             assert "github state: UNKNOWN" in p.stderr
             assert "Next commands:" in p.stderr
             assert "spec-dock/scripts/spec-dock issue finish" in p.stderr
             assert "spec-dock/scripts/spec-dock issue start iss-00102 -f" in p.stderr
-            assert "spec-dock/scripts/spec-dock active set iss-00102 --checkout" in p.stderr
+            assert "spec-dock/scripts/spec-dock active set iss-00102" in p.stderr
             assert (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8") == before
             after_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert after_branch == before_branch
+
+    def test_issue_start_force_bypasses_unknown_active_guard_when_dependencies_are_ready(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
+            target = Path(tmp)
+            self._prepare_clean_repo_with_two_issues(target)
+            bin_dir = Path(bin_tmp)
+            self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._run_runtime(target, ["issue", "start", "101"], env=test_env)
+            self._commit_all(target, "active first issue")
+
+            self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"}, fail_view_numbers={101})
+            p = self._run_runtime_capture(target, ["issue", "start", "102", "--force"], env=test_env)
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "issue start forced=true" in p.stderr
+            assert "issue start blocked" not in p.stderr
+            assert self._active_issue_id(target) == "iss-00102"
+            assert self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip() == (
+                "iss-00102-second-issue"
+            )
+
+    def test_issue_start_blocks_when_active_issue_has_no_github_link(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
+            target = Path(tmp)
+            self._prepare_clean_repo_with_two_issues(target)
+            bin_dir = Path(bin_tmp)
+            self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._run_runtime(target, ["issue", "start", "101"], env=test_env)
+            self._commit_all(target, "active first issue")
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00101-first-issue"
+                / ".meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta.pop("github", None)
+            self._write_json_force(issue_meta, meta)
+            self._commit_all(target, "remove active issue github link")
+            before_active = (target / "spec-dock" / ".agent" / "active.json").read_bytes()
+            before_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+
+            p = self._run_runtime_capture(target, ["issue", "start", "102"], env=test_env)
+
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "issue start blocked: unfinished active issue" in p.stderr
+            assert "github state: UNKNOWN" in p.stderr
+            assert "active node resolution: resolved" in p.stderr
+            assert (target / "spec-dock" / ".agent" / "active.json").read_bytes() == before_active
+            assert self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip() == before_branch
 
     def test_issue_start_force_bypasses_only_lifecycle_guard_not_dependency_guard(self) -> None:
         if os.name == "nt":
@@ -1056,7 +1216,8 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["issue", "start", "102", "-f"], env=test_env)
             assert p.returncode != 0, p.stdout + p.stderr
-            assert "active set blocked" in p.stderr
+            assert "issue start blocked: dependency readiness failed" in p.stderr
+            assert "iss-00101" in p.stderr
             assert "spec-dock: ok (issue start)" not in p.stdout
             assert self._active_issue_id(target) == "iss-00101"
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
@@ -1099,7 +1260,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["issue", "start", "102", "--force"], env=test_env)
             assert p.returncode != 0, p.stdout + p.stderr
-            assert "active set blocked" in p.stderr
+            assert "issue start blocked: dependency readiness failed" in p.stderr
             assert "epic-00202" in p.stderr
             assert "spec-dock: ok (issue start)" not in p.stdout
             assert self._active_issue_id(target) == "iss-00101"
@@ -1143,7 +1304,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00102-second-issue"
 
-    def test_issue_start_from_main_and_same_issue_restart_do_not_trigger_guard(self) -> None:
+    def test_issue_start_from_main_still_blocks_different_open_active_but_same_issue_restarts(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
         if shutil.which("git") is None:
@@ -1170,11 +1331,12 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
 
             self._run_git(target, ["checkout", initial_branch])
             main_start = self._run_runtime_capture(target, ["issue", "start", "102"], env=test_env)
-            assert main_start.returncode == 0, main_start.stdout + main_start.stderr
-            assert "issue start blocked" not in main_start.stderr
-            assert self._active_issue_id(target) == "iss-00102"
+            assert main_start.returncode != 0, main_start.stdout + main_start.stderr
+            assert "issue start blocked: unfinished active issue" in main_start.stderr
+            assert "current branch:" in main_start.stderr
+            assert self._active_issue_id(target) == "iss-00101"
 
-    def test_issue_start_from_non_issue_branch_allows_switching_open_active_issue(self) -> None:
+    def test_issue_start_from_non_issue_branch_blocks_switching_open_active_issue(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
         if shutil.which("git") is None:
@@ -1193,14 +1355,43 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self._run_git(target, ["checkout", "-b", "maintenance-check"])
 
             p = self._run_runtime_capture(target, ["issue", "start", "102"], env=test_env)
-            assert p.returncode == 0, p.stdout + p.stderr
-            assert "issue start blocked" not in p.stderr
-            assert "spec-dock: ok (issue start)" in p.stdout
-            assert self._active_issue_id(target) == "iss-00102"
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "issue start blocked: unfinished active issue" in p.stderr
+            assert "current branch: maintenance-check" in p.stderr
+            assert "spec-dock: ok (issue start)" not in p.stdout
+            assert self._active_issue_id(target) == "iss-00101"
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            assert current == "iss-00102-second-issue"
+            assert current == "maintenance-check"
 
-    def test_issue_start_then_finish_closes_open_issue_and_clears_active(self) -> None:
+    def test_issue_start_from_detached_head_blocks_switching_open_active_issue(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
+            target = Path(tmp)
+            self._prepare_clean_repo_with_two_issues(target)
+            bin_dir = Path(bin_tmp)
+            self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            first = self._run_runtime_capture(target, ["issue", "start", "101"], env=test_env)
+            assert first.returncode == 0, first.stdout + first.stderr
+            self._commit_all(target, "active first issue")
+            self._run_git(target, ["checkout", "--detach", "HEAD"])
+
+            p = self._run_runtime_capture(target, ["issue", "start", "102"], env=test_env)
+
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "issue start blocked: unfinished active issue" in p.stderr
+            assert "current branch: (detached)" in p.stderr
+            assert "spec-dock: ok (issue start)" not in p.stdout
+            assert self._active_issue_id(target) == "iss-00101"
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            assert current == "HEAD"
+
+    def test_issue_finish_after_issue_start_then_finish_closes_open_issue_and_clears_active(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
         if shutil.which("git") is None:
@@ -1219,7 +1410,8 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert "issue=iss-00101" in started.stdout
             assert "spec-dock: ok (issue checkout) branch=iss-00101-first-issue" in started.stdout
             assert self._active_issue_id(target) == "iss-00101"
-            assert self._active_issue_promotion_decision(target) == "runtime_active_selection"
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            assert set(active["issue"]) == {"id", "path"}
             started_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert started_branch == "iss-00101-first-issue"
             list_count_before_finish = (bin_dir / "gh-calls.log").read_text(encoding="utf-8").count("issue list")
@@ -1243,6 +1435,28 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             log = (bin_dir / "gh-calls.log").read_text(encoding="utf-8")
             assert log.count("issue list") == list_count_before_finish + 1
 
+    @pytest.mark.parametrize("mutation", S09_LEGACY_EVIDENCE_MUTATIONS)
+    def test_core_operations_legacy_evidence_mutation_invariance(self, mutation: str) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            baseline = self._capture_s09_core_sequence(
+                root / "baseline",
+                root / "baseline-bin",
+                mutation=None,
+            )
+            mutated = self._capture_s09_core_sequence(
+                root / "mutated",
+                root / "mutated-bin",
+                mutation=mutation,
+            )
+
+        assert mutated == baseline, mutation
+
     def test_issue_finish_closes_open_issue_and_clears_active(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
@@ -1251,8 +1465,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
-            self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            assert self._active_issue_promotion_decision(target) == "runtime_active_selection"
+            self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
             bin_dir = Path(bin_tmp)
             state_path = self._make_gh_stub(bin_dir, states={101: "OPEN"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1268,7 +1481,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             state = json.loads(state_path.read_text(encoding="utf-8"))
             assert state["101"]["state"] == "CLOSED"
 
-    def test_issue_finish_active_set_synthetic_approval_closes_open_issue_and_clears_active(self) -> None:
+    def test_issue_finish_ignores_heavy_report_and_assurance(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
 
@@ -1276,7 +1489,14 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
-            self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
+            self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            issue_dir = target / active["issue"]["path"]
+            (issue_dir / "report.md").write_text(
+                "## Evidence Adoption Ledger\n\n| id | adoption_status |\n|---|---|\n| EAL-1 | blocked |\n",
+                encoding="utf-8",
+            )
+            (issue_dir / ".assurance.json").write_text('{"authorized_profile":"critical"}\n', encoding="utf-8")
             bin_dir = Path(bin_tmp)
             state_path = self._make_gh_stub(bin_dir, states={101: "OPEN"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1301,8 +1521,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
-            self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            assert self._active_issue_promotion_decision(target) == "runtime_active_selection"
+            self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "CLOSED"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1329,7 +1548,8 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert "issue finish requires an active issue" in no_active.stderr
             assert "Recovery:" in no_active.stderr
             assert "issue start <issue>" in no_active.stderr
-            assert "active set <issue> --checkout" in no_active.stderr
+            assert "active set <issue>" in no_active.stderr
+            assert "--checkout" not in no_active.stderr
             assert self._active_issue_id(target) is None
 
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
@@ -1348,8 +1568,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             unlinked_meta = dict(linked_meta)
             unlinked_meta.pop("github", None)
             self._write_json_force(linked_meta_path, unlinked_meta)
-            self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            assert self._active_issue_promotion_decision(target) == "runtime_active_selection"
+            self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
             no_link = self._run_runtime_capture(target, ["issue", "finish"])
             assert no_link.returncode != 0, no_link.stdout + no_link.stderr
             assert "issue finish failed while closing GitHub issue" in no_link.stderr
@@ -1359,26 +1578,21 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert "spec-dock/scripts/spec-dock active show" in no_link.stderr
             assert "Node is not linked to a GitHub issue" in no_link.stderr
             assert self._active_issue_id(target) == "iss-00101"
-            assert self._active_issue_promotion_decision(target) == "issue_finish_lifecycle_transition"
-
             active_path = target / "spec-dock" / ".agent" / "active.json"
             stale_active = json.loads(active_path.read_text(encoding="utf-8"))
             stale_active["issue"]["id"] = "iss-00999"
             self._write_json_force(active_path, stale_active)
+            stale_active_bytes = active_path.read_bytes()
             node_not_found = self._run_runtime_capture(target, ["issue", "finish"])
             assert node_not_found.returncode != 0, node_not_found.stdout + node_not_found.stderr
-            assert "issue finish blocked: authority gate failed" in node_not_found.stderr
-            assert "promotion_record_not_bound_to_active_entry" in node_not_found.stderr
-            assert "required_grant: issue_finish" in node_not_found.stderr
+            assert "issue finish failed while closing GitHub issue" in node_not_found.stderr
+            assert "Node not found: iss-00999" in node_not_found.stderr
             assert "Recovery:" in node_not_found.stderr
-            assert "obtain a fresh approved promotion record" in node_not_found.stderr
-            assert "issue start <issue>" not in node_not_found.stderr
-            assert "expected_revision=active:iss-00999" in node_not_found.stderr
             assert self._active_issue_id(target) == "iss-00999"
+            assert active_path.read_bytes() == stale_active_bytes
 
             self._write_json_force(linked_meta_path, linked_meta)
-            self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
-            assert self._active_issue_promotion_decision(target) == "runtime_active_selection"
+            self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "OPEN"}, fail_view_numbers={101})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1391,7 +1605,10 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert "spec-dock/scripts/spec-dock active show" in close_failure.stderr
             assert "view failed: 101" in close_failure.stderr
             assert self._active_issue_id(target) == "iss-00101"
-            assert self._active_issue_promotion_decision(target) == "issue_finish_lifecycle_transition"
+            assert set(json.loads((target / "spec-dock" / ".agent" / "active.json").read_text())["issue"]) == {
+                "id",
+                "path",
+            }
             assert "issue list" not in (bin_dir / "gh-calls.log").read_text(encoding="utf-8")
 
             self._make_gh_stub(bin_dir, states={101: "OPEN"}, fail_close_numbers={101})
@@ -1404,5 +1621,8 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert "spec-dock/scripts/spec-dock active show" in close_command_failure.stderr
             assert "close failed: 101" in close_command_failure.stderr
             assert self._active_issue_id(target) == "iss-00101"
-            assert self._active_issue_promotion_decision(target) == "issue_finish_lifecycle_transition"
+            assert set(json.loads((target / "spec-dock" / ".agent" / "active.json").read_text())["issue"]) == {
+                "id",
+                "path",
+            }
             assert "issue list" not in (bin_dir / "gh-calls.log").read_text(encoding="utf-8")

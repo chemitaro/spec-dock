@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 
     from spec_dock_runtime.application.contracts import (
         ArtifactWriteResult,
-        BinaryArtifactPublishRequest,
-        BinaryArtifactPublishResult,
         BootstrapResult,
         ExplicitFileArtifactPublishRequest,
         ExplicitFileArtifactPublishResult,
@@ -20,10 +18,8 @@ if TYPE_CHECKING:
         GitHubCapabilityProbeRequest,
         GitWorktreeRecord,
         GuardedExplicitFileSource,
-        GuardedWorkbenchSource,
         SyncCommandResult,
         SyncRequest,
-        WorkbenchSourceGuardRequest,
     )
     from spec_dock_runtime.domain.issue_planning_candidate import CandidateMaterial, ValidatedIssueAuthoringPayload
     from spec_dock_runtime.domain.issue_planning_contracts import (
@@ -56,6 +52,8 @@ class NodeRepository(Protocol):
 
     def write_meta(self, dest_dir: Path, record: StoredMetaRecord) -> None: ...
 
+    def write_meta_at(self, dest_dir_fd: int, record: StoredMetaRecord) -> None: ...
+
     def add_issue_dependency(self, meta_path: Path, to_id: str) -> None: ...
 
     def remove_issue_dependency(
@@ -71,6 +69,14 @@ class TemplateScaffolder(Protocol):
     def load_template_text(self, src_path: Path) -> str: ...
 
     def copy_scaffolded_tree(self, src_dir: Path, dest_dir: Path, replacements: dict[str, str]) -> list[Path]: ...
+
+    def copy_scaffolded_tree_at(
+        self,
+        src_dir: Path,
+        dest_dir: Path,
+        dest_dir_fd: int,
+        replacements: dict[str, str],
+    ) -> list[Path]: ...
 
     def write_text(self, dest_path: Path, text: str) -> None: ...
 
@@ -193,14 +199,6 @@ class FilesystemGateway(Protocol):
     def guard_workbench_inventory(self, specdock_dir: Path) -> None: ...
 
     def copy_workbench(self, source: Path, destination: Path) -> None: ...
-
-
-class WorkbenchSourceGuard(Protocol):
-    def guard_source(self, request: WorkbenchSourceGuardRequest) -> GuardedWorkbenchSource: ...
-
-
-class BinaryArtifactPublisher(Protocol):
-    def publish(self, request: BinaryArtifactPublishRequest) -> BinaryArtifactPublishResult: ...
 
 
 class ExplicitFileSourceGuard(Protocol):
@@ -443,8 +441,6 @@ class Ports:
     bootstrap_gateway: BootstrapGateway | None = None
     environment_gateway: EnvironmentGateway | None = None
     filesystem_gateway: FilesystemGateway | None = None
-    workbench_source_guard: WorkbenchSourceGuard | None = None
-    binary_artifact_publisher: BinaryArtifactPublisher | None = None
     issue_planning: IssuePlanningDependencies | None = None
     explicit_file_source_guard: ExplicitFileSourceGuard | None = None
     explicit_file_artifact_publisher: ExplicitFileArtifactPublisher | None = None

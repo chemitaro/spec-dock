@@ -4,7 +4,6 @@ from spec_dock.cli import main
 
 _SELECTOR_TOKENS = ("--oracle", "oracle_implementation", "OracleImplementation")
 _INSTALLED_SELECTOR_SURFACES = (
-    "spec-dock/scripts/spec_dock_runtime/commands/authoring.py",
     "spec-dock/scripts/spec_dock_runtime/application/authoring_pack/backend_invoke.py",
     "spec-dock/scripts/spec_dock_runtime/domain/authoring_pack/backend_invoke_contract.py",
     "spec-dock/scripts/authoring-pack/invoke_chatgpt_backend.py",
