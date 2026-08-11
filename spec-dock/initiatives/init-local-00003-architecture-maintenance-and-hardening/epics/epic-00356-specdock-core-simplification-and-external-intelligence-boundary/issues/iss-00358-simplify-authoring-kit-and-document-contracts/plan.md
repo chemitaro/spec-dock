@@ -5,7 +5,7 @@ ID: "iss-00358"
 関連GitHub: ["#358"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-08-11"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00356", "init-local-00003"]
 承認: "Product Owner review completed 2026-08-10"
@@ -15,15 +15,17 @@ ID: "iss-00358"
 
 ## 1. 計画の目標
 
-承認済みRequirement / Designを、Fresh authoringの利用者flowごとの縦スライスとして実装する。Thin Template、Detailed Guide、Planning Level、Report、Artifact authority、Current / Historical navigation、parity、preservationを一つずつ観測可能にし、Issue 357のmechanismとIC-1で一致させる。
+承認済みRequirement / Designを、Fresh authoringの利用者flowごとの縦スライスとして実装する。Thin Template、Detailed Guide、Planning Level、Report、Artifact authority、Current / Historical navigation、parity、preservation、Epic-level統合入力を一つずつ観測可能にし、358-owned contractだけでIssue完了を判定できるようにする。
 
-このPlanは実装開始を許可する正本である。PR作成、merge、Issue close、Epic完了、obsolete assetの物理pruneは別scopeであり、自動実行しない。
+このPlanは実装開始を許可する正本である。Issue 358のcommit、push、main向けmergeable PR作成は本Issueのdeliveryに含める。merge、Issue close、Epic完了、obsolete assetの物理pruneは別scopeであり自動実行しない。
+
+Product Ownerの2026-08-10指示により、放棄予定の旧SpecDock workflow、`guidance issue-execution`、そのreport evaluatorは本Issueの実行authorityまたはstep closure条件にしない。fresh code / spec reviewはRequirement / Design / 本Planと現行実装の品質・整合性を評価し、旧workflow evaluatorを通すためのRuntime変更や履歴改変を要求しない。
 
 ## 2. Planning Level
 
 - Selected level: `strict`
 - 理由: shipped template / docs contract、Fresh scaffold、Existing document preservation、provider / dogfood parity、後続skill / installer handoffへ影響するため。
-- Risk factors: path / link drift、CurrentとHistoricalの混同、template肥大化、既存node rewrite、Issue 357とのshared contract不一致。
+- Risk factors: path / link drift、CurrentとHistoricalの混同、template肥大化、既存node rewrite、Epic-level統合入力の不一致。
 - Re-evaluation: user-owned fileの不可逆migration、security / privacy instruction、installer ownership変更が必要になった場合は実装を停止し、親Epicと該当Issueへ戻す。
 - Completion Guide: `spec-dock/docs/authoring/issue-plan-levels/strict.md`。Target Guideがまだ未実装の場合は、本PlanのStrict obligationを優先する。
 
@@ -74,7 +76,7 @@ S90 --> S99
 @enduml
 ```
 
-S02〜S05は論理上並行可能だが、`docs/authoring/`、scope template、test manifestを共有するため、一つのworktreeではstep単位に順序化する。Issue 357とはRuntime / template proseのownershipを分け、IC-1以前に互いの所有fileを編集しない。
+S02〜S05は論理上並行可能だが、`docs/authoring/`、scope template、test manifestを共有するため、一つのworktreeではstep単位に順序化する。Issue 357とはRuntime / template proseのownershipを分け、358の完了を357の実装・review待ちにしない。
 
 ## 5. Allowed / forbidden paths
 
@@ -108,14 +110,14 @@ S02〜S05は論理上並行可能だが、`docs/authoring/`、scope template、t
 | `CL-358-002` | `AC-358-002` | template content | thin、policy混在なし | template再肥大化 | yes | red-required | heading / size / forbidden test | report S02 | S02 |
 | `CL-358-003` | `AC-358-003`の文書責務 / scope部分 | Guideとscope semantics | link可能、四文書 / 三scope責務が正しい | empty / wrong Guide | yes | red + manual | contract test + spec review | report S01 | S01 |
 | `CL-358-004` | `AC-358-004` | Issue Plan / Guide tree | one Plan、Base + 四独立Guide | multi-plan / chain inheritance | yes | red-required | file / link test | report S03 | S03 |
-| `CL-358-005` | `AC-358-005` | Level本文変更 | Runtime / metadata不変 | hidden parser | yes | shared evidence | 357 IC-1 test | report S09 | S09 |
+| `CL-358-005` | `AC-358-005` | Level本文変更 | Runtime / metadata不変 | hidden parser | yes | red-required | docs-only mutation test | report S03/S99 | S03/S99 |
 | `CL-358-006` | `AC-358-006` | Fresh Report | 三必須heading、empty-valid、non-gating | heavy gate復活 | yes | red-required | report contract test | report S04 | S04 |
 | `CL-358-007` | `AC-358-007` | Artifact Guide / catalog | Current六種だけ | analysis / draft再流入 | yes | red-required | catalog / nav test | report S05 | S05 |
 | `CL-358-008` | `AC-358-008` | authority guidance | durable先はR/D/P/accepted ADR | evidence自動昇格 | yes | red + manual | content contract + spec review | report S05 | S05 |
 | `CL-358-009` | `AC-358-009` | Current assets | old workflow mandatory語なし | Current導線の逆戻り | yes | red-required | path-aware vocabulary | report S06 | S06 |
 | `CL-358-010` | `AC-358-010` | provider / dogfood | owned manifest byte parity、link有効 | projection drift | yes | red-required | parity / link test | report S07 | S07 |
 | `CL-358-011` | `AC-358-011` | Existing fixture | 全user-owned byte hash不変 | update rewrite | yes | red-required | preservation matrix | report S08 | S08 |
-| `CL-358-012` | `AC-358-012` | 357 Fresh scaffold | IC-1 contract一致 | mechanism / content drift | yes | joint-required | shared fixture | report S09 | S09 |
+| `CL-358-012` | `AC-358-012` | Epic-level IC-1 input | 358 contractのmanifest / expected values / routingが機械可読 | missing integration input | yes | manual-required | contract input audit | report S09 | S09 |
 | `CL-358-013` | `AC-358-013` | 359 / 360 handoff | exact manifest、未割当なし | downstream推測 | yes | manual-required | handoff matrix | report S10 | S10 |
 | `CL-358-014` | `AC-358-014` | Level example table | impact / recoveryで選び、label単独を否定 | urgency / effort誤分類 | yes | red-required | Example ID contract test | report S03 | S03 |
 | `CL-358-015` | `AC-358-003`のArtifact Guide導線部分 | Current navigationからArtifact Guideへ到達 | S05のArtifact GuideがS06のCurrent入口からlink可能 | Guide実装前の早期close / broken route | yes | red + manual | Artifact / navigation link test + spec review | report S05/S06 | S05/S06 |
@@ -129,27 +131,27 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 | `RQ-358-001` | `CL-358-001/002/006`, S02/S04 | 三scopeのthin R/D/P/Reportと禁止field |
 | `RQ-358-002` | `CL-358-003`, S01 | 四文書責務と責務混在禁止 |
 | `RQ-358-003` | `CL-358-003`, S01 | 三scopeの責務差と親scope非再定義 |
-| `RQ-358-004` | `CL-358-004/005/014`, S03/S09 | one Plan、docs-only Level、impact / recovery選択 |
+| `RQ-358-004` | `CL-358-004/005/014`, S03/S99 | one Plan、docs-only Level、impact / recovery選択 |
 | `RQ-358-005` | `CL-358-007/009/015`, S05/S06 | Current六種とHistoricalの分離、Artifact Guide導線 |
 | `RQ-358-006` | `CL-358-008`, S05 | durable decision / Artifact / Reportのauthority flow |
 | `RQ-358-007` | `CL-358-009/015`, S06 | Current / Historical navigationとArtifact Guideへの到達 |
-| `RQ-358-008` | `CL-358-010/011/012/013`, S07/S08/S09/S10 | parity、preservation、IC-1、handoff |
+| `RQ-358-008` | `CL-358-010/011/012/013`, S07/S08/S09/S10 | parity、preservation、Epic-level統合入力、handoff |
 | `EC-358-001/002` | `CL-358-009`, S06 | Currentだけのvocabulary negative、Historical positive control |
-| `EC-358-003/004` | `CL-358-004/005/014`, S03/S09 | Runtime metadataとlevel別Planを拒否 |
+| `EC-358-003/004` | `CL-358-004/005/014`, S03/S99 | Runtime metadataとlevel別Planを拒否 |
 | `EC-358-005` | `CL-358-006`, S04 | heavy gate / ledgerをReportへ戻さない |
 | `EC-358-006/007` | `CL-358-010`, S07 | provider / dogfood driftとbroken linkを検出 |
 | `EC-358-008` | `CL-358-011`, S08 | Existing user-owned bytes不変 |
-| `EC-358-009` | `CL-358-012`, S09 | IC-1不一致でhandoff停止 |
+| `EC-358-009` | `CL-358-012`, S09 | 後続Epic統合での不一致をowner別にrouting |
 | Design §4 / §5 | E00/S02/S04/S07 | exact Add / Modify manifest、Thin Template、Report exact shape |
 | Design §6〜§10 | S01/S03/S05/S06 | 文書責務、scope、Planning Level、Artifact、authority、navigation |
-| Design §11〜§14 | S07/S08/S09/S10 | projection、preservation、IC-1、359 / 360 handoff |
+| Design §11〜§14 | S07/S08/S09/S10 | projection、preservation、Epic-level統合入力、359 / 360 handoff |
 | Design §15〜§18 | S08/S09/S90/S99 | migration / rollback、failure、test、completion boundary |
 
 ## 7. 共通delegation contract
 
 - S01〜S06とS90の文書 / template本文: bounded stepごとに`doc-writer`。
 - 同じstepのcontract test: 文書変更完了後にfresh `dev-coder`。同時編集しない。
-- S07〜S09のfixture / parity / preservation test: fresh `dev-coder`。
+- S07〜S09のfixture / parity / preservation / Epic-level contract-input test: fresh `dev-coder`。
 - 文書意味: fresh `spec-reviewer`。test code: fresh `code-reviewer`。
 - test十分性: milestoneまたはS99でfresh `qa-reviewer`。
 - canonical R/D/P/report: main orchestratorだけが更新する。
@@ -160,21 +162,21 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 ### E00 — Asset / link / preservation baseline
 
-**振る舞い目標:** 変更前のprovider / dogfood asset、Current / Historical候補、Existing保存fixtureのhashを固定する。
+**振る舞い目標:** 変更前のprovider / dogfood assetとCurrent / Historical / Existing保存対象の候補inventoryを固定し、後続stepがmaterialize / ownership確定すべき入力を明示する。
 
 **許可:** read-only tree / link / content / hash調査、main orchestratorのreport記録。
 
 **禁止:** asset、node content、metadata、active、depsの変更。
 
-**ケース概要（規範的なテストカードは§9）:** Design §4.1のAdd / Modify action、provider / dogfood現行parity、scope templateの実際のcopy depth、保存対象全fileのhash、obsolete asset候補とownerを一覧化する。
+**ケース概要（規範的なテストカードは§9）:** Design §4.1のAdd / Modify action、provider / dogfood現行parity、scope templateの実際のcopy depth、保存対象候補と既存source / hash、obsolete asset候補を一覧化する。現存しない保存fixtureのbytes / hashはS08でmaterializeして確定する。Design §4外のsurfaceは削除せず`owner pending S10`として記録する。
 
-**Step Closure Contract:** path、baseline Action、owner、before hash、planned testが全rowにあり、report差分がfresh `spec-reviewer`のdocs/spec alignment reviewをpassする。曖昧な物理削除rowがない。M0 commit候補は`docs(iss-00358): Authoring asset baselineを記録`。
+**Step Closure Contract:** Design §4.1の各rowにpath、baseline Action、358 owner、既存時のbefore hash、planned testがあり、preservation候補はS08のmaterialization input、Design §4外surfaceはno-delete / `owner pending S10`として明示される。E00は`CL-358-010`のbaseline evidenceだけを閉じ、`CL-358-011/013`はS08 / S10で閉じる。曖昧な物理削除rowがない。M0 commit候補は`docs(iss-00358): Authoring asset baselineを記録`。
 
 ### S01 — Authoring Guide foundationとscope responsibility
 
 **振る舞い目標:** Overviewから四文書責務と三scope責務へ到達し、何をどこへ書くかを理解できる。
 
-**Allowed paths:** `docs/authoring/{overview,requirement,design,report,scope-layering}.md`、必要なREADME / Guide link、dogfood projection、専用contract test。
+**Allowed paths:** `docs/authoring/{overview,requirement,design,issue-plan,report,scope-layering}.md`、README / GuideのAuthoring Kit入口と直接矛盾するfirst-read / mandatory workflow表現の中立化、dogfood projection、専用contract test。`issue-plan.md`はprovider-neutralな基礎だけをS01で扱い、Planning Level / Completion Guide詳細はS03で扱う。Current / Historical catalog全体の再編はS06で扱う。
 
 **Forbidden:** Planning Level詳細、Artifact filename、skill linkの先行有効化、Runtime手順。
 
@@ -222,7 +224,7 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **ケース概要（規範的なテストカードは§9）:** 三scopeReport一つ、exact三heading、optional Notes、empty body valid、zero-byteではない、forbidden ledger / gate語なし。
 
-**Verification:** `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k report`。357の実生成との照合はS09だけで行う。
+**Verification:** `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k report`。Runtime実生成との照合は後続Epic統合で行い、本stepでは358-owned Report contractだけを検証する。
 
 **Step Closure Contract:** `CL-358-001/006`、fresh spec / code review。Commit候補: `feat(authoring): thin Report契約へ置換`。
 
@@ -230,13 +232,13 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **振る舞い目標:** Current六種の用途とdurable reflection先を説明し、evidenceの自動昇格を禁止する。
 
-**Allowed paths:** `templates/artifacts/`のCurrent六種、`docs/authoring/artifacts.md`、dogfood projection、catalog tests。
+**Allowed paths:** `templates/artifacts/`のCurrent六種、`docs/authoring/artifacts.md`、dogfood projection、catalog tests、`tests/cli_runtime/test_new.py`のArtifact生成content markerだけ。
 
 **Forbidden:** filename parser、Historical file削除、`analysis`、draft / repair Current route、mandatory EAL。
 
 **ケース概要（規範的なテストカードは§9）:** Current六template exact catalog、六用途 / reflection先、single-source researchとmulti-source disc、accepted ADRだけauthority、external ZIP / draft / Report no-auto-promotion、Historical physical retention。
 
-**Verification:** `uv run pytest tests/unit/infra/test_artifact_templates.py tests/unit/infra/test_authoring_kit_assets.py -k artifact`。
+**Verification:** `uv run pytest tests/unit/infra/test_artifact_templates.py tests/unit/infra/test_authoring_kit_assets.py -k artifact`と`uv run pytest --run-full-regression tests/cli_runtime/test_new.py::TestCliNew::test_new_artifact_full_direct_catalog_success -q`。
 
 **Step Closure Contract:** `CL-358-007/008`、fresh spec / code review。Commit候補: `docs(artifact): Current六種とauthority境界を明示`。
 
@@ -276,23 +278,23 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **Forbidden:** installer migration実装、fixtureの正規化、node-local content rewrite。
 
-**ケース概要（規範的なテストカードは§9）:** canonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、Profile由来文書のbefore / after SHA-256一致。
+**ケース概要（規範的なテストカードは§9）:** E00 candidate inventoryからcanonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、Profile由来文書を含むfull fixtureをmaterializeし、materialization直後のbaseline SHA-256とasset適用simulation後のSHA-256一致を固定する。
 
 **Verification:** `uv run pytest tests/unit/infra/test_authoring_kit_assets.py -k preservation`。
 
-**Step Closure Contract:** `CL-358-011`、全fixture row不変、negative controlで意図的変更を検出、fresh QA / code review。Commit候補: `test(authoring): Existing文書保持を固定`。
+**Step Closure Contract:** `CL-358-011`、E00 candidate inventoryの全categoryが実在fixture / baseline SHA-256へ解決され、全fixture row不変、negative controlで意図的変更を検出、fresh QA / code review。Commit候補: `test(authoring): Existing文書保持を固定`。
 
-### S09 — IC-1 Core / Kit contract
+### S09 — Epic-level IC-1 contract input
 
-**振る舞い目標:** 357のmechanismが358のfile / Report / Artifact / one-plan contractを実際に生成・保持する。
+**振る舞い目標:** 358-ownedのfile / Report / Artifact / one-plan / Planning Level contractを、後続Epic統合が機械的に消費できるmanifest・期待値・mismatch routingとして固定する。357のRuntimeやFresh scaffold実装はこのstepの入力でも完了条件でもない。
 
-**Entry:** S01〜S08完了、357のFresh scaffold / Artifact mechanism evidenceが利用可能。
+**Entry:** S01〜S08完了。Issue 357の実装・review・commitを待たずに開始できる。
 
-**ケース概要（規範的なテストカードは§9）:** scope_files四件、Report三heading / empty-valid / non-gating、Current六type、Historical policy、one Issue Plan、Guide path、Planning Level Runtime非所有、provider / dogfood relative shape。
+**ケース概要（規範的なテストカードは§9）:** scope_files四件、Report三heading / empty-valid / non-gating、Current六type、Historical policy、one Issue Plan、Guide path、Planning Level Runtime非所有、provider / dogfood relative shapeを、358-owned assetとcontract fixtureで照合する。
 
-**Mismatch routing:** content / Guide / headingは358へ、copy / parser / filename / Runtime behaviorは357へ戻す。358からRuntimeを修正しない。
+**Mismatch routing:** content / Guide / headingは358へ、copy / parser / filename / Runtime behaviorは該当Runtime Issueへ後続Epic統合で戻す。358からRuntimeを修正しない。
 
-**Step Closure Contract:** `CL-358-005/012`。Epic orchestratorがIC-1 evidenceをEpic-local `disc`とEpic reportへ統合し、pass前に359 handoffを有効化しない。mismatch修正がなくてもreport / IC evidence差分をM4 commitへ同梱する。
+**Step Closure Contract:** `CL-358-005/012`。Issue reportへEpic-level IC-1 inputの内容、version、consumer、mismatch routingを記録し、358-owned testsとfresh code / spec reviewがpassした時点で閉じる。実生成との照合とEpic-local `disc` / Epic reportへの統合は後続Epic確認とする。
 
 ### S10 — 359 / 360 handoff manifest
 
@@ -302,7 +304,9 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **360 handoff:** Fresh asset manifest、obsolete asset manifest、retain / replace / historical-only / prune分類、全preservation list、provider / dogfood parity、installed consumer再検証義務。
 
-**Step Closure Contract:** `CL-358-013`、重複 / 欠落 / owner未設定rowなし、fresh spec review。Commit候補: S90 docs commitへ同梱可能。
+E00で`owner pending S10`としたDesign §4外surfaceは、ここで359 / 360またはretain-onlyへ一意に割り当てる。S10より前に物理削除ownerを推測しない。
+
+**Step Closure Contract:** `CL-358-013`、E00のpending rowを含め重複 / 欠落 / owner未設定rowなし、fresh spec review。Commit候補: S90 docs commitへ同梱可能。
 
 ### S90 — Docs impact resolution
 
@@ -310,7 +314,7 @@ locked expectationを変える必要がある場合はstepを停止し、canonic
 
 **ケース概要（規範的なテストカードは§9）:** all relative links、provider-neutral Japanese-first wording、Current allowlist、Historical exclusions、Planning Level examples、359 reserved handoff、360 inventory link、README first-read route。
 
-**Step Closure Contract:** fresh `spec-reviewer` pass、docs impactを`none`にせず、S09 / S10 evidenceを含むM4 docs commitとpost-commit clean checkで閉じる。
+**Step Closure Contract:** fresh `spec-reviewer` pass、docs impactを`none`にせず、S09 contract input / S10 handoff evidenceを含むM4 docs commitとpost-commit clean checkで閉じる。
 
 ### S99 — Final Issue quality gate
 
@@ -337,14 +341,14 @@ git status --short
 
 §8は成果の概要である。実装委任、Red / Green、docs-only代替証拠、停止判断、review、report更新は本節を規範とする。`doc-writer`と`dev-coder`は同一stepを同時編集せず、文書asset確定後にcontract testを追加する。
 
-### E00 contract — Asset / link / preservation baseline
+### E00 contract — Asset / link / preservation candidate baseline
 
 - Depends on: 承認済みR/D/Pとbaseline `2c75e0c02cb65a6e74040a72dc161d342d661091`。Unblocks: S01〜S08。
-- Target files: Design §4.1対象のread-only inventoryとIssue `report.md` E00 evidence。
-- Planned obligation: Add / Modify、provider / dogfood hash、link、copy depth、preservation hash、obsolete ownerを固定する。
+- Target files: Design §4.1対象のread-only inventory、preservation / Design §4外candidate inventory、Issue `report.md` E00 evidence。
+- Planned obligation: Add / Modify、provider / dogfood hash、link、copy depth、preservation候補、Design §4外no-delete rowを固定する。未作成fixtureのbytes / hashとpending ownerをE00完了条件にしない。
 - Redまたは代替証拠: `inspect-only`。behavior変更なしのためtestは不要で、before manifest / hash / link scanを代替証拠とする。
 - Bounded implementation: assetやuser contentを変えずreportだけを更新する。
-- Green verification: 全Design §4.1 rowにAction / owner / before hash / test ownerがある。
+- Green verification: 全Design §4.1 rowにAction / 358 owner / 既存時のbefore hash / test ownerがあり、preservation候補はS08 input、Design §4外rowはno-delete / `owner pending S10`である。
 - Refactor guardrail: obsolete候補を358のDeleteへ分類しない。
 - Amendment trigger: Design §4.1外の変更、user-owned rewrite、Runtime / installer変更が必要なら停止する。
 - Report destination: `report.md`のE00 `Step Contract Closure` / `Delegated Worker Evidence`。
@@ -353,26 +357,26 @@ git status --short
   - input docs: Requirement §5〜§9、Design §4 / §11 / §14、Plan Closure Index。
   - allowed paths: repositoryのread-only調査、Issue reportへのmain orchestrator転記。
   - forbidden changes: asset、source、tests、user content、metadata / deps / active / Git state。
-  - acceptance criteria: Design manifest完全性、baseline parity、preservation対象完全性。
+  - acceptance criteria: Design manifest完全性、baseline parity、preservation candidate category完全性、Design §4外surfaceのno-delete明示。
   - required verification: tree / link / hash / copy-depth inspection。
   - reviewer focus: Historical / `.workbench` / rules / flat referencesの暗黙Deleteがないこと。
-  - stop conditions: action / owner不明、Design外path、baseline drift。
+  - stop conditions: Design §4.1 rowのaction / 358 owner不明、baseline drift、Design §4外surfaceをDeleteへ分類した場合。preservation fixture未materializeとS10 owner pendingは停止条件ではない。
   - output required: manifest、hash、link evidence、risk、material decision有無。
-- `tc-e00-001` inspect: baseline asset and preservation manifest
-  - 前提: provider / dogfood assetとExisting full-fixtureがある。
-  - 操作: Design §4.1 path、relative links、scope copy depth、全preservation対象のSHA-256を収集する。
-  - 期待結果: 各rowにAction / owner / hash / planned testがあり、provider / dogfoodの現行差分が説明できる。
-  - 失敗検出: 未収集path、未割当owner、Existing対象欠落、暗黙Delete。
-  - 検証方法: explicit manifest、relative-link scan、SHA-256一覧をreportへ保存する。
-  - 関連 closure id: `CL-358-010`, `CL-358-011`, `CL-358-013`。
+- `tc-e00-001` inspect: baseline asset and preservation candidate manifest
+  - 前提: provider / dogfood assetと、既存repositoryから収集可能なpreservation候補がある。
+  - 操作: Design §4.1 path、relative links、scope copy depth、preservation categoryごとのcandidate source / 既存SHA-256、Design §4外surfaceを収集する。
+  - 期待結果: Design §4.1 rowにAction / 358 owner / 既存hash / planned testがあり、preservation未materialize rowはS08へ、Design §4外rowはno-delete / S10へ明示的にroutingされる。
+  - 失敗検出: Design §4.1未収集path、provider / dogfood説明不能差分、preservation category欠落、暗黙Delete。
+  - 検証方法: explicit manifest、relative-link scan、既存SHA-256一覧、S08 / S10 routingをreportへ保存する。
+  - 関連 closure id: `CL-358-010`。`CL-358-011/013`のcandidate evidenceは収集するがcloseしない。
 - Step gate: mainがreportを更新し、曖昧rowゼロを確認する。fresh `spec-reviewer`がE00 report evidenceとapproved R/D/Pのdocs/spec alignmentをpassした後、M0 commit候補`docs(iss-00358): Authoring asset baselineを記録`を作成し、`git status --short`で意図しない残差がないことを確認してからS01へ進む。report差分があるため`approved-no-op`は使わない。
 
 ### S01 contract — Authoring Guide foundation
 
-- Depends on: E00。Unblocks: S02 / S03 / S05。Target files: `docs/authoring/{overview,requirement,design,report,scope-layering}.md`、Design §4.1 navigation entry、dogfood projection、Guide contract tests。
-- Planned obligation: Overviewから四文書責務と三scope責務へ到達でき、禁止する責務混在を説明する。
+- Depends on: E00。Unblocks: S02 / S03 / S05。Target files: `docs/authoring/{overview,requirement,design,issue-plan,report,scope-layering}.md`、Design §4.1 navigation entry、dogfood projection、Guide contract tests。
+- Planned obligation: Overviewから四文書責務と三scope責務へ到達でき、禁止する責務混在を説明する。`issue-plan.md`はS01でprovider-neutralなPlan基礎とscope境界を確立し、Planning Level選択 / Completion Guide詳細はS03で追加する。
 - Redまたは代替証拠: `red-required`。missing link / heading / responsibility tokenとforbidden workflow wordingを先に失敗させる。
-- Bounded implementation: Guide foundationだけを追加し、Planning Level詳細 / Artifact / Runtime手順を後続へ残す。
+- Bounded implementation: Guide foundationとprovider-neutralなPlan基礎だけを追加し、Planning Level詳細 / Completion Guide / Artifact / Runtime手順を後続へ残す。
 - Green verification: `CL-358-003`のlink / meaning contractとfresh spec reviewがpassする。
 - Refactor guardrail: provider-specific agent workflowをAuthoring contractにしない。
 - Amendment trigger: 四文書 / 三scope責務またはpathを変える必要があれば停止する。
@@ -381,8 +385,8 @@ git status --short
   - delegated role: fresh `doc-writer`、asset確定後のtestだけfresh `dev-coder`。
   - input docs: `RQ-358-002/003`, `AC-358-003`; Design §4 / §6; `CL-358-003`。
   - allowed paths: 本step Target filesだけ。
-  - forbidden changes: templates、Planning Level / Artifact詳細、Runtime / skill / installer、Existing content。
-  - acceptance criteria: 全link有効、責務 / 禁止混在 / scope継承が正本どおり説明される。
+  - forbidden changes: templates、Planning Level選択 / Completion Guide / Artifact詳細、Runtime / skill / installer、Existing content。
+  - acceptance criteria: 全link有効、R/D/P/Report責務 / 禁止混在 / scope継承が正本どおり説明され、Current Plan Guideが特定agent / provider / workflowを必須にしない。
   - required verification: authoring asset testsのguide / scope cases、manual semantic review。
   - reviewer focus: 意味の正確さ、親scope非再定義、日本語first-readability。
   - stop conditions: path / responsibilityのmaterial変更、scope外assetが必要。
@@ -431,7 +435,7 @@ git status --short
 - Planned obligation: canonical Plan一つ、Base Guide一つ、独立した四Completion Guideとimpact / recovery選択例を提供する。
 - Redまたは代替証拠: `red-required`。multi-plan / cross-level chain / Runtime metadata / positive-negative examplesを先に失敗させる。
 - Bounded implementation: docs / templateだけを変更し、Runtime parser / `.meta.json`を変更しない。
-- Green verification: `CL-358-004/014`がpassする。`CL-358-005`のRuntime非所有はS09で最終確認する。
+- Green verification: `CL-358-004/014`がpassする。`CL-358-005`のRuntime非所有はdocs-only mutation testとS99で最終確認する。
 - Refactor guardrail: priority / severity / effort / readinessをLevel判定に使わない。
 - Amendment trigger: level数、one-plan、selection criteriaを変える必要がある場合は停止する。
 - Report destination: `report.md`のS03 closure / Test Contract Closure / Reviewer Gate Status。
@@ -492,7 +496,7 @@ git status --short
 
 ### S05 contract — Artifact semantics and authority
 
-- Depends on: S01。Unblocks: S06。Target files: Current六template、`docs/authoring/artifacts.md`、dogfood projection、Artifact asset tests。
+- Depends on: S01。Unblocks: S06。Target files: Current六template、`docs/authoring/artifacts.md`、dogfood projection、Artifact asset tests、`tests/cli_runtime/test_new.py`のArtifact生成content marker。
 - Planned obligation: Current六種の用途 / reflection先とR/D/P/accepted ADRだけのdurable authorityを説明する。
 - Redまたは代替証拠: `red-required`。exact catalog、type semantics、auto-promotion禁止、Historical保持を先に失敗させる。
 - Bounded implementation: Design §4.1 pathだけを変更し、`docs/rules/**`とRuntime filename parserを触らない。
@@ -503,10 +507,10 @@ git status --short
 - Delegation contract:
   - delegated role: fresh `doc-writer`、asset確定後のtestだけfresh `dev-coder`。
   - input docs: `RQ-358-005/006`, `AC-358-003/007/008`; Design §8 / §9; `CL-358-007/008/015`。
-  - allowed paths: 本step Target filesだけ。
+  - allowed paths: 本step Target filesだけ。CLI testは既存Artifact生成caseのcontent marker更新に限定する。
   - forbidden changes: `docs/rules/**`、Runtime / parser、Historical file、Existing Artifact、new type。
   - acceptance criteria: exact six templates、用途 / reflection、accepted ADR authority、no auto-promotion。
-  - required verification: Artifact template / Authoring asset tests、manual semantic review。
+  - required verification: Artifact template / Authoring asset tests、Artifact生成full-regression一件、manual semantic review。
   - reviewer focus: single vs multi-source guidance、candidate vs accepted ADR、evidence-only boundary。
   - stop conditions: catalog / filename change、rule docsの必要、new durable authority。
   - output required: changed docs / templates / tests、Red / Green、catalog evidence、risk、material decision有無。
@@ -581,90 +585,90 @@ git status --short
 
 - Depends on: S07 / E00。Unblocks: S09。Target files: preservation fixture / tests、358-owned asset copy simulation、bounded test helper。
 - Planned obligation: Authoring asset変更が既存user-owned contentを一byteも変更しないことを証明する。
-- Redまたは代替証拠: `red-required`。全preservation surfaceと意図的mutation negative controlを先に固定する。
-- Bounded implementation: test / fixtureだけを変更し、migration / rewriteを実装しない。
-- Green verification: `CL-358-011`の全SHA-256 row不変、negative control検出。
+- Redまたは代替証拠: `red-required`。E00 candidate inventoryから全preservation surfaceをmaterializeし、asset適用前baseline SHA-256と意図的mutation negative controlを先に固定する。
+- Bounded implementation: test / fixtureだけを変更し、thin Report、candidate ADR、profile-derived文書を含む不足categoryはfixtureとして明示生成する。migration / rewriteは実装しない。
+- Green verification: `CL-358-011`の全categoryが実在fixtureとbaseline SHA-256を持ち、simulation後も全row不変でnegative controlを検出する。
 - Refactor guardrail: fixture normalizationやhash対象省略を禁止する。
 - Amendment trigger: Existing content変更が必要、または360 migration proofを358へ持ち込む場合は停止する。
 - Report destination: `report.md`のS08 closure / Test Contract Closure / Reviewer Gate Status。
 - Delegation contract:
   - delegated role: fresh `dev-coder`。
-  - input docs: `RQ-358-008`, `EC-358-008`, `AC-358-011`; Design §14 / §15; `CL-358-011`、E00 hash manifest。
+  - input docs: `RQ-358-008`, `EC-358-008`, `AC-358-011`; Design §14 / §15; `CL-358-011`、E00 preservation candidate manifest。
   - allowed paths: 本step Target filesだけ。
   - forbidden changes: installer / update behavior、node-local content、fixture normalization、Runtime。
-  - acceptance criteria: canonical docs / Reports / all Artifact / Discussion / ADR / Assurance / profile-derived docs byte不変。
+  - acceptance criteria: canonical docs / thin and heavy Reports / all Artifact / Discussion / accepted and candidate ADR / Assurance / profile-derived docsがfixtureとbaseline SHA-256を持ち、byte不変。
   - required tests: preservation matrix + negative control。
   - reviewer focus: full surface、hash timing、simulation fidelity、360との境界。
   - stop conditions: user data mutation、test-onlyで証明不能、scope外update実装。
   - output required: changed tests / fixtures、hash matrix、negative control、risk、material decision有無。
 - `tc-s08-001` compatibility: full Existing preservation surface
-  - 前提: canonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、profile-derived docsを含むfixtureがある。
-  - 操作: 358-owned asset適用simulationの前後で全file SHA-256を比較し、一件を意図的に変えるnegative controlも実行する。
+  - 前提: E00 candidate inventoryがcategory / candidate source / synthetic-requiredを区別している。
+  - 操作: canonical R/D/P、thin / heavy Report、Current六種、draft / repair / scratch / note / generic import、Discussion、accepted / candidate ADR、`.assurance.json`、profile-derived docsを含むfixtureをmaterializeし、直後のbaselineと358-owned asset適用simulation後の全file SHA-256を比較する。一件を意図的に変えるnegative controlも実行する。
   - 期待結果: 通常simulationは全hash一致、negative controlだけが確実に失敗する。
   - 失敗検出: hash差、対象欠落、mutation見逃し。
   - 検証方法: explicit path / SHA-256 matrixとfresh QA / code review。
   - 関連 closure id: `CL-358-011`。
 - Step gate: report更新後、fresh `code-reviewer`とmilestone `qa-reviewer`がpassする。
 
-### S09 contract — IC-1 Core / Kit contract
+### S09 contract — Epic-level IC-1 contract input
 
-- Depends on: S08かつIssue 357のFresh scaffold / Artifact mechanism evidence。Unblocks: S10。Target files: shared IC-1 fixture / evidence、358-owned mismatch修正、Issue / Epic report。
-- Planned obligation: 357のmechanismによる実生成を358の四文書 / Report / Artifact / one-plan / Guide contractと照合する。
-- Redまたは代替証拠: `red-required`。共有fixtureでcontent / mechanism mismatchを検出し、Planning Level文言mutationでもRuntime結果不変を確認する。
-- Bounded implementation: content / Guide / heading mismatchだけを358で修正し、copy / parser / filename / Runtime mismatchは357へ戻す。
-- Green verification: `CL-358-005/012`と`EC-358-003/009`がIC-1 evidenceでpassする。
+- Depends on: S08。Issue 357のFresh scaffold / Artifact mechanism evidenceには依存しない。Unblocks: S10。Target files: 358-owned IC-1 contract fixture / evidence、Issue report。
+- Planned obligation: 358の四文書 / Report / Artifact / one-plan / Guide contractを、後続Epic統合向けのmanifest・期待値・mismatch routingとして固定する。
+- Redまたは代替証拠: `red-required`。358-owned fixtureでmissing / duplicate / forbidden workflow couplingを検出し、Planning Level文言mutationでもRuntime-owned fieldがないことを確認する。
+- Bounded implementation: content / Guide / heading / contract-input mismatchだけを358で修正し、copy / parser / filename / Runtime mismatchは後続Epic統合から該当Runtime Issueへ戻す。
+- Green verification: `CL-358-005/012`と`EC-358-003/009`が358-owned evidenceでpassする。
 - Refactor guardrail: Runtime非所有とIssue間single-writerを守る。
-- Amendment trigger: mismatch owner不明、IC schema変更、357未完、Runtime変更が必要なら停止する。
-- Report destination: Issue `report.md`のS09 closureとEpic report / Epic-local IC-1 evidence。
+- Amendment trigger: IC schema変更、Runtime変更、358-owned contractのmaterial driftが必要なら停止する。
+- Report destination: Issue `report.md`のS09 closure。Epic report / Epic-local `disc`は後続統合のdestinationとする。
 - Delegation contract:
-  - delegated role: Epic main orchestrator、必要な358 content修正はfresh `doc-writer`、shared fixtureはfresh `dev-coder`。
-  - input docs: `RQ-358-004/008`, `EC-358-003/009`, `AC-358-005/012`; Design §12; `CL-358-005/012`; 357 verified evidence。
-  - allowed paths: shared IC fixture / evidence、358-owned content mismatch、Issue / Epic report。
-  - forbidden changes: 357 Runtime、359 / 360 docs、metadata / deps / active、IC pass前handoff。
-  - acceptance criteria: exact Fresh manifest、thin Report、Current six、one Plan、Guide paths、Runtime Level非所有。
-  - required tests: shared Fresh scaffold / non-gating / content-mutation fixture。
-  - reviewer focus: mismatch routing、Runtime independence、cross-Issue evidence completeness。
-  - stop conditions: 357 evidence不足、mechanism mismatch、material contract drift。
-  - output required: IC-1 result、mismatch owner、changed files、test evidence、risk、material decision有無。
-- `tc-s09-001` integration: Core / Kit fresh contract
-  - 前提: S01〜S08 pass、357のFresh scaffold / Artifact mechanismが利用可能である。
-  - 操作: three scopesを実生成し、scope_files四件、Report shape / non-gating、Current six、Historical policy、one Plan、Guide pathを照合する。
-  - 期待結果: 358 contractと一致し、content mismatchは358、mechanism mismatchは357へ一意にroutingされる。
-  - 失敗検出: missing / duplicate、owner曖昧、IC failなのにhandoff有効化。
-  - 検証方法: shared fixture、manifest diff、Epic-local IC evidence。
+  - delegated role: main orchestrator、必要な358 content修正はfresh `doc-writer`、contract fixture / testはfresh `dev-coder`。
+  - input docs: `RQ-358-004/008`, `EC-358-003/009`, `AC-358-005/012`; Design §12; `CL-358-005/012`。
+  - allowed paths: 358-owned contract fixture / evidence、Issue report。
+  - forbidden changes: 357 Runtime、359 / 360 docs、metadata / deps / active、cross-Issue source変更。
+  - acceptance criteria: exact scope manifest、thin Report、Current six、one Plan、Guide paths、Runtime Level非所有、mismatch routing。
+  - required tests: 358-owned contract / non-gating / content-mutation fixture。
+  - reviewer focus: mismatch routing、Runtime independence、Epic handoff completeness。
+  - stop conditions: contract owner不明、material contract drift、Runtime変更要求。
+  - output required: IC-1 input manifest、consumer / version、mismatch owner、changed files、test evidence、risk、material decision有無。
+- `tc-s09-001` contract input: Core / Kit expectations
+  - 前提: S01〜S08 pass。
+  - 操作: provider / dogfoodの三scope四文書、Report shape / non-gating、Current six、Historical policy、one Plan、Guide pathを358-owned manifestへ照合する。
+  - 期待結果: 期待値が一意で、後続EpicがRuntime実生成を照合できる入力とowner routingが揃う。
+  - 失敗検出: missing / duplicate、owner曖昧、Runtime field混入、未定義の357依存。
+  - 検証方法: manifest diff、asset contract test、Issue report evidence。
   - 関連 closure id: `CL-358-012`。
 - `tc-s09-002` negative control: Planning Level is docs-only
-  - 前提: 同一Fresh IssueでPlanning Level本文だけが異なるvariantがある。
-  - 操作: scaffold / active / deps / lifecycle結果を比較し、`.meta.json` / Runtime stateもscanする。
-  - 期待結果: Runtime結果は同一でLevel field / parserが存在しない。
+  - 前提: 同一の358-owned contract fixtureでPlanning Level本文だけが異なるvariantがある。
+  - 操作: file / symbol scanで`.meta.json`、`.assurance.json`、Runtime parser / stateへのLevel追加がないことを確認する。
+  - 期待結果: Levelは同一`plan.md`の本文差分としてのみ表現され、Runtime-owned field / parserが存在しない。
   - 失敗検出: contentによるRuntime差、metadata / parser追加。
-  - 検証方法: shared result snapshot、file / symbol scan。
+  - 検証方法: asset contract test、file / symbol scan。
   - 関連 closure id: `CL-358-005`, `CL-358-014`。
-- Step gate: IC-1 evidenceとreport更新後、fresh code / spec reviewがpassし、Epic orchestratorがhandoff可を記録する。
+- Step gate: contract inputとreport更新後、fresh code / spec reviewがpassして358 S09を閉じる。Epic-level実生成比較は後続統合で記録する。
 
 ### S10 contract — 359 / 360 handoff manifest
 
-- Depends on: S09。Unblocks: S90 / Issue 359 / 360。Target files: Issue `report.md`、Epic-local handoff evidence、358-owned reserved navigation説明だけ。
+- Depends on: S09。Unblocks: S90。359 / 360へのhandoff inputを記録するが、後続Issueが消費・実装開始できるのはEpic-level IC-1確認後である。Target files: Issue `report.md`、Epic-level handoff evidence、358-owned reserved navigation説明だけ。
 - Planned obligation: exact path / semantic / owner / retain-replace-historical-prune分類を後続へ渡す。
 - Redまたは代替証拠: `manual-required`。implementation test不要の理由はhandoff evidenceのみのstepであるため。duplicate / missing / unowned row inspectionを代替証拠とする。
 - Bounded implementation: handoff manifestだけを作り、skill本文 / installer / pruneを実行しない。
-- Green verification: `CL-358-013`が重複 / 欠落 / owner未設定ゼロでpassする。
+- Green verification: `CL-358-013`がE00の全`owner pending S10` rowを消化し、重複 / 欠落 / owner未設定ゼロでpassする。S09のEpic-level contract inputを参照するが、357の実装・IC-1 passは358の記録完了の前提にしない。handoffの実消費・359/360の実装開始はEpic-level IC-1確認後に限定する。
 - Refactor guardrail: reserved linkを359実装前にliveにしない。
 - Amendment trigger: skill target、360分類、preservation ownerの変更が必要なら停止する。
 - Report destination: Issue `report.md`のS10 closure / HandoffとEpic report。
 - Delegation contract:
   - delegated role: main orchestrator。
-  - input docs: `RQ-358-008`, `AC-358-013`; Design §13 / §14; `CL-358-013`; IC-1 pass evidence。
+  - input docs: `RQ-358-008`, `AC-358-013`; Design §13 / §14; `CL-358-013`; S09 contract input evidence。
   - allowed paths: 本step Target filesだけ。
   - forbidden changes: skill / installer / Runtime、obsolete delete、359 / 360 canonical docs。
-  - acceptance criteria: 359 exact Guide / skill targets、360 full asset classification / preservation / parity obligation。
+  - acceptance criteria: 359 exact Guide / skill targets、360 full asset classification / preservation / parity obligation、retain-onlyを含むDesign §4外surfaceの一意owner。
   - required verification: duplicate / gap / ownership inspection、fresh spec review。
   - reviewer focus: downstreamがrepo再調査不要な具体性、reserved link timing。
-  - stop conditions: IC-1未pass、owner未確定、path / classificationのmaterial変更。
+  - stop conditions: contract input未作成、owner未確定、path / classificationのmaterial変更。
   - output required: handoff manifest、inspection evidence、risk、material decision有無。
 - `tc-s10-001` manual: 359 / 360 handoff completeness
-  - 前提: IC-1 pass、Design §13 / §14 exact contracts、S01〜S09 evidenceがある。
-  - 操作: 359のGuide / semantic / exact skill targetと、360のretain / replace / historical-only / prune全assetをowner / destinationへ割り当てる。
+  - 前提: S09 contract input pass、Design §13 / §14 exact contracts、S01〜S09 evidenceがある。
+  - 操作: 359のGuide / semantic / exact skill targetと、E00 pending inventoryを含む360のretain / replace / historical-only / prune全assetをowner / destinationへ割り当てる。
   - 期待結果: 重複・欠落・未割当ゼロで、各rowがverified evidenceへlinkし、skill linkは予約状態である。
   - 失敗検出:曖昧path、ownerなし、IC evidenceなし、live link先行。
   - 検証方法: manifest inspectionとfresh spec review。
@@ -692,7 +696,7 @@ git status --short
   - stop conditions: verified behaviorとdocs矛盾、ownership外変更。
   - output required: changed docs、inspection結果、risk、material decision有無。
 - `tc-s90-001` manual: complete documentation route
-  - 前提: S01〜S10のverified asset / IC / handoffがある。
+  - 前提: S01〜S10のverified asset / contract input / handoffがある。
   - 操作: README first-read、全relative link、Current allowlist、Historical exclusion、Level examples、reserved handoffを通読 / scanする。
   - 期待結果: link切れがなく、旧workflowをCurrent推奨せず、新メンバーが正しいGuideへ到達できる。
   - 失敗検出: broken / circular mandatory route、英語のみの説明、Current / Historical混在、live skill link。
@@ -712,22 +716,22 @@ git status --short
 - Report destination: `report.md`のClosure Coverage / Test Contract Closure / Reviewer Gate Status / Residual Risks。
 - Delegation contract:
   - delegated role: fresh `qa-reviewer`、fresh issue-wide `code-reviewer`、fresh `spec-reviewer`。修正は必要時だけfresh `dev-coder` / `doc-writer`。
-  - input docs: canonical R/D/P、全step report evidence、IC-1 / handoff evidence。
+  - input docs: canonical R/D/P、全step report evidence、S09 contract input / handoff evidence。
   - allowed paths: 358-owned failure原因だけ。
-  - forbidden changes: Runtime / skill / installer、他Issue、new scope、PR / merge / finish、full-regression無断実行。
-  - acceptance criteria: `CL-358-001`〜`015` closed、open Ledger Noteなし、全required checks pass。
+  - forbidden changes: Runtime / skill / installer、他Issue、new scope、merge / finish、full-regression無断実行。
+  - acceptance criteria: `CL-358-001`〜`015` closed、open Ledger Noteなし、全required checks pass、PR作成に必要な差分が明確。
   - required tests: §8 S99 sequenceとreviewerが認定したIssue-local追加test。
   - reviewer focus: trace completeness、test defect sensitivity、unplanned diff、preservation / IC evidence。
   - stop conditions: P0 / P1、unclosed closure、scope外failure、material amendment。
   - output required: check一覧、review JSON、closure evidence、残余risk、ready / not-ready判定。
 - `tc-s99-001` gate: complete authoring contract
-  - 前提: E00〜S90のstep gatesとIC-1がpassし、reportにevidenceがある。
+  - 前提: E00〜S90のstep gatesとS09 contract inputがpassし、reportにevidenceがある。
   - 操作: §8 Verification sequence、closure audit、fresh QA / code / spec reviewを実行する。
   - 期待結果: 全required check / reviewがpassし、unplanned diff / open noteなしでIssue-local完了を判定できる。
   - 失敗検出: skipped check、evidenceなしclosure、P0 / P1、ownership外diff。
   - 検証方法: command log、review JSON、closure-to-evidence audit。
   - 関連 closure id: `CL-358-001`〜`CL-358-015`。
-- Step gate: main orchestratorがreportへ最終判定を記録し、M99 final commit候補`docs(iss-00358): 最終実装証跡を確定`を作成して`git status --short`で意図しない残差がないことを確認する。PR、merge、Issue finishは実行しない。
+- Step gate: main orchestratorがreportへ最終判定を記録し、M99 final commit候補`docs(iss-00358): 最終実装証跡を確定`を作成して`git status --short`で意図しない残差がないことを確認する。その後、Issue 358のcommit / push / main向けmergeable PR作成を行い、mergeとIssue finishは実行しない。
 
 ## 10. Milestone / commit候補
 
@@ -737,7 +741,7 @@ git status --short
 | M1 Guide / template | S01〜S04 | `feat(authoring): thin templateとGuide契約を導入` | asset tests + spec / code review |
 | M2 Artifact / navigation | S05〜S06 | `docs(authoring): ArtifactとCurrent導線を整理` | link / vocab + spec review |
 | M3 Parity / preservation | S07〜S08 | `test(authoring): parityと既存文書保持を固定` | QA / code review |
-| M4 IC / handoff | S09〜S90 | `docs(authoring): 後続handoffを確定` | IC-1 + spec review |
+| M4 IC / handoff | S09〜S90 | `docs(authoring): Epic統合入力と後続handoffを確定` | contract input + spec review |
 | M99 Final ledger | S99 | `docs(iss-00358): 最終実装証跡を確定` | final QA / code / spec review + post-commit clean check |
 
 実際のcommit分割はdiffのcoherenceを優先し、未完stepをまとめない。commit作成時はユーザーの明示依頼とgit commit workflowに従う。
@@ -747,7 +751,7 @@ git status --short
 - providerとdogfood projectionを同じcommit boundaryで戻す。
 - navigation → Artifact docs → Planning Guides → scope templatesの逆順でrevertする。
 - node-local content migration、`.assurance.json`変換、legacy renameを行わない。
-- IC-1 mismatchでRuntime policyを358へ追加しない。
+- Epic-level IC-1 mismatchでRuntime policyを358へ追加しない。mechanism mismatchは後続統合から該当Runtime Issueへroutingする。
 - obsolete assetの物理削除を360より前に行わない。
 - compatibility mode、dual Current route、Runtime Planning Level fallbackを導入しない。
 
@@ -756,8 +760,8 @@ git status --short
 - `CL-358-001`〜`CL-358-015`がすべてclosed。
 - Design §4.1のAdd / Modify manifestと実diffが一致する。
 - provider / dogfood parity、link、vocabulary、preservation testがpass。
-- IC-1がpassし、359 / 360 handoff manifestが具体的である。
+- Epic-level IC-1 contract inputがpassし、359 / 360 handoff manifestが具体的である。357の実生成比較は後続Epic統合に残す。
 - targeted / unit / ordinary fast suite / lint / validate / diff checkがpass。
 - fresh QA / code / spec reviewがpass。
 - reportに実装結果、検証、残余risk、handoffが反映されている。
-- PR、merge、Issue finish、Epic完了、legacy pruneはこのExit後も自動実行しない。
+- Issue 358のmain向けmergeable PRが作成され、PR checks / mergeabilityを確認する。merge、Issue finish、Epic完了、legacy pruneは自動実行しない。
