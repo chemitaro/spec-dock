@@ -64,7 +64,7 @@ Branch: `iss-00050-host-adapter-scaffold-and-final-parity`
 - `git_gateway` を `Ports` 経由で使用する
 - `issue_view_minimal(..., repo_slug=...)` を呼ぶ
 
-したがって、B 差分は host adapter のための新規仕様ではない。  
+したがって、B 差分は host adapter のための新規仕様ではない。
 既存 runtime contract に対して checked-in parity tests を追随させる修正であり、`iss-00050` S03 の dogfooding parity closure として扱うのが妥当。
 
 ## Keep / justify / drop

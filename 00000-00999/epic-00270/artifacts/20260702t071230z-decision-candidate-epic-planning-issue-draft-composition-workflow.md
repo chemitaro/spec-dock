@@ -77,7 +77,7 @@ affected scope:
 | Composed draft | profile template を Issue-local artifact として合成し、設計・計画の形を揃える | yes | evidence only |
 | Authored draft | system-architect / implementation-planner / manual fallback が実質的な設計・計画内容を埋める | grade による | evidence only |
 
-Lite でも **composed draft** は作る。  
+Lite でも **composed draft** は作る。
 ただし Lite では **authored draft** は原則不要で、薄い draft に skip reason、変更境界、確認観点があればよい。
 
 Strict / Critical では composed draft だけでは不足する。専門家 draft または manual fallback evidence が必要である。
