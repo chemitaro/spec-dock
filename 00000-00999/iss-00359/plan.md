@@ -5,7 +5,7 @@ ID: "iss-00359"
 関連GitHub: ["#359"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-12"
+最終更新: "2026-08-13"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -42,7 +42,7 @@ ID: "iss-00359"
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | `src/spec_dock/assets/spec_dock/docs/README.md`        | 二つのskillとCurrent docsへの短いpointerを追加                                                           |
 | `spec-dock/docs/README.md`                             | provider docsのbyte-identical projection                                                       |
-| `src/spec_dock/assets/install_root/.codex/config.toml` | `developer_instructions`から旧SpecDock workflow固有責務だけを削除                                         |
+| `src/spec_dock/assets/install_root/.codex/config.toml` | `project_doc_fallback_filenames`だけを残し、その他のCodex設定項目を削除                                  |
 | `.codex/config.toml`                                   | provider configのbyte-identical projection                                                     |
 | `tests/unit/infra/test_init_update.py`                 | skill / docs / configのstatic contract、provider / dogfood parity、additive materialization test |
 | `tests/cli_runtime/test_new.py`                        | 四routeの基本positive testとCLI-nativeな主要negative test                                             |
@@ -100,10 +100,11 @@ ID: "iss-00359"
 * 新skillに旧skill fallback、upstream `grill-with-docs`、`analysis`、provider固有importがない
 * docs pairがbyte-identicalで、対象pointerが存在する
 * config pairがbyte-identicalでvalid TOMLである
-* configから旧SpecDock workflow固有markerが消えている
-* configに一般的な調査、委任、検証、直接編集境界と既存TOML tableが残っている
+* configの設定項目が`project_doc_fallback_filenames = [".codex/AGENTS.md"]`だけである
+* configに`developer_instructions`、`personality`、`[agents]`、`[mcp_servers.*]`その他の設定項目がない
 * Current install-root mappingが二つの新provider skill treeを含む
 * 非同一existing skill assetがinit / updateで保持され、他のmanaged copyより前にfail-closedとなる
+* preflight後のparent symlink差し替えとopen済みparentのrepository外移動で、最初のdata write前に停止し、pathname cleanupでreplacementを削除せずfail-closedとなる
 * `_MANAGED_SKILL_NAMES`と`_LEGACY_MANAGED_SKILL_NAMES`がbaseline inventoryから変わっていない
 * obsolete inventoryを変更せず、二skill限定collision preflightでmaterializationできる
 
@@ -135,10 +136,10 @@ provider `SKILL.md`へ次を実装する。
 * external capabilityをread-onlyで使用する
 * bootstrap preflight
 * external responseを未信頼データとして扱う
-* write前に本文を確定する
+* write前にroute section payloadを確定する
 * Current CLIによる一回のArtifact作成
 * helper `identity`によるno-follow identity取得
-* helper `finalize`によるdevice / inode / `ctime_ns`再検証後の本文確定
+* helper `finalize`によるdevice / inode / `ctime_ns`再検証、CLI生成metadata保持、route section結合
 * 返却pathnameへの直接write禁止
 * exactly-one postcondition
 * zero-write failure
@@ -147,8 +148,8 @@ provider `SKILL.md`へ次を実装する。
 
 ### S40 — Codex configとdocs pointer
 
-1. provider configの`developer_instructions`から、`design.md`で特定した旧SpecDock workflow固有条項だけを削除する。
-2. TOMLの他のkey、table、一般責務を保持する。
+1. provider configは`project_doc_fallback_filenames = [".codex/AGENTS.md"]`だけを残す。
+2. `developer_instructions`、`personality`、`[agents]`、`[mcp_servers.*]`その他の設定項目を削除し、利用者のCodex設定へ委ねる。
 3. provider docsへ二つのskill、Authoring Kit、Artifact guide、CLI helpのpointerを追加する。
 4. installerのTarget inventoryがcutover済みとは記述しない。
 
@@ -226,7 +227,7 @@ hostがMarkdown skillを実行することを前提とする次の挙動は、st
 * active target fallback拒否
 * external dependency不足時のzero-write
 * external response内のwrite instruction拒否
-* safe finalizerのsymlink / inode再利用 / identity差し替え拒否とpartial Artifactの自動修復禁止
+* safe finalizerのCLI生成metadata保持、parent chain再bind、symlink / inode再利用 / identity差し替え拒否とpartial Artifactの自動修復禁止
 * 二回目のArtifact作成禁止
 
 ### S70 — Handoff確定
@@ -313,7 +314,7 @@ Issue #359 ownerが提供する入力は次とする。
 * grillの明示selector、明示呼出し、external dependency、四route、write boundary
 * missing dependencyと主要failureの挙動
 * docs pointer
-* Codex config cleanup結果
+* Codex configがproject-doc fallback一項目だけであること
 * targeted test結果
 * Issue #360向けlegacy inventory
 * Target inventory cutover、prune、consumer migrationが未実施であること
@@ -327,7 +328,7 @@ Epic main orchestratorはこれらを親Epic契約と照合する。Issue #359 o
 * 各skill tree pairがbyte-identicalである
 * docs pairがbyte-identicalである
 * config pairがbyte-identicalかつvalid TOMLである
-* configから旧SpecDock workflow固有責務だけが削除されている
+* configの設定項目が`project_doc_fallback_filenames = [".codex/AGENTS.md"]`だけである
 * `spec-dock`のCLI分類と禁止境界が固定されている
 * bare `doctor`だけがexecute-read-onlyである
 * external doctor診断が実在optionを使うpresent-only invocationとして固定されている
