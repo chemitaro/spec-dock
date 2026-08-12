@@ -80,7 +80,7 @@ provider / dogfoodのskill-local helperをbyte-identicalに更新し、`identity
 
 ## Commit Evidence
 
-pending implementation commit
+Implementation commit: `9bfcecae75008addc6fe40c38482aad72a032e20`。provider / dogfood helper、skill contract、R/D/P、companion、ZIP、regression testを同commitへ含む。
 
 ## Re-observation Result
 
