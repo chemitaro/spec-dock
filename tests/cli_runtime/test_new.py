@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -864,6 +865,202 @@ class TestCliNew(CliRuntimeHarness):
 
             created_names = sorted(path.name for path in (issue_dir / "artifacts").glob("*.md"))
             assert created_names == sorted(["rules.md", *(filename for _, _, _, filename, _ in cases)])
+
+    @pytest.mark.parametrize(
+        ("artifact_type", "template_marker", "authority_marker", "route_sections"),
+        (
+            (
+                "research",
+                'template: "research"',
+                'authority: "evidence"',
+                "## Question\n\n- Final question\n\n## Source\n\n- Final source\n\n"
+                "## Findings\n\n- Final finding\n\n## Reflection\n\n- Final reflection\n",
+            ),
+            (
+                "interview",
+                'template: "interview"',
+                'authority: "evidence"',
+                "## Question\n\n- Final question\n\n## Answer\n\n- Final answer\n\n"
+                "## Reflection\n\n- Final reflection\n",
+            ),
+            (
+                "disc",
+                'template: "disc"',
+                'authority: "evidence"',
+                "## Inputs\n\n- Final input\n\n## Synthesis\n\n- Final synthesis\n\n"
+                "## Options and trade-offs\n\n- Final option\n\n## Reflection\n\n- Final reflection\n",
+            ),
+            (
+                "decision-candidate",
+                'template: "decision-candidate"',
+                'authority: "draft"',
+                "## Context\n\n- Final context\n\n## Options\n\n- Final option\n\n"
+                "## Candidate\n\n- Final candidate\n\n## Reflection\n\n- Final reflection\n",
+            ),
+        ),
+    )
+    def test_issue_359_grill_route_creates_exactly_one_artifact_without_scope_mutation(
+        self,
+        artifact_type: str,
+        template_marker: str,
+        authority_marker: str,
+        route_sections: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            self._write_runtime_clock(target, now_iso="2026-03-12T01:02:03+00:00", today="2026-03-12")
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            artifacts_dir = issue_dir / "artifacts"
+            title = f"Issue 359 {artifact_type}"
+            collision_seed = self._run_runtime_capture(
+                target,
+                ["new", "artifact", artifact_type, "--issue", "iss-00003", "--title", title],
+            )
+            assert collision_seed.returncode == 0, collision_seed.stdout + collision_seed.stderr
+            protected_paths = (
+                issue_dir / "requirement.md",
+                issue_dir / "design.md",
+                issue_dir / "plan.md",
+                issue_dir / "report.md",
+                issue_dir / ".meta.json",
+                target / "spec-dock" / ".agent" / "active.json",
+                target / "spec-dock" / ".agent" / "deps-issues.json",
+            )
+            protected_before = {path: path.read_bytes() if path.is_file() else None for path in protected_paths}
+            artifact_tree_before = self._artifact_tree_snapshot(issue_dir)
+            assert artifact_tree_before is not None
+            artifact_entries_before = {entry[0]: entry for entry in artifact_tree_before}
+
+            result = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "artifact",
+                    artifact_type,
+                    "--issue",
+                    "iss-00003",
+                    "--title",
+                    title,
+                ],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            artifact_tree_after = self._artifact_tree_snapshot(issue_dir)
+            assert artifact_tree_after is not None
+            artifact_entries_after = {entry[0]: entry for entry in artifact_tree_after}
+            added = set(artifact_entries_after) - set(artifact_entries_before)
+            assert len(added) == 1
+            created = artifacts_dir / added.pop()
+            assert created.is_file()
+            assert created.suffix == ".md"
+            created_before_finalize = created.read_text(encoding="utf-8")
+            artifact_id = re.search(r'(?m)^ID: "([^"]+)"$', created_before_finalize)
+            assert artifact_id is not None
+            assert "-01-" in artifact_id.group(1)
+            helper = target / ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py"
+            artifact_rel = created.relative_to(target).as_posix()
+            identity_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(helper),
+                    "identity",
+                    "--repo-root",
+                    str(target),
+                    "--artifact",
+                    artifact_rel,
+                ],
+                cwd=target,
+                capture_output=True,
+                check=False,
+            )
+            assert identity_result.returncode == 0, identity_result.stderr.decode()
+            identity = json.loads(identity_result.stdout)
+            finalize_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(helper),
+                    "finalize",
+                    "--repo-root",
+                    str(target),
+                    "--artifact",
+                    artifact_rel,
+                    "--expected-device",
+                    str(identity["device"]),
+                    "--expected-inode",
+                    str(identity["inode"]),
+                    "--expected-ctime-ns",
+                    str(identity["ctime_ns"]),
+                ],
+                cwd=target,
+                input=route_sections.encode(),
+                capture_output=True,
+                check=False,
+            )
+            assert finalize_result.returncode == 0, finalize_result.stderr.decode()
+            finalized = created.read_text(encoding="utf-8")
+            for preserved in (
+                f'ID: "{artifact_id.group(1)}"',
+                f'タイトル: "{title}"',
+                '親: ["iss-00003"]',
+                template_marker,
+                authority_marker,
+                f"# {artifact_id.group(1)} {title}",
+            ):
+                assert preserved in finalized
+            assert finalized.endswith(route_sections)
+            artifact_tree_finalized = self._artifact_tree_snapshot(issue_dir)
+            assert artifact_tree_finalized is not None
+            artifact_entries_after = {entry[0]: entry for entry in artifact_tree_finalized}
+            assert set(artifact_entries_after) - set(artifact_entries_before) == {created.name}
+            assert f"path={created.relative_to(target).as_posix()}" in result.stdout
+            assert set(artifact_entries_before) <= set(artifact_entries_after)
+            for rel, entry_before in artifact_entries_before.items():
+                assert artifact_entries_after[rel] == entry_before
+            assert {path: path.read_bytes() if path.is_file() else None for path in protected_paths} == protected_before
+
+    @pytest.mark.parametrize(
+        "artifact_args",
+        (
+            ["new", "artifact", "research", "--title", "Missing selector"],
+            [
+                "new",
+                "artifact",
+                "research",
+                "--issue",
+                "iss-00003",
+                "--epic",
+                "epic-00002",
+                "--title",
+                "Multiple selectors",
+            ],
+            ["new", "artifact", "research", "--issue", "iss-00003", "--title", ""],
+        ),
+    )
+    def test_issue_359_artifact_input_failures_are_zero_write(self, artifact_args: list[str]) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            protected_paths = (
+                issue_dir / "requirement.md",
+                issue_dir / "design.md",
+                issue_dir / "plan.md",
+                issue_dir / "report.md",
+                issue_dir / ".meta.json",
+                target / "spec-dock" / ".agent" / "active.json",
+                target / "spec-dock" / ".agent" / "deps-issues.json",
+            )
+            artifact_tree_before = self._artifact_tree_snapshot(issue_dir)
+            protected_before = {path: path.read_bytes() if path.is_file() else None for path in protected_paths}
+
+            result = self._run_runtime_capture(target, artifact_args)
+
+            assert result.returncode != 0, result.stdout + result.stderr
+            assert self._artifact_tree_snapshot(issue_dir) == artifact_tree_before
+            assert {path: path.read_bytes() if path.is_file() else None for path in protected_paths} == protected_before
 
     def test_new_artifact_unsupported_types_fail_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

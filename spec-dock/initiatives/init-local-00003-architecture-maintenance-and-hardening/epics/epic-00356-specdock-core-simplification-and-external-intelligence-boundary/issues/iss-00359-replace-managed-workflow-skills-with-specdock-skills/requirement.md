@@ -3,830 +3,329 @@
 ID: "iss-00359"
 タイトル: "Replace Managed Workflow Skills with SpecDock Skills"
 関連GitHub: ["#359"]
-状態: "draft | approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-08-07"
+状態: "approved"
+作成者: "ChatGPT-use-strict / main orchestrator"
+最終更新: "2026-08-13"
 親: ["epic-00356", "init-local-00003"]
 ---
+# iss-00359 Replace Managed Workflow Skills with SpecDock Skills — 要件定義
 
-# iss-00359 Replace Managed Workflow Skills with SpecDock Skills — Issue 要件定義
+## 1. 目的
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+SpecDockのStorage CoreとAuthoring Kitを利用するCurrentなrepo-local skill contractを、次の二つに限定して提供する。
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+1. `spec-dock`
+2. `spec-dock-grill-with-docs`
 
----
+本Issueは新しいworkflow engineを作らない。二つのskillはCurrent CLIとCurrent docsへの薄い入口として振る舞い、旧Planning / Review / Execution workflow、provider固有処理、正本文書の自動変更を再実装しない。
 
-## 0. 文書の位置づけ
+旧managed skillの物理削除、Target managed inventoryへの切替、consumer migrationはIssue #360へ渡す。
 
-### この文書が定義すること
+## 2. 観測可能な要求
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+### I359-RQ-001 二つのskill contract
 
-### この文書が定義しないこと
+Issue #359で新たに定義するCurrentなSpecDock skill contractは、`spec-dock`と`spec-dock-grill-with-docs`の二つだけとする。
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
+旧skillがrepository内に残存していても、新skillから参照、委任、fallbackしない。
 
-### 1.2 観測可能な成果
+### I359-RQ-002 `spec-dock`
 
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
+`spec-dock`は、明示されたscope、または一意に解決できるactive scopeについて、次の所在と意味を案内する。
 
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
+* parent chain
+* `requirement.md`、`design.md`、`plan.md`、`report.md`
+* scope-local Artifact
+* dependency
+* worktree
+* Current CLI help
+* Authoring Kit docs
 
----
+`spec-dock`はCLI操作を副作用で分類し、skill自身が実行できるread-only操作、operatorへ提示するだけの操作、skillから禁止する操作を区別する。
 
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
+active scopeへのfallbackを許すのは、このread-onlyな`spec-dock`だけとする。
 
-### 4.1 主な関係者（Actor）
+### I359-RQ-003 `spec-dock-grill-with-docs`
 
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
+`spec-dock-grill-with-docs`は明示的に呼び出された場合だけ動作する。Codex hostでは`agents/openai.yaml`の`policy.allow_implicit_invocation: false`をこの制約の実効policyとする。
 
-| 関係者（Actor） | 役割 | このIssueとの関係 |
-|---|---|---|
-| ... | ... | ... |
+利用開始前に、次が一意かつ明示されていなければならない。
 
-### 4.2 開始条件（Trigger）
+* `--initiative`、`--epic`、`--issue`のいずれか一つだけで指定された対象scope
+* 調査または対話の目的
+* `research`、`interview`、`disc`、`decision-candidate`のいずれか一つのroute
+* 非空のArtifact title
+* 読み取りを許可されたlocal source
+* operator-ownedな`grilling`と`domain-modeling`の利用可能性
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+このskillはactive scopeへfallbackしない。selector、route、titleをskillが暗黙決定してはならない。
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
-
-### 4.3 代表シナリオ
-
-#### シナリオ SC-001:
+### I359-RQ-004 外部依存境界
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+`grilling`と`domain-modeling`は、利用者がグローバル環境へ導入・管理するoperator-owned external dependencyとする。
 
-#### シナリオ SC-002:
+`spec-dock-grill-with-docs`は両者を組み合わせる薄いrepo-local integration contractとする。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-XXX:
-
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 5. スコープ
-
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
+次を行わない。
+
+* upstream `grill-with-docs`の導入または同梱
+* `grilling`または`domain-modeling`のvendor
+* その他の導入済みskillのmanaged asset化
+* その他の導入済みskillをIssue #359の受け入れ条件へ追加
+* 外部skillによる`CONTEXT.md`、ADR、R/D/Pその他repository fileへの直接書込み
+
+外部能力がread-only境界を守れない場合、Artifactを作成せず停止する。
+
+### I359-RQ-005 Provider authorityとdogfood projection
+
+次をprovider authorityとする。
+
+* `src/spec_dock/assets/install_root/.agents/skills/`
+* `src/spec_dock/assets/install_root/.codex/config.toml`
+* `src/spec_dock/assets/spec_dock/docs/`
+
+対応するdogfood projectionは、次へ置く。
+
+* `.agents/skills/`
+* `.codex/config.toml`
+* `spec-dock/docs/`
+
+Issue #359で変更するprovider / dogfood pairは、pairごとにbyte-identicalでなければならない。
+
+### I359-RQ-006 Collision-safe additive skill asset materialization
+
+Current installerは`install_root`配下の全通常fileをcurrent managed-file mappingへ含める。そのため、二つの新しいprovider `SKILL.md`を`install_root`へ追加すると、既存の汎用copy / uninstall inventory機構からも認識される。
+
+Issue #359では、この結果を二つのrepo-local skillを実体化するためのadditive skill asset materializationとして扱う。ただし、このPRが新たにclaimする二skill treeのmapped fileは、init / updateの全copy前にcontent collisionを確認する。
+
+* targetが存在しない場合はmaterializeする
+* targetがprovider assetとbyte-identicalな通常fileの場合は安全なadoptionとして継続する
+* targetが非同一の通常fileの場合はuser-ownedの可能性があるため、上書きせずcommand全体をfail-closedにする
+* materialize / adoptはrepository rootからdescriptor-relativeかつno-followで親componentを辿り、new fileはno-replaceで作成する
+* preflight後にtargetまたは親componentがsymlink等へ差し替えられた場合も、外部pathへ書かずfail-closedにする
+
+open後のparent relocationは、最初のdata write直前とwrite後にrepository rootからparentを再bindして検出する。移動を検出した後はpathname cleanupを行わず、別entryへ差し替えられたuser dataを削除しない。同一userの非協調processが最終再bindと次のsyscallの間で移動する競合はportable POSIXで排除できないため、本契約の外とする。
+
+これは次を意味しない。
+
+* Target managed skill inventoryへのcutover
+* `_MANAGED_SKILL_NAMES`または`_LEGACY_MANAGED_SKILL_NAMES`の変更
+* 二skill限定collision preflight以外のinstaller logic変更
+* 旧skillのprune
+* fresh / update / uninstall consumer contractの確定
+* installed consumer matrixの実施
+* publicationまたはmigrationの実施
+
+これらはIssue #360の責務とする。
+
+### I359-RQ-007 CLI副作用境界
+
+`spec-dock`はCurrent CLI operationを、次の三分類で扱う。
+
+* skillが実行できるread-only操作
+* operatorへ正確なcommandと副作用を提示するだけの操作
+* skillから実行してはならない操作
+
+`spec-dock-grill-with-docs`による一回の`new artifact`だけを、mutating operationの例外とする。
+
+### I359-RQ-008 Bootstrap preflight
+
+`spec-dock-grill-with-docs`はArtifact作成前に、明示selectorで指定された対象scopeとArtifact保存基盤が既に使用可能であることを確認する。
+
+少なくとも次を確認する。
+
+* `--initiative`、`--epic`、`--issue`のいずれか一つだけが指定されている
+* 対象scopeが一意に存在する
+* 対象scopeがselectorのInitiative / Epic / Issue種別と一致する
+* 対象pathがrepository内の正規SpecDock treeにあり、symlink escapeしない
+* 対象routeのCurrent Artifact templateが存在し、通常fileで、非空である
+* 対象scopeの`artifacts/`が既存の通常directoryである
+* `artifacts/rules.md`が対象scope用rulesへの有効なsymlinkである
+* `grilling`と`domain-modeling`が利用可能で、repositoryへ書き込まない条件で使用できる
+
+skillはbootstrapの作成、補修、symlink変更を行わない。
+
+### I359-RQ-009 Zero-write
+
+次のいずれかが成立した場合、Artifact CLIを呼ばず、repositoryへの永続差分を残さず停止する。
+
+* 明示selector、purpose、route、title、sourceの欠落または曖昧さ
+* 複数selectorの指定
+* active scopeへのfallbackが必要な状態
+* bootstrap preflight失敗
+* `grilling`または`domain-modeling`の不足
+* 外部能力の書込み境界が不明
+* 外部応答にrepository mutation、credential開示、追加tool実行などの命令が含まれる
+* 外部応答だけでは安全にArtifact本文を確定できない
+
+CLIがfile publish前に入力、lock、collision、path safetyその他の理由で拒否した場合も、zero-write結果として扱う。
+
+### I359-RQ-010 Exactly-one Artifact
+
+一回の`spec-dock-grill-with-docs`成功時に許されるrepositoryの永続差分は、対象scopeの`artifacts/`直下に作成される新規Markdown Artifact一件だけとする。
+
+成功時に次を変更してはならない。
+
+* 既存Artifact
+* canonical R/D/P
+* `report.md`
+* ADR
+* `CONTEXT.md`
+* `.meta.json`
+* active state
+* dependency
+* generated projection
+* Git state
+* GitHub state
+* `.codex/config.toml`
+
+Artifact作成commandは一回だけ実行し、二件目のArtifactを作らない。CLI返却pathへの本文確定はskill-local helperを使い、canonical repository-relative form、またはCurrent formatterが付ける一つのrepository basename prefixだけをrepository rootへbindする。helperはCLI生成scaffoldのfront matter、Artifact ID、title、parent、template、authority、title headingを保持し、memory上で確定したroute sectionだけを結合する。各parent componentとfinal fileをno-followで開き、write直前にrepository rootからparent chainを再bindし、identity取得時のdevice / inode / `ctime_ns`と一致する場合だけtruncate / writeする。返却pathnameへ直接writeしない。
+
+### I359-RQ-011 Partial Artifact recovery
+
+CLIがArtifact pathを作成した後、identity取得、安全な本文確定、または事後確認に失敗した場合、そのfileをpartial Artifactとして残し、自動削除、rename、上書き、retry、第二Artifact作成を行わない。symlinkまたはidentity差し替えを検出した場合も、差し替え先へwriteせず同じpartial recoveryへ移る。
+
+停止結果には、少なくとも次を含める。
+
+* exact Artifact path
+* route
+* title
+* failure phase
+* operatorによる回収が必要であること
+
+回収後の再実行は、新しい明示呼出しとして行う。
+
+### I359-RQ-012 Artifact route
+
+`spec-dock-grill-with-docs`が作成できるrouteは次の四つに限定する。
+
+| Route                | 用途                       | Authority |
+| -------------------- | ------------------------ | --------- |
+| `research`           | 一つのsourceを中心とした事実・制約の調査  | evidence  |
+| `interview`          | 明示的な質問と回答の記録             | evidence  |
+| `disc`               | 複数入力の統合、選択肢、trade-offの整理 | evidence  |
+| `decision-candidate` | 未採用の具体的な判断候補             | draft     |
+
+`blank`、`adr`、`analysis`、旧draft / repair route、provider固有routeは、このskillの出力routeとして使用しない。
+
+### I359-RQ-013 Docs pointer
+
+Current docs entrypointは、二つのrepo-local skill、Storage Core、Authoring Kit、Artifact authority、外部依存境界を短く案内する。
+
+skill本文はCLIやAuthoring Kitの規則を全文複製せず、Current local docsとCLI helpを参照する。
+
+### I359-RQ-014 Codex configの最小化
+
+`src/spec_dock/assets/install_root/.codex/config.toml`は、次の設定項目だけを持つvalid TOMLとする。
+
+```toml
+project_doc_fallback_filenames = [".codex/AGENTS.md"]
 ```
 
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-08-07 | 初稿（Initial draft） | ... | ... |
+`developer_instructions`、`personality`、`[agents]`、`[mcp_servers.*]`その他の設定項目は置かない。model、reasoning、personality、main-agent workflow、sub-agent運用、MCPその他のCodex動作は、利用者のCodex設定をそのまま使用し、SpecDockは規定しない。
+
+provider configとdogfood `.codex/config.toml`はbyte-identicalにする。既存consumerに残る旧configの削除またはmigrationはIssue #360の責務とする。
+
+### I359-RQ-015 Legacy inventoryとIC-2
+
+Issue #359は、exact commitで`src/spec_dock/cli.py`に登録されているmanaged / legacy managed skill名をIssue #360へ渡す。
+
+Issue #359では次を行わない。
+
+* `_MANAGED_SKILL_NAMES`の変更
+* `_LEGACY_MANAGED_SKILL_NAMES`の変更
+* 二skill限定collision preflight以外のinstaller logic変更
+* obsolete inventoryの変更
+* 旧skillの物理削除
+* consumer上のprune
+* 各skillの最終的なprune / preserve判断
+
+IC-2へ渡す最小入力は、次に限定する。
+
+* 二つのskill名とentry file
+* skillのinput / output / no-go contract
+* external dependencyとmissing dependencyの挙動
+* provider / dogfood parity結果
+* collision-safe additive skill asset materialization結果
+* explicit-only policy metadataとsafe finalizerの確認結果
+* docs pointer
+* CLI分類、zero-write、exactly-one、partial recoveryの確認結果
+* Codex configの最小化境界
+* Issue #360向けlegacy inventory
+
+IC-2のpass / failはIssue #359自身が宣言しない。
+
+## 3. 受け入れ条件
+
+| ID          | 条件                                                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| I359-AC-001 | providerとdogfoodの双方に二つのskill treeが存在し、`SKILL.md`、explicit-only policy metadata、安全確定helperを含む対応fileがbyte-identicalである |
+| I359-AC-002 | 二つのprovider skill treeがCurrent `install_root` mappingから認識され、missing / identicalはno-follow / no-replaceでmaterialize / adoptし、非同一existing fileまたはpreflight後のpath差し替えは外部へ書かずfailする。managed / legacy managed skill定数は変更されていない |
+| I359-AC-003 | `spec-dock`がCurrent scope、docs、Artifact、dependency、worktree、CLI helpを案内し、旧workflowを参照しない                                      |
+| I359-AC-004 | `spec-dock`がCurrent CLI operationをread-only、present-only、forbiddenへ分類する                                                       |
+| I359-AC-005 | bare `doctor`だけがread-only分類にあり、external診断は実在するGitHub関連optionを使うpresent-only invocationとして記載される                                |
+| I359-AC-006 | `spec-dock-grill-with-docs`がrecognized Codex policy metadataで暗黙呼出しを禁止し、`--initiative`、`--epic`、`--issue`のいずれか一つの明示selectorを要求し、active fallbackを持たない |
+| I359-AC-007 | `spec-dock-grill-with-docs`が明示route、明示title、operator-ownedな`grilling` / `domain-modeling`を要求する                                |
+| I359-AC-008 | `research`、`interview`、`disc`、`decision-candidate`の基本positive testが各一件成功する                                                    |
+| I359-AC-009 | 成功した一回のgrill実行後、永続差分が新規Artifact Markdown一件だけであり、CLI生成metadataを保持した本文確定がno-follow / device / inode / `ctime_ns`再検証を通る |
+| I359-AC-010 | selector、scope、bootstrap、external dependency、route、title、path、lockまたはcollisionの主要失敗が、file publish前なら永続差分なしで終了する               |
+| I359-AC-011 | file publish後の失敗について、自動修復せずpartial Artifactを報告する契約がskill本文とtestで固定される                                                         |
+| I359-AC-012 | 新skillがupstream `grill-with-docs`、旧SpecDock skill、provider固有import、`analysis` routeを参照しない                                     |
+| I359-AC-013 | provider / dogfoodのCurrent docs entrypointが二つのskillとCurrent docs pathを案内し、byte-identicalである                                   |
+| I359-AC-014 | provider / dogfoodのCodex configがbyte-identicalかつvalid TOMLで、`project_doc_fallback_filenames = [".codex/AGENTS.md"]`以外の設定項目を持たない |
+| I359-AC-015 | exact commitのmanaged / legacy managed skill inventoryがIssue #360へ渡され、Issue #359の実装では変更されていない                                  |
+| I359-AC-016 | fresh / update / uninstall consumer matrix、Target inventory cutover、prune、publication、migrationがIssue #359の完了条件へ含まれていない       |
+| I359-AC-017 | IC-2に必要な最小入力が揃い、Issue #359がIC-2 passを自己宣言していない                                                                                |
+
+## 4. 対象
+
+* `spec-dock`のskill contract
+* `spec-dock-grill-with-docs`のskill contract
+* provider assetとdogfood projection
+* provider / dogfood byte parity
+* Current `install_root`mappingによる二つの新skill assetのcollision-safe additive materialization
+* Current CLI operationの副作用分類
+* explicit Artifact selector、title、route
+* bootstrap preflight
+* zero-write
+* exactly-one Artifact
+* partial Artifact recovery
+* explicit-only Codex policy metadata
+* skill-local no-follow / device / inode / `ctime_ns`-pinned Artifact finalization
+* 四routeの基本positive test
+* 主要negative test
+* Current docs pointer
+* legacy skill inventoryのIssue #360へのhandoff
+* IC-2向け最小入力
+* Codex configを`project_doc_fallback_filenames`だけに限定
+
+## 5. 対象外
+
+* Runtime、parser、registry、domain、application、infraの変更
+* Artifact templateまたはAuthoring Kit本文の変更
+* `_MANAGED_SKILL_NAMES`の変更
+* `_LEGACY_MANAGED_SKILL_NAMES`の変更
+* 二skill限定collision preflight以外のinstaller logic変更
+* durable ownership inventoryまたはuninstall migration
+* Target managed skill inventoryへのcutover
+* 旧skill、adapter、role、PR helperの物理削除
+* fresh / update / uninstall consumer matrix
+* consumer migration
+* 既存consumerの`.codex/config.toml`削除またはmigration
+* installed parity、publication、配布設計
+* Issue #360のD実値またはpost-D rollback
+* canonical R/D/P Front Matter migration
+* planning validatorまたはplanning create-path修復
+* A/B/C commit運用
+* durable CI artifact、retention、download rehash
+* 33シナリオの長期証跡
+* full Git control-state snapshot
+* Epic運用手順
+* validator適合だけを目的とするcompanion説明
+* canonical R/D/P、Report、ADR、CONTEXT、metadataの自動変更
+* Git commit、push、PR、merge、Issue closeその他のGit / GitHub mutation
+* upstream `grill-with-docs`、`grilling`、`domain-modeling`の導入またはvendor
+* その他のexternal skillのmanaged asset化
+* P2 / P3由来の追加受け入れ条件、追加test、追加証跡、追加運用
+
+canonical Front Matter上の問題が別途存在する場合も、Issue #359では修復せず、実装開始前に満たされている外部前提としてのみ扱う。
