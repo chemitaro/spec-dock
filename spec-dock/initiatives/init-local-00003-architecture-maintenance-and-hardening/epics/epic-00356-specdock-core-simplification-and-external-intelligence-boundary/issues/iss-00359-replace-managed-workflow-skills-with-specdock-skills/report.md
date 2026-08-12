@@ -3,291 +3,312 @@
 ID: "iss-00359"
 タイトル: "Replace Managed Workflow Skills with SpecDock Skills"
 関連GitHub: ["#359"]
-状態: "draft | approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-08-07"
+状態: "approved"
+作成者: "main orchestrator"
+最終更新: "2026-08-13"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
 
-# iss-00359 Replace Managed Workflow Skills with SpecDock Skills — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00359 実装報告
 
-> `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。
+## 1. 現在の結果
 
-## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
+Issue 359のreview済みscopeに従い、次を実装した。
 
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
+- `spec-dock`と`spec-dock-grill-with-docs`のprovider assetとdogfood projection
+- Current CLI操作のread-only / present-only / forbidden分類
+- grill skillのexplicit selector、route、title、bootstrap preflight、zero-write、exactly-one、partial recovery契約
+- operator-owned `grilling` / `domain-modeling`のread-only利用境界
+- provider / dogfood byte parity
+- Current docs pointer
+- Codex configを`project_doc_fallback_filenames = [".codex/AGENTS.md"]`だけに限定し、その他の設定を利用者のCodex設定へ委譲
+- 四routeのpositive test、主要negative test、additive materializationのstatic contract test
+- recognized explicit-only policy metadata
+- 二skill tree限定のcollision-safe init / update adoption
+- no-follow / device / inode / `ctime_ns`再検証を行うskill-local Artifact finalizer
 
-Material な判断がない場合もこの section は残し、次を明示する。
+Artifact Runtime、public CLI argument、managed / legacy inventory、obsolete inventory、旧skill、consumer migrationには変更を加えていない。installer変更は二skill treeの非同一existing fileを全copy前に拒否するpreflightだけである。
 
-- No material interpretation changes.
-- No decision entries.
+## 2. 仕様採用と実装権限
 
-Ledger entry は次の契約値を使う。
+- Active context: Initiative `init-local-00003` / Epic `epic-00356` / Issue `iss-00359`。
+- Dependency: `deps check iss-00359`は`ready=true`、`blockers=0`。
+- Review evidence: `artifacts/20260812t090019z-review-issue-359-strict-pass.md`。P0=0、P1=0、P2=0、P3=0。
+- Current reviewed bundle: `artifacts/20260812t090016z-bundle-issue-359-reviewed-specifications.zip`、SHA-256 `ffd9876e4537dee3a8a835689ab2567e6e705397024c8ad969329875642dcec6`。required CI blockerの`ctime_ns`修正をR/D/P、companion、final gate evidenceへ反映して差し替えた。
+- Human approval: ユーザーは2026-08-12に、review済み仕様を基準とする実装開始と完了を明示承認した。
+- Model boundary: 実装、修正、最終品質ゲートではChatGPT / Oracleを使用しない。
+- Adoption route: normal `planning apply`用closed JSONは再構成成果物に含まれず、ユーザーがChatGPT経路を使用しないよう明示したため、既存PASS evidenceとhuman approvalを根拠にmanual adoptionした。
+- Promotion: R/D/PのFront Matterを`approved`へ変更した。仕様本文の追加変更はD-359-001、ユーザーの最終品質ゲート指示を同期したD-359-002、Codex configを最小化したD-359-009、final gateのP1を閉じたD-359-010である。
 
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
+Reviewed bundle内のpre-promotion hash:
 
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
+| 文書 | SHA-256 |
+|---|---|
+| `requirement.md` | `532f0da2fad3f6756f2b0e06349781d70ffab217148b883ff1d82a1cc6a9a361` |
+| `design.md` | `9f17d861d9d83d9a035c5e56030ee49fe86dc272142ed7467d14132ff48303af` |
+| `plan.md` | `30858e6bcc92030195fa9539690692e45710d4c42d1118e4cea36e9658eb61c0` |
 
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
+現在のcanonical hash:
 
-| 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
-|---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| 文書 | SHA-256 | 差分理由 |
+|---|---|---|
+| `requirement.md` | `e11e3f5b074681351c4d79163fdbe34a7629557ba72bf5bd16747672f766d608` | promotion、D-359-009、D-359-010 |
+| `design.md` | `684efefcded0a0910a7a3e1afd48d3cac4691537a64e09667c4624ea18f4dcd9` | promotion、D-359-001、D-359-009、D-359-010 |
+| `plan.md` | `9361670122d7286efa248bb7620e76c6d56412be02cb89a21385f636ef9c89ca` | promotion、D-359-002、D-359-009、D-359-010 |
 
-## 証跡採用台帳（Evidence Adoption Ledger / 必須）
+## 3. 仕様解釈・判断台帳
 
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
-
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
-|---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
-
-## 目的整合台帳（Objective Alignment Ledger / 必須）
-
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
-
-| 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
+| ID | Status | Type | 判断 | 根拠 / Disposition |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| D-359-001 | resolved | implementation | `spec-dock-grill-with-docs`へ`disable-model-invocation: true`を設定する | descriptionだけではI359-RQ-003のexplicit invocationを強制できない。`design.md` §2.1へpromoted_to_design。最終spec review対象 |
+| D-359-002 | resolved | deviation | stepごとのreviewを省略し、S99のFinal QA / Code / Spec reviewへ一本化する | ユーザーの明示指示。TDD Red / Greenとfocused verificationは各stepで維持し、`plan.md` S90 / S99へ反映。final review失敗時は修正と再reviewを実施 |
+| D-359-003 | resolved | implementation | docsのskill pointerを相対Markdown linkではなくcode pathにする | provider docsとdogfood docsはroot構造が異なり、同一relative linkはproviderでbrokenになる。byte parityを保つCurrent path pointerとしてapplied |
+| D-359-004 | resolved | safety | grillのexplicit-only authorityを`agents/openai.yaml`へ移す | PR #363 P1。Current Codexが認識する`policy.allow_implicit_invocation: false`を採用し、未認識front matter keyを削除。R/D/Pへpromoted |
+| D-359-005 | resolved | safety | 二skill treeだけをcollision-aware adoptionにする | PR #363 P1。missing / byte-identicalはmaterialize / adopt、非同一existing fileは全copy前に保持してfail。Target inventory / migrationは#360へ維持 |
+| D-359-006 | resolved | safety | Artifact本文をskill-local helperで安全確定する | PR #363 P1。public Artifact CLIを変えず、identity / finalize間のdevice / inode pin、component no-follow traversal、direct pathname write禁止をR/D/Pへpromoted |
+| D-359-007 | resolved | safety | additive materializationをdescriptor-relative no-follow / no-replaceにする | S99 P1。final preflight後のtarget差し替えでもgeneric `copy2`を使わず、外部pathへ書かない。R/D/Pへpromoted |
+| D-359-008 | resolved | safety | finalizer identityへ`ctime_ns`を追加する | Provider CI blocker。Linuxでunlink後にinodeが即時再利用され、device / inodeだけでは置換を識別できなかった。public Artifact CLIとpartial recoveryを変えず、truncate前のidentity比較だけを強化した |
+| D-359-009 | resolved | scope | repo-local Codex configは`project_doc_fallback_filenames`だけを保持する | ユーザーの明示決定。SpecDock固有workflowだけでなく`developer_instructions`、`personality`、`[agents]`、`[mcp_servers.*]`を削除し、Codex動作は利用者設定へ委ねる。既存consumer migrationは#360 |
+| D-359-010 | resolved | safety | CLI生成scaffoldを保持してroute sectionだけを確定し、open済みpathの移動を再確認する | Final Code / QA P1。helperはID / title / parent / template / authority / title headingを保持し、write直前にparent chainをrepo rootから再bindする。installerは最初のdata writeを行う関数内でparentを再bindし、移動検出後はpathname cleanupを行わずreplacementを保持する |
 
-## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
+未解決entryはない。新しいfeature、運用flow、証跡、品質gateは追加していない。
 
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
+## 4. Parent Implementation Exception
 
-| フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
-|---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+- Approval source: ユーザーによる「ChatGPTを使用せず、自分自身の高度な推論能力で実装を完了」の明示指示。
+- Allowed changes: `plan.md` §2の対象file、Issue-local R/D/P/report、同scopeのPR修正artifactに加え、PR #363のP1修正に必要な二skillの`agents/openai.yaml`、skill-local安全確定helper、`src/spec_dock/cli.py`の二skill限定collision preflight、その公開境界test、およびユーザーが明示したCodex configの一項目化。
+- Forbidden changes: managed / legacy inventory、obsolete inventory、旧skill prune、consumer migration、publication、Issue 360のTarget inventory / uninstall / migration責務、既存Artifact CLIのpublic argument contract。
+- Rollback: 新規skill fileは独立して除去可能。既存config / docs / testsは対象diffを逆適用できる。無関係な既存変更は巻き戻さない。
+- Verification: invocation metadata static contract、collision preflightのinit / update public behavior、safe finalizerのno-follow / inode reuse / `ctime_ns` test、Codex configのexact-key contract、focused test、provider / dogfood byte parity、TOML parse、lint、ordinary pytest、sync、validate、S99 final review、PR latest-head再観測。
+- Reviewer cadence: per-step reviewはユーザー指示により実施せず、S99 final gateだけをfreshかつissue-wideに実施する。
+- User approval: 2026-08-12の再設定ゴール「このissueの実装を完了させ、マージ可能なプルリクエストを作成」「ChatGPT-Useは今後不要」「最終品質ゲートで包括的なレビュー」と、2026-08-13のCodex config一項目化の決定を、`approved-local-execution`およびscope authorityとして記録する。
 
-## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `artifacts/` direct child にある flat Markdown
-  - filename: typed artifacts use `<ts>-<type>-<slug>.md` or `<ts>-<nn>-<type>-<slug>.md`; blank artifacts use `<ts>-<slug>.md` or `<ts>-<nn>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - legacy `discussions/` と既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+## 5. 変更ファイル
 
-| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+### 新規
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| ワークフロー単位の許可証跡不足（missing workflow-scoped authorization evidence） | blocked / incomplete | ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring に戻す | ワークフロー単位の named role 許可（Workflow-Scoped Authorization） / この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py`
+- `.agents/skills/spec-dock/SKILL.md`
+- `.agents/skills/spec-dock-grill-with-docs/SKILL.md`
+- `.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml`
+- `.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py`
+- `tests/unit/infra/test_issue_359_skill_helpers.py`
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+### 変更
 
-## 実装記録（セッションログ） (必須)
+- `src/spec_dock/assets/install_root/.codex/config.toml`
+- `.codex/config.toml`
+- `src/spec_dock/assets/spec_dock/docs/README.md`
+- `spec-dock/docs/README.md`
+- `tests/unit/infra/test_init_update.py`
+- `tests/cli_runtime/test_new.py`
+- `src/spec_dock/cli.py`（二skill tree限定collision preflight）
+- Issue 359 `requirement.md`、`design.md`、`plan.md`、`report.md`
 
-### セッションログ（2026-08-07 HH:MM - HH:MM）
+### 変更していない境界
 
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+- `_MANAGED_SKILL_NAMES`
+- `_LEGACY_MANAGED_SKILL_NAMES`
+- obsolete exact path inventory
+- Runtime / parser / registry / application / domain / infra
+- 旧managed skill asset
 
-#### 実施内容
-- ...
+## 6. TDDと検証証跡
 
-#### 実行コマンド / 結果
-```bash
-<command>
+### Red / characterization
 
-<result>
-```
+| 対象 | コマンド / 観測 | 結果 |
+|---|---|---|
+| static contract RED | `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py::test_issue_359_repo_local_skill_contracts_and_additive_materialization -q` | provider `spec-dock/SKILL.md` missingで1 failed。実装後は1 passed |
+| four-route characterization | Issue 359 route test | 実装前からCurrent CLI境界が4 passed。Runtime変更不要を確認 |
 
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+### Green / regression
 
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| 検証 | 結果 |
+|---|---|
+| Issue 359 focused contract（static、collision、race、hard-link adoption、finalizer、four-route、主要negative） | 27 passed |
+| `tests/unit/infra/test_artifact_templates.py` | 54 passed |
+| `tests/cli_runtime/test_storage_core_cli.py` | 4 passed（targeted explicit permission） |
+| `tests/unit/infra/test_authoring_kit_assets.py` | 304 passed |
+| `make lint` | ruff check / format / mypy pass |
+| ordinary `uv run pytest -q` | 1651 passed、2203 policy-skipped |
+| D-359-009 config exact contract | focused 1 passed、関連helper/callsite 5 passed |
+| D-359-009 CLI route explicit run | 7 passed、43 deselected |
+| D-359-009 storage core explicit run | 4 passed |
+| `test_init_update.py` full-regression diagnosis | 556 passed、29 failed。失敗は旧workflow文書、退役済みruntime/API、旧planning / authoring asset等の既存契約で、Issue 359 focused nodeの失敗なし |
+| `./spec-dock/scripts/spec-dock sync` | pass。active unchanged、current projections regenerated |
+| `./spec-dock/scripts/spec-dock validate` | pass、nodes=221 |
 
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+通常laneでは`test_init_update.py`とCLI runtimeのfull-regression bodyがpolicy skipされるため、Issue 359のfocused nodeを`--run-full-regression -k issue_359`付きで明示実行した。さらに、影響面の診断として`test_init_update.py`と新規helper testをfull-regression permission付きで完走した。28 failureはいずれもIssue 359のfocused契約外であり、本Issueに取り込むと旧planning / authoring / runtimeの復元になるため修正しない。repository全体のfull-regression、consumer matrix、publication testは実施していない。
 
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+### 検出・修正した回帰
 
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+初回fast laneでprovider docsのskill相対linkが2件failした。providerとdogfoodで異なるrootを跨ぐ相対linkをbyte-identicalにできないため、Current `.agents/skills/.../SKILL.md`をcode path pointerとして記載した。修正後、authoring asset 304件とordinary suiteがpassした。
 
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+最終品質ゲートの初回判定では、旧config責務を要求する既存full-regression test二件、安全契約のsection固定不足、既存Artifact内容を含まないexactly-one snapshot不足をP1として検出した。config contract helperを新しい削除 / 保持境界へ統一し、CLI分類、selector、preflight、one-write、zero-write、partial recoveryをsection単位で固定した。成功時は返却path一件だけを許可して既存Artifactの内容 / symlinkとprotected scopeを比較し、失敗時はcanonical / metadata / active / dependencyも不変であることを確認するよう修正した。影響testはすべてpassした。
 
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+最終gate後のrequired Provider CIでは、Linux filesystemがunlink直後の同名fileへinodeを再利用し、device / inodeだけのpinが置換を見逃すP1相当の安全blockerを検出した。finalizer identityへ`ctime_ns`を追加し、lstat / open / fstatの三値が一致する場合だけtruncateするよう修正した。deterministicなctime mismatch testを追加し、helper 6件、Issue 359 focused 21件、lint、ordinary 1648件がlocalでpassした。これは新しいreview工程ではなく、S99とrequired CIで検出したblockerのclosureである。
 
-#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
-`workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
+Spec reviewの初回指摘二件は、explicit user authorityとRequirement §5を再照合し、full planning closure indexとdelegated-draft ledgerをIssue #359へ追加するscope expansionであるため撤回された。R/D/P、Report、companion、実装、testへ統合していない。
 
-Authorization source は、ユーザーによる SpecDock workflow 利用依頼でよい。範囲は active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility に限る。この section は role ごと・phase ごとの追加承認 gate ではなく、scope 内の named role 利用前に追加許可を求める根拠にしてはならない。
+## 7. Parityとadditive materialization
 
-別途確認が必要なのは scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用である。unavailable / denied / host conflict は fail-closed とし、fresh `passed` reviewer gate の代替にしてはならない。
+| Pair / contract | 結果 |
+|---|---|
+| provider / dogfood `spec-dock/SKILL.md` | byte-identical |
+| provider / dogfood `spec-dock-grill-with-docs/SKILL.md` | byte-identical |
+| provider / dogfood `spec-dock-grill-with-docs/agents/openai.yaml` | byte-identical、implicit invocation禁止 |
+| provider / dogfood `spec-dock-grill-with-docs/scripts/finalize-artifact.py` | byte-identical、no-follow / device / inode / `ctime_ns`-pinned |
+| provider / dogfood `docs/README.md` | byte-identical |
+| provider / dogfood `.codex/config.toml` | byte-identical、valid TOML、設定項目は`project_doc_fallback_filenames`だけ |
+| `_build_current_managed_file_mappings()` | 二つの新provider skill treeを対応するrepo-local targetへmapping |
+| init / update collision boundary | non-identical existing fileを保持し、preflight後のsymlink差し替えでも外部へ書かずfail |
+| managed / legacy inventory | baseline exact tupleから変更なし |
+| old skill prune / Target inventory cutover | 未実施 |
 
-| 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
+## 8. 受け入れ条件クロージャ
+
+| AC | 結果 | 主証跡 |
+|---|---|---|
+| I359-AC-001 | pass | skill tree 2 pairの存在、policy / helperを含むbyte parity |
+| I359-AC-002 | pass | current mapping、init / update collision / race test、inventory定数未変更 |
+| I359-AC-003 | pass | `spec-dock` read order / output / no-go static contract |
+| I359-AC-004 | pass | 三つのCLI side-effect class |
+| I359-AC-005 | pass | bare `doctor`と実在GitHub optionのstatic contract |
+| I359-AC-006 | pass | recognized explicit-only policy、一selector必須、active fallback禁止 |
+| I359-AC-007 | pass | route / title / external dependency contract |
+| I359-AC-008 | pass | 四route parameterized test 4 passed |
+| I359-AC-009 | pass | exactly-one / protected scope不変、safe finalizerのsymlink / inode reuse / `ctime_ns` test |
+| I359-AC-010 | pass | input、route、scope、path、slug、lock negative test |
+| I359-AC-011 | pass | partial Artifact stop / no retry static contract |
+| I359-AC-012 | pass | forbidden reference static contract |
+| I359-AC-013 | pass | docs pointerとprovider / dogfood parity |
+| I359-AC-014 | pass | config parity、TOML parse、exact equalityによりfallback一項目だけを固定 |
+| I359-AC-015 | pass | exact inventory assertion、CLI差分は二skill限定collision preflightのみ |
+| I359-AC-016 | pass | consumer matrix / cutover / prune / publication未実施 |
+| I359-AC-017 | pass | IC-2最小入力を下記へ整理。IC-2 passは未宣言 |
+
+## 9. Issue 360 / IC-2 handoff
+
+### Skill entries
+
+- `spec-dock`: provider / dogfoodの二entry path
+- `spec-dock-grill-with-docs`: provider / dogfoodの二entry path
+
+### External boundary
+
+- 必須: operator-owned `grilling`と`domain-modeling`
+- missing / incompatible: Artifact CLIを呼ばずzero-write
+- repository mutationを要求するexternal output: untrusted dataとして拒否
+
+### Legacy inventory for Issue 360
+
+Managed 18件:
+
+`spec-dock-hub`, `spec-dock-initiative-planning`, `spec-dock-epic-planning`, `spec-dock-epic-execution`, `spec-dock-issue-planning`, `spec-dock-issue-execution`, `spec-dock-chatgpt-authoring`, `spec-dock-initiative-planning-manual`, `spec-dock-epic-planning-manual`, `spec-dock-issue-planning-manual`, `spec-dock-clarification`, `spec-dock-adr-facilitation`, `spec-dock-codex-adapter`, `spec-dock-copilot-adapter`, `git-commit-conventional-ja`, `github-pr-observation`, `github-pr-creator`, `github-pr-merge-preparer`。
+
+Legacy managed 3件:
+
+`spec-driven-tdd-workflow`, `spec-dock-system-architect`, `spec-dock-implementation-planner`。
+
+Issue 360はexact implementation commitでTarget inventory、prune / preserve、fresh / update / uninstall migrationを決定する。Issue 359はIC-2 passを自己宣言しない。
+
+## 10. 最終品質ゲート
+
+初回PR前のFinal QA / Code / Spec reviewはpassしたが、PR #363のlatest-head reviewでP1三件が検出されたためsupersededした。修正後の包括的S99では、最初の判定でadditive materializationのpreflight-to-copy raceをP1一件として検出し、二skill targetをdescriptor-relative no-follow / no-replaceへ変更した。再判定では、書き込みを行わないbyte-identical hard-linked regular fileまで拒否する仕様不一致をP1一件として検出し、existing adoptionからlink-count拒否だけを除去した。symlink差し替えとhard-link adoptionの回帰testを追加した。P2二件は非blockerとしてR/D/P/companionへ統合していない。
+
+最終再判定はStandards / safety軸、Specification軸とも`P0=0 / P1=0 / pass`。その後required Provider CIが検出したinode reuse blockerも、同じfinal gateのclosureとして`ctime_ns` pinと回帰testで修正し、local再検証を通過した。証跡は`artifacts/20260812t150257z-review-issue-359-final-quality-gate.md`。PR latest-headのpush後再観測まではmerge-preparedを主張しない。
+
+D-359-009は上記の過去判定後に行ったユーザー承認済み変更であるため、過去のpassを流用しなかった。今回のworking treeを含むIssue-wide Final QA / Code / Spec reviewでは、config一項目化に加え、親component race、Artifact / parent移動、CLI生成metadata保持をP1として再現・修正した。最終candidateはCode / Spec / QAの三軸すべて`pass`、`P0=0 / P1=0`である。focused 27件、lint、ordinary suite、provider / dogfood parity、config exact、diff check、validateがpassした。P2 / P3は非blockerとして実装・R/D/P/companionへ統合していない。
+
+## 11. PR #363 Repair Batch（進行中）
+
+### 11.1 Batch identity
+
+- `batch_path`: `N/A`
+- Inline理由: Current Storage Coreの`new artifact` catalogは`pr-repair-batch`を受理しないため、merge-preparerの同一body schemaをscope-local `report.md`へ記録する。runtime catalogを本修正のために拡張しない。
+- PR: `https://github.com/chemitaro/spec-dock/pull/363`
+- Base / head: `main` / `iss-00359-replace-managed-workflow-skills-with-specdock-skills`
+- First observed head: `93e2d44bfe9f5fa1bfca3ac533e5bf073a223108`
+- Latest observed head: `0159985c266930519bfce00709f07f0a9477db04`
+- Latest observation: Provider CI run `31610744167`がhelperのinode replacement testでfailure。Codex reviewはcurrent completion signal前、merge conflictなし。
+- Iteration: `iteration_index=2`、`iteration_count=telemetry only`
+
+### 11.2 Raw Intake Inventory
+
+| ID | reported_priority | decided_priority | validity | merge_blocking | need_to_fix | disposition | root_cause_family | status |
 |---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00359 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
+| PR363-P1-001 | P1 | P1 | valid | yes | yes | fix-now | `skill-invocation-policy` | implemented |
+| PR363-P1-002 | P1 | P1 | valid | yes | yes | fix-now | `additive-skill-ownership` | implemented |
+| PR363-P1-003 | P1 | P1 | valid | yes | yes | fix-now | `artifact-finalization-toctou` | implemented |
+| PR363-CI-001 | CI | required-ci | valid | yes | yes | fix-now | `artifact-finalization-inode-reuse` | implemented-local |
 
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+P2 / P3、merge conflict、observation limitationはない。全inventoryをtriage済みとし、P2 / P3由来の変更は行わない。
 
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+### 11.3 Consultation fallback binding
 
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+- `consultation_status`: `consultation_denied`
+- Reason: ユーザーが本実装と今後の修正でChatGPT / Oracleを使用しないよう明示した。
+- `fallback_state`: `approved_for_invocation`
+- `fallback_invocation_id`: `pr-363-issue359-p1-repair-20260812`
+- `fallback_approved_by`: human user
+- `fallback_approved_at`: `2026-08-12T13:45:36Z`
+- `bound_strategy_context`: PR #363 head `93e2d44bfe9f5fa1bfca3ac533e5bf073a223108`の上記P1三familyだけ。新しいfeature、P2 / P3、Target inventory、uninstall、consumer migration、#360責務を含まない。
+- `fallback_manual_analysis_ref`: 本節11.2および11.4
+- `fallback_consumed_at`: `2026-08-12T13:45:36Z`
+- Expiry: この三familyの修正commitをpushし、PR #363のlatest head再観測が完了した時点、またはinventory / strategy / scopeがmaterialに変わった時点の早い方。再利用しない。
 
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+#### CI repair fallback binding
 
-#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
-Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
+- `consultation_status`: `consultation_denied`
+- Reason: ユーザーの明示指示「ChatGPTを使用せずに、自分自身の高度な推論能力を用いて、この実装を完了」に従う。
+- `fallback_state`: `approved_for_invocation`
+- `fallback_invocation_id`: `pr-363-issue359-ci-inode-reuse-20260813`
+- `fallback_approved_by`: human user
+- `fallback_approved_at`: `2026-08-12T15:12:41Z`
+- `bound_strategy_context`: PR #363 head `0159985c266930519bfce00709f07f0a9477db04`のrequired Provider CI failure `PR363-CI-001`だけ。Artifact CLI、planning、P2 / P3、#360責務を含まない。
+- `fallback_manual_analysis_ref`: 本節11.2、11.4および`artifacts/20260812t151202z-disc-pr-repair-unit-pr363-u004-ci-inode-reuse.md`
+- `fallback_consumed_at`: `2026-08-12T15:12:41Z`
+- Expiry: `PR363-CI-001`の修正commitをpushした時点、またはinventory / strategy / scopeがmaterialに変わった時点の早い方。再利用しない。
 
-| グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
-|---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+### 11.4 Orchestrator disposition and integrated strategy
 
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| Family | Disposition | 最小修正 |
+|---|---|---|
+| `skill-invocation-policy` | use | `spec-dock-grill-with-docs/agents/openai.yaml`をprovider / dogfoodへ追加し、`policy.allow_implicit_invocation: false`を正本とする |
+| `additive-skill-ownership` | use | 二skill配下のnew asset targetだけをcollision-aware adoption対象とし、missingまたはbyte-identicalだけを許可し、非同一existing fileは全copy前preflightでfail-closedにする |
+| `artifact-finalization-toctou` | use | skill-local helperでparent directoryとArtifact inodeをpinし、no-follow open後にidentityを再検証してから本文を確定する |
+| `artifact-finalization-inode-reuse` | use | helper identityへ`ctime_ns`を追加し、inodeが再利用されてもtruncate前にreplacementを拒否する |
 
-#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
-| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+- Coupling / order: metadataとhelperをprovider authorityへ追加し、collision preflightはそれらを含む二skill tree全体を保護する。public seamのRED test、最小実装、provider / dogfood projection、R/D/P整合の順で進める。
+- `strategy_delta`: 初回PRはfront matterだけでexplicit invocationを表し、generic copyとpathname直接writeを信頼していた。修正ではrecognized host metadata、pre-copy content collision、dirfd / inode / no-follow finalizationへ境界を移す。
+- Validation: 三seamのfocused test、affected regression、full ordinary suite、lint、parity、sync、validate、一度だけのissue-wide final QA / Code / Spec review、commit / push / latest-head re-observation。
+- Residual boundary: Durable ownership inventory、uninstall migration、旧skill pruneは#360。Artifact CLIのpublic argumentは変更しない。
+- `orchestrator_disposition`: 初回三findingとrequired CI blockerを`use`。修正scopeはP1解消に必要な範囲へ限定する。
+- CI `strategy_delta`: `device + inode`だけのpinから`device + inode + ctime_ns`へ変更し、Linux inode reuseというCI実測条件を識別する。public Artifact CLIとpartial recoveryは変更しない。
 
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+### 11.5 Repair units
 
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-08-07 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
-
-## 最終品質ゲート（Final Quality Gate / 必須）
-
-### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
-|---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
-
-### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
-|---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
-
-### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
-
-### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
-
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
+| Unit | Family | Source | State |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| PR363-U001 | `skill-invocation-policy` | PR363-P1-001 | `artifacts/20260812t134617z-disc-pr-repair-unit-pr363-u001-skill-invocation-policy.md` / implemented, validated, commit `7d303a11` |
+| PR363-U002 | `additive-skill-ownership` | PR363-P1-002 | `artifacts/20260812t134618z-disc-pr-repair-unit-pr363-u002-additive-skill-ownership.md` / implemented, validated, commit `7d303a11` |
+| PR363-U003 | `artifact-finalization-toctou` | PR363-P1-003 | `artifacts/20260812t134618z-01-disc-pr-repair-unit-pr363-u003-artifact-finalization-toctou.md` / implemented, validated, commit `7d303a11` |
+| PR363-U004 | `artifact-finalization-inode-reuse` | PR363-CI-001 | `artifacts/20260812t151202z-disc-pr-repair-unit-pr363-u004-ci-inode-reuse.md` / implemented, validated locally, commit `9bfcecae` |
 
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+### 11.6 Re-observation result
 
-## 学んだこと (任意)
-- ...
+head `0159985c266930519bfce00709f07f0a9477db04`ではProvider CI failureを観測し、current Codex review completion前に停止した。trigger boundaryはcomment `5268667887` / `2026-08-12T15:09:32Z`。PR363-U004修正後のnew latest headを新しいfixed trigger境界で再観測する。
 
-## 今後の推奨事項 (任意)
-- ...
+## 12. D-359-009 Codex config最小化
 
-## 省略/例外メモ (必須)
-- 該当なし
+- Provider authorityとdogfood projectionは、ともに`project_doc_fallback_filenames = [".codex/AGENTS.md"]`の一行だけであり、byte-identicalである。
+- `tomllib.loads()`後のmappingをexact equalityで検証するため、未知の追加keyやtableも回帰として検出する。
+- historical Issue 170 migration testは当時のstale configをtest fixture内で自己完結させ、Current provider configへ旧`developer_instructions`を再導入しない。
+- fresh provider / dogfoodだけを本Issueで変更する。既存consumerのconfig migrationはIssue #360へ渡す。
+- `make lint`とordinary suiteはpassした。Issue 359のpolicy-selected testは`--run-full-regression`で明示実行してpassした。
+- 最終品質ゲート: Code / Spec / QAともpass、P0=0 / P1=0。P2 / P3は非blockerとして未統合。

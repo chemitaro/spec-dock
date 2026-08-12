@@ -14,6 +14,13 @@ Storage Core の操作は、現存する runtime command と次の参照を使�
 
 仕様を作成・更新するときは、[Authoring Kit 概要](authoring/overview.md) から始めます。Requirement、Design、Issue Plan、Report、scope の境界、Artifact の役割を確認できます。
 
+## Repo-local skills
+
+- `.agents/skills/spec-dock/SKILL.md`: 明示targetまたは一意なactive scopeについて、Storage Core、Authoring Kit、正本文書、Artifact、dependency、worktree、Current CLI helpをread-onlyで案内します。
+- `.agents/skills/spec-dock-grill-with-docs/SKILL.md`: 明示selector・route・title・sourceを受け取り、operator-ownedな`grilling`と`domain-modeling`をread-only境界で使用して、scope-local Artifactを一件だけ作成します。両external skillの導入と管理はoperator-ownedで、不足時はrepositoryへ書き込みません。
+
+Artifactのauthorityとrouteは[Artifact Guide](authoring/artifacts.md)を確認してください。CLI syntaxは`./spec-dock/scripts/spec-dock --help`と対象commandのleaf helpをCurrent authorityとして使用します。二つのskillはplanning / review / execution engineではなく、正本文書を自動変更しません。
+
 ## Historical
 
 既存証跡の扱いは [Historical authoring](authoring/historical.md) に分けています。Current の新規作成手順ではありません。

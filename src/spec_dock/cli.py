@@ -19,13 +19,14 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import sys
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from spec_dock import __version__
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
@@ -56,6 +57,10 @@ _LEGACY_MANAGED_SKILL_NAMES = (
     "spec-dock-system-architect",
     "spec-dock-implementation-planner",
 )
+_COLLISION_AWARE_ADDITIVE_SKILL_NAMES = frozenset({
+    "spec-dock",
+    "spec-dock-grill-with-docs",
+})
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
     "# spec-dock runtime (generated)\n"
     "# v2 generated state for agents (SSOT + derived views)\n"
@@ -1668,6 +1673,245 @@ def _build_current_managed_file_mappings(
     return tuple(mappings), source_by_target
 
 
+def _is_collision_aware_additive_skill_path(target_rel: Path) -> bool:
+    parts = target_rel.parts
+    return len(parts) >= 4 and parts[:2] == (".agents", "skills") and parts[2] in _COLLISION_AWARE_ADDITIVE_SKILL_NAMES
+
+
+def _preflight_collision_aware_additive_skill_assets(
+    target_root: Path,
+    *,
+    assets_dir: Path,
+    mappings: tuple[_ManagedCurrentFileMapping, ...],
+) -> None:
+    for mapping in mappings:
+        if not _is_collision_aware_additive_skill_path(mapping.target_rel):
+            continue
+        target_path = target_root / mapping.target_rel
+        if not target_path.exists():
+            if target_path.is_symlink():
+                raise RuntimeError(
+                    "target path conflict for additive skill asset "
+                    f"'{mapping.target_rel.as_posix()}' (dangling symlink)"
+                )
+            continue
+        if target_path.is_symlink() or not target_path.is_file():
+            raise RuntimeError(
+                "target path conflict for additive skill asset "
+                f"'{mapping.target_rel.as_posix()}' (expected an ordinary file)"
+            )
+        source_path = assets_dir / mapping.source_asset_rel
+        if target_path.read_bytes() != source_path.read_bytes():
+            raise RuntimeError(
+                "refusing to overwrite non-identical additive skill asset "
+                f"'{mapping.target_rel.as_posix()}'; preserve or relocate the existing file first"
+            )
+
+
+def _additive_skill_directory_flags() -> int:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if not isinstance(nofollow, int) or not isinstance(directory, int):
+        raise RuntimeError("platform lacks required no-follow directory support for additive skill assets")
+    return os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+
+
+def _open_additive_skill_parent(target_root: Path, target_rel: Path, *, create_missing: bool) -> int:
+    flags = _additive_skill_directory_flags()
+    try:
+        current_fd = os.open(target_root, flags)
+    except OSError as exc:
+        raise RuntimeError(f"cannot open additive skill target root without following symlinks: {exc}") from exc
+
+    try:
+        for component in target_rel.parts[:-1]:
+            try:
+                next_fd = os.open(component, flags, dir_fd=current_fd)
+            except FileNotFoundError:
+                if not create_missing:
+                    raise RuntimeError(
+                        f"missing additive skill parent component '{component}' for '{target_rel.as_posix()}'"
+                    ) from None
+                with suppress(FileExistsError):
+                    os.mkdir(component, dir_fd=current_fd)
+                try:
+                    next_fd = os.open(component, flags, dir_fd=current_fd)
+                except OSError as exc:
+                    raise RuntimeError(
+                        f"unsafe additive skill parent component '{component}' for '{target_rel.as_posix()}': {exc}"
+                    ) from exc
+            except OSError as exc:
+                raise RuntimeError(
+                    f"unsafe additive skill parent component '{component}' for '{target_rel.as_posix()}': {exc}"
+                ) from exc
+            os.close(current_fd)
+            current_fd = next_fd
+        return current_fd
+    except BaseException:
+        os.close(current_fd)
+        raise
+
+
+def _read_file_descriptor(fd: int) -> bytes:
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(fd, 1024 * 64)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+
+
+def _write_file_descriptor(
+    fd: int,
+    content: bytes,
+    *,
+    before_first_write: Callable[[], None] | None = None,
+) -> None:
+    if before_first_write is not None:
+        before_first_write()
+    view = memoryview(content)
+    written = 0
+    while written < len(view):
+        count = os.write(fd, view[written:])
+        if count <= 0:
+            raise RuntimeError("additive skill asset write made no progress")
+        written += count
+
+
+def _require_additive_skill_parent_still_bound(
+    *,
+    target_root: Path,
+    target_rel: Path,
+    parent_fd: int,
+) -> None:
+    try:
+        rebound_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=False)
+    except RuntimeError as exc:
+        raise RuntimeError(
+            f"additive skill parent moved outside the repository for '{target_rel.as_posix()}': {exc}"
+        ) from exc
+    try:
+        opened = os.fstat(parent_fd)
+        rebound = os.fstat(rebound_fd)
+        if (opened.st_dev, opened.st_ino) != (rebound.st_dev, rebound.st_ino):
+            raise RuntimeError(f"additive skill parent moved outside the repository for '{target_rel.as_posix()}'")
+    finally:
+        os.close(rebound_fd)
+
+
+def _verify_existing_additive_skill_asset(
+    *,
+    source_bytes: bytes,
+    target_root: Path,
+    target_rel: Path,
+) -> None:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("platform lacks required no-follow file support for additive skill assets")
+    parent_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=False)
+    file_fd: int | None = None
+    try:
+        try:
+            file_fd = os.open(
+                target_rel.name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise RuntimeError(
+                "target path conflict for additive skill asset "
+                f"'{target_rel.as_posix()}' (symlink or unreadable entry): {exc}"
+            ) from exc
+        info = os.fstat(file_fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise RuntimeError(
+                f"target path conflict for additive skill asset '{target_rel.as_posix()}' (expected an ordinary file)"
+            )
+        if _read_file_descriptor(file_fd) != source_bytes:
+            raise RuntimeError(
+                "refusing to overwrite non-identical additive skill asset "
+                f"'{target_rel.as_posix()}'; preserve or relocate the existing file first"
+            )
+        observed = os.stat(target_rel.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (observed.st_dev, observed.st_ino) != (info.st_dev, info.st_ino):
+            raise RuntimeError(f"target path changed while adopting additive skill asset '{target_rel.as_posix()}'")
+    finally:
+        if file_fd is not None:
+            os.close(file_fd)
+        os.close(parent_fd)
+
+
+def _materialize_collision_aware_additive_skill_asset(
+    *,
+    source_path: Path,
+    target_root: Path,
+    target_rel: Path,
+) -> None:
+    source_bytes = source_path.read_bytes()
+    source_mode = stat.S_IMODE(source_path.stat().st_mode)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("platform lacks required no-follow file support for additive skill assets")
+
+    parent_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=True)
+    file_fd: int | None = None
+    try:
+        _require_additive_skill_parent_still_bound(
+            target_root=target_root,
+            target_rel=target_rel,
+            parent_fd=parent_fd,
+        )
+        try:
+            file_fd = os.open(
+                target_rel.name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                source_mode,
+                dir_fd=parent_fd,
+            )
+        except FileExistsError:
+            os.close(parent_fd)
+            parent_fd = -1
+            _verify_existing_additive_skill_asset(
+                source_bytes=source_bytes,
+                target_root=target_root,
+                target_rel=target_rel,
+            )
+            return
+
+        created = os.fstat(file_fd)
+        if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
+            raise RuntimeError(f"new additive skill asset is not a safe ordinary file: '{target_rel.as_posix()}'")
+        _write_file_descriptor(
+            file_fd,
+            source_bytes,
+            before_first_write=lambda: _require_additive_skill_parent_still_bound(
+                target_root=target_root,
+                target_rel=target_rel,
+                parent_fd=parent_fd,
+            ),
+        )
+        os.fsync(file_fd)
+        _require_additive_skill_parent_still_bound(
+            target_root=target_root,
+            target_rel=target_rel,
+            parent_fd=parent_fd,
+        )
+        observed = os.stat(target_rel.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(observed.st_mode)
+            or observed.st_nlink != 1
+            or (observed.st_dev, observed.st_ino) != (created.st_dev, created.st_ino)
+        ):
+            raise RuntimeError(f"target path changed while creating additive skill asset '{target_rel.as_posix()}'")
+    except OSError as exc:
+        raise RuntimeError(f"cannot safely materialize additive skill asset '{target_rel.as_posix()}': {exc}") from exc
+    finally:
+        if file_fd is not None:
+            os.close(file_fd)
+        if parent_fd >= 0:
+            os.close(parent_fd)
+
+
 def _build_obsolete_exact_rel_paths(
     *,
     manifest: dict[str, Any],
@@ -2009,26 +2253,30 @@ def _preflight_target_path_conflicts(
 def _preflight_managed_skill_install_plan(target_root: Path | None = None) -> _ManagedSkillInstallPlan:
     with _assets_dir() as assets_dir:
         plan = _build_managed_skill_install_plan(assets_dir)
-
-    if target_root is not None:
-        current_target_rel_paths = tuple(
-            sorted(
-                {mapping.target_rel for mapping in plan.current_file_mappings},
-                key=lambda path: path.as_posix(),
+        if target_root is not None:
+            current_target_rel_paths = tuple(
+                sorted(
+                    {mapping.target_rel for mapping in plan.current_file_mappings},
+                    key=lambda path: path.as_posix(),
+                )
             )
-        )
-        obsolete_target_rel_paths = tuple(
-            sorted(
-                set(plan.obsolete_exact_rel_paths),
-                key=lambda path: path.as_posix(),
+            obsolete_target_rel_paths = tuple(
+                sorted(
+                    set(plan.obsolete_exact_rel_paths),
+                    key=lambda path: path.as_posix(),
+                )
             )
-        )
-        _preflight_target_path_conflicts(
-            target_root,
-            current_target_rel_paths=current_target_rel_paths,
-            obsolete_target_rel_paths=obsolete_target_rel_paths,
-            bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
-        )
+            _preflight_target_path_conflicts(
+                target_root,
+                current_target_rel_paths=current_target_rel_paths,
+                obsolete_target_rel_paths=obsolete_target_rel_paths,
+                bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
+            )
+            _preflight_collision_aware_additive_skill_assets(
+                target_root,
+                assets_dir=assets_dir,
+                mappings=plan.current_file_mappings,
+            )
 
     return plan
 
@@ -2060,6 +2308,11 @@ def _apply_managed_skill_install_plan(
         obsolete_target_rel_paths=obsolete_target_rel_paths,
         bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
     )
+    _preflight_collision_aware_additive_skill_assets(
+        target_root,
+        assets_dir=assets_dir,
+        mappings=plan.current_file_mappings,
+    )
 
     for mapping in plan.current_file_mappings:
         source_path = assets_dir / mapping.source_asset_rel
@@ -2069,6 +2322,13 @@ def _apply_managed_skill_install_plan(
         current_sync_plan.append((mapping.target_rel, source_path, target_path))
 
     for target_rel, source_path, target_path in current_sync_plan:
+        if _is_collision_aware_additive_skill_path(target_rel):
+            _materialize_collision_aware_additive_skill_asset(
+                source_path=source_path,
+                target_root=target_root,
+                target_rel=target_rel,
+            )
+            continue
         if target_rel in bootstrap_only_target_rel_paths and target_path.exists():
             if target_path.is_file():
                 _migrate_bootstrap_only_config_if_stale(target_rel, target_path)
@@ -2079,11 +2339,16 @@ def _apply_managed_skill_install_plan(
             )
         _copy_file(source_path, target_path)
 
-    missing_current_targets = [
-        target_rel.as_posix()
-        for target_rel, _source_path, target_path in current_sync_plan
-        if not target_path.is_file()
-    ]
+    missing_current_targets: list[str] = []
+    for target_rel, source_path, target_path in current_sync_plan:
+        if _is_collision_aware_additive_skill_path(target_rel):
+            _verify_existing_additive_skill_asset(
+                source_bytes=source_path.read_bytes(),
+                target_root=target_root,
+                target_rel=target_rel,
+            )
+        elif not target_path.is_file():
+            missing_current_targets.append(target_rel.as_posix())
     if missing_current_targets:
         joined = ", ".join(sorted(missing_current_targets))
         raise RuntimeError(f"managed current sync incomplete (missing target): {joined}")
