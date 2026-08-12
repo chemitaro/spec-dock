@@ -47,7 +47,7 @@ active scopeへのfallbackを許すのは、このread-onlyな`spec-dock`だけ�
 
 ### I359-RQ-003 `spec-dock-grill-with-docs`
 
-`spec-dock-grill-with-docs`は明示的に呼び出された場合だけ動作する。
+`spec-dock-grill-with-docs`は明示的に呼び出された場合だけ動作する。Codex hostでは`agents/openai.yaml`の`policy.allow_implicit_invocation: false`をこの制約の実効policyとする。
 
 利用開始前に、次が一意かつ明示されていなければならない。
 
@@ -92,17 +92,23 @@ active scopeへのfallbackを許すのは、このread-onlyな`spec-dock`だけ�
 
 Issue #359で変更するprovider / dogfood pairは、pairごとにbyte-identicalでなければならない。
 
-### I359-RQ-006 Additive skill asset materialization
+### I359-RQ-006 Collision-safe additive skill asset materialization
 
 Current installerは`install_root`配下の全通常fileをcurrent managed-file mappingへ含める。そのため、二つの新しいprovider `SKILL.md`を`install_root`へ追加すると、既存の汎用copy / uninstall inventory機構からも認識される。
 
-Issue #359では、この結果を二つのrepo-local skillを実体化するためのadditive skill asset materializationとして扱う。
+Issue #359では、この結果を二つのrepo-local skillを実体化するためのadditive skill asset materializationとして扱う。ただし、このPRが新たにclaimする二skill treeのmapped fileは、init / updateの全copy前にcontent collisionを確認する。
+
+* targetが存在しない場合はmaterializeする
+* targetがprovider assetとbyte-identicalな通常fileの場合は安全なadoptionとして継続する
+* targetが非同一の通常fileの場合はuser-ownedの可能性があるため、上書きせずcommand全体をfail-closedにする
+* materialize / adoptはrepository rootからdescriptor-relativeかつno-followで親componentを辿り、new fileはno-replaceで作成する
+* preflight後にtargetまたは親componentがsymlink等へ差し替えられた場合も、外部pathへ書かずfail-closedにする
 
 これは次を意味しない。
 
 * Target managed skill inventoryへのcutover
 * `_MANAGED_SKILL_NAMES`または`_LEGACY_MANAGED_SKILL_NAMES`の変更
-* installer logicの変更
+* 二skill限定collision preflight以外のinstaller logic変更
 * 旧skillのprune
 * fresh / update / uninstall consumer contractの確定
 * installed consumer matrixの実施
@@ -171,11 +177,11 @@ CLIがfile publish前に入力、lock、collision、path safetyその他の理�
 * GitHub state
 * `.codex/config.toml`
 
-Artifact作成commandは一回だけ実行し、二件目のArtifactを作らない。
+Artifact作成commandは一回だけ実行し、二件目のArtifactを作らない。CLI返却pathへの本文確定はskill-local helperを使い、canonical repository-relative form、またはCurrent formatterが付ける一つのrepository basename prefixだけをrepository rootへbindする。各parent componentとfinal fileをno-followで開き、identity取得時のdevice / inodeとwrite時のdevice / inodeが一致する場合だけtruncate / writeする。返却pathnameへ直接writeしない。
 
 ### I359-RQ-011 Partial Artifact recovery
 
-CLIがArtifact pathを作成した後、本文確定または事後確認に失敗した場合、そのfileをpartial Artifactとして残し、自動削除、rename、上書き、retry、第二Artifact作成を行わない。
+CLIがArtifact pathを作成した後、identity取得、安全な本文確定、または事後確認に失敗した場合、そのfileをpartial Artifactとして残し、自動削除、rename、上書き、retry、第二Artifact作成を行わない。symlinkまたはinode差し替えを検出した場合も、差し替え先へwriteせず同じpartial recoveryへ移る。
 
 停止結果には、少なくとも次を含める。
 
@@ -240,7 +246,7 @@ Issue #359では次を行わない。
 
 * `_MANAGED_SKILL_NAMES`の変更
 * `_LEGACY_MANAGED_SKILL_NAMES`の変更
-* installer logicの変更
+* 二skill限定collision preflight以外のinstaller logic変更
 * obsolete inventoryの変更
 * 旧skillの物理削除
 * consumer上のprune
@@ -252,7 +258,8 @@ IC-2へ渡す最小入力は、次に限定する。
 * skillのinput / output / no-go contract
 * external dependencyとmissing dependencyの挙動
 * provider / dogfood parity結果
-* additive skill asset materialization結果
+* collision-safe additive skill asset materialization結果
+* explicit-only policy metadataとsafe finalizerの確認結果
 * docs pointer
 * CLI分類、zero-write、exactly-one、partial recoveryの確認結果
 * `developer_instructions`変更境界
@@ -264,15 +271,15 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 
 | ID          | 条件                                                                                                                            |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| I359-AC-001 | providerとdogfoodの双方に二つの`SKILL.md`が存在し、対応pairがbyte-identicalである                                                                |
-| I359-AC-002 | 二つのprovider `SKILL.md`がCurrent `install_root`全file mappingから認識される一方、managed / legacy managed skill定数とinstaller logicが変更されていない |
+| I359-AC-001 | providerとdogfoodの双方に二つのskill treeが存在し、`SKILL.md`、explicit-only policy metadata、安全確定helperを含む対応fileがbyte-identicalである |
+| I359-AC-002 | 二つのprovider skill treeがCurrent `install_root` mappingから認識され、missing / identicalはno-follow / no-replaceでmaterialize / adoptし、非同一existing fileまたはpreflight後のpath差し替えは外部へ書かずfailする。managed / legacy managed skill定数は変更されていない |
 | I359-AC-003 | `spec-dock`がCurrent scope、docs、Artifact、dependency、worktree、CLI helpを案内し、旧workflowを参照しない                                      |
 | I359-AC-004 | `spec-dock`がCurrent CLI operationをread-only、present-only、forbiddenへ分類する                                                       |
 | I359-AC-005 | bare `doctor`だけがread-only分類にあり、external診断は実在するGitHub関連optionを使うpresent-only invocationとして記載される                                |
-| I359-AC-006 | `spec-dock-grill-with-docs`が明示呼出しと、`--initiative`、`--epic`、`--issue`のいずれか一つの明示selectorを要求し、active fallbackを持たない               |
+| I359-AC-006 | `spec-dock-grill-with-docs`がrecognized Codex policy metadataで暗黙呼出しを禁止し、`--initiative`、`--epic`、`--issue`のいずれか一つの明示selectorを要求し、active fallbackを持たない |
 | I359-AC-007 | `spec-dock-grill-with-docs`が明示route、明示title、operator-ownedな`grilling` / `domain-modeling`を要求する                                |
 | I359-AC-008 | `research`、`interview`、`disc`、`decision-candidate`の基本positive testが各一件成功する                                                    |
-| I359-AC-009 | 成功した一回のgrill実行後、永続差分が新規Artifact Markdown一件だけである                                                                               |
+| I359-AC-009 | 成功した一回のgrill実行後、永続差分が新規Artifact Markdown一件だけであり、本文確定がno-follow / device / inode再検証を通る |
 | I359-AC-010 | selector、scope、bootstrap、external dependency、route、title、path、lockまたはcollisionの主要失敗が、file publish前なら永続差分なしで終了する               |
 | I359-AC-011 | file publish後の失敗について、自動修復せずpartial Artifactを報告する契約がskill本文とtestで固定される                                                         |
 | I359-AC-012 | 新skillがupstream `grill-with-docs`、旧SpecDock skill、provider固有import、`analysis` routeを参照しない                                     |
@@ -288,13 +295,15 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 * `spec-dock-grill-with-docs`のskill contract
 * provider assetとdogfood projection
 * provider / dogfood byte parity
-* Current `install_root`汎用mappingによる二つの新skill assetのadditive materialization
+* Current `install_root`mappingによる二つの新skill assetのcollision-safe additive materialization
 * Current CLI operationの副作用分類
 * explicit Artifact selector、title、route
 * bootstrap preflight
 * zero-write
 * exactly-one Artifact
 * partial Artifact recovery
+* explicit-only Codex policy metadata
+* skill-local no-follow / inode-pinned Artifact finalization
 * 四routeの基本positive test
 * 主要negative test
 * Current docs pointer
@@ -308,7 +317,8 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 * Artifact templateまたはAuthoring Kit本文の変更
 * `_MANAGED_SKILL_NAMES`の変更
 * `_LEGACY_MANAGED_SKILL_NAMES`の変更
-* installer logicまたはobsolete inventoryの変更
+* 二skill限定collision preflight以外のinstaller logic変更
+* durable ownership inventoryまたはuninstall migration
 * Target managed skill inventoryへのcutover
 * 旧skill、adapter、role、PR helperの物理削除
 * fresh / update / uninstall consumer matrix
