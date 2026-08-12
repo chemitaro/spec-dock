@@ -177,11 +177,11 @@ CLIがfile publish前に入力、lock、collision、path safetyその他の理�
 * GitHub state
 * `.codex/config.toml`
 
-Artifact作成commandは一回だけ実行し、二件目のArtifactを作らない。CLI返却pathへの本文確定はskill-local helperを使い、canonical repository-relative form、またはCurrent formatterが付ける一つのrepository basename prefixだけをrepository rootへbindする。各parent componentとfinal fileをno-followで開き、identity取得時のdevice / inodeとwrite時のdevice / inodeが一致する場合だけtruncate / writeする。返却pathnameへ直接writeしない。
+Artifact作成commandは一回だけ実行し、二件目のArtifactを作らない。CLI返却pathへの本文確定はskill-local helperを使い、canonical repository-relative form、またはCurrent formatterが付ける一つのrepository basename prefixだけをrepository rootへbindする。各parent componentとfinal fileをno-followで開き、identity取得時のdevice / inode / `ctime_ns`とwrite直前のidentityが一致する場合だけtruncate / writeする。返却pathnameへ直接writeしない。
 
 ### I359-RQ-011 Partial Artifact recovery
 
-CLIがArtifact pathを作成した後、identity取得、安全な本文確定、または事後確認に失敗した場合、そのfileをpartial Artifactとして残し、自動削除、rename、上書き、retry、第二Artifact作成を行わない。symlinkまたはinode差し替えを検出した場合も、差し替え先へwriteせず同じpartial recoveryへ移る。
+CLIがArtifact pathを作成した後、identity取得、安全な本文確定、または事後確認に失敗した場合、そのfileをpartial Artifactとして残し、自動削除、rename、上書き、retry、第二Artifact作成を行わない。symlinkまたはidentity差し替えを検出した場合も、差し替え先へwriteせず同じpartial recoveryへ移る。
 
 停止結果には、少なくとも次を含める。
 
@@ -279,7 +279,7 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 | I359-AC-006 | `spec-dock-grill-with-docs`がrecognized Codex policy metadataで暗黙呼出しを禁止し、`--initiative`、`--epic`、`--issue`のいずれか一つの明示selectorを要求し、active fallbackを持たない |
 | I359-AC-007 | `spec-dock-grill-with-docs`が明示route、明示title、operator-ownedな`grilling` / `domain-modeling`を要求する                                |
 | I359-AC-008 | `research`、`interview`、`disc`、`decision-candidate`の基本positive testが各一件成功する                                                    |
-| I359-AC-009 | 成功した一回のgrill実行後、永続差分が新規Artifact Markdown一件だけであり、本文確定がno-follow / device / inode再検証を通る |
+| I359-AC-009 | 成功した一回のgrill実行後、永続差分が新規Artifact Markdown一件だけであり、本文確定がno-follow / device / inode / `ctime_ns`再検証を通る |
 | I359-AC-010 | selector、scope、bootstrap、external dependency、route、title、path、lockまたはcollisionの主要失敗が、file publish前なら永続差分なしで終了する               |
 | I359-AC-011 | file publish後の失敗について、自動修復せずpartial Artifactを報告する契約がskill本文とtestで固定される                                                         |
 | I359-AC-012 | 新skillがupstream `grill-with-docs`、旧SpecDock skill、provider固有import、`analysis` routeを参照しない                                     |
@@ -303,7 +303,7 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 * exactly-one Artifact
 * partial Artifact recovery
 * explicit-only Codex policy metadata
-* skill-local no-follow / inode-pinned Artifact finalization
+* skill-local no-follow / device / inode / `ctime_ns`-pinned Artifact finalization
 * 四routeの基本positive test
 * 主要negative test
 * Current docs pointer

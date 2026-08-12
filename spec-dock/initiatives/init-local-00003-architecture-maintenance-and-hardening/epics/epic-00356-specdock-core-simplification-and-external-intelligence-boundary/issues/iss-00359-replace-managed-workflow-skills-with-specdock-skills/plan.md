@@ -29,7 +29,7 @@ ID: "iss-00359"
 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md`                 | provider authorityとなる`spec-dock` contract       |
 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md` | provider authorityとなるgrill integration contract |
 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml` | explicit-only Codex policy metadata |
-| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py` | no-follow / inode-pinned body finalizer |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py` | no-follow / device / inode / `ctime_ns`-pinned body finalizer |
 | `.agents/skills/spec-dock/SKILL.md`                                                   | `spec-dock`のdogfood projection                  |
 | `.agents/skills/spec-dock-grill-with-docs/SKILL.md`                                   | grillのdogfood projection                        |
 | `.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml`                         | invocation policyのdogfood projection            |
@@ -138,7 +138,7 @@ provider `SKILL.md`へ次を実装する。
 * write前に本文を確定する
 * Current CLIによる一回のArtifact作成
 * helper `identity`によるno-follow identity取得
-* helper `finalize`によるdevice / inode再検証後の本文確定
+* helper `finalize`によるdevice / inode / `ctime_ns`再検証後の本文確定
 * 返却pathnameへの直接write禁止
 * exactly-one postcondition
 * zero-write failure
@@ -226,7 +226,7 @@ hostがMarkdown skillを実行することを前提とする次の挙動は、st
 * active target fallback拒否
 * external dependency不足時のzero-write
 * external response内のwrite instruction拒否
-* safe finalizerのsymlink / inode差し替え拒否とpartial Artifactの自動修復禁止
+* safe finalizerのsymlink / inode再利用 / identity差し替え拒否とpartial Artifactの自動修復禁止
 * 二回目のArtifact作成禁止
 
 ### S70 — Handoff確定
@@ -332,7 +332,7 @@ Epic main orchestratorはこれらを親Epic契約と照合する。Issue #359 o
 * bare `doctor`だけがexecute-read-onlyである
 * external doctor診断が実在optionを使うpresent-only invocationとして固定されている
 * grillがrecognized policy metadataでimplicit invocationを拒否し、一つの明示selectorを要求し、active fallbackを持たない
-* grillのexplicit route / title、preflight、zero-write、exactly-one、no-follow / inode-pinned finalization、partial recoveryが固定されている
+* grillのexplicit route / title、preflight、zero-write、exactly-one、no-follow / device / inode / `ctime_ns`-pinned finalization、partial recoveryが固定されている
 * 四routeの基本positive testが成功する
 * 主要negative testがno-writeを確認する
 * 新skillが旧skill、upstream `grill-with-docs`、`analysis`、provider固有importへfallbackしない

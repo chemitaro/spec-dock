@@ -41739,7 +41739,8 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
     assert "./spec-dock/scripts/spec-dock new artifact <route>" in one_write
     assert "scripts/finalize-artifact.py identity" in one_write
     assert "scripts/finalize-artifact.py finalize" in one_write
-    assert "device and inode" in one_write
+    assert "device, inode, and `ctime_ns`" in one_write
+    assert "--expected-ctime-ns <ctime-ns>" in one_write
     assert "Do not write to the returned pathname directly." in one_write
     assert "persistent delta is exactly one new Markdown Artifact" in one_write
 
