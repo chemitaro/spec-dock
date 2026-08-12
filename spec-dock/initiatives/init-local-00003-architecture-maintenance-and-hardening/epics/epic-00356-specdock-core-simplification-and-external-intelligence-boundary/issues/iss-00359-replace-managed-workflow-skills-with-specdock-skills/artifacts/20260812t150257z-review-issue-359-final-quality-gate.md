@@ -25,7 +25,7 @@ reflected_to: ["report.md"]
 - recognized explicit-only policy metadata
 - Current CLI side-effect classificationとgrillのwrite boundary
 - collision-safe additive materialization
-- no-follow / inode-pinned Artifact finalizer
+- no-follow / device / inode / `ctime_ns`-pinned Artifact finalizer
 - Codex developer instructionsの旧workflow責務削除
 - canonical Requirement / Design / Plan、companion、report、test
 
@@ -39,12 +39,16 @@ reflected_to: ["report.md"]
    - additive対象をgeneric `copy2`から分離し、descriptor-relative `O_NOFOLLOW`と`O_CREAT | O_EXCL`、no-follow final verificationへ変更した。
 3. S99 Spec軸がbyte-identical hard-linked regular fileの過剰拒否をP1として検出した。
    - existing adoptionはread-onlyのためlink-count拒否を外し、新規作成fileだけ書込前に`nlink=1`を要求した。
+4. S99後のrequired Provider CIが、Linuxでunlink直後の同名fileへinodeが再利用されるP1相当の安全blockerを検出した。
+   - finalizer identityへ`ctime_ns`を追加し、lstat / open / fstatの三値が一致する場合だけtruncateするよう修正した。
+   - deterministicなctime mismatch testを追加した。これは新しいreview gateではなく、同じ最終gateのrequired CI closureである。
 
 ## Verification
 
-- Issue 359 focused contract: `20 passed`
+- skill-local finalizer contract: `6 passed`
+- Issue 359 focused contract: `21 passed`
 - `make lint`: ruff check / format / mypy pass
-- ordinary `uv run pytest -q`: `1647 passed, 2200 skipped`
+- ordinary `uv run pytest -q`: `1648 passed, 2200 skipped`
 - `spec-dock sync`: pass
 - `spec-dock validate`: pass、`nodes=221`
 - affected full-regression diagnosis: `558 passed, 28 failed`。28件は旧workflow文書、退役済みruntime/API、旧planning asset等の既存契約であり、Issue 359のfocused testには失敗なし。
@@ -56,4 +60,4 @@ reflected_to: ["report.md"]
 | Standards / safety | 0 | 0 | pass |
 | Specification | 0 | 0 | pass |
 
-最終判定は`pass`。Issue 359のscope内に未解消P0 / P1はない。
+local最終判定は`pass`。Issue 359のscope内に未解消P0 / P1はない。latest-headのrequired CIとCodex review完了はpush後のPR観測で確定する。

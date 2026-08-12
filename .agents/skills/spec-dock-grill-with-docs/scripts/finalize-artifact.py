@@ -103,7 +103,16 @@ def _identity(repo_root: str, artifact: str) -> int:
         info = _stat_artifact(parent_fd, parts[-1])
     finally:
         os.close(parent_fd)
-    print(json.dumps({"device": info.st_dev, "inode": info.st_ino}, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "ctime_ns": info.st_ctime_ns,
+                "device": info.st_dev,
+                "inode": info.st_ino,
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 
@@ -123,6 +132,7 @@ def _finalize(
     *,
     expected_device: int,
     expected_inode: int,
+    expected_ctime_ns: int,
 ) -> int:
     body = sys.stdin.buffer.read()
     if not body:
@@ -133,8 +143,8 @@ def _finalize(
     file_fd: int | None = None
     try:
         before = _stat_artifact(parent_fd, parts[-1])
-        expected = (expected_device, expected_inode)
-        observed_before = (before.st_dev, before.st_ino)
+        expected = (expected_device, expected_inode, expected_ctime_ns)
+        observed_before = (before.st_dev, before.st_ino, before.st_ctime_ns)
         if observed_before != expected:
             raise FinalizeError(
                 f"Artifact identity changed before open: expected={expected} observed={observed_before}"
@@ -144,7 +154,7 @@ def _finalize(
         except OSError as exc:
             raise FinalizeError(f"cannot open Artifact without following symlinks: {exc}") from exc
         opened = os.fstat(file_fd)
-        observed_opened = (opened.st_dev, opened.st_ino)
+        observed_opened = (opened.st_dev, opened.st_ino, opened.st_ctime_ns)
         if (
             not stat.S_ISREG(opened.st_mode)
             or opened.st_nlink != 1
@@ -161,8 +171,11 @@ def _finalize(
 
         after = _stat_artifact(parent_fd, parts[-1])
         observed_after = (after.st_dev, after.st_ino)
-        if observed_after != expected:
-            raise FinalizeError(f"Artifact identity changed after write: expected={expected} observed={observed_after}")
+        expected_after = (expected_device, expected_inode)
+        if observed_after != expected_after:
+            raise FinalizeError(
+                f"Artifact identity changed after write: expected={expected_after} observed={observed_after}"
+            )
     finally:
         if file_fd is not None:
             os.close(file_fd)
@@ -187,6 +200,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     add_path_arguments(finalize)
     finalize.add_argument("--expected-device", type=int, required=True)
     finalize.add_argument("--expected-inode", type=int, required=True)
+    finalize.add_argument("--expected-ctime-ns", type=int, required=True)
     return parser.parse_args(argv)
 
 
@@ -200,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
             args.artifact,
             expected_device=args.expected_device,
             expected_inode=args.expected_inode,
+            expected_ctime_ns=args.expected_ctime_ns,
         )
     except (FinalizeError, OSError) as exc:
         print(

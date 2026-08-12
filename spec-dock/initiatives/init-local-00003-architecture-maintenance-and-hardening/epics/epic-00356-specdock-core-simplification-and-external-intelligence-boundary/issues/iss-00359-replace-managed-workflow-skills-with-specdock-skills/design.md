@@ -261,8 +261,8 @@ slugはCurrent CLIのoptional inputのままとする。titleから安全なslug
   [--slug <slug>]
 ```
 
-10. CLIが返したexact path textについて、skill-local helperの`identity`を使い、canonical repository-relative formまたはCurrent formatterの一つのrepository basename prefixだけをrepository rootへbindし、no-follow traversalでdevice / inodeを取得する。
-11. 同helperの`finalize`へdevice / inodeとmemory上の本文をstdinで渡す。helperはparent componentをdirfd + `O_NOFOLLOW`で開き、final fileのlstat / open / fstat identityが一致した場合だけtruncate / write / fsyncする。
+10. CLIが返したexact path textについて、skill-local helperの`identity`を使い、canonical repository-relative formまたはCurrent formatterの一つのrepository basename prefixだけをrepository rootへbindし、no-follow traversalでdevice / inode / `ctime_ns`を取得する。
+11. 同helperの`finalize`へdevice / inode / `ctime_ns`とmemory上の本文をstdinで渡す。helperはparent componentをdirfd + `O_NOFOLLOW`で開き、final fileのlstat / open / fstat identityが一致した場合だけtruncate / write / fsyncする。write後はctimeの更新を許容し、pathが同じdevice / inodeを指すことを確認する。
 12. exactly-one postconditionを確認する。
 13. exact pathとrouteをoperatorへ返す。
 
@@ -302,7 +302,7 @@ Artifact CLIがpublish前に拒否
 
 ### 6.3 Exactly-one
 
-成功後の`artifacts/` snapshot差分は、CLIが返した新規Markdown file一件だけでなければならない。本文確定前にhelperのidentityを取得し、finalize時に同じdevice / inodeであることを再検証する。final pathまたはancestorがsymlinkの場合、またはinodeが変わった場合はwriteしない。
+成功後の`artifacts/` snapshot差分は、CLIが返した新規Markdown file一件だけでなければならない。本文確定前にhelperのidentityを取得し、finalize時に同じdevice / inode / `ctime_ns`であることを再検証する。final pathまたはancestorがsymlinkの場合、またはidentityが変わった場合はwriteしない。
 
 次のいずれかが検出された場合、成功と報告しない。
 

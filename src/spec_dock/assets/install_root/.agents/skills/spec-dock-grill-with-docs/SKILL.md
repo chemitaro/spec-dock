@@ -82,7 +82,7 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
      --artifact <exact-returned-relative-path>
    ```
 
-   Accept only its exact JSON `device` and `inode` values.
+   Accept only its exact JSON `device`, `inode`, and `ctime_ns` values.
 7. Pass the already-finalized body through stdin to the helper's finalize command, with no shell interpolation:
 
    ```text
@@ -90,10 +90,11 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
      --repo-root <absolute-repository-root> \
      --artifact <exact-returned-relative-path> \
      --expected-device <device> \
-     --expected-inode <inode>
+     --expected-inode <inode> \
+     --expected-ctime-ns <ctime-ns>
    ```
 
-   The helper traverses parent components without following symlinks and verifies the same device and inode before truncating or writing. Do not write to the returned pathname directly.
+   The helper traverses parent components without following symlinks and verifies the same device, inode, and `ctime_ns` before truncating or writing. Do not write to the returned pathname directly.
 8. Verify that the persistent delta is exactly one new Markdown Artifact and that pre-existing Artifact entries and protected scope files are unchanged.
 9. Return the exact path, route, title, and evidence/draft authority to the operator.
 

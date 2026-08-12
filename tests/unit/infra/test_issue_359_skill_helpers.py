@@ -50,7 +50,7 @@ def _identity(repo_root: Path) -> dict[str, int]:
     )
     assert result.returncode == 0, result.stderr.decode()
     payload = json.loads(result.stdout)
-    assert set(payload) == {"device", "inode"}
+    assert set(payload) == {"ctime_ns", "device", "inode"}
     return payload
 
 
@@ -66,6 +66,8 @@ def _finalize(repo_root: Path, identity: dict[str, int], body: bytes) -> subproc
         str(identity["device"]),
         "--expected-inode",
         str(identity["inode"]),
+        "--expected-ctime-ns",
+        str(identity["ctime_ns"]),
         body=body,
     )
 
@@ -114,6 +116,33 @@ def test_issue_359_finalizer_rejects_inode_replacement_without_truncating_it(
 
     assert result.returncode != 0
     assert artifact.read_bytes() == b"replacement\n"
+    assert b"identity changed" in result.stderr
+
+
+def test_issue_359_finalizer_rejects_ctime_mismatch_when_device_inode_match(
+    tmp_path: Path,
+) -> None:
+    artifact = _create_artifact(tmp_path)
+    original = _identity(tmp_path)
+
+    result = _run_helper(
+        tmp_path,
+        "finalize",
+        "--repo-root",
+        str(tmp_path),
+        "--artifact",
+        _ARTIFACT_REL.as_posix(),
+        "--expected-device",
+        str(original["device"]),
+        "--expected-inode",
+        str(original["inode"]),
+        "--expected-ctime-ns",
+        str(original["ctime_ns"] + 1),
+        body=b"unsafe\n",
+    )
+
+    assert result.returncode != 0
+    assert artifact.read_bytes() == b"template\n"
     assert b"identity changed" in result.stderr
 
 
@@ -172,6 +201,8 @@ def test_issue_359_helper_accepts_current_cli_prefix_for_repo_named_spec_dock(
         str(identity["device"]),
         "--expected-inode",
         str(identity["inode"]),
+        "--expected-ctime-ns",
+        str(identity["ctime_ns"]),
         body=b"# Final body\n",
     )
     assert finalize_result.returncode == 0, finalize_result.stderr.decode()
