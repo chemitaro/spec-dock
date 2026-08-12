@@ -12,20 +12,28 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Design / Planはすべてfresh review passでapprovedである。実装、commit、push、formal `issue start`、PR、Issue close、IC-3判定は未実施である。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Design / Planはすべてfresh review passでapprovedであり、planning commit / pushとformal `issue start`を完了した。実装、ChatGPT-SpecReview-Strict、PR、Issue close、IC-3判定は未実施である。
 
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
-* Current integrated HEAD: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
+* Integrated main baseline: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
-* Current branch upstream: `origin/iss-00359-replace-managed-workflow-skills-with-specdock-skills`（first Issue 360 push時に正しいupstream設定が必要）
+* Initial approved planning commit: `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
+* Current branch upstream: `origin/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
+* Push verification at planning commit: local `HEAD` = upstream = `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * `origin/main` merge: fast-forward success、Issue 360文書差分を保持
 * `active set iss-00360`: success
 * Initial `issue start iss-00360`: dependency `iss-00359`未完了でblocked
 * Post-merge dependency check: `ready=true`、blockers=0
 * Post-merge `issue start iss-00360`: 未コミットIssue 360文書を保護するcheckout safetyで停止。active selection unchanged
+* Approved planning docs / IC evidence commit: success、対象7 pathだけ、commit `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
+* Issue 360 branch first push / same-name upstream setup: success
+* Formal `issue start iss-00360`: success。Issue checkoutはcurrent Issue 360 branch、auto-sync success
+* Post-start active context: Initiative `init-local-00003`、Epic `epic-00356`、Issue `iss-00360`
+* Post-start dependency: `ready=true`、blockers 0、authority `github`、effective status `open`
+* Post-start validation: `spec-dock: ok (validate) nodes=221`
 * ChatGPT-Use-Strict: GitHub connectorで`chemitaro/spec-dock` `main` = `a6ded0d9a838b40cdcd741fa473cd264b801f245`を検証し、session `required-strict-github-connector-verificati-65`、resolved model `5.5Pro`でR/D/P authoring案を取得。main orchestratorがrepository factsとIC evidenceへ照合して正本候補へ統合
 * Requirement fresh spec review: round 1 / round 2 fail、round 3 pass（P0/P1なし）
 * Design fresh spec review: round 1 / round 2 fail、round 3 pass（P0/P1なし、confidence 0.98）
@@ -36,8 +44,8 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。実装開始前にはCurrent branch HEADとTarget二skillのexact inventoryをもう一度lockする。
-* Formal `issue start`はdependency上は実行可能になったが、文書差分をcommit / stashせずにcheckoutしない安全契約により未完了である。現在のactive contextはplanning selection stateである。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録した。Requirement / Design / Plan reviewはpass。残るplanning blockerはcommit / push、formal start、clean upstream HEADでのStrict final reviewである。
+* Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design / Plan review、commit / push、formal startを完了した。残るplanning blockerはこのlifecycle evidence commitとclean exact-upstream HEADでのStrict final reviewである。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
@@ -179,4 +187,4 @@ Fresh reviewerは、retained `.github/workflows/ci.yml`が利用者所有の同�
 
 ### Lifecycle state
 
-初回`issue start`はdependency readinessを満たさず実行開始を拒否した。利用者が指定したfallbackに従い、`active set iss-00360`でIssue 360を選択し、ユーザーがIssue 359 branchからIssue 360 branchを作成した。Issue 359 merge後はdependency `ready=true`となったが、再試行はdirty worktree safetyで停止した。IC-1 / IC-2はその後passを記録したものの、formal lifecycle startとplanning reviewは別途完了させる。
+初回`issue start`はdependency readinessを満たさず実行開始を拒否した。利用者が指定したfallbackに従い、`active set iss-00360`でIssue 360を選択し、ユーザーがIssue 359 branchからIssue 360 branchを作成した。Issue 359 merge後はdependency `ready=true`となったが、再試行はdirty worktree safetyで停止した。IC-1 / IC-2とR/D/P reviewを閉じ、planning commitを同名upstreamへpushした後、formal `issue start iss-00360`を再実行してIssue checkout / auto-syncを含めsuccessした。Post-startもactive Issue、dependency、validation、local / upstream SHAを実測している。
