@@ -72,7 +72,7 @@ Issue 359 focused contract 20件、ordinary suite 1647件、lintがpassした。
 
 ## Commit Evidence
 
-pending
+Implementation commit: `7d303a11c79c7803eeb48593dc11fc4931a66544`。recognized policy metadata、provider / dogfood parity、focused / ordinary test、final gateを同commitへ含む。
 
 ## Re-observation Result
 

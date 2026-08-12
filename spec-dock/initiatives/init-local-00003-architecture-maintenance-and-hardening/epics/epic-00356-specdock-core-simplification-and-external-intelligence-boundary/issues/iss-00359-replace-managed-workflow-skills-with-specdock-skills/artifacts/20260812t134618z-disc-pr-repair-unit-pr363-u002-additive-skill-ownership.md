@@ -73,7 +73,7 @@ Target inventory cutover、ownership manifest、旧skill prune、consumer migrat
 
 ## Commit Evidence
 
-pending
+Implementation commit: `7d303a11c79c7803eeb48593dc11fc4931a66544`。collision / race / hard-link adoption test、descriptor-relative materialization、R/D/P整合を同commitへ含む。
 
 ## Re-observation Result
 
