@@ -72,7 +72,7 @@ helperのpublic behavior 5件を含むIssue 359 focused contract 20件、ordinar
 
 ## Commit Evidence
 
-pending
+Implementation commit: `7d303a11c79c7803eeb48593dc11fc4931a66544`。safe finalizer、provider / dogfood parity、helper public behavior test、final gateを同commitへ含む。
 
 ## Re-observation Result
 
