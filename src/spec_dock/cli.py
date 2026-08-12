@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 from spec_dock import __version__
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
@@ -1761,7 +1761,14 @@ def _read_file_descriptor(fd: int) -> bytes:
         chunks.append(chunk)
 
 
-def _write_file_descriptor(fd: int, content: bytes) -> None:
+def _write_file_descriptor(
+    fd: int,
+    content: bytes,
+    *,
+    before_first_write: Callable[[], None] | None = None,
+) -> None:
+    if before_first_write is not None:
+        before_first_write()
     view = memoryview(content)
     written = 0
     while written < len(view):
@@ -1769,6 +1776,27 @@ def _write_file_descriptor(fd: int, content: bytes) -> None:
         if count <= 0:
             raise RuntimeError("additive skill asset write made no progress")
         written += count
+
+
+def _require_additive_skill_parent_still_bound(
+    *,
+    target_root: Path,
+    target_rel: Path,
+    parent_fd: int,
+) -> None:
+    try:
+        rebound_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=False)
+    except RuntimeError as exc:
+        raise RuntimeError(
+            f"additive skill parent moved outside the repository for '{target_rel.as_posix()}': {exc}"
+        ) from exc
+    try:
+        opened = os.fstat(parent_fd)
+        rebound = os.fstat(rebound_fd)
+        if (opened.st_dev, opened.st_ino) != (rebound.st_dev, rebound.st_ino):
+            raise RuntimeError(f"additive skill parent moved outside the repository for '{target_rel.as_posix()}'")
+    finally:
+        os.close(rebound_fd)
 
 
 def _verify_existing_additive_skill_asset(
@@ -1828,6 +1856,11 @@ def _materialize_collision_aware_additive_skill_asset(
     parent_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=True)
     file_fd: int | None = None
     try:
+        _require_additive_skill_parent_still_bound(
+            target_root=target_root,
+            target_rel=target_rel,
+            parent_fd=parent_fd,
+        )
         try:
             file_fd = os.open(
                 target_rel.name,
@@ -1848,8 +1881,21 @@ def _materialize_collision_aware_additive_skill_asset(
         created = os.fstat(file_fd)
         if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
             raise RuntimeError(f"new additive skill asset is not a safe ordinary file: '{target_rel.as_posix()}'")
-        _write_file_descriptor(file_fd, source_bytes)
+        _write_file_descriptor(
+            file_fd,
+            source_bytes,
+            before_first_write=lambda: _require_additive_skill_parent_still_bound(
+                target_root=target_root,
+                target_rel=target_rel,
+                parent_fd=parent_fd,
+            ),
+        )
         os.fsync(file_fd)
+        _require_additive_skill_parent_still_bound(
+            target_root=target_root,
+            target_rel=target_rel,
+            parent_fd=parent_fd,
+        )
         observed = os.stat(target_rel.name, dir_fd=parent_fd, follow_symlinks=False)
         if (
             not stat.S_ISREG(observed.st_mode)
