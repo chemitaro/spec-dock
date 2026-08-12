@@ -37,7 +37,7 @@ providerを先に実装し、dogfoodへbyte-identicalに反映する。
 
 grillは`--initiative`、`--epic`、`--issue`のいずれか一つの明示selectorを必須とし、active scopeへfallbackしない。
 
-grillの暗黙呼出しは`agents/openai.yaml`で禁止する。成功時に許される永続差分は、対象scopeの新規Artifact Markdown一件だけである。本文はskill-local finalizerがno-follow / device / inode再検証後に確定する。`grilling`と`domain-modeling`はoperator-ownedであり、repositoryへ直接書き込ませない。
+grillの暗黙呼出しは`agents/openai.yaml`で禁止する。成功時に許される永続差分は、対象scopeの新規Artifact Markdown一件だけである。本文はskill-local finalizerがno-follow / device / inode / `ctime_ns`再検証後に確定する。`grilling`と`domain-modeling`はoperator-ownedであり、repositoryへ直接書き込ませない。
 
 ## Provider assetの境界
 
