@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Design / Planはすべてfresh review passでapprovedであり、planning commit / pushとformal `issue start`を完了した。実装、ChatGPT-SpecReview-Strict、PR、Issue close、IC-3判定は未実施である。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Design / Planはすべてfresh review passでapprovedであり、planning commit / pushとformal `issue start`を完了した。ChatGPT-SpecReview-Strict round 1はexact upstream SHA `e7520e6a433c0b6345b4f52f1172c32f56fad9d3`を検証した上で、Requirement / Designに残ったformal start前のhistorical statusをP1として検出した。現在地の同期修正後、fresh exact-upstream re-reviewを行う。実装、PR、Issue close、IC-3判定は未実施である。
 
 ## Verification
 
@@ -38,6 +38,8 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * Requirement fresh spec review: round 1 / round 2 fail、round 3 pass（P0/P1なし）
 * Design fresh spec review: round 1 / round 2 fail、round 3 pass（P0/P1なし、confidence 0.98）
 * Plan fresh spec review: round 1 / round 2 fail、round 3 pass（P0/P1なし、confidence 0.99）
+* ChatGPT-SpecReview-Strict pre-submit attempt: session `required-strict-github-connector-verificati-66`はrate-limit dialogで停止。`promptSubmitted=false`、conversation IDなし、leaseなしでreview未成立
+* ChatGPT-SpecReview-Strict round 1: session `required-strict-github-connector-verificati-67`、GitHub connectorでcurrent branch exact SHA `e7520e6a433c0b6345b4f52f1172c32f56fad9d3`を検証、resolved model `GPT-5.5` verified。Lifecycle current-state矛盾1件をP1として`fail`
 * IC-1 fresh verification: Storage Core `4 passed`、S09 Authoring Kit `23 passed`、Fresh node / Artifact `3 passed`
 * IC-2 fresh verification: Issue 359 static / collision `11 passed`、finalizer `9 passed`、route / zero-write `7 passed`
 
@@ -45,7 +47,7 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。実装開始前にはCurrent branch HEADとTarget二skillのexact inventoryをもう一度lockする。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design / Plan review、commit / push、formal startを完了した。残るplanning blockerはこのlifecycle evidence commitとclean exact-upstream HEADでのStrict final reviewである。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design / Plan review、commit / push、formal startを完了した。残るplanning blockerはlifecycle current-state同期修正のcommit / pushと、そのclean exact-upstream HEADでのStrict re-reviewである。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
@@ -118,7 +120,15 @@ Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-
 | Requirement | `spec-reviewer` | fresh round 3 | passed | none | Requirement approved |
 | Design | `spec-reviewer` | fresh round 3 | passed | none | Design approved |
 | Plan | `spec-reviewer` | fresh round 3 | passed | none | Plan approved。Git/lifecycle/Strict gateへ進む |
-| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | not run | pending | none | commit / push / formal start後までimplementation block |
+| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | fresh round 1 | failed | none | `e7520e6a…`でlifecycle current-state矛盾をP1検出。Requirement / Design同期修正をcommit / push後、fresh exact-SHA re-review |
+
+### ChatGPT-SpecReview-Strict round 1
+
+Pre-submit session `required-strict-github-connector-verificati-66`はChatGPTのrate-limit dialog再表示で停止した。Recovery診断では`promptSubmitted=false`、conversation IDなし、leaseなしであり、review結果として数えない。共有Pro sessionのterminal完了後、new-submission gateを満たすことを確認してfresh reviewを開始した。
+
+Session `required-strict-github-connector-verificati-67`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `e7520e6a433c0b6345b4f52f1172c32f56fad9d3`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。Requirement / Designにformal start前のcheckout-safety停止とreview未完了が現在形で残る一方、Report / Planはformal startとphase reviewの成功を記録しているため、S00の現在地が一意でないというP1を1件検出し、`review_status=fail`となった。
+
+Findingはrepository factsと一致したため採用し、Requirement I360-RQ-001とDesign §1を最新lifecycle evidenceへ同期した。Product scope、migration contract、acceptance criteria、implementation stepは変更していない。修正commitを同名upstreamへpushし、別のfresh Strict conversationでexact-SHA re-reviewするまでimplementation blockを維持する。
 
 ### Design review round 1
 
