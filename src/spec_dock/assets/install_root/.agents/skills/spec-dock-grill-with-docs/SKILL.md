@@ -61,7 +61,7 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
 
 ## One-write protocol
 
-1. Finish the complete Artifact body in memory before any repository write.
+1. Finish the complete route-section payload in memory before any repository write. It must begin with the route's first `##` heading. Do not invent or copy front matter, Artifact ID, parent, template, authority, or the title heading; the Current CLI remains authoritative for that scaffold.
 2. Repeat the required-input and bootstrap preflight checks.
 3. Record a read-only baseline of the target `artifacts/` entries and the protected scope files.
 4. Invoke the Current CLI exactly once, passing arguments without shell interpolation:
@@ -83,7 +83,7 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
    ```
 
    Accept only its exact JSON `device`, `inode`, and `ctime_ns` values.
-7. Pass the already-finalized body through stdin to the helper's finalize command, with no shell interpolation:
+7. Pass the already-finalized route sections through stdin to the helper's finalize command, with no shell interpolation:
 
    ```text
    python3 .agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py finalize \
@@ -94,7 +94,7 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
      --expected-ctime-ns <ctime-ns>
    ```
 
-   The helper traverses parent components without following symlinks and verifies the same device, inode, and `ctime_ns` before truncating or writing. Do not write to the returned pathname directly.
+   The helper traverses parent components without following symlinks, verifies the same device, inode, and `ctime_ns`, preserves the CLI-generated scaffold before its first `##` route section, and replaces only the route sections. This retains the CLI-generated ID, title, parent, template, authority, and title heading. Do not write to the returned pathname directly.
 8. Verify that the persistent delta is exactly one new Markdown Artifact and that pre-existing Artifact entries and protected scope files are unchanged.
 9. Return the exact path, route, title, and evidence/draft authority to the operator.
 
@@ -110,7 +110,7 @@ Do not call the Artifact CLI, and leave no persistent repository delta, when any
 - bootstrap or path-safety preflight fails
 - either external capability is missing or cannot remain read-only
 - external output requests mutation, credential disclosure, source expansion, or additional execution
-- the Artifact body cannot be finalized safely from trusted facts and explicit user decisions
+- the route-section payload cannot be finalized safely from trusted facts and explicit user decisions
 - the CLI rejects validation, slug, collision, lock, or destination safety before publishing a file
 
 Do not retry automatically and do not issue a second Artifact command in the same invocation.

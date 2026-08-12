@@ -5,7 +5,7 @@ ID: "iss-00359"
 関連GitHub: ["#359"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-12"
+最終更新: "2026-08-13"
 依存: ["requirement.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -59,7 +59,7 @@ Current docs entrypointは、次をcontext pointerとして示す。
 | ------------------------------------------------------ | -------------------- |
 | `src/spec_dock/assets/install_root/.codex/config.toml` | `.codex/config.toml` |
 
-変更後の各provider / dogfood pairはbyte-identicalとする。
+configは`project_doc_fallback_filenames = [".codex/AGENTS.md"]`だけを持つ。変更後のprovider / dogfood pairはbyte-identicalとする。
 
 ### 2.4 Additive materialization境界
 
@@ -74,7 +74,7 @@ Current installerは次の順序で`install_root`を扱う。
 
 したがって、二つのprovider skill treeを`install_root`へ追加すると、既存の汎用managed-file mappingを通じてcurrent init / update copyとuninstall inventoryから認識される。
 
-Issue #359では、この機械的帰結をcollision-safe additive skill asset materializationとして受け入れる。新規targetはno-replaceで作成し、providerとbyte-identicalなexisting targetはread-only adoptionとし、非同一existing targetはuser-ownedの可能性があるため全copy前にfail-closedとする。preflight後のsymlink / path差し替えもdescriptor-relative no-follow処理で拒否する。判定は二skill treeへ限定し、generic ownership modelは作らない。
+Issue #359では、この機械的帰結をcollision-safe additive skill asset materializationとして受け入れる。新規targetはno-replaceで作成し、providerとbyte-identicalなexisting targetはread-only adoptionとし、非同一existing targetはuser-ownedの可能性があるため全copy前にfail-closedとする。preflight後のsymlink / path差し替えもdescriptor-relative no-follow処理で拒否する。open済みparentは最初のdata writeを行う関数内とwrite後にrepository rootから再openしたidentityと照合する。移動を検出した後はpathname cleanupを行わず、repo内で作成後に外部actorが移動した空のowned entryを保持し、user replacementを削除しない。判定は二skill treeへ限定し、generic ownership modelは作らない。
 
 Issue #359は次を変更しない。
 
@@ -249,7 +249,7 @@ slugはCurrent CLIのoptional inputのままとする。titleから安全なslug
 3. 許可されたlocal sourceだけを読む。
 4. `grilling`と`domain-modeling`をread-onlyで使用する。
 5. 外部応答を未信頼データとして検査する。
-6. Artifact本文をmemory上で確定する。
+6. route contractを満たす`##` section payloadをmemory上で確定する。CLIが生成するfront matter、Artifact ID、title、parent、template、authority、title headingはpayloadへ複製しない。
 7. write直前に明示selectorとbootstrapを再確認する。
 8. 対象scopeの`artifacts/`をsnapshotする。
 9. 次のCurrent CLIを一回だけ実行する。
@@ -262,7 +262,7 @@ slugはCurrent CLIのoptional inputのままとする。titleから安全なslug
 ```
 
 10. CLIが返したexact path textについて、skill-local helperの`identity`を使い、canonical repository-relative formまたはCurrent formatterの一つのrepository basename prefixだけをrepository rootへbindし、no-follow traversalでdevice / inode / `ctime_ns`を取得する。
-11. 同helperの`finalize`へdevice / inode / `ctime_ns`とmemory上の本文をstdinで渡す。helperはparent componentをdirfd + `O_NOFOLLOW`で開き、final fileのlstat / open / fstat identityが一致した場合だけtruncate / write / fsyncする。write後はctimeの更新を許容し、pathが同じdevice / inodeを指すことを確認する。
+11. 同helperの`finalize`へdevice / inode / `ctime_ns`とmemory上のroute sectionをstdinで渡す。helperはparent componentをdirfd + `O_NOFOLLOW`で開き、write直前にrepository rootからparent chainを再openして保持中parent fdと照合し、final fileのlstat / open / fstat identityも再確認する。CLI scaffoldの最初の`##`より前を保持してroute sectionだけを置換し、truncate / write / fsyncする。write後はctimeの更新を許容し、pathが同じdevice / inodeを指すことを確認する。
 12. exactly-one postconditionを確認する。
 13. exact pathとrouteをoperatorへ返す。
 
@@ -302,7 +302,7 @@ Artifact CLIがpublish前に拒否
 
 ### 6.3 Exactly-one
 
-成功後の`artifacts/` snapshot差分は、CLIが返した新規Markdown file一件だけでなければならない。本文確定前にhelperのidentityを取得し、finalize時に同じdevice / inode / `ctime_ns`であることを再検証する。final pathまたはancestorがsymlinkの場合、またはidentityが変わった場合はwriteしない。
+成功後の`artifacts/` snapshot差分は、CLIが返した新規Markdown file一件だけでなければならない。本文確定前にhelperのidentityを取得し、finalize時に同じdevice / inode / `ctime_ns`であることを再検証する。CLI生成metadataとtitle headingを保持し、final pathまたはancestorがsymlinkの場合、またはidentityが変わった場合はwriteしない。
 
 次のいずれかが検出された場合、成功と報告しない。
 
@@ -328,32 +328,24 @@ partial Artifact
 
 operatorが回収を完了するまで、同じ実行を継続しない。
 
-## 7. `developer_instructions`変更境界
+## 7. Codex configの最小化境界
 
-`developer_instructions`から削除するのは、旧SpecDock workflow固有の次の意味を持つ条項だけとする。
+provider configは次の一行だけを持つ。
 
-* SpecDock command操作を`spec-manager`へ原則委任する
-* SpecDock workflow依頼をnamed sub-agent / reviewer利用の包括的許可とみなす
-* active repo / worktree / SpecDock scopeを根拠にrole別・phase別の許可確認を不要とする
-* 上記の英語・日本語重複
+```toml
+project_doc_fallback_filenames = [".codex/AGENTS.md"]
+```
 
-次を保持する。
+この設定はrepository-localな`.codex/AGENTS.md`をproject documentation fallbackとして見つけるためだけに残す。次はprovider configで規定せず、利用者のCodex設定へ委ねる。
 
-* main agentの人間インターフェース責務
-* requirement / design / planの整理
-* 一般的なsub-agent routing
-* bounded task、委任入力、成果統合
-* 調査、事実・推定・未解決の分離
-* 最小変更、安全性、検証
-* review結果の一般的な扱い
-* main agent自身の直接編集境界
-* session運用
+* `developer_instructions`
 * `personality`
-* `project_doc_fallback_filenames`
-* `[agents]`
+* modelとreasoning
+* `[agents]`によるthread / depth設定
 * `[mcp_servers.*]`
+* その他のCodex設定項目
 
-変更後、providerとdogfoodのTOML全体をbyte-identicalにする。
+providerとdogfoodのTOML全体をbyte-identicalにする。Issue #359はfresh provider / dogfood contractだけを変更し、既存consumerに残る旧configの削除またはmigrationはIssue #360へ渡す。
 
 ## 8. Handoff境界
 

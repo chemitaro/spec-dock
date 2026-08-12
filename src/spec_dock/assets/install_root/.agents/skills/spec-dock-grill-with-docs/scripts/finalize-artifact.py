@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safely finalize one CLI-published SpecDock Artifact."""
+"""Safely merge route sections into one CLI-published SpecDock Artifact."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _directory_flags() -> int:
 
 
 def _file_flags() -> int:
-    return os.O_WRONLY | _required_flag("O_NOFOLLOW") | getattr(os, "O_CLOEXEC", 0)
+    return os.O_RDWR | _required_flag("O_NOFOLLOW") | getattr(os, "O_CLOEXEC", 0)
 
 
 def _artifact_parts(raw: str, repo_root: str) -> tuple[str, ...]:
@@ -96,6 +96,20 @@ def _stat_artifact(parent_fd: int, filename: str) -> os.stat_result:
     return info
 
 
+def _require_parent_still_bound(repo_root: str, parts: tuple[str, ...], parent_fd: int) -> None:
+    try:
+        rebound_fd = _open_parent(repo_root, parts)
+    except FinalizeError as exc:
+        raise FinalizeError(f"Artifact parent moved outside the repository: {exc}") from exc
+    try:
+        opened = os.fstat(parent_fd)
+        rebound = os.fstat(rebound_fd)
+        if (opened.st_dev, opened.st_ino) != (rebound.st_dev, rebound.st_ino):
+            raise FinalizeError("Artifact parent moved outside the repository")
+    finally:
+        os.close(rebound_fd)
+
+
 def _identity(repo_root: str, artifact: str) -> int:
     parts = _artifact_parts(artifact, repo_root)
     parent_fd = _open_parent(repo_root, parts)
@@ -124,6 +138,35 @@ def _write_all(fd: int, body: bytes) -> None:
         if count <= 0:
             raise FinalizeError("Artifact write made no progress")
         written += count
+
+
+def _read_all(fd: int) -> bytes:
+    os.lseek(fd, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(fd, 1024 * 64)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+
+
+def _merge_scaffold_with_sections(scaffold: bytes, sections: bytes) -> bytes:
+    if not sections.startswith(b"## "):
+        raise FinalizeError("final Artifact input must begin with a level-two route section")
+    try:
+        scaffold.decode("utf-8")
+        sections.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise FinalizeError("Artifact scaffold and route sections must be valid UTF-8") from exc
+    if not scaffold.startswith(b"---\n") or b"\n---\n" not in scaffold[4:]:
+        raise FinalizeError("CLI-generated Artifact scaffold has invalid front matter")
+    section_offset = scaffold.find(b"\n## ")
+    if section_offset < 0:
+        raise FinalizeError("CLI-generated Artifact scaffold has no route section seam")
+    heading_offset = scaffold.find(b"\n# ")
+    if heading_offset < 0 or heading_offset >= section_offset:
+        raise FinalizeError("CLI-generated Artifact scaffold has no preserved title heading")
+    return scaffold[: section_offset + 1] + sections
 
 
 def _finalize(
@@ -165,8 +208,25 @@ def _finalize(
                 f"Artifact identity changed during open: expected={expected} observed={observed_opened}"
             )
 
+        scaffold = _read_all(file_fd)
+        final_body = _merge_scaffold_with_sections(scaffold, body)
+        _require_parent_still_bound(repo_root, parts, parent_fd)
+        before_write = _stat_artifact(parent_fd, parts[-1])
+        opened_before_write = os.fstat(file_fd)
+        observed_before_write = (before_write.st_dev, before_write.st_ino, before_write.st_ctime_ns)
+        observed_opened_before_write = (
+            opened_before_write.st_dev,
+            opened_before_write.st_ino,
+            opened_before_write.st_ctime_ns,
+        )
+        if observed_before_write != expected or observed_opened_before_write != expected:
+            raise FinalizeError(
+                "Artifact identity changed immediately before write: "
+                f"expected={expected} path={observed_before_write} opened={observed_opened_before_write}"
+            )
         os.ftruncate(file_fd, 0)
-        _write_all(file_fd, body)
+        os.lseek(file_fd, 0, os.SEEK_SET)
+        _write_all(file_fd, final_body)
         os.fsync(file_fd)
 
         after = _stat_artifact(parent_fd, parts[-1])

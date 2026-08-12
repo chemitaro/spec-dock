@@ -5,7 +5,7 @@ ID: "iss-00359"
 関連GitHub: ["#359"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-12"
+最終更新: "2026-08-13"
 親: ["epic-00356", "init-local-00003"]
 ---
 # iss-00359 Replace Managed Workflow Skills with SpecDock Skills — 要件定義
@@ -104,6 +104,8 @@ Issue #359では、この結果を二つのrepo-local skillを実体化するた
 * materialize / adoptはrepository rootからdescriptor-relativeかつno-followで親componentを辿り、new fileはno-replaceで作成する
 * preflight後にtargetまたは親componentがsymlink等へ差し替えられた場合も、外部pathへ書かずfail-closedにする
 
+open後のparent relocationは、最初のdata write直前とwrite後にrepository rootからparentを再bindして検出する。移動を検出した後はpathname cleanupを行わず、別entryへ差し替えられたuser dataを削除しない。同一userの非協調processが最終再bindと次のsyscallの間で移動する競合はportable POSIXで排除できないため、本契約の外とする。
+
 これは次を意味しない。
 
 * Target managed skill inventoryへのcutover
@@ -177,7 +179,7 @@ CLIがfile publish前に入力、lock、collision、path safetyその他の理�
 * GitHub state
 * `.codex/config.toml`
 
-Artifact作成commandは一回だけ実行し、二件目のArtifactを作らない。CLI返却pathへの本文確定はskill-local helperを使い、canonical repository-relative form、またはCurrent formatterが付ける一つのrepository basename prefixだけをrepository rootへbindする。各parent componentとfinal fileをno-followで開き、identity取得時のdevice / inode / `ctime_ns`とwrite直前のidentityが一致する場合だけtruncate / writeする。返却pathnameへ直接writeしない。
+Artifact作成commandは一回だけ実行し、二件目のArtifactを作らない。CLI返却pathへの本文確定はskill-local helperを使い、canonical repository-relative form、またはCurrent formatterが付ける一つのrepository basename prefixだけをrepository rootへbindする。helperはCLI生成scaffoldのfront matter、Artifact ID、title、parent、template、authority、title headingを保持し、memory上で確定したroute sectionだけを結合する。各parent componentとfinal fileをno-followで開き、write直前にrepository rootからparent chainを再bindし、identity取得時のdevice / inode / `ctime_ns`と一致する場合だけtruncate / writeする。返却pathnameへ直接writeしない。
 
 ### I359-RQ-011 Partial Artifact recovery
 
@@ -212,31 +214,17 @@ Current docs entrypointは、二つのrepo-local skill、Storage Core、Authorin
 
 skill本文はCLIやAuthoring Kitの規則を全文複製せず、Current local docsとCLI helpを参照する。
 
-### I359-RQ-014 `developer_instructions`変更
+### I359-RQ-014 Codex configの最小化
 
-`src/spec_dock/assets/install_root/.codex/config.toml`の`developer_instructions`から、廃止対象の旧SpecDock workflowをmain agentが直接orchestrateする固有責務だけを削除する。
+`src/spec_dock/assets/install_root/.codex/config.toml`は、次の設定項目だけを持つvalid TOMLとする。
 
-削除対象は次である。
+```toml
+project_doc_fallback_filenames = [".codex/AGENTS.md"]
+```
 
-* SpecDock commandを既定で`spec-manager`へ委任する規則
-* SpecDock workflow依頼をnamed role利用の一括許可とみなす規則
-* active SpecDock scopeを根拠にrole別・phase別の追加承認を不要とする規則
-* 上記規則の英語・日本語の重複記述
+`developer_instructions`、`personality`、`[agents]`、`[mcp_servers.*]`その他の設定項目は置かない。model、reasoning、personality、main-agent workflow、sub-agent運用、MCPその他のCodex動作は、利用者のCodex設定をそのまま使用し、SpecDockは規定しない。
 
-一般的な次の責務は保持する。
-
-* 人間との対話
-* 要件、設計、計画の整理
-* 調査、事実と推定の区別
-* bounded taskの委任と統合
-* 最小変更
-* 検証
-* 安全判断
-* 一般的なreview lifecycle
-* main agentの直接編集境界
-* その他のTOML key、`[agents]`、MCP設定
-
-provider configとdogfood `.codex/config.toml`はbyte-identicalにする。
+provider configとdogfood `.codex/config.toml`はbyte-identicalにする。既存consumerに残る旧configの削除またはmigrationはIssue #360の責務とする。
 
 ### I359-RQ-015 Legacy inventoryとIC-2
 
@@ -262,7 +250,7 @@ IC-2へ渡す最小入力は、次に限定する。
 * explicit-only policy metadataとsafe finalizerの確認結果
 * docs pointer
 * CLI分類、zero-write、exactly-one、partial recoveryの確認結果
-* `developer_instructions`変更境界
+* Codex configの最小化境界
 * Issue #360向けlegacy inventory
 
 IC-2のpass / failはIssue #359自身が宣言しない。
@@ -279,12 +267,12 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 | I359-AC-006 | `spec-dock-grill-with-docs`がrecognized Codex policy metadataで暗黙呼出しを禁止し、`--initiative`、`--epic`、`--issue`のいずれか一つの明示selectorを要求し、active fallbackを持たない |
 | I359-AC-007 | `spec-dock-grill-with-docs`が明示route、明示title、operator-ownedな`grilling` / `domain-modeling`を要求する                                |
 | I359-AC-008 | `research`、`interview`、`disc`、`decision-candidate`の基本positive testが各一件成功する                                                    |
-| I359-AC-009 | 成功した一回のgrill実行後、永続差分が新規Artifact Markdown一件だけであり、本文確定がno-follow / device / inode / `ctime_ns`再検証を通る |
+| I359-AC-009 | 成功した一回のgrill実行後、永続差分が新規Artifact Markdown一件だけであり、CLI生成metadataを保持した本文確定がno-follow / device / inode / `ctime_ns`再検証を通る |
 | I359-AC-010 | selector、scope、bootstrap、external dependency、route、title、path、lockまたはcollisionの主要失敗が、file publish前なら永続差分なしで終了する               |
 | I359-AC-011 | file publish後の失敗について、自動修復せずpartial Artifactを報告する契約がskill本文とtestで固定される                                                         |
 | I359-AC-012 | 新skillがupstream `grill-with-docs`、旧SpecDock skill、provider固有import、`analysis` routeを参照しない                                     |
 | I359-AC-013 | provider / dogfoodのCurrent docs entrypointが二つのskillとCurrent docs pathを案内し、byte-identicalである                                   |
-| I359-AC-014 | provider / dogfoodのCodex configがbyte-identicalかつvalid TOMLで、旧SpecDock workflow固有条項だけが削除されている                                  |
+| I359-AC-014 | provider / dogfoodのCodex configがbyte-identicalかつvalid TOMLで、`project_doc_fallback_filenames = [".codex/AGENTS.md"]`以外の設定項目を持たない |
 | I359-AC-015 | exact commitのmanaged / legacy managed skill inventoryがIssue #360へ渡され、Issue #359の実装では変更されていない                                  |
 | I359-AC-016 | fresh / update / uninstall consumer matrix、Target inventory cutover、prune、publication、migrationがIssue #359の完了条件へ含まれていない       |
 | I359-AC-017 | IC-2に必要な最小入力が揃い、Issue #359がIC-2 passを自己宣言していない                                                                                |
@@ -309,7 +297,7 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 * Current docs pointer
 * legacy skill inventoryのIssue #360へのhandoff
 * IC-2向け最小入力
-* `developer_instructions`の旧SpecDock workflow固有責務の限定削除
+* Codex configを`project_doc_fallback_filenames`だけに限定
 
 ## 5. 対象外
 
@@ -323,6 +311,7 @@ IC-2のpass / failはIssue #359自身が宣言しない。
 * 旧skill、adapter、role、PR helperの物理削除
 * fresh / update / uninstall consumer matrix
 * consumer migration
+* 既存consumerの`.codex/config.toml`削除またはmigration
 * installed parity、publication、配布設計
 * Issue #360のD実値またはpost-D rollback
 * canonical R/D/P Front Matter migration
