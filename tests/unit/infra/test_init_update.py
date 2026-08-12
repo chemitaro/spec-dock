@@ -3694,20 +3694,10 @@ class TestInitUpdate(CliRuntimeHarness):
             assert (docs_dir / "reference_sync.md").is_file()
 
             docs_readme = (docs_dir / "README.md").read_text(encoding="utf-8")
-            assert "spec-dock-hub" in docs_readme
-            assert "spec-dock-clarification" in docs_readme
-            assert "spec-dock-initiative-planning" in docs_readme
-            assert "spec-dock-epic-planning" in docs_readme
-            assert "spec-dock-epic-execution" in docs_readme
-            assert "spec-dock-issue-planning" in docs_readme
-            assert "spec-dock-issue-execution" in docs_readme
-            assert "spec-dock-adr-facilitation" in docs_readme
-            assert "reference レイヤ" in docs_readme
-            assert "[workflow_clarification.md](workflow_clarification.md)" in docs_readme
-            assert "[workflow_spec_authoring.md](workflow_spec_authoring.md)" in docs_readme
-            assert "[phase_requirement.md](phase_requirement.md)" in docs_readme
-            assert "[phase_design.md](phase_design.md)" in docs_readme
-            assert "[phase_plan.md](phase_plan.md)" in docs_readme
+            assert ".agents/skills/spec-dock/SKILL.md" in docs_readme
+            assert ".agents/skills/spec-dock-grill-with-docs/SKILL.md" in docs_readme
+            assert "[Artifact Guide](authoring/artifacts.md)" in docs_readme
+            assert "./spec-dock/scripts/spec-dock --help" in docs_readme
 
             guide_text = (docs_dir / "guide.md").read_text(encoding="utf-8")
             assert "phase playbook（共通の作り方）" in guide_text
@@ -11438,7 +11428,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
                 shutil.rmtree(skills_root / skill_name)
-            assert list(skills_root.glob("*")) == []
+            assert sorted(path.name for path in skills_root.iterdir()) == [
+                "spec-dock",
+                "spec-dock-grill-with-docs",
+            ]
             assert main(["update", str(target)]) == 0
             self._assert_managed_skills_installed(target)
 
@@ -41651,11 +41644,13 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
 
     skill_texts: dict[str, str] = {}
     for skill_name in skill_names:
-        provider = provider_skill_root / skill_name / "SKILL.md"
-        dogfood = dogfood_skill_root / skill_name / "SKILL.md"
+        provider_dir = provider_skill_root / skill_name
+        dogfood_dir = dogfood_skill_root / skill_name
+        provider = provider_dir / "SKILL.md"
+        dogfood = dogfood_dir / "SKILL.md"
         assert provider.is_file(), f"missing provider skill: {provider}"
         assert dogfood.is_file(), f"missing dogfood skill: {dogfood}"
-        assert dogfood.read_bytes() == provider.read_bytes()
+        assert _managed_tree_bytes(dogfood_dir) == _managed_tree_bytes(provider_dir)
         skill_texts[skill_name] = provider.read_text(encoding="utf-8")
 
     spec_dock_text = skill_texts["spec-dock"]
@@ -41708,7 +41703,9 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
         assert boundary in forbidden_from_skill
 
     grill_text = skill_texts["spec-dock-grill-with-docs"]
-    assert "disable-model-invocation: true" in grill_text
+    assert "disable-model-invocation" not in grill_text
+    invocation_policy = provider_skill_root / "spec-dock-grill-with-docs/agents/openai.yaml"
+    assert invocation_policy.read_text(encoding="utf-8") == ("policy:\n  allow_implicit_invocation: false\n")
     required_inputs = markdown_section(grill_text, "## Required inputs", "## Read-only bootstrap preflight")
     assert "exactly one explicit selector: `--initiative <id>`, `--epic <id>`, or `--issue <id>`" in required_inputs
     assert "exactly one route: `research`, `interview`, `disc`, or `decision-candidate`" in required_inputs
@@ -41740,7 +41737,10 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
     assert "Finish the complete Artifact body in memory before any repository write." in one_write
     assert "Invoke the Current CLI exactly once" in one_write
     assert "./spec-dock/scripts/spec-dock new artifact <route>" in one_write
-    assert "Write the already-finalized body only to that new path. Do not touch another file." in one_write
+    assert "scripts/finalize-artifact.py identity" in one_write
+    assert "scripts/finalize-artifact.py finalize" in one_write
+    assert "device and inode" in one_write
+    assert "Do not write to the returned pathname directly." in one_write
     assert "persistent delta is exactly one new Markdown Artifact" in one_write
 
     zero_write = markdown_section(grill_text, "## Zero-write", "## Partial Artifact recovery")
@@ -41803,6 +41803,118 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
     assert {
         ".agents/skills/spec-dock/SKILL.md",
         ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+        ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+        ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
     } <= mapped_targets
     assert cli._MANAGED_SKILL_NAMES == _ISSUE_359_MANAGED_SKILL_INVENTORY
     assert cli._LEGACY_MANAGED_SKILL_NAMES == _ISSUE_359_LEGACY_MANAGED_SKILL_INVENTORY
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        ".agents/skills/spec-dock/SKILL.md",
+        ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+        ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+        ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+    ),
+)
+def test_issue_359_init_preserves_nonidentical_preexisting_skill_asset(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    relative_path: str,
+) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    collision = target / relative_path
+    collision.parent.mkdir(parents=True)
+    collision.write_bytes(b"user-owned sentinel\n")
+
+    result = main(["init", str(target)])
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert collision.read_bytes() == b"user-owned sentinel\n"
+    assert not (target / "spec-dock").exists()
+    assert "non-identical additive skill asset" in captured.err
+    assert relative_path in captured.err
+
+
+def test_issue_359_update_collision_fails_before_other_managed_writes(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    skill = target / ".agents/skills/spec-dock/SKILL.md"
+    docs = target / "spec-dock/docs/README.md"
+    skill.write_bytes(b"user-owned update sentinel\n")
+    docs.write_bytes(b"stale docs sentinel\n")
+
+    result = main(["update", str(target)])
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert skill.read_bytes() == b"user-owned update sentinel\n"
+    assert docs.read_bytes() == b"stale docs sentinel\n"
+    assert "non-identical additive skill asset" in captured.err
+
+
+def test_issue_359_init_rejects_additive_target_symlink_swapped_after_preflight(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import spec_dock.cli as cli
+
+    target = tmp_path / "target"
+    target.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_bytes(b"outside sentinel\n")
+    swapped_target = target / ".agents/skills/spec-dock/SKILL.md"
+    original_preflight = cli._preflight_collision_aware_additive_skill_assets
+    injected = False
+
+    def preflight_then_swap(*args: object, **kwargs: object) -> None:
+        nonlocal injected
+        original_preflight(*args, **kwargs)
+        if not injected and (target / "spec-dock").is_dir():
+            swapped_target.parent.mkdir(parents=True, exist_ok=True)
+            swapped_target.symlink_to(outside)
+            injected = True
+
+    monkeypatch.setattr(cli, "_preflight_collision_aware_additive_skill_assets", preflight_then_swap)
+
+    result = main(["init", str(target)])
+
+    captured = capsys.readouterr()
+    assert injected
+    assert result == 1
+    assert swapped_target.is_symlink()
+    assert outside.read_bytes() == b"outside sentinel\n"
+    assert "additive skill asset" in captured.err
+
+
+def test_issue_359_init_read_only_adopts_byte_identical_hard_link(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    provider = repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md"
+    target = tmp_path / "target"
+    target.mkdir()
+    shared = tmp_path / "shared-skill.md"
+    shared.write_bytes(provider.read_bytes())
+    installed = target / ".agents/skills/spec-dock/SKILL.md"
+    installed.parent.mkdir(parents=True)
+    try:
+        os.link(shared, installed)
+    except OSError as exc:
+        pytest.skip(f"hard links unavailable: {exc}")
+    before = shared.stat()
+
+    assert main(["init", str(target)]) == 0
+
+    after = shared.stat()
+    assert installed.read_bytes() == provider.read_bytes()
+    assert shared.read_bytes() == provider.read_bytes()
+    assert (after.st_dev, after.st_ino, after.st_nlink) == (before.st_dev, before.st_ino, before.st_nlink)

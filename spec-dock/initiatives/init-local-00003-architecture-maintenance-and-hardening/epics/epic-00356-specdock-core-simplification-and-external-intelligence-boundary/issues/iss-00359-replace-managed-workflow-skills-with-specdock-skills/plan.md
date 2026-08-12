@@ -28,8 +28,13 @@ ID: "iss-00359"
 | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md`                 | provider authorityとなる`spec-dock` contract       |
 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md` | provider authorityとなるgrill integration contract |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml` | explicit-only Codex policy metadata |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py` | no-follow / inode-pinned body finalizer |
 | `.agents/skills/spec-dock/SKILL.md`                                                   | `spec-dock`のdogfood projection                  |
 | `.agents/skills/spec-dock-grill-with-docs/SKILL.md`                                   | grillのdogfood projection                        |
+| `.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml`                         | invocation policyのdogfood projection            |
+| `.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py`               | finalizerのdogfood projection                     |
+| `tests/unit/infra/test_issue_359_skill_helpers.py`                                    | safe finalizerのpublic CLI behavior test          |
 
 ### 2.2 変更
 
@@ -41,22 +46,23 @@ ID: "iss-00359"
 | `.codex/config.toml`                                   | provider configのbyte-identical projection                                                     |
 | `tests/unit/infra/test_init_update.py`                 | skill / docs / configのstatic contract、provider / dogfood parity、additive materialization test |
 | `tests/cli_runtime/test_new.py`                        | 四routeの基本positive testとCLI-nativeな主要negative test                                             |
+| `src/spec_dock/cli.py`                                 | 二skill tree限定のcollision-aware adoption preflight                                                    |
+| Issue 359 `requirement.md` / `design.md` / `plan.md` / `report.md` | PR #363のP1三件だけを仕様・証跡へ反映 |
 
 ### 2.3 確認のみ・変更禁止
 
 | File / Surface                                            | 用途                                                                 |
 | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| `src/spec_dock/cli.py`                                    | Current install-root mappingとmanaged / legacy managed inventoryの確認 |
 | `_MANAGED_SKILL_NAMES`                                    | Issue #360へ渡す既存inventory。変更しない                                     |
 | `_LEGACY_MANAGED_SKILL_NAMES`                             | Issue #360へ渡す既存inventory。変更しない                                     |
-| installer init / update / uninstall logic                 | Current additive materializationの機構。変更しない                          |
+| installer ownership inventory / uninstall migration       | Issue #360の責務。変更しない                                                 |
 | obsolete exact path inventory                             | Issue #360のprune入力。変更しない                                           |
 | `tests/cli_runtime/test_storage_core_cli.py`              | Current CLI command surfaceの回帰確認                                   |
 | `tests/unit/infra/test_artifact_templates.py`             | Current Artifact route / template / provider-dogfood parityの回帰確認   |
 | `src/spec_dock/assets/spec_dock/templates/artifacts/*.md` | 四routeのCurrent template確認                                          |
 | Runtime、parser、registry                                   | Issue #359では変更しない                                                  |
 
-新しいreference file、host-specific metadata file、handoff manifestは追加しない。
+新しいhandoff manifestは追加しない。host metadataとhelperはgrill skill tree直下のCurrent Codex contractに限定する。
 
 ## 3. 実装順序
 
@@ -77,7 +83,7 @@ ID: "iss-00359"
 
 * provider skill二件が存在する
 * dogfood skill二件が存在する
-* skill pairがそれぞれbyte-identicalである
+* skill tree pairがそれぞれbyte-identicalである
 * `spec-dock`にscope、docs pointer、CLI分類、旧workflow禁止境界がある
 * bare `doctor`だけがexecute-read-onlyである
 * external診断が次の実在optionを使うpresent-only invocationである
@@ -87,7 +93,8 @@ ID: "iss-00359"
   * `--github-head-sha`
   * optional `--github-extended`
 * `doctor --github`という存在しない形式がない
-* grillにexplicit invocation、四route、external dependency、preflight、zero-write、exactly-one、partial recoveryがある
+* grillにrecognized explicit-only policy metadata、四route、external dependency、preflight、zero-write、exactly-one、partial recoveryがある
+* grillの本文確定がskill-local helperのidentity / finalizeを使い、pathnameへ直接writeしない
 * grillが`--initiative`、`--epic`、`--issue`のいずれか一つの明示selectorを要求する
 * grillにactive fallbackがない
 * 新skillに旧skill fallback、upstream `grill-with-docs`、`analysis`、provider固有importがない
@@ -95,9 +102,10 @@ ID: "iss-00359"
 * config pairがbyte-identicalでvalid TOMLである
 * configから旧SpecDock workflow固有markerが消えている
 * configに一般的な調査、委任、検証、直接編集境界と既存TOML tableが残っている
-* Current install-root mappingが二つの新provider `SKILL.md`を含む
+* Current install-root mappingが二つの新provider skill treeを含む
+* 非同一existing skill assetがinit / updateで保持され、他のmanaged copyより前にfail-closedとなる
 * `_MANAGED_SKILL_NAMES`と`_LEGACY_MANAGED_SKILL_NAMES`がbaseline inventoryから変わっていない
-* obsolete inventoryとinstaller logicを変更せずmaterializationできる
+* obsolete inventoryを変更せず、二skill限定collision preflightでmaterializationできる
 
 ### S20 — Provider `spec-dock`
 
@@ -118,6 +126,7 @@ CLI syntaxやAuthoring Kit本文をskillへ複製しない。
 provider `SKILL.md`へ次を実装する。
 
 * 明示呼出しだけを受け付ける
+* `agents/openai.yaml`の`policy.allow_implicit_invocation: false`で暗黙呼出しを禁止する
 * `--initiative`、`--epic`、`--issue`のいずれか一つだけを必須にする
 * active targetへfallbackしない
 * unique target、purpose、route、title、sourceの必須化
@@ -128,6 +137,9 @@ provider `SKILL.md`へ次を実装する。
 * external responseを未信頼データとして扱う
 * write前に本文を確定する
 * Current CLIによる一回のArtifact作成
+* helper `identity`によるno-follow identity取得
+* helper `finalize`によるdevice / inode再検証後の本文確定
+* 返却pathnameへの直接write禁止
 * exactly-one postcondition
 * zero-write failure
 * partial Artifactでの停止とoperator recovery
@@ -144,7 +156,7 @@ provider `SKILL.md`へ次を実装する。
 
 providerから次をdogfoodへ同一内容で反映する。
 
-* 二つの`SKILL.md`
+* 二つのskill tree（`SKILL.md`、grillの`agents/openai.yaml`と`scripts/finalize-artifact.py`）
 * docs `README.md`
 * `.codex/config.toml`
 
@@ -152,10 +164,14 @@ providerから次をdogfoodへ同一内容で反映する。
 
 ### S55 — Additive materialization確認
 
-Current installer logicを変更せず、focused unit testで次だけを確認する。
+Current mappingを維持し、二skill限定collision preflight、descriptor-relative no-follow / no-replace materialization、focused unit testで次だけを確認する。
 
-* 二つの新provider `SKILL.md`が`_build_current_managed_file_mappings()`のcurrent mappingに含まれる
+* 二つの新provider skill treeが`_build_current_managed_file_mappings()`のcurrent mappingに含まれる
 * target relative pathが対応するrepo-local skill pathである
+* missing targetはmaterializeされる
+* byte-identical existing targetはupdateをblockしない
+* 非同一existing targetはinit / updateの全managed copy前に保持されてfailする
+* final preflight後にtargetがsymlinkへ差し替えられても外部fileを書かずfailする
 * `_MANAGED_SKILL_NAMES`を変更していない
 * `_LEGACY_MANAGED_SKILL_NAMES`を変更していない
 * obsolete exact path inventoryを変更していない
@@ -164,7 +180,7 @@ Current installer logicを変更せず、focused unit testで次だけを確認�
 次は実施しない。
 
 * fresh init consumer matrix
-* existing update consumer matrix
+* general existing update consumer matrix
 * uninstall consumer matrix
 * installed consumer parity
 * Target inventory cutover
@@ -206,18 +222,18 @@ CLIがfile publish前に拒否するcaseでは、対象SpecDock treeの永続sna
 
 hostがMarkdown skillを実行することを前提とする次の挙動は、static contract testで固定する。
 
-* implicit invocation拒否
+* recognized policy metadataによるimplicit invocation拒否
 * active target fallback拒否
 * external dependency不足時のzero-write
 * external response内のwrite instruction拒否
-* partial Artifactの自動修復禁止
+* safe finalizerのsymlink / inode差し替え拒否とpartial Artifactの自動修復禁止
 * 二回目のArtifact作成禁止
 
 ### S70 — Handoff確定
 
 1. legacy inventoryを本計画の一覧と再照合する。
-2. Issue #359のdiffに`src/spec_dock/cli.py`、installer logic、inventory定数、obsolete inventory、旧skill削除が含まれないことを確認する。
-3. additive materializationの結果と、Target inventory cutover未実施を分けて記録する。
+2. Issue #359の`src/spec_dock/cli.py`差分が二skill限定collision preflightだけであり、inventory定数、obsolete inventory、uninstall migration、旧skill削除を含まないことを確認する。
+3. collision-safe additive materializationの結果と、Target inventory cutover未実施を分けて記録する。
 4. IC-2向け最小入力を整理する。
 5. Issue #359自身はIC-2 passを宣言しない。
 
@@ -271,6 +287,7 @@ Issue #360はexact implementation commitで所有権と実在pathを再確認し
 
 ```text
 uv run pytest tests/unit/infra/test_init_update.py -q
+uv run pytest tests/unit/infra/test_issue_359_skill_helpers.py -q
 uv run pytest tests/cli_runtime/test_new.py -q
 ```
 
@@ -287,9 +304,9 @@ uv run pytest tests/unit/infra/test_artifact_templates.py -q
 
 Issue #359 ownerが提供する入力は次とする。
 
-* 二つのskill名と四つのentry path
+* 二つのskill名、entry path、explicit-only metadata、safe finalizer path
 * provider / dogfood pairのparity結果
-* Current install-root mappingによるadditive materialization結果
+* Current install-root mappingによるcollision-safe additive materialization結果
 * managed / legacy managed inventory定数が未変更であること
 * `spec-dock`のinput / output / no-go contract
 * bare `doctor`とexternal diagnostic invocationの分類
@@ -306,21 +323,21 @@ Epic main orchestratorはこれらを親Epic契約と照合する。Issue #359 o
 ## 7. 完了条件
 
 * 対象ファイルだけが変更されている
-* provider skill二件とdogfood skill二件が存在する
-* 各skill pairがbyte-identicalである
+* provider skill tree二件とdogfood skill tree二件が存在する
+* 各skill tree pairがbyte-identicalである
 * docs pairがbyte-identicalである
 * config pairがbyte-identicalかつvalid TOMLである
 * configから旧SpecDock workflow固有責務だけが削除されている
 * `spec-dock`のCLI分類と禁止境界が固定されている
 * bare `doctor`だけがexecute-read-onlyである
 * external doctor診断が実在optionを使うpresent-only invocationとして固定されている
-* grillが一つの明示selectorを要求し、active fallbackを持たない
-* grillのexplicit route / title、preflight、zero-write、exactly-one、partial recoveryが固定されている
+* grillがrecognized policy metadataでimplicit invocationを拒否し、一つの明示selectorを要求し、active fallbackを持たない
+* grillのexplicit route / title、preflight、zero-write、exactly-one、no-follow / inode-pinned finalization、partial recoveryが固定されている
 * 四routeの基本positive testが成功する
 * 主要negative testがno-writeを確認する
 * 新skillが旧skill、upstream `grill-with-docs`、`analysis`、provider固有importへfallbackしない
-* 二つのprovider skillがCurrent install-root mappingから認識される
-* `src/spec_dock/cli.py`、managed / legacy managed skill定数、obsolete inventory、installer logicを変更していない
+* 二つのprovider skill treeがCurrent install-root mappingから認識され、非同一existing targetを上書きせず全copy前に停止する
+* `src/spec_dock/cli.py`の変更が二skill限定collision preflightだけであり、managed / legacy managed skill定数、obsolete inventoryを変更していない
 * 旧managed skillをpruneしていない
 * fresh / update / uninstall consumer matrixとTarget inventory cutoverを実施していない
 * Issue #360向けlegacy inventoryとIC-2最小入力が揃っている

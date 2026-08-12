@@ -27,12 +27,16 @@ ID: "iss-00359"
 
 ### 2.1 Skill asset
 
-| Provider authority                                                                    | Dogfood projection                                  |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md`                 | `.agents/skills/spec-dock/SKILL.md`                 |
-| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md` | `.agents/skills/spec-dock-grill-with-docs/SKILL.md` |
+| Provider authority                                                                                                      | Dogfood projection                                                    |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md`                                                   | `.agents/skills/spec-dock/SKILL.md`                                   |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md`                                   | `.agents/skills/spec-dock-grill-with-docs/SKILL.md`                   |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml`                         | `.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml`         |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py`               | `.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py` |
 
-`spec-dock`のFront Matterは、既存skill discoveryに必要な`name`と`description`に限定する。`spec-dock-grill-with-docs`は明示呼出し限定を実現するCurrent skill metadataとして、これらに`disable-model-invocation: true`を加える。未確認のhost固有metadataや`agents/openai.yaml`は追加しない。
+`spec-dock`のFront Matterは、既存skill discoveryに必要な`name`と`description`に限定する。`spec-dock-grill-with-docs`の明示呼出し限定はCurrent Codexが認識する`agents/openai.yaml`の`policy.allow_implicit_invocation: false`で実効化する。SKILL front matterへ未認識のinvocation keyを置かない。
+
+`finalize-artifact.py`はgrill skillだけが使用するskill-local client helperである。Artifact CLIのpublic argument、template、Runtimeを拡張せず、CLI publish後のsecond-openだけを安全にする。
 
 ### 2.2 Docs
 
@@ -63,25 +67,24 @@ Current installerは次の順序で`install_root`を扱う。
 
 1. `_iter_install_root_files()`が`install_root`配下の全通常fileを再帰的に列挙する。
 2. `_build_current_managed_file_mappings()`が各fileを同じrelative targetへ対応付ける。
-3. `_apply_managed_skill_install_plan()`がcurrent mappingを対象repositoryへcopyする。
-4. uninstall inventoryも同じcurrent mappingを参照する。
+3. 二skill treeのmapped fileだけは、全copy前にmissing / byte-identical / non-identicalを判定する。
+4. 二skill treeはrepository rootからdescriptor-relativeかつ`O_NOFOLLOW`で親を辿り、missing fileを`O_CREAT | O_EXCL`で作成する。existing fileはread-only no-follow openでbyte identityを再確認し、書き換えない。
+5. その他のcurrent mappingは既存のcopy処理を使う。
+6. uninstall inventoryも同じcurrent mappingを参照する。
 
-したがって、二つのprovider `SKILL.md`を`install_root`へ追加すると、既存の汎用managed-file mappingを通じてcurrent init / update copyとuninstall inventoryから認識される。
+したがって、二つのprovider skill treeを`install_root`へ追加すると、既存の汎用managed-file mappingを通じてcurrent init / update copyとuninstall inventoryから認識される。
 
-Issue #359では、この機械的帰結をadditive skill asset materializationとして受け入れる。二つのskill contractとprovider assetを所有するという親Epicの境界に含まれる。
+Issue #359では、この機械的帰結をcollision-safe additive skill asset materializationとして受け入れる。新規targetはno-replaceで作成し、providerとbyte-identicalなexisting targetはread-only adoptionとし、非同一existing targetはuser-ownedの可能性があるため全copy前にfail-closedとする。preflight後のsymlink / path差し替えもdescriptor-relative no-follow処理で拒否する。判定は二skill treeへ限定し、generic ownership modelは作らない。
 
 Issue #359は次を変更しない。
 
 * `_MANAGED_SKILL_NAMES`
 * `_LEGACY_MANAGED_SKILL_NAMES`
-* `_iter_install_root_files()`
-* `_build_current_managed_file_mappings()`
 * `_build_managed_skill_install_plan()`
-* `_apply_managed_skill_install_plan()`
 * obsolete exact path inventory
-* installerのinit / update / uninstall logic
+* 二skill限定content-collision preflight以外のinstaller init / update / uninstall logic
 
-Current mappingに二つのfileが追加されることと、Target managed inventoryを二つへcutoverすることは別である。
+Current mappingに二skill treeが追加されることと、Target managed inventoryを二つへcutoverすることは別である。
 
 Issue #360が次を所有する。
 
@@ -258,9 +261,10 @@ slugはCurrent CLIのoptional inputのままとする。titleから安全なslug
   [--slug <slug>]
 ```
 
-10. CLIが返したexact pathだけへ、確定済み本文を反映する。
-11. exactly-one postconditionを確認する。
-12. exact pathとrouteをoperatorへ返す。
+10. CLIが返したexact path textについて、skill-local helperの`identity`を使い、canonical repository-relative formまたはCurrent formatterの一つのrepository basename prefixだけをrepository rootへbindし、no-follow traversalでdevice / inodeを取得する。
+11. 同helperの`finalize`へdevice / inodeとmemory上の本文をstdinで渡す。helperはparent componentをdirfd + `O_NOFOLLOW`で開き、final fileのlstat / open / fstat identityが一致した場合だけtruncate / write / fsyncする。
+12. exactly-one postconditionを確認する。
+13. exact pathとrouteをoperatorへ返す。
 
 ## 6. Write boundary
 
@@ -280,7 +284,7 @@ preflightはread-onlyで行う。
 
 preflightはactive stateからtargetを補完せず、directory、file、symlink、lockを作成・補修しない。
 
-collision、CLI lock、no-replace publish、最終的なpath safetyの判定はCurrent Artifact CLIをauthorityとする。
+collision、CLI lock、no-replace publish、publish時のdestination safetyはCurrent Artifact CLIをauthorityとする。publish後の本文確定はskill-local helperをauthorityとし、返却pathnameへ直接writeしない。
 
 ### 6.2 Zero-write
 
@@ -298,7 +302,7 @@ Artifact CLIがpublish前に拒否
 
 ### 6.3 Exactly-one
 
-成功後の`artifacts/` snapshot差分は、CLIが返した新規Markdown file一件だけでなければならない。
+成功後の`artifacts/` snapshot差分は、CLIが返した新規Markdown file一件だけでなければならない。本文確定前にhelperのidentityを取得し、finalize時に同じdevice / inodeであることを再検証する。final pathまたはancestorがsymlinkの場合、またはinodeが変わった場合はwriteしない。
 
 次のいずれかが検出された場合、成功と報告しない。
 
@@ -310,7 +314,7 @@ Artifact CLIがpublish前に拒否
 
 ### 6.4 Partial Artifact
 
-Artifact publish後に本文反映またはpostcondition確認が失敗した場合、次の状態とする。
+Artifact publish後にidentity取得、安全な本文反映、またはpostcondition確認が失敗した場合、次の状態とする。
 
 ```text
 partial Artifact
@@ -366,7 +370,7 @@ Issue #359は次を用意する。
 
 Issue #359は次を変更または実施しない。
 
-* installer logic
+* 二skill限定collision preflight以外のinstaller logic
 * managed / legacy managed skill定数
 * obsolete inventory
 * Target inventory cutover

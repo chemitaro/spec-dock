@@ -1,7 +1,6 @@
 ---
 name: spec-dock-grill-with-docs
 description: Explicitly create one scope-local SpecDock evidence Artifact after read-only grilling and domain clarification.
-disable-model-invocation: true
 ---
 
 # SpecDock Grill with Docs
@@ -35,7 +34,8 @@ Complete this preflight twice: before external capability use and immediately be
 5. Require `artifacts/rules.md` to be a symlink that resolves to the matching Initiative, Epic, or Issue Artifact rules file inside `spec-dock/docs/rules/`.
 6. Require `spec-dock/templates/artifacts/<route>.md` to exist as a non-empty ordinary file whose resolved path remains inside the repository template tree.
 7. Read root and `new artifact --help` output and confirm the selector, route, title, and optional slug are accepted by the Current CLI.
-8. Confirm both external capabilities are available and can obey this skill's read-only boundary.
+8. Require this skill's `agents/openai.yaml` and `scripts/finalize-artifact.py` to exist as non-empty ordinary files inside this skill directory.
+9. Confirm both external capabilities are available and can obey this skill's read-only boundary.
 
 Do not create or repair directories, templates, rules links, active state, locks, or bootstrap files. The Current Artifact CLI remains the authority for collision, lock, no-replace publication, and final destination safety.
 
@@ -73,10 +73,29 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
      [--slug <slug>]
    ```
 
-5. Accept only the exact path returned by a successful command. Require it to be a new direct-child Markdown file under the selected scope's `artifacts/` directory.
-6. Write the already-finalized body only to that new path. Do not touch another file.
-7. Verify that the persistent delta is exactly one new Markdown Artifact and that pre-existing Artifact entries and protected scope files are unchanged.
-8. Return the exact path, route, title, and evidence/draft authority to the operator.
+5. Accept only the exact path text returned by a successful command. Require it to identify a new direct-child Markdown file under the selected scope's `artifacts/` directory. The helper accepts the canonical repository-relative form and, when present, one leading repository-basename component emitted by the Current formatter; reject every other prefix.
+6. Run the skill-local helper's read-only identity command with argument-vector execution:
+
+   ```text
+   python3 .agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py identity \
+     --repo-root <absolute-repository-root> \
+     --artifact <exact-returned-relative-path>
+   ```
+
+   Accept only its exact JSON `device` and `inode` values.
+7. Pass the already-finalized body through stdin to the helper's finalize command, with no shell interpolation:
+
+   ```text
+   python3 .agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py finalize \
+     --repo-root <absolute-repository-root> \
+     --artifact <exact-returned-relative-path> \
+     --expected-device <device> \
+     --expected-inode <inode>
+   ```
+
+   The helper traverses parent components without following symlinks and verifies the same device and inode before truncating or writing. Do not write to the returned pathname directly.
+8. Verify that the persistent delta is exactly one new Markdown Artifact and that pre-existing Artifact entries and protected scope files are unchanged.
+9. Return the exact path, route, title, and evidence/draft authority to the operator.
 
 Protected files include canonical Requirement, Design, Plan, Report, ADR, `CONTEXT.md`, `.meta.json`, active and dependency state, generated projections, `.codex/config.toml`, and Git/GitHub state.
 
@@ -97,7 +116,7 @@ Do not retry automatically and do not issue a second Artifact command in the sam
 
 ## Partial Artifact recovery
 
-If the CLI publishes the Artifact path and body writing or postcondition verification then fails:
+If the CLI publishes the Artifact path and identity capture, safe finalization, or postcondition verification then fails:
 
 - leave the partial Artifact at the exact returned path
 - do not delete, rename, overwrite, repair, or retry it automatically
