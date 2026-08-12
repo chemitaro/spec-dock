@@ -29,9 +29,9 @@ ID: "epic-00356"
   - 2026-08-10、Product OwnerがEpicの要件定義書・設計書・計画書を採用し、ユーザーレビュー完了と判断した。3文書の状態を`approved`へ更新し、Issue 357 / 358のDraft 1正式化へ進む。
   - Issue 357、358、359はそれぞれPR #362、#361、#363でmainへmergeされ、GitHub Issueもclosedである。current mainは`a6ded0d9a838b40cdcd741fa473cd264b801f245`。
   - 2026-08-13、Epic Plan §6.1に従いIC-1 / IC-2をcurrent mainと各Issue reportへ再照合した。Fresh node / Storage Core / Authoring Kitは`4 + 23 + 3 passed`、二skill contract / finalizer / routeは`11 + 9 + 7 passed`で、Epic-local `disc` Artifactと本Reportに`pass`を記録した。
-  - Issue 360はRequirementがfresh review pass済みで、Design / Planとdistribution inventoryを具体化中である。IC-1 / IC-2の親handoff gateとdirect dependency readinessは充足したが、formal `issue start`、Design / Plan review、Strict final reviewは未完了である。
+  - Issue 360はRequirement / Design / Planが各fresh reviewでP0 / P1なしとなり`approved`である。IC-1 / IC-2、direct dependency readiness、planning commit / push、formal `issue start`、active / deps / validateを完了し、ChatGPT-SpecReview-Strict round 2もexact upstream SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`でP0 / P1なしの`pass`となった。Planはpromotion commitで`implementation-start-ready`へ昇格し、そのcommit自身のfresh exact-current Strict passを外部delivery evidenceとして要求する。
 - 次のマイルストーン:
-  - Issue 360のcanonical Design / Planをfresh reviewし、cleanなupstream同期済みHEADでStrict spec reviewを通したうえでformal `issue start`を完了する。
+  - Issue 360 promotion commitのclean exact-current Strict passを外部delivery evidenceとして確認後、Plan S00から実装を開始する。
   - 新規の品質・統合・deliverable handoff Issue候補は、別途人間がnode作成を承認した場合だけ357〜360すべてへの直接依存を持つnodeとしてmaterializeする。
 - ブロッカー:
   - Requirement phaseのブロッカーは解消済み。2026-08-07の旧findingは2026-08-09の正本revisionで解決し、fresh `spec-reviewer`が`pass`と判定した。
@@ -194,7 +194,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `iss-00357 Reduce Runtime to Storage Core`: PR #362 merged、GitHub #357 closed。
 - `iss-00358 Simplify Authoring Kit and Document Contracts`: PR #361 merged、GitHub #358 closed。
 - `iss-00359 Replace Managed Workflow Skills with SpecDock Skills`: PR #363 merged、GitHub #359 closed。
-- `iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces`: GitHub #360 open。planning / formal start未完了。
+- `iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces`: GitHub #360 open。planning / formal start / Strict round 2は完了し、実装は未開始。Implementation-start-ready promotion commitはfresh exact-current Strict passを外部delivery evidenceとして要求する。
 - Release publicationは未実施。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)

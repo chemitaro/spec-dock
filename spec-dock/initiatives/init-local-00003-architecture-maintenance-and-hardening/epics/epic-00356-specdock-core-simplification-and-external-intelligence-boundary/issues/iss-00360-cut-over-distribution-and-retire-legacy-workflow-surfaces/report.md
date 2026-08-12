@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Design / Planはすべてfresh review passでapprovedであり、planning commit / pushとformal `issue start`を完了した。ChatGPT-SpecReview-Strict round 1はexact upstream SHA `e7520e6a433c0b6345b4f52f1172c32f56fad9d3`を検証した上で、Requirement / Designに残ったformal start前のhistorical statusをP1として検出した。現在地の同期修正後、fresh exact-upstream re-reviewを行う。実装、PR、Issue close、IC-3判定は未実施である。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Design / Planはすべてfresh review passでapprovedであり、planning commit / pushとformal `issue start`を完了した。ChatGPT-SpecReview-Strict round 1のP1を修正後、round 2はexact upstream SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`でP0 / P1なしの`pass`となった。Planを`implementation-start-ready`へ昇格するpromotion commitは、自己参照するreport commitを増やさないため、push後のfresh exact-current Strict passをrepository外の最終delivery evidenceとして要求する。実装、PR、Issue close、IC-3判定は未実施である。
 
 ## Verification
 
@@ -40,6 +40,7 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * Plan fresh spec review: round 1 / round 2 fail、round 3 pass（P0/P1なし、confidence 0.99）
 * ChatGPT-SpecReview-Strict pre-submit attempt: session `required-strict-github-connector-verificati-66`はrate-limit dialogで停止。`promptSubmitted=false`、conversation IDなし、leaseなしでreview未成立
 * ChatGPT-SpecReview-Strict round 1: session `required-strict-github-connector-verificati-67`、GitHub connectorでcurrent branch exact SHA `e7520e6a433c0b6345b4f52f1172c32f56fad9d3`を検証、resolved model `GPT-5.5` verified。Lifecycle current-state矛盾1件をP1として`fail`
+* ChatGPT-SpecReview-Strict round 2: session `required-strict-github-connector-verificati-68`、GitHub connectorでcurrent branch exact SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`を検証、resolved model `GPT-5.5` verified。P0 / P1なしで`pass`、親Epic Reportの進捗drift 1件だけをP2として検出
 * IC-1 fresh verification: Storage Core `4 passed`、S09 Authoring Kit `23 passed`、Fresh node / Artifact `3 passed`
 * IC-2 fresh verification: Issue 359 static / collision `11 passed`、finalizer `9 passed`、route / zero-write `7 passed`
 
@@ -47,7 +48,7 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。実装開始前にはCurrent branch HEADとTarget二skillのexact inventoryをもう一度lockする。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design / Plan review、commit / push、formal startを完了した。残るplanning blockerはlifecycle current-state同期修正のcommit / pushと、そのclean exact-upstream HEADでのStrict re-reviewである。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design / Plan review、commit / push、formal start、Strict round 2 passを完了した。Promotion commitをpushした後のfresh exact-current Strict passだけを最終外部gateとし、pass後はrepositoryを変更せず実装へhandoffする。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
@@ -74,9 +75,9 @@ ChatGPT-Use-Strictの出力はadvisory evidenceとして扱い、main orchestrat
 |---|---|---|---|---|---|---|
 | EAL-360-001 | adopted | ChatGPT-Use-Strict authoring evidence | Current physical authority、historical identity、deep module、operation × provenance、forward recovery、parityをR/D/Pへ具体化できる | Requirement / Design / Plan | GitHub connectorで`chemitaro/spec-dock` main SHA `a6ded0d9…`を確認し、session `required-strict-github-connector-verificati-65`の提案をlocal source / tests / IC evidenceへ照合した | no。canonical authorityはR/D/Pとfresh reviewer |
 | EAL-360-002 | adopted | `implementation-planner` read-only draft | Plan round 1の5 P1をstep-local vertical TDD、Closure Index、delegation/review/commit gate、S90/S99/H10へ再構成する | Plan §4〜§9 | Canonical editなしのdraftをmain orchestratorがapproved R/Dとworkflow policyへ照合して統合した | no。Plan round 3 passでadoption closure確認済み |
-| EAL-360-003 | adopted | fresh `spec-reviewer` findings | Requirement / Design / PlanのP0/P1をphaseごとに検出し、修正範囲を限定する | R/D/P/report | Requirement round 3、Design round 3、Plan round 3のpassをraw authorityではなくreview evidenceとして採用した | no。Strict final reviewを別途実施 |
+| EAL-360-003 | adopted | fresh `spec-reviewer` findings | Requirement / Design / PlanのP0/P1をphaseごとに検出し、修正範囲を限定する | R/D/P/report | Requirement round 3、Design round 3、Plan round 3のpassをraw authorityではなくreview evidenceとして採用した | no。Strict round 2 passで独立最終照合済み |
 
-Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-002のpromotion gateはPlan round 3 passでclosedした。Git / lifecycle / Strict gateはadoptionとは別に未完了である。
+Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-002のpromotion gateはPlan round 3 passでclosedし、Git / lifecycle gateとStrict round 2もpassした。Promotion commit自身のfresh exact-current Strict passはrepository外のdelivery evidenceとして確認する。
 
 ### Delegated Draft Evidence
 
@@ -111,7 +112,7 @@ Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-
 |---|---|---|---|---|
 | Requirement | `requirement.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし。IC-1 / IC-2、Design promotion、formal start、implementation handoffは非承認 |
 | Design | `design.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし、confidence 0.98。Plan phaseへ昇格 |
-| Plan | `plan.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし、confidence 0.99。Approved、Git/lifecycle/Strict gateへ進む |
+| Plan | `plan.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし、confidence 0.99。Approved。Git/lifecycleとStrict round 2 pass後にimplementation-start-readyへ昇格 |
 
 ### Reviewer Gate Status
 
@@ -119,8 +120,8 @@ Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-
 |---|---|---|---|---|---|
 | Requirement | `spec-reviewer` | fresh round 3 | passed | none | Requirement approved |
 | Design | `spec-reviewer` | fresh round 3 | passed | none | Design approved |
-| Plan | `spec-reviewer` | fresh round 3 | passed | none | Plan approved。Git/lifecycle/Strict gateへ進む |
-| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | fresh round 1 | failed | none | `e7520e6a…`でlifecycle current-state矛盾をP1検出。Requirement / Design同期修正をcommit / push後、fresh exact-SHA re-review |
+| Plan | `spec-reviewer` | fresh round 3 | passed | none | Plan approved。Git/lifecycleとStrict round 2 pass後にimplementation-start-readyへ昇格 |
+| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | fresh round 2 | passed | none | `4b325885…`でP0/P1なし。P2の親Epic Report進捗driftをpromotion commitで同期し、そのexact-current passを外部delivery evidenceとして確認 |
 
 ### ChatGPT-SpecReview-Strict round 1
 
@@ -129,6 +130,12 @@ Pre-submit session `required-strict-github-connector-verificati-66`はChatGPTの
 Session `required-strict-github-connector-verificati-67`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `e7520e6a433c0b6345b4f52f1172c32f56fad9d3`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。Requirement / Designにformal start前のcheckout-safety停止とreview未完了が現在形で残る一方、Report / Planはformal startとphase reviewの成功を記録しているため、S00の現在地が一意でないというP1を1件検出し、`review_status=fail`となった。
 
 Findingはrepository factsと一致したため採用し、Requirement I360-RQ-001とDesign §1を最新lifecycle evidenceへ同期した。Product scope、migration contract、acceptance criteria、implementation stepは変更していない。修正commitを同名upstreamへpushし、別のfresh Strict conversationでexact-SHA re-reviewするまでimplementation blockを維持する。
+
+### ChatGPT-SpecReview-Strict round 2
+
+Session `required-strict-github-connector-verificati-68`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。P0 / P1はなく、`review_status=pass`、overall confidence 0.91である。Requirement / Design / Planはhard cutover、ownership / provenance、path safety、retry / recovery、Fresh / update / uninstall、parity、docs、IC-3 handoffを相互にtraceでき、実装開始を妨げる矛盾または必須欠落はないと判定された。
+
+唯一のfindingは、親Epic Reportの進捗サマリーがIssue 360のDesign / Plan具体化中、formal start未完了のまま残るというP2である。非規範文書のdriftで実装開始blockerではないが、operatorの誤読を避けるためpromotion commitで最新lifecycleへ同期した。Planの`handoff_state`も`implementation-start-ready`へ更新した。このpromotion commit自身は、push後に別のfresh Strict conversationでexact-current SHAをpassさせ、その結果をrepositoryへ追記せず最終delivery evidenceとして提示する。
 
 ### Design review round 1
 

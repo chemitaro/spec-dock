@@ -10,7 +10,7 @@ ID: "iss-00360"
 親: ["epic-00356", "init-local-00003"]
 planning_level: "strict"
 implementation_baseline: "a6ded0d9a838b40cdcd741fa473cd264b801f245"
-handoff_state: "strict-review-candidate"
+handoff_state: "implementation-start-ready"
 ---
 
 # iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces — 実装計画
