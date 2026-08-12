@@ -291,7 +291,7 @@ P2 / P3、merge conflict、observation limitationはない。全inventoryをtria
 | PR363-U001 | `skill-invocation-policy` | PR363-P1-001 | `artifacts/20260812t134617z-disc-pr-repair-unit-pr363-u001-skill-invocation-policy.md` / implemented, validated, commit `7d303a11` |
 | PR363-U002 | `additive-skill-ownership` | PR363-P1-002 | `artifacts/20260812t134618z-disc-pr-repair-unit-pr363-u002-additive-skill-ownership.md` / implemented, validated, commit `7d303a11` |
 | PR363-U003 | `artifact-finalization-toctou` | PR363-P1-003 | `artifacts/20260812t134618z-01-disc-pr-repair-unit-pr363-u003-artifact-finalization-toctou.md` / implemented, validated, commit `7d303a11` |
-| PR363-U004 | `artifact-finalization-inode-reuse` | PR363-CI-001 | `artifacts/20260812t151202z-disc-pr-repair-unit-pr363-u004-ci-inode-reuse.md` / implemented, validated locally, commit pending |
+| PR363-U004 | `artifact-finalization-inode-reuse` | PR363-CI-001 | `artifacts/20260812t151202z-disc-pr-repair-unit-pr363-u004-ci-inode-reuse.md` / implemented, validated locally, commit `9bfcecae` |
 
 ### 11.6 Re-observation result
 
