@@ -533,6 +533,40 @@ def test_s60_root_rebind_during_scaffold_mutation(
     assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "distribution-applied"
 
 
+def test_s60_root_rebind_during_version_publication(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    displaced = tmp_path.with_name(f"{tmp_path.name}-version-displaced")
+    original_write = cli._write_atomic_regular_file
+    switched = False
+
+    def rebind_before_version_write(path, payload, *, mode):
+        nonlocal switched
+        if not switched and Path(path).name == "spec-dock.version":
+            switched = True
+            tmp_path.rename(displaced)
+            tmp_path.mkdir()
+            (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
+        return original_write(path, payload, mode=mode)
+
+    monkeypatch.setattr(cli, "_write_atomic_regular_file", rebind_before_version_write)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during version-write" in captured
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not (tmp_path / "spec-dock").exists()
+    marker = displaced / "spec-dock/.distribution-retry.json"
+    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "post-verified"
+
+    monkeypatch.setattr(cli, "_write_atomic_regular_file", original_write)
+    assert main(["update", str(displaced)]) == 0
+    assert not marker.exists()
+
+
 def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(
     tmp_path: Path,
     monkeypatch,
