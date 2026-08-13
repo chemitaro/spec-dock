@@ -23,9 +23,9 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * Initial approved planning commit: `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * Current branch upstream: `origin/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
 
-* Current implementation-admission SHA: `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`（local HEAD = upstream、clean）
+* Current implementation-admission SHA: `8c01c9fd2e76d7d7bccc754bca902e8010026703`（local HEAD = upstream、clean）
 * Plan amendment local review: fresh `spec-reviewer` pass（S40A verificationは既存`test_storage_core_cli.py`のみ）
-* Plan amendment Strict review: session `issue-360-amended-current-strict-3`、GitHub exact SHA `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`、resolved `GPT-5.5` verified、P0 / P1なしでpass
+* Plan amendment Strict review: session `issue-360-admission-current-strict`、GitHub exact SHA `8c01c9fd2e76d7d7bccc754bca902e8010026703`、resolved `GPT-5.5` verified、P0 / P1なしでpass
 
 * Push verification at planning commit: local `HEAD` = upstream = `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * `origin/main` merge: fast-forward success、Issue 360文書差分を保持
@@ -132,7 +132,7 @@ EAL-360-002の旧promotion gateはPlan amendment、fresh local `spec-reviewer`�
 | Requirement | `spec-reviewer` | fresh round 3 | passed | none | Requirement approved |
 | Design | `spec-reviewer` | fresh round 3 | passed | none | Design approved |
 | Plan | `spec-reviewer` | amendment後fresh review | passed | S40A verificationを既存Storage Core CLI testへ限定し、S20本文順・依存graph・gate metadataを確認 | Plan `approved` / `implementation-start-ready`、S10へhandoff |
-| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | amendment後exact-current review | passed | session `issue-360-amended-current-strict-3`でGitHub exact SHA `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`を検証、resolved `GPT-5.5` verified、P0/P1なし | implementation admissionを解消し、S00 / S10を開始 |
+| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | amendment後exact-current review | passed | session `issue-360-admission-current-strict`でGitHub exact SHA `8c01c9fd2e76d7d7bccc754bca902e8010026703`を検証、resolved `GPT-5.5` verified、P0/P1なし | implementation admissionを解消し、S00 / S10を開始 |
 
 ### ChatGPT-SpecReview-Strict round 1
 
@@ -150,7 +150,7 @@ Session `required-strict-github-connector-verificati-68`はGitHub connectorで`c
 
 ### ChatGPT-SpecReview-Strict round 3（current admission）
 
-Session `issue-360-amended-current-strict-3`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。S20がS40A legacy Runtime retirementとS40B shipped Target physical cutoverの後に配置され、S40Aの検証が既存`tests/cli_runtime/test_storage_core_cli.py`へ限定され、S45がS35を前提とすることを確認した。Requirement / Design / Plan / Reportのgate状態もfresh local `spec-reviewer` passと整合し、P0 / P1なし、`review_status=pass`、overall confidence 0.92となった。この結果によりPlanを`approved` / `implementation-start-ready`へ戻し、S00 / S10を開始する。
+Session `issue-360-admission-current-strict`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `8c01c9fd2e76d7d7bccc754bca902e8010026703`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。S20がS40A legacy Runtime retirementとS40B shipped Target physical cutoverの後に配置され、S40Aの検証が既存`tests/cli_runtime/test_storage_core_cli.py`へ限定され、S45がS35を前提とすることを確認した。Requirement / Design / Plan / Reportのgate状態もfresh local `spec-reviewer` passと整合し、P0 / P1なし、`review_status=pass`、overall confidence 0.92となった。この結果によりPlanを`approved` / `implementation-start-ready`へ維持し、S00 / S10を開始する。
 
 ### Design review round 1
 
