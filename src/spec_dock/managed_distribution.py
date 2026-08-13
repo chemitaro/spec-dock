@@ -522,6 +522,15 @@ _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
 _DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
 _DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
+_DISTRIBUTION_RETRY_PHASES = frozenset(
+    {
+        "preflight-complete",
+        "distribution-applied",
+        "scaffold-refreshed",
+        "post-verified",
+        "version-written",
+    }
+)
 _UNINSTALL_RETRY_MARKER_PAYLOAD = {
     "schema_version": 1,
     "managed_by": "spec-dock",
@@ -675,7 +684,7 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
     ):
         _admission_block("marker-invalid", "distribution retry marker target_root identity is invalid")
     phase = raw.get("last_completed_phase")
-    if not isinstance(phase, str) or not phase:
+    if not isinstance(phase, str) or phase not in _DISTRIBUTION_RETRY_PHASES:
         _admission_block("marker-invalid", "distribution retry marker phase is invalid")
     if raw.get("purpose") != _DISTRIBUTION_RETRY_PURPOSE:
         _admission_block("marker-invalid", "distribution retry marker purpose is unsupported")

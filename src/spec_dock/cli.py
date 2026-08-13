@@ -1668,6 +1668,109 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
     return tuple(sources)
 
 
+def _append_distribution_uninstall_actions(
+    actions: list[_UninstallAction],
+    target_root: Path,
+    *,
+    plan,
+    include_missing_removals: bool,
+    known_rel_paths: set[Path],
+) -> None:
+    """Project the shared ownership classifier into the uninstall report."""
+    obsolete_paths = {
+        Path(item["path"])
+        for item in plan.manifest.obsolete_exact_files
+    }
+    current_paths = {Path(asset.path) for asset in plan.current_assets}
+    for distribution_action in plan.actions:
+        rel_path = Path(distribution_action.path)
+        if rel_path == Path("spec"):
+            # The shortcut has a dedicated renderer with a more specific
+            # target-link diagnostic below.
+            continue
+        known_rel_paths.add(rel_path)
+        target_exists = _path_exists_for_uninstall(target_root / rel_path)
+        if not target_exists and not include_missing_removals:
+            continue
+
+        category = (
+            "obsolete_managed"
+            if rel_path in obsolete_paths
+            else _uninstall_category_for_install_root_path(
+                rel_path,
+                bootstrap_only_rel_paths=set(),
+            )
+        )
+        if distribution_action.action == "prune":
+            if rel_path in obsolete_paths:
+                reason = (
+                    "known obsolete SpecDock-managed asset"
+                    if target_exists
+                    else "known obsolete SpecDock-managed asset already absent"
+                )
+            elif distribution_action.provenance == "historical":
+                reason = (
+                    "historical SpecDock-managed asset exact identity"
+                    if target_exists
+                    else "historical SpecDock-managed asset already absent"
+                )
+            else:
+                reason = (
+                    "current shipped asset exact identity"
+                    if target_exists
+                    else "current shipped asset already absent"
+                )
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category=category,
+                    status="would_remove",
+                    reason=reason,
+                )
+            )
+            continue
+
+        if distribution_action.blocked or distribution_action.action == "preserve":
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category=category,
+                    status="preserved",
+                    reason=(
+                        f"{distribution_action.reason}; "
+                        f"{distribution_action.operator_action}"
+                    ),
+                )
+            )
+            continue
+
+        # Uninstall classification should never create/adopt/upgrade a target;
+        # fail closed in the report if a future classifier change violates it.
+        actions.append(
+            _UninstallAction(
+                rel_path=rel_path.as_posix(),
+                category=category,
+                status="preserved",
+                reason="unexpected uninstall classification; manual review required",
+            )
+        )
+
+    if include_missing_removals:
+        for item in plan.manifest.obsolete_exact_files:
+            rel_path = Path(item["path"])
+            known_rel_paths.add(rel_path)
+            if rel_path in current_paths or _path_exists_for_uninstall(target_root / rel_path):
+                continue
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category="obsolete_managed",
+                    status="would_remove",
+                    reason="known obsolete SpecDock-managed asset already absent",
+                )
+            )
+
+
 def _build_uninstall_plan(
     target_root: Path,
     *,
@@ -1679,75 +1782,20 @@ def _build_uninstall_plan(
     known_rel_paths: set[Path] = set()
 
     with _assets_dir() as assets_dir:
-        install_plan = _build_managed_skill_install_plan(assets_dir)
-        bootstrap_only_rel_paths = set(install_plan.bootstrap_only_rel_paths)
-        for mapping in install_plan.current_file_mappings:
-            rel_path = mapping.target_rel
-            known_rel_paths.add(rel_path)
-            target_path = target_root / rel_path
-            if not _path_exists_for_uninstall(target_path):
-                if include_missing_removals:
-                    category = _uninstall_category_for_install_root_path(
-                        rel_path,
-                        bootstrap_only_rel_paths=bootstrap_only_rel_paths,
-                    )
-                    actions.append(
-                        _UninstallAction(
-                            rel_path=rel_path.as_posix(),
-                            category=category,
-                            status="would_remove",
-                            reason=(
-                                "known SpecDock-managed agent/skill asset"
-                                if _is_delete_even_if_mismatch_uninstall_path(rel_path)
-                                else "current shipped asset exact match"
-                            ),
-                        )
-                    )
-                continue
-            category = _uninstall_category_for_install_root_path(
-                rel_path,
-                bootstrap_only_rel_paths=bootstrap_only_rel_paths,
-            )
-            if _is_delete_even_if_mismatch_uninstall_path(rel_path):
-                actions.append(
-                    _UninstallAction(
-                        rel_path=rel_path.as_posix(),
-                        category=category,
-                        status="would_remove",
-                        reason="known SpecDock-managed agent/skill asset",
-                    )
-                )
-                continue
-            _add_exact_match_uninstall_action(
-                actions,
-                target_root,
-                rel_path,
-                category=category,
-                expected=(assets_dir / mapping.source_asset_rel).read_bytes(),
-                include_missing_removals=include_missing_removals,
-            )
-
-        for rel_path in install_plan.obsolete_exact_rel_paths:
-            known_rel_paths.add(rel_path)
-            if not _path_exists_for_uninstall(target_root / rel_path):
-                if include_missing_removals:
-                    actions.append(
-                        _UninstallAction(
-                            rel_path=rel_path.as_posix(),
-                            category="obsolete_managed",
-                            status="would_remove",
-                            reason="known obsolete SpecDock-managed asset",
-                        )
-                    )
-                continue
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category="obsolete_managed",
-                    status="would_remove",
-                    reason="known obsolete SpecDock-managed asset",
-                )
-            )
+        distribution_plan = build_distribution_plan(
+            assets_dir / "install_root",
+            manifest_path=assets_dir / "managed_distribution.json",
+            scaffold_root=assets_dir / "spec_dock",
+            target_root=target_root,
+            operation="uninstall",
+        )
+        _append_distribution_uninstall_actions(
+            actions,
+            target_root,
+            plan=distribution_plan,
+            include_missing_removals=include_missing_removals,
+            known_rel_paths=known_rel_paths,
+        )
 
         for rel_path, expected in _build_scaffold_uninstall_sources(assets_dir):
             known_rel_paths.add(rel_path)
