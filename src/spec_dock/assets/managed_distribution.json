@@ -8,19 +8,1268 @@
           "path": "spec-dock/scripts/spec-dock",
           "kind": "regular",
           "sha256": "76eafeaa3395e4146c8cc46dcf8e86499b6859212042c0bd6f6a77185ab63e99",
-          "source": {"kind": "provider-source", "ref": "iss-00359-final"}
+          "source": {
+            "kind": "provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
         },
         {
           "path": "spec-dock/.gitignore",
           "kind": "regular",
           "sha256": "5b789e5e5dda0baa0df7975784d17742fd612d5e44b5fc1ebca4b3727f2876d7",
-          "source": {"kind": "provider-source", "ref": "iss-00359-final"}
+          "source": {
+            "kind": "provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
         }
       ]
     }
   ],
   "historical_current_identities": [],
   "trusted_consumer_manifests": [],
-  "obsolete_exact_files": [],
+  "obsolete_exact_files": [
+    {
+      "path": ".agents/skills/spec-dock-implementation-planner/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-system-architect/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/host-adapters/meta.json",
+      "surface": "legacy-host-adapter",
+      "identities": [
+        {
+          "path": ".agents/host-adapters/meta.json",
+          "kind": "regular",
+          "sha256": "5d2d9da4c7fb151070222eb507b673adbd35f99718530bee1bcf2740bff6966f",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/git-commit-conventional-ja/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/git-commit-conventional-ja/SKILL.md",
+          "kind": "regular",
+          "sha256": "069d32ab8d5fec0b4ce94a0f079debff6d27580930afbf7fc49ab92d5c7e3ac7",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
+          "kind": "regular",
+          "sha256": "c0f9cd82b319946f3b902b922ff5baa56fc95c2e0ae3fc0af3d21ec5e6a4c593",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
+          "kind": "regular",
+          "sha256": "8e1f17a30e2dc060b47c2d6506496fc105b050c62a5b0890111cb425b9dad13e",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-creator/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-creator/SKILL.md",
+          "kind": "regular",
+          "sha256": "d25690bfa151c5776880cd4b8e60d56d8840edb04f4652a29a20317273364055",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-creator/agents/openai.yaml",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-creator/agents/openai.yaml",
+          "kind": "regular",
+          "sha256": "3517d7bc103695f9bbf8ed746c8db6979719bdaf5f74888e7a6d4aa77c8db2dc",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-merge-preparer/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-merge-preparer/SKILL.md",
+          "kind": "regular",
+          "sha256": "954198110ef19567a29b66ad15cc07b6323c61317e4e621108d90dc1403e7c9a",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-merge-preparer/agents/openai.yaml",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-merge-preparer/agents/openai.yaml",
+          "kind": "regular",
+          "sha256": "ec23ab2cf1ab58f1307eddde286cf1361530085cc6d841fefe0fc09b22be10a8",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-merge-preparer/templates/pr-repair-batch.md",
+          "kind": "regular",
+          "sha256": "1e8a837b292fc2361c8fab99a1b779a1a36ba852591dca41ed5a53e2570d49cb",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/SKILL.md",
+          "kind": "regular",
+          "sha256": "3eaed5b08447fce5c43f0e739532eb1a526a6cacc24a4f924a8a9ea8ba01641c",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/codex-review-instructions.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/codex-review-instructions.md",
+          "kind": "regular",
+          "sha256": "4287f397423281bdc92cf2a90f83619d4dfa089c124f07d4f1844bf8a1351311",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
+          "kind": "regular",
+          "sha256": "18e8782f7f7e097efa1a6c3af1a7e99e8ffc81ae29bb1b0144ac08ccd0d70959",
+          "mode": 493,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
+          "kind": "regular",
+          "sha256": "e97573c3a1293d90c650965f5ebab9ec8d022f2e80574d240277def793ce73dd",
+          "mode": 493,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh",
+          "kind": "regular",
+          "sha256": "06c7cc2c4c3213646dfebd33d9ecd6db6aace64265fcd605b50c1462c1389643",
+          "mode": 493,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py",
+          "kind": "regular",
+          "sha256": "48d0a61aab575f9902c074c422fbb42dad799ee117eb84a45c50fc1f6c3d9437",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py",
+          "kind": "regular",
+          "sha256": "02e3a07eb17de73edf1ccdbd0d622a14128205134a5b411e82575f1c636beebd",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py",
+          "kind": "regular",
+          "sha256": "9987e5e2baaf2359a7f8ecb7edd9f5648b6d20ea0aaca93bbc46faa81a3f5042",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py",
+          "kind": "regular",
+          "sha256": "9f242e851f3f21c5722d096c765d8825560e518418c9864fd874e16e824065a6",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh",
+          "kind": "regular",
+          "sha256": "2a7bb9f8ce490a23b7325419195cbfa0ea851a88d889623e7fbbb9e6da083f7d",
+          "mode": 493,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
+          "kind": "regular",
+          "sha256": "4906758e8f5b9e99c7f2faf465a1baf497cc465d4cf1bb33ff86dfaf41c75eb7",
+          "mode": 493,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
+          "kind": "regular",
+          "sha256": "24b3b85065f1f6934b6b4de4623370db1c639e99c07bfd6e24e65cb3663eb48d",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
+          "kind": "regular",
+          "sha256": "ee772961200a12d790c82de0c7da32bace380466e6af4a6ad6778c21d5ccd1ac",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-clarification/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-clarification/SKILL.md",
+          "kind": "regular",
+          "sha256": "660c752f4423d5641ab361c0025e7822c425a40206202e83c2265ff1777be8fc",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+          "kind": "regular",
+          "sha256": "d0a38b9c627c6cff5d4b7ad2c6ae4b6e0ee0f4ee4d08731cc25431a9c1f6b129",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+          "kind": "regular",
+          "sha256": "e076ef2af9cf8389872351bc026c6a8e05082338f267154a3feb5ee4ddd1ed86",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-epic-execution/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-epic-execution/SKILL.md",
+          "kind": "regular",
+          "sha256": "cc7c2afa27f77813b493a0c8e4793c2d02cb6a030057c56860f8a24a40ed6260",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-epic-planning-manual/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-epic-planning-manual/SKILL.md",
+          "kind": "regular",
+          "sha256": "f7b5379c3c3515cc4df330907971caac81cb2a0a6bcc0a8232e26bfb0327949d",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-epic-planning/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-epic-planning/SKILL.md",
+          "kind": "regular",
+          "sha256": "1a774e56b2858374c144c1a80c4d878b031c351683657e2ef044d2d8052074e8",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-hub/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-hub/SKILL.md",
+          "kind": "regular",
+          "sha256": "1467a8a7888080aebf73b7a2d9c7ca9392f296e643bd89e7dd65ddb0f882c219",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-initiative-planning-manual/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-initiative-planning-manual/SKILL.md",
+          "kind": "regular",
+          "sha256": "398e1b718f46dcd275ed7d86a771e04713413f0f27e06ba02ad6e3ff9e6463be",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+          "kind": "regular",
+          "sha256": "570d53739a7e6d2b8daf1d77f25a38767cd8a99892845b750f3142a99791b1aa",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-issue-execution/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-issue-execution/SKILL.md",
+          "kind": "regular",
+          "sha256": "d8621fa0d6fefa9af77e74a0d1f0ab6713a6a5fe15d908238be2c48196747ecf",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-issue-planning-manual/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-issue-planning-manual/SKILL.md",
+          "kind": "regular",
+          "sha256": "385e147bd729e53fb7b43e9e567d1686b632674f2bfa8bc5a0500e0a0bfcf547",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-issue-planning/SKILL.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-issue-planning/SKILL.md",
+          "kind": "regular",
+          "sha256": "cceb2b7c729dec713c170a04de7d703f14cfcd6c91ee243d197c976ac2bcfa20",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-issue-planning/resources/planner-prompt.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-issue-planning/resources/planner-prompt.md",
+          "kind": "regular",
+          "sha256": "128de5876da6a1696da7865625b905518ef113014300c086c9393c3576049712",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-issue-planning/resources/reviewer-prompt.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-issue-planning/resources/reviewer-prompt.md",
+          "kind": "regular",
+          "sha256": "96c1723ed813e59a661b1ce7562b4966be130de5363108348a2e70c8f5275507",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-issue-planning/resources/revision-prompt.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-issue-planning/resources/revision-prompt.md",
+          "kind": "regular",
+          "sha256": "64afad5b3fa54c33825282ff87afe64b37c8877760db3def0bbc3c84979a723c",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".agents/skills/spec-dock-issue-planning/resources/transport-output-contract.md",
+      "surface": "legacy-managed-skill",
+      "identities": [
+        {
+          "path": ".agents/skills/spec-dock-issue-planning/resources/transport-output-contract.md",
+          "kind": "regular",
+          "sha256": "cb6847049dce4fd2e93bf90d0b3f514f34982935d131b5d2b6b44ac108a7f4eb",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/AGENTS.md",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/AGENTS.md",
+          "kind": "regular",
+          "sha256": "fe26eddc72773df6285badf64d87aefc6457ea4352817418704adcf55e1f3ce3",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/code-reviewer.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/code-reviewer.toml",
+          "kind": "regular",
+          "sha256": "344528412d40edcc4ba329f1fe83a69201a2775e688a20c56e697c9982d24213",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/consultant.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/consultant.toml",
+          "kind": "regular",
+          "sha256": "309ad758960bd39358d5f0343fea859e3713375fa76f37f26d7ca73bbb52e04f",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/deep-consultant.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/deep-consultant.toml",
+          "kind": "regular",
+          "sha256": "9f5c7af4ac08a1b55b2ec2a8082f013bdd8ed65f5eeb1870fd8012be7e5c96d1",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/default.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/default.toml",
+          "kind": "regular",
+          "sha256": "37309b3aa9ff654d65aaae90bd6a1208639944106cec9d0b6ce7e861cbb9a3ee",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/dev-coder.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/dev-coder.toml",
+          "kind": "regular",
+          "sha256": "7e47d624e5d2768aef7eb2934a076d4cc47912631666452429690eec70e27c16",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/doc-writer.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/doc-writer.toml",
+          "kind": "regular",
+          "sha256": "8e995dbcfc066163beaef867a93a1b79a787acc3e1aabff02b2c6a94a38d5150",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/explorer.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/explorer.toml",
+          "kind": "regular",
+          "sha256": "59b3eb9690600a49e9581a007ab58b164af60d14cf9f61fe0cbaf6b37d200d5d",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/implementation-planner.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/implementation-planner.toml",
+          "kind": "regular",
+          "sha256": "a64e9b83b93d0e9be9849a5ca69a049618ccd590d743a4c0d48db16164c40337",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/qa-reviewer.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/qa-reviewer.toml",
+          "kind": "regular",
+          "sha256": "efa3f384c2c52fc1112c662a0789972eedfaeea141efe593635905877bb55733",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/repo-analyst.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/repo-analyst.toml",
+          "kind": "regular",
+          "sha256": "49b64c8973fd7ec2e951ba7c4e15c8cb19461cc15faaa35246b88223ad93fda8",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/researcher.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/researcher.toml",
+          "kind": "regular",
+          "sha256": "676572c33e16f047dafa77f808ebfcebc0af1467c422f0d4e11772a7b786883d",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/spark-worker.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/spark-worker.toml",
+          "kind": "regular",
+          "sha256": "d2e7da86f3ab2ada9c3f35f744d3b93fc71548b9bc90a404f213567ef83b1f72",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/spec-manager.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/spec-manager.toml",
+          "kind": "regular",
+          "sha256": "ad31a53f9752667059ec70cd5250ffcad00b0486514376b1efbfe133884c3a21",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/spec-reviewer.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/spec-reviewer.toml",
+          "kind": "regular",
+          "sha256": "d84dde2a06cbdc4b3e21c2a4706ed42f95a2ae9fc31be62a5b2a62f1cdcdb1c3",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/system-architect.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/system-architect.toml",
+          "kind": "regular",
+          "sha256": "ddb0a20b01269534f9037a63c4df7067774f75b19d90ce121cc30ff18e8e0c7a",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/utility-worker.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/utility-worker.toml",
+          "kind": "regular",
+          "sha256": "99da3c642ca69c0091688862b45d5542c4f62fa0bbc4af70889cec093656926f",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/agents/worker.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/agents/worker.toml",
+          "kind": "regular",
+          "sha256": "56afa40af251a9777627aa6c0b130b7c810a68edf59ca0bf66ebbca30c7dde49",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/config.toml",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/config.toml",
+          "kind": "regular",
+          "sha256": "d1b89268f0fc636c349851609db60b8c3a74defc546a24c19d1750fdc881b2b4",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/prompts/execute-epic.md",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/prompts/execute-epic.md",
+          "kind": "regular",
+          "sha256": "08f1442464526aaf15f2f772012b1944986d8809eb8936db6588bb141223f8d3",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/prompts/execute-initiative.md",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/prompts/execute-initiative.md",
+          "kind": "regular",
+          "sha256": "21f356a1e0b1f2c77dbcf59c005dd02c177095cfc64c457fe03b0e47283b3f54",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/prompts/execute-issue.md",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/prompts/execute-issue.md",
+          "kind": "regular",
+          "sha256": "d216882f9a226fe014f4bca0bba4459d7cb1a9f09b0d6b041afc15a0644d02bc",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".codex/rules/spec-dock-commands.rules",
+      "surface": "legacy-codex-surface",
+      "identities": [
+        {
+          "path": ".codex/rules/spec-dock-commands.rules",
+          "kind": "regular",
+          "sha256": "ac79ceb19a64e7755122021e13e408ff5a05e0e95242723f4a01811214f9e3e5",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/code-reviewer.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/code-reviewer.agent.md",
+          "kind": "regular",
+          "sha256": "843769a0e60602f89c29c8a04cd8a05d1e17a8533ef4e08f26adfa9af97f66e3",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/consultant.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/consultant.agent.md",
+          "kind": "regular",
+          "sha256": "bdfa500094b071fe9b1eec896e3361325172bc7dc6937cc800b4f12ba949410b",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/dev-coder.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/dev-coder.agent.md",
+          "kind": "regular",
+          "sha256": "c779f0e81e7832ed661b266833bf369165b5be08a8bab5244772bd77b32c5527",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/doc-writer.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/doc-writer.agent.md",
+          "kind": "regular",
+          "sha256": "d699575923d6e32b5effeaddb7cdfc4ab4e92ca2c4c91f49ebc911ca0fc4b1eb",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/orchestrator.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/orchestrator.agent.md",
+          "kind": "regular",
+          "sha256": "7372bd4f7b31c25107f73b24845052a6bc6e7ea17615e2e5625484c33018d38a",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/qa-reviewer.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/qa-reviewer.agent.md",
+          "kind": "regular",
+          "sha256": "54b2217c207a74cf0e03caded11bb7d694ad4902f64e2ed50c63d098b7cbe71b",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/repo-analyst.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/repo-analyst.agent.md",
+          "kind": "regular",
+          "sha256": "dc8d6eaec7f45e156c11378821a69a2d9891db1aa95b9b3005401a664963285a",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/researcher.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/researcher.agent.md",
+          "kind": "regular",
+          "sha256": "f4f4e9e885a5e7d9096fbe876afc071051bdd251e1e6206368977f91e3e09819",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/spec-manager.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/spec-manager.agent.md",
+          "kind": "regular",
+          "sha256": "ae245c9b47eb256c6c7e9586562c107a40df5d8d6c8a906df6fd1656726339fd",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/spec-reviewer.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/spec-reviewer.agent.md",
+          "kind": "regular",
+          "sha256": "ecb63d5844acf18a3f3f78d520d9666343c13f08b1f19fa891eed8b8a632a318",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": ".github/agents/utility-worker.agent.md",
+      "surface": "legacy-agent-shim",
+      "identities": [
+        {
+          "path": ".github/agents/utility-worker.agent.md",
+          "kind": "regular",
+          "sha256": "dbbbb454fd43883d04c01edeea1a74638329b056885c81f371d47cad914f8c01",
+          "mode": 420,
+          "source": {
+            "kind": "git-provider-source",
+            "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+          }
+        }
+      ],
+      "on_unknown": "preserve-and-block"
+    }
+  ],
   "historical_shortcuts": []
 }
