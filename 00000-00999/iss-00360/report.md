@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認した。S00 / S10、S40A / S40B、S20 / S25 / S30を完了し、S35でversion / retry marker admissionとCLIのzero-write rejectionを実装・検証した。続くS45では、Genuine Freshだけを対象にCurrent配布計画を適用し、既存のunknown／obsolete-looking外部資産を保全し、Current衝突を最初の書き込み前に拒否する経路と回帰テストを追加した。S45のfresh code review、step commit、clean/upstream一致後にS50へ進む。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認した。S00 / S10、S40A / S40B、S20 / S25 / S30を完了し、S35でversion / retry marker admissionとCLIのzero-write rejectionを実装・検証した。S45ではGenuine FreshのCurrent配布計画、S50ではrecognized update / `init --force`の共通plan/applyを実装した。S55では、Issue 359 final commitから再現できる旧managed資産をexact SHAでcatalog化し、既知旧資産のprune、変更済み・不明・unsafe候補のpreserve-and-block、既存dogfood consumerのcutoverを実装・検証した。S55のfresh code review、step commit、clean/upstream一致後にS60へ進む。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
 
 ## Verification
 
@@ -24,6 +24,8 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * Current branch upstream: `origin/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
 
 * S35 implementation-admission SHA: `2cd8f5c5fa007d69eb716d79546eeffe3d0d02f8`（local HEAD = upstream、clean）
+* S45 implementation SHA: `37d2da3693d4fc26bc815dbeb4b39b9619cda27d`
+* S50 implementation SHA: `dd7c86aa446b8fb103caf47d0141d50990bf0f95`
 * Plan amendment local review: fresh `spec-reviewer` pass（S40A verificationは既存`test_storage_core_cli.py`のみ）
 * Plan amendment Strict review: session `issue-360-admission-current-strict`、GitHub exact SHA `8c01c9fd2e76d7d7bccc754bca902e8010026703`、resolved `GPT-5.5` verified、P0 / P1なしでpass
 * S00 revalidation: branch / active Issue / dependency `ready=true` / blockers 0 / `validate nodes=221` / local HEAD = upstream `9916af139e01a322d092e6fc0434b49f6a567e37` / clean
@@ -191,11 +193,30 @@ S50では、admissionを通過したrecognized workspaceの`update`と既存work
 
 S50のfresh code review、step commit、clean / upstream一致後にS55 proven obsolete prune / preserveへ進む。
 
+### S55 Proven obsolete prune / preserve-and-block
+
+S55では、Issue 359 final commit `948d0cf0dedb84ca34e51a4adc0995820aa011f6` のprovider `install_root`からCurrent 5ファイルを除外した旧managed配布物を再走査し、再現可能な72ファイルをGit provider-source SHA-256付きの`obsolete_exact_files`へ登録した。旧legacy 3 skill（`spec-driven-tdd-workflow`、`spec-dock-system-architect`、`spec-dock-implementation-planner`）は過去bytesを現行履歴から再現できないためidentityを推測せず、空identityの`preserve-and-block`として登録した。ManifestはCurrent catalogを複製せず、exact relative path / identity / `on_unknown`だけを保持する。
+
+Provenanceテストは全identityのsource refがこの固定commit SHAであることを常時検証し、履歴オブジェクトが利用できるcheckout（今回のローカル実行）では各blobのSHA-256とmodeまで`git show` / `git ls-tree`で照合する。履歴を取得しないshallow checkoutでは、静的なSHA束縛を実行したうえでblob照合部分だけを明示的にskipし、CIが履歴の有無で誤失敗しないようにする。
+
+既知のobsolete identityに一致するregular fileは`update` / `init --force`でexact entryだけをpruneし、変更済み・ownership不明・symlink・exact directoryは保持またはblockして全mutation前に停止する。既存dogfood checkoutへrecognized `update`を実行し、旧`.agents/**`、`.codex/**`、`.github/agents/**`と旧docs / template surfaceをproviderへ同期して除去した。一方、`spec-dock/initiatives/**`、Issue-local `.workbench/**`、retained CI、Current二skill、unknown siblingは保持した。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| S55 catalog / manifest | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py -q` → `65 passed`; manifest obsolete exact entries `75`（known 72 + unproven legacy 3） |
+| Proven obsolete prune | pass | unit testでknown digest一致の`.codex/config.toml`を`update`時にprune。CLI testで`update` / `init --force`の実consumer経路を確認 |
+| Preserve-and-block | pass | modified / unknown regular、symlink、exact directoryをbefore/after不変で停止。診断はrelative path / reasonのみ |
+| Existing consumer cutover | pass | `uv run spec-dock update .` 成功。old managed external surfaceとobsolete scaffold docs/templatesを除去し、initiatives / Issue-local Workbench / retained CIを保持 |
+| Focused regression | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `87 passed`（unit 65、CLI 22） |
+| Static checks | pass | `python3 -m json.tool src/spec_dock/assets/managed_distribution.json`、`uv run ruff check src/spec_dock/managed_distribution.py tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py`、`git diff --check` |
+
+S55ではknown historical assetだけのbounded pruneとpreserve-and-blockを閉じた。再現不能legacy 3 skillの自動削除、partial failure marker / forward retry、uninstall apply、package parity、docs最終整合はS60以降の未完了範囲であり、S55単独で旧surface完全除去を宣言しない。
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force testsを完了した。S50 fresh code review、step commit、clean/upstream一致後にS55へ進む。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force tests、S55 obsolete prune / preserve testsを完了した。S55 fresh code review、step commit、clean/upstream一致後にS60へ進む。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
