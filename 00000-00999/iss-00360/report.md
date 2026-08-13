@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認したため、Planを`approved`、handoffを`implementation-start-ready`へ戻した。S00の再確認後、S10のread-only inventory lockから実装を開始する。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認したため、Planを`approved`、handoffを`implementation-start-ready`へ戻した。S00再確認とS10 read-only inventory lockを完了し、S40Aの実装へ進む。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
 
 ## Verification
 
@@ -26,6 +26,7 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * Current implementation-admission SHA: `8c01c9fd2e76d7d7bccc754bca902e8010026703`（local HEAD = upstream、clean）
 * Plan amendment local review: fresh `spec-reviewer` pass（S40A verificationは既存`test_storage_core_cli.py`のみ）
 * Plan amendment Strict review: session `issue-360-admission-current-strict`、GitHub exact SHA `8c01c9fd2e76d7d7bccc754bca902e8010026703`、resolved `GPT-5.5` verified、P0 / P1なしでpass
+* S00 revalidation: branch / active Issue / dependency `ready=true` / blockers 0 / `validate nodes=221` / local HEAD = upstream `9916af139e01a322d092e6fc0434b49f6a567e37` / clean
 
 * Push verification at planning commit: local `HEAD` = upstream = `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * `origin/main` merge: fast-forward success、Issue 360文書差分を保持
@@ -55,11 +56,24 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 
 最小修正として、Planの順序を`S10 → S40A → S40B → S20 → S25 → S30 → S35 → S45`へ変更し、S40Aの検証を既存`tests/cli_runtime/test_storage_core_cli.py`だけへ限定した。S10のread-only exact inventoryを先にlockし、S40A / S40Bでprovider physical cutoverを完了してからS20のCurrent catalog / historical manifest validationを行う契約は維持した。Plan amendment後のfresh local `spec-reviewer`とcurrent exact-upstream Strictがともにpassしたため、implementation-start gateを解消し、S00 / S10へ進む。
 
+### S10 Exact inventory lock
+
+S10はread-onlyで完了した。基準HEADは`9916af139e01a322d092e6fc0434b49f6a567e37`、provider-side historical sourceはIssue 359 final commit `948d0cf0dedb84ca34e51a4adc0995820aa011f6`（reachable branch `iss-00359-replace-managed-workflow-skills-with-specdock-skills`、package version `0.2.3`）とした。`git ls-tree` / `git show`でinstall_root 77 filesと旧scaffoldのexact mode/blob/SHA-256を再現できるため、旧surfaceのhistorical identityはGit provider-source provenanceとして採用できる。wheel / sdistの保存物は存在せず、配布済みpackage identityとは断定しない。
+
+| 分類 | S10でlockした現物 | 実装上の扱い |
+|---|---|---|
+| Current Target | provider `spec_dock/{docs,templates,scripts,system}/**`、`.gitignore`、install_root二skill、`.github/workflows/ci.yml`、root `spec`、generated `active/.agent` | S40B後にphysical catalogとして導出し、Current全量manifestは作らない |
+| Obsolete managed | 旧18 managed skill、host-adapter/native agent/config/prompt/rule、ChatGPT wrapper、authoring-pack、planning runtime、obsolete docs/templates | S40A/S40Bでproviderから除去。consumer pruneはGit-source exact identityまたはtrusted manifest + target identity一致時だけ |
+| Preserve / user-owned | `initiatives/**`、node-local evidence、Workbench payload、unknown external skill/config/workflow、unproven same-name path | 自動置換・pruneせず、必要時はpreserve-and-block |
+| Read-only evidence | Issue 357〜359 report、Epic IC artifacts、Git history/tree、package metadata、current provider/dogfood parity | source-of-truth照合とreport evidenceだけに使用 |
+
+Provider / dogfoodの現行二skill、CI、`.gitignore`、`scripts/spec-dock`のselected bytes/modeは一致した。dogfood固有のgenerated filesは`spec-dock.version`、active/agent derived views、dashboard/deps/tree projectionに限定される。`meta.json`のowner/path claims、workspace marker、directory名だけでは個別ownershipを証明しない。S10で再現できない「過去wheel/sdistのpackage digest」は未採用候補としてpreserve-and-blockに記録し、S20のmanifestへ推測値を登録しない。
+
 ## Residual Risks / Follow-ups
 
-* Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockする。
+* Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict passを完了した。次はS10 inventory lockである。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lockを完了した。次はS40A physical Runtime retirementである。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
