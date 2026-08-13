@@ -766,3 +766,60 @@ def test_s65_uninstall_legacy_retry_marker_without_version_is_admissible_and_rea
 
     assert main(["uninstall", str(tmp_path)]) == 0
     assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s65_uninstall_dry_run_preserves_modified_current_skill(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    skill = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    skill.write_text("user-modified\n", encoding="utf-8")
+
+    assert main(["uninstall", str(tmp_path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    action = next(item for item in payload["actions"] if item["path"] == ".agents/skills/spec-dock/SKILL.md")
+    assert action["status"] == "preserved"
+    assert "unknown-current-collision" in action["reason"]
+    assert skill.read_text(encoding="utf-8") == "user-modified\n"
+
+
+def test_s65_uninstall_dry_run_surfaces_known_obsolete_identity(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    obsolete = tmp_path / ".codex/config.toml"
+    obsolete.parent.mkdir(parents=True, exist_ok=True)
+    obsolete.write_bytes(b'project_doc_fallback_filenames = [".codex/AGENTS.md"]\n')
+    obsolete.chmod(0o644)
+
+    assert main(["uninstall", str(tmp_path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    action = next(item for item in payload["actions"] if item["path"] == ".codex/config.toml")
+    assert action["status"] == "would_remove"
+    assert action["category"] == "obsolete_managed"
+    assert "known obsolete" in action["reason"]
+    assert obsolete.exists()
+
+
+def test_s60_retry_marker_phase_allowlist_rejects_unknown_phase_without_writes(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    root_stat = tmp_path.stat()
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    marker.write_text(
+        json.dumps(
+            {
+                "last_completed_phase": "unknown-phase",
+                "operation": "update",
+                "package_version": "0.2.3",
+                "purpose": "distribution-rerun",
+                "schema_version": 1,
+                "target_root": {"device": root_stat.st_dev, "inode": root_stat.st_ino},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+    assert "marker-invalid" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before
