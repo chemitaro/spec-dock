@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、実装コミット `7736daec83cfc4a9e60843a080d1404fb57160cf` をpush済みである。Issue 360対象の最終品質確認は、通常テスト・lint・focused distribution regression・package integration・`spec-dock validate`までpassした一方、全リポジトリのfull regressionにはIssue 360対象外の既存runtime回帰が残り、最終ChatGPT-SpecReview-Strictはブラウザ側のprompt reconstruction / rate-limitで送信前に成立しなかった。そのためS99/H10、Issue close、IC-3判定は未実施のまま、レビュー可能な実装PRとしてhandoffする。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、実装コミット `7736daec83cfc4a9e60843a080d1404fb57160cf` と安全境界のfollow-up `ff3dcc52ca91a1629753344354a17f4d0e59f46b` を作成した。Issue 360対象の最終品質確認は、通常テスト・lint・focused distribution regression・package integration・`spec-dock validate`までpassした一方、全リポジトリのfull regressionにはIssue 360対象外の既存runtime回帰が残り、最終ChatGPT-SpecReview-Strictはブラウザ側のprompt reconstruction / rate-limitで送信前に成立しなかった。そのためS99/H10、Issue close、IC-3判定は未実施のまま、レビュー可能な実装PRとしてhandoffする。
 
 ## Verification
 
@@ -285,9 +285,9 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | `uv run pytest` → `986 passed, 1513 skipped` |
+| Fast lane | pass | `uv run pytest` → `986 passed, 1516 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
-| Issue 360 focused regression | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_distribution_cutover.py tests/unit/infra/test_init_update.py tests/unit/infra/test_managed_distribution.py tests/unit/infra/test_artifact_templates.py tests/integration/test_epic_00343_distribution.py -q` → `303 passed, 468 skipped` |
+| Issue 360 focused regression | pass (Issue 360 suites) | The installer/distribution suites pass (`239 passed, 468 skipped` across cutover, managed distribution, and init/update; artifact templates `54 passed`; archive integration `13 passed`). The combined command also exercised `tests/integration/test_epic_00343_distribution.py`; it produced `305 passed, 468 skipped` plus one existing cross-filesystem privacy-sentinel failure caused by a timestamp digit collision, so that aggregate command is not claimed as a full pass. |
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
