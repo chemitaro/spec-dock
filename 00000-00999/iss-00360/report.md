@@ -177,11 +177,25 @@ S45では、`spec-dock/` が存在しないGenuine Freshだけを対象に、pro
 
 S45のfresh code review、step commit、clean / upstream一致後にS50 recognized update / `init --force`へ進む。
 
+### S50 Recognized update / `init --force`
+
+S50では、admissionを通過したrecognized workspaceの`update`と既存workspaceへの`init --force`を同じ`managed_distribution` plan/applyへ接続した。Current external assetのcreate／adopt／upgradeはdistribution applyをauthorityとし、その後に`spec-dock/{docs,templates,scripts,system}`だけをrefreshする。`initiatives/**`、既存の`.workbench/**`、unknown siblingはこの経路で削除・置換しない。Fresh `init`はS45の経路を維持し、`--force`なしの既存workspaceは既存のerror契約へ戻した。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| S50 focused behavior | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_distribution_cutover.py -q -k "s50 or update or force"` → `7 passed, 11 deselected` |
+| S50 + distribution regression | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `77 passed` |
+| Preserve / zero-write matrix | pass | missing Currentのrestore、`init --force` parity、unknown Current collision、directory collisionを検証。initiatives / `.workbench` sentinelは不変 |
+| Static checks | pass | `uv run ruff check src/spec_dock/cli.py tests/cli_runtime/test_distribution_cutover.py`、`git diff --check` |
+| Existing broad selection | not adopted | legacy provider assetを前提にした既存updateテストと、Current anchorを意図的に壊す旧テストはS35以降の仕様と不一致のため、S50 step gateには採用しない |
+
+S50のfresh code review、step commit、clean / upstream一致後にS55 proven obsolete prune / preserveへ進む。
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision testsを完了した。S45 fresh code review、step commit、clean/upstream一致後にS50へ進む。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force testsを完了した。S50 fresh code review、step commit、clean/upstream一致後にS55へ進む。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
