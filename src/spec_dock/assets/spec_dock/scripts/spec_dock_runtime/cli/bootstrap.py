@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.check_deps import check_deps as application_check_deps
 from spec_dock_runtime.application.close_node import close_node as application_close_node
-from spec_dock_runtime.application.contracts import SyncRequest, UseCases, ValidateTreeRequest
+from spec_dock_runtime.application.contracts import UseCases
 from spec_dock_runtime.application.create_artifact_doc import create_artifact_doc as application_create_artifact_doc
 from spec_dock_runtime.application.create_node import (
     create_epic as application_create_epic,
@@ -26,23 +25,8 @@ from spec_dock_runtime.application.issue_lifecycle import (
     issue_finish as application_issue_finish,
     issue_start as application_issue_start,
 )
-from spec_dock_runtime.application.issue_planning import (
-    run_issue_planning_apply as application_run_issue_planning_apply,
-    run_issue_planning_create as application_run_issue_planning_create,
-    run_issue_planning_review as application_run_issue_planning_review,
-    run_issue_planning_revise as application_run_issue_planning_revise,
-)
 from spec_dock_runtime.application.mutate_deps import mutate_deps as application_mutate_deps
-from spec_dock_runtime.application.ports import (
-    IssuePlanningApplyOutputRejected,
-    IssuePlanningCandidateArchiveRejected,
-    IssuePlanningCandidateBuildFailed,
-    IssuePlanningCandidateCollision,
-    IssuePlanningCandidateOutputRejected,
-    IssuePlanningCandidatePublicationFailed,
-    IssuePlanningDependencies,
-    Ports,
-)
+from spec_dock_runtime.application.ports import Ports
 from spec_dock_runtime.application.set_active import (
     clear_active as application_clear_active,
     set_active as application_set_active,
@@ -57,8 +41,6 @@ from spec_dock_runtime.application.worktree import (
     worktree_remove as application_worktree_remove,
     worktree_show as application_worktree_show,
 )
-from spec_dock_runtime.domain.models import SpecNodeKind, SpecNodeSeed
-from spec_dock_runtime.domain.tree import build_graph
 from spec_dock_runtime.infra import (
     active_store as infra_active_store,
     artifact_writer as infra_artifact_writer,
@@ -70,10 +52,6 @@ from spec_dock_runtime.infra import (
     git_cli as infra_git_cli,
     github_capability_cli as infra_github_capability_cli,
     github_cli as infra_github_cli,
-    issue_planning_apply as infra_issue_planning_apply,
-    issue_planning_candidate as infra_issue_planning_candidate,
-    issue_planning_chatgpt as infra_issue_planning_chatgpt,
-    issue_planning_review as infra_issue_planning_review,
     json_store as infra_json_store,
     make_cli as infra_make_cli,
     template_scaffolder as infra_template_scaffolder,
@@ -81,8 +59,7 @@ from spec_dock_runtime.infra import (
 from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.domain.models import SpecGraph
-    from spec_dock_runtime.infra.contracts import StoredMetaRecord
+    from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -344,138 +321,14 @@ class _Clock:
 
 
 @dataclass(frozen=True)
-class _IssuePlanningGateway:
-    def validate_candidate_output_directory(self, output_dir: Path, repo_root: Path):
-        try:
-            return infra_issue_planning_candidate.validate_candidate_output_directory(output_dir, repo_root)
-        except infra_issue_planning_candidate.CandidateOutputRejected as error:
-            raise IssuePlanningCandidateOutputRejected(str(error)) from error
-
-    def load_verified_issue_candidate(self, candidate_path: Path, repo_root: Path):
-        try:
-            return infra_issue_planning_candidate.load_verified_issue_candidate(candidate_path, repo_root)
-        except infra_issue_planning_candidate.CandidateArchiveRejected as error:
-            raise IssuePlanningCandidateArchiveRejected(error.findings) from error
-
-    def load_validated_issue_authoring_payload(
-        self,
-        snapshot: object,
-        *,
-        expected_companion_path: str,
-        repo_root: Path,
-    ):
-        try:
-            return infra_issue_planning_candidate.load_validated_issue_authoring_payload(
-                cast("Any", snapshot),
-                expected_companion_path=expected_companion_path,
-                repo_root=repo_root,
-            )
-        except infra_issue_planning_candidate.CandidateArchiveRejected as error:
-            raise IssuePlanningCandidateArchiveRejected(error.findings) from error
-
-    def build_and_publish_candidate(self, **kwargs: Any):
-        try:
-            return infra_issue_planning_candidate.build_and_publish_candidate(**kwargs)
-        except infra_issue_planning_candidate.CandidateCollision as error:
-            raise IssuePlanningCandidateCollision(str(error)) from error
-        except infra_issue_planning_candidate.CandidateArchiveRejected as error:
-            raise IssuePlanningCandidateArchiveRejected(error.findings) from error
-        except infra_issue_planning_candidate.CandidateBuildFailed as error:
-            raise IssuePlanningCandidateBuildFailed(str(error)) from error
-        except infra_issue_planning_candidate.CandidatePublicationFailed as error:
-            raise IssuePlanningCandidatePublicationFailed(str(error)) from error
-        except infra_issue_planning_candidate.CandidateOutputRejected as error:
-            raise IssuePlanningCandidateOutputRejected(str(error)) from error
-
-    def open_safe_directory_descriptor(self, path: Path) -> int:
-        try:
-            return infra_issue_planning_candidate.open_safe_directory_descriptor(path)
-        except infra_issue_planning_candidate.CandidateArchiveRejected as error:
-            raise IssuePlanningCandidateArchiveRejected(error.findings) from error
-
-    def read_bounded_regular_file(self, path: Path, *, max_bytes: int) -> bytes:
-        return infra_issue_planning_candidate.read_bounded_regular_file(path, max_bytes=max_bytes)
-
-    def read_bounded_regular_file_at(
-        self,
-        root_descriptor: int,
-        relative_path: str,
-        *,
-        max_bytes: int,
-    ) -> bytes:
-        try:
-            return infra_issue_planning_candidate.read_bounded_regular_file_at(
-                root_descriptor,
-                relative_path,
-                max_bytes=max_bytes,
-            )
-        except infra_issue_planning_candidate.CandidateArchiveRejected as error:
-            raise IssuePlanningCandidateArchiveRejected(error.findings) from error
-
-    def read_external_review_result(self, path: Path, **kwargs: Any) -> bytes:
-        return infra_issue_planning_review.read_external_review_result(path, **kwargs)
-
-    def publish_planning_review_evidence(self, **kwargs: Any):
-        try:
-            return infra_issue_planning_review.publish_planning_review_evidence(**kwargs)
-        except infra_issue_planning_candidate.CandidateOutputRejected as error:
-            raise IssuePlanningCandidateOutputRejected(str(error)) from error
-
-    def load_expected_planning_targets(
-        self,
-        repo_root: Path,
-        expected_head: str,
-        canonical_target_paths: tuple[str, str, str],
-    ):
-        return infra_issue_planning_apply.load_expected_planning_targets(
-            repo_root,
-            expected_head,
-            canonical_target_paths,
-        )
-
-    def planning_apply_resume_available(self, operation, *, output_guard) -> bool:
-        try:
-            return infra_issue_planning_apply.planning_apply_resume_available(
-                cast("Any", operation),
-                output_guard=output_guard,
-            )
-        except infra_issue_planning_apply.PlanningApplyOutputRejected as error:
-            raise IssuePlanningApplyOutputRejected(str(error)) from error
-
-    def create_planning_apply_operation(self, **kwargs: Any):
-        return infra_issue_planning_apply.PlanningApplyOperation.create(**kwargs)
-
-
-@dataclass(frozen=True)
 class _ArtifactWriter:
     def write(self, specdock_dir: Path, bundle):
         return infra_artifact_writer.write(specdock_dir, bundle)
 
 
-def _planning_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
-    return SpecNodeSeed(
-        kind=cast("SpecNodeKind", record.kind),
-        id=record.id,
-        title=record.title,
-        slug=record.slug,
-        path=Path(record.path),
-        meta_path=Path(record.meta_path),
-        parent_id=record.parent_id,
-        initiative_id=record.initiative_id,
-        epic_id=record.epic_id,
-        github_issue_number=record.github_issue_number,
-        github_repo_owner=record.github_repo_owner,
-        github_repo_name=record.github_repo_name,
-    )
-
-
 def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> BootstrapContext:
     resolved_repo_root = repo_root if repo_root is not None else specdock_dir.parent
     binary_artifact_publisher = FilesystemBinaryArtifactPublisher()
-    issue_planning_dependencies = IssuePlanningDependencies(
-        clock=_Clock(),
-        gateway=_IssuePlanningGateway(),
-    )
     ports = Ports(
         node_reader=_NodeReader(specdock_dir=specdock_dir),
         repo_root=resolved_repo_root,
@@ -492,76 +345,11 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         environment_gateway=_EnvironmentGateway(),
         filesystem_gateway=_FilesystemGateway(),
         json_store=_JsonStore(),
-        clock=issue_planning_dependencies.clock,
+        clock=_Clock(),
         artifact_writer=_ArtifactWriter(),
-        issue_planning=issue_planning_dependencies,
         explicit_file_source_guard=binary_artifact_publisher,
         explicit_file_artifact_publisher=binary_artifact_publisher,
     )
-
-    def load_planning_state() -> tuple[tuple[StoredMetaRecord, ...], SpecGraph]:
-        records = tuple(ports.node_reader.load_node_records())
-        return records, build_graph([_planning_node_seed(record) for record in records])
-
-    def planning_create(request):
-        records, graph = load_planning_state()
-        return application_run_issue_planning_create(
-            request=request,
-            records=records,
-            repo_root=resolved_repo_root,
-            dependencies=issue_planning_dependencies,
-            repo_slug_resolver=infra_issue_planning_chatgpt.resolve_issue_planning_github_repository,
-            backend_invoker=infra_issue_planning_chatgpt.invoke_issue_planning_chatgpt,
-            dependency_loader=lambda issue_id: infra_deps_reader.load_direct_dependency_resolutions(
-                specdock_dir,
-                graph,
-                issue_id,
-            ),
-        )
-
-    def planning_review(request):
-        records, _graph = load_planning_state()
-        return application_run_issue_planning_review(
-            request=request,
-            records=records,
-            repo_root=resolved_repo_root,
-            dependencies=issue_planning_dependencies,
-            repo_slug_resolver=infra_issue_planning_chatgpt.resolve_issue_planning_github_repository,
-            backend_invoker=infra_issue_planning_chatgpt.invoke_issue_planning_chatgpt,
-        )
-
-    def planning_revise(request):
-        records, _graph = load_planning_state()
-        return application_run_issue_planning_revise(
-            request=request,
-            review_evidence=None,
-            records=records,
-            repo_root=resolved_repo_root,
-            dependencies=issue_planning_dependencies,
-            repo_slug_resolver=infra_issue_planning_chatgpt.resolve_issue_planning_github_repository,
-            backend_invoker=infra_issue_planning_chatgpt.invoke_issue_planning_chatgpt,
-        )
-
-    def planning_apply(request):
-        records, _graph = load_planning_state()
-        return application_run_issue_planning_apply(
-            request=request,
-            records=records,
-            repo_root=resolved_repo_root,
-            dependencies=issue_planning_dependencies,
-            repo_slug_resolver=infra_issue_planning_chatgpt.resolve_issue_planning_github_repository,
-            validation_runner=lambda: application_validate_tree(ValidateTreeRequest(), ports),
-            sync_runner=lambda: application_sync(
-                SyncRequest(
-                    force=False,
-                    github_enabled=False,
-                    issue_limit=10000,
-                    update_active_from_branch=False,
-                ),
-                ports,
-            ),
-            transaction_runner=infra_issue_planning_apply.execute_planning_apply_transaction,
-        )
 
     use_cases = UseCases(
         create_initiative=lambda req: application_create_initiative(req, ports),
@@ -589,9 +377,5 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         worktree_show=lambda req: application_worktree_show(req, ports),
         worktree_remove=lambda req: application_worktree_remove(req, ports),
         workbench_copy=lambda req: application_workbench_copy(req, ports),
-        planning_create=planning_create,
-        planning_revise=planning_revise,
-        planning_review=planning_review,
-        planning_apply=planning_apply,
     )
     return BootstrapContext(use_cases=use_cases)

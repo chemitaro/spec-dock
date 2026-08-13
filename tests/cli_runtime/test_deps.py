@@ -513,7 +513,7 @@ class TestCliDeps(CliRuntimeHarness):
                 target,
                 ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Sibling issue"],
             )
-            self._run_runtime(target, ["active", "set", "iss-00301", "--force"])
+            self._run_runtime(target, ["active", "set", "iss-00301"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -554,7 +554,7 @@ class TestCliDeps(CliRuntimeHarness):
                 target,
                 ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Child issue"],
             )
-            self._run_runtime(target, ["active", "set", "epic-00201", "--force"])
+            self._run_runtime(target, ["active", "set", "epic-00201"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)

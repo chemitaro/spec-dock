@@ -4,7 +4,7 @@ ID: "epic-00356"
 タイトル: "SpecDock Core Simplification and External Intelligence Boundary"
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-08-10"
+最終更新: "2026-08-13"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-local-00003"]
 ---
@@ -27,8 +27,11 @@ ID: "epic-00356"
   - Issue 357〜360へStrict draft requirement / design / planを各3件、合計12件、byte-exact copyした。
   - 初版HTMLへのユーザー指摘を受け、ChatGPT / Oracleを使用せず、現行正本R/D/Pから新メンバー向け詳細HTMLを再構成した。旧版は履歴証跡として保持し、delivery indexは詳細版を現在の推奨資料として案内する。
   - 2026-08-10、Product OwnerがEpicの要件定義書・設計書・計画書を採用し、ユーザーレビュー完了と判断した。3文書の状態を`approved`へ更新し、Issue 357 / 358のDraft 1正式化へ進む。
+  - Issue 357、358、359はそれぞれPR #362、#361、#363でmainへmergeされ、GitHub Issueもclosedである。current mainは`a6ded0d9a838b40cdcd741fa473cd264b801f245`。
+  - 2026-08-13、Epic Plan §6.1に従いIC-1 / IC-2をcurrent mainと各Issue reportへ再照合した。Fresh node / Storage Core / Authoring Kitは`4 + 23 + 3 passed`、二skill contract / finalizer / routeは`11 + 9 + 7 passed`で、Epic-local `disc` Artifactと本Reportに`pass`を記録した。
+  - Issue 360はRequirement / Design / Planが各fresh reviewでP0 / P1なしとなり`approved`である。IC-1 / IC-2、direct dependency readiness、planning commit / push、formal `issue start`、active / deps / validateを完了し、ChatGPT-SpecReview-Strict round 2もexact upstream SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`でP0 / P1なしの`pass`となった。Planはpromotion commitで`implementation-start-ready`へ昇格し、そのcommit自身のfresh exact-current Strict passを外部delivery evidenceとして要求する。
 - 次のマイルストーン:
-  - 承認済みDraft 1を基にIssue 357 / 358のcanonical requirement / design / planを正式化し、Issue単位のfresh reviewer gateと実装引き継ぎ条件を閉じる。
+  - Issue 360 promotion commitのclean exact-current Strict passを外部delivery evidenceとして確認後、Plan S00から実装を開始する。
   - 新規の品質・統合・deliverable handoff Issue候補は、別途人間がnode作成を承認した場合だけ357〜360すべてへの直接依存を持つnodeとしてmaterializeする。
 - ブロッカー:
   - Requirement phaseのブロッカーは解消済み。2026-08-07の旧findingは2026-08-09の正本revisionで解決し、fresh `spec-reviewer`が`pass`と判定した。
@@ -39,6 +42,17 @@ ID: "epic-00356"
 | 対象 | 承認日 | 判断 | 承認範囲 | 残る人間判断 |
 |---|---|---|---|---|
 | Epic `epic-00356` Requirement / Design / Plan | 2026-08-10 | 採用、ユーザーレビュー完了 | 現行の3正本文書、Issue 357〜360の縦スライス、Issue 357 / 358の並行着手方針 | 品質・統合・deliverable handoff用の新規Issue nodeを作成するかは未承認のまま維持 |
+
+## Integration checkpoint記録
+
+ICはRuntime gateではなく、Epic Plan §6.1に基づく文書上のhandoffである。Issue自身の自己承認ではなく、各ownerのreport / test / merged sourceをEpic main orchestratorが再照合して判定した。
+
+| IC | 判定日 | Verdict | Exact source | Fresh verification | Evidence / transition |
+|---|---|---|---|---|---|
+| IC-1 Core / Kit | 2026-08-13 | `pass` | PR #361 head `5d1e3a4c…` / merge `3e166d4c…`、PR #362 head `55a7e41d…` / merge `8e10f255…`、current main `a6ded0d9…` | Storage Core `4 passed`、S09 Authoring Kit `23 passed`、Fresh node / Artifact `3 passed` | `artifacts/20260812t174542z-disc-ic-1-core-kit-contract.md`。Fresh node、thin Report、六Artifact、optional blank、Guide、provider / dogfood contractを固定し、IC-1をclosedとする |
+| IC-2 Skills | 2026-08-13 | `pass` | PR #363 head `948d0cf0…` / merge `a6ded0d9…` | Static / collision `11 passed`、safe finalizer `9 passed`、four-route / zero-write `7 passed` | `artifacts/20260812t174548z-disc-ic-2-skill-contract.md`。二skill、Guide link、missing capability、旧18 + legacy 3 handoffを固定し、Issue 360への文書上のhandoffを承認する |
+
+Passの範囲は親handoffだけである。Issue 360のformal lifecycle、R/D/P review、実装、IC-3、未承認の最終Issue候補、Epic完了は別途判定する。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -177,15 +191,16 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - なし。長期 architecture decision の ADR 化は fresh review 後に判断する。
 
 ## 完了した Issue / PR / Release (必須)
-- 完了Issueはなし。次のscaffoldのみ作成済み:
-  - `iss-00357 Reduce Runtime to Storage Core`（GitHub `#357`）
-  - `iss-00358 Simplify Authoring Kit and Document Contracts`（GitHub `#358`）
-  - `iss-00359 Replace Managed Workflow Skills with SpecDock Skills`（GitHub `#359`）
-  - `iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces`（GitHub `#360`）
+- `iss-00357 Reduce Runtime to Storage Core`: PR #362 merged、GitHub #357 closed。
+- `iss-00358 Simplify Authoring Kit and Document Contracts`: PR #361 merged、GitHub #358 closed。
+- `iss-00359 Replace Managed Workflow Skills with SpecDock Skills`: PR #363 merged、GitHub #359 closed。
+- `iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces`: GitHub #360 open。planning / formal start / Strict round 2は完了し、実装は未開始。Implementation-start-ready promotion commitはfresh exact-current Strict passを外部delivery evidenceとして要求する。
+- Release publicationは未実施。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001〜E-AC-009: 未実装。現時点はEpic planning段階。
-- E-AC-010: 未実装かつ最終Issue nodeの人間承認待ち。承認された場合は357〜360すべてへの直接依存、full regression、cross-slice integration、defect-only repair、diff audit、handoff evidenceを追跡する。
+- Issue 357〜359のslice-local acceptanceは各Issue reportに記録済みで、IC-1 / IC-2は上記Artifactに`pass`を記録した。
+- E-AC-001〜E-AC-009のEpic-level closureはIssue 360のdistribution / consumer / preservation / parity結果とIC-3が未完了のため、まだ完了を宣言しない。
+- E-AC-010は未実装かつ最終Issue nodeの人間承認待ち。承認された場合は357〜360すべてへの直接依存、full regression、cross-slice integration、defect-only repair、diff audit、handoff evidenceを追跡する。
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
@@ -196,11 +211,11 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - ...
 
 ## フォローアップ（別Issue化） (必須)
-- `iss-00357`〜`iss-00360` の具体化は未実施。各Issue開始時のIssue planningで行う。
+- `iss-00360`のR/D/P review、formal `issue start`、distribution実装、IC-3 inputを完了する。
 - direct dependency:
   - `iss-00359` depends on `iss-00357`, `iss-00358`
   - `iss-00360` depends on `iss-00357`, `iss-00358`, `iss-00359`
 
 ## 省略/例外メモ (必須)
-- 2026-08-07のユーザー明示指示により、fresh requirement reviewer `fail` のままIssue nodeと依存関係だけを先行materializeした。
-- scaffoldの`requirement.md`、`design.md`、`plan.md`、`report.md`は具体化していない。dependency `ready=true` は構造上のdependency-readyだけを意味し、planning完了、execution-ready、Issue start許可ではない。
+- 2026-08-07のユーザー明示指示により、fresh requirement reviewer `fail` のままIssue nodeと依存関係だけを先行materializeした。この初期状態は後続の正本revisionとreviewでsupersededされた。
+- 2026-08-13時点で357〜359は実装・merge・close済み、360はplanning中である。Dependency `ready=true`、IC-1 / IC-2 pass、R/D/P review、formal `issue start`は別の条件として維持する。

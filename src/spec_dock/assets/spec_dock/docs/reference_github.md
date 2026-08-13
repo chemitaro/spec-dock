@@ -17,12 +17,12 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 補足:
 - `./spec-dock/scripts/spec-dock update [path]` は GitHub を更新しない repo-local self-update path です。target 省略時は current directory を更新し、明示 path を渡すとその managed repo を更新します
 - runtime update は installer update の wrapper で、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>` として実行します。arbitrary package source / cache option / `--force` は公開しません
-- update は managed files/docs/templates/scripts/skills を refresh しますが、`init --force` ではなく、old workspace の in-place migration も保証しません
+- update は recognized managed distribution を一つの plan/apply として refresh します。ownership不明、modified target、symlink / hard-link、root差し替えは preserve-and-block で、`init --force` でも無条件の old workspace migration でもありません
 - `spec-dock uninstall [path]` / `./spec-dock/scripts/spec-dock uninstall [path]` は repo-local managed artifacts の removal です。GitHub Issue / remote state は変更せず、Python package / global CLI / environment / `uvx` cache の uninstall も行いません
 - runtime uninstall は installer uninstall の wrapper で、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock uninstall <target>` として実行します。repo-local runtime が削除済みの場合の retry / reinstall / refresh は installer CLI の `spec-dock uninstall <target>` / `spec-dock init <target>` / `spec-dock update <target>` を使います
 - dependency metadata の canonical storage は `.meta.json` top-level `depends_on` であり、追加/削除/確認は `./spec-dock/scripts/spec-dock deps add/remove/check` の command-first mutation を使います（詳細: `reference_deps.md`）
-- legacy `meta.json`（旧名）、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で吸収されず current create / import / validate / sync が reject / fail-fast しうる
-- その場合は auto-migrate を期待せず、手動で normalize するか workspace を rebuild してください
+- legacy `meta.json`（旧名）、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で推測修復せず preserve-and-block します。partial apply は `.distribution-retry.json` の同一root束縛で再試行し、別root・別package・別operation・dual marker は mutation 前に拒否します
+- `uninstall` は dry-run が既定です。`--apply` は全計画の検証後にだけ mutation を開始し、部分失敗時は legacy `.uninstall-retry.json` を保持します。`--keep-specs` では spec history を削除せず、削除には `--remove-specs` が必要です
 
 代表的な解決材料（`gh` 側）:
 - カレントディレクトリが Git リポジトリであること

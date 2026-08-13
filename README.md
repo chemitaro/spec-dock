@@ -45,10 +45,10 @@ uvx --from ~/src/spec-dock spec-dock init /path/to/your/project
 uvx --from ~/src/spec-dock spec-dock update
 ```
 
-`spec-dock update` refreshes managed files/docs/templates/scripts/skills, but it is not `init --force`
-and does **not** guarantee in-place migration of older workspaces. If an older tree still has legacy
-`meta.json`, partial linkage, or current-repo mismatches, current runtime commands may
-reject/fail-fast; normalize manually or rebuild the workspace instead of expecting auto-migration.
+`spec-dock update` refreshes the recognized managed distribution through one plan/apply path. It
+preserves user-owned and unknown paths, blocks before writing when ownership or workspace identity is
+ambiguous, and records a same-root retry marker when an apply is interrupted. It is distinct from
+`init --force`; older or incompatible workspaces may still require manual normalization or rebuild.
 
 ## Worktree Root Setup
 
@@ -76,8 +76,9 @@ Troubleshooting:
 
 ## Usage (local scripts)
 
-After `init`, Core operations use `./spec-dock/scripts/spec-dock`. ChatGPT-first Issue Planning uses
-the separate repo-local `./spec-dock/scripts/spec-dock-chatgpt` executable.
+After `init`, Core operations use `./spec-dock/scripts/spec-dock`. The installed skill surface is
+limited to the Storage Core guide and the optional operator-owned documentation grill; planning,
+review, and execution orchestration are not shipped as repository-local workflow engines.
 
 ```bash
 # Create nodes:
@@ -121,15 +122,6 @@ the separate repo-local `./spec-dock/scripts/spec-dock-chatgpt` executable.
 ./spec-dock/scripts/spec-dock issue start iss-local-00001 # local node id
 ./spec-dock/scripts/spec-dock issue finish                # lifecycle closure: GitHub close + active clear
 
-# ChatGPT-first Issue Planning (all output paths must be external to the repository)
-# Requires the `oracle` executable on PATH. No personal wrapper or API fallback is used.
-./spec-dock/scripts/spec-dock-chatgpt planning create --issue iss-00123 --output /path/to/output
-./spec-dock/scripts/spec-dock-chatgpt review planning --issue iss-00123 --mode archive-candidate --candidate /path/to/candidate.zip --output /path/to/review
-./spec-dock/scripts/spec-dock-chatgpt review planning --issue iss-00123 --mode git-bound --candidate /path/to/candidate.zip --reviewed-head <sha> --output /path/to/review
-./spec-dock/scripts/spec-dock-chatgpt planning revise --candidate /path/to/candidate.zip --request /path/to/review/planning-revision-request.json --output /path/to/output
-./spec-dock/scripts/spec-dock-chatgpt planning apply --issue iss-00123 --mode archive-candidate --review-result /path/to/review/planning-review-result.json --human-decision /path/to/decision.json --expected-head <sha> --output /path/to/operation --candidate /path/to/candidate.zip --logical-filename <name> --zip-sha256 <sha256>
-./spec-dock/scripts/spec-dock-chatgpt planning apply --issue iss-00123 --mode git-bound --review-result /path/to/review/planning-review-result.json --human-decision /path/to/decision.json --expected-head <sha> --output /path/to/operation --candidate /path/to/candidate.zip --reviewed-head <sha>
-
 # Manual / recovery active-set path (low-level)
 ./spec-dock/scripts/spec-dock active set 123             # default: active only (no checkout)
 ./spec-dock/scripts/spec-dock active set iss-local-00001 # local node id (no checkout)
@@ -150,13 +142,15 @@ the separate repo-local `./spec-dock/scripts/spec-dock-chatgpt` executable.
 ```
 
 Notes:
-- Issue Planning resolves `oracle` only through `PATH`; unavailable or unsupported Oracle blocks the run without a wrapper, arbitrary backend, or API fallback. It verifies the exact current repository, branch, and HEAD through GitHub without a default-branch fallback.
-- Planner and Semantic Revision return exactly one authoring ZIP containing canonical `requirement.md`, `design.md`, and `plan.md` plus exactly one runtime-selected onboarding companion. The companion is subordinate evidence, not a fourth canonical specification; Reviewer returns closed JSON.
-- Both archive and git-bound Review/apply use the exact Candidate created by `planning create`. Candidate and Review are evidence-only until an exact Human approval is supplied to `planning apply`; managed writes occur only after that approval.
-- `planning revise` uses only the exact sibling `planning-review-result.json` beside its request.
-  `archive-candidate` and `git-bound` Reviews are distinct identities. Candidate and Review results
-  remain evidence-only until exact Human approval is applied and the result is `ready`. Planning
-  does not imply PR creation, Issue finish, or merge.
+- `update` and `init --force` use the same recognized distribution classifier and fail closed on
+  unknown, modified, symlinked, hard-linked, or root-rebound targets. No pathname-based recursive
+  cleanup is used for unknown paths.
+- An interrupted update may leave `.distribution-retry.json`; rerun the same package and operation
+  against the same repository root to continue. A different root, package, operation, malformed
+  marker, or dual marker is rejected before mutation.
+- `uninstall` is dry-run by default. `--apply` requires a complete ownership-safe plan; partial
+  failures retain `.uninstall-retry.json` until post-verification succeeds, and `--remove-specs` is
+  required before spec history is deleted. `--keep-specs` preserves initiatives and unknown content.
 - `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
   installer update command by running
   `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>`.
@@ -164,8 +158,9 @@ Notes:
   passed to the installer.
 - Runtime update always uses the fixed upstream `git+https://github.com/chemitaro/spec-dock` source
   with `uvx --no-cache`; it does not expose arbitrary package source, cache, or `--force` options.
-- Runtime update refreshes managed files through installer update. It is not `init --force` and is
-  not an automatic migration tool for legacy or incompatible workspaces.
+- Runtime update refreshes recognized managed files through installer update. It is not `init --force`.
+  Legacy or incompatible workspaces are preserved or blocked when identity cannot be proven; they are
+  not silently rewritten.
 - Workbench is an experimental, Git-ignored, non-canonical, disposable work area. The root
   `spec-dock/.workbench/` uses date buckets and manual file selection only; there is no root bulk-copy
   command. Initiative/Epic/Issue Workbenches can be copied explicitly to the same scope in one linked
@@ -207,12 +202,9 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `.agent/` (generated agent state; gitignored)
   - `.workbench/` (optional experimental root Workbench; date buckets/manual selection; gitignored)
   - `.gitignore` (ignores `active/`, `.agent/`, `.workbench/` (and legacy `.work/`))
-- `.agents/skills/` (Codex-compatible multi-skill set)
-  - `spec-dock-hub/` (hub; entry point)
-  - `spec-dock-initiative-planning/` (leaf: initiative workflow)
-  - `spec-dock-epic-planning/` (leaf: epic workflow)
-  - `spec-dock-issue-execution/` (leaf: issue workflow)
-  - `spec-dock-adr-facilitation/` (leaf: ADR workflow)
+- `.agents/skills/` (Codex-compatible installed surface)
+  - `spec-dock/` (Storage Core and Authoring Kit guidance)
+  - `spec-dock-grill-with-docs/` (optional operator-owned documentation Artifact helper)
 
 ## Testing
 
@@ -269,7 +261,7 @@ PR still requires a human to perform the merge.
 ## 日本語（概要）
 
 `spec-dock` は、既存リポジトリに `spec-dock/`（仕様書駆動開発のためのドキュメント一式）と
-Codex 互換 Skill セット（hub + 4 leaf）を生成するためのスキャフォルディングツールです。
+Codex 互換の二つの補助Skillを生成するためのスキャフォルディングツールです。
 
 実行は `uvx` を想定しており、導入後は生成されたファイル（Markdown/スクリプト/Skill）を使って運用します。
 
