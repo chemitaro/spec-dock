@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager, suppress
+import hashlib
 from importlib.resources import as_file, files
 import json
 import os
@@ -132,8 +133,45 @@ def _ignore_generated_python_caches(_dir: str, names: list[str]) -> set[str]:
     return {name for name in names if name == "__pycache__" or name.endswith(".pyc")}
 
 
-def _sync_tree(src: Path, dest: Path) -> None:
+class _ManagedPathIdentity(NamedTuple):
+    """No-follow identity captured for one managed scaffold boundary."""
+
+    device: int
+    inode: int
+    ctime_ns: int
+
+
+def _managed_path_identity(path: Path) -> _ManagedPathIdentity:
+    try:
+        info = os.lstat(path)
+    except OSError as exc:
+        raise RuntimeError(f"managed scaffold target cannot be inspected safely: {path}") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or info.st_nlink < 1:
+        raise RuntimeError(f"managed scaffold target is not a safe directory: {path}")
+    return _ManagedPathIdentity(info.st_dev, info.st_ino, info.st_ctime_ns)
+
+
+def _assert_managed_path_identity(path: Path, expected: _ManagedPathIdentity | None) -> None:
+    """Reject a managed scaffold boundary that changed after preflight."""
+    if expected is None:
+        if os.path.lexists(path):
+            raise RuntimeError(f"managed scaffold target appeared after preflight: {path}")
+        return
+    current = _managed_path_identity(path)
+    if (current.device, current.inode) != (expected.device, expected.inode):
+        raise RuntimeError(f"managed scaffold target identity changed: {path}")
+
+
+def _sync_tree(
+    src: Path,
+    dest: Path,
+    *,
+    expected_identity: _ManagedPathIdentity | None = None,
+    identity_checked: bool = False,
+) -> None:
     """Replace `dest` directory with a full copy of `src`."""
+    if expected_identity is not None or identity_checked:
+        _assert_managed_path_identity(dest, expected_identity)
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
@@ -976,6 +1014,7 @@ def _install_spec_dock_bound(
     write_version: bool = True,
     expected_root_identity: DistributionRootIdentity | None = None,
     root_identity_path: Path | None = None,
+    expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
 ) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
     identity_path = root_identity_path or target_root
@@ -1013,6 +1052,11 @@ def _install_spec_dock_bound(
             managed_scaffold_sync_plan.append((src, specdock_dir / name))
 
         guard_root()
+        if expected_managed_scaffold_identities is not None:
+            _assert_managed_path_identity(
+                specdock_dir,
+                expected_managed_scaffold_identities[specdock_dir],
+            )
         specdock_dir.mkdir(parents=True, exist_ok=True)
         guard_root()
 
@@ -1021,8 +1065,22 @@ def _install_spec_dock_bound(
         # never removed by this installer.
         for src, dest in managed_scaffold_sync_plan:
             guard_root()
+            if expected_managed_scaffold_identities is not None:
+                _assert_managed_path_identity(
+                    dest,
+                    expected_managed_scaffold_identities[dest],
+                )
             if dest.exists() or force:
-                _sync_tree(src, dest)
+                _sync_tree(
+                    src,
+                    dest,
+                    expected_identity=(
+                        expected_managed_scaffold_identities.get(dest)
+                        if expected_managed_scaffold_identities is not None
+                        else None
+                    ),
+                    identity_checked=expected_managed_scaffold_identities is not None,
+                )
             else:
                 shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
             guard_root()
@@ -1091,6 +1149,7 @@ def _install_spec_dock(
     install_root_shortcut: bool = True,
     write_version: bool = True,
     expected_root_identity: DistributionRootIdentity | None = None,
+    expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
 ) -> None:
     """Install/update scaffold while binding all writes to the opened root."""
     with _bound_distribution_root(target_root, expected_root_identity) as (
@@ -1105,6 +1164,7 @@ def _install_spec_dock(
             write_version=write_version,
             expected_root_identity=bound_identity,
             root_identity_path=visible_root,
+            expected_managed_scaffold_identities=expected_managed_scaffold_identities,
         )
 
 
@@ -1128,7 +1188,9 @@ def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
         raise RuntimeError(f"Missing asset file: {root_workbench_readme}")
 
 
-def _preflight_managed_scaffold_target_paths(target_root: Path) -> None:
+def _preflight_managed_scaffold_target_paths(
+    target_root: Path,
+) -> dict[Path, _ManagedPathIdentity | None]:
     """Reject unsafe existing scaffold targets before a recognized update.
 
     The scaffold refresh replaces the four provider-managed directories and
@@ -1138,6 +1200,7 @@ def _preflight_managed_scaffold_target_paths(target_root: Path) -> None:
     """
 
     specdock_dir = _specdock_dir(target_root)
+    identities: dict[Path, _ManagedPathIdentity | None] = {}
 
     def require_directory(path: Path, *, label: str) -> None:
         try:
@@ -1160,9 +1223,11 @@ def _preflight_managed_scaffold_target_paths(target_root: Path) -> None:
             raise RuntimeError(f"managed scaffold target '{label}' is not a safe regular file")
 
     require_directory(specdock_dir, label="spec-dock")
+    identities[specdock_dir] = _managed_path_identity(specdock_dir) if os.path.lexists(specdock_dir) else None
     for name in _MANAGED_DIRS:
         managed_dir = specdock_dir / name
         require_directory(managed_dir, label=f"spec-dock/{name}")
+        identities[managed_dir] = _managed_path_identity(managed_dir) if os.path.lexists(managed_dir) else None
         if not managed_dir.exists():
             continue
         # `_sync_tree` removes and recreates this whole directory.  Refuse any
@@ -1187,6 +1252,8 @@ def _preflight_managed_scaffold_target_paths(target_root: Path) -> None:
         require_directory(specdock_dir / name, label=f"spec-dock/{name}")
     require_regular_file(specdock_dir / "active" / "context-pack.md", label="spec-dock/active/context-pack.md")
     require_regular_file(specdock_dir / ".agent" / "active.json", label="spec-dock/.agent/active.json")
+
+    return identities
 
 
 def _install_fresh_distribution(target_root: Path) -> None:
@@ -1242,7 +1309,10 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 raise RuntimeError(f"distribution preflight blocked: {reasons}")
 
             _assert_distribution_root_identity(target_root, root_identity)
-            _preflight_managed_scaffold_target_paths(target_root)
+            absolute_scaffold_identities = _preflight_managed_scaffold_target_paths(target_root)
+            managed_scaffold_identities = {
+                path.relative_to(target_root): identity for path, identity in absolute_scaffold_identities.items()
+            }
             _write_distribution_retry_marker(
                 target_root,
                 operation=operation,
@@ -1268,6 +1338,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 force=True,
                 write_version=False,
                 expected_root_identity=root_identity,
+                expected_managed_scaffold_identities=managed_scaffold_identities,
             )
             _write_distribution_retry_marker(
                 target_root,
@@ -1393,12 +1464,26 @@ class _ManagedSkillInstallPlan(NamedTuple):
     obsolete_exact_rel_paths: tuple[Path, ...]
 
 
+class _UninstallTargetIdentity(NamedTuple):
+    """No-follow identity captured before an uninstall mutation."""
+
+    kind: str
+    device: int
+    inode: int
+    ctime_ns: int
+    size: int = 0
+    sha256: str | None = None
+    link_target: str | None = None
+
+
 class _UninstallAction(NamedTuple):
     rel_path: str
     category: str
     status: str
     reason: str
     error: str | None = None
+    expected_identity: _UninstallTargetIdentity | None = None
+    expected_absent: bool = False
 
 
 def _uninstall_specs_mode(ns: argparse.Namespace) -> str | None:
@@ -1570,7 +1655,7 @@ def _create_uninstall_retry_marker(
     with _open_uninstall_parent_chain(
         target_root,
         marker_rel,
-        create_missing=True,
+        create_missing=False,
         expected_root_identity=expected_root_identity,
     ) as fds:
         parent_fd = fds[-1]
@@ -1620,6 +1705,128 @@ def _path_exists_for_uninstall(path: Path) -> bool:
     return path.exists() or path.is_symlink()
 
 
+def _hash_uninstall_regular_fd(fd: int) -> tuple[str, os.stat_result]:
+    """Hash one held regular-file descriptor and return its final stat."""
+    before = os.fstat(fd)
+    digest = hashlib.sha256()
+    while True:
+        chunk = os.read(fd, 1024 * 1024)
+        if not chunk:
+            break
+        digest.update(chunk)
+    after = os.fstat(fd)
+    if (
+        before.st_dev,
+        before.st_ino,
+        before.st_ctime_ns,
+        before.st_size,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_ctime_ns,
+        after.st_size,
+    ):
+        raise RuntimeError("uninstall target changed while capturing identity")
+    return digest.hexdigest(), after
+
+
+def _capture_uninstall_target_identity(target_root: Path, rel_path: Path) -> _UninstallTargetIdentity | None:
+    """Capture a target identity through a no-follow parent descriptor chain."""
+    if not _path_exists_for_uninstall(target_root / rel_path):
+        return None
+    with _open_uninstall_parent_chain(target_root, rel_path) as fds:
+        parent_fd = fds[-1]
+        try:
+            info = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+        if stat.S_ISLNK(info.st_mode):
+            return _UninstallTargetIdentity(
+                "symlink",
+                info.st_dev,
+                info.st_ino,
+                info.st_ctime_ns,
+                link_target=os.readlink(rel_path.name, dir_fd=parent_fd),
+            )
+        if stat.S_ISDIR(info.st_mode):
+            return _UninstallTargetIdentity("directory", info.st_dev, info.st_ino, info.st_ctime_ns)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            return _UninstallTargetIdentity("unsafe", info.st_dev, info.st_ino, info.st_ctime_ns)
+        fd = os.open(
+            rel_path.name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        try:
+            digest, final_info = _hash_uninstall_regular_fd(fd)
+        finally:
+            os.close(fd)
+        return _UninstallTargetIdentity(
+            "regular",
+            final_info.st_dev,
+            final_info.st_ino,
+            final_info.st_ctime_ns,
+            size=final_info.st_size,
+            sha256=digest,
+        )
+
+
+def _assert_uninstall_target_identity(
+    parent_fd: int,
+    name: str,
+    info: os.stat_result,
+    expected: _UninstallTargetIdentity,
+) -> None:
+    """Fail closed when a planned uninstall entry was replaced or rewritten."""
+    if expected.kind == "symlink":
+        if not stat.S_ISLNK(info.st_mode) or os.readlink(name, dir_fd=parent_fd) != expected.link_target:
+            raise RuntimeError("uninstall target identity changed during safe operation")
+        return
+    if expected.kind == "directory":
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or info.st_dev != expected.device
+            or info.st_ino != expected.inode
+            or info.st_ctime_ns != expected.ctime_ns
+        ):
+            raise RuntimeError("uninstall target identity changed during safe operation")
+        return
+    if expected.kind != "regular" or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise RuntimeError("uninstall target identity changed during safe operation")
+    if (
+        info.st_dev != expected.device
+        or info.st_ino != expected.inode
+        or info.st_ctime_ns != expected.ctime_ns
+        or info.st_size != expected.size
+    ):
+        raise RuntimeError("uninstall target identity changed during safe operation")
+    fd = os.open(
+        name,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=parent_fd,
+    )
+    try:
+        digest, final_info = _hash_uninstall_regular_fd(fd)
+    finally:
+        os.close(fd)
+    if (
+        digest != expected.sha256
+        or final_info.st_dev != expected.device
+        or final_info.st_ino != expected.inode
+        or final_info.st_ctime_ns != expected.ctime_ns
+        or final_info.st_size != expected.size
+    ):
+        raise RuntimeError("uninstall target identity changed during safe operation")
+
+
+def _planned_uninstall_identity(
+    target_root: Path,
+    rel_path: Path,
+) -> tuple[_UninstallTargetIdentity | None, bool]:
+    identity = _capture_uninstall_target_identity(target_root, rel_path)
+    return identity, identity is None
+
+
 def _compare_uninstall_bytes(target_path: Path, expected: bytes) -> tuple[bool, str | None]:
     if target_path.is_symlink():
         return False, "comparison error: symlink requires manual review"
@@ -1643,8 +1850,8 @@ def _add_exact_match_uninstall_action(
     expected: bytes,
     include_missing_removals: bool = False,
 ) -> None:
-    target_path = target_root / rel_path
-    if not _path_exists_for_uninstall(target_path):
+    identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
+    if expected_absent:
         if include_missing_removals:
             actions.append(
                 _UninstallAction(
@@ -1652,18 +1859,20 @@ def _add_exact_match_uninstall_action(
                     category=category,
                     status="would_remove",
                     reason="current shipped asset exact match",
+                    expected_absent=True,
                 )
             )
         return
 
-    is_match, preserve_reason = _compare_uninstall_bytes(target_path, expected)
-    if is_match:
+    expected_digest = hashlib.sha256(expected).hexdigest()
+    if identity is not None and identity.kind == "regular" and identity.sha256 == expected_digest:
         actions.append(
             _UninstallAction(
                 rel_path=rel_path.as_posix(),
                 category=category,
                 status="would_remove",
                 reason="current shipped asset exact match",
+                expected_identity=identity,
             )
         )
     else:
@@ -1672,7 +1881,7 @@ def _add_exact_match_uninstall_action(
                 rel_path=rel_path.as_posix(),
                 category=category,
                 status="preserved",
-                reason=preserve_reason or "manual review required",
+                reason="content mismatch; manual review required",
             )
         )
 
@@ -1726,12 +1935,15 @@ def _add_generated_state_uninstall_actions(
         for path in _iter_existing_files_or_symlinks(target_root / rel_root):
             rel_path = path.relative_to(target_root)
             known_rel_paths.add(rel_path)
+            identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
             actions.append(
                 _UninstallAction(
                     rel_path=rel_path.as_posix(),
                     category="generated_state",
                     status="would_remove",
                     reason="SpecDock generated state",
+                    expected_identity=identity,
+                    expected_absent=expected_absent,
                 )
             )
 
@@ -1747,12 +1959,15 @@ def _add_spec_history_uninstall_action(
     if not (target_root / spec_history_path).exists() and not (specs_mode == "remove" and include_missing_removals):
         return
     if specs_mode == "remove":
+        identity, expected_absent = _planned_uninstall_identity(target_root, spec_history_path)
         actions.append(
             _UninstallAction(
                 rel_path=spec_history_path.as_posix(),
                 category="spec_history",
                 status="would_remove",
                 reason="explicit remove-specs mode",
+                expected_identity=identity,
+                expected_absent=expected_absent,
             )
         )
     else:
@@ -1775,12 +1990,15 @@ def _add_uninstall_retry_marker_action(
     known_rel_paths.add(_UNINSTALL_RETRY_MARKER_REL)
     if not _path_exists_for_uninstall(target_root / _UNINSTALL_RETRY_MARKER_REL):
         return
+    identity, expected_absent = _planned_uninstall_identity(target_root, _UNINSTALL_RETRY_MARKER_REL)
     actions.append(
         _UninstallAction(
             rel_path=_UNINSTALL_RETRY_MARKER_REL.as_posix(),
             category="generated_state",
             status="preserved",
             reason="SpecDock uninstall retry marker for idempotent rerun",
+            expected_identity=identity,
+            expected_absent=expected_absent,
         )
     )
 
@@ -1792,12 +2010,15 @@ def _add_shortcut_uninstall_action(actions: list[_UninstallAction], target_root:
     if (
         shortcut.is_symlink() and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"  # noqa: PTH115 - raw exact target.
     ):
+        identity, expected_absent = _planned_uninstall_identity(target_root, Path("spec"))
         actions.append(
             _UninstallAction(
                 rel_path="spec",
                 category="shortcut",
                 status="would_remove",
                 reason="repo-root shortcut targets spec-dock/scripts/spec-dock",
+                expected_identity=identity,
+                expected_absent=expected_absent,
             )
         )
     else:
@@ -1894,6 +2115,7 @@ def _append_distribution_uninstall_actions(
             )
         )
         if distribution_action.action == "prune":
+            identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
             if rel_path in obsolete_paths:
                 reason = (
                     "known obsolete SpecDock-managed asset"
@@ -1916,6 +2138,8 @@ def _append_distribution_uninstall_actions(
                     category=category,
                     status="would_remove",
                     reason=reason,
+                    expected_identity=identity,
+                    expected_absent=expected_absent,
                 )
             )
             continue
@@ -1954,6 +2178,7 @@ def _append_distribution_uninstall_actions(
                     category="obsolete_managed",
                     status="would_remove",
                     reason="known obsolete SpecDock-managed asset already absent",
+                    expected_absent=True,
                 )
             )
 
@@ -1988,12 +2213,15 @@ def _build_uninstall_plan(
             known_rel_paths.add(rel_path)
             if _is_delete_even_if_mismatch_uninstall_path(rel_path):
                 if _path_exists_for_uninstall(target_root / rel_path) or include_missing_removals:
+                    identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
                     actions.append(
                         _UninstallAction(
                             rel_path=rel_path.as_posix(),
                             category="scaffold_managed",
                             status="would_remove",
                             reason="SpecDock managed state",
+                            expected_identity=identity,
+                            expected_absent=expected_absent,
                         )
                     )
                 continue
@@ -2073,7 +2301,31 @@ def _remove_uninstall_path(
             try:
                 info = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
             except FileNotFoundError:
+                if action.expected_absent:
+                    return action._replace(status="already_removed", error=None)
+                if action.expected_identity is not None:
+                    return action._replace(status="already_removed", error=None)
                 return action._replace(status="already_removed", error=None)
+
+            if action.expected_absent:
+                return action._replace(
+                    status="failed",
+                    error="uninstall target appeared after preflight",
+                )
+            if action.expected_identity is None:
+                return action._replace(
+                    status="failed",
+                    error="uninstall target identity was not captured during preflight",
+                )
+            try:
+                _assert_uninstall_target_identity(
+                    parent_fd,
+                    rel_path.name,
+                    info,
+                    action.expected_identity,
+                )
+            except (OSError, RuntimeError) as exc:
+                return action._replace(status="failed", error=str(exc))
 
             if stat.S_ISLNK(info.st_mode):
                 # A managed file is never removed through a symlink.  The only
@@ -2280,6 +2532,7 @@ def _remove_uninstall_retry_marker(
     target_root: Path,
     *,
     expected_root_identity: DistributionRootIdentity | None = None,
+    expected_identity: _UninstallTargetIdentity | None = None,
 ) -> None:
     """Remove the legacy uninstall marker only after every other action passes."""
     marker_rel = _UNINSTALL_RETRY_MARKER_REL
@@ -2296,6 +2549,8 @@ def _remove_uninstall_retry_marker(
             return
         if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
             raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+        if expected_identity is not None:
+            _assert_uninstall_target_identity(parent_fd, marker_rel.name, info, expected_identity)
         os.unlink(marker_rel.name, dir_fd=parent_fd)
         _assert_uninstall_visible_chain(target_root, marker_rel, fds)
 
@@ -2308,9 +2563,13 @@ def _finalize_uninstall_retry_marker(
 ) -> tuple[_UninstallAction, ...]:
     """Remove the marker last and reflect that mutation in the result ledger."""
 
+    marker_identity = _capture_uninstall_target_identity(target_root, _UNINSTALL_RETRY_MARKER_REL)
+    if marker_identity is None:
+        raise RuntimeError("SpecDock uninstall retry marker disappeared before finalization")
     _remove_uninstall_retry_marker(
         target_root,
         expected_root_identity=expected_root_identity,
+        expected_identity=marker_identity,
     )
     marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
     finalized = [

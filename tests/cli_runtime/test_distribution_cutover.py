@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -929,6 +930,77 @@ def test_s70_uninstall_apply_blocks_modified_current_before_marker_or_removal(
     )
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s70_uninstall_apply_rejects_rewritten_target_after_plan(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    managed = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    original_write_marker = cli._write_uninstall_retry_marker
+
+    def rewrite_after_marker(*args, **kwargs):
+        original_write_marker(*args, **kwargs)
+        managed.write_text("replacement after uninstall plan\n", encoding="utf-8")
+
+    monkeypatch.setattr(cli, "_write_uninstall_retry_marker", rewrite_after_marker)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "partial_failure"
+    assert managed.read_text(encoding="utf-8") == "replacement after uninstall plan\n"
+    assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
+
+
+def test_s70_uninstall_apply_does_not_recreate_vanished_specdock_parent(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    original_write_marker = cli._write_uninstall_retry_marker
+
+    def remove_parent_before_marker(*args, **kwargs):
+        shutil.rmtree(tmp_path / "spec-dock")
+        return original_write_marker(*args, **kwargs)
+
+    monkeypatch.setattr(cli, "_write_uninstall_retry_marker", remove_parent_before_marker)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "partial_failure"
+    assert not (tmp_path / "spec-dock").exists()
+
+
+def test_s50_update_rejects_managed_directory_replacement_after_preflight(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    original_sync_tree = cli._sync_tree
+    switched = False
+
+    def replace_before_sync(src: Path, dest: Path, **kwargs):
+        nonlocal switched
+        if not switched:
+            switched = True
+            managed = tmp_path / "spec-dock/docs"
+            shutil.rmtree(managed)
+            managed.mkdir(parents=True)
+            (managed / "replacement-sentinel.md").write_text("keep\n", encoding="utf-8")
+        return original_sync_tree(src, dest, **kwargs)
+
+    monkeypatch.setattr(cli, "_sync_tree", replace_before_sync)
+
+    assert main(["update", str(tmp_path)]) == 1
+    capsys.readouterr()
+    assert (tmp_path / "spec-dock/docs/replacement-sentinel.md").read_text(encoding="utf-8") == "keep\n"
 
 
 def test_s70_uninstall_apply_blocks_mixed_known_obsolete_and_unknown_before_mutation(
