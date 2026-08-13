@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="ja" data-plantuml-status="pending" data-plantuml-contract="2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Issue 360 実装開始ガイド — 配布切替と旧workflow surface廃止</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #edf2f0;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #536273;
+      --border: #d8e0ea;
+      --accent: #006b5f;
+      --accent-soft: #e3f5f1;
+      --warning: #9a6700;
+      --warning-bg: #fff7d6;
+      --danger: #b42318;
+      --danger-bg: #fef3f2;
+      --ink: #102a2e;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --error: #b42318;
+      --error-bg: #fef3f2;
+      --code-bg: #101828;
+      --code-text: #f2f4f7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(100% - 24px, 1120px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header, section {
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgb(16 24 40 / 8%);
+    }
+
+    header { margin-top: 0; }
+    h1, h2, h3 { color: var(--ink); line-height: 1.4; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2.25rem); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.2rem, 4vw, 1.5rem); }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .plantuml-status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .plantuml-status.error { background: var(--error-bg); color: var(--error); }
+    .plantuml-diagram {
+      position: relative;
+      min-height: 160px;
+      margin-top: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      color: #182230;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .plantuml-diagram[data-zoom-ready="true"] { cursor: zoom-in; }
+    .plantuml-diagram[data-zoom-ready="true"]:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .diagram-zoom-hint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgb(16 24 40 / 14%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plantuml-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .muted { color: var(--muted); }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+    .lead { max-width: 850px; font-size: 1.05rem; }
+    .meta-row, .card-grid, .step-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .meta, .card, .step {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--surface) 92%, var(--accent-soft));
+    }
+    .meta strong, .card h3, .step strong { display: block; margin-bottom: 5px; }
+    .card.keep { border-top: 5px solid var(--success); }
+    .card.remove { border-top: 5px solid var(--danger); }
+    .card.preserve { border-top: 5px solid var(--warning); }
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--accent);
+      border-radius: 8px;
+      background: var(--accent-soft);
+    }
+    .callout.warning { border-left-color: var(--warning); background: var(--warning-bg); }
+    .callout.danger { border-left-color: var(--danger); background: var(--danger-bg); }
+    .table-wrap { margin-top: 14px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { padding: 11px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--accent-soft); color: var(--ink); }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 5px; }
+    .phase {
+      display: inline-block;
+      margin: 2px 3px 2px 0;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { position: relative; padding-left: 1.7rem; }
+    .checklist li::before { position: absolute; left: 0; content: "✓"; color: var(--success); font-weight: 900; }
+    .source-list code { overflow-wrap: anywhere; }
+
+    @media (max-width: 760px) {
+      .meta-row, .card-grid, .step-grid { grid-template-columns: 1fr; }
+      header, section { padding: 18px; }
+      th, td { min-width: 150px; }
+    }
+
+    body.diagram-zoom-open { overflow: hidden; }
+
+    .diagram-zoom-dialog[hidden] { display: none !important; }
+    .diagram-zoom-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgb(3 10 21 / 78%);
+    }
+
+    .diagram-zoom-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(1800px, 100%);
+      height: min(1200px, 100%);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+    }
+
+    .diagram-zoom-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 16px;
+      margin: 0;
+      padding: 12px 14px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .diagram-zoom-title {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .diagram-zoom-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-zoom-controls button {
+      min-height: 38px;
+      padding: 6px 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .diagram-zoom-controls button:hover,
+    .diagram-zoom-controls button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .diagram-zoom-controls button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .diagram-zoom-level {
+      min-width: 4.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    .diagram-zoom-help {
+      margin: 0;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .diagram-zoom-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #ffffff;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .diagram-zoom-canvas {
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 24px;
+    }
+
+    .diagram-zoom-canvas svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .diagram-zoom-dialog { padding: 0; }
+      .diagram-zoom-panel { border-radius: 0; }
+      .diagram-zoom-header { align-items: flex-start; }
+      .diagram-zoom-controls { width: 100%; }
+      .diagram-zoom-controls button { flex: 1 1 auto; }
+      .diagram-zoom-canvas { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0c111d;
+        --surface: #161b26;
+        --text: #f5f7fa;
+        --muted: #b9c2cf;
+        --border: #333b48;
+        --success-bg: #053321;
+        --error-bg: #55160c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">SpecDock / Issue 360 / implementation companion</p>
+      <h1>配布を新しいSpecDockへ切り替え、旧workflow surfaceを安全に退役させる</h1>
+      <p class="lead">Issue 360の要件定義書・設計書・実装計画書を、実装開始前に一続きで理解するための日本語ガイドです。何を残し、何を消し、既存利用者の履歴をどう守るか、どの順序で実装と検証を閉じるかを説明します。</p>
+      <div class="meta-row">
+        <div class="meta"><strong>現在地</strong><code>implementation-start-ready</code></div>
+        <div class="meta"><strong>Planning Level</strong><code>strict</code></div>
+        <div class="meta"><strong>対象Issue</strong><code>iss-00360 / #360</code></div>
+      </div>
+      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
+        図を読み込んでいます。
+      </div>
+      <p class="muted">図はブラウザ内で描画します。初回表示にはTailscale接続に加えてインターネット接続が必要です。図をクリックすると拡大できます。</p>
+    </header>
+
+    <section>
+      <h2>1. 最初に結論</h2>
+      <p>Issue 357〜359で、SpecDockの中核はすでに「Storage Core」「薄いAuthoring Kit」「二つのrepo-local skill」へ絞られました。しかしproviderの配布ツリー、installer、dogfood workspace、package、既存consumerには、旧Planning・Review・Execution・Assurance・Profile・PR orchestrationの物理ファイルや導線が残っています。</p>
+      <p>Issue 360は、その残存物を<strong>配布の全surfaceから一度に切り替える最後のvertical slice</strong>です。新規利用者には新しいTargetだけを配り、既存利用者からはSpecDock所有と証明できる旧ファイルだけを除去します。</p>
+      <div class="callout danger"><strong>最重要の安全原則:</strong> パス名やworkspace markerだけで「SpecDock所有」と推定しません。所有を証明できない同名ファイルは保持し、書き込み開始前にoperation全体を停止します。</div>
+    </section>
+
+    <section>
+      <h2>2. この資料で分かること</h2>
+      <ul class="checklist">
+        <li>Issue 360が解決する配布上の問題と、357〜359との境界</li>
+        <li>Target・obsolete・preserveの三分類と、所有権を判定する規則</li>
+        <li>Fresh init、update、<code>init --force</code>、uninstallの正常系</li>
+        <li>symlink、hard link、途中失敗、root差し替えを含む停止条件</li>
+        <li>S00〜S99とH10をどの順番で進め、何を証拠に完了とするか</li>
+      </ul>
+      <p class="muted">このHTMLは説明用Artifactです。実装上の判断が食い違う場合は、承認済みの<code>requirement.md</code>、<code>design.md</code>、<code>plan.md</code>を優先します。</p>
+    </section>
+
+    <section>
+      <h2>3. 背景: 357〜360で何が変わるのか</h2>
+      <div class="step-grid">
+        <div class="step"><strong>Issue 357</strong>RuntimeをStorage Coreへ縮小し、旧planning backendは360で物理削除するhandoffとした。</div>
+        <div class="step"><strong>Issue 358</strong>正本文書・Artifact・ReportのAuthoring Kitを薄くし、Historical evidenceの保持規則を決めた。</div>
+        <div class="step"><strong>Issue 359</strong>repo-local skillを<code>spec-dock</code>と<code>spec-dock-grill-with-docs</code>の二つへ置き換えた。</div>
+      </div>
+      <div class="callout"><strong>Issue 360の役割:</strong> 357〜359の意味を再設計せず、その確定結果をprovider、dogfood、wheel、sdist、Fresh、Updated、uninstall、migration docsへ物理的に反映します。</div>
+    </section>
+
+    <section>
+      <h2>4. 先に知っておく三つの分類</h2>
+      <div class="card-grid">
+        <div class="card keep"><h3>Target — 今後配るもの</h3><p>Storage Core、薄いAuthoring Kit、二skill、Storage Core用CI、rootの<code>spec</code> shortcutです。Currentな物理provider treeが正本です。</p></div>
+        <div class="card remove"><h3>Obsolete — 退役候補</h3><p>旧planning runtime、旧docs/template、旧18 + legacy 3 skill、adapter、agent shim、agent-driven workflowです。exact fileと既知identityの両方が必要です。</p></div>
+        <div class="card preserve"><h3>Preserve — 必ず守るもの</h3><p><code>initiatives/**</code>配下のR/D/P/Report、Artifact、Discussion、ADR、assurance、unknown file、利用者所有のskill/config/workflowです。</p></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>対象</th><th>Fresh</th><th>Update</th><th>Uninstall</th></tr></thead>
+          <tbody>
+            <tr><td>Current Target</td><td>missingなら作成。衝突は保持して停止</td><td>同一なら採用。既知旧版だけupgrade</td><td>ownershipを証明できるものだけ除去</td></tr>
+            <tr><td>Obsolete candidate</td><td>pruneしない</td><td>既知identity一致だけprune</td><td>同じownership policyでprune</td></tr>
+            <tr><td>Spec history</td><td>新規作成分のみ</td><td>content/type/mode/pathを不変保持</td><td><code>--remove-specs</code>明示時だけ削除</td></tr>
+            <tr><td>Unknown / user-owned</td><td colspan="3">自動変更しない。競合する場合は全mutation前にblock</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. 設計の中心: 一つの深いmoduleへ安全規則を集約する</h2>
+      <p><code>src/spec_dock/managed_distribution.py</code>を新設し、init・update・uninstallが同じplan、classifier、path safety、applyを共有します。CLIは引数、workspace admission、text/JSON表示だけを担当します。</p>
+
+      <script type="text/plain"
+              class="plantuml-source"
+              id="source-system-overview"
+              data-target="diagram-system-overview">
+@startuml
+title Issue 360のTarget architecture
+left to right direction
+
+actor "利用者 / CI" as User
+component "installer CLI\n引数・admission・表示" as CLI
+component "managed_distribution\nplan / classifier / apply" as Distribution
+folder "物理provider asset tree\nCurrentの正本" as Provider
+file "managed_distribution.json\n旧identityとmigration policy" as Manifest
+folder "consumer repository\n変更対象" as Consumer
+
+User --> CLI : init / update / uninstall
+CLI --> Distribution : planを作成・適用する
+Provider --> Distribution : Current bytesを供給する
+Manifest --> Distribution : 既知の旧identityを供給する
+Distribution --> Consumer : 検証済みactionだけを実行する
+Distribution --> CLI : status / phase / retryを返す
+@enduml
+      </script>
+
+      <div id="diagram-system-overview" class="plantuml-diagram">
+        全体構成図を描画しています。
+      </div>
+
+      <details>
+        <summary>PlantUMLソースを確認する</summary>
+        <pre data-source-copy="source-system-overview"></pre>
+      </details>
+      <h3>公開interface</h3>
+      <ul>
+        <li><code>build_distribution_plan(...)</code>: read-onlyで全pathを<code>create</code> / <code>adopt</code> / <code>upgrade</code> / <code>refresh-tree</code> / <code>prune</code> / <code>preserve</code> / <code>block</code>へ分類する。</li>
+        <li><code>apply_distribution_plan(plan)</code>: apply可能と検証済みのplanだけを実行する。</li>
+        <li>一件でも<code>block</code>があれば、copyやpruneを一件も始めない。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. 正常時の処理</h2>
+      <p>全operationは、変更前に全体を読み取り、適用直前にpath identityを再確認し、適用後に期待identityを検証します。operation全体のportableなatomic rollbackは約束せず、markerと再実行によるforward recoveryを使います。</p>
+      <script type="text/plain"
+              class="plantuml-source"
+              id="source-operation-flow"
+              data-target="diagram-operation-flow">
+@startuml
+title 配布operationの正常な流れ
+
+actor "operator" as Operator
+participant "CLI" as CLI
+participant "managed_distribution" as Distribution
+database "consumer filesystem" as FS
+
+Operator -> CLI : init / update / uninstallを実行
+CLI -> Distribution : build_distribution_plan(...)
+Distribution -> FS : root・ancestor・targetをno-followで読む
+FS --> Distribution : identity snapshotを返す
+Distribution -> Distribution : provenanceとactionを分類
+alt blockが一件でもある
+  Distribution --> CLI : apply不可のplanとoperator action
+  CLI --> Operator : zero-writeで停止
+else 全actionがapply可能
+  CLI -> Distribution : apply_distribution_plan(plan)
+  Distribution -> FS : rootと対象identityを再照合
+  Distribution -> FS : phase markerを書き、actionを順に適用
+  Distribution -> FS : Target / preserve / removedをpost-verify
+  Distribution --> CLI : 完了phaseとresult
+  CLI --> Operator : successと相対pathの結果
+end
+@enduml
+      </script>
+      <div id="diagram-operation-flow" class="plantuml-diagram">operation flowを描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-operation-flow"></pre></details>
+      <h3>Operationごとの違い</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Operation</th><th>主な挙動</th><th>成功の条件</th></tr></thead>
+        <tbody>
+          <tr><td>Fresh init</td><td>Targetだけを配置し、obsolete候補をpruneしない</td><td>unrelated file不変、再実行で収束</td></tr>
+          <tr><td>Update / recognized <code>init --force</code></td><td>managed scaffoldをrefreshし、証明済みobsoleteだけprune</td><td>Target一致、preserve不変、旧導線不在</td></tr>
+          <tr><td>Uninstall dry-run</td><td>action listだけを返す</td><td>filesystem writeが0</td></tr>
+          <tr><td>Uninstall <code>--apply</code></td><td><code>--keep-specs</code>または<code>--remove-specs</code>を必須化</td><td>明示したspec policyとownership policyを両方満たす</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section>
+      <h2>7. 失敗時はどう止まり、どう回復するか</h2>
+      <div class="card-grid">
+        <div class="card"><h3>Preflight block</h3><p>unknown ownership、Current collision、unsafe path、symlink parent、directory conflict、hard link mutationは、書き込み前に停止します。</p></div>
+        <div class="card"><h3>Apply中の失敗</h3><p>失敗phase、完了済み・未完了action、相対path、同じoperationの再実行commandを返します。</p></div>
+        <div class="card"><h3>Post-verify失敗</h3><p>versionを確定せずmarkerを保持します。成功と表示せず、同一root・同一packageでforward retryします。</p></div>
+      </div>
+      <script type="text/plain"
+              class="plantuml-source"
+              id="source-safety-decision"
+              data-target="diagram-safety-decision">
+@startuml
+title mutation前の安全判定
+start
+:repository-relative exact pathを検証;
+if (path escape・glob・overlapがある?) then (はい)
+  :manifest defectとしてzero-write停止;
+  stop
+endif
+:root・親・targetをno-followで取得;
+if (親symlink / directory conflict / hard link mutation?) then (はい)
+  :対象を保持してzero-write停止;
+  stop
+endif
+:Currentまたはhistorical identityと照合;
+if (ownershipを証明できる?) then (はい)
+  :許可されたactionをplanへ追加;
+else (いいえ)
+  :preserve-and-blockをplanへ追加;
+  :operator actionを診断する;
+  stop
+endif
+:全pathのpreflight完了後だけapply可能;
+stop
+@enduml
+      </script>
+      <div id="diagram-safety-decision" class="plantuml-diagram">安全判定図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-safety-decision"></pre></details>
+      <div class="callout warning"><strong>Recoveryの制約:</strong> markerを別repositoryへコピーしたcross-root retry、別operationのmarker、dual marker、unknown/newer versionは推定で続行せずzero-writeで停止します。</div>
+    </section>
+
+    <section>
+      <h2>8. 物理的に変わる主な場所</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>場所</th><th>変更</th><th>責務</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/spec_dock/managed_distribution.py</code></td><td>追加</td><td>分類・path safety・plan・apply・retry</td></tr>
+          <tr><td><code>src/spec_dock/assets/managed_distribution.json</code></td><td>追加</td><td>provider-privateなhistorical identity</td></tr>
+          <tr><td><code>src/spec_dock/cli.py</code></td><td>変更</td><td>三operationを共通moduleへ委譲</td></tr>
+          <tr><td><code>assets/install_root/</code></td><td>大幅縮小</td><td>二skillと<code>ci.yml</code>だけをCurrentにする</td></tr>
+          <tr><td><code>assets/spec_dock/</code></td><td>削除・更新</td><td>旧runtime/docs/templateを除きCurrent Kitへ切替</td></tr>
+          <tr><td><code>spec-dock/</code></td><td>projection更新</td><td>consumerとしてproviderとのparityを検証</td></tr>
+          <tr><td><code>tests/</code></td><td>追加・整理</td><td>ownership、path safety、consumer matrix、package parity</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted">削除対象のdirectory表記はprovider source上のold-only treeを示します。consumerでprefixやdirectory単位の推測削除を許可するものではありません。</p>
+    </section>
+
+    <section>
+      <h2>9. 実装の進め方</h2>
+      <p>計画は安全機構を先に閉じ、その後に配布物を切り替えます。各stepは「REDまたは事前観測 → bounded GREEN → 検証 → report evidence → fresh review → commit / approved-no-op → clean確認」で完結させます。</p>
+      <h3>段階1: 入場と安全基盤</h3>
+      <p><span class="phase">S00 gate</span><span class="phase">S10 inventory</span><span class="phase">S20 manifest validation</span><span class="phase">S25 classifier</span><span class="phase">S30 no-follow apply</span><span class="phase">S35 version/retry admission</span></p>
+      <p>所有権inventory、path validation、衝突分類、TOCTOU対策、version/marker admissionを先に固定します。S10前にmanifest/prune logicを書かず、S30/S35が閉じる前にmutationを接続しません。</p>
+      <h3>段階2: Providerの物理cutover</h3>
+      <p><span class="phase">S40A legacy runtime retirement</span><span class="phase">S40B Target catalog cutover</span></p>
+      <p>旧planning backendと専用testを物理削除し、docs/template/skill/workflowをTarget allowlistへ縮小します。</p>
+      <h3>段階3: Consumer operation</h3>
+      <p><span class="phase">S45 Fresh</span><span class="phase">S50 update</span><span class="phase">S55 prune/preserve</span><span class="phase">S60 forward retry</span><span class="phase">S65 uninstall dry-run</span><span class="phase">S70 uninstall apply</span></p>
+      <p>同じclassifierとapplyを再利用して、正常系、negative case、preservation、故障注入を閉じます。</p>
+      <h3>段階4: 配布全体の証明</h3>
+      <p><span class="phase">S80 package parity</span><span class="phase">S85 installed smoke</span><span class="phase">S90 docs</span><span class="phase">S95 verification</span><span class="phase">S99 3 reviewers</span><span class="phase">H10 IC-3 handoff</span></p>
+      <p>wheel/sdistから隔離consumerを作り、working checkoutへfallbackせず、357〜359の代表契約とremoved surface不在を検証します。最後はQA・code・specの三者passを必須とし、H10はIC-3判断材料を渡すだけです。</p>
+    </section>
+
+    <section>
+      <h2>10. テストと完了判定</h2>
+      <p>受け入れ条件は22項目、追加の安全・scope closureは15項目です。後段テストの成功で前段の失敗を隠さず、各Closure IDをIssue reportへ一対一で記録します。</p>
+      <div class="card-grid">
+        <div class="card"><h3>Filesystem safety</h3><p>path escape、symlink、hard link、root rebind、unknown ownership、marker replayをfault testで確認。</p></div>
+        <div class="card"><h3>Consumer matrix</h3><p>Fresh、legacy update、collision、partial retry、keep/remove specs、repeated uninstallを確認。</p></div>
+        <div class="card"><h3>Distribution parity</h3><p>provider、dogfood、wheel、sdist、Fresh、Updatedでcatalog・bytes・mode・removed absenceを比較。</p></div>
+      </div>
+      <h3>実装完了を名乗れる条件</h3>
+      <ul class="checklist">
+        <li>S00〜S95がcommit済み、または真正な<code>approved-no-op</code>で閉じている。</li>
+        <li>preserve fixtureのcontent・type・mode・relative pathが不変である。</li>
+        <li>旧surfaceがprovider/package/consumer/help/docs/import graphから消えている。</li>
+        <li>fresh <code>qa-reviewer</code>、issue-wide <code>code-reviewer</code>、<code>spec-reviewer</code>が全員passしている。</li>
+        <li>final reportとexact implementation identityをH10へ渡せる。</li>
+      </ul>
+      <div class="callout warning">Issue 360はpackage publication、PR merge、Issue/Epic close、IC-3の自己承認を行いません。H10はEpic ownerへevidenceを渡すread-only handoffです。</div>
+    </section>
+
+    <section>
+      <h2>11. 実装開始時に読む順番</h2>
+      <ol>
+        <li><code>spec-dock/active/issue/requirement.md</code>で、I360-RQ / I360-ACと対象外を確認する。</li>
+        <li><code>spec-dock/active/issue/design.md</code>で、manifest trust chain、classifier、no-follow apply、marker/retryを確認する。</li>
+        <li><code>spec-dock/active/issue/plan.md</code>で、現在着手するstepのallowed path、RED、closure、review、commit条件を確認する。</li>
+        <li><code>spec-dock/active/issue/report.md</code>へ、そのstepの実測結果とClosure IDを記録する。</li>
+      </ol>
+      <div class="callout"><strong>最初の実装行はS00ではありません。</strong> S00はbranch、SHA、active、dependency、Strict reviewを再確認するread-only admissionです。S10でinventoryをlockし、S20の期待どおりのREDが得られてからproduction behaviorを変更します。</div>
+    </section>
+
+    <section>
+      <h2>12. 現在の準備状況と正本</h2>
+      <ul>
+        <li>Requirement / Design / Plan: <code>approved</code></li>
+        <li>Formal <code>issue start iss-00360</code>: 完了</li>
+        <li>Dependency: <code>ready=true</code>、blockers 0</li>
+        <li>Final Strict spec review: exact upstream SHAで<code>pass</code></li>
+        <li>Plan handoff state: <code>implementation-start-ready</code></li>
+      </ul>
+      <p>これは「実装を開始してよい」という意味であり、S10以降のclosureやIssue完了を先取りするものではありません。</p>
+      <h3>このArtifactが統合した正本</h3>
+      <ul class="source-list">
+        <li><code>spec-dock/active/issue/requirement.md</code></li>
+        <li><code>spec-dock/active/issue/design.md</code></li>
+        <li><code>spec-dock/active/issue/plan.md</code></li>
+        <li>作成時HEAD: <code>a0fc9c1872019e246995499ba74d931cee66a602</code></li>
+      </ul>
+      <p class="muted">作成日: 2026-08-13。仕様変更後はこの説明だけを更新して判断せず、正本のreview/promotionを先に行ってください。</p>
+    </section>
+  </main>
+
+  <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
+    <section class="diagram-zoom-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagram-zoom-title"
+             aria-describedby="diagram-zoom-help">
+      <header class="diagram-zoom-header">
+        <h2 id="diagram-zoom-title" class="diagram-zoom-title">図を拡大表示</h2>
+        <div class="diagram-zoom-controls" aria-label="図の拡大率を操作する">
+          <button type="button" id="diagram-zoom-out" aria-label="図を縮小する">−</button>
+          <output id="diagram-zoom-level" class="diagram-zoom-level" aria-live="polite">100%</output>
+          <button type="button" id="diagram-zoom-in" aria-label="図を拡大する">＋</button>
+          <button type="button" id="diagram-zoom-reset">100%に戻す</button>
+          <button type="button" id="diagram-zoom-close">閉じる</button>
+        </div>
+      </header>
+      <p id="diagram-zoom-help" class="diagram-zoom-help">
+        図が画面より大きい場合は、縦横にスクロールして確認できます。Escキーでも閉じられます。
+      </p>
+      <div id="diagram-zoom-viewport" class="diagram-zoom-viewport" tabindex="0">
+        <div id="diagram-zoom-canvas" class="diagram-zoom-canvas"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const sources = [...document.querySelectorAll(".plantuml-source")];
+      const status = document.getElementById("plantuml-status");
+
+      window.__plantumlDocumentState = {
+        expected: sources.length,
+        rendered: 0,
+        errors: [],
+        completed: false
+      };
+
+      window.__plantumlFail = message => {
+        const state = window.__plantumlDocumentState;
+        state.errors.push(String(message));
+        state.completed = true;
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図の描画に失敗しました: ${message}`;
+      };
+
+      for (const output of document.querySelectorAll("[data-source-copy]")) {
+        const source = document.getElementById(output.dataset.sourceCopy);
+        if (source) output.textContent = source.textContent.trim();
+      }
+
+      document.documentElement.dataset.plantumlStatus = "running";
+    })();
+  </script>
+
+  <script
+    src="https://unpkg.com/@plantuml/core@1.2026.6/viz-global.js"
+    onerror="window.__plantumlFail('viz-global.jsを読み込めませんでした。')"></script>
+
+  <script type="module">
+    const state = window.__plantumlDocumentState;
+    const status = document.getElementById("plantuml-status");
+    const zoomDialog = document.getElementById("diagram-zoom-dialog");
+    const zoomTitle = document.getElementById("diagram-zoom-title");
+    const zoomViewport = document.getElementById("diagram-zoom-viewport");
+    const zoomCanvas = document.getElementById("diagram-zoom-canvas");
+    const zoomLevelOutput = document.getElementById("diagram-zoom-level");
+    const zoomOutButton = document.getElementById("diagram-zoom-out");
+    const zoomInButton = document.getElementById("diagram-zoom-in");
+    const zoomResetButton = document.getElementById("diagram-zoom-reset");
+    const zoomCloseButton = document.getElementById("diagram-zoom-close");
+    let zoomLevel = 1;
+    let zoomBaseWidth = 0;
+    let zoomedSvg = null;
+    let zoomReturnFocus = null;
+
+    const diagramTitle = sourceElement => {
+      const titleLine = sourceElement.textContent.match(/^\s*title\s+(.+)$/m);
+      return titleLine?.[1]?.trim() || "図を拡大表示";
+    };
+
+    const applyDiagramZoom = () => {
+      if (!zoomedSvg || zoomBaseWidth <= 0) return;
+      zoomedSvg.style.width = `${Math.round(zoomBaseWidth * zoomLevel)}px`;
+      zoomedSvg.style.height = "auto";
+      zoomLevelOutput.value = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelOutput.textContent = zoomLevelOutput.value;
+      zoomOutButton.disabled = zoomLevel <= 0.5;
+      zoomInButton.disabled = zoomLevel >= 3;
+    };
+
+    const setDiagramZoom = nextLevel => {
+      zoomLevel = Math.min(3, Math.max(0.5, nextLevel));
+      applyDiagramZoom();
+    };
+
+    const closeDiagramZoom = () => {
+      if (zoomDialog.hidden) return;
+      zoomDialog.hidden = true;
+      document.body.classList.remove("diagram-zoom-open");
+      zoomCanvas.replaceChildren();
+      zoomedSvg = null;
+      zoomBaseWidth = 0;
+      zoomReturnFocus?.focus();
+      zoomReturnFocus = null;
+    };
+
+    const openDiagramZoom = (target, sourceElement) => {
+      const sourceSvg = target.querySelector("svg");
+      if (!sourceSvg) return;
+
+      zoomReturnFocus = target;
+      zoomedSvg = sourceSvg.cloneNode(true);
+      zoomedSvg.removeAttribute("height");
+      zoomedSvg.style.maxWidth = "none";
+      const viewBoxWidth = zoomedSvg.viewBox?.baseVal?.width || 0;
+      const declaredWidth = Number.parseFloat(zoomedSvg.getAttribute("width")) || 0;
+      zoomBaseWidth = Math.max(viewBoxWidth, declaredWidth, sourceSvg.getBoundingClientRect().width);
+      zoomLevel = 1;
+      zoomTitle.textContent = diagramTitle(sourceElement);
+      zoomCanvas.replaceChildren(zoomedSvg);
+      zoomDialog.hidden = false;
+      document.body.classList.add("diagram-zoom-open");
+      zoomViewport.scrollTo({ top: 0, left: 0 });
+      applyDiagramZoom();
+      zoomCloseButton.focus();
+    };
+
+    const prepareDiagramZoom = (target, sourceElement) => {
+      target.dataset.zoomReady = "true";
+      target.tabIndex = 0;
+      target.setAttribute("role", "button");
+      target.setAttribute("aria-label", `${diagramTitle(sourceElement)}を拡大表示する`);
+      const hint = document.createElement("span");
+      hint.className = "diagram-zoom-hint";
+      hint.textContent = "クリックして拡大";
+      hint.setAttribute("aria-hidden", "true");
+      target.append(hint);
+      target.addEventListener("click", () => openDiagramZoom(target, sourceElement));
+      target.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDiagramZoom(target, sourceElement);
+        }
+      });
+    };
+
+    const focusableZoomElements = () => [...zoomDialog.querySelectorAll(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => !element.hidden && element.getClientRects().length > 0);
+
+    zoomOutButton.addEventListener("click", () => setDiagramZoom(zoomLevel - 0.25));
+    zoomInButton.addEventListener("click", () => setDiagramZoom(zoomLevel + 0.25));
+    zoomResetButton.addEventListener("click", () => setDiagramZoom(1));
+    zoomCloseButton.addEventListener("click", closeDiagramZoom);
+    zoomDialog.addEventListener("click", event => {
+      if (event.target === zoomDialog) closeDiagramZoom();
+    });
+    document.addEventListener("keydown", event => {
+      if (zoomDialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDiagramZoom();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableZoomElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    try {
+      const { renderToString } = await import(
+        "https://unpkg.com/@plantuml/core@1.2026.6/plantuml.js"
+      );
+
+      const renderDiagram = lines => new Promise((resolve, reject) => {
+        renderToString(
+          lines,
+          svg => resolve(svg),
+          message => reject(new Error(message))
+        );
+      });
+
+      const normalizeDiagnosticText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+      const inspectRenderedSvg = svgMarkup => {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const root = parsed.documentElement;
+        if (!root || root.localName.toLowerCase() === "parsererror" || parsed.querySelector("parsererror")) {
+          throw new Error("PlantUMLが不正なSVGを返しました。");
+        }
+        if (root.localName.toLowerCase() !== "svg") {
+          throw new Error("PlantUMLの描画結果がSVGではありません。");
+        }
+
+        const fullText = normalizeDiagnosticText(root.textContent);
+        const diagramType = root.getAttribute("data-diagram-type")?.toLowerCase() ?? "";
+        const hasKnownErrorText = /Syntax Error\?|An error has occurred/i.test(fullText);
+        const hasDiagnosticStructure = /PlantUML version\b/i.test(fullText)
+          && /\[From [^\]]*\(line \d+\)\s*\]/i.test(fullText)
+          && /@startuml/i.test(fullText);
+
+        if (diagramType === "error" || hasKnownErrorText || hasDiagnosticStructure) {
+          const diagnosticLines = [...root.querySelectorAll("text")]
+            .filter(element => {
+              const presentation = [
+                element.getAttribute("fill"),
+                element.getAttribute("style"),
+                element.getAttribute("text-decoration")
+              ].filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, "");
+              return /(?:fill:)?(?:#ff0000|#f00|red|rgb\(255,0,0\))/.test(presentation)
+                || presentation.includes("wavy");
+            })
+            .map(element => normalizeDiagnosticText(element.textContent))
+            .filter(Boolean);
+          const reason = [...new Set(diagnosticLines)].join(" / ").slice(0, 500)
+            || (hasKnownErrorText
+              ? fullText.match(/Syntax Error\?|An error has occurred/i)?.[0]
+              : "PlantUMLの診断画面が返されました。");
+          throw new Error(`PlantUMLの診断SVGが検出されました: ${reason}`);
+        }
+
+        return root;
+      };
+
+      for (const sourceElement of document.querySelectorAll(".plantuml-source")) {
+        const target = document.getElementById(sourceElement.dataset.target);
+        if (!target) {
+          state.errors.push(`${sourceElement.id}: 描画先がありません。`);
+          continue;
+        }
+
+        try {
+          const lines = sourceElement.textContent.trim().split(/\r?\n/);
+          const svgMarkup = await renderDiagram(lines);
+          const svg = inspectRenderedSvg(svgMarkup);
+          target.replaceChildren(document.importNode(svg, true));
+          prepareDiagramZoom(target, sourceElement);
+          target.dataset.plantumlStatus = "success";
+          state.rendered += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          state.errors.push(`${sourceElement.id}: ${message}`);
+          target.dataset.plantumlStatus = "error";
+          target.textContent = `この図の描画に失敗しました: ${message}`;
+        }
+      }
+
+      state.completed = true;
+      if (state.rendered === state.expected && state.errors.length === 0) {
+        document.documentElement.dataset.plantumlStatus = "success";
+        status.textContent = `図を${state.rendered}件すべて描画できました。`;
+      } else {
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図を${state.rendered}件描画し、${state.errors.length}件のエラーが発生しました。`;
+      }
+    } catch (error) {
+      window.__plantumlFail(error instanceof Error ? error.message : String(error));
+    }
+  </script>
+</body>
+</html>
