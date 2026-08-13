@@ -201,7 +201,7 @@ Execution contract:
 - `tc-s40a-retained-core`: selection、dependency lifecycle、Artifact、sync / validateのretained characterizationが削除前後でpassする。
 
 - Bounded GREEN: old-only graphと専用test/fixtureを削除し、shared fileからold consumerだけを切る。
-- Verification: `uv run pytest --run-full-regression tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_distribution_cutover.py -q -k "planning or removed or retained"`。
+- Verification: `uv run pytest --run-full-regression tests/cli_runtime/test_storage_core_cli.py -q`。S40Aの検証は現行のStorage Core runtime deletion contractだけを対象とし、S40Bで追加する`test_distribution_cutover.py`へ先行依存しない。
 - Refactor guardrail: retained Runtimeを移動・rename・再設計しない。
 - Stop / output: retained test failureまたはS10外のshared dependency発見時は削除を止めDesign/Plan amendment。Reportへexact deletion list、retained symbols、RED/GREEN、worker noteを記録する。
 - Reviewer / fix: fresh `code-reviewer`がshared-symbol safetyとfallback absenceを確認。Fail後fresh re-review。
