@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import stat
+import subprocess
 
 import pytest
 
@@ -22,6 +23,7 @@ from spec_dock.managed_distribution import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 INSTALL_ROOT = REPO_ROOT / "src" / "spec_dock" / "assets" / "install_root"
 MANIFEST_PATH = REPO_ROOT / "src" / "spec_dock" / "assets" / "managed_distribution.json"
+HISTORICAL_COMMIT = "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
 
 EXPECTED_CURRENT_PATHS = frozenset(
     {
@@ -31,6 +33,32 @@ EXPECTED_CURRENT_PATHS = frozenset(
         ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
         ".github/workflows/ci.yml",
     }
+)
+EXPECTED_OBSOLETE_SKILL_PATHS = frozenset(
+    f".agents/skills/{name}/SKILL.md"
+    for name in (
+        "spec-dock-hub",
+        "spec-dock-initiative-planning",
+        "spec-dock-epic-planning",
+        "spec-dock-epic-execution",
+        "spec-dock-issue-planning",
+        "spec-dock-issue-execution",
+        "spec-dock-chatgpt-authoring",
+        "spec-dock-initiative-planning-manual",
+        "spec-dock-epic-planning-manual",
+        "spec-dock-issue-planning-manual",
+        "spec-dock-clarification",
+        "spec-dock-adr-facilitation",
+        "spec-dock-codex-adapter",
+        "spec-dock-copilot-adapter",
+        "git-commit-conventional-ja",
+        "github-pr-observation",
+        "github-pr-creator",
+        "github-pr-merge-preparer",
+        "spec-driven-tdd-workflow",
+        "spec-dock-system-architect",
+        "spec-dock-implementation-planner",
+    )
 )
 MANIFEST_FIELDS = {
     "schema_version",
@@ -86,7 +114,12 @@ def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
     assert plan.actions == ()
     assert plan.manifest.schema_version == 1
     assert plan.manifest.historical_current_identities == ()
-    assert plan.manifest.obsolete_exact_files == ()
+    obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files}
+    assert len(obsolete_paths) == 75
+    assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
+    assert ".agents/host-adapters/meta.json" in obsolete_paths
+    assert any(path.startswith(".codex/") for path in obsolete_paths)
+    assert any(path.startswith(".github/agents/") for path in obsolete_paths)
     for asset in plan.current_assets:
         source = INSTALL_ROOT / asset.path
         assert asset.identity.kind == "regular"
@@ -100,7 +133,44 @@ def test_s20_current_catalog_is_not_duplicated_in_historical_manifest() -> None:
     assert set(raw) == MANIFEST_FIELDS
     assert not any(key in raw for key in {"current", "current_assets", "current_catalog"})
     assert raw["historical_current_identities"] == []
-    assert raw["obsolete_exact_files"] == []
+    obsolete_paths = {item["path"] for item in raw["obsolete_exact_files"]}
+    assert len(obsolete_paths) == 75
+    assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
+    assert not any(
+        item["path"] in EXPECTED_CURRENT_PATHS
+        for item in raw["obsolete_exact_files"]
+    )
+
+
+def test_s55_obsolete_catalog_is_bound_to_reproducible_git_source() -> None:
+    raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    records = [
+        identity
+        for item in raw["obsolete_exact_files"]
+        for identity in item["identities"]
+    ]
+
+    assert records
+    assert {identity["source"]["ref"] for identity in records} == {HISTORICAL_COMMIT}
+    source_available = subprocess.run(
+        ["git", "cat-file", "-e", f"{HISTORICAL_COMMIT}^{{commit}}"],
+        check=False,
+        capture_output=True,
+    )
+    if source_available.returncode != 0:
+        pytest.skip("historical source commit is unavailable in this checkout")
+    for identity in records:
+        path = identity["path"]
+        provider_path = f"src/spec_dock/assets/install_root/{path}"
+        content = subprocess.check_output(["git", "show", f"{HISTORICAL_COMMIT}:{provider_path}"])
+        tree = subprocess.check_output(
+            ["git", "ls-tree", HISTORICAL_COMMIT, "--", provider_path],
+            text=True,
+        )
+        mode = tree.split(maxsplit=1)[0]
+        assert mode in {"100644", "100755"}
+        assert identity["sha256"] == hashlib.sha256(content).hexdigest()
+        assert identity["mode"] == int(mode, 8) & 0o777
 
 
 def test_s20_build_is_read_only(tmp_path: Path) -> None:
@@ -794,6 +864,153 @@ def test_s30_apply_prunes_historical_target_without_following_symlink(tmp_path: 
 
     assert result.status == "complete"
     assert not target.exists()
+
+
+def test_s55_apply_prunes_proven_obsolete_target_during_update(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old = b"legacy-managed\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": ".codex/config.toml",
+                    "surface": "legacy-codex-surface",
+                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".codex" / "config.toml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".codex/config.toml")
+    assert action.action == "prune"
+    assert action.provenance == "historical"
+    assert action.blocked is False
+
+    result = apply_distribution_plan(plan)
+
+    assert result.status == "complete"
+    assert not target.exists()
+
+
+def test_s55_mode_mismatch_preserves_obsolete_target_and_blocks(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old = b"legacy-managed\n"
+    record = _regular_record(".codex/config.toml", old)
+    record["mode"] = 0o644
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": ".codex/config.toml",
+                    "surface": "legacy-codex-surface",
+                    "identities": [record],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".codex" / "config.toml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    target.chmod(0o755)
+    before = target.read_bytes(), stat.S_IMODE(target.stat().st_mode)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".codex/config.toml")
+    assert action.action == "preserve"
+    assert action.reason == "obsolete-identity-unknown"
+    assert action.blocked is True
+    with pytest.raises(DistributionApplyError, match="blocked"):
+        apply_distribution_plan(plan)
+
+    assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
+
+
+@pytest.mark.parametrize(
+    ("target_kind", "expected_reason"),
+    [
+        ("modified", "obsolete-identity-unknown"),
+        ("symlink", "obsolete-identity-unknown"),
+        ("directory", "exact-path-directory"),
+    ],
+)
+def test_s55_unknown_or_unsafe_obsolete_target_blocks_before_mutation(
+    tmp_path: Path,
+    target_kind: str,
+    expected_reason: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old = b"legacy-managed\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": ".codex/config.toml",
+                    "surface": "legacy-codex-surface",
+                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".codex" / "config.toml"
+    target.parent.mkdir(parents=True)
+    if target_kind == "modified":
+        target.write_bytes(b"user-owned\n")
+    elif target_kind == "symlink":
+        outside = tmp_path / "outside.txt"
+        outside.write_bytes(b"outside\n")
+        target.symlink_to(outside)
+    else:
+        target.mkdir()
+    before = target_root / ".codex"
+    before_snapshot = (
+        target.lstat(),
+        tuple(sorted(path.relative_to(before).as_posix() for path in before.rglob("*"))),
+    )
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".codex/config.toml")
+    assert action.action == ("block" if target_kind == "directory" else "preserve")
+    assert action.reason == expected_reason
+    assert action.blocked is True
+    with pytest.raises(DistributionApplyError, match="blocked"):
+        apply_distribution_plan(plan)
+
+    assert target.exists() or target.is_symlink()
+    assert (
+        target.lstat(),
+        tuple(sorted(path.relative_to(before).as_posix() for path in before.rglob("*"))),
+    ) == before_snapshot
 
 
 def test_s30_apply_blocks_root_rebind_before_any_write(tmp_path: Path) -> None:

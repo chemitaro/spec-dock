@@ -375,3 +375,70 @@ def test_s50_force_init_directory_only_current_collision_is_zero_write(tmp_path:
     assert main(["init", str(tmp_path), "--force"]) == 1
 
     assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s55_update_prunes_proven_historical_managed_file(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    legacy = tmp_path / ".codex/config.toml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b'project_doc_fallback_filenames = [".codex/AGENTS.md"]\n')
+    legacy.chmod(0o644)
+
+    assert main(["update", str(tmp_path)]) == 0
+
+    assert not legacy.exists()
+
+
+def test_s55_force_init_prunes_proven_historical_managed_file(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    legacy = tmp_path / ".codex/config.toml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b'project_doc_fallback_filenames = [".codex/AGENTS.md"]\n')
+    legacy.chmod(0o644)
+
+    assert main(["init", str(tmp_path), "--force"]) == 0
+
+    assert not legacy.exists()
+
+
+def test_s55_update_preserves_modified_historical_managed_file_and_blocks(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    legacy = tmp_path / ".codex/config.toml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b"user-owned configuration\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "obsolete-identity-unknown" in captured.err
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s55_update_prunes_known_legacy_and_preserves_node_local_data(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    legacy = tmp_path / ".codex/config.toml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b'project_doc_fallback_filenames = [".codex/AGENTS.md"]\n')
+    legacy.chmod(0o644)
+    unknown = tmp_path / ".codex/user-owned.toml"
+    unknown.write_bytes(b"user-owned\n")
+    initiative = tmp_path / "spec-dock/initiatives/user-owned.md"
+    initiative.parent.mkdir(parents=True, exist_ok=True)
+    initiative.write_bytes(b"keep initiative\n")
+    issue_workbench = (
+        tmp_path
+        / "spec-dock/initiatives/user-owned/.workbench/README.md"
+    )
+    issue_workbench.parent.mkdir(parents=True)
+    issue_workbench.write_bytes(b"keep workbench\n")
+
+    assert main(["update", str(tmp_path)]) == 0
+
+    assert not legacy.exists()
+    assert unknown.read_bytes() == b"user-owned\n"
+    assert initiative.read_bytes() == b"keep initiative\n"
+    assert issue_workbench.read_bytes() == b"keep workbench\n"

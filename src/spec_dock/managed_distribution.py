@@ -279,7 +279,7 @@ def _source(value: Any, *, field_name: str) -> dict[str, Any]:
 def _identity_record(value: Any, *, field_name: str, require_source: bool = True) -> dict[str, Any]:
     if not isinstance(value, dict):
         _fail(f"{field_name} must be an object")
-    allowed = {"path", "kind", "sha256", "target", "source"}
+    allowed = {"path", "kind", "sha256", "mode", "target", "source"}
     unknown = set(value) - allowed
     if unknown:
         _fail(f"{field_name} contains unsupported fields: {', '.join(sorted(unknown))}")
@@ -290,6 +290,11 @@ def _identity_record(value: Any, *, field_name: str, require_source: bool = True
         if "target" in value:
             _fail(f"{field_name}.target is only valid for symlinks")
         result: dict[str, Any] = {"path": path.as_posix(), "kind": kind, "sha256": digest}
+        if "mode" in value:
+            mode = value["mode"]
+            if isinstance(mode, bool) or not isinstance(mode, int) or not 0 <= mode <= 0o777:
+                _fail(f"{field_name}.mode must be an integer between 0 and 0o777")
+            result["mode"] = mode
     elif kind == "symlink":
         target = value.get("target")
         if not isinstance(target, str) or not target or "\\" in target or target.startswith("/"):
@@ -889,7 +894,10 @@ def _identity_matches(actual: DistributionIdentity, record: dict[str, Any]) -> b
     if actual.kind != record.get("kind"):
         return False
     if actual.kind == "regular":
-        return actual.sha256 == record.get("sha256")
+        if actual.sha256 != record.get("sha256"):
+            return False
+        expected_mode = record.get("mode")
+        return expected_mode is None or actual.mode == expected_mode
     return actual.target == record.get("target")
 
 
