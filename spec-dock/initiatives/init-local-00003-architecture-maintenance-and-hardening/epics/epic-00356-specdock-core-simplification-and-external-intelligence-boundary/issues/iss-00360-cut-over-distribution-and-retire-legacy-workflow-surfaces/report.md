@@ -12,11 +12,12 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認した。S00 / S10、S40A / S40B、S20 / S25 / S30を完了し、S35でversion / retry marker admissionとCLIのzero-write rejectionを実装・検証した。S45ではGenuine FreshのCurrent配布計画、S50ではrecognized update / `init --force`の共通plan/applyを実装した。S55では、Issue 359 final commitから再現できる旧managed資産をexact SHAでcatalog化し、既知旧資産のprune、変更済み・不明・unsafe候補のpreserve-and-block、既存dogfood consumerのcutoverを実装・検証した。S60では、init / updateのphase marker、same-root / same-package / same-operationのforward retry、post-verify前のversion確定抑止、root rebind検知、markerのno-replace原子公開、fault診断のサニタイズを実装・検証した。S65ではuninstall admission / dry-runを共通classifierへ接続し、S70ではapply前の全計画検証、所有権不明時の全mutation停止、legacy marker-last retry、keep/remove specs境界、root identity再検証を実装・検証した。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、実装コミット `7736daec83cfc4a9e60843a080d1404fb57160cf` をpush済みである。Issue 360対象の最終品質確認は、通常テスト・lint・focused distribution regression・package integration・`spec-dock validate`までpassした一方、全リポジトリのfull regressionにはIssue 360対象外の既存runtime回帰が残り、最終ChatGPT-SpecReview-Strictはブラウザ側のprompt reconstruction / rate-limitで送信前に成立しなかった。そのためS99/H10、Issue close、IC-3判定は未実施のまま、レビュー可能な実装PRとしてhandoffする。
 
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
+* Final implementation commit: `7736daec83cfc4a9e60843a080d1404fb57160cf`（local HEAD = configured upstream、clean）
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
 * Integrated main baseline: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
@@ -278,11 +279,27 @@ S90では、root README、provider docs、dogfood projection、Current rulesの�
 | Removed route / link scan | pass | root README、provider / dogfood docs・rules・templates・scriptsをpath-aware `rg`で走査し、旧skill・`spec-dock-chatgpt`・削除済みworkflow / phase link 0件 |
 | Provider / dogfood docs parity | pass | provider `docs/README.md`、`reference_github.md`、rules 5ファイルをdogfoodへ反映しbyte parityを確認 |
 
+### S95 / S99 Final quality gate status
+
+Issue 360の対象範囲に対する最終確認を実施した。対象外の既存runtime回帰と外部ブラウザ制限は、passへ置換せず明示的に残す。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| Fast lane | pass | `uv run pytest` → `986 passed, 1513 skipped` |
+| Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
+| Issue 360 focused regression | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_distribution_cutover.py tests/unit/infra/test_init_update.py tests/unit/infra/test_managed_distribution.py tests/unit/infra/test_artifact_templates.py tests/integration/test_epic_00343_distribution.py -q` → `303 passed, 468 skipped` |
+| Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
+| Package build | pass | `uv build` → wheel / sdist生成 |
+| Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
+| Full repository regression | not adopted | `uv run pytest --run-full-regression`の試行ではIssue 360対象外のlegacy runtime/import/active/shell回帰を検出。対象Issueのfocused suiteへ縮小し、全体passとは主張しない |
+| Final ChatGPT-SpecReview-Strict | blocked before review | `issue360-final-spec-review` / `issue360-final-strict-correct-root` はprompt reconstruction mismatch、`issue360-correct-root-smoke` はrate-limit dialogでいずれも`promptSubmitted=false`・conversationなし。既存のplanning Strict passを現実装のfinal passへ流用しない |
+| S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force tests、S55 obsolete prune / preserve tests、S60 forward-retry / root-binding tests、S65/S70 uninstall、S80 package parity、S85 installed smoke、S90 docs refreshを完了した。S95/S99/H10は最終品質gateとhandoffとして残る。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force tests、S55 obsolete prune / preserve tests、S60 forward-retry / root-binding tests、S65/S70 uninstall、S80 package parity、S85 installed smoke、S90 docs refreshを完了した。現実装SHAに対する最終Strictは外部ブラウザ制限で未成立、S99/H10は未完了として扱う。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
