@@ -4453,8 +4453,10 @@ class TestInitUpdate(CliRuntimeHarness):
             target = Path(tmp)
             specdock_dir = target / "spec-dock"
             specdock_dir.mkdir()
+            before = self._relative_file_snapshot(target)
 
-            assert main(["init", str(target), "--force"]) == 0
+            assert main(["init", str(target), "--force"]) == 1
+            assert self._relative_file_snapshot(target) == before
             assert not (specdock_dir / ".workbench" / "README.md").exists()
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -4494,7 +4496,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 before_target = specdock_entry.readlink()
                 before_mtime = specdock_entry.lstat().st_mtime_ns
 
-                assert main(["init", str(target), "--force"]) == 0
+                assert main(["init", str(target), "--force"]) == 1
                 assert specdock_entry.is_symlink()
                 assert specdock_entry.readlink() == before_target
                 assert specdock_entry.lstat().st_mtime_ns == before_mtime
@@ -38672,7 +38674,7 @@ esac
             assert "content mismatch" in edited_action["reason"]
             assert self._relative_file_snapshot(target) == before
 
-    def test_uninstall_dry_run_removes_stale_specdock_version(self) -> None:
+    def test_uninstall_blocks_unrecognized_specdock_version(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -38680,12 +38682,13 @@ esac
             version_file.write_text("0.0.0\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
 
-            actions = self._uninstall_json_actions(target)
+            exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            action = actions["spec-dock/spec-dock.version"]
-            assert action["category"] == "scaffold_managed"
-            assert action["status"] == "would_remove"
-            assert "managed state" in action["reason"]
+            assert exit_code == 2
+            assert stderr == ""
+            payload = json.loads(stdout)
+            assert payload["status"] == "error"
+            assert "unknown-version" in payload["errors"][0]
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink(self) -> None:

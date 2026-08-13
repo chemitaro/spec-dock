@@ -33,6 +33,14 @@ class DistributionApplyError(RuntimeError):
     """Raised when a distribution plan cannot be applied safely."""
 
 
+class DistributionAdmissionError(RuntimeError):
+    """Raised when a consumer cannot safely enter a distribution operation."""
+
+    def __init__(self, message: str, *, reason: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
 @dataclass(frozen=True)
 class DistributionIdentity:
     """The immutable identity of one provider or historical file."""
@@ -169,6 +177,47 @@ class DistributionResult:
     actions: tuple[DistributionAction, ...]
 
 
+@dataclass(frozen=True)
+class DistributionRootIdentity:
+    """Stable identity used to bind a retry marker to one repository root."""
+
+    device: int
+    inode: int
+
+
+@dataclass(frozen=True)
+class DistributionRetryMarker:
+    """Validated init/update retry marker without absolute paths or secrets."""
+
+    operation: Literal["fresh", "update", "init-force"]
+    package_version: str
+    target_root: DistributionRootIdentity
+    last_completed_phase: str
+    purpose: Literal["distribution-rerun"]
+
+
+@dataclass(frozen=True)
+class DistributionAdmission:
+    """Read-only result of operation admission."""
+
+    operation: DistributionOperation
+    status: Literal["fresh", "existing", "recognized", "retry", "uninstall-retry"]
+    package_version: str
+    target_version: str | None = None
+    marker: DistributionRetryMarker | None = None
+
+    def diagnostic(self) -> dict[str, object]:
+        """Return stable, repository-relative admission evidence."""
+
+        return {
+            "operation": self.operation,
+            "status": self.status,
+            "package_version": self.package_version,
+            "target_version": self.target_version,
+            "retry": self.marker is not None,
+        }
+
+
 _SCHEMA_VERSION = 1
 _MANIFEST_FIELDS = frozenset(
     {
@@ -285,8 +334,10 @@ def _validate_manifest(raw: Any) -> DistributionManifest:
         if not isinstance(item, dict) or set(item) != {"version", "anchors"}:
             _fail(f"recognized_workspace_versions[{index}] has invalid shape")
         version = item.get("version")
-        if not isinstance(version, str) or not version.strip():
-            _fail(f"recognized_workspace_versions[{index}].version must be non-empty")
+        if not isinstance(version, str) or re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", version) is None:
+            _fail(
+                f"recognized_workspace_versions[{index}].version must be canonical MAJOR.MINOR.PATCH"
+            )
         anchors_raw = item.get("anchors")
         if not isinstance(anchors_raw, list) or not anchors_raw:
             _fail(f"recognized_workspace_versions[{index}].anchors must be non-empty")
@@ -459,6 +510,339 @@ def _load_manifest(path: Path) -> DistributionManifest:
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise DistributionManifestError(f"unable to load distribution manifest: {path.name}") from exc
     return _validate_manifest(raw)
+
+
+_CANONICAL_VERSION_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\n$")
+_DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
+_UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
+_DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
+_DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
+_UNINSTALL_RETRY_MARKER_PAYLOAD = {
+    "schema_version": 1,
+    "managed_by": "spec-dock",
+    "purpose": "uninstall-rerun",
+}
+_VERSION_ANCHOR_PATHS = frozenset({"spec-dock/scripts/spec-dock", "spec-dock/.gitignore"})
+
+
+def _admission_block(reason: str, detail: str) -> NoReturn:
+    raise DistributionAdmissionError(f"distribution admission blocked ({reason}): {detail}", reason=reason)
+
+
+def _parse_canonical_version(value: str, *, source: str) -> tuple[int, int, int]:
+    """Parse the deliberately narrow version grammar used by workspace markers."""
+
+    try:
+        match = _CANONICAL_VERSION_RE.fullmatch(value)
+    except (OverflowError, ValueError):
+        match = None
+    if match is None:
+        _admission_block("invalid-version", f"{source} is not canonical MAJOR.MINOR.PATCH")
+    assert match is not None
+    try:
+        return tuple(int(component) for component in match.groups())  # type: ignore[return-value]
+    except (OverflowError, ValueError):
+        _admission_block("invalid-version", f"{source} contains an invalid numeric component")
+
+
+def _parse_package_version(value: str, *, source: str) -> tuple[int, int, int]:
+    if "\n" in value or "\r" in value:
+        _admission_block("invalid-version", f"{source} must not contain a line break")
+    return _parse_canonical_version(value + "\n", source=source)
+
+
+def _read_no_follow_regular(path: Path, *, label: str, allow_missing: bool = False) -> bytes | None:
+    """Read one link-count-one regular file without following a symlink."""
+
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        _admission_block("platform-unsupported", "no-follow regular-file admission is unavailable")
+    if path.is_symlink():
+        if label == "uninstall retry marker":
+            _admission_block("invalid-file", "symlinked SpecDock uninstall retry marker")
+        _admission_block("invalid-file", f"{label} is symlinked")
+    flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        _admission_block("missing", f"{label} is missing")
+    except OSError:
+        _admission_block("invalid-file", f"{label} cannot be opened without following links")
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            _admission_block("invalid-file", f"{label} must be a regular file")
+        if info.st_nlink != 1:
+            _admission_block("hard-link", f"{label} must have link count 1")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return b"".join(chunks)
+    except OSError:
+        _admission_block("read-error", f"{label} cannot be read safely")
+    finally:
+        os.close(fd)
+
+
+def _path_present_no_follow(path: Path) -> bool:
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        _admission_block("marker-invalid", f"cannot inspect {path.name}")
+    return True
+
+
+def _root_identity_for_admission(target_root: Path) -> DistributionRootIdentity:
+    try:
+        info = os.lstat(target_root)
+    except OSError:
+        _admission_block("target-root-invalid", "target root cannot be inspected safely")
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        _admission_block("target-root-invalid", "target root must be a real directory")
+    return DistributionRootIdentity(device=info.st_dev, inode=info.st_ino)
+
+
+def _assert_real_parent_chain(target_root: Path, relative_path: str, *, label: str) -> bool:
+    current = target_root
+    for component in PurePosixPath(relative_path).parts[:-1]:
+        current = current / component
+        try:
+            info = os.lstat(current)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            _admission_block("invalid-file", f"{label} parent cannot be inspected")
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            _admission_block("invalid-file", f"{label} parent must be a real directory")
+    return True
+
+
+def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarker | None:
+    path = target_root / _DISTRIBUTION_RETRY_MARKER_REL
+    if not _path_present_no_follow(path):
+        return None
+    raw_bytes = _read_no_follow_regular(path, label="distribution retry marker")
+    assert raw_bytes is not None
+    try:
+        raw = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        _admission_block("marker-invalid", "distribution retry marker is not valid UTF-8 JSON")
+    if not isinstance(raw, dict):
+        _admission_block("marker-invalid", "distribution retry marker must be an object")
+    expected_fields = {
+        "schema_version",
+        "operation",
+        "package_version",
+        "target_root",
+        "last_completed_phase",
+        "purpose",
+    }
+    if set(raw) != expected_fields:
+        _admission_block("marker-invalid", "distribution retry marker fields are invalid")
+    if raw.get("schema_version") != _DISTRIBUTION_RETRY_SCHEMA_VERSION:
+        _admission_block("marker-invalid", "distribution retry marker schema is unsupported")
+    operation = raw.get("operation")
+    if operation not in {"fresh", "update", "init-force"}:
+        _admission_block("marker-invalid", "distribution retry marker operation is unsupported")
+    package_version = raw.get("package_version")
+    if not isinstance(package_version, str):
+        _admission_block("marker-invalid", "distribution retry marker package_version is invalid")
+    _parse_package_version(package_version, source="distribution retry marker package_version")
+    root = raw.get("target_root")
+    if not isinstance(root, dict) or set(root) != {"device", "inode"}:
+        _admission_block("marker-invalid", "distribution retry marker target_root identity is invalid")
+    device = root.get("device")
+    inode = root.get("inode")
+    if (
+        isinstance(device, bool)
+        or not isinstance(device, int)
+        or device <= 0
+        or isinstance(inode, bool)
+        or not isinstance(inode, int)
+        or inode <= 0
+    ):
+        _admission_block("marker-invalid", "distribution retry marker target_root identity is invalid")
+    phase = raw.get("last_completed_phase")
+    if not isinstance(phase, str) or not phase:
+        _admission_block("marker-invalid", "distribution retry marker phase is invalid")
+    if raw.get("purpose") != _DISTRIBUTION_RETRY_PURPOSE:
+        _admission_block("marker-invalid", "distribution retry marker purpose is unsupported")
+    return DistributionRetryMarker(
+        operation=operation,
+        package_version=package_version,
+        target_root=DistributionRootIdentity(device=device, inode=inode),
+        last_completed_phase=phase,
+        purpose=_DISTRIBUTION_RETRY_PURPOSE,
+    )
+
+
+def _read_uninstall_retry_marker_for_admission(target_root: Path) -> bool:
+    path = target_root / _UNINSTALL_RETRY_MARKER_REL
+    if not _path_present_no_follow(path):
+        return False
+    raw_bytes = _read_no_follow_regular(path, label="uninstall retry marker")
+    assert raw_bytes is not None
+    try:
+        raw = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        _admission_block("marker-invalid", "uninstall retry marker is not valid UTF-8 JSON")
+    if raw != _UNINSTALL_RETRY_MARKER_PAYLOAD:
+        _admission_block("marker-invalid", "uninstall retry marker schema is invalid")
+    return True
+
+
+def _anchor_identity_matches(target_root: Path, anchor: dict[str, Any]) -> bool:
+    path_text = anchor.get("path")
+    if path_text not in _VERSION_ANCHOR_PATHS or anchor.get("kind") != "regular":
+        return False
+    expected_digest = anchor.get("sha256")
+    if not isinstance(expected_digest, str):
+        return False
+    if not _assert_real_parent_chain(target_root, path_text, label=f"version anchor {path_text}"):
+        return False
+    actual = _read_no_follow_regular(target_root / path_text, label=f"version anchor {path_text}", allow_missing=True)
+    if actual is None:
+        return False
+    return hashlib.sha256(actual).hexdigest() == expected_digest
+
+
+def _recognized_version_entry(manifest: DistributionManifest, version: str) -> dict[str, Any]:
+    matches = [item for item in manifest.recognized_workspace_versions if item.get("version") == version]
+    if len(matches) != 1:
+        _admission_block("unknown-version", f"workspace version {version!r} is not an exact recognized entry")
+    entry = matches[0]
+    anchors = entry.get("anchors")
+    if not isinstance(anchors, tuple):
+        _admission_block("anchor-mismatch", f"workspace version {version!r} has invalid anchors")
+    by_path = {anchor.get("path"): anchor for anchor in anchors if isinstance(anchor, dict)}
+    if set(_VERSION_ANCHOR_PATHS) - set(by_path):
+        _admission_block("anchor-mismatch", f"workspace version {version!r} is missing required anchors")
+    return entry
+
+
+def _validate_workspace_version(
+    target_root: Path,
+    *,
+    manifest: DistributionManifest,
+    package_version: str,
+) -> tuple[str, tuple[int, int, int]]:
+    version_path = target_root / "spec-dock" / "spec-dock.version"
+    raw_bytes = _read_no_follow_regular(version_path, label="spec-dock/spec-dock.version", allow_missing=True)
+    if raw_bytes is None:
+        _admission_block("missing-version", "spec-dock/spec-dock.version is missing")
+    try:
+        version_text = raw_bytes.decode("ascii")
+    except UnicodeDecodeError:
+        _admission_block("invalid-version", "spec-dock/spec-dock.version must be ASCII")
+    target_tuple = _parse_canonical_version(version_text, source="spec-dock/spec-dock.version")
+    entry = _recognized_version_entry(manifest, version_text[:-1])
+    anchors = entry["anchors"]
+    for path_text in _VERSION_ANCHOR_PATHS:
+        anchor = next((item for item in anchors if item.get("path") == path_text), None)
+        if anchor is None or not _anchor_identity_matches(target_root, anchor):
+            _admission_block("anchor-mismatch", f"version anchor does not match: {path_text}")
+    package_tuple = _parse_package_version(package_version, source="executing package version")
+    if target_tuple > package_tuple:
+        _admission_block("downgrade-blocked", f"target version {version_text[:-1]} is newer than package {package_version}")
+    return version_text[:-1], target_tuple
+
+
+def admit_distribution_operation(
+    target_root: Path,
+    *,
+    operation: DistributionOperation,
+    package_version: str,
+    manifest_path: Path,
+) -> DistributionAdmission:
+    """Admit an installer operation without mutating the consumer tree.
+
+    This is intentionally separate from distribution planning and apply.  It
+    validates the package version, workspace marker, version-specific anchors,
+    and operation-specific retry markers before any caller performs a write.
+    """
+
+    if operation not in _OPERATIONS:
+        _admission_block("operation-invalid", f"unsupported operation: {operation!r}")
+    _parse_package_version(package_version, source="executing package version")
+    target_root = Path(target_root)
+    root_identity = _root_identity_for_admission(target_root)
+    try:
+        manifest = _load_manifest(Path(manifest_path))
+    except DistributionManifestError as exc:
+        _admission_block("manifest-invalid", str(exc))
+
+    specdock_path = target_root / "spec-dock"
+    try:
+        specdock_info = os.lstat(specdock_path)
+    except FileNotFoundError:
+        specdock_info = None
+    except OSError:
+        _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+    if specdock_info is not None and not stat.S_ISLNK(specdock_info.st_mode) and not stat.S_ISDIR(specdock_info.st_mode):
+        _admission_block("workspace-invalid", "spec-dock must be a real directory")
+    if specdock_info is not None and stat.S_ISLNK(specdock_info.st_mode):
+        _admission_block("workspace-invalid", "spec-dock is a symlink; a real directory is required")
+
+    distribution_marker_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
+    uninstall_marker_present = _path_present_no_follow(target_root / _UNINSTALL_RETRY_MARKER_REL)
+    if distribution_marker_present and uninstall_marker_present:
+        _admission_block("dual-marker", "distribution and uninstall retry markers cannot coexist")
+
+    distribution_marker = _read_distribution_retry_marker(target_root)
+    uninstall_marker = _read_uninstall_retry_marker_for_admission(target_root)
+    if distribution_marker is not None:
+        if operation == "uninstall":
+            _admission_block("distribution-retry-present", "recover distribution before uninstall")
+        if distribution_marker.operation != operation:
+            _admission_block("marker-operation-mismatch", "retry marker belongs to another operation")
+        if distribution_marker.package_version != package_version:
+            _admission_block("marker-package-mismatch", "retry marker belongs to another package version")
+        if distribution_marker.target_root != root_identity:
+            _admission_block("cross-root-replay", "retry marker belongs to another repository root")
+        return DistributionAdmission(
+            operation=operation,
+            status="retry",
+            package_version=package_version,
+            marker=distribution_marker,
+        )
+    if uninstall_marker:
+        if operation != "uninstall":
+            _admission_block("uninstall-retry-present", "recover uninstall before init or update")
+        return DistributionAdmission(
+            operation=operation,
+            status="uninstall-retry",
+            package_version=package_version,
+        )
+
+    if specdock_info is None:
+        if operation in {"fresh", "init-force"}:
+            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
+        if operation == "update":
+            _admission_block(
+                "workspace-missing",
+                "'spec-dock' not found. Run 'spec-dock init' first.",
+            )
+        _admission_block("workspace-missing", "target is not a managed SpecDock repo")
+    if operation == "fresh":
+        return DistributionAdmission(operation=operation, status="existing", package_version=package_version)
+    target_version, _target_tuple = _validate_workspace_version(
+        target_root,
+        manifest=manifest,
+        package_version=package_version,
+    )
+    return DistributionAdmission(
+        operation=operation,
+        status="recognized",
+        package_version=package_version,
+        target_version=target_version,
+    )
 
 
 def _current_assets(install_root: Path) -> tuple[DistributionAsset, ...]:

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 from spec_dock import cli
 from tests.cli_runtime.harness import main
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROVIDER_ROOT = REPO_ROOT / "src" / "spec_dock" / "assets"
@@ -109,6 +109,59 @@ def test_s40b_retained_skill_identity_matches_issue359_final_source() -> None:
     for relative_path, expected_sha256 in CURRENT_SKILL_SHA256.items():
         actual_sha256 = hashlib.sha256((INSTALL_ROOT / relative_path).read_bytes()).hexdigest()
         assert actual_sha256 == expected_sha256
+
+
+def test_s35_cli_blocks_unknown_version_before_any_update_write(tmp_path: Path, capsys) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    version = target / "spec-dock" / "spec-dock.version"
+    version.write_bytes(b"9.9.9\n")
+    before = {
+        path.relative_to(target): path.read_bytes()
+        for path in target.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+
+    assert main(["update", str(target)]) == 1
+    assert "unknown-version" in capsys.readouterr().err
+    after = {
+        path.relative_to(target): path.read_bytes()
+        for path in target.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+    assert after == before
+
+
+def test_s35_cli_rejects_dual_retry_markers_without_writes(tmp_path: Path, capsys) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    marker = target / "spec-dock" / ".distribution-retry.json"
+    root_stat = target.stat()
+    marker.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "operation": "update",
+                "package_version": "0.2.3",
+                "target_root": {"device": root_stat.st_dev, "inode": root_stat.st_ino},
+                "last_completed_phase": "preflight-complete",
+                "purpose": "distribution-rerun",
+            }
+        ),
+        encoding="utf-8",
+    )
+    uninstall_marker = target / "spec-dock" / ".uninstall-retry.json"
+    uninstall_marker.write_text(
+        json.dumps({"schema_version": 1, "managed_by": "spec-dock", "purpose": "uninstall-rerun"}),
+        encoding="utf-8",
+    )
+    before = marker.read_bytes(), uninstall_marker.read_bytes()
+
+    assert main(["update", str(target)]) == 1
+    assert "dual-marker" in capsys.readouterr().err
+    assert (marker.read_bytes(), uninstall_marker.read_bytes()) == before
 
 
 def test_s40b_retained_ci_and_gitignore_are_deterministic_assets() -> None:
