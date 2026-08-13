@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認したため、Planを`approved`、handoffを`implementation-start-ready`へ戻した。S00再確認とS10 read-only inventory lockを完了し、S40Aの実装へ進む。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認した。S00 / S10、S40A / S40B、S20 / S25 / S30を完了し、S35でversion / retry marker admissionとCLIのzero-write rejectionを実装・検証した。S35のfresh code review、step commit、clean/upstream一致後にS45へ進む。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
 
 ## Verification
 
@@ -151,11 +151,24 @@ S30では、S25で確定したblock-free planだけを対象に、provider Curre
 
 S30のfresh code reviewでは、書込み直前のroot / parent再bind、apply中に作成した祖先のidentity binding、hard-link countの最終検証、symlink upgradeのatomic swap、staging cleanupについて修正指摘を受けた。修正後は13件のS30テスト、focused regression 363件、mypy / ruff対象チェックを再実行した。no-follow / no-replace primitiveのcapabilityはparent作成前に検証し、未対応platformではempty parentを残すmutationも開始しない。再レビューpass、step commit、clean / upstream一致を閉じるまでS35へ進まない。
 
+### S35 Version / retry marker admission
+
+S35では、provider-private `managed_distribution.json`に実在する`0.2.3`のrecognized workspace entryと、`spec-dock/scripts/spec-dock` / `spec-dock/.gitignore`のSHA-256 anchorを登録した。`managed_distribution.py`へ読み取り専用の`admit_distribution_operation`を追加し、実行中package version、no-follow・link-count-oneのcanonical `MAJOR.MINOR.PATCH\n` marker、recognized allowlist、version-specific anchor、newer targetのdowngrade拒否を共通判定する。init / update / `init --force`では同一package・同一operation・同一repository rootのdevice / inodeへ束縛した`.distribution-retry.json`だけをforward retryとして許可し、uninstallでは既存`.uninstall-retry.json`のschemaを変更せず使用する。invalid、unknown、dual、operation / package / root mismatchは全mutation前に拒否し、`cli.py`のinit / update / uninstall入口へ接続した。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| S35 bounded GREEN | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q -k "s35 or s40b"` → `16 passed, 50 deselected` |
+| Version / marker focused regression | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q -k "version or marker or force or cross_root"` → `16 passed, 2 skipped, 634 deselected` |
+| Zero-write / cross-root | pass | malformed・BOM・CRLF・追加行、hard-link、newer、dual marker、A→B marker replayで`DistributionAdmissionError`を返し、consumer snapshot / marker bytes不変 |
+| Legacy uninstall marker | pass | 既存`{"schema_version":1,"managed_by":"spec-dock","purpose":"uninstall-rerun"}`だけをversion欠損のuninstall retryとしてadmitし、新markerへ移行しない |
+| Static checks | pass | `uv run ruff check src/spec_dock/managed_distribution.py tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py`、`uv run mypy src/spec_dock/managed_distribution.py src/spec_dock/cli.py`、`python -m py_compile`、`git diff --check` |
+| Broad regression | not adopted | 既存S40Bで削除済みlegacy assetを前提にした旧テスト群、およびanchor mismatchを意図的に作る旧updateテストが残るため、S35のstep gateにはfocused commandのみを採用 |
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier testsを完了した。S25 fresh code review、step commit、clean/upstream一致後にS30へ進む。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused testsを完了した。S35 fresh code review、step commit、clean/upstream一致後にS45へ進む。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
