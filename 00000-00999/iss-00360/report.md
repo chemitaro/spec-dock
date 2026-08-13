@@ -122,11 +122,25 @@ S20では、S40B後のphysical `install_root`からCurrent assetのpath、regula
 
 S20レビューで、recognized version anchors / trusted manifest claimsのnested identityをoverlap検査から漏らしていたP1を検出した。全historical sectionを再帰的に検査し、Current pathとの祖先・子孫衝突を拒否する実装とnegative testsへ修正した。S20のfresh re-review pass、S40B scope re-review pass、step commit / clean / upstream一致後にS25 classifierへ進む。
 
+### S25 Ownership classifier / Current collision
+
+S25では`managed_distribution.py`へ読み取り専用のTarget分類を追加した。provider Current assetに加えてcanonical `spec -> spec-dock/scripts/spec-dock` shortcutを合成し、Fresh / update / `init --force` / uninstallのoperation別にmissing、current-identical、direct historical、trusted manifest + target identity、unknown collision、exact directory、symlink container、hard-link mutationを分類する。Freshではhistorical identityをupgradeせず`preserve-and-block`とし、recognized operationではknown historicalだけをupgrade / prune候補にする。consumer-side `owner`やmarker単独は信頼せず、manifest自身のknown bytesとprovider-private claim、実target identityの一致だけを補助証拠にした。`DistributionAction.diagnostic()`はrepository-relative path、classification、reason、operator actionだけを返し、source bytes・credential風文字列・repository外absolute pathを保持しない。S25ではwrite、delete、CLI接続、version / retry admissionを行わない。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| RED seed | pass | target_root / operation引数未実装時の`uv run pytest tests/unit/infra/test_managed_distribution.py -q -k "s25"` → `9 failed` |
+| S25 bounded GREEN | pass | `uv run pytest tests/unit/infra/test_managed_distribution.py -q -k "s25"` → `17 passed, 20 deselected` |
+| S20 + S25 + S40B focused regression | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py tests/cli_runtime/test_storage_core_cli.py tests/unit/infra/test_authoring_kit_assets.py -q` → `350 passed` |
+| Historical Current overlap / obsolete shape | pass | historical Current exact-path overlapを許可し祖先・子孫を拒否、obsolete exact recordのshapeを正規化してduplicate / Current collisionを検証 |
+| Read-only / diagnostic sanitation | pass | target tree unchanged、diagnosticにsecret・source bytes・external absolute pathなし、`git diff --check` |
+
+S25 fresh code reviewは、missing uninstallのno-op、canonical shortcutのhistorical evidence、synthetic Current overlap、Freshでのhistorical shortcut非materialization、current hard-link uninstallの5点を検出した。分類器と回帰テストを修正し、Freshでhistorical identityを`preserve-and-block`として明示分類する回帰も追加した。S25 bounded GREEN `17 passed`、S20 + S25 + S40B focused regression `350 passed`を再確認した。修正後のfresh re-review pass、step commit、clean / upstream一致後にS30へ進む。
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog testsを完了した。S40B/S20のstep commit、fresh review、clean/upstream一致後にS25 classifierへ進む。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier testsを完了した。S25 fresh code review、step commit、clean/upstream一致後にS30へ進む。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
