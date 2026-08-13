@@ -3,14 +3,14 @@
 ID: "iss-00360"
 タイトル: "Cut Over Distribution and Retire Legacy Workflow Surfaces"
 関連GitHub: ["#360"]
-状態: "approved"
+状態: "draft"
 作成者: "Codex main orchestrator"
 最終更新: "2026-08-13"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00356", "init-local-00003"]
 planning_level: "strict"
 implementation_baseline: "a6ded0d9a838b40cdcd741fa473cd264b801f245"
-handoff_state: "implementation-start-ready"
+handoff_state: "implementation-start-blocked"
 ---
 
 # iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces — 実装計画
@@ -59,6 +59,8 @@ IC-1 / IC-2はEpic Plan §6.1の文書上のhandoffであり、Runtime metadata�
 
 §2.2を満たした時点をplanning handoff / implementation-start-readyとする。実装開始後も、S10 inventory lockがpassするまでmanifest / prune logicを書かず、S20のRED testが期待理由で失敗するまでproduction behaviorを変更しない。
 
+現在はS20の実行順をS40A / S40Bのphysical cutover後へ改訂した直後であり、Planの状態は`draft`、handoffは`implementation-start-blocked`とする。改訂後のstep本文順・依存graph・exact-upstream SHAに対するfresh `spec-reviewer`および`ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を得るまで、S10を含む実装stepを開始しない。両gate通過後にのみ、metadataを`approved` / `implementation-start-ready`へ戻す。
+
 ## 3. 実装対象inventory
 
 詳細なTarget / obsolete / preserve契約はRequirement §2とDesign §4〜§9を正本とする。S10で現物から再生成し、次の最小境界をlockする。
@@ -95,12 +97,12 @@ Preservationはcontent、file type、mode、relative pathの不変を意味す�
 ```text
 S00 gate admission
   -> S10 inventory lock
+  -> S40A legacy Runtime retirement
+  -> S40B shipped Target cutover
   -> S20 catalog validation tracer
   -> S25 ownership classifier / collision
   -> S30 no-follow apply / root rebind
   -> S35 version / retry admission
-  -> S40A legacy Runtime retirement
-  -> S40B shipped Target cutover
   -> S45 Fresh init
   -> S50 recognized update / init --force
   -> S55 obsolete prune / preservation
@@ -176,7 +178,7 @@ Recovery:
 Execution contract:
 
 - Behavior / closure: exact inventoryとhistorical evidenceの採否をlockする。C360-AC-001〜C360-AC-005、C360-AC-021、C360-RISK-UNKNOWN-OWNERSHIP。
-- depends_on: S00。unblocks: S20。
+- depends_on: S00。unblocks: S40A。
 - Source / exact targets: provider / dogfood / package memberのread-only inventory、Issue 357〜359 reports、historical tags / archives、Issue report。Production sourceとmanifestはこのstepで変更しない。
 - Delegation: `repo-analyst`のread-only調査へ委任し、main orchestratorが採否をreportへ記録する。推測digest、untraceable ownership、範囲外pathは採用しない。
 - Concrete evidence seed: `rg --files src/spec_dock/assets spec-dock tests`とarchive / git evidenceからCurrent / obsolete / preserve / read-onlyを再構成し、same-path / ancestor overlap、二skill / CI bytes、version anchorsを照合する。
@@ -184,14 +186,58 @@ Execution contract:
 - Stop / output: baseline drift、再現不能identity、preserve overlapはPlan/Design amendment blocker。Reportへexact inventory、source identity、採否、未採用candidateを記録する。
 - Reviewer / commit: fresh `spec-reviewer`がRequirement / Designとのinventory整合を確認する。Fail後はread-only調査を再委任してfresh re-review。Report evidenceをcommit候補としpost-commit cleanを確認する。
 
+### S40A — Legacy planning Runtime physical retirement
+
+- Behavior / closure: 357 handoffのold-only Runtime / wrapper / import / registrationを物理削除し、retained Storage Coreを保つ。C360-AC-002、C360-RISK-OLD-ROUTE。
+- depends_on: S10。unblocks: S40B。
+- Source of truth: Requirement I360-RQ-003、Design §5.3〜5.4、Issue 357 reportの360 handoff。
+- Exact target paths: `src/spec_dock/assets/spec_dock/scripts/spec-dock-chatgpt`、`scripts/authoring-pack/`、Runtimeの`cli/chatgpt_parser.py`、`cli/chatgpt_registry.py`、`commands/issue_planning.py`、`application/issue_planning.py`、`application/issue_planning_prompt.py`、`domain/issue_planning_candidate.py`、`domain/issue_planning_contracts.py`、`infra/issue_planning_*.py`、`presentation/issue_planning.py`、各layerの`authoring_pack/`、Design §5.4で[M]指定した`app.py`、`cli/bootstrap.py`、`application/contracts.py`、`application/ports.py`、S10 exact inventoryのold-only tests / fixtures。
+- Allowed / forbidden: old-only symbol、callback、import、test / fixtureだけを削除する。`dispatch`、Storage Core bootstrap、generic Artifact port、retained use case / testの削除は禁止する。
+- Implementation Delegation Gate: `dev-coder`へS10のexact Runtime/test delete manifestを渡す。Shared symbolのownerを判定できない場合は停止する。
+
+具体テストケース一覧:
+
+- `tc-s40a-route-absence`: removed command / parser / registry / import / wrapperへ到達できず、CLI helpにfallbackがない。現状で存在することを期待REDとする。
+- `tc-s40a-retained-core`: selection、dependency lifecycle、Artifact、sync / validateのretained characterizationが削除前後でpassする。
+
+- Bounded GREEN: old-only graphと専用test/fixtureを削除し、shared fileからold consumerだけを切る。
+- Verification: `uv run pytest --run-full-regression tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_distribution_cutover.py -q -k "planning or removed or retained"`。
+- Refactor guardrail: retained Runtimeを移動・rename・再設計しない。
+- Stop / output: retained test failureまたはS10外のshared dependency発見時は削除を止めDesign/Plan amendment。Reportへexact deletion list、retained symbols、RED/GREEN、worker noteを記録する。
+- Reviewer / fix: fresh `code-reviewer`がshared-symbol safetyとfallback absenceを確認。Fail後fresh re-review。
+- Commit candidate / clean: Runtime retirementと対応test/reportだけをcommitしclean確認。
+
+### S40B — Shipped Target catalog physical cutover
+
+- Behavior / closure: provider TargetをStorage Core / Authoring Kit / 二skill / retained CIへ縮小し、consumer mutationへ渡せる物理catalogにする。C360-AC-001、C360-AC-003、C360-AC-005、C360-RISK-OLD-ROUTE。
+- depends_on: S40A。unblocks: S20。
+- Source of truth: Requirement I360-RQ-002、004〜006、Design §4〜§5、Issue 358 / 359 handoff。
+- Exact target paths: `src/spec_dock/assets/install_root/`、`src/spec_dock/assets/spec_dock/{docs,templates,scripts,system}/`、`src/spec_dock/assets/spec_dock/.gitignore`、`src/spec_dock/cli.py`のhard-coded gitignore fallback、`tests/unit/infra/test_authoring_kit_assets.py`、`tests/cli_runtime/test_storage_core_cli.py`、`tests/cli_runtime/test_distribution_cutover.py`。
+- Allowed / forbidden: S10 exact obsolete inventoryを物理削除し、Target catalog testと必須`.gitignore` sourceを整える。Dogfood projectionの直接編集、node-local data、README / migration本文の最終編集、二skill semantic変更は禁止する。
+- Implementation Delegation Gate: provider asset / scaffold behaviorを`dev-coder`へ委任する。Issue 359 final bytesとの不一致またはunknown provider fileを見つけたら停止する。
+
+具体テストケース一覧:
+
+- `tc-s40b-provider-catalog`: install-rootは二skill tree + `.github/workflows/ci.yml`だけ、template / docsはRequirement allowlistだけ、removed surfaceはproviderから不在となる。
+- `tc-s40b-retained-identities`: 二skillがIssue 359 final sourceとbyte-identical、retained CIはStorage Coreのdeterministic commandだけ、`.gitignore`は物理package assetとして存在する。
+
+- Bounded GREEN: exact provider additions/deletionsとfallback除去だけを行う。
+- Verification: `uv run pytest --run-full-regression tests/unit/infra/test_authoring_kit_assets.py tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_distribution_cutover.py -q -k "target_catalog or removed_surface or retained or gitignore"`。
+- Refactor guardrail: providerを正本とし、dogfoodへ別実装を作らない。
+- Stop / output: Target allowlistの変更、unknown assetの削除、package-data amendmentが必要なら停止。Reportへcatalog diff、identity、absence evidence。
+- Reviewer / fix: fresh `code-reviewer`がasset API、retained behavior、scopeを確認。Fail後fresh re-review。
+- Commit candidate / clean: Provider catalog sliceだけをcommitしclean確認。
+
 ### S20 — Current / historical catalog validation tracer
 
 - Behavior / closure: provider physical treeからCurrent catalogを導出し、historical-only manifestを公開plan interfaceで検証する。C360-AC-001、C360-AC-003、C360-AC-005、C360-AC-011、C360-RISK-UNKNOWN-OWNERSHIP。
-- depends_on: S10。unblocks: S25。
+- depends_on: S40B。unblocks: S25。
 - Source of truth: Design §3、§4、§5、S10でlockしたexact inventory。
 - Exact target paths: `src/spec_dock/managed_distribution.py` [A]、`src/spec_dock/assets/managed_distribution.json` [A]、`tests/unit/infra/test_managed_distribution.py` [A]。
 - Allowed / forbidden: path grammar、physical Current derivation、historical record validationだけを実装する。Classifier、filesystem mutation、CLI接続、consumer asset削除、Current catalogのJSON全量複製は禁止する。
 - Implementation Delegation Gate: `dev-coder`へ上記3 pathだけを委任する。Historical bytesを再現できない、Design schemaを変更する必要がある、またはprovider treeとpackage-dataが一致しない場合は停止する。
+
+S20はS40Bのprovider物理cutover後に実行する。S10でlockしたbaselineのobsolete inventoryはmanifest recordのsource evidenceとして使うが、cutover前に残るobsolete provider pathをCurrent catalogとして扱わない。これにより、Design §4.2のCurrent / obsolete overlap拒否を緩めず、Current catalogはcutover済みphysical treeから導出する。
 
 具体テストケース一覧:
 
@@ -256,7 +302,7 @@ Execution contract:
 ### S35 — Version / retry marker admission
 
 - Behavior / closure: canonical versionとoperation-specific retry markerだけをadmitし、unknown/newer/cross-root/dual stateを全mutation前に拒否する。C360-AC-010、C360-AC-011、C360-AC-015、C360-RISK-CROSS-ROOT-RETRY、C360-RISK-DOWNGRADE、C360-RISK-DUAL-MARKER、C360-RISK-POSTVERIFY。
-- depends_on: S30。unblocks: S40A。
+- depends_on: S30。unblocks: S45。
 - Source of truth: Design §7.3、§8.1。
 - Exact target paths: `src/spec_dock/managed_distribution.py`、`src/spec_dock/cli.py`、`tests/unit/infra/test_managed_distribution.py`、`tests/unit/infra/test_init_update.py`、`tests/cli_runtime/test_distribution_cutover.py` [A]。
 - Allowed / forbidden: admission / diagnostic / zero-write rejectionだけをCLIへ接続できる。Full Fresh / update / uninstall mutation、version range、downgrade、marker暗黙移行は禁止する。
@@ -276,52 +322,10 @@ Execution contract:
 - Reviewer / fix: fresh `code-reviewer`。Fail時は同一scopeへ修正委任しfresh re-review。
 - Commit candidate / clean: S35の5 pathとreportだけをcommitしclean確認。
 
-### S40A — Legacy planning Runtime physical retirement
-
-- Behavior / closure: 357 handoffのold-only Runtime / wrapper / import / registrationを物理削除し、retained Storage Coreを保つ。C360-AC-002、C360-RISK-OLD-ROUTE。
-- depends_on: S35。unblocks: S40B。
-- Source of truth: Requirement I360-RQ-003、Design §5.3〜5.4、Issue 357 reportの360 handoff。
-- Exact target paths: `src/spec_dock/assets/spec_dock/scripts/spec-dock-chatgpt`、`scripts/authoring-pack/`、Runtimeの`cli/chatgpt_parser.py`、`cli/chatgpt_registry.py`、`commands/issue_planning.py`、`application/issue_planning.py`、`application/issue_planning_prompt.py`、`domain/issue_planning_candidate.py`、`domain/issue_planning_contracts.py`、`infra/issue_planning_*.py`、`presentation/issue_planning.py`、各layerの`authoring_pack/`、Design §5.4で[M]指定した`app.py`、`cli/bootstrap.py`、`application/contracts.py`、`application/ports.py`、S10 exact inventoryのold-only tests / fixtures。
-- Allowed / forbidden: old-only symbol、callback、import、test / fixtureだけを削除する。`dispatch`、Storage Core bootstrap、generic Artifact port、retained use case / testの削除は禁止する。
-- Implementation Delegation Gate: `dev-coder`へS10のexact Runtime/test delete manifestを渡す。Shared symbolのownerを判定できない場合は停止する。
-
-具体テストケース一覧:
-
-- `tc-s40a-route-absence`: removed command / parser / registry / import / wrapperへ到達できず、CLI helpにfallbackがない。現状で存在することを期待REDとする。
-- `tc-s40a-retained-core`: selection、dependency lifecycle、Artifact、sync / validateのretained characterizationが削除前後でpassする。
-
-- Bounded GREEN: old-only graphと専用test/fixtureを削除し、shared fileからold consumerだけを切る。
-- Verification: `uv run pytest --run-full-regression tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_distribution_cutover.py -q -k "planning or removed or retained"`。
-- Refactor guardrail: retained Runtimeを移動・rename・再設計しない。
-- Stop / output: retained test failureまたはS10外のshared dependency発見時は削除を止めDesign/Plan amendment。Reportへexact deletion list、retained symbols、RED/GREEN、worker noteを記録する。
-- Reviewer / fix: fresh `code-reviewer`がshared-symbol safetyとfallback absenceを確認。Fail後fresh re-review。
-- Commit candidate / clean: Runtime retirementと対応test/reportだけをcommitしclean確認。
-
-### S40B — Shipped Target catalog physical cutover
-
-- Behavior / closure: provider TargetをStorage Core / Authoring Kit / 二skill / retained CIへ縮小し、consumer mutationへ渡せる物理catalogにする。C360-AC-001、C360-AC-003、C360-AC-005、C360-RISK-OLD-ROUTE。
-- depends_on: S40A。unblocks: S45。
-- Source of truth: Requirement I360-RQ-002、004〜006、Design §4〜§5、Issue 358 / 359 handoff。
-- Exact target paths: `src/spec_dock/assets/install_root/`、`src/spec_dock/assets/spec_dock/{docs,templates,scripts,system}/`、`src/spec_dock/assets/spec_dock/.gitignore`、`src/spec_dock/cli.py`のhard-coded gitignore fallback、`tests/unit/infra/test_authoring_kit_assets.py`、`tests/cli_runtime/test_storage_core_cli.py`、`tests/cli_runtime/test_distribution_cutover.py`。
-- Allowed / forbidden: S10 exact obsolete inventoryを物理削除し、Target catalog testと必須`.gitignore` sourceを整える。Dogfood projectionの直接編集、node-local data、README / migration本文の最終編集、二skill semantic変更は禁止する。
-- Implementation Delegation Gate: provider asset / scaffold behaviorを`dev-coder`へ委任する。Issue 359 final bytesとの不一致またはunknown provider fileを見つけたら停止する。
-
-具体テストケース一覧:
-
-- `tc-s40b-provider-catalog`: install-rootは二skill tree + `.github/workflows/ci.yml`だけ、template / docsはRequirement allowlistだけ、removed surfaceはproviderから不在となる。
-- `tc-s40b-retained-identities`: 二skillがIssue 359 final sourceとbyte-identical、retained CIはStorage Coreのdeterministic commandだけ、`.gitignore`は物理package assetとして存在する。
-
-- Bounded GREEN: exact provider additions/deletionsとfallback除去だけを行う。
-- Verification: `uv run pytest --run-full-regression tests/unit/infra/test_authoring_kit_assets.py tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_distribution_cutover.py -q -k "target_catalog or removed_surface or retained or gitignore"`。
-- Refactor guardrail: providerを正本とし、dogfoodへ別実装を作らない。
-- Stop / output: Target allowlistの変更、unknown assetの削除、package-data amendmentが必要なら停止。Reportへcatalog diff、identity、absence evidence。
-- Reviewer / fix: fresh `code-reviewer`がasset API、retained behavior、scopeを確認。Fail後fresh re-review。
-- Commit candidate / clean: Provider catalog sliceだけをcommitしclean確認。
-
 ### S45 — Fresh init cutover
 
 - Behavior / closure: Genuine FreshへTargetだけを配置し、unrelated / obsolete-looking external pathを保持し、Current collision時は全write前に停止する。C360-AC-001、C360-AC-005、C360-AC-006、C360-AC-010A。
-- depends_on: S40B。unblocks: S50。
+- depends_on: S35。unblocks: S50。
 - Source of truth: Requirement I360-RQ-002、007、009、Design §6.1、§7.1〜7.2。
 - Exact target paths: `src/spec_dock/cli.py`、`src/spec_dock/managed_distribution.py`、`tests/unit/infra/test_init_update.py`、`tests/cli_runtime/test_distribution_cutover.py`。
 - Allowed / forbidden: Fresh plan/apply、post-verify、root Workbench seed、generated stateだけを接続する。Obsolete prune、historical ownership推定、pre-existing Workbench rewriteは禁止する。

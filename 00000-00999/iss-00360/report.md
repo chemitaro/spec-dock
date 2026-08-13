@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Design / Planはすべてfresh review passでapprovedであり、planning commit / pushとformal `issue start`を完了した。ChatGPT-SpecReview-Strict round 1のP1を修正後、round 2はexact upstream SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`でP0 / P1なしの`pass`となった。Planを`implementation-start-ready`へ昇格するpromotion commitは、自己参照するreport commitを増やさないため、push後のfresh exact-current Strict passをrepository外の最終delivery evidenceとして要求する。実装、PR、Issue close、IC-3判定は未実施である。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Designはapprovedだが、PlanはS20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すamendment中であり、状態を`draft`、handoffを`implementation-start-blocked`へ戻している。改訂後のstep本文順・依存graph・exact-upstream SHAに対するfresh `spec-reviewer`と`ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を得るまで、実装、PR、Issue close、IC-3判定は開始しない。
 
 ## Verification
 
@@ -22,6 +22,7 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
 * Initial approved planning commit: `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * Current branch upstream: `origin/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
+
 * Push verification at planning commit: local `HEAD` = upstream = `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * `origin/main` merge: fast-forward success、Issue 360文書差分を保持
 * `active set iss-00360`: success
@@ -44,11 +45,17 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * IC-1 fresh verification: Storage Core `4 passed`、S09 Authoring Kit `23 passed`、Fresh node / Artifact `3 passed`
 * IC-2 fresh verification: Issue 359 static / collision `11 passed`、finalizer `9 passed`、route / zero-write `7 passed`
 
+## Execution Admission / Blocker
+
+2026-08-13のimplementation-start admissionで、current exact upstream SHA `a3901a7ec2056bd392762c3d4efa71967f4ec232`に対するfresh `ChatGPT-SpecReview-Strict`を実行した。Strict reviewerはRequirement / Design / Planを参照し、PlanのS20がprovider physical treeのobsolete source pathをS40A / S40Bのphysical cutover前にCurrent / obsolete overlapとして検証し得るP1を1件検出した。仕様のoverlap拒否を緩めずにS20を通す実装順がcanonical Planに固定されていなかったため、production / test / provider asset mutationを開始せず、P1をPlan amendmentへ戻した。
+
+最小修正として、Planの順序を`S10 → S40A → S40B → S20 → S25 → S30 → S35 → S45`へ変更した。S10のread-only exact inventoryを先にlockし、S40A / S40Bでprovider physical cutoverを完了してからS20のCurrent catalog / historical manifest validationを行う。S20のCurrent / obsolete overlap invariant、S10のtraceable historical identity、S40A / S40Bのconsumer mutation前 gateは変更しない。Plan amendment後にfresh `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`を再実行し、両方のpassを得るまで実装開始をblockedとする。
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。実装開始前にはCurrent branch HEADとTarget二skillのexact inventoryをもう一度lockする。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design / Plan review、commit / push、formal start、Strict round 2 passを完了した。Promotion commitをpushした後のfresh exact-current Strict passだけを最終外部gateとし、pass後はrepositoryを変更せず実装へhandoffする。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、旧Strict round 2 passを完了した。現在のPlan amendmentをcommit / pushした後、fresh `spec-reviewer`とexact-current Strict passを両方確認するまで実装へhandoffしない。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
@@ -74,10 +81,10 @@ ChatGPT-Use-Strictの出力はadvisory evidenceとして扱い、main orchestrat
 | ID | adoption_status | Source / role | Claim | Canonical target | Rationale / evidence | Blocking / next action |
 |---|---|---|---|---|---|---|
 | EAL-360-001 | adopted | ChatGPT-Use-Strict authoring evidence | Current physical authority、historical identity、deep module、operation × provenance、forward recovery、parityをR/D/Pへ具体化できる | Requirement / Design / Plan | GitHub connectorで`chemitaro/spec-dock` main SHA `a6ded0d9…`を確認し、session `required-strict-github-connector-verificati-65`の提案をlocal source / tests / IC evidenceへ照合した | no。canonical authorityはR/D/Pとfresh reviewer |
-| EAL-360-002 | adopted | `implementation-planner` read-only draft | Plan round 1の5 P1をstep-local vertical TDD、Closure Index、delegation/review/commit gate、S90/S99/H10へ再構成する | Plan §4〜§9 | Canonical editなしのdraftをmain orchestratorがapproved R/Dとworkflow policyへ照合して統合した | no。Plan round 3 passでadoption closure確認済み |
+| EAL-360-002 | adopted | `implementation-planner` read-only draft | Plan round 1の5 P1をstep-local vertical TDD、Closure Index、delegation/review/commit gate、S90/S99/H10へ再構成する | Plan §4〜§9 | Canonical editなしのdraftをmain orchestratorがapproved R/Dとworkflow policyへ照合して統合した | 旧Plan round 3 passはamendment前の証拠としてsuperseded。現行step順・依存graphのfresh review待ち |
 | EAL-360-003 | adopted | fresh `spec-reviewer` findings | Requirement / Design / PlanのP0/P1をphaseごとに検出し、修正範囲を限定する | R/D/P/report | Requirement round 3、Design round 3、Plan round 3のpassをraw authorityではなくreview evidenceとして採用した | no。Strict round 2 passで独立最終照合済み |
 
-Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-002のpromotion gateはPlan round 3 passでclosedし、Git / lifecycle gateとStrict round 2もpassした。Promotion commit自身のfresh exact-current Strict passはrepository外のdelivery evidenceとして確認する。
+EAL-360-002の旧promotion gateはPlan amendmentにより再開されている。現行Planの`draft` / `implementation-start-blocked`状態、fresh `spec-reviewer`、current exact-upstream Strict reviewの3点が揃うまで、implementation-start-readyを主張しない。
 
 ### Delegated Draft Evidence
 
@@ -112,7 +119,7 @@ Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-
 |---|---|---|---|---|
 | Requirement | `requirement.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし。IC-1 / IC-2、Design promotion、formal start、implementation handoffは非承認 |
 | Design | `design.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし、confidence 0.98。Plan phaseへ昇格 |
-| Plan | `plan.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし、confidence 0.99。Approved。Git/lifecycleとStrict round 2 pass後にimplementation-start-readyへ昇格 |
+| Plan | `plan.md` | amendment後fresh review待ち | pending / blocked | 旧round 3 passはS20本文順・依存graph改訂前のためsuperseded | fresh pass後に`approved`へ戻し、exact-current Strict pass後にimplementation-start-readyへ昇格 |
 
 ### Reviewer Gate Status
 
@@ -120,8 +127,8 @@ Unresolved `blocked` / `stale` / `unreviewed` adoption entryはない。EAL-360-
 |---|---|---|---|---|---|
 | Requirement | `spec-reviewer` | fresh round 3 | passed | none | Requirement approved |
 | Design | `spec-reviewer` | fresh round 3 | passed | none | Design approved |
-| Plan | `spec-reviewer` | fresh round 3 | passed | none | Plan approved。Git/lifecycleとStrict round 2 pass後にimplementation-start-readyへ昇格 |
-| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | fresh round 2 | passed | none | `4b325885…`でP0/P1なし。P2の親Epic Report進捗driftをpromotion commitで同期し、そのexact-current passを外部delivery evidenceとして確認 |
+| Plan | `spec-reviewer` | amendment後fresh review待ち | pending / blocked | S20本文順・依存graph・gate metadataを改訂。旧round 3 passはamendment前のためsuperseded | fresh pass後に`approved`へ戻す |
+| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | amendment後exact-current review待ち | pending / blocked | 旧round 2は`4b325885…`に対する証拠であり、現行amendment SHAを承認しない | clean upstream SHAでP0/P1なしのfresh pass後にhandoff readyへ戻す |
 
 ### ChatGPT-SpecReview-Strict round 1
 
@@ -135,7 +142,7 @@ Findingはrepository factsと一致したため採用し、Requirement I360-RQ-0
 
 Session `required-strict-github-connector-verificati-68`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。P0 / P1はなく、`review_status=pass`、overall confidence 0.91である。Requirement / Design / Planはhard cutover、ownership / provenance、path safety、retry / recovery、Fresh / update / uninstall、parity、docs、IC-3 handoffを相互にtraceでき、実装開始を妨げる矛盾または必須欠落はないと判定された。
 
-唯一のfindingは、親Epic Reportの進捗サマリーがIssue 360のDesign / Plan具体化中、formal start未完了のまま残るというP2である。非規範文書のdriftで実装開始blockerではないが、operatorの誤読を避けるためpromotion commitで最新lifecycleへ同期した。Planの`handoff_state`も`implementation-start-ready`へ更新した。このpromotion commit自身は、push後に別のfresh Strict conversationでexact-current SHAをpassさせ、その結果をrepositoryへ追記せず最終delivery evidenceとして提示する。
+唯一のfindingは、親Epic Reportの進捗サマリーがIssue 360のDesign / Plan具体化中、formal start未完了のまま残るというP2であった。これは旧Planに対する履歴であり、現在はS20順序のP1を受けてPlan amendmentとfresh gateを再開している。amendment後のpush済みexact-current SHAを別のfresh Strict conversationでpassさせるまで、implementation-start-readyへ戻さない。
 
 ### Design review round 1
 

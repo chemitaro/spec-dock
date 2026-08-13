@@ -24,9 +24,9 @@ ID: "iss-00360"
 * Integrated main merge: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
 * Issue 359 PR: `#363`、merged。GitHub Issue 359はclosed、Issue 360 dependency checkは`ready=true`
 
-Requirementはfresh review round 3でP0 / P1なしのpassを得た。Epic Planが要求するIC-1 / IC-2は、Issue 357〜359 owner report、merged PR、current main上のfresh testsをEpic main orchestratorが再照合し、Epic-local ArtifactとEpic Reportへ2026-08-13の`pass`を記録した。Issue 359 report自身のIC-2 self-approvalは行っていない。本書とPlanも各fresh review round 3でP0 / P1なしとなり、`approved`へ昇格した。Planning commit / push後のformal `issue start iss-00360`はIssue checkout / auto-syncを含めて成功し、post-startのactive Issueは`iss-00360`、dependencyはGitHub authorityで`ready=true`かつblockers 0、`spec-dock validate`は`nodes=221`である。
+Requirementはfresh review round 3でP0 / P1なしのpassを得た。Epic Planが要求するIC-1 / IC-2は、Issue 357〜359 owner report、merged PR、current main上のfresh testsをEpic main orchestratorが再照合し、Epic-local ArtifactとEpic Reportへ2026-08-13の`pass`を記録した。Issue 359 report自身のIC-2 self-approvalは行っていない。本設計自身もfresh review round 3でP0 / P1なしとなり、設計scopeは`approved`である。Planning commit / push後のformal `issue start iss-00360`はIssue checkout / auto-syncを含めて成功し、post-startのactive Issueは`iss-00360`、dependencyはGitHub authorityで`ready=true`かつblockers 0、`spec-dock validate`は`nodes=221`である。
 
-Issue 359のexact final head、二skill inventory、report handoffは上記gate closure時に再照合済みである。実装開始前に残るplanning gateはclean exact-upstream HEADに対するChatGPT-SpecReview-Strictのpassだけであり、差分が本設計のinterfaceまたはownership decisionを変える場合は実装前に本書へ戻る。
+Issue 359のexact final head、二skill inventory、report handoffは上記gate closure時に再照合済みである。現在のPlanはS20のphysical catalog検証順をS40A / S40B cutover後へ改訂中で、frontmatterは`draft` / `implementation-start-blocked`である。実装開始前には改訂Planのfresh `spec-reviewer` passと、改訂後のclean exact-upstream HEADに対するChatGPT-SpecReview-Strict passの両方が必要である。Plan amendmentが本設計のinterfaceまたはownership decisionを変える場合は実装前に本書へ戻る。
 
 ## 2. 設計判断の要約
 
