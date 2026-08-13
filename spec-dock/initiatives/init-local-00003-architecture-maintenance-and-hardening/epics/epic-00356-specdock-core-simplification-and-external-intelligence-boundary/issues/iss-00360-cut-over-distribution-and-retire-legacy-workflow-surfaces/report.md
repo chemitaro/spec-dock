@@ -221,7 +221,7 @@ root identityはoperation開始時に固定し、marker更新、scaffold refresh
 | 観測 | 結果 | 証拠 |
 |---|---|---|
 | S60指定契約 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q -k "retry or fault or rebind or cross_root or post_verify or diagnostic"` → `16 passed` |
-| S55 + S60 + S65 + S70対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `107 passed`（unit 65、CLI 42。S55 baseline 87＝unit 65、CLI 22からS60〜S70の20ケースを追加） |
+| S55 + S60 + S65 + S70対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `108 passed`（unit 65、CLI 43。S55 baseline 87＝unit 65、CLI 22からS60〜S70の21ケースを追加） |
 | Fault / diagnostic sanitation | pass | distribution-apply、scaffold、post-verify / version faultでphase marker保持・旧version保持・same-operation retry収束を確認し、credential風文字列・source bytes・repository外absolute pathをstderrへ出さないことを確認 |
 | Root rebind / no-replace | pass | descriptor-bound marker / scaffold / version mutationをroot差し替え中に実行してもreplacement sentinelを変更せず、旧root markerを保持し、retry側replacementへのwriteを0件にした。atomic regular-file publishでrace destinationを上書きしないことも確認 |
 
@@ -237,9 +237,9 @@ S65では、uninstall入口がdistribution retry marker、dual marker、invalid 
 
 S70では、S65のdry-run分類をapplyへ引き継ぎ、preservedなownership collision、modified / unknown asset、symlink / hard-link / boundary collisionが1件でもある場合はretry marker作成前に全mutationを停止するようにした。applyableなplanだけが既存`.uninstall-retry.json`を最初のmutationとして作成し、各remove / empty-boundary cleanupでroot device / inodeを再検証する。部分失敗時はmarkerを保持して再実行を許可し、post-verify完了後にmarkerを最後のmanaged fileとして除去する。`--keep-specs`では`initiatives/**`を保持し、`--remove-specs`だけが明示的に削除する。
 
-| S70指定契約 | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_distribution_cutover.py -q -k "keep_specs or remove_specs or legacy or repeated or partial or retry"` → `11 passed, 39 deselected` |
+| S70指定契約 | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_distribution_cutover.py -q -k "keep_specs or remove_specs or legacy or repeated or partial or retry or empty"` → `12 passed, 39 deselected` |
 | S70 fail-closed / marker ordering | pass | modified current、known obsolete + unknown mixed candidateのapply前block、marker未作成、partial failureでmarker保持、same-package rerunでmarker-last除去を確認 |
-| S70 preservation boundary | pass | `--keep-specs`でinitiative bytesを保持し、`--remove-specs`でのみspec historyを削除。clean boundaryのcurrent / obsolete action、unknown sibling、root shortcutを分類どおり処理 |
+| S70 preservation boundary | pass | `--keep-specs`でinitiative bytesを保持し、`--remove-specs`でのみspec historyを削除。空のpreserved / unknown directoryも削除候補へ昇格させず、clean boundaryのcurrent / obsolete action、unknown sibling、root shortcutを分類どおり処理 |
 | S70 static checks | pass | `uv run ruff check src/spec_dock/cli.py src/spec_dock/managed_distribution.py tests/cli_runtime/test_distribution_cutover.py`、`uv run mypy src/spec_dock/cli.py src/spec_dock/managed_distribution.py`、`git diff --check` |
 
 S60〜S70の直接契約は上記107件のfocused regressionで閉じた。`tests/unit/infra/test_init_update.py`の旧uninstall群には、markerを成功後も保持する契約、modified Workbenchを保存して続行する契約、version marker欠損後の無条件rerunなど、Issue 360 Design §7.4 / §8.1と異なる期待が残るため、S95の全回帰で仕様移行対象として扱う。

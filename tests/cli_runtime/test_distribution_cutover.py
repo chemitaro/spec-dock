@@ -947,3 +947,32 @@ def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, c
     capsys.readouterr()
     assert not remove_initiative.exists()
     assert not (remove_target / "spec-dock/.uninstall-retry.json").exists()
+
+
+def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    empty_initiative = tmp_path / "spec-dock/initiatives/empty-preserved"
+    empty_initiative.mkdir(parents=True)
+    empty_workbench = tmp_path / "spec-dock/.workbench/empty-payload"
+    empty_workbench.mkdir(parents=True)
+    empty_unknown = tmp_path / ".codex/user-owned-empty"
+    empty_unknown.mkdir(parents=True)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    removed_empty_paths = {
+        action["path"]
+        for action in payload["actions"]
+        if action["status"] == "empty_dir_removed"
+    }
+
+    assert empty_initiative.is_dir()
+    assert empty_workbench.is_dir()
+    assert empty_unknown.is_dir()
+    assert "spec-dock/initiatives/empty-preserved" not in removed_empty_paths
+    assert "spec-dock/.workbench/empty-payload" not in removed_empty_paths
+    assert ".codex/user-owned-empty" not in removed_empty_paths

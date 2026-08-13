@@ -1932,22 +1932,37 @@ def _is_uninstall_cleanup_boundary_path(rel_path: Path) -> bool:
 
 def _cleanup_empty_uninstall_dirs(
     target_root: Path,
+    actions: tuple[_UninstallAction, ...],
     *,
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> tuple[_UninstallAction, ...]:
     cleanup_actions: list[_UninstallAction] = []
     candidates: set[Path] = set()
-    for boundary_root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS:
-        root = target_root / boundary_root
-        if not root.exists() or not root.is_dir() or root.is_symlink():
+
+    # Cleanup is derived only from proven managed removals.  Scanning every
+    # directory under a boundary would turn an unknown empty user directory
+    # into an implicit deletion candidate.
+    protected: set[Path] = set()
+    for action in actions:
+        rel_path = Path(action.rel_path)
+        if action.status == "preserved":
+            protected.add(rel_path)
+            if rel_path.parts and rel_path.parts[0] in {
+                root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS
+            }:
+                protected.update(rel_path.parents)
             continue
-        candidates.add(boundary_root)
-        for path in root.rglob("*"):
-            if path.is_dir() and not path.is_symlink():
-                candidates.add(path.relative_to(target_root))
+        if action.status != "removed" or rel_path == _UNINSTALL_RETRY_MARKER_REL:
+            continue
+        current = rel_path if action.category == "spec_history" else rel_path.parent
+        while current.parts and current.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS}:
+            candidates.add(current)
+            current = current.parent
 
     for rel_path in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
         if not _is_uninstall_cleanup_boundary_path(rel_path):
+            continue
+        if rel_path in protected:
             continue
         target_path = target_root / rel_path
         if not target_path.exists() or not target_path.is_dir() or target_path.is_symlink():
@@ -1992,6 +2007,7 @@ def _apply_uninstall_plan(
     results.extend(
         _cleanup_empty_uninstall_dirs(
             target_root,
+            tuple(results),
             expected_root_identity=expected_root_identity,
         )
     )
