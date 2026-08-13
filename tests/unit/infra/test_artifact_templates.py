@@ -19,7 +19,6 @@ CURRENT_ARTIFACT_TYPES = (
 )
 PHYSICAL_ARTIFACT_TEMPLATES = {
     *(f"{artifact_type}.md" for artifact_type in CURRENT_ARTIFACT_TYPES),
-    "pr-repair-batch.md",
 }
 HISTORICAL_ROUTE_MARKERS = {
     "`analysis`": "`analysis`",
@@ -122,7 +121,7 @@ def _requires_mandatory_workflow(content: str) -> bool:
     return False
 
 
-def test_physical_catalog_retains_existing_template_while_current_catalog_is_exact_six() -> None:
+def test_physical_catalog_current_catalog_is_exact_six() -> None:
     physical_template_names = {path.name for path in (PROVIDER_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY).glob("*.md")}
     guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
 
@@ -273,7 +272,7 @@ def test_artifact_guide_rejects_automatic_promotion_of_evidence_and_report() -> 
     assert "正本へ明示的に再記述" in authority_flow
 
 
-def test_historical_routes_are_not_current_and_existing_template_is_retained() -> None:
+def test_historical_routes_are_not_current_and_retired_template_is_absent() -> None:
     guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
     current_catalog = _section(guide, "## Current creation catalog")
     historical_retention = _section(guide, "## Historical retention")
@@ -284,8 +283,8 @@ def test_historical_routes_are_not_current_and_existing_template_is_retained() -
     assert "draft-" not in current_catalog
     assert "Current creation route ではありません" in historical_retention
     assert "削除、rename、rewrite を指示しません" in historical_retention
-    assert (PROVIDER_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").is_file()
-    assert (DOGFOOD_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").is_file()
+    assert not (PROVIDER_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").exists()
+    assert not (DOGFOOD_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").exists()
 
 
 def test_draft_document_state_and_adr_draft_authority_are_not_historical_routes() -> None:

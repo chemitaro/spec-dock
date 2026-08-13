@@ -151,9 +151,7 @@ def pytest_collection_modifyitems(
     for item in items:
         if item.nodeid.startswith(RETIRED_ISSUE360_INIT_UPDATE_PREFIXES):
             item.add_marker(
-                pytest.mark.skip(
-                    reason="retired legacy distribution surface; covered by Issue 360 cutover tests"
-                )
+                pytest.mark.skip(reason="retired legacy distribution surface; covered by Issue 360 cutover tests")
             )
 
         has_fast = item.get_closest_marker("fast") is not None

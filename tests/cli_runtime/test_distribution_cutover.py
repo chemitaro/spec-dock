@@ -14,15 +14,13 @@ PROVIDER_ROOT = REPO_ROOT / "src" / "spec_dock" / "assets"
 INSTALL_ROOT = PROVIDER_ROOT / "install_root"
 SCAFFOLD_ROOT = PROVIDER_ROOT / "spec_dock"
 
-CURRENT_INSTALL_ROOT_FILES = frozenset(
-    {
-        ".agents/skills/spec-dock/SKILL.md",
-        ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
-        ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
-        ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-        ".github/workflows/ci.yml",
-    }
-)
+CURRENT_INSTALL_ROOT_FILES = frozenset({
+    ".agents/skills/spec-dock/SKILL.md",
+    ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+    ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+    ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+    ".github/workflows/ci.yml",
+})
 CURRENT_SKILL_SHA256 = {
     ".agents/skills/spec-dock/SKILL.md": "7d722020bc4666dd523ddb48d454d5af40367b1d712299e3d5c7dbc88319ae71",
     ".agents/skills/spec-dock-grill-with-docs/SKILL.md": "7182c1156bcf3635ffd3113cdcfb1d507c819b6aba6982673c0b10166f5da40c",
@@ -33,54 +31,50 @@ REMOVED_INSTALL_ROOT_PREFIXES = (
     ".codex/",
     ".github/agents/",
 )
-REMOVED_SKILL_NAMES = frozenset(
-    {
-        "spec-dock-hub",
-        "spec-dock-initiative-planning",
-        "spec-dock-epic-planning",
-        "spec-dock-epic-execution",
-        "spec-dock-issue-planning",
-        "spec-dock-issue-execution",
-        "spec-dock-chatgpt-authoring",
-        "spec-dock-initiative-planning-manual",
-        "spec-dock-epic-planning-manual",
-        "spec-dock-issue-planning-manual",
-        "spec-dock-clarification",
-        "spec-dock-adr-facilitation",
-        "spec-dock-codex-adapter",
-        "spec-dock-copilot-adapter",
-        "git-commit-conventional-ja",
-        "github-pr-observation",
-        "github-pr-creator",
-        "github-pr-merge-preparer",
-        "spec-driven-tdd-workflow",
-        "spec-dock-system-architect",
-        "spec-dock-implementation-planner",
-    }
-)
-REMOVED_DOC_PATHS = frozenset(
-    {
-        "docs/authoring/chatgpt-pack.md",
-        "docs/authoring/decision-routing.md",
-        "docs/reference_authoring_pack_backend.md",
-        "docs/reference_hard_cutover.md",
-        "docs/github.md",
-        "docs/phase_design.md",
-        "docs/phase_plan.md",
-        "docs/phase_plan_epic.md",
-        "docs/phase_plan_initiative.md",
-        "docs/phase_plan_issue.md",
-        "docs/phase_requirement.md",
-        "docs/workflow-tree.md",
-        "docs/workflow_adr.md",
-        "docs/workflow_chatgpt_authoring_pack.md",
-        "docs/workflow_clarification.md",
-        "docs/workflow_epic.md",
-        "docs/workflow_initiative.md",
-        "docs/workflow_issue.md",
-        "docs/workflow_spec_authoring.md",
-    }
-)
+REMOVED_SKILL_NAMES = frozenset({
+    "spec-dock-hub",
+    "spec-dock-initiative-planning",
+    "spec-dock-epic-planning",
+    "spec-dock-epic-execution",
+    "spec-dock-issue-planning",
+    "spec-dock-issue-execution",
+    "spec-dock-chatgpt-authoring",
+    "spec-dock-initiative-planning-manual",
+    "spec-dock-epic-planning-manual",
+    "spec-dock-issue-planning-manual",
+    "spec-dock-clarification",
+    "spec-dock-adr-facilitation",
+    "spec-dock-codex-adapter",
+    "spec-dock-copilot-adapter",
+    "git-commit-conventional-ja",
+    "github-pr-observation",
+    "github-pr-creator",
+    "github-pr-merge-preparer",
+    "spec-driven-tdd-workflow",
+    "spec-dock-system-architect",
+    "spec-dock-implementation-planner",
+})
+REMOVED_DOC_PATHS = frozenset({
+    "docs/authoring/chatgpt-pack.md",
+    "docs/authoring/decision-routing.md",
+    "docs/reference_authoring_pack_backend.md",
+    "docs/reference_hard_cutover.md",
+    "docs/github.md",
+    "docs/phase_design.md",
+    "docs/phase_plan.md",
+    "docs/phase_plan_epic.md",
+    "docs/phase_plan_initiative.md",
+    "docs/phase_plan_issue.md",
+    "docs/phase_requirement.md",
+    "docs/workflow-tree.md",
+    "docs/workflow_adr.md",
+    "docs/workflow_chatgpt_authoring_pack.md",
+    "docs/workflow_clarification.md",
+    "docs/workflow_epic.md",
+    "docs/workflow_initiative.md",
+    "docs/workflow_issue.md",
+    "docs/workflow_spec_authoring.md",
+})
 REMOVED_TEMPLATE_PREFIXES = (
     "templates/discussions/",
     "templates/assurance/",
@@ -116,8 +110,7 @@ def test_s40b_provider_install_root_is_current_catalog_only() -> None:
     assert actual == CURRENT_INSTALL_ROOT_FILES
     assert all(not path.startswith(prefix) for path in actual for prefix in REMOVED_INSTALL_ROOT_PREFIXES)
     assert all(
-        not (path.startswith(".agents/skills/") and Path(path).parts[2] in REMOVED_SKILL_NAMES)
-        for path in actual
+        not (path.startswith(".agents/skills/") and Path(path).parts[2] in REMOVED_SKILL_NAMES) for path in actual
     )
 
 
@@ -156,16 +149,14 @@ def test_s35_cli_rejects_dual_retry_markers_without_writes(tmp_path: Path, capsy
     marker = target / "spec-dock" / ".distribution-retry.json"
     root_stat = target.stat()
     marker.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "operation": "update",
-                "package_version": "0.2.3",
-                "target_root": {"device": root_stat.st_dev, "inode": root_stat.st_ino},
-                "last_completed_phase": "preflight-complete",
-                "purpose": "distribution-rerun",
-            }
-        ),
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "0.2.3",
+            "target_root": {"device": root_stat.st_dev, "inode": root_stat.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+        }),
         encoding="utf-8",
     )
     uninstall_marker = target / "spec-dock" / ".uninstall-retry.json"
@@ -201,9 +192,7 @@ def test_s40b_fresh_init_materializes_only_current_external_catalog(tmp_path: Pa
 
     installed = _relative_files(tmp_path)
     installed_external = frozenset(
-        path
-        for path in installed
-        if path.startswith(".agents/") or path.startswith(".github/")
+        path for path in installed if path.startswith(".agents/") or path.startswith(".github/")
     )
     assert installed_external == CURRENT_INSTALL_ROOT_FILES
     assert (tmp_path / "spec-dock/.gitignore").read_bytes() == (SCAFFOLD_ROOT / ".gitignore").read_bytes()
@@ -379,6 +368,31 @@ def test_s50_force_init_directory_only_current_collision_is_zero_write(tmp_path:
     assert _filesystem_snapshot(tmp_path) == before
 
 
+@pytest.mark.parametrize("managed_name", ("docs", "templates", "scripts", "system"))
+@pytest.mark.parametrize("collision_kind", ("symlink", "non_directory"))
+def test_s50_update_scaffold_boundary_collision_is_zero_write(
+    tmp_path: Path,
+    managed_name: str,
+    collision_kind: str,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    managed_dir = tmp_path / "spec-dock" / managed_name
+    preserved = tmp_path / "preserved" / managed_name
+    preserved.parent.mkdir(parents=True, exist_ok=True)
+    managed_dir.rename(preserved)
+    if collision_kind == "symlink":
+        managed_dir.symlink_to(preserved, target_is_directory=True)
+    else:
+        managed_dir.write_text("user-owned replacement\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+    capsys.readouterr()
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
 def test_s55_update_prunes_proven_historical_managed_file(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
     legacy = tmp_path / ".codex/config.toml"
@@ -408,6 +422,7 @@ def test_s55_update_preserves_modified_historical_managed_file_and_blocks(
     capsys,
 ) -> None:
     assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
     legacy = tmp_path / ".codex/config.toml"
     legacy.parent.mkdir(parents=True)
     legacy.write_bytes(b"user-owned configuration\n")
@@ -431,10 +446,7 @@ def test_s55_update_prunes_known_legacy_and_preserves_node_local_data(tmp_path: 
     initiative = tmp_path / "spec-dock/initiatives/user-owned.md"
     initiative.parent.mkdir(parents=True, exist_ok=True)
     initiative.write_bytes(b"keep initiative\n")
-    issue_workbench = (
-        tmp_path
-        / "spec-dock/initiatives/user-owned/.workbench/README.md"
-    )
+    issue_workbench = tmp_path / "spec-dock/initiatives/user-owned/.workbench/README.md"
     issue_workbench.parent.mkdir(parents=True)
     issue_workbench.write_bytes(b"keep workbench\n")
 
@@ -669,6 +681,78 @@ def test_s60_root_rebind_preserves_replacement_and_original_retry_marker(
     assert marker.exists()
 
 
+def test_s65_uninstall_root_rebind_before_marker_write_is_zero_write(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    displaced = tmp_path.with_name(f"{tmp_path.name}-uninstall-displaced")
+    original_create = cli._create_uninstall_retry_marker
+    switched = False
+
+    def rebind_before_marker(*args, **kwargs):
+        nonlocal switched
+        if not switched:
+            switched = True
+            tmp_path.rename(displaced)
+            tmp_path.mkdir()
+            (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
+        return original_create(*args, **kwargs)
+
+    monkeypatch.setattr(cli, "_create_uninstall_retry_marker", rebind_before_marker)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "partial_failure"
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert not (displaced / "spec-dock/.uninstall-retry.json").exists()
+
+
+def test_s70_uninstall_cleanup_rebind_keeps_replacement_untouched(tmp_path: Path, monkeypatch) -> None:
+    managed_file = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    managed_file.parent.mkdir(parents=True)
+    managed_file.write_text("managed\n", encoding="utf-8")
+    managed_file.unlink()
+    actions = (
+        cli._UninstallAction(
+            rel_path=".agents/skills/spec-dock/SKILL.md",
+            category="agent_skill",
+            status="removed",
+            reason="test cleanup race",
+        ),
+    )
+    displaced = tmp_path.with_name(f"{tmp_path.name}-agents-displaced")
+    replacement_sentinel = "preserve replacement\n"
+    original_rmdir = cli.os.rmdir
+    switched = False
+
+    def rebind_before_rmdir(name, *, dir_fd=None):
+        nonlocal switched
+        if not switched:
+            switched = True
+            (tmp_path / ".agents").rename(displaced / ".agents")
+            replacement = tmp_path / ".agents"
+            replacement.mkdir(parents=True)
+            (replacement / "replacement-sentinel.txt").write_text(replacement_sentinel, encoding="utf-8")
+        return original_rmdir(name, dir_fd=dir_fd)
+
+    displaced.mkdir()
+    monkeypatch.setattr(cli.os, "rmdir", rebind_before_rmdir)
+
+    result = cli._cleanup_empty_uninstall_dirs(
+        tmp_path,
+        actions,
+        expected_root_identity=cli._distribution_root_identity(tmp_path),
+    )
+
+    assert result == ()
+    assert (tmp_path / ".agents/replacement-sentinel.txt").read_text(encoding="utf-8") == replacement_sentinel
+    assert not (tmp_path / ".agents/skills/spec-dock").exists()
+
+
 def test_s60_post_verify_failure_keeps_marker_until_forward_retry(tmp_path: Path, monkeypatch, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     version = tmp_path / "spec-dock/spec-dock.version"
@@ -840,8 +924,7 @@ def test_s70_uninstall_apply_blocks_modified_current_before_marker_or_removal(
 
     assert payload["status"] == "blocked"
     assert any(
-        action["path"] == ".agents/skills/spec-dock/SKILL.md"
-        and action["status"] == "preserved"
+        action["path"] == ".agents/skills/spec-dock/SKILL.md" and action["status"] == "preserved"
         for action in payload["actions"]
     )
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
@@ -867,12 +950,10 @@ def test_s70_uninstall_apply_blocks_mixed_known_obsolete_and_unknown_before_muta
 
     assert payload["status"] == "blocked"
     assert any(
-        action["path"] == ".codex/config.toml" and action["status"] == "would_remove"
-        for action in payload["actions"]
+        action["path"] == ".codex/config.toml" and action["status"] == "would_remove" for action in payload["actions"]
     )
     assert any(
-        action["path"] == ".codex/user-owned.toml" and action["status"] == "preserved"
-        for action in payload["actions"]
+        action["path"] == ".codex/user-owned.toml" and action["status"] == "preserved" for action in payload["actions"]
     )
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert _filesystem_snapshot(tmp_path) == before
@@ -886,9 +967,7 @@ def test_s70_uninstall_marker_is_removed_last_after_success(tmp_path: Path, caps
     payload = json.loads(capsys.readouterr().out)
 
     assert payload["status"] == "completed"
-    marker_action = next(
-        action for action in payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json"
-    )
+    marker_action = next(action for action in payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json")
     assert marker_action["status"] == "removed"
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
@@ -900,28 +979,35 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
 ) -> None:
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
-    failing = tmp_path / ".agents/skills/spec-dock/SKILL.md"
-    original_unlink = Path.unlink
+    original_remove = cli._remove_uninstall_path
 
-    def fail_one(path: Path, *args: object, **kwargs: object) -> object:
-        if path == failing:
+    def fail_one(
+        target_root: Path,
+        action,
+        *,
+        expected_root_identity: cli.DistributionRootIdentity | None = None,
+    ):
+        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
             raise OSError("injected uninstall unlink failure")
-        return original_unlink(path, *args, **kwargs)
+        return original_remove(target_root, action, expected_root_identity=expected_root_identity)
 
-    monkeypatch.setattr("src.spec_dock.cli.Path.unlink", fail_one)
+    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_one)
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     first_payload = json.loads(capsys.readouterr().out)
     marker = tmp_path / "spec-dock/.uninstall-retry.json"
     assert first_payload["status"] == "partial_failure"
     assert marker.is_file()
 
-    monkeypatch.setattr("src.spec_dock.cli.Path.unlink", original_unlink)
+    monkeypatch.setattr(cli, "_remove_uninstall_path", original_remove)
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     second_payload = json.loads(capsys.readouterr().out)
     assert second_payload["status"] == "completed"
-    assert next(
-        action for action in second_payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json"
-    )["status"] == "removed"
+    assert (
+        next(action for action in second_payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json")[
+            "status"
+        ]
+        == "removed"
+    )
     assert not marker.exists()
 
 
@@ -964,11 +1050,7 @@ def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
 
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    removed_empty_paths = {
-        action["path"]
-        for action in payload["actions"]
-        if action["status"] == "empty_dir_removed"
-    }
+    removed_empty_paths = {action["path"] for action in payload["actions"] if action["status"] == "empty_dir_removed"}
 
     assert empty_initiative.is_dir()
     assert empty_workbench.is_dir()

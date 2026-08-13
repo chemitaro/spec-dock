@@ -2,7 +2,7 @@
 
 このディレクトリは initiative に紐づく legacy / historical discussion docs の preservation surface です。新規 working artifacts は対象 scope の `artifacts/` direct child に作成します。
 
-- Discussion workflow: `spec-dock/docs/workflow_adr.md`
+- Artifact guidance: `spec-dock/docs/authoring/artifacts.md`
 - Naming rules: `spec-dock/docs/reference_naming.md`
 - Existing docs in this directory are timestamp-prefixed originals（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。legacy sequential files は grandfathered で、自動 rename しません。
 - Delegated authoring の future draft / analysis / artifact-local report は対象 scope の `artifacts/` direct child に flat Markdown として保存します。per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/`、`artifacts/delegated-authoring/` は新規出力先にしません。
