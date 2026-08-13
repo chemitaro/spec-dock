@@ -71,7 +71,7 @@ Provider / dogfoodの現行二skill、CI、`.gitignore`、`scripts/spec-dock`の
 
 ### S40A Legacy planning Runtime physical retirement
 
-S40Aの実装候補を、S10でlockしたexact targetとPlanの共有symbol境界に従って作成した。候補はまだcommitしていないため、実装baselineは直前のclean HEAD `befad5d3c7fc453f9784679feb4c3fe60f10dda3` とする。
+S40Aの実装を、S10でlockしたexact targetとPlanの共有symbol境界に従って完了した。実装commitは`abcea9c21669b64bdb2277e6a0cf212ff8ae9727`、旧専用test / fixture整理commitは`091a323225a5b8af854f6f5f16705354fcb761b6`であり、S40A後のclean HEAD / upstreamは`091a323225a5b8af854f6f5f16705354fcb761b6`で一致している。
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
@@ -82,13 +82,13 @@ S40Aの実装候補を、S10でlockしたexact targetとPlanの共有symbol境�
 | Adjacent retained surfaces | pass | `uv run pytest tests/cli_runtime/test_wrappers.py tests/unit/infra/test_authoring_kit_assets.py -q` → `304 passed, 9 skipped` |
 | Formatting / review | pass | `git diff --check`、fresh `code-reviewer` pass（P0/P1なし、provider/dogfood parity確認） |
 
-S40AのREDは、共有契約を先に切断した状態で旧planning modulesをretained listへ残したため、Storage Core testが旧存在期待で失敗したこと。GREENではremoved module / use case fieldへ期待値を移し、物理削除後に4件すべてpassした。旧専用test / fixture 53件も削除し、S40B対象の`test_wrappers.py`、`test_authoring_kit_assets.py`、`test_init_update.py`、`authoring_kit` fixtureは保持した。S40Bのinstaller / asset catalog / docs / templatesは未変更であり、次のstepはS40Bである。
+S40AのREDは、共有契約を先に切断した状態で旧planning modulesをretained listへ残したため、Storage Core testが旧存在期待で失敗したこと。GREENではremoved module / use case fieldへ期待値を移し、物理削除後に4件すべてpassした。旧専用test / fixture 53件も削除し、S40B対象の`test_wrappers.py`、`test_authoring_kit_assets.py`、`test_init_update.py`、`authoring_kit` fixtureは保持した。S40A実装commitとtest整理commitの後にworktree / upstream SHA一致を確認した。S40Bのinstaller / asset catalog / docs / templatesは未変更であり、次のstepはS40Bである。
 
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused testを完了した。S40Aのcommit後にS40B physical Target catalog cutoverへ進む。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40A post-commit clean/upstream一致を完了した。次はS40B physical Target catalog cutoverへ進む。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
