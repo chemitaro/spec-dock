@@ -82,13 +82,51 @@ S40Aの実装を、S10でlockしたexact targetとPlanの共有symbol境界に�
 | Adjacent retained surfaces | pass | `uv run pytest tests/cli_runtime/test_wrappers.py tests/unit/infra/test_authoring_kit_assets.py -q` → `304 passed, 9 skipped` |
 | Formatting / review | pass | `git diff --check`、fresh `code-reviewer` pass（P0/P1なし、provider/dogfood parity確認） |
 
-S40AのREDは、共有契約を先に切断した状態で旧planning modulesをretained listへ残したため、Storage Core testが旧存在期待で失敗したこと。GREENではremoved module / use case fieldへ期待値を移し、物理削除後に4件すべてpassした。旧専用test / fixture 53件も削除し、S40B対象の`test_wrappers.py`、`test_authoring_kit_assets.py`、`test_init_update.py`、`authoring_kit` fixtureは保持した。S40A実装commitとtest整理commitの後にworktree / upstream SHA一致を確認した。S40Bのinstaller / asset catalog / docs / templatesは未変更であり、次のstepはS40Bである。
+S40AのREDは、共有契約を先に切断した状態で旧planning modulesをretained listへ残したため、Storage Core testが旧存在期待で失敗したこと。GREENではremoved module / use case fieldへ期待値を移し、物理削除後に4件すべてpassした。旧専用test / fixture 53件も削除し、S40B対象の`test_wrappers.py`、`test_authoring_kit_assets.py`、`test_init_update.py`、`authoring_kit` fixtureは保持した。S40A実装commitとtest整理commitの後にworktree / upstream SHA一致を確認した。S40Bのprovider physical catalog cutoverへ進んだ。
+
+### S40B Shipped Target catalog physical cutover
+
+S40Bのprovider-side physical cutoverを実施中である。Current install-rootは次の5ファイルへ縮小した。
+
+* `.agents/skills/spec-dock/SKILL.md`
+* `.agents/skills/spec-dock-grill-with-docs/SKILL.md`
+* `.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml`
+* `.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py`
+* `.github/workflows/ci.yml`
+
+旧18 managed skill、legacy 3 skill、host-adapter metadata、`.codex/**`、`.github/agents/**`、旧ChatGPT / planning / authoring-pack配布面はprovider treeから除去した。Current二skillのIssue 359 final bytesをSHA-256で固定し、retained CIはStorage Coreの`sync` / `validate`だけを実行することを確認した。`.gitignore`は`src/spec_dock/assets/spec_dock/.gitignore`を物理provider assetとして必須化し、`_DEFAULT_SPEC_DOCK_GITIGNORE` fallbackを削除した。provider source欠損時はmutation前に停止する境界を残している。
+
+旧phase / workflow / authoring / host-adapter専用docsと、`discussions/**`、`assurance/**`、`issue-profiles/**`、`pr-repair-batch.md`のprovider scaffoldも除去した。S40Bではdogfood projectionを直接編集・更新せず、既存consumerのlegacy external surfaceは保持したままS20/S25 classifierとS55のproven pruneへ引き渡す。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| Provider install-root exact catalog | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_distribution_cutover.py -q` → `5 passed` |
+| Retained Storage Core / authoring kit | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_storage_core_cli.py -q` → `4 passed`; `uv run pytest tests/cli_runtime/test_wrappers.py tests/unit/infra/test_authoring_kit_assets.py -q` → `304 passed, 9 skipped` |
+| S40B focused contract | pass | `uv run pytest --run-full-regression tests/unit/infra/test_authoring_kit_assets.py tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_distribution_cutover.py -q -k "target_catalog or removed_surface or retained or gitignore or s40b or storage_core"` → `11 passed, 302 deselected` |
+| Fresh external catalog | pass | temporary repository `init` materialized only the two skill trees and retained `ci.yml`; no `spec-dock-chatgpt` |
+| Formatting | pass | `git diff --check` |
+
+S40Bのprovider / test差分はstep commit前であり、fresh `code-reviewer`のpassとpost-commit clean / upstream一致を閉じるまでS20へ進まない。S20はこのphysical treeからCurrent catalogを導出し、historical-only manifestを追加する。既存consumerのclassifier、prune、uninstall mutationはS25以降の未着手範囲である。
+
+### S20 Current / historical catalog validation
+
+S20では、S40B後のphysical `install_root`からCurrent assetのpath、regular-file SHA-256、modeをread-onlyで導出する`src/spec_dock/managed_distribution.py`と、consumerへコピーしないprovider-private `src/spec_dock/assets/managed_distribution.json`を追加した。ManifestはCurrent catalogを複製せず、historical sectionのpath grammar、kind、lowercase SHA-256、trace source、duplicate / nested identity / ancestor-descendant / Current overlap、schema fieldsをfail-closedで検証する。`build_distribution_plan`は`actions=()`を返し、S20ではconsumer scan、classifier、CLI接続、write / deleteを行わない。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| RED seed | pass | module未作成状態で`uv run pytest tests/unit/infra/test_managed_distribution.py -q` → `ModuleNotFoundError` |
+| S20 bounded GREEN | pass | `uv run pytest tests/unit/infra/test_managed_distribution.py -q` → `20 passed` |
+| S20 required selection | pass | `uv run pytest tests/unit/infra/test_managed_distribution.py -q -k "catalog or manifest or overlap"` → `6 passed, 14 deselected` |
+| S20 + S40B focused regression | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/unit/infra/test_authoring_kit_assets.py tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_distribution_cutover.py -q` → `333 passed` |
+| Read-only / formatting | pass | no target write in S20 tests、`git diff --cached --check` |
+
+S20レビューで、recognized version anchors / trusted manifest claimsのnested identityをoverlap検査から漏らしていたP1を検出した。全historical sectionを再帰的に検査し、Current pathとの祖先・子孫衝突を拒否する実装とnegative testsへ修正した。S20のfresh re-review pass、S40B scope re-review pass、step commit / clean / upstream一致後にS25 classifierへ進む。
 
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40A post-commit clean/upstream一致を完了した。次はS40B physical Target catalog cutoverへ進む。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog testsを完了した。S40B/S20のstep commit、fresh review、clean/upstream一致後にS25 classifierへ進む。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes

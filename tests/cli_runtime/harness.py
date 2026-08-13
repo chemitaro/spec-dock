@@ -31,6 +31,12 @@ def _expected_spec_dock_version() -> str:
 
 
 _EXPECTED_MANAGED_SKILL_NAMES = (
+    "spec-dock",
+    "spec-dock-grill-with-docs",
+)
+_DELETED_ROLE_SKILL_NAMES = (
+    "spec-dock-system-architect",
+    "spec-dock-implementation-planner",
     "spec-dock-hub",
     "spec-dock-initiative-planning",
     "spec-dock-epic-planning",
@@ -49,10 +55,7 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "github-pr-observation",
     "github-pr-creator",
     "github-pr-merge-preparer",
-)
-_DELETED_ROLE_SKILL_NAMES = (
-    "spec-dock-system-architect",
-    "spec-dock-implementation-planner",
+    "spec-driven-tdd-workflow",
 )
 
 
