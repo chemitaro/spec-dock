@@ -148,8 +148,7 @@ def test_s55_obsolete_catalog_is_bound_to_reproducible_git_source() -> None:
         check=False,
         capture_output=True,
     )
-    if source_available.returncode != 0:
-        pytest.skip("historical source commit is unavailable in this checkout")
+    assert source_available.returncode == 0, "historical source commit is unavailable in this checkout"
     for identity in records:
         path = identity["path"]
         provider_path = f"src/spec_dock/assets/install_root/{path}"
