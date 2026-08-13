@@ -216,17 +216,24 @@ S55ではknown historical assetだけのbounded pruneとpreserve-and-blockを閉
 
 S60では、recognized `update` / `init --force`のapplyをphase marker付きforward recoveryへ切り替えた。full preflight後に`spec-dock/.distribution-retry.json`を作成し、distribution apply、managed scaffold refresh、post-verify、version writeの各境界で完了phaseをatomicに更新する。`spec-dock.version`はpost-verify後まで旧値を保持し、version writeとmarker除去が完了したときだけsuccessへ到達する。markerはschema version、operation、package version、target rootのdevice / inode、last completed phase、purposeだけを持ち、credential、source bytes、absolute pathを含めない。
 
-root identityはoperation開始時に固定し、marker更新、scaffold refresh、version publish、marker removalの前後で再検証する。root rebind時はpartial failureとして停止し、旧rootへ残ったmarkerやpathname replacementをcleanupしない。markerとversionのregular-file publishはno-follow、link-count-one、destination identity再検証を行い、preflight後に出現したdestinationを上書きしないno-replace pathを採用した。同じroot / package / operationの再実行は既存Currentをadoptしながら収束し、別rootへのmarker replayはadmissionでzero-write blockする。
+root identityはoperation開始時に固定し、marker更新、scaffold refresh、version publish、marker removalの前後で再検証する。実際のmarker / version / scaffold操作はno-followでopenしたroot directory descriptorへbindした相対pathで実行し、visible rootを差し替えられてもreplacement repositoryへredirectしない。root rebind時はpartial failureとして停止し、旧rootへ残ったmarkerやpathname replacementをcleanupしない。markerとversionのregular-file publishはno-follow、link-count-one、destination identity再検証を行い、preflight後に出現したdestinationを上書きしないno-replace pathを採用した。同じroot / package / operationの再実行は既存Currentをadoptしながら収束し、別rootへのmarker replayはadmissionでzero-write blockする。
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| S60指定契約 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q -k "retry or fault or rebind or cross_root or post_verify or diagnostic"` → `12 passed` |
-| S55 + S60対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `92 passed`（unit 65、CLI 27。S55 baseline 87＝unit 65、CLI 22からS60の5ケースを追加） |
+| S60指定契約 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q -k "retry or fault or rebind or cross_root or post_verify or diagnostic"` → `14 passed` |
+| S55 + S60対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `94 passed`（unit 65、CLI 29。S55 baseline 87＝unit 65、CLI 22からS60の7ケースを追加） |
 | Fault / diagnostic sanitation | pass | scaffold fault、post-verify / version faultでmarker保持・旧version保持・same-operation retry収束を確認し、credential風文字列・source bytes・repository外absolute pathをstderrへ出さないことを確認 |
-| Root rebind / no-replace | pass | root差し替え後のreplacement sentinelと旧root markerを保持し、retry側replacementへのwriteを0件にした。atomic regular-file publishでrace destinationを上書きしないことを確認 |
+| Root rebind / no-replace | pass | descriptor-bound marker / scaffold mutationをroot差し替え中に実行してもreplacement sentinelを変更せず、旧root markerを保持し、retry側replacementへのwriteを0件にした。atomic regular-file publishでrace destinationを上書きしないことも確認 |
+
+### S65 Uninstall admission / dry-run
+
+S65では、uninstall入口がdistribution retry marker、dual marker、invalid / newer / anchor-mismatch versionを既存uninstall planへ渡す前に拒否し、version欠損でも正規のlegacy `.uninstall-retry.json` だけをread-only retryとしてadmitすることを確認した。`--apply` の実削除やmarker書き換えはS70へ残し、S65ではdry-run / admission以外のmutationを追加していない。
+
+| S65指定契約 | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_distribution_cutover.py -q -k "dry_run or admission or marker"` → `8 passed, 32 deselected` |
+| S65 zero-write | pass | invalid version、distribution / dual markerのuninstallをfilesystem snapshot不変で拒否し、legacy uninstall markerのみversion欠損のrerun admissionを許可 |
 | Static checks | pass | `uv run ruff check src/spec_dock/cli.py tests/cli_runtime/test_distribution_cutover.py`、`uv run mypy src/spec_dock/cli.py src/spec_dock/managed_distribution.py`、`python3 -m json.tool src/spec_dock/assets/managed_distribution.json`、`git diff --check`、`./spec-dock/scripts/spec-dock validate` |
 
-S60の広範な`tests/unit/infra/test_init_update.py`は、S55で物理退役したlegacy assetや旧anchor mismatchを前提とする既存テストを含むためstep gateには採用しない。S60の直接契約は上記92件のfocused regressionで閉じ、旧テスト群の仕様移行はS65以降の別作業として扱う。
+S60の広範な`tests/unit/infra/test_init_update.py`は、S55で物理退役したlegacy assetや旧anchor mismatchを前提とする既存テストを含むためstep gateには採用しない。S60の直接契約は上記94件のfocused regressionで閉じ、旧テスト群の仕様移行はS65以降の別作業として扱う。
 
 ## Residual Risks / Follow-ups
 

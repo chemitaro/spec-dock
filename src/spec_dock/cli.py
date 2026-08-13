@@ -766,6 +766,11 @@ def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None
 
     fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=parent)
     temporary = Path(temporary_name)
+    # `mkstemp` returns an absolute pathname even when `parent` is relative.
+    # Keep the staging reference relative while a root-bound caller holds the
+    # opened directory, otherwise a root rename would make the absolute name
+    # point at the now-empty original pathname.
+    temporary_ref = parent / temporary.name if not parent.is_absolute() else temporary
     closed = False
     try:
         os.fchmod(fd, mode)
@@ -789,12 +794,12 @@ def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None
                 or current.st_ino != existing.st_ino
             ):
                 raise RuntimeError("managed file destination identity changed")
-            temporary.replace(path)
+            temporary_ref.replace(path)
         else:
             # A destination that was absent during preflight must not be
             # replaced if another actor creates it before publication.
-            os.link(temporary, path, follow_symlinks=False)
-            temporary.unlink()
+            os.link(temporary_ref, path, follow_symlinks=False)
+            temporary_ref.unlink()
         temporary = None  # type: ignore[assignment]
     except OSError as exc:
         raise RuntimeError("managed file write failed") from exc
@@ -804,7 +809,7 @@ def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None
                 os.close(fd)
         if temporary is not None:
             with suppress(OSError):
-                temporary.unlink()
+                temporary_ref.unlink()
 
 
 def _distribution_root_identity(target_root: Path) -> DistributionRootIdentity:
@@ -827,29 +832,76 @@ def _assert_distribution_root_identity(
         raise RuntimeError("distribution target root identity changed")
 
 
+@contextmanager
+def _bound_distribution_root(
+    target_root: Path,
+    expected: DistributionRootIdentity | None = None,
+) -> Iterator[tuple[Path, Path, DistributionRootIdentity]]:
+    """Bind pathname operations to one opened repository-root directory.
+
+    The visible root path is still checked before yielding and callers keep
+    checking it around phase boundaries.  Actual scaffold/marker operations
+    run with the opened directory as the process cwd, so a later rename and
+    replacement of the visible root cannot redirect those relative writes to
+    the replacement repository.
+    """
+    identity_path = Path(target_root).absolute()
+    bound_identity = expected or _distribution_root_identity(identity_path)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int) or not hasattr(os, "fchdir"):
+        raise RuntimeError("root-bound distribution operations are unavailable")
+    root_flags = os.O_RDONLY | nofollow | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        root_fd = os.open(identity_path, root_flags)
+    except OSError as exc:
+        raise RuntimeError("distribution target root cannot be opened safely") from exc
+    cwd_fd: int | None = None
+    try:
+        root_stat = os.fstat(root_fd)
+        if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_nlink < 1:
+            raise RuntimeError("distribution target root is not a real directory")
+        if (root_stat.st_dev, root_stat.st_ino) != (
+            bound_identity.device,
+            bound_identity.inode,
+        ):
+            raise RuntimeError("distribution target root identity changed")
+        cwd_fd = os.open(".", os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
+        os.fchdir(root_fd)
+        _assert_distribution_root_identity(identity_path, bound_identity)
+        yield Path(), identity_path, bound_identity
+    finally:
+        if cwd_fd is not None:
+            with suppress(OSError):
+                os.fchdir(cwd_fd)
+            with suppress(OSError):
+                os.close(cwd_fd)
+        with suppress(OSError):
+            os.close(root_fd)
+
+
 def _write_spec_dock_version(
     target_root: Path,
     *,
     expected_root_identity: DistributionRootIdentity | None = None,
+    root_identity_path: Path | None = None,
 ) -> None:
     """Publish the generated version marker after post-verification."""
-    if expected_root_identity is not None:
-        _assert_distribution_root_identity(target_root, expected_root_identity)
-    path = _specdock_dir(target_root) / "spec-dock.version"
-    mode = 0o644
-    try:
-        info = os.lstat(path)
-    except FileNotFoundError:
-        info = None
-    except OSError as exc:
-        raise RuntimeError("version marker cannot be inspected safely") from exc
-    if info is not None:
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise RuntimeError("version marker is not a safe regular file")
-        mode = stat.S_IMODE(info.st_mode)
-    _write_atomic_regular_file(path, f"{_tool_version()}\n".encode(), mode=mode)
-    if expected_root_identity is not None:
-        _assert_distribution_root_identity(target_root, expected_root_identity)
+    identity_path = root_identity_path or target_root
+    with _bound_distribution_root(identity_path, expected_root_identity) as (bound_root, visible_root, bound_identity):
+        path = _specdock_dir(bound_root) / "spec-dock.version"
+        mode = 0o644
+        try:
+            info = os.lstat(path)
+        except FileNotFoundError:
+            info = None
+        except OSError as exc:
+            raise RuntimeError("version marker cannot be inspected safely") from exc
+        if info is not None:
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise RuntimeError("version marker is not a safe regular file")
+            mode = stat.S_IMODE(info.st_mode)
+        _write_atomic_regular_file(path, f"{_tool_version()}\n".encode(), mode=mode)
+        _assert_distribution_root_identity(visible_root, bound_identity)
 
 
 def _distribution_retry_marker_path(target_root: Path) -> Path:
@@ -864,33 +916,32 @@ def _write_distribution_retry_marker(
     expected_root_identity: DistributionRootIdentity,
 ) -> None:
     """Create or atomically advance the init/update forward-retry marker."""
-    _assert_distribution_root_identity(target_root, expected_root_identity)
-    marker = _distribution_retry_marker_path(target_root)
-    try:
-        root_info = os.lstat(target_root)
-        parent_info = os.lstat(marker.parent)
-    except OSError as exc:
-        raise RuntimeError("distribution retry marker parent cannot be inspected safely") from exc
-    if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
-        raise RuntimeError("distribution retry marker target root is unsafe")
-    if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
-        raise RuntimeError("distribution retry marker parent is unsafe")
-    _assert_distribution_root_identity(target_root, expected_root_identity)
+    with _bound_distribution_root(target_root, expected_root_identity) as (bound_root, visible_root, bound_identity):
+        marker = _distribution_retry_marker_path(bound_root)
+        try:
+            root_info = os.lstat(bound_root)
+            parent_info = os.lstat(marker.parent)
+        except OSError as exc:
+            raise RuntimeError("distribution retry marker parent cannot be inspected safely") from exc
+        if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+            raise RuntimeError("distribution retry marker target root is unsafe")
+        if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
+            raise RuntimeError("distribution retry marker parent is unsafe")
 
-    payload = {
-        "schema_version": _DISTRIBUTION_RETRY_MARKER_PAYLOAD_VERSION,
-        "operation": operation,
-        "package_version": _tool_version(),
-        "target_root": {
-            "device": expected_root_identity.device,
-            "inode": expected_root_identity.inode,
-        },
-        "last_completed_phase": last_completed_phase,
-        "purpose": _DISTRIBUTION_RETRY_MARKER_PURPOSE,
-    }
-    marker_bytes = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
-    _write_atomic_regular_file(marker, marker_bytes, mode=0o600)
-    _assert_distribution_root_identity(target_root, expected_root_identity)
+        payload = {
+            "schema_version": _DISTRIBUTION_RETRY_MARKER_PAYLOAD_VERSION,
+            "operation": operation,
+            "package_version": _tool_version(),
+            "target_root": {
+                "device": bound_identity.device,
+                "inode": bound_identity.inode,
+            },
+            "last_completed_phase": last_completed_phase,
+            "purpose": _DISTRIBUTION_RETRY_MARKER_PURPOSE,
+        }
+        marker_bytes = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        _write_atomic_regular_file(marker, marker_bytes, mode=0o600)
+        _assert_distribution_root_identity(visible_root, bound_identity)
 
 
 def _remove_distribution_retry_marker(
@@ -899,39 +950,39 @@ def _remove_distribution_retry_marker(
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> None:
     """Remove the init/update marker only when it is a safe regular file."""
-    if expected_root_identity is not None:
-        _assert_distribution_root_identity(target_root, expected_root_identity)
-    marker = _distribution_retry_marker_path(target_root)
-    try:
-        info = os.lstat(marker)
-    except FileNotFoundError:
-        return
-    except OSError as exc:
-        raise RuntimeError("distribution retry marker cannot be inspected safely") from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-        raise RuntimeError("distribution retry marker is not a safe regular file")
-    if expected_root_identity is not None:
-        _assert_distribution_root_identity(target_root, expected_root_identity)
-    try:
-        marker.unlink()
-    except OSError as exc:
-        raise RuntimeError("distribution retry marker could not be removed") from exc
-    if expected_root_identity is not None:
-        _assert_distribution_root_identity(target_root, expected_root_identity)
+    with _bound_distribution_root(target_root, expected_root_identity) as (bound_root, visible_root, bound_identity):
+        marker = _distribution_retry_marker_path(bound_root)
+        try:
+            info = os.lstat(marker)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise RuntimeError("distribution retry marker cannot be inspected safely") from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise RuntimeError("distribution retry marker is not a safe regular file")
+        _assert_distribution_root_identity(visible_root, bound_identity)
+        try:
+            marker.unlink()
+        except OSError as exc:
+            raise RuntimeError("distribution retry marker could not be removed") from exc
+        _assert_distribution_root_identity(visible_root, bound_identity)
 
 
-def _install_spec_dock(
+def _install_spec_dock_bound(
     target_root: Path,
     *,
     force: bool,
     install_root_shortcut: bool = True,
     write_version: bool = True,
     expected_root_identity: DistributionRootIdentity | None = None,
+    root_identity_path: Path | None = None,
 ) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
+    identity_path = root_identity_path or target_root
+
     def guard_root() -> None:
         if expected_root_identity is not None:
-            _assert_distribution_root_identity(target_root, expected_root_identity)
+            _assert_distribution_root_identity(identity_path, expected_root_identity)
 
     guard_root()
     specdock_dir = _specdock_dir(target_root)
@@ -1023,6 +1074,7 @@ def _install_spec_dock(
             _write_spec_dock_version(
                 target_root,
                 expected_root_identity=expected_root_identity,
+                root_identity_path=identity_path,
             )
 
         # Best-effort: provide `./spec` at repo root for convenience.
@@ -1030,6 +1082,30 @@ def _install_spec_dock(
             guard_root()
             _install_repo_root_shortcut(target_root)
             guard_root()
+
+
+def _install_spec_dock(
+    target_root: Path,
+    *,
+    force: bool,
+    install_root_shortcut: bool = True,
+    write_version: bool = True,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> None:
+    """Install/update scaffold while binding all writes to the opened root."""
+    with _bound_distribution_root(target_root, expected_root_identity) as (
+        bound_root,
+        visible_root,
+        bound_identity,
+    ):
+        _install_spec_dock_bound(
+            bound_root,
+            force=force,
+            install_root_shortcut=install_root_shortcut,
+            write_version=write_version,
+            expected_root_identity=bound_identity,
+            root_identity_path=visible_root,
+        )
 
 
 def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
