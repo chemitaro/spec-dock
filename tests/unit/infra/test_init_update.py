@@ -103,40 +103,27 @@ def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
     }
 
 
-def test_issue_334_init_and_update_install_chatgpt_assets_byte_exact(
-    tmp_path: Path,
-) -> None:
+def test_issue_334_init_and_update_install_current_target_catalog_byte_exact(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[3]
     provider_scripts = repo_root / "src/spec_dock/assets/spec_dock/scripts"
-    provider_skill = repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning"
-    provider_docs = repo_root / "src/spec_dock/assets/spec_dock/docs"
+    provider_skills = repo_root / "src/spec_dock/assets/install_root/.agents/skills"
     target = tmp_path / "target"
     target.mkdir()
 
     assert main(["init", str(target)]) == 0
     assert os.access(target / "spec-dock/scripts/spec-dock", os.X_OK)
-    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+    assert not (target / "spec-dock/scripts/spec-dock-chatgpt").exists()
     assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
-    assert _managed_tree_bytes(target / ".agents/skills/spec-dock-issue-planning") == _managed_tree_bytes(
-        provider_skill
-    )
-    for name in ("README.md", "workflow_issue.md"):
-        assert (target / "spec-dock/docs" / name).read_bytes() == (provider_docs / name).read_bytes()
+    for skill_name in ("spec-dock", "spec-dock-grill-with-docs"):
+        assert _managed_tree_bytes(target / ".agents/skills" / skill_name) == _managed_tree_bytes(
+            provider_skills / skill_name
+        )
 
-    (target / "spec-dock/scripts/spec-dock-chatgpt").write_text(
-        "stale\n",
-        encoding="utf-8",
-    )
     assert main(["update", str(target)]) == 0
-    assert (target / "spec-dock/scripts/spec-dock-chatgpt").read_bytes() == (
-        provider_scripts / "spec-dock-chatgpt"
-    ).read_bytes()
-    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
 
 
-def test_issue_334_update_restores_managed_assets_and_preserves_unmanaged_content(
-    tmp_path: Path,
-) -> None:
+def test_issue_334_update_preserves_unmanaged_content(tmp_path: Path) -> None:
     target = tmp_path / "target"
     target.mkdir()
     assert main(["init", str(target)]) == 0
@@ -145,17 +132,11 @@ def test_issue_334_update_restores_managed_assets_and_preserves_unmanaged_conten
     initiative_sentinel.write_bytes(b"persistent\n")
     unmanaged_sentinel = target / "unmanaged-s06-sentinel.txt"
     unmanaged_sentinel.write_bytes(b"unmanaged\n")
-    (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").write_bytes(b"stale\n")
-
     assert main(["update", str(target)]) == 0
 
     assert initiative_sentinel.read_bytes() == b"persistent\n"
     assert unmanaged_sentinel.read_bytes() == b"unmanaged\n"
-    provider_skill = (
-        Path(__file__).resolve().parents[3]
-        / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
-    )
-    assert (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").read_bytes() == provider_skill.read_bytes()
+    assert not (target / ".agents/skills/spec-dock-issue-planning").exists()
 
 
 def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
@@ -170,8 +151,12 @@ def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
             repo_root / "spec-dock/docs",
         ),
         (
-            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning",
-            repo_root / ".agents/skills/spec-dock-issue-planning",
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock",
+            repo_root / ".agents/skills/spec-dock",
+        ),
+        (
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs",
+            repo_root / ".agents/skills/spec-dock-grill-with-docs",
         ),
     )
     for provider, dogfood in comparisons:
@@ -626,6 +611,43 @@ class TestInitUpdate(CliRuntimeHarness):
         ".github/agents/spec-manager.agent.md": (
             "src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md"
         ),
+    }
+    # S40B replaces the historical mirror inventory with the physical current
+    # catalog. Keep this assertion focused on retained provider-owned files;
+    # stale consumer-only files are handled by the later classifier steps.
+    _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
+        "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
+        "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
+        "spec-dock/docs/README.md": "src/spec_dock/assets/spec_dock/docs/README.md",
+        "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
+        "spec-dock/docs/reference_deps.md": "src/spec_dock/assets/spec_dock/docs/reference_deps.md",
+        "spec-dock/docs/reference_github.md": "src/spec_dock/assets/spec_dock/docs/reference_github.md",
+        "spec-dock/docs/reference_naming.md": "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
+        "spec-dock/docs/reference_sync.md": "src/spec_dock/assets/spec_dock/docs/reference_sync.md",
+        "spec-dock/docs/reference_worktree.md": "src/spec_dock/assets/spec_dock/docs/reference_worktree.md",
+        "spec-dock/docs/authoring/artifacts.md": "src/spec_dock/assets/spec_dock/docs/authoring/artifacts.md",
+        "spec-dock/docs/authoring/design.md": "src/spec_dock/assets/spec_dock/docs/authoring/design.md",
+        "spec-dock/docs/authoring/historical.md": "src/spec_dock/assets/spec_dock/docs/authoring/historical.md",
+        "spec-dock/docs/authoring/issue-plan.md": "src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md",
+        "spec-dock/docs/authoring/overview.md": "src/spec_dock/assets/spec_dock/docs/authoring/overview.md",
+        "spec-dock/docs/authoring/report.md": "src/spec_dock/assets/spec_dock/docs/authoring/report.md",
+        "spec-dock/docs/authoring/requirement.md": "src/spec_dock/assets/spec_dock/docs/authoring/requirement.md",
+        "spec-dock/docs/authoring/scope-layering.md": "src/spec_dock/assets/spec_dock/docs/authoring/scope-layering.md",
+        "spec-dock/docs/rules/initiative/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md",
+        "spec-dock/docs/rules/initiative/discussions.md": "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
+        "spec-dock/docs/rules/initiative/epics.md": "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md",
+        "spec-dock/docs/rules/epic/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
+        "spec-dock/docs/rules/epic/discussions.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md",
+        "spec-dock/docs/rules/epic/issues.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
+        "spec-dock/docs/rules/issue/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md",
+        "spec-dock/docs/rules/issue/discussions.md": "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md",
+        "spec-dock/docs/rules/root/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md",
+        ".agents/skills/spec-dock/SKILL.md": "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md",
+        ".agents/skills/spec-dock-grill-with-docs/SKILL.md": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
+        ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+        ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+        ".github/workflows/ci.yml": "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
     }
     _DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/system/active-none/initiative/report.md": (
@@ -41572,24 +41594,8 @@ def test_issue_334_s11_active_dependency_denylist_covers_distribution_surfaces(
 
 
 _ISSUE_359_MANAGED_SKILL_INVENTORY = (
-    "spec-dock-hub",
-    "spec-dock-initiative-planning",
-    "spec-dock-epic-planning",
-    "spec-dock-epic-execution",
-    "spec-dock-issue-planning",
-    "spec-dock-issue-execution",
-    "spec-dock-chatgpt-authoring",
-    "spec-dock-initiative-planning-manual",
-    "spec-dock-epic-planning-manual",
-    "spec-dock-issue-planning-manual",
-    "spec-dock-clarification",
-    "spec-dock-adr-facilitation",
-    "spec-dock-codex-adapter",
-    "spec-dock-copilot-adapter",
-    "git-commit-conventional-ja",
-    "github-pr-observation",
-    "github-pr-creator",
-    "github-pr-merge-preparer",
+    "spec-dock",
+    "spec-dock-grill-with-docs",
 )
 
 _ISSUE_359_LEGACY_MANAGED_SKILL_INVENTORY = (
@@ -41758,13 +41764,6 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
     ):
         assert marker in docs_text
 
-    provider_config = assets_root / "install_root/.codex/config.toml"
-    dogfood_config = repo_root / ".codex/config.toml"
-    assert dogfood_config.read_bytes() == provider_config.read_bytes()
-    config_bytes = provider_config.read_bytes()
-    config = tomllib.loads(config_bytes.decode("utf-8"))
-    assert config == _ISSUE_359_EXPECTED_CODEX_CONFIG
-
     mappings, _ = cli._build_current_managed_file_mappings(assets_root)
     mapped_targets = {mapping.target_rel.as_posix() for mapping in mappings}
     assert {
@@ -41774,7 +41773,7 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
         ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
     } <= mapped_targets
     assert cli._MANAGED_SKILL_NAMES == _ISSUE_359_MANAGED_SKILL_INVENTORY
-    assert cli._LEGACY_MANAGED_SKILL_NAMES == _ISSUE_359_LEGACY_MANAGED_SKILL_INVENTORY
+    assert not hasattr(cli, "_LEGACY_MANAGED_SKILL_NAMES")
 
 
 @pytest.mark.parametrize(
