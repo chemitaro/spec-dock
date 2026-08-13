@@ -25,15 +25,13 @@ INSTALL_ROOT = REPO_ROOT / "src" / "spec_dock" / "assets" / "install_root"
 MANIFEST_PATH = REPO_ROOT / "src" / "spec_dock" / "assets" / "managed_distribution.json"
 HISTORICAL_COMMIT = "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
 
-EXPECTED_CURRENT_PATHS = frozenset(
-    {
-        ".agents/skills/spec-dock/SKILL.md",
-        ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
-        ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
-        ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-        ".github/workflows/ci.yml",
-    }
-)
+EXPECTED_CURRENT_PATHS = frozenset({
+    ".agents/skills/spec-dock/SKILL.md",
+    ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+    ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+    ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+    ".github/workflows/ci.yml",
+})
 EXPECTED_OBSOLETE_SKILL_PATHS = frozenset(
     f".agents/skills/{name}/SKILL.md"
     for name in (
@@ -136,19 +134,12 @@ def test_s20_current_catalog_is_not_duplicated_in_historical_manifest() -> None:
     obsolete_paths = {item["path"] for item in raw["obsolete_exact_files"]}
     assert len(obsolete_paths) == 75
     assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
-    assert not any(
-        item["path"] in EXPECTED_CURRENT_PATHS
-        for item in raw["obsolete_exact_files"]
-    )
+    assert not any(item["path"] in EXPECTED_CURRENT_PATHS for item in raw["obsolete_exact_files"])
 
 
 def test_s55_obsolete_catalog_is_bound_to_reproducible_git_source() -> None:
     raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    records = [
-        identity
-        for item in raw["obsolete_exact_files"]
-        for identity in item["identities"]
-    ]
+    records = [identity for item in raw["obsolete_exact_files"] for identity in item["identities"]]
 
     assert records
     assert {identity["source"]["ref"] for identity in records} == {HISTORICAL_COMMIT}
@@ -276,12 +267,8 @@ def test_s20_ancestor_overlap_between_historical_records_is_rejected(tmp_path: P
     manifest_path = _write_manifest(
         tmp_path,
         _manifest_with(
-            historical_current_identities=[
-                {"path": ".agents/legacy.md", "kind": "regular", "sha256": "a" * 64}
-            ],
-            obsolete_exact_files=[
-                {"path": ".agents/legacy.md/child", "kind": "regular", "sha256": "b" * 64}
-            ],
+            historical_current_identities=[{"path": ".agents/legacy.md", "kind": "regular", "sha256": "a" * 64}],
+            obsolete_exact_files=[{"path": ".agents/legacy.md/child", "kind": "regular", "sha256": "b" * 64}],
         ),
     )
 
@@ -1405,9 +1392,7 @@ def test_s35_admission_rejects_noncanonical_version_before_mutation(
     version_path = tmp_path / "consumer" / "spec-dock" / "spec-dock.version"
     version_path.write_bytes(version_bytes)
     before = {
-        path.relative_to(tmp_path): path.read_bytes()
-        for path in (tmp_path / "consumer").rglob("*")
-        if path.is_file()
+        path.relative_to(tmp_path): path.read_bytes() for path in (tmp_path / "consumer").rglob("*") if path.is_file()
     }
 
     with pytest.raises(DistributionAdmissionError) as exc_info:
@@ -1420,9 +1405,7 @@ def test_s35_admission_rejects_noncanonical_version_before_mutation(
 
     assert exc_info.value.reason == reason
     after = {
-        path.relative_to(tmp_path): path.read_bytes()
-        for path in (tmp_path / "consumer").rglob("*")
-        if path.is_file()
+        path.relative_to(tmp_path): path.read_bytes() for path in (tmp_path / "consumer").rglob("*") if path.is_file()
     }
     assert after == before
 
@@ -1488,16 +1471,14 @@ def test_s35_cross_root_retry_replay_and_dual_marker_are_blocked(tmp_path: Path)
     marker = source_root / "spec-dock" / ".distribution-retry.json"
     source_stat = source_root.stat()
     marker.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "operation": "update",
-                "package_version": "1.2.4",
-                "target_root": {"device": source_stat.st_dev, "inode": source_stat.st_ino},
-                "last_completed_phase": "preflight-complete",
-                "purpose": "distribution-rerun",
-            }
-        ),
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.4",
+            "target_root": {"device": source_stat.st_dev, "inode": source_stat.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+        }),
         encoding="utf-8",
     )
     admission = admit_distribution_operation(

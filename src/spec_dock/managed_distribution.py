@@ -219,16 +219,14 @@ class DistributionAdmission:
 
 
 _SCHEMA_VERSION = 1
-_MANIFEST_FIELDS = frozenset(
-    {
-        "schema_version",
-        "recognized_workspace_versions",
-        "historical_current_identities",
-        "trusted_consumer_manifests",
-        "obsolete_exact_files",
-        "historical_shortcuts",
-    }
-)
+_MANIFEST_FIELDS = frozenset({
+    "schema_version",
+    "recognized_workspace_versions",
+    "historical_current_identities",
+    "trusted_consumer_manifests",
+    "obsolete_exact_files",
+    "historical_shortcuts",
+})
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 _GLOB_CHARS = frozenset("*?[]{}")
@@ -339,10 +337,11 @@ def _validate_manifest(raw: Any) -> DistributionManifest:
         if not isinstance(item, dict) or set(item) != {"version", "anchors"}:
             _fail(f"recognized_workspace_versions[{index}] has invalid shape")
         version = item.get("version")
-        if not isinstance(version, str) or re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", version) is None:
-            _fail(
-                f"recognized_workspace_versions[{index}].version must be canonical MAJOR.MINOR.PATCH"
-            )
+        if (
+            not isinstance(version, str)
+            or re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", version) is None
+        ):
+            _fail(f"recognized_workspace_versions[{index}].version must be canonical MAJOR.MINOR.PATCH")
         anchors_raw = item.get("anchors")
         if not isinstance(anchors_raw, list) or not anchors_raw:
             _fail(f"recognized_workspace_versions[{index}].anchors must be non-empty")
@@ -394,14 +393,12 @@ def _validate_manifest(raw: Any) -> DistributionManifest:
             _fail(f"obsolete_exact_files[{index}] identity path must match record path")
         if item.get("on_unknown") != "preserve-and-block":
             _fail(f"obsolete_exact_files[{index}].on_unknown must be preserve-and-block")
-        obsolete.append(
-            {
-                "path": path.as_posix(),
-                "surface": surface,
-                "identities": identities,
-                "on_unknown": "preserve-and-block",
-            }
-        )
+        obsolete.append({
+            "path": path.as_posix(),
+            "surface": surface,
+            "identities": identities,
+            "on_unknown": "preserve-and-block",
+        })
 
     shortcuts: list[dict[str, Any]] = []
     for index, item in enumerate(_section_list(raw, "historical_shortcuts")):
@@ -411,14 +408,12 @@ def _validate_manifest(raw: Any) -> DistributionManifest:
             _fail(f"historical_shortcuts[{index}].kind must be symlink")
         path = _exact_relative_path(item.get("path"), field_name=f"historical_shortcuts[{index}].path")
         target = _exact_relative_path(item.get("target"), field_name=f"historical_shortcuts[{index}].target")
-        shortcuts.append(
-            {
-                "path": path.as_posix(),
-                "kind": "symlink",
-                "target": target.as_posix(),
-                "source": _source(item.get("source"), field_name=f"historical_shortcuts[{index}].source"),
-            }
-        )
+        shortcuts.append({
+            "path": path.as_posix(),
+            "kind": "symlink",
+            "target": target.as_posix(),
+            "source": _source(item.get("source"), field_name=f"historical_shortcuts[{index}].source"),
+        })
 
     return DistributionManifest(
         schema_version=_SCHEMA_VERSION,
@@ -450,13 +445,11 @@ def _assert_no_manifest_overlap(
     records: list[tuple[str, str, bool]] = []
     for version_index, version in enumerate(manifest.recognized_workspace_versions):
         for anchor_index, anchor in enumerate(version["anchors"]):
-            records.append(
-                (
-                    anchor["path"],
-                    f"recognized_workspace_versions[{version_index}].anchors[{anchor_index}]",
-                    False,
-                )
-            )
+            records.append((
+                anchor["path"],
+                f"recognized_workspace_versions[{version_index}].anchors[{anchor_index}]",
+                False,
+            ))
     for item in manifest.historical_current_identities:
         # A historical identity is intentionally allowed to describe the same
         # target path as a newly shipped Current asset.  It is the evidence
@@ -467,13 +460,11 @@ def _assert_no_manifest_overlap(
     for manifest_index, item in enumerate(manifest.trusted_consumer_manifests):
         records.append((item["path"], f"trusted_consumer_manifests[{manifest_index}]", False))
         for claim_index, claim in enumerate(item["claims"]):
-            records.append(
-                (
-                    claim["path"],
-                    f"trusted_consumer_manifests[{manifest_index}].claims[{claim_index}]",
-                    True,
-                )
-            )
+            records.append((
+                claim["path"],
+                f"trusted_consumer_manifests[{manifest_index}].claims[{claim_index}]",
+                True,
+            ))
     for item in manifest.historical_shortcuts:
         # The canonical shortcut is a Current identity even though it is
         # synthesized rather than shipped as a regular file.  Historical
@@ -484,8 +475,7 @@ def _assert_no_manifest_overlap(
     for index, (path, section, allows_current_overlap) in enumerate(records):
         if allows_current_overlap:
             current_overlap = any(
-                _path_overlaps(path, current_path) and path != current_path
-                for current_path in current_paths
+                _path_overlaps(path, current_path) and path != current_path for current_path in current_paths
             )
         else:
             current_overlap = any(_path_overlaps(path, current_path) for current_path in current_paths)
@@ -522,15 +512,13 @@ _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
 _DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
 _DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
-_DISTRIBUTION_RETRY_PHASES = frozenset(
-    {
-        "preflight-complete",
-        "distribution-applied",
-        "scaffold-refreshed",
-        "post-verified",
-        "version-written",
-    }
-)
+_DISTRIBUTION_RETRY_PHASES = frozenset({
+    "preflight-complete",
+    "distribution-applied",
+    "scaffold-refreshed",
+    "post-verified",
+    "version-written",
+})
 _UNINSTALL_RETRY_MARKER_PAYLOAD = {
     "schema_version": 1,
     "managed_by": "spec-dock",
@@ -764,7 +752,9 @@ def _validate_workspace_version(
             _admission_block("anchor-mismatch", f"version anchor does not match: {path_text}")
     package_tuple = _parse_package_version(package_version, source="executing package version")
     if target_tuple > package_tuple:
-        _admission_block("downgrade-blocked", f"target version {version_text[:-1]} is newer than package {package_version}")
+        _admission_block(
+            "downgrade-blocked", f"target version {version_text[:-1]} is newer than package {package_version}"
+        )
     return version_text[:-1], target_tuple
 
 
@@ -799,7 +789,11 @@ def admit_distribution_operation(
         specdock_info = None
     except OSError:
         _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
-    if specdock_info is not None and not stat.S_ISLNK(specdock_info.st_mode) and not stat.S_ISDIR(specdock_info.st_mode):
+    if (
+        specdock_info is not None
+        and not stat.S_ISLNK(specdock_info.st_mode)
+        and not stat.S_ISDIR(specdock_info.st_mode)
+    ):
         _admission_block("workspace-invalid", "spec-dock must be a real directory")
     if specdock_info is not None and stat.S_ISLNK(specdock_info.st_mode):
         _admission_block("workspace-invalid", "spec-dock is a symlink; a real directory is required")
@@ -866,7 +860,10 @@ def _current_assets(install_root: Path) -> tuple[DistributionAsset, ...]:
     for candidate in sorted(install_root.rglob("*"), key=lambda item: item.relative_to(install_root).as_posix()):
         if not candidate.is_file() or candidate.is_symlink():
             continue
-        relative = _exact_relative_path(candidate.relative_to(install_root).as_posix(), field_name="Current path")
+        relative_candidate = candidate.relative_to(install_root)
+        if "__pycache__" in relative_candidate.parts or relative_candidate.suffix in {".pyc", ".pyo"}:
+            continue
+        relative = _exact_relative_path(relative_candidate.as_posix(), field_name="Current path")
         try:
             file_stat = candidate.stat()
             digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
@@ -1164,7 +1161,14 @@ def _classify_current_target(
         return _blocked_action(path, operation, "symlink-container")
     if observation.state == "non-directory-container":
         return _blocked_action(path, operation, "non-directory-container")
-    if observation.state in {"root-symlink", "root-non-directory", "root-error", "parent-error", "target-error", "special"}:
+    if observation.state in {
+        "root-symlink",
+        "root-non-directory",
+        "root-error",
+        "parent-error",
+        "target-error",
+        "special",
+    }:
         return _blocked_action(path, operation, "unsafe-target-path")
 
     actual = observation.identity
@@ -1201,7 +1205,11 @@ def _classify_current_target(
         if operation == "uninstall":
             return DistributionAction(path, operation, "prune", "historical", "historical-identity-match")
         if operation in {"update", "init-force"}:
-            reason = "trusted-manifest-identity-match" if provenance == "trusted-manifest" else "direct-historical-identity-match"
+            reason = (
+                "trusted-manifest-identity-match"
+                if provenance == "trusted-manifest"
+                else "direct-historical-identity-match"
+            )
             return DistributionAction(path, operation, "upgrade", "historical", reason)
         return _blocked_action(
             path,
@@ -1389,25 +1397,17 @@ def _open_distribution_parent_chain(
             expected_parent = None
             if expected_snapshot is not None:
                 expected_parent = next(
-                    (
-                        parent
-                        for parent in expected_snapshot.parents
-                        if parent.relative_path == component_relative
-                    ),
+                    (parent for parent in expected_snapshot.parents if parent.relative_path == component_relative),
                     None,
                 )
             try:
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
                 if expected_parent is not None and not expected_parent.exists:
                     os.close(next_fd)
-                    raise DistributionApplyError(
-                        f"managed target parent appeared during apply for '{target_rel}'"
-                    )
+                    raise DistributionApplyError(f"managed target parent appeared during apply for '{target_rel}'")
             except FileNotFoundError:
                 if not create_missing:
-                    raise DistributionApplyError(
-                        f"managed target parent is missing for '{target_rel}'"
-                    ) from None
+                    raise DistributionApplyError(f"managed target parent is missing for '{target_rel}'") from None
                 if expected_snapshot is not None:
                     _assert_distribution_chain_bound(
                         tuple(fds),
@@ -1427,9 +1427,7 @@ def _open_distribution_parent_chain(
                     created_missing = True
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
             except OSError as exc:
-                raise DistributionApplyError(
-                    f"managed target parent is unsafe for '{target_rel}'"
-                ) from exc
+                raise DistributionApplyError(f"managed target parent is unsafe for '{target_rel}'") from exc
             fds.append(next_fd)
             _assert_visible_distribution_chain_bound(target_root, target_rel, tuple(fds))
             if expected_snapshot is not None:
@@ -1495,9 +1493,7 @@ def _assert_distribution_chain_bound(
         if not expected.exists:
             continue
         parent_matches = (
-            _same_stat_identity(os.fstat(fd), expected)
-            if exact
-            else _same_stat_structure(os.fstat(fd), expected)
+            _same_stat_identity(os.fstat(fd), expected) if exact else _same_stat_structure(os.fstat(fd), expected)
         )
         if not parent_matches:
             raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
@@ -1721,9 +1717,7 @@ def _same_structure_identity(actual: PathIdentitySnapshot, expected: PathIdentit
     if not expected.exists or not actual.exists:
         return actual.exists == expected.exists
     return (
-        actual.device == expected.device
-        and actual.inode == expected.inode
-        and actual.file_type == expected.file_type
+        actual.device == expected.device and actual.inode == expected.inode and actual.file_type == expected.file_type
     )
 
 
@@ -1737,7 +1731,9 @@ def _assert_pending_snapshot_stable(
         raise DistributionApplyError(f"managed target identity changed for '{path}'")
     actual_parents = {parent.relative_path: parent for parent in actual.parents}
     for expected_parent in expected.parents:
-        actual_parent = actual_parents.get(expected_parent.relative_path, _missing_snapshot(expected_parent.relative_path))
+        actual_parent = actual_parents.get(
+            expected_parent.relative_path, _missing_snapshot(expected_parent.relative_path)
+        )
         if expected_parent.exists:
             if not _same_structure_identity(actual_parent, expected_parent):
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
@@ -1917,8 +1913,7 @@ def _apply_regular_action(
             verified = os.fstat(fd)
             if (
                 verified.st_nlink != 1
-                or
-                stat.S_IMODE(verified.st_mode) != source_mode
+                or stat.S_IMODE(verified.st_mode) != source_mode
                 or hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != expected.sha256
             ):
                 raise DistributionApplyError(f"managed target verification failed for '{path}'")

@@ -78,7 +78,8 @@ Storage Core の詳細な参照先です。
 ./spec-dock/scripts/spec-dock update /path/to/project
 ```
 
-`spec-dock-chatgpt` は Storage Core Runtime 外の、後続Issueが所有する compatibility / handoff surface です。この README では、その利用手順や reviewer gate を Current の通常操作としては説明しません。
+旧来の外部 authoring / review surface は配布対象外です。Current の通常操作は Storage Core、
+Authoring Kit、二つの installed skill、および明示的な Artifact import に限定されます。
 
 ## Storage Core の運用ルール
 
@@ -92,9 +93,10 @@ Storage Core の詳細な参照先です。
 - `active set` / `deps check` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
 - 依存関係の追加/削除/確認は metadata の直編集ではなく `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、変更後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` で GitHub live state を含めて整合を確認する。GitHub を呼ばない確認が必要な場合だけ `--no-github` を指定する
 - legacy sequential discussion docs は grandfathered only。新規作成で sequence reuse / auto-rename / auto-repair はしない
-- `./spec-dock/scripts/spec-dock update [path]` は repo-local self-update path で、target 省略時は current directory を更新する。明示 path を渡すとその managed repo を更新する
+- `./spec-dock/scripts/spec-dock update [path]` は repo-local self-update path で、target 省略時は current directory を更新する。明示 path を渡すとその managed repo を更新する。recognized distribution planを先に検証し、ownership不明・root差し替え・衝突時は書込み前に停止する
 - runtime update は installer update の wrapper であり、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>` として実行する。arbitrary source / cache / `--force` option は公開しない
-- update は managed files/docs/templates/scripts/skills の更新であり、`init --force` でも old workspace の in-place migration ツールでもない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
+- update は managed files/docs/templates/scripts/skills の recognized distribution refresh であり、`init --force` でも無条件の old workspace migration でもない。unknown / modified / symlink / hard-link / root-rebind は preserve-and-block とし、partial apply は同一root・同一package・同一operationの retry marker で再実行する
+- `uninstall` は dry-run が既定で、`--apply` は全actionのownership検証後だけ実行する。部分失敗時は `.uninstall-retry.json` を保持し、post-verify後に最後に除去する。`--keep-specs` は spec history と unknown content を保持し、`--remove-specs` のときだけ spec history を削除する
 - Workbench は任意です。optional、temporary、worktree-local、disposable、non-canonical な作業場であり、fresh root と future Initiative / Epic / Issue の shell に `.workbench/README.md` が生成されますが、existing scope には no-backfill です。presence は任意であり、不在でも workspace は valid です
 - `.workbench/README.md` は direct child の README-only tracking surface です。その他の Workbench entry は ignored payload として Git に ignore されます。Git ignore は security boundary ではありません。secret、credential、private customer data を置かないでください
 - `artifact import file` は唯一の Current import surface です。`--root` / `--initiative` / `--epic` / `--issue` のいずれか一つと `--file` を指定し、一件の明示 regular file を opaque generic Artifact として保存します。source は変更・削除せず、source content、hash、byte count、repository 外 absolute path は出力しません。既存の `artifact import chatgpt-output` は撤去済みで、同じ一件の file は `artifact import file` へ移行してください。filename と collision は [reference_naming.md](reference_naming.md) を参照してください
