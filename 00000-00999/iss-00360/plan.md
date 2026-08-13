@@ -3,14 +3,14 @@
 ID: "iss-00360"
 タイトル: "Cut Over Distribution and Retire Legacy Workflow Surfaces"
 関連GitHub: ["#360"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex main orchestrator"
 最終更新: "2026-08-13"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00356", "init-local-00003"]
 planning_level: "strict"
 implementation_baseline: "a6ded0d9a838b40cdcd741fa473cd264b801f245"
-handoff_state: "implementation-start-blocked"
+handoff_state: "implementation-start-ready"
 ---
 
 # iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces — 実装計画
@@ -59,7 +59,7 @@ IC-1 / IC-2はEpic Plan §6.1の文書上のhandoffであり、Runtime metadata�
 
 §2.2を満たした時点をplanning handoff / implementation-start-readyとする。実装開始後も、S10 inventory lockがpassするまでmanifest / prune logicを書かず、S20のRED testが期待理由で失敗するまでproduction behaviorを変更しない。
 
-現在はS20の実行順をS40A / S40Bのphysical cutover後へ改訂した直後であり、Planの状態は`draft`、handoffは`implementation-start-blocked`とする。改訂後のstep本文順・依存graph・exact-upstream SHAに対するfresh `spec-reviewer`および`ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を得るまで、S10を含む実装stepを開始しない。両gate通過後にのみ、metadataを`approved` / `implementation-start-ready`へ戻す。
+S20の実行順をS40A / S40Bのphysical cutover後へ改訂したPlanについて、fresh `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認した。したがってPlanの状態を`approved`、handoffを`implementation-start-ready`へ戻し、S00のgate revalidationとS10のread-only inventory lockを開始できる。S10以降も各stepの依存、RED / GREEN、review、commit、clean条件を満たすまで後続stepへ進まない。
 
 ## 3. 実装対象inventory
 

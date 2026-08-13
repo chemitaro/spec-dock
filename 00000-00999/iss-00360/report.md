@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。Requirement / Designはapprovedだが、PlanはS20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すamendment中であり、状態を`draft`、handoffを`implementation-start-blocked`へ戻している。改訂後のstep本文順・依存graph・exact-upstream SHAに対するfresh `spec-reviewer`と`ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を得るまで、実装、PR、Issue close、IC-3判定は開始しない。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認したため、Planを`approved`、handoffを`implementation-start-ready`へ戻した。S00の再確認後、S10のread-only inventory lockから実装を開始する。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
 
 ## Verification
 
@@ -22,6 +22,10 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
 * Initial approved planning commit: `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * Current branch upstream: `origin/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
+
+* Current implementation-admission SHA: `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`（local HEAD = upstream、clean）
+* Plan amendment local review: fresh `spec-reviewer` pass（S40A verificationは既存`test_storage_core_cli.py`のみ）
+* Plan amendment Strict review: session `issue-360-amended-current-strict-3`、GitHub exact SHA `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`、resolved `GPT-5.5` verified、P0 / P1なしでpass
 
 * Push verification at planning commit: local `HEAD` = upstream = `3147c80bbbd6a8d4f76685ed5228d1d4495f1aef`
 * `origin/main` merge: fast-forward success、Issue 360文書差分を保持
@@ -47,15 +51,15 @@ Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、I
 
 ## Execution Admission / Blocker
 
-2026-08-13のimplementation-start admissionで、current exact upstream SHA `a3901a7ec2056bd392762c3d4efa71967f4ec232`に対するfresh `ChatGPT-SpecReview-Strict`を実行した。Strict reviewerはRequirement / Design / Planを参照し、PlanのS20がprovider physical treeのobsolete source pathをS40A / S40Bのphysical cutover前にCurrent / obsolete overlapとして検証し得るP1を1件検出した。仕様のoverlap拒否を緩めずにS20を通す実装順がcanonical Planに固定されていなかったため、production / test / provider asset mutationを開始せず、P1をPlan amendmentへ戻した。
+2026-08-13のimplementation-start admissionでは、current exact upstream SHA `a3901a7ec2056bd392762c3d4efa71967f4ec232`に対するStrict reviewがS20順序のP1を検出したため、production / test / provider asset mutationを開始せずPlan amendmentへ戻した。その後、S10 → S40A → S40B → S20の順序、S45の依存、Requirement / Design / Reportのgate記述、S40Aの検証対象を修正し、fresh local `spec-reviewer`とStrictを再実行した。
 
-最小修正として、Planの順序を`S10 → S40A → S40B → S20 → S25 → S30 → S35 → S45`へ変更した。S10のread-only exact inventoryを先にlockし、S40A / S40Bでprovider physical cutoverを完了してからS20のCurrent catalog / historical manifest validationを行う。S20のCurrent / obsolete overlap invariant、S10のtraceable historical identity、S40A / S40Bのconsumer mutation前 gateは変更しない。Plan amendment後にfresh `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`を再実行し、両方のpassを得るまで実装開始をblockedとする。
+最小修正として、Planの順序を`S10 → S40A → S40B → S20 → S25 → S30 → S35 → S45`へ変更し、S40Aの検証を既存`tests/cli_runtime/test_storage_core_cli.py`だけへ限定した。S10のread-only exact inventoryを先にlockし、S40A / S40Bでprovider physical cutoverを完了してからS20のCurrent catalog / historical manifest validationを行う契約は維持した。Plan amendment後のfresh local `spec-reviewer`とcurrent exact-upstream Strictがともにpassしたため、implementation-start gateを解消し、S00 / S10へ進む。
 
 ## Residual Risks / Follow-ups
 
-* Issue 359 final headとmain mergeへR/D/Pを再照合した。実装開始前にはCurrent branch HEADとTarget二skillのexact inventoryをもう一度lockする。
+* Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockする。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、旧Strict round 2 passを完了した。現在のPlan amendmentをcommit / pushした後、fresh `spec-reviewer`とexact-current Strict passを両方確認するまで実装へhandoffしない。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict passを完了した。次はS10 inventory lockである。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
@@ -81,10 +85,10 @@ ChatGPT-Use-Strictの出力はadvisory evidenceとして扱い、main orchestrat
 | ID | adoption_status | Source / role | Claim | Canonical target | Rationale / evidence | Blocking / next action |
 |---|---|---|---|---|---|---|
 | EAL-360-001 | adopted | ChatGPT-Use-Strict authoring evidence | Current physical authority、historical identity、deep module、operation × provenance、forward recovery、parityをR/D/Pへ具体化できる | Requirement / Design / Plan | GitHub connectorで`chemitaro/spec-dock` main SHA `a6ded0d9…`を確認し、session `required-strict-github-connector-verificati-65`の提案をlocal source / tests / IC evidenceへ照合した | no。canonical authorityはR/D/Pとfresh reviewer |
-| EAL-360-002 | adopted | `implementation-planner` read-only draft | Plan round 1の5 P1をstep-local vertical TDD、Closure Index、delegation/review/commit gate、S90/S99/H10へ再構成する | Plan §4〜§9 | Canonical editなしのdraftをmain orchestratorがapproved R/Dとworkflow policyへ照合して統合した | 旧Plan round 3 passはamendment前の証拠としてsuperseded。現行step順・依存graphのfresh review待ち |
+| EAL-360-002 | adopted | `implementation-planner` read-only draft | Plan round 1の5 P1をstep-local vertical TDD、Closure Index、delegation/review/commit gate、S90/S99/H10へ再構成する | Plan §4〜§9 | Canonical editなしのdraftをmain orchestratorがapproved R/Dとworkflow policyへ照合して統合した。S20順序・S45依存・S40A検証対象をamendし、fresh local reviewとStrict passを確認した | amendment後の現行Planは`approved` / `implementation-start-ready`。S10からstep executionへhandoff |
 | EAL-360-003 | adopted | fresh `spec-reviewer` findings | Requirement / Design / PlanのP0/P1をphaseごとに検出し、修正範囲を限定する | R/D/P/report | Requirement round 3、Design round 3、Plan round 3のpassをraw authorityではなくreview evidenceとして採用した | no。Strict round 2 passで独立最終照合済み |
 
-EAL-360-002の旧promotion gateはPlan amendmentにより再開されている。現行Planの`draft` / `implementation-start-blocked`状態、fresh `spec-reviewer`、current exact-upstream Strict reviewの3点が揃うまで、implementation-start-readyを主張しない。
+EAL-360-002の旧promotion gateはPlan amendment、fresh local `spec-reviewer`、current exact-upstream Strict passにより解消された。現行Planは`approved` / `implementation-start-ready`であり、S00再確認後にS10 inventory lockへ進む。
 
 ### Delegated Draft Evidence
 
@@ -119,7 +123,7 @@ EAL-360-002の旧promotion gateはPlan amendmentにより再開されている�
 |---|---|---|---|---|
 | Requirement | `requirement.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし。IC-1 / IC-2、Design promotion、formal start、implementation handoffは非承認 |
 | Design | `design.md` | fresh `spec-reviewer` | pass | round 3でP0/P1なし、confidence 0.98。Plan phaseへ昇格 |
-| Plan | `plan.md` | amendment後fresh review待ち | pending / blocked | 旧round 3 passはS20本文順・依存graph改訂前のためsuperseded | fresh pass後に`approved`へ戻し、exact-current Strict pass後にimplementation-start-readyへ昇格 |
+| Plan | `plan.md` | amendment後fresh review | passed | S40A verificationを既存Storage Core CLI testへ限定し、S20本文順・依存graph・gate metadataを確認 | Plan `approved` / `implementation-start-ready`、S10へhandoff |
 
 ### Reviewer Gate Status
 
@@ -127,8 +131,8 @@ EAL-360-002の旧promotion gateはPlan amendmentにより再開されている�
 |---|---|---|---|---|---|
 | Requirement | `spec-reviewer` | fresh round 3 | passed | none | Requirement approved |
 | Design | `spec-reviewer` | fresh round 3 | passed | none | Design approved |
-| Plan | `spec-reviewer` | amendment後fresh review待ち | pending / blocked | S20本文順・依存graph・gate metadataを改訂。旧round 3 passはamendment前のためsuperseded | fresh pass後に`approved`へ戻す |
-| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | amendment後exact-current review待ち | pending / blocked | 旧round 2は`4b325885…`に対する証拠であり、現行amendment SHAを承認しない | clean upstream SHAでP0/P1なしのfresh pass後にhandoff readyへ戻す |
+| Plan | `spec-reviewer` | amendment後fresh review | passed | S40A verificationを既存Storage Core CLI testへ限定し、S20本文順・依存graph・gate metadataを確認 | Plan `approved` / `implementation-start-ready`、S10へhandoff |
+| ChatGPT-SpecReview-Strict | ChatGPT browser-only exact-upstream review | amendment後exact-current review | passed | session `issue-360-amended-current-strict-3`でGitHub exact SHA `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`を検証、resolved `GPT-5.5` verified、P0/P1なし | implementation admissionを解消し、S00 / S10を開始 |
 
 ### ChatGPT-SpecReview-Strict round 1
 
@@ -142,7 +146,11 @@ Findingはrepository factsと一致したため採用し、Requirement I360-RQ-0
 
 Session `required-strict-github-connector-verificati-68`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `4b325885b82dbffa26cdd5cd372d3914e8d604ef`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。P0 / P1はなく、`review_status=pass`、overall confidence 0.91である。Requirement / Design / Planはhard cutover、ownership / provenance、path safety、retry / recovery、Fresh / update / uninstall、parity、docs、IC-3 handoffを相互にtraceでき、実装開始を妨げる矛盾または必須欠落はないと判定された。
 
-唯一のfindingは、親Epic Reportの進捗サマリーがIssue 360のDesign / Plan具体化中、formal start未完了のまま残るというP2であった。これは旧Planに対する履歴であり、現在はS20順序のP1を受けてPlan amendmentとfresh gateを再開している。amendment後のpush済みexact-current SHAを別のfresh Strict conversationでpassさせるまで、implementation-start-readyへ戻さない。
+唯一のfindingは、親Epic Reportの進捗サマリーがIssue 360のDesign / Plan具体化中、formal start未完了のまま残るというP2であった。これは旧Planに対する履歴であり、S20順序のP1を受けてPlan amendmentとfresh gateを再開した。後続のround 3でamendment後SHAを再検証し、implementation-start-readyへ戻した。
+
+### ChatGPT-SpecReview-Strict round 3（current admission）
+
+Session `issue-360-amended-current-strict-3`はGitHub connectorで`chemitaro/spec-dock`、current Issue 360 branch、exact SHA `d49376ddb8c11fa5f7db3995e1a2d00191e9d8cc`を検証し、requested `gpt-5.5-pro`、resolved label `GPT-5.5`、model verification `yes`で完了した。S20がS40A legacy Runtime retirementとS40B shipped Target physical cutoverの後に配置され、S40Aの検証が既存`tests/cli_runtime/test_storage_core_cli.py`へ限定され、S45がS35を前提とすることを確認した。Requirement / Design / Plan / Reportのgate状態もfresh local `spec-reviewer` passと整合し、P0 / P1なし、`review_status=pass`、overall confidence 0.92となった。この結果によりPlanを`approved` / `implementation-start-ready`へ戻し、S00 / S10を開始する。
 
 ### Design review round 1
 
