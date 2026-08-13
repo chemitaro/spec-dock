@@ -24,6 +24,7 @@ import sys
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from spec_dock import __version__
+from spec_dock.managed_distribution import DistributionOperation, admit_distribution_operation
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -73,6 +74,17 @@ def _tool_version() -> str:
 
     match = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', text)
     return match.group(1) if match else __version__
+
+
+def _admit_distribution_cli(target_root: Path, *, operation: DistributionOperation) -> None:
+    """Run version/marker admission before any installer mutation."""
+    with _assets_dir() as assets_dir:
+        admit_distribution_operation(
+            target_root,
+            operation=operation,
+            package_version=_tool_version(),
+            manifest_path=assets_dir / "managed_distribution.json",
+        )
 
 
 def _specdock_dir(target_root: Path) -> Path:
@@ -1520,6 +1532,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
         )
 
     try:
+        _admit_distribution_cli(target_root, operation="uninstall")
         if apply_requested:
             symlink_boundary = _symlinked_uninstall_boundary_root(target_root)
             if symlink_boundary is not None:
@@ -2158,11 +2171,15 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if ns.command == "init":
+            _admit_distribution_cli(
+                target_root,
+                operation="init-force" if bool(ns.force) else "fresh",
+            )
             skill_install_plan = _preflight_managed_skill_install_plan(target_root)
             _install_spec_dock(target_root, force=bool(ns.force))
             _install_skill(target_root, plan=skill_install_plan)
         elif ns.command == "update":
-            _require_specdock(target_root)
+            _admit_distribution_cli(target_root, operation="update")
             skill_install_plan = _preflight_managed_skill_install_plan(target_root)
             _install_spec_dock(target_root, force=True)
             _install_skill(target_root, plan=skill_install_plan)

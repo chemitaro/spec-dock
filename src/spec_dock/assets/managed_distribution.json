@@ -1,6 +1,24 @@
 {
   "schema_version": 1,
-  "recognized_workspace_versions": [],
+  "recognized_workspace_versions": [
+    {
+      "version": "0.2.3",
+      "anchors": [
+        {
+          "path": "spec-dock/scripts/spec-dock",
+          "kind": "regular",
+          "sha256": "76eafeaa3395e4146c8cc46dcf8e86499b6859212042c0bd6f6a77185ab63e99",
+          "source": {"kind": "provider-source", "ref": "iss-00359-final"}
+        },
+        {
+          "path": "spec-dock/.gitignore",
+          "kind": "regular",
+          "sha256": "5b789e5e5dda0baa0df7975784d17742fd612d5e44b5fc1ebca4b3727f2876d7",
+          "source": {"kind": "provider-source", "ref": "iss-00359-final"}
+        }
+      ]
+    }
+  ],
   "historical_current_identities": [],
   "trusted_consumer_manifests": [],
   "obsolete_exact_files": [],

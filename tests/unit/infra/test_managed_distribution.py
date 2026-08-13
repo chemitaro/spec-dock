@@ -9,10 +9,12 @@ import pytest
 
 import spec_dock.managed_distribution as managed_distribution
 from spec_dock.managed_distribution import (
+    DistributionAdmissionError,
     DistributionApplyError,
     DistributionManifestError,
     DistributionResult,
     DistributionTargetSnapshot,
+    admit_distribution_operation,
     apply_distribution_plan,
     build_distribution_plan,
 )
@@ -1127,3 +1129,207 @@ def test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support(
     assert shortcut.is_symlink()
     assert shortcut.readlink().as_posix() == "legacy/spec-dock"
     assert not list(target_root.glob(".spec-dock-symlink-*"))
+
+
+def _s35_version_manifest(tmp_path: Path, *, version: str = "1.2.3") -> Path:
+    target_root = tmp_path / "consumer"
+    scripts = target_root / "spec-dock" / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "spec-dock").write_bytes(b"runtime\n")
+    (target_root / "spec-dock" / ".gitignore").write_bytes(b"ignore\n")
+    (target_root / "spec-dock" / "spec-dock.version").write_text(f"{version}\n", encoding="ascii")
+    manifest = _manifest_with(
+        recognized_workspace_versions=[
+            {
+                "version": version,
+                "anchors": [
+                    _regular_record("spec-dock/scripts/spec-dock", b"runtime\n"),
+                    _regular_record("spec-dock/.gitignore", b"ignore\n"),
+                ],
+            }
+        ]
+    )
+    return _write_manifest(tmp_path / "manifest", manifest)
+
+
+def test_s35_admission_accepts_fresh_and_recognized_workspace_without_writes(tmp_path: Path) -> None:
+    manifest_path = _s35_version_manifest(tmp_path)
+    target_root = tmp_path / "consumer"
+    before = {path.relative_to(tmp_path): path.read_bytes() for path in target_root.rglob("*") if path.is_file()}
+
+    admission = admit_distribution_operation(
+        target_root,
+        operation="update",
+        package_version="1.2.4",
+        manifest_path=manifest_path,
+    )
+
+    assert admission.status == "recognized"
+    assert admission.target_version == "1.2.3"
+    after = {path.relative_to(tmp_path): path.read_bytes() for path in target_root.rglob("*") if path.is_file()}
+    assert after == before
+
+
+@pytest.mark.parametrize(
+    ("version_bytes", "reason"),
+    [
+        (b"1.2.3", "invalid-version"),
+        (b"1.2.3\r\n", "invalid-version"),
+        (b"\xef\xbb\xbf1.2.3\n", "invalid-version"),
+        (b"1.2.3\nextra\n", "invalid-version"),
+    ],
+)
+def test_s35_admission_rejects_noncanonical_version_before_mutation(
+    tmp_path: Path,
+    version_bytes: bytes,
+    reason: str,
+) -> None:
+    manifest_path = _s35_version_manifest(tmp_path)
+    version_path = tmp_path / "consumer" / "spec-dock" / "spec-dock.version"
+    version_path.write_bytes(version_bytes)
+    before = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in (tmp_path / "consumer").rglob("*")
+        if path.is_file()
+    }
+
+    with pytest.raises(DistributionAdmissionError) as exc_info:
+        admit_distribution_operation(
+            tmp_path / "consumer",
+            operation="update",
+            package_version="1.2.4",
+            manifest_path=manifest_path,
+        )
+
+    assert exc_info.value.reason == reason
+    after = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in (tmp_path / "consumer").rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+
+
+def test_s35_admission_rejects_hard_link_and_newer_workspace(tmp_path: Path) -> None:
+    manifest_path = _s35_version_manifest(tmp_path, version="1.2.4")
+    target_root = tmp_path / "consumer"
+    version_path = target_root / "spec-dock" / "spec-dock.version"
+    external = tmp_path / "external-version"
+    external.write_bytes(b"1.2.4\n")
+    version_path.unlink()
+    version_path.hardlink_to(external)
+    with pytest.raises(DistributionAdmissionError, match="hard-link"):
+        admit_distribution_operation(
+            target_root,
+            operation="update",
+            package_version="1.2.5",
+            manifest_path=manifest_path,
+        )
+
+    version_path.unlink()
+    version_path.write_text("1.2.4\n", encoding="ascii")
+    with pytest.raises(DistributionAdmissionError, match="downgrade-blocked"):
+        admit_distribution_operation(
+            target_root,
+            operation="update",
+            package_version="1.2.3",
+            manifest_path=manifest_path,
+        )
+
+
+def test_s35_admission_rejects_anchor_mismatch_and_symlink_version(tmp_path: Path) -> None:
+    manifest_path = _s35_version_manifest(tmp_path)
+    target_root = tmp_path / "consumer"
+    runtime = target_root / "spec-dock" / "scripts" / "spec-dock"
+    runtime.write_bytes(b"edited\n")
+
+    with pytest.raises(DistributionAdmissionError, match="anchor-mismatch"):
+        admit_distribution_operation(
+            target_root,
+            operation="update",
+            package_version="1.2.4",
+            manifest_path=manifest_path,
+        )
+
+    version_path = target_root / "spec-dock" / "spec-dock.version"
+    version_path.unlink()
+    external = tmp_path / "external-version"
+    external.write_bytes(b"1.2.3\n")
+    version_path.symlink_to(external)
+    with pytest.raises(DistributionAdmissionError, match="symlink"):
+        admit_distribution_operation(
+            target_root,
+            operation="update",
+            package_version="1.2.4",
+            manifest_path=manifest_path,
+        )
+
+
+def test_s35_cross_root_retry_replay_and_dual_marker_are_blocked(tmp_path: Path) -> None:
+    manifest_path = _s35_version_manifest(tmp_path)
+    source_root = tmp_path / "consumer"
+    marker = source_root / "spec-dock" / ".distribution-retry.json"
+    source_stat = source_root.stat()
+    marker.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "operation": "update",
+                "package_version": "1.2.4",
+                "target_root": {"device": source_stat.st_dev, "inode": source_stat.st_ino},
+                "last_completed_phase": "preflight-complete",
+                "purpose": "distribution-rerun",
+            }
+        ),
+        encoding="utf-8",
+    )
+    admission = admit_distribution_operation(
+        source_root,
+        operation="update",
+        package_version="1.2.4",
+        manifest_path=manifest_path,
+    )
+    assert admission.status == "retry"
+    replay_root = tmp_path / "replay"
+    replay_root.mkdir()
+    (replay_root / "spec-dock").mkdir()
+    (replay_root / "spec-dock" / ".distribution-retry.json").write_bytes(marker.read_bytes())
+
+    with pytest.raises(DistributionAdmissionError, match="cross-root-replay"):
+        admit_distribution_operation(
+            replay_root,
+            operation="update",
+            package_version="1.2.4",
+            manifest_path=manifest_path,
+        )
+
+    (replay_root / "spec-dock" / ".uninstall-retry.json").write_text(
+        json.dumps({"schema_version": 1, "managed_by": "spec-dock", "purpose": "uninstall-rerun"}),
+        encoding="utf-8",
+    )
+    with pytest.raises(DistributionAdmissionError, match="dual-marker"):
+        admit_distribution_operation(
+            replay_root,
+            operation="update",
+            package_version="1.2.4",
+            manifest_path=manifest_path,
+        )
+
+
+def test_s35_legacy_uninstall_marker_remains_admissible_without_version(tmp_path: Path) -> None:
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    (target_root / "spec-dock" / ".uninstall-retry.json").write_text(
+        json.dumps({"schema_version": 1, "managed_by": "spec-dock", "purpose": "uninstall-rerun"}),
+        encoding="utf-8",
+    )
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+
+    admission = admit_distribution_operation(
+        target_root,
+        operation="uninstall",
+        package_version="1.2.3",
+        manifest_path=manifest_path,
+    )
+
+    assert admission.status == "uninstall-retry"
