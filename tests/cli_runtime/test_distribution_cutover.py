@@ -94,6 +94,20 @@ def _relative_files(root: Path) -> frozenset[str]:
     )
 
 
+def _filesystem_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
+    snapshot: dict[str, tuple[object, ...]] = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        info = path.lstat()
+        if path.is_symlink():
+            snapshot[relative] = ("symlink", path.readlink())
+        elif path.is_file():
+            snapshot[relative] = ("file", info.st_mode & 0o777, path.read_bytes())
+        elif path.is_dir():
+            snapshot[relative] = ("directory", info.st_mode & 0o777)
+    return snapshot
+
+
 def test_s40b_provider_install_root_is_current_catalog_only() -> None:
     actual = _relative_files(INSTALL_ROOT)
 
@@ -192,3 +206,104 @@ def test_s40b_fresh_init_materializes_only_current_external_catalog(tmp_path: Pa
     assert installed_external == CURRENT_INSTALL_ROOT_FILES
     assert (tmp_path / "spec-dock/.gitignore").read_bytes() == (SCAFFOLD_ROOT / ".gitignore").read_bytes()
     assert not (tmp_path / "spec-dock/scripts/spec-dock-chatgpt").exists()
+
+
+def test_s45_fresh_preserves_unrelated_and_obsolete_looking_external_paths(tmp_path: Path) -> None:
+    unrelated = tmp_path / "README.user.md"
+    unrelated.write_bytes(b"user content\n")
+    obsolete_skill = tmp_path / ".agents/skills/spec-dock-issue-planning/SKILL.md"
+    obsolete_skill.parent.mkdir(parents=True)
+    obsolete_skill.write_bytes(b"user-owned obsolete-looking skill\n")
+    native_shim = tmp_path / ".codex/agents/legacy.md"
+    native_shim.parent.mkdir(parents=True)
+    native_shim.write_bytes(b"user-owned native shim\n")
+    unknown_workflow = tmp_path / ".github/workflows/user.yml"
+    unknown_workflow.parent.mkdir(parents=True)
+    unknown_workflow.write_bytes(b"user-owned workflow\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path)]) == 0
+
+    after = _filesystem_snapshot(tmp_path)
+    for path in (
+        unrelated,
+        obsolete_skill,
+        native_shim,
+        unknown_workflow,
+    ):
+        relative = path.relative_to(tmp_path).as_posix()
+        assert after[relative] == before[relative]
+    assert (tmp_path / "spec-dock/.workbench/README.md").is_file()
+    assert (tmp_path / "spec-dock/.gitignore").read_bytes() == (SCAFFOLD_ROOT / ".gitignore").read_bytes()
+
+
+def test_s45_fresh_current_collision_blocks_before_any_write(tmp_path: Path, capsys) -> None:
+    collision = tmp_path / ".github/workflows/ci.yml"
+    collision.parent.mkdir(parents=True)
+    collision.write_bytes(b"user-owned workflow\n")
+    unrelated = tmp_path / "user.txt"
+    unrelated.write_bytes(b"keep\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "unknown-current-collision" in captured.err
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock").exists()
+    assert not (tmp_path / ".agents/skills/spec-dock/SKILL.md").exists()
+
+
+def test_s45_fresh_rejects_existing_spec_dock_non_directory_without_writes(tmp_path: Path, capsys) -> None:
+    workspace = tmp_path / "spec-dock"
+    workspace.write_bytes(b"user-owned path\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "workspace-invalid" in captured.err
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s45_fresh_adopts_identical_current_assets_without_rewriting_them(tmp_path: Path) -> None:
+    for relative_path in CURRENT_INSTALL_ROOT_FILES:
+        source = INSTALL_ROOT / relative_path
+        destination = tmp_path / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+        destination.chmod(source.stat().st_mode & 0o777)
+    shortcut = tmp_path / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path)]) == 0
+
+    after = _filesystem_snapshot(tmp_path)
+    for relative_path in (*CURRENT_INSTALL_ROOT_FILES, "spec"):
+        assert after[relative_path] == before[relative_path]
+
+
+def test_s45_fresh_current_symlink_or_directory_collision_is_zero_write(tmp_path: Path) -> None:
+    for collision_kind in ("symlink", "directory"):
+        target = tmp_path / collision_kind
+        target.mkdir()
+        collision = target / ".github/workflows/ci.yml"
+        collision.parent.mkdir(parents=True)
+        if collision_kind == "symlink":
+            collision.symlink_to(target / "user-owned.yml")
+        else:
+            collision.mkdir()
+        before = _filesystem_snapshot(target)
+
+        assert main(["init", str(target)]) == 1
+        assert _filesystem_snapshot(target) == before
+
+
+def test_s45_fresh_rerun_through_force_converges(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path), "--force"]) == 0
+
+    assert _filesystem_snapshot(tmp_path) == before

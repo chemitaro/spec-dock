@@ -24,7 +24,12 @@ import sys
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from spec_dock import __version__
-from spec_dock.managed_distribution import DistributionOperation, admit_distribution_operation
+from spec_dock.managed_distribution import (
+    DistributionOperation,
+    admit_distribution_operation,
+    apply_distribution_plan,
+    build_distribution_plan,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -732,7 +737,7 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
         (specdock_dir / name).unlink(missing_ok=True)
 
 
-def _install_spec_dock(target_root: Path, *, force: bool) -> None:
+def _install_spec_dock(target_root: Path, *, force: bool, install_root_shortcut: bool = True) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
     specdock_dir = _specdock_dir(target_root)
     fresh_specdock = not os.path.lexists(specdock_dir)
@@ -802,7 +807,70 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         (specdock_dir / "spec-dock.version").write_text(f"{_tool_version()}\n", encoding="utf-8")
 
         # Best-effort: provide `./spec` at repo root for convenience.
-        _install_repo_root_shortcut(target_root)
+        if install_root_shortcut:
+            _install_repo_root_shortcut(target_root)
+
+
+def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
+    """Validate the Fresh scaffold sources before the first target write."""
+    src_spec_dock = assets_dir / "spec_dock"
+    if not src_spec_dock.is_dir() or src_spec_dock.is_symlink():
+        raise RuntimeError(f"Missing asset directory: {src_spec_dock}")
+
+    src_gitignore = src_spec_dock / ".gitignore"
+    if not src_gitignore.is_file() or src_gitignore.is_symlink():
+        raise RuntimeError(f"Missing asset file: {src_gitignore}")
+
+    for name in _MANAGED_DIRS:
+        source = src_spec_dock / name
+        if not source.is_dir() or source.is_symlink():
+            raise RuntimeError(f"Invalid asset directory: {source}")
+
+    root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
+    if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
+        raise RuntimeError(f"Missing asset file: {root_workbench_readme}")
+
+
+def _install_fresh_distribution(target_root: Path) -> None:
+    """Apply one validated Fresh distribution, then verify its Current assets."""
+    with _assets_dir() as assets_dir:
+        _preflight_fresh_spec_dock_assets(assets_dir)
+        plan = build_distribution_plan(
+            assets_dir / "install_root",
+            manifest_path=assets_dir / "managed_distribution.json",
+            scaffold_root=assets_dir / "spec_dock",
+            target_root=target_root,
+            operation="fresh",
+        )
+        if plan.blocked:
+            reasons = ", ".join(
+                f"{action.path}: {action.reason}"
+                for action in plan.actions
+                if action.blocked
+            )
+            raise RuntimeError(f"distribution preflight blocked: {reasons}")
+
+        apply_distribution_plan(plan)
+        _install_spec_dock(target_root, force=False, install_root_shortcut=False)
+
+        post_plan = build_distribution_plan(
+            assets_dir / "install_root",
+            manifest_path=assets_dir / "managed_distribution.json",
+            scaffold_root=assets_dir / "spec_dock",
+            target_root=target_root,
+            operation="fresh",
+        )
+        if post_plan.blocked:
+            reasons = ", ".join(
+                f"{action.path}: {action.reason}"
+                for action in post_plan.actions
+                if action.blocked
+            )
+            raise RuntimeError(f"distribution post-verify blocked: {reasons}")
+        non_adopted = [action.path for action in post_plan.actions if action.action != "adopt"]
+        if non_adopted:
+            joined = ", ".join(non_adopted)
+            raise RuntimeError(f"distribution post-verify incomplete: {joined}")
 
 
 def _managed_skill_names() -> tuple[str, ...]:
@@ -1889,6 +1957,7 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
         obsolete_exact_rel_paths=(),
     )
 
+
 def _preflight_target_path_conflicts(
     target_root: Path,
     *,
@@ -2175,9 +2244,12 @@ def main(argv: list[str] | None = None) -> int:
                 target_root,
                 operation="init-force" if bool(ns.force) else "fresh",
             )
-            skill_install_plan = _preflight_managed_skill_install_plan(target_root)
-            _install_spec_dock(target_root, force=bool(ns.force))
-            _install_skill(target_root, plan=skill_install_plan)
+            if not ns.force and not os.path.lexists(_specdock_dir(target_root)):
+                _install_fresh_distribution(target_root)
+            else:
+                skill_install_plan = _preflight_managed_skill_install_plan(target_root)
+                _install_spec_dock(target_root, force=bool(ns.force))
+                _install_skill(target_root, plan=skill_install_plan)
         elif ns.command == "update":
             _admit_distribution_cli(target_root, operation="update")
             skill_install_plan = _preflight_managed_skill_install_plan(target_root)
