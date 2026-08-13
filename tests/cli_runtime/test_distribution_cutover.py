@@ -474,6 +474,65 @@ def test_s60_atomic_regular_file_does_not_replace_racing_destination(
     assert destination.read_bytes() == b"user replacement\n"
 
 
+def test_s60_root_rebind_during_marker_publication(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    displaced = tmp_path.with_name(f"{tmp_path.name}-marker-displaced")
+    original_link = cli.os.link
+    switched = False
+
+    def rebind_before_publish(source, target, *, follow_symlinks=False):
+        nonlocal switched
+        if not switched:
+            switched = True
+            tmp_path.rename(displaced)
+            tmp_path.mkdir()
+            (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
+        return original_link(source, target, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(cli.os, "link", rebind_before_publish)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution target root identity changed" in captured
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not (tmp_path / "spec-dock").exists()
+    assert (displaced / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_s60_root_rebind_during_scaffold_mutation(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    displaced = tmp_path.with_name(f"{tmp_path.name}-scaffold-displaced")
+    original_sync = cli._sync_tree
+    switched = False
+
+    def rebind_before_sync(*args, **kwargs):
+        nonlocal switched
+        if not switched:
+            switched = True
+            tmp_path.rename(displaced)
+            tmp_path.mkdir()
+            (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
+        return original_sync(*args, **kwargs)
+
+    monkeypatch.setattr(cli, "_sync_tree", rebind_before_sync)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during scaffold-refresh" in captured
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not (tmp_path / "spec-dock").exists()
+    marker = displaced / "spec-dock/.distribution-retry.json"
+    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "distribution-applied"
+
+
 def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(
     tmp_path: Path,
     monkeypatch,
@@ -571,3 +630,75 @@ def test_s60_post_verify_failure_keeps_marker_until_forward_retry(tmp_path: Path
     monkeypatch.setattr(cli, "_write_spec_dock_version", original)
     assert main(["update", str(tmp_path)]) == 0
     assert not marker.exists()
+
+
+def test_s65_uninstall_invalid_version_is_zero_write(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    version = tmp_path / "spec-dock/spec-dock.version"
+    version.write_text("not-a-version\n", encoding="ascii")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path)]) == 2
+
+    captured = capsys.readouterr().err
+    assert "spec-dock.version" in captured
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s65_uninstall_distribution_or_dual_marker_is_zero_write(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    root_stat = tmp_path.stat()
+    distribution_marker = tmp_path / "spec-dock/.distribution-retry.json"
+    distribution_marker.write_text(
+        json.dumps(
+            {
+                "last_completed_phase": "distribution-applied",
+                "operation": "update",
+                "package_version": "0.2.3",
+                "purpose": "distribution-rerun",
+                "schema_version": 1,
+                "target_root": {"device": root_stat.st_dev, "inode": root_stat.st_ino},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    before_distribution = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path)]) == 2
+    assert "recover distribution" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before_distribution
+
+    uninstall_marker = tmp_path / "spec-dock/.uninstall-retry.json"
+    uninstall_marker.write_text(
+        json.dumps(
+            {"managed_by": "spec-dock", "purpose": "uninstall-rerun", "schema_version": 1},
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    before_dual = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path)]) == 2
+    assert "dual-marker" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before_dual
+
+
+def test_s65_uninstall_legacy_retry_marker_without_version_is_admissible_and_read_only(tmp_path: Path) -> None:
+    specdock = tmp_path / "spec-dock"
+    specdock.mkdir()
+    marker = specdock / ".uninstall-retry.json"
+    marker.write_text(
+        json.dumps(
+            {"managed_by": "spec-dock", "purpose": "uninstall-rerun", "schema_version": 1},
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path)]) == 0
+    assert _filesystem_snapshot(tmp_path) == before
