@@ -1407,11 +1407,27 @@ def _reject_symlinked_uninstall_retry_marker(target_root: Path) -> None:
         )
 
 
-def _write_uninstall_retry_marker(target_root: Path) -> None:
-    marker = target_root / _UNINSTALL_RETRY_MARKER_REL
-    _reject_symlinked_uninstall_retry_marker(target_root)
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(json.dumps(_uninstall_retry_marker_payload(), sort_keys=True) + "\n", encoding="utf-8")
+def _write_uninstall_retry_marker(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> None:
+    with _bound_distribution_root(target_root, expected_root_identity) as (
+        bound_root,
+        visible_root,
+        bound_identity,
+    ):
+        marker = bound_root / _UNINSTALL_RETRY_MARKER_REL
+        if marker.is_symlink():
+            raise RuntimeError(
+                f"target contains symlinked SpecDock uninstall retry marker: {_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
+            )
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(
+            json.dumps(_uninstall_retry_marker_payload(), sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        _assert_distribution_root_identity(visible_root, bound_identity)
 
 
 def _symlinked_uninstall_boundary_root(target_root: Path) -> Path | None:
@@ -1870,7 +1886,12 @@ def _has_symlink_uninstall_container(target_root: Path, rel_path: Path) -> bool:
     return False
 
 
-def _remove_uninstall_path(target_root: Path, action: _UninstallAction) -> _UninstallAction:
+def _remove_uninstall_path(
+    target_root: Path,
+    action: _UninstallAction,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> _UninstallAction:
     rel_path = Path(action.rel_path)
     if not _is_safe_uninstall_rel_path(rel_path):
         return action._replace(status="failed", error="unsafe uninstall path outside managed boundaries")
@@ -1878,6 +1899,11 @@ def _remove_uninstall_path(target_root: Path, action: _UninstallAction) -> _Unin
         return action._replace(status="failed", error="unsafe uninstall path through symlink container")
 
     target_path = target_root / rel_path
+    if expected_root_identity is not None:
+        try:
+            _assert_distribution_root_identity(target_root, expected_root_identity)
+        except RuntimeError as exc:
+            return action._replace(status="failed", error=str(exc))
     if not _path_exists_for_uninstall(target_path):
         return action._replace(status="already_removed", error=None)
 
@@ -1888,6 +1914,11 @@ def _remove_uninstall_path(target_root: Path, action: _UninstallAction) -> _Unin
             target_path.unlink()
     except OSError as e:
         return action._replace(status="failed", error=str(e))
+    if expected_root_identity is not None:
+        try:
+            _assert_distribution_root_identity(target_root, expected_root_identity)
+        except RuntimeError as exc:
+            return action._replace(status="failed", error=str(exc))
     return action._replace(status="removed", error=None)
 
 
@@ -1899,7 +1930,11 @@ def _is_uninstall_cleanup_boundary_path(rel_path: Path) -> bool:
     return rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS}
 
 
-def _cleanup_empty_uninstall_dirs(target_root: Path) -> tuple[_UninstallAction, ...]:
+def _cleanup_empty_uninstall_dirs(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> tuple[_UninstallAction, ...]:
     cleanup_actions: list[_UninstallAction] = []
     candidates: set[Path] = set()
     for boundary_root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS:
@@ -1917,10 +1952,14 @@ def _cleanup_empty_uninstall_dirs(target_root: Path) -> tuple[_UninstallAction, 
         target_path = target_root / rel_path
         if not target_path.exists() or not target_path.is_dir() or target_path.is_symlink():
             continue
+        if expected_root_identity is not None:
+            _assert_distribution_root_identity(target_root, expected_root_identity)
         try:
             target_path.rmdir()
         except OSError:
             continue
+        if expected_root_identity is not None:
+            _assert_distribution_root_identity(target_root, expected_root_identity)
         cleanup_actions.append(
             _UninstallAction(
                 rel_path=rel_path.as_posix(),
@@ -1932,15 +1971,135 @@ def _cleanup_empty_uninstall_dirs(target_root: Path) -> tuple[_UninstallAction, 
     return tuple(cleanup_actions)
 
 
-def _apply_uninstall_plan(target_root: Path, actions: tuple[_UninstallAction, ...]) -> tuple[_UninstallAction, ...]:
+def _apply_uninstall_plan(
+    target_root: Path,
+    actions: tuple[_UninstallAction, ...],
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> tuple[_UninstallAction, ...]:
     results: list[_UninstallAction] = []
     for action in actions:
         if action.status == "would_remove":
-            results.append(_remove_uninstall_path(target_root, action))
+            results.append(
+                _remove_uninstall_path(
+                    target_root,
+                    action,
+                    expected_root_identity=expected_root_identity,
+                )
+            )
         else:
             results.append(action)
-    results.extend(_cleanup_empty_uninstall_dirs(target_root))
+    results.extend(
+        _cleanup_empty_uninstall_dirs(
+            target_root,
+            expected_root_identity=expected_root_identity,
+        )
+    )
     return tuple(sorted(results, key=lambda action: (action.rel_path, action.status)))
+
+
+def _uninstall_apply_blockers(
+    actions: tuple[_UninstallAction, ...],
+    *,
+    specs_mode: str,
+) -> tuple[_UninstallAction, ...]:
+    """Return preserved findings that must stop an uninstall before mutation.
+
+    ``keep-specs`` and the legacy uninstall retry marker are intentional
+    preserved state.  Every other preserved action represents an ownership,
+    type, or boundary collision and therefore blocks the entire apply plan;
+    executing unrelated ``would_remove`` actions would violate the shared
+    classifier's fail-closed contract.
+    """
+
+    blockers: list[_UninstallAction] = []
+    for action in actions:
+        if action.status != "preserved":
+            continue
+        if action.category == "spec_history" and specs_mode == "keep":
+            continue
+        if action.rel_path == _UNINSTALL_RETRY_MARKER_REL.as_posix():
+            continue
+        blockers.append(action)
+    return tuple(blockers)
+
+
+def _ensure_uninstall_retry_marker_action(
+    actions: tuple[_UninstallAction, ...],
+) -> tuple[_UninstallAction, ...]:
+    """Expose the marker as a managed action without scheduling early removal."""
+
+    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
+    if any(action.rel_path == marker_path for action in actions):
+        return actions
+    return tuple(
+        sorted(
+            (
+                *actions,
+                _UninstallAction(
+                    rel_path=marker_path,
+                    category="generated_state",
+                    status="preserved",
+                    reason="SpecDock uninstall retry marker removed last after post-verify",
+                ),
+            ),
+            key=lambda action: action.rel_path,
+        )
+    )
+
+
+def _remove_uninstall_retry_marker(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> None:
+    """Remove the legacy uninstall marker only after every other action passes."""
+
+    with _bound_distribution_root(target_root, expected_root_identity) as (
+        bound_root,
+        visible_root,
+        bound_identity,
+    ):
+        marker = bound_root / _UNINSTALL_RETRY_MARKER_REL
+        if marker.is_symlink():
+            raise RuntimeError(
+                f"target contains symlinked SpecDock uninstall retry marker: {_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
+            )
+        if not marker.exists():
+            return
+        if not marker.is_file():
+            raise RuntimeError("SpecDock uninstall retry marker is not a regular file")
+        try:
+            marker.unlink()
+        except OSError as exc:
+            raise RuntimeError("SpecDock uninstall retry marker could not be removed") from exc
+        _assert_distribution_root_identity(visible_root, bound_identity)
+
+
+def _finalize_uninstall_retry_marker(
+    target_root: Path,
+    actions: tuple[_UninstallAction, ...],
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> tuple[_UninstallAction, ...]:
+    """Remove the marker last and reflect that mutation in the result ledger."""
+
+    _remove_uninstall_retry_marker(
+        target_root,
+        expected_root_identity=expected_root_identity,
+    )
+    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
+    finalized = [
+        action._replace(
+            status="removed",
+            reason="SpecDock uninstall retry marker removed after post-verify",
+            error=None,
+        )
+        if action.rel_path == marker_path
+        else action
+        for action in actions
+    ]
+    return tuple(sorted(finalized, key=lambda action: (action.rel_path, action.status)))
 
 
 def _uninstall_payload(
@@ -2047,6 +2206,17 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
         )
 
     try:
+        uninstall_root_identity = _distribution_root_identity(target_root)
+    except RuntimeError as e:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=str(e),
+        )
+
+    try:
         _admit_distribution_cli(target_root, operation="uninstall")
         if apply_requested:
             symlink_boundary = _symlinked_uninstall_boundary_root(target_root)
@@ -2072,8 +2242,9 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
         )
 
     try:
-        if apply_requested:
-            _write_uninstall_retry_marker(target_root)
+        # The complete plan must be validated before the first apply mutation.
+        # In particular, a preserved ownership collision blocks every unrelated
+        # removal; do not create the retry marker until that gate passes.
         actions = _build_uninstall_plan(
             target_root,
             specs_mode=specs_mode,
@@ -2088,8 +2259,75 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             message=str(e),
         )
     if apply_requested:
-        actions = _apply_uninstall_plan(target_root, actions)
+        assert specs_mode is not None
+        blockers = _uninstall_apply_blockers(actions, specs_mode=specs_mode)
+        if blockers:
+            payload = _uninstall_payload(
+                target_root,
+                apply=True,
+                specs_mode=specs_mode,
+                actions=actions,
+                status="blocked",
+                errors=[
+                    "uninstall apply blocked before mutation: "
+                    + "; ".join(f"{action.rel_path}: {action.reason}" for action in blockers)
+                ],
+            )
+            if json_requested:
+                print(json.dumps(payload, sort_keys=True))
+            else:
+                print(_render_uninstall_text(payload))
+            return 1
+
+        try:
+            _write_uninstall_retry_marker(
+                target_root,
+                expected_root_identity=uninstall_root_identity,
+            )
+            actions = _ensure_uninstall_retry_marker_action(actions)
+            actions = _apply_uninstall_plan(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+            )
+        except (OSError, RuntimeError) as e:
+            payload = _uninstall_payload(
+                target_root,
+                apply=True,
+                specs_mode=specs_mode,
+                actions=actions,
+                status="partial_failure",
+                errors=[str(e)],
+            )
+            if json_requested:
+                print(json.dumps(payload, sort_keys=True))
+            else:
+                print(_render_uninstall_text(payload))
+            return 1
+
     has_failures = any(action.status == "failed" for action in actions)
+    if apply_requested and not has_failures:
+        try:
+            actions = _finalize_uninstall_retry_marker(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+            )
+        except (OSError, RuntimeError) as e:
+            payload = _uninstall_payload(
+                target_root,
+                apply=True,
+                specs_mode=specs_mode,
+                actions=actions,
+                status="partial_failure",
+                errors=[str(e)],
+            )
+            if json_requested:
+                print(json.dumps(payload, sort_keys=True))
+            else:
+                print(_render_uninstall_text(payload))
+            return 1
+
     payload = _uninstall_payload(
         target_root,
         apply=apply_requested,

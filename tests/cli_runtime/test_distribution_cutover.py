@@ -823,3 +823,127 @@ def test_s60_retry_marker_phase_allowlist_rejects_unknown_phase_without_writes(t
     assert main(["update", str(tmp_path)]) == 1
     assert "marker-invalid" in capsys.readouterr().err
     assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s70_uninstall_apply_blocks_modified_current_before_marker_or_removal(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    skill = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    skill.write_text("user-modified\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    assert any(
+        action["path"] == ".agents/skills/spec-dock/SKILL.md"
+        and action["status"] == "preserved"
+        for action in payload["actions"]
+    )
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s70_uninstall_apply_blocks_mixed_known_obsolete_and_unknown_before_mutation(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    obsolete = tmp_path / ".codex/config.toml"
+    obsolete.parent.mkdir(parents=True, exist_ok=True)
+    obsolete.write_bytes(b'project_doc_fallback_filenames = [".codex/AGENTS.md"]\n')
+    obsolete.chmod(0o644)
+    unknown = tmp_path / ".codex/user-owned.toml"
+    unknown.write_text("user-owned\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    assert any(
+        action["path"] == ".codex/config.toml" and action["status"] == "would_remove"
+        for action in payload["actions"]
+    )
+    assert any(
+        action["path"] == ".codex/user-owned.toml" and action["status"] == "preserved"
+        for action in payload["actions"]
+    )
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s70_uninstall_marker_is_removed_last_after_success(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "completed"
+    marker_action = next(
+        action for action in payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json"
+    )
+    assert marker_action["status"] == "removed"
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+
+
+def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    failing = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    original_unlink = Path.unlink
+
+    def fail_one(path: Path, *args: object, **kwargs: object) -> object:
+        if path == failing:
+            raise OSError("injected uninstall unlink failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr("src.spec_dock.cli.Path.unlink", fail_one)
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    first_payload = json.loads(capsys.readouterr().out)
+    marker = tmp_path / "spec-dock/.uninstall-retry.json"
+    assert first_payload["status"] == "partial_failure"
+    assert marker.is_file()
+
+    monkeypatch.setattr("src.spec_dock.cli.Path.unlink", original_unlink)
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    second_payload = json.loads(capsys.readouterr().out)
+    assert second_payload["status"] == "completed"
+    assert next(
+        action for action in second_payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json"
+    )["status"] == "removed"
+    assert not marker.exists()
+
+
+def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    initiative = tmp_path / "spec-dock/initiatives/user-owned.md"
+    initiative.write_text("keep me\n", encoding="utf-8")
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs"]) == 0
+    capsys.readouterr()
+    assert initiative.read_text(encoding="utf-8") == "keep me\n"
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+
+    # A fresh consumer verifies that only explicit remove-specs permits
+    # recursive history removal.
+    remove_target = tmp_path / "remove-specs"
+    remove_target.mkdir()
+    assert main(["init", str(remove_target)]) == 0
+    remove_initiative = remove_target / "spec-dock/initiatives/user-owned.md"
+    remove_initiative.write_text("remove me\n", encoding="utf-8")
+    assert main(["uninstall", str(remove_target), "--apply", "--remove-specs"]) == 0
+    capsys.readouterr()
+    assert not remove_initiative.exists()
+    assert not (remove_target / "spec-dock/.uninstall-retry.json").exists()
