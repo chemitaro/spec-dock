@@ -136,6 +136,21 @@ S25では`managed_distribution.py`へ読み取り専用のTarget分類を追加�
 
 S25 fresh code reviewは、missing uninstallのno-op、canonical shortcutのhistorical evidence、synthetic Current overlap、Freshでのhistorical shortcut非materialization、current hard-link uninstallの5点を検出した。分類器と回帰テストを修正し、Freshでhistorical identityを`preserve-and-block`として明示分類する回帰も追加した。S25 bounded GREEN `17 passed`、S20 + S25 + S40B focused regression `350 passed`を再確認した。修正後のfresh re-review pass、step commit、clean / upstream一致後にS30へ進む。
 
+### S30 No-follow apply / repository root rebind
+
+S30では、S25で確定したblock-free planだけを対象に、provider Current bytesと合成shortcutをdescriptor-relativeなno-follow parent chainからmaterializeし、historical Current / obsolete targetをidentity再検証後にupgradeまたはpruneする`apply_distribution_plan`を追加した。Plan生成時にroot、ancestor、exact targetのdevice、inode、`ctime_ns`、type、link count、content/link identityをsnapshotし、apply開始前と各action直前に再照合する。missing regular fileは`O_CREAT | O_EXCL | O_NOFOLLOW`で作成し、regular upgradeはheld descriptorへ書き込み、pruneはheld parentのexact entryだけをunlinkする。symlink upgradeはplatformのno-replace rename capabilityを先に確認し、private staging symlinkとdescriptor-relative `RENAME_EXCL` / `RENAME_NOREPLACE`でpublishする。hard-link、symlink container、exact directory、root / parent差し替え、destination出現は例外で停止し、外部replacement・旧root・既存user bytesへ書き込まない。CLI、version marker、retry marker、recursive cleanupはS30の対象外である。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| S30 bounded GREEN | pass | `uv run pytest tests/unit/infra/test_managed_distribution.py -q -k "s30"` → `13 passed, 37 deselected` |
+| S20 + S25 + S30 + S40B focused regression | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py tests/cli_runtime/test_storage_core_cli.py tests/unit/infra/test_authoring_kit_assets.py -q` → `363 passed` |
+| Root / parent rebind and destination race | pass | preflight前後、data write直前、既作成祖先の差し替え、destination出現を`DistributionApplyError`で停止し、replacement / 外部root / user bytesが不変 |
+| No-follow / hard-link / shortcut | pass | missing Current、historical regular upgrade / prune、canonical shortcutのno-replace upgrade、hard-link uninstallをdescriptor-relativeに検証 |
+| Syntax / formatting | pass | `python -m py_compile src/spec_dock/managed_distribution.py`、`git diff --check` |
+| S30 fresh code review / re-review | pass | code-reviewerがTOCTOU、hard-link、symlink swap、staging cleanup、capability preflightを再確認し`findings=[]`, `review_status=pass` |
+
+S30のfresh code reviewでは、書込み直前のroot / parent再bind、apply中に作成した祖先のidentity binding、hard-link countの最終検証、symlink upgradeのatomic swap、staging cleanupについて修正指摘を受けた。修正後は13件のS30テスト、focused regression 363件、mypy / ruff対象チェックを再実行した。no-follow / no-replace primitiveのcapabilityはparent作成前に検証し、未対応platformではempty parentを残すmutationも開始しない。再レビューpass、step commit、clean / upstream一致を閉じるまでS35へ進まない。
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
