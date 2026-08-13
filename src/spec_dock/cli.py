@@ -2102,6 +2102,26 @@ def _finalize_uninstall_retry_marker(
     return tuple(sorted(finalized, key=lambda action: (action.rel_path, action.status)))
 
 
+def _verify_uninstall_postcondition(
+    target_root: Path,
+    actions: tuple[_UninstallAction, ...],
+    *,
+    expected_root_identity: DistributionRootIdentity,
+) -> None:
+    """Verify every scheduled removal is absent before marker deletion."""
+
+    _assert_distribution_root_identity(target_root, expected_root_identity)
+    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
+    for action in actions:
+        if action.status not in {"removed", "already_removed", "empty_dir_removed"}:
+            continue
+        if action.rel_path == marker_path:
+            continue
+        if _path_exists_for_uninstall(target_root / action.rel_path):
+            raise RuntimeError(f"uninstall post-verify found residual managed path: {action.rel_path}")
+    _assert_distribution_root_identity(target_root, expected_root_identity)
+
+
 def _uninstall_payload(
     target_root: Path,
     *,
@@ -2308,6 +2328,11 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     has_failures = any(action.status == "failed" for action in actions)
     if apply_requested and not has_failures:
         try:
+            _verify_uninstall_postcondition(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+            )
             actions = _finalize_uninstall_retry_marker(
                 target_root,
                 actions,
