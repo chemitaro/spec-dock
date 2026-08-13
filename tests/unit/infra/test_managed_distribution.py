@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import hashlib
 import json
-import stat
 from pathlib import Path
+import stat
 
 import pytest
 
+import spec_dock.managed_distribution as managed_distribution
 from spec_dock.managed_distribution import (
+    DistributionApplyError,
     DistributionManifestError,
+    DistributionResult,
+    DistributionTargetSnapshot,
+    apply_distribution_plan,
     build_distribution_plan,
 )
-
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 INSTALL_ROOT = REPO_ROOT / "src" / "spec_dock" / "assets" / "install_root"
@@ -705,3 +709,421 @@ def test_s25_noncanonical_historical_shortcut_is_evidence_only(tmp_path: Path) -
     )
 
     assert "legacy-spec" not in {action.path for action in plan.actions}
+
+
+def test_s30_apply_materializes_missing_regular_target_without_replacing_existing_path(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / ".github" / "workflows").mkdir(parents=True)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    result = apply_distribution_plan(plan)
+
+    assert isinstance(result, DistributionResult)
+    assert result.status == "complete"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    assert target.read_bytes() == b"current\n"
+    assert target.stat().st_nlink == 1
+
+
+def test_s30_apply_upgrades_historical_regular_target_in_place(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    before_inode = target.stat().st_ino
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    result = apply_distribution_plan(plan)
+
+    assert result.status == "complete"
+    assert target.read_bytes() == b"new\n"
+    assert target.stat().st_ino == before_inode
+
+
+def test_s30_apply_prunes_historical_target_without_following_symlink(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": ".agents/skills/legacy/SKILL.md",
+                    "surface": "legacy-test",
+                    "identities": [_regular_record(".agents/skills/legacy/SKILL.md", old)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".agents" / "skills" / "legacy" / "SKILL.md"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    result = apply_distribution_plan(plan)
+
+    assert result.status == "complete"
+    assert not target.exists()
+
+
+def test_s30_apply_blocks_root_rebind_before_any_write(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / ".github" / "workflows").mkdir(parents=True)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    displaced = tmp_path / "displaced-consumer"
+    target_root.rename(displaced)
+    target_root.mkdir()
+    sentinel = target_root / "sentinel.txt"
+    sentinel.write_text("replacement\n", encoding="utf-8")
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert sentinel.read_text(encoding="utf-8") == "replacement\n"
+    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+    assert not (displaced / ".github" / "workflows" / "ci.yml").exists()
+
+
+def test_s30_apply_blocks_root_rebind_after_preflight_before_parent_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    displaced = tmp_path / "displaced-consumer"
+    original_open = managed_distribution._open_distribution_parent_chain
+    switched = False
+
+    def switch_root_before_open(
+        root: Path,
+        relative_path: str,
+        *,
+        create_missing: bool = False,
+        expected_snapshot: DistributionTargetSnapshot | None = None,
+    ) -> tuple[int, ...]:
+        nonlocal switched
+        if not switched:
+            switched = True
+            root.rename(displaced)
+            root.mkdir()
+            (root / "sentinel.txt").write_text("replacement\n", encoding="utf-8")
+        return original_open(
+            root,
+            relative_path,
+            create_missing=create_missing,
+            expected_snapshot=expected_snapshot,
+        )
+
+    monkeypatch.setattr(managed_distribution, "_open_distribution_parent_chain", switch_root_before_open)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert (target_root / "sentinel.txt").read_text(encoding="utf-8") == "replacement\n"
+    assert not (target_root / ".github").exists()
+    assert not (displaced / ".github" / "workflows" / "ci.yml").exists()
+
+
+def test_s30_apply_blocks_root_rebind_during_data_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    displaced = tmp_path / "displaced-consumer"
+    original_write = managed_distribution._write_fd_bytes
+    switched = False
+
+    def switch_root_before_write(fd: int, content: bytes, *, before_mutation: object = None) -> None:
+        nonlocal switched
+        if not switched:
+            switched = True
+            target_root.rename(displaced)
+            target_root.mkdir()
+            (target_root / "sentinel.txt").write_text("replacement\n", encoding="utf-8")
+        original_write(fd, content, before_mutation=before_mutation)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", switch_root_before_write)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert (target_root / "sentinel.txt").read_text(encoding="utf-8") == "replacement\n"
+    assert not (target_root / ".github").exists()
+    assert not (displaced / ".github" / "workflows" / "ci.yml").exists()
+
+
+def test_s30_apply_blocks_replaced_ancestor_created_by_prior_action(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    extra_source = install_root / ".agents" / "skills" / "legacy" / "SKILL.md"
+    extra_source.parent.mkdir(parents=True)
+    extra_source.write_bytes(b"legacy\n")
+    (extra_source.parent / "README.md").write_bytes(b"legacy-readme\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    original_apply = managed_distribution._apply_distribution_action
+    replaced = False
+
+    def replace_created_ancestor(
+        current_plan: object,
+        root: Path,
+        action: object,
+        snapshot: object,
+        bindings: dict[str, object],
+    ) -> None:
+        nonlocal replaced
+        original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
+        if not replaced and getattr(action, "path", "").startswith(".agents/"):
+            ancestor = root / ".agents"
+            displaced = root / ".agents-old"
+            ancestor.rename(displaced)
+            ancestor.mkdir()
+            (ancestor / "sentinel.txt").write_text("replacement\n", encoding="utf-8")
+            replaced = True
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", replace_created_ancestor)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert (target_root / ".agents" / "sentinel.txt").read_text(encoding="utf-8") == "replacement\n"
+    assert not (target_root / ".agents" / "skills").exists()
+
+
+def test_s30_apply_blocks_parent_rebind_before_any_write(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    parent = target_root / ".github" / "workflows"
+    parent.mkdir(parents=True)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    displaced = target_root / ".github" / "workflows-old"
+    parent.rename(displaced)
+    parent.mkdir()
+    sentinel = parent / "sentinel.txt"
+    sentinel.write_text("replacement\n", encoding="utf-8")
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert sentinel.read_text(encoding="utf-8") == "replacement\n"
+    assert not (parent / "ci.yml").exists()
+    assert not (displaced / "ci.yml").exists()
+
+
+def test_s30_apply_blocks_destination_appearance_without_overwrite(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    parent = target_root / ".github" / "workflows"
+    parent.mkdir(parents=True)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    target = parent / "ci.yml"
+    target.write_bytes(b"user-owned\n")
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == b"user-owned\n"
+
+
+def test_s30_apply_blocks_hard_link_prune_without_mutation(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"current\n")
+    alias = target_root / "alias"
+    alias.hardlink_to(target)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    with pytest.raises(DistributionApplyError, match="blocked"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == b"current\n"
+    assert alias.read_bytes() == b"current\n"
+
+
+def test_s30_apply_materializes_canonical_shortcut_without_following_target(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    result = apply_distribution_plan(plan)
+
+    assert result.status == "complete"
+    shortcut = target_root / "spec"
+    assert shortcut.is_symlink()
+    assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
+
+
+def test_s30_apply_upgrades_canonical_shortcut_with_no_replace_publish(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            historical_shortcuts=[
+                {
+                    "path": "spec",
+                    "kind": "symlink",
+                    "target": "legacy/spec-dock",
+                    "source": {"kind": "test-fixture", "ref": "issue-360-test"},
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("legacy/spec-dock")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    result = apply_distribution_plan(plan)
+
+    assert result.status == "complete"
+    assert shortcut.is_symlink()
+    assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
+    assert not list(target_root.glob(".spec-dock-symlink-*"))
+
+
+def test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            historical_shortcuts=[
+                {
+                    "path": "spec",
+                    "kind": "symlink",
+                    "target": "legacy/spec-dock",
+                    "source": {"kind": "test-fixture", "ref": "issue-360-test"},
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("legacy/spec-dock")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    def unsupported_no_replace() -> tuple[object, int]:
+        raise DistributionApplyError("platform lacks required atomic replace support")
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_resolve_distribution_swap_rename",
+        unsupported_no_replace,
+    )
+
+    with pytest.raises(DistributionApplyError, match="atomic replace"):
+        apply_distribution_plan(plan)
+
+    assert shortcut.is_symlink()
+    assert shortcut.readlink().as_posix() == "legacy/spec-dock"
+    assert not list(target_root.glob(".spec-dock-symlink-*"))
