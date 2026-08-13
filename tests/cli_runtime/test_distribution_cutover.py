@@ -567,6 +567,36 @@ def test_s60_root_rebind_during_version_publication(
     assert not marker.exists()
 
 
+def test_s60_distribution_apply_fault_keeps_marker_and_old_version(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    version = tmp_path / "spec-dock/spec-dock.version"
+    before_version = version.read_bytes()
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    original_apply = cli.apply_distribution_plan
+
+    def fail_distribution_apply(_plan):
+        raise RuntimeError("credential=secret /private/outside/source.txt")
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", fail_distribution_apply)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "credential=secret" not in captured
+    assert "/private/outside/source.txt" not in captured
+    assert "distribution partial failure during distribution-apply" in captured
+    payload = json.loads(marker.read_text(encoding="utf-8"))
+    assert payload["last_completed_phase"] == "preflight-complete"
+    assert version.read_bytes() == before_version
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", original_apply)
+    assert main(["update", str(tmp_path)]) == 0
+    assert not marker.exists()
+
+
 def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(
     tmp_path: Path,
     monkeypatch,
