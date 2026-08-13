@@ -44,8 +44,8 @@ _STALE_WHEEL_PATTERNS = (
     "spec_dock/assets/spec_dock/templates/requirement.md",
 )
 _S04_MANAGED_PROJECTION_ROOTS = ("docs", "templates", "scripts", "system")
-# Provider and checked-in consumer assets are aligned at the candidate
-# revision, so the disposable update is intentionally diff-clean.
+# The clean candidate checkout already contains the current docs and provider
+# projection, so update should not create a tracked status delta.
 _S04_UPDATE_EXPECTED_STATUS: set[str] = set()
 
 
@@ -475,11 +475,13 @@ def _assert_exact_status_manifest(target: Path, expected: set[str]) -> None:
     assert set(_git_status_paths(target)) == expected
 
 
-def _snapshot_tree(root: Path) -> FileSnapshot:
+def _snapshot_tree(root: Path, *, include_symlinks: bool = True) -> FileSnapshot:
     if not root.is_dir():
         return ()
     return tuple(
-        (path.relative_to(root).as_posix(), path.read_bytes()) for path in sorted(root.rglob("*")) if path.is_file()
+        (path.relative_to(root).as_posix(), path.read_bytes())
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and (include_symlinks or not path.is_symlink())
     )
 
 
@@ -1233,7 +1235,7 @@ def test_tc_346_s04_004_disposable_exact_dogfood_update_keeps_epic_00343_unbackf
         checkout, env, installed_cli = _clone_exact_candidate_checkout(candidate_wheel, "s04-dogfood-no-backfill")
         assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
         _assert_epic_00343_unbackfilled(checkout)
-        canonical_before = _snapshot_tree(checkout / "spec-dock" / "initiatives")
+        canonical_before = _snapshot_tree(checkout / "spec-dock" / "initiatives", include_symlinks=False)
         provider_before = _snapshot_tree(checkout / "src" / "spec_dock" / "assets" / "spec_dock")
         update_result = subprocess.run(
             [str(installed_cli), "update", str(checkout)],
@@ -1247,7 +1249,7 @@ def test_tc_346_s04_004_disposable_exact_dogfood_update_keeps_epic_00343_unbackf
         assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
         _assert_epic_00343_unbackfilled(checkout)
         _assert_s04_provider_projection_parity(candidate_wheel, checkout)
-        assert _snapshot_tree(checkout / "spec-dock" / "initiatives") == canonical_before
+        assert _snapshot_tree(checkout / "spec-dock" / "initiatives", include_symlinks=False) == canonical_before
         assert _snapshot_tree(checkout / "src" / "spec_dock" / "assets" / "spec_dock") == provider_before
         _assert_exact_status_manifest(checkout, _S04_UPDATE_EXPECTED_STATUS)
 

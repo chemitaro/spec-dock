@@ -3,830 +3,364 @@
 ID: "iss-00360"
 タイトル: "Cut Over Distribution and Retire Legacy Workflow Surfaces"
 関連GitHub: ["#360"]
-状態: "draft | approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-08-07"
+状態: "approved"
+作成者: "Codex main orchestrator"
+最終更新: "2026-08-13"
 親: ["epic-00356", "init-local-00003"]
+依存: ["iss-00357", "iss-00358", "iss-00359"]
 ---
 
-# iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces — Issue 要件定義
+# iss-00360 Cut Over Distribution and Retire Legacy Workflow Surfaces — 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+## 1. 目的
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+SpecDockの配布物を、Epic 00356で確定したStorage Core、薄いAuthoring Kit、二つのrepo-local skillへhard cutoverする。
 
----
+Fresh consumerには旧Planning / Review / Execution / Assurance / Profile / provider固有authoring / PR workflow surfaceを配布しない。Existing consumerでは、既知のSpecDock-managed旧surfaceだけをownership boundary内で除去し、Initiative / Epic / Issueのidentity、正本文書、Artifact、Discussion、ADR、既存Report、`.assurance.json`その他のhistorical evidenceを変更しない。Uninstallでも、利用者が明示的に`--remove-specs`を選ばない限り同じspec historyを保持する。
 
-## 0. 文書の位置づけ
+本Issueはinstaller、provider asset、dogfood projection、package artifact、fresh / update / uninstall consumer、migration docsを一つのvertical sliceとして閉じる。357〜359が定義・実装したRuntime、Authoring Kit、skill semanticsを再設計しない。
 
-### この文書が定義すること
+## 2. 固定された入力と現在地
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+### I360-RQ-001 親契約と実装基準
 
-### この文書が定義しないこと
+次を本Issueで再質問・逆転しない。
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
+* Storage CoreのCurrent command、lifecycle、Artifact、import contractはIssue 357の承認済みR/D/Pと実装handoffを入力とする。
+* Thin template、Authoring Guide、Current六種のArtifact、Historical policy、単一Issue Plan、docs-only Planning LevelはIssue 358の承認済みR/D/Pと実装handoffを入力とする。
+* Currentなrepo-local skillは`spec-dock`と`spec-dock-grill-with-docs`の二つだけとし、その本文・failure contractはIssue 359の承認済みR/D/Pとexact implementation commitを入力とする。
+* Planning selection、親Epicのhandoff approval、Runtime dependency readinessを別のgateとして扱う。Blocked Issueを`active set`で選択し、Requirementとinventory調査を先行できるが、それだけでDesignへのphase promotionまたはimplementation readinessを主張しない。
+* Designへのphase promotionは、Epic 00356 Planで定義されたIC-1とIC-2について、Epic-local ArtifactとReportにpass evidenceが存在する場合に限る。代わりに進める場合は、親Epic Planのhuman-approved revisionを正本へ反映しなければならない。Issue 360自身の文書やreview結果でこのapprovalを自己宣言しない。
+* Issue 360のformal `issue start`と実装開始は、上記handoff approvalに加え、Issue 359を含むdirect dependencyがRuntimeのdependency-only readinessを満たした後に限る。
+* 人間承認前の「品質・統合・deliverable handoff用の最終Issue候補」を新規作成せず、本Issueのdependencyまたは完了条件にしない。
 
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
+本要件の初回具体化はIssue 359の途中head `27b8682cb6e5262c980f3b04c7f01459a87685e9`で開始し、2026-08-13にIssue 359 final head `948d0cf0dedb84ca34e51a4adc0995820aa011f6`を含むmain merge `a6ded0d9a838b40cdcd741fa473cd264b801f245`へ再照合した。GitHub Issue 359はclosedとなり、Runtime dependency readinessは`ready=true`である。Epic Plan §6.1に従うIC-1 / IC-2は、Epic-local Artifact `20260812t174542z-disc-ic-1-core-kit-contract.md`と`20260812t174548z-disc-ic-2-skill-contract.md`およびEpic Reportへ2026-08-13のfresh verification付きで`pass`を記録した。Requirement / Design / Planはそれぞれfresh reviewでP0 / P1なしとなり、planning commit / push後のformal `issue start iss-00360`もIssue checkout / auto-syncを含めて成功した。Post-startのactive Issueは`iss-00360`、dependencyはGitHub authorityで`ready=true`かつblockers 0、`spec-dock validate`は`nodes=221`である。Plan amendment後の現在の実装開始には、clean exact-upstream HEADに対するlocal `spec-reviewer`のpassとChatGPT-SpecReview-Strictのpassの両方が必要であり、いずれかが未確認の間は実装開始可能と扱わない。
 
----
+### I360-RQ-002 Target distribution
 
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
+Fresh install後にCurrentなSpecDock product surfaceとして存在してよいものを次に限定する。
 
-### 4.1 主な関係者（Actor）
+* `spec-dock/{docs,templates,scripts,system}`にあるStorage CoreとAuthoring KitのTarget asset
+* `spec-dock/.gitignore`、`spec-dock/spec-dock.version`、root Workbench README、生成可能な`active/`と`.agent/`
+* `.agents/skills/spec-dock/**`
+* `.agents/skills/spec-dock-grill-with-docs/**`
+* `.github/workflows/ci.yml`。Storage Coreの決定論的な`sync` / `validate`だけを検証し、agent、review、planning、PR orchestrationを実行しない
+* repo rootの安全な`spec` shortcut
 
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
+Fresh installのrepo-local skill surfaceは二skill treeだけとする。`install_root`由来の非skill surfaceは上記`ci.yml`だけを許可する。`.agents/host-adapters/**`、`.codex/**`、`.github/agents/**`、その他の`.github/workflows/**`をSpecDockのTarget distributionとして新規配置しない。
 
-| 関係者（Actor） | 役割 | このIssueとの関係 |
-|---|---|---|
-| ... | ... | ... |
+### I360-RQ-003 Storage Core physical cutover
 
-### 4.2 開始条件（Trigger）
+Issue 357が「360 handoff keep」とした通常CLI外の旧planning / authoring-pack surfaceをprovider、dogfood、wheel、sdist、fresh consumerから物理的に除去する。
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+少なくとも次を含む。
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
-
-### 4.3 代表シナリオ
+* `scripts/spec-dock-chatgpt`
+* `scripts/authoring-pack/**`
+* Runtimeの`chatgpt_app.py`、`cli/chatgpt_{parser,registry}.py`
+* `commands/issue_planning.py`
+* `application/{issue_planning,issue_planning_prompt}.py`
+* `domain/{issue_planning_candidate,issue_planning_contracts}.py`
+* `infra/issue_planning_*.py`
+* `presentation/issue_planning.py`
+* Runtime各layerの`authoring_pack/**`
+* shared bootstrap / contracts / ports / appに残るplanning専用symbolと到達経路
+* 上記だけを検証していたtest、fixture、manual helper
 
-#### シナリオ SC-001:
+削除後にimport、parser、registry、wrapper、docs、test、packaged memberから旧backendへ到達するfallbackを残さない。Storage Coreと共有されるsymbolまたはtestは、旧consumerだけを切り離し、retained behaviorを保持する。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### I360-RQ-004 Authoring Kit physical cutover
 
-#### シナリオ SC-002:
+Target template catalogを次へ限定する。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-XXX:
-
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 5. スコープ
-
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
+* `templates/{initiative,epic,issue}/{requirement,design,plan,report}.md`
+* `templates/{root,initiative,epic,issue}/.workbench/README.md`
+* `templates/artifacts/{blank,research,interview,disc,decision-candidate,adr}.md`
+* `templates/README.md`
 
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
+次のprovider / dogfood managed templateはFresh distributionから除去する。
 
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
+* `templates/artifacts/pr-repair-batch.md`
+* `templates/discussions/**`
+* `templates/assurance/**`
+* `templates/issue-profiles/**`
 
-#### `lite` を検討できる条件
+Existing node内に既に存在する同種のArtifact、Discussion、`.assurance.json`、profile由来R/D/P、heavy ReportはHistorical user dataであり、template pruneの対象にしない。
 
-すべて満たす場合のみ `lite` を検討できる。
+### I360-RQ-005 Current docs cutover
 
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
+Current docsは次の系統だけを入口として配布する。
 
----
+* `docs/README.md`と`docs/guide.md`
+* `docs/migration.md`
+* `docs/authoring/{overview,requirement,design,issue-plan,report,scope-layering,artifacts,historical}.md`
+* `docs/authoring/issue-plan-levels/{light,standard,strict,critical}.md`
+* Current Storage Coreが参照する`docs/reference_{deps,github,naming,sync,worktree}.md`
+* Artifact / scope layoutを支える`docs/rules/**`
 
-## 14. 設計への引き渡し
+旧Current workflowを標準導線としていた次をprovider / dogfood / package / consumerから除去する。
 
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
+* `docs/authoring/{chatgpt-pack,decision-routing}.md`
+* `docs/phase_*.md`
+* `docs/workflow*.md`
+* `docs/reference_{authoring_pack_backend,hard_cutover}.md`
+* 旧導線だけを持つ`docs/github.md`
 
-### 14.1 設計で必ず扱うべき論点
+Current docsからremoved pathへのlinkを残さない。`docs/authoring/historical.md`は旧語彙を説明できるが、旧workflowをCurrentな操作として案内しない。
 
-- ...
-- ...
+Package metadataのreadmeでもあるrepository rootの`README.md`をCurrent entrypointへ更新し、`spec-dock/docs/migration.md`へ到達可能にする。Installed側の`docs/README.md`と`docs/guide.md`からも`docs/migration.md`へlinkする。
 
-### 14.2 責任所有者が未確定のもの
+削除対象外のMarkdownもCurrent contractとの整合対象とする。少なくとも`scripts/README.md`、`system/**/*.md`、`templates/README.md`、root / scope Workbench READMEを全文scanし、removed command、removed path、旧skill、旧phase / review / assurance routeをCurrent操作として案内するlink・command・語彙を更新する。Historical explanationとして残す語は非Currentであることを明示する。
 
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+### I360-RQ-006 Repo-local skill / agent surface cutover
 
-### 14.3 境界が未確定のもの
+Issue 359が渡した18個のmanaged skillと、3個のlegacy managed skillをobsolete inventoryとし、Target managed skill inventoryを二skillへ切り替える。
 
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+旧18 skill:
 
-### 14.4 契約影響が未確定のもの
+* `spec-dock-hub`
+* `spec-dock-initiative-planning`
+* `spec-dock-epic-planning`
+* `spec-dock-epic-execution`
+* `spec-dock-issue-planning`
+* `spec-dock-issue-execution`
+* `spec-dock-chatgpt-authoring`
+* `spec-dock-initiative-planning-manual`
+* `spec-dock-epic-planning-manual`
+* `spec-dock-issue-planning-manual`
+* `spec-dock-clarification`
+* `spec-dock-adr-facilitation`
+* `spec-dock-codex-adapter`
+* `spec-dock-copilot-adapter`
+* `git-commit-conventional-ja`
+* `github-pr-observation`
+* `github-pr-creator`
+* `github-pr-merge-preparer`
 
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+legacy 3 skill:
 
-### 14.5 上位へ昇格すべき可能性がある判断
+* `spec-driven-tdd-workflow`
+* `spec-dock-system-architect`
+* `spec-dock-implementation-planner`
 
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
+旧host adapter metadata、native agent shim、execution prompt、repo-local agent profile、SpecDock-installed Codex rule、agent-driven GitHub workflowをTargetから外す。Storage Coreの決定論的な`.github/workflows/ci.yml`は維持する。旧skillやshimを二skillへのwrapperとして残さない。
 
----
+### I360-RQ-007 Fresh consumer
 
-## 15. 実装計画への引き渡し
+Empty repositoryとunrelated user fileを含むrepositoryへのFresh initは、Target assetだけを配置する。
 
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
+Fresh consumerで次を観測できなければならない。
 
-### 15.1 計画で分解すべき成果
+* single R/D/Pとthin Reportを持つscopeを作成できる
+* Current六種のArtifact templateとBase + 四Completion Guideが存在する
+* 二skill treeがIssue 359のprovider sourceとbyte-identicalである
+* `.github/workflows/ci.yml`が存在し、Storage Coreの`sync` / `validate`以外のagent・review・planning orchestrationを含まない
+* `spec-dock` wrapperだけがexecutable entrypointとして存在する
+* removed Runtime / docs / template / skill / adapter / agent / agent-driven workflow surfaceが存在しない
+* unrelated fileとpre-existing user-owned external skillを変更しない
+* obsolete inventoryと同名のpre-existing external skillもFresh initではpruneしない
+* 同じpackageからの再実行が収束する
 
-- ...
-- ...
+### I360-RQ-008 Existing consumer update
 
-### 15.2 検証が必要な観測点
+Existing updateは全mutation前に、Target current path、obsolete exact path、preserve root、path type、symlink container、collisionを分類する。
 
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
+Managed scaffold tree外のCurrent target（Target二skill、`.github/workflows/ci.yml`、repo rootの`spec` shortcut）は、missingなら作成し、regular fileはbyte-identical、shortcutは正規化済みlink targetとfile typeが一致するときだけno-op adoptionできる。認識済みhistorical package digest、認識済みcanonical shortcut identity、またはdurable ownership manifestがSpecDock ownershipを証明する旧版だけをTargetへ更新できる。Non-identicalかつownership不明の同名file、symlink、directoryは保持し、全mutation前に停止する。Fresh initではhistorical workspace ownershipを推定せず、missing / current-identical以外を同じく保持・停止する。
 
-### 15.3 TDDが必要な振る舞い候補
+Update後は次を満たす。
 
-振る舞い変更がある場合のみ記述する。
+* `spec-dock/{docs,templates,scripts,system}`はTarget provider treeへrefreshされる
+* known obsolete SpecDock-managed tool fileはexact-path inventoryとownership evidenceの両方に従ってpruneされる
+* Target二skillとretained CIはIssue 359のno-follow / no-replace / byte-identical adoption contractを維持し、proven historical Targetだけを明示したupgrade pathで置換する
+* unknown sibling、external skill、arbitrary `.codex` / `.github` fileを列挙外の名前やdirectory patternで削除しない
+* node-local preserve setはrename、rewrite、mode change、deleteされない
+* removed surfaceがTarget側のhelp、docs navigation、import graphへ再出現しない
 
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
+`spec-dock/{docs,templates,scripts,system}`はinstaller-managed refresh surfaceであり、その中のlocal modificationをuser-owned specとして扱わない。この境界はmigration guideへ明記する。
 
-### 15.4 TDD不要または限定的でよい理由
+### I360-RQ-009 Current / obsolete assetのownership policy
 
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
+Current / obsolete inventoryはper-fileの正規化済みrelative path、認識可能なhistorical package digest、mutation policyを持つ。directory名、glob、prefix、exact pathだけを置換・削除のownership evidenceにしない。
 
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
+Operationとprovenanceを組み合わせ、少なくとも次を区別する。
 
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-08-07 | 初稿（Initial draft） | ... | ... |
+1. **genuine Fresh init**: 認識済みSpecDock workspace / ownership markerがないconsumerではobsolete pruneを実行しない。旧skillと同名のexternal skill、native agent shim、config、workflowを含め、Targetとのcollision以外の既存pathを変更しない。
+2. **proven obsolete tool file**: Update、recognized workspaceへの`init --force`、uninstallでは、対象bytesが認識済みhistorical package digestと一致するか、既存のdurable SpecDock ownership manifestが当該pathを所有すると証明するときだけ、旧managed / legacy skill、host adapter、native agent shimをpruneできる。Exact pathとworkspace markerだけではcontent mismatchを削除しない。
+3. **current reusable target**: `.github/workflows/ci.yml`など利用者も同じpathを使い得るTargetは、missing / current-identical / proven historical identityだけをcreate / adopt / upgradeできる。Regular fileはdigest、`spec` shortcutはfile typeと正規化済みlink targetでidentityを判定する。Non-identicalかつownership不明なら保持して全mutation前に停止する。Retained CIをobsolete inventoryへ含めず、workspace markerやpath一致だけで上書きしない。
+4. **obsolete reusable file**: 旧`.codex/config.toml`、`.codex/AGENTS.md`、prompt、rule、その他のGitHub fileなどは、同じownership evidenceを満たす場合だけpruneする。不一致・symlink・判定不能は保持し、全mutation前のdiagnosticでoperator actionを示す。
+5. **managed scaffold tree**: `spec-dock/{docs,templates,scripts,system}`。recognized workspaceでprovider treeへdirectory単位にrefreshする。`initiatives/**`、root Workbench payload、active source metadataをこのclassへ含めない。
+6. **user-owned preserve**: 列挙済みspec history、unknown sibling、ownershipを証明できないsame-name skill / shim / config / workflow。自動置換・pruneしない。
+
+Historical digestは実際に配布されたprovider / package bytesから再現可能でなければならず、推測値を登録しない。Ownershipを証明できないobsolete candidateが残る場合はapply前に停止し、preserved path、理由、operator actionを返す。Update / uninstallを成功扱いして「旧surfaceが完全に消えた」と報告しない。
+
+### I360-RQ-010 Preservation contract
+
+Updateおよびdefault uninstallで次をbyte-preserveする。
+
+* Initiative / Epic / Issue directory、stable ID、parent chain
+* `.meta.json`、GitHub linkage、direct dependency edge
+* node-local `requirement.md`、`design.md`、`plan.md`、`report.md`
+* Current / Historical Artifactとimport済みopaque file
+* `discussions/**`
+* accepted / candidate ADR
+* `.assurance.json`
+* profile由来文書、draft、repair、heavy Reportその他のhistorical evidence
+* root / scope Workbenchのunmanaged payload
+* unknown node-local file
+* user-owned external skill、agent config、GitHub file、unrelated repository file
+
+Preservationはcontent、file type、mode、pathの不変を意味する。Generated `active/**`と`.agent/**`は再生成またはuninstallで除去できるため、このbyte-preserve setに含めない。
+
+### I360-RQ-011 Uninstall
+
+Uninstallはdry-runを既定とし、apply時はcurrent Target assetとknown legacy managed assetを同じownership policyで処理する。
+
+* `--apply`は`--keep-specs`または`--remove-specs`の明示を要求する。
+* `--keep-specs`は`spec-dock/initiatives/**`を保持する。
+* `--remove-specs`だけがspec history全体の削除を許可する。
+* generated `active/**`と`.agent/**`、version marker、SpecDock自身のshortcutは既存安全契約内で除去できる。
+* ownershipを証明できないmodified file、unknown sibling、external skillを保持し、apply前に停止してaction listへ理由を出す。
+* current、legacy、mixed、partially-updated consumerで再実行が収束する。
+
+### I360-RQ-012 Path safetyとfailure boundary
+
+Init / update / uninstallは次を満たす。
+
+* repository rootから外れるabsolute path、`..`、backslash escape、glob、directory-like obsolete entryを拒否する
+* managed boundaryの親componentがsymlinkまたはnon-directoryならmutation前に停止する
+* exact obsolete fileがsymlinkでも外部targetを辿らずlink自身だけを扱う
+* exact obsolete pathにdirectoryがある場合、recursive deletionせず停止する
+* Target current pathとobsolete pathの重複・祖先子孫overlapを拒否する
+* full preflightが終わる前にcopyまたはpruneを開始しない
+* error出力にcredential、source content、repository外absolute evidence pathを含めない
+
+### I360-RQ-013 Partial failureと再実行
+
+Updateは少なくともpreflight、managed scaffold refresh、current install-root copy、obsolete prune、post-verifyを識別できる。Uninstallは既存retry marker contractを保持する。
+
+Operationがatomicでない場合も、失敗phase、対象relative path、完了済み / 未完了の区別、再実行commandを返す。故障注入後の再実行でTargetへ収束し、node-local preserve setを変更しないことをtestで示す。証拠なしにrollback可能とは主張しない。
+
+### I360-RQ-014 Provider / dogfood / package / consumer parity
+
+Provider sourceを唯一の配布正本とし、次を検証する。
+
+* provider Target assetとdogfood projectionのcatalog / bytes / executable mode
+* wheelとsdistのpackage member catalogがprovider Targetと一致する
+* wheel / sdistからのFresh initが同じTarget catalogを生成する
+* Existing update後のmanaged Target fileがproviderと一致する
+* preserve setはprovider parity対象ではなく、before / after hashとpath metadataで不変を確認する
+* removed assetがprovider、dogfood、wheel、sdist、Fresh、Updatedの全surfaceで不在である
+
+Package scanは少なくともbinary、Python cache、secret-like file、local absolute path、verbatim interaction log、unexpected hidden managed payloadを検出対象とする。
+
+### I360-RQ-015 Integrated consumer smoke
+
+Packageから構築したconsumerで、357〜359の代表契約を一つのmatrixとして確認する。
+
+* blocked Issueを`active set`で選択できる
+* `issue start`がunfinished active guardとdependency readinessを区別し、`--force`がdependencyを迂回しない
+* omitted type / explicit `blank` / typed Artifact作成とHistorical recognition
+* `artifact import file`だけがCurrent importとして動く
+* Fresh thin Reportがempty-validであり、existing heavy Reportは不変である
+* 二skillがdiscoverableで、旧skill fallbackがない
+* external `grilling` / `domain-modeling`不足がStorage Coreのinstall / useを阻害しない
+* `issue finish`のclose / clear / sync契約をstubbed GitHub boundaryで確認する
+* `validate`と必要なlocal `sync`がTarget consumerで成功する
+
+### I360-RQ-016 Migration / compatibility communication
+
+Repository rootの`README.md`、installed `docs/{README,guide,migration}.md`は実装と同じ内容で次を説明する。
+
+* removed command、wrapper、docs、template、skill、adapter、agent / workflow surface
+* retained Storage Core commandと新しいArtifact syntax
+* `artifact import file`だけがCurrent importであること
+* Planning Levelがdocs-onlyであること
+* Fresh thin Reportとexisting Report preservation
+* 二skill entrypointとexternal Intelligenceのoperator-owned境界
+* managed scaffold内local modificationとnode-local preserve setの違い
+* update時にmodified reusable fileを保持した場合の手動対応
+* update / uninstallのdry-run、partial failure、retry / recovery
+* Historical evidenceは保持されるがCurrent routeではないこと
+
+## 3. 受け入れ条件
+
+| ID | 条件 |
+|---|---|
+| I360-AC-001 | Fresh installのTarget catalogがI360-RQ-002と一致し、repo-local skillは二skill、非skill install-root assetはStorage Core用`.github/workflows/ci.yml`だけである |
+| I360-AC-002 | 357 handoffのplanning / authoring-pack wrapper、module、shared symbol、専用test / fixtureが物理削除され、retained Storage Core testがpassする |
+| I360-AC-003 | Template catalogがscope R/D/P/Report、Workbench README、Current六Artifact、READMEだけになり、obsolete templateが全配布surfaceで不在である |
+| I360-AC-004 | Current docs catalogとlink graphがI360-RQ-005を満たし、removed docsへのlive linkがなく、Historical pageだけが旧語彙を非Currentとして説明する |
+| I360-AC-005 | Managed skill inventoryが二skill、obsolete skill inventoryが旧18 + legacy 3で、旧skill / adapter / wrapper fallbackがない |
+| I360-AC-006 | Empty / unrelated-file Fresh matrixがTarget配置、unrelated preservation、再実行収束を示し、obsolete同名external skill / native shimをpruneしない |
+| I360-AC-007 | Unmodified legacy consumer updateがknown obsolete managed assetをpruneし、Target managed assetをproviderと一致させる |
+| I360-AC-008 | `spec-dock/initiatives/**`のpreservation fixture全pathがupdate前後でcontent、type、mode、relative path不変である |
+| I360-AC-009 | Unknown sibling / external skill / arbitrary agent or GitHub fileがupdateで変更されず、same-name skill / modified profile / native shimもownership未証明なら保持される |
+| I360-AC-010 | Fresh、historical digest一致、durable manifest一致、content mismatch、ownership不明、managed scaffold、user-owned preserveのoperation × provenance policyがpositive / negative testで識別される |
+| I360-AC-010A | Pre-existing `.github/workflows/ci.yml`、Target二skill、`spec` shortcutについて、missing create、current-identical adoption、proven historical upgrade、non-identical user-owned preserve-and-blockをFresh / updateで検証する |
+| I360-AC-011 | Unsafe parent symlink、exact directory conflict、path escape、current / obsolete overlapが全write前にfailする |
+| I360-AC-012 | Ownership未証明またはmodifiedなobsolete candidateは全mutation前に保持・診断され、旧surface完全除去のmisleading successにならない |
+| I360-AC-013 | Uninstall dry-run / keep-specs / remove-specsがcurrent、legacy、mixed、partial consumerで期待どおり分類・収束する |
+| I360-AC-014 | `--keep-specs` uninstallがspec history preservation fixtureを変更せず、`--remove-specs`だけが明示対象を削除する |
+| I360-AC-015 | Update / pruneとuninstallの故障注入・再実行testがphase diagnostic、retry convergence、preserve set不変を示す |
+| I360-AC-016 | provider / dogfood / wheel / sdist / Fresh / UpdatedのTarget catalog、bytes、mode parityとremoved-surface absenceがpassする |
+| I360-AC-017 | Package scanにunexpected binary、cache、secret-like file、local absolute path、interaction log、unexpected hidden managed payloadがない |
+| I360-AC-018 | Installed consumerで357〜359のintegrated smokeがpassし、external Intelligence不在でもStorage Coreが利用できる |
+| I360-AC-019 | Root `README.md`とinstalled `docs/{README,guide,migration}.md`がactual help、asset inventory、ownership policy、recovery behaviorと一致し、相互にmigration入口へlinkする |
+| I360-AC-020 | Retained `scripts/README.md`、`system/**/*.md`、`templates/README.md`、Workbench READMEの全文scanで、removed link / command / Current語彙が残らない |
+| I360-AC-021 | Epic-local ArtifactとReportがIC-1 / IC-2 passを示すか、親Epic Planのhuman-approved revisionが存在するまで、Design promotion、formal start、implementation handoffをblockedとして扱う |
+| I360-AC-022 | Issue 360のreportがexact implementation identity、consumer matrix、target / obsolete / preserve inventory、residual risk、IC-3入力を記録し、未承認の最終Issue作成やEpic完了を自己宣言しない |
+
+## 4. 対象
+
+* `src/spec_dock/cli.py`のinit / update / uninstall inventory、preflight、prune、diagnostic
+* `src/spec_dock/assets/install_root/**`のTarget cutover
+* `src/spec_dock/assets/spec_dock/{docs,templates,scripts,system}/**`のTarget cutover
+* 対応するdogfood projection
+* Issue 357が360へ渡したplanning / authoring-pack Runtime、shared symbol、test / fixture
+* package-data catalogとwheel / sdist build result
+* fresh / update / uninstall fixtureとpreservation fixture
+* installed consumer smoke
+* migration / compatibility / recovery docs
+* repository root `README.md`とretained MarkdownのCurrent vocabulary / link audit
+* provider / dogfood / installed parityとremoved-surface negative scan
+* Issue-local R/D/P/reportとIC-3 handoff evidence
+
+## 5. 対象外
+
+* 357のStorage Core command / lifecycle / Artifact semanticsの再設計
+* 358のAuthoring Kit文書意味・template本文の再設計
+* 359の二skill本文・external capability behaviorの機能追加
+* external model、browser、Oracle、`grilling`、`domain-modeling`の導入・vendor・実行
+* existing node-local R/D/P/Report / Artifact / Discussion / ADRの自動変換、rename、rewrite
+* existing `.assurance.json`のschema migration
+* 旧skillを新skillへ委任するcompatibility wrapper
+* provider固有importの代替route
+* Product-owned Planning / Review / Execution / Assurance / Profile state machine
+* arbitrary user-owned configを削除して完全Targetへ強制すること
+* package publication、release、merge、Issue close、Epic close
+* 人間未承認の最終Issue候補の作成・番号付与・dependency登録
+* unrelated repository cleanupまたはarchitecture refactor
+
+## 6. 制約・失敗時の判断
+
+* 本IssueのPlanning Levelは`strict`を推奨する。public distribution、existing consumer migration、managed-file deletion、cross-platform filesystem safety、uninstallに影響し、回復難度が高いためである。
+* Security / privacy境界、credential、production data、不可逆なuser-data deletionが対象へ入る場合は`critical`へ再評価し、実装を停止する。
+* Node-local preserve pathとmanaged pathが重なる事実が見つかった場合、削除側へ推測せずDesignを修正する。
+* Issue 359のfinal implementation inventoryが本書の基準SHAから変わった場合、実装前にexact inventoryとtest expectationを更新する。
+* Retained Runtime / Kit / skill contract自体のdefectを見つけた場合、distribution integrationに不可欠な最小修正だけをowner付きで扱い、機能scopeを黙って360へ移さない。
+* Full regressionやconsumer matrixが未実施・失敗の状態で、distribution cutover完了またはIC-3 passを主張しない。
+
+## 7. 設計・計画への引き渡し
+
+Designは次を具体化する。
+
+* provider treeをcurrent inventoryの正本とし、obsolete / policyだけを二重化なく表現するmanifest構造
+* host-adapter固有manifestとrequired native shim validatorの廃止方法
+* Fresh / update / uninstallのpreflight、apply、post-verify、partial recovery flow
+* operation × provenance policy、historical package digest、ownership未証明時のpreflight block
+* 357〜359 handoffの削除 / retain / shared edit file inventory
+* provider / dogfood / package / consumer parityの比較単位
+* preservation fixtureとfault injection point
+* docs / migration source-of-truth
+
+Planは、依存ready再確認、inventory lock、RED test、provider cutover、dogfood projection、consumer matrix、docs、S90、S99、IC-3 handoffを、step-local closure conditionとrollback point付きで分解する。

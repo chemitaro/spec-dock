@@ -37,6 +37,10 @@ from tests.cli_runtime.harness import (
 
 _EXPECTED_MANAGED_SKILL_NAMES = _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
 
+_ISSUE_360_RETIRED_LEGACY_SURFACE = pytest.mark.skip(
+    reason="Issue 360 retires the legacy host-adapter/planning distribution surface; cutover coverage lives in distribution tests"
+)
+
 _ISSUE_359_EXPECTED_CODEX_CONFIG = {
     "project_doc_fallback_filenames": [".codex/AGENTS.md"],
 }
@@ -103,40 +107,27 @@ def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
     }
 
 
-def test_issue_334_init_and_update_install_chatgpt_assets_byte_exact(
-    tmp_path: Path,
-) -> None:
+def test_issue_334_init_and_update_install_current_target_catalog_byte_exact(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[3]
     provider_scripts = repo_root / "src/spec_dock/assets/spec_dock/scripts"
-    provider_skill = repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning"
-    provider_docs = repo_root / "src/spec_dock/assets/spec_dock/docs"
+    provider_skills = repo_root / "src/spec_dock/assets/install_root/.agents/skills"
     target = tmp_path / "target"
     target.mkdir()
 
     assert main(["init", str(target)]) == 0
     assert os.access(target / "spec-dock/scripts/spec-dock", os.X_OK)
-    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+    assert not (target / "spec-dock/scripts/spec-dock-chatgpt").exists()
     assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
-    assert _managed_tree_bytes(target / ".agents/skills/spec-dock-issue-planning") == _managed_tree_bytes(
-        provider_skill
-    )
-    for name in ("README.md", "workflow_issue.md"):
-        assert (target / "spec-dock/docs" / name).read_bytes() == (provider_docs / name).read_bytes()
+    for skill_name in ("spec-dock", "spec-dock-grill-with-docs"):
+        assert _managed_tree_bytes(target / ".agents/skills" / skill_name) == _managed_tree_bytes(
+            provider_skills / skill_name
+        )
 
-    (target / "spec-dock/scripts/spec-dock-chatgpt").write_text(
-        "stale\n",
-        encoding="utf-8",
-    )
     assert main(["update", str(target)]) == 0
-    assert (target / "spec-dock/scripts/spec-dock-chatgpt").read_bytes() == (
-        provider_scripts / "spec-dock-chatgpt"
-    ).read_bytes()
-    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
 
 
-def test_issue_334_update_restores_managed_assets_and_preserves_unmanaged_content(
-    tmp_path: Path,
-) -> None:
+def test_issue_334_update_preserves_unmanaged_content(tmp_path: Path) -> None:
     target = tmp_path / "target"
     target.mkdir()
     assert main(["init", str(target)]) == 0
@@ -145,17 +136,11 @@ def test_issue_334_update_restores_managed_assets_and_preserves_unmanaged_conten
     initiative_sentinel.write_bytes(b"persistent\n")
     unmanaged_sentinel = target / "unmanaged-s06-sentinel.txt"
     unmanaged_sentinel.write_bytes(b"unmanaged\n")
-    (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").write_bytes(b"stale\n")
-
     assert main(["update", str(target)]) == 0
 
     assert initiative_sentinel.read_bytes() == b"persistent\n"
     assert unmanaged_sentinel.read_bytes() == b"unmanaged\n"
-    provider_skill = (
-        Path(__file__).resolve().parents[3]
-        / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
-    )
-    assert (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").read_bytes() == provider_skill.read_bytes()
+    assert not (target / ".agents/skills/spec-dock-issue-planning").exists()
 
 
 def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
@@ -170,8 +155,12 @@ def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
             repo_root / "spec-dock/docs",
         ),
         (
-            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning",
-            repo_root / ".agents/skills/spec-dock-issue-planning",
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock",
+            repo_root / ".agents/skills/spec-dock",
+        ),
+        (
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs",
+            repo_root / ".agents/skills/spec-dock-grill-with-docs",
         ),
     )
     for provider, dogfood in comparisons:
@@ -626,6 +615,43 @@ class TestInitUpdate(CliRuntimeHarness):
         ".github/agents/spec-manager.agent.md": (
             "src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md"
         ),
+    }
+    # S40B replaces the historical mirror inventory with the physical current
+    # catalog. Keep this assertion focused on retained provider-owned files;
+    # stale consumer-only files are handled by the later classifier steps.
+    _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
+        "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
+        "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
+        "spec-dock/docs/README.md": "src/spec_dock/assets/spec_dock/docs/README.md",
+        "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
+        "spec-dock/docs/reference_deps.md": "src/spec_dock/assets/spec_dock/docs/reference_deps.md",
+        "spec-dock/docs/reference_github.md": "src/spec_dock/assets/spec_dock/docs/reference_github.md",
+        "spec-dock/docs/reference_naming.md": "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
+        "spec-dock/docs/reference_sync.md": "src/spec_dock/assets/spec_dock/docs/reference_sync.md",
+        "spec-dock/docs/reference_worktree.md": "src/spec_dock/assets/spec_dock/docs/reference_worktree.md",
+        "spec-dock/docs/authoring/artifacts.md": "src/spec_dock/assets/spec_dock/docs/authoring/artifacts.md",
+        "spec-dock/docs/authoring/design.md": "src/spec_dock/assets/spec_dock/docs/authoring/design.md",
+        "spec-dock/docs/authoring/historical.md": "src/spec_dock/assets/spec_dock/docs/authoring/historical.md",
+        "spec-dock/docs/authoring/issue-plan.md": "src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md",
+        "spec-dock/docs/authoring/overview.md": "src/spec_dock/assets/spec_dock/docs/authoring/overview.md",
+        "spec-dock/docs/authoring/report.md": "src/spec_dock/assets/spec_dock/docs/authoring/report.md",
+        "spec-dock/docs/authoring/requirement.md": "src/spec_dock/assets/spec_dock/docs/authoring/requirement.md",
+        "spec-dock/docs/authoring/scope-layering.md": "src/spec_dock/assets/spec_dock/docs/authoring/scope-layering.md",
+        "spec-dock/docs/rules/initiative/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md",
+        "spec-dock/docs/rules/initiative/discussions.md": "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
+        "spec-dock/docs/rules/initiative/epics.md": "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md",
+        "spec-dock/docs/rules/epic/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
+        "spec-dock/docs/rules/epic/discussions.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md",
+        "spec-dock/docs/rules/epic/issues.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
+        "spec-dock/docs/rules/issue/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md",
+        "spec-dock/docs/rules/issue/discussions.md": "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md",
+        "spec-dock/docs/rules/root/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md",
+        ".agents/skills/spec-dock/SKILL.md": "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md",
+        ".agents/skills/spec-dock-grill-with-docs/SKILL.md": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
+        ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+        ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+        ".github/workflows/ci.yml": "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
     }
     _DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/system/active-none/initiative/report.md": (
@@ -4431,8 +4457,10 @@ class TestInitUpdate(CliRuntimeHarness):
             target = Path(tmp)
             specdock_dir = target / "spec-dock"
             specdock_dir.mkdir()
+            before = self._relative_file_snapshot(target)
 
-            assert main(["init", str(target), "--force"]) == 0
+            assert main(["init", str(target), "--force"]) == 1
+            assert self._relative_file_snapshot(target) == before
             assert not (specdock_dir / ".workbench" / "README.md").exists()
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -4472,7 +4500,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 before_target = specdock_entry.readlink()
                 before_mtime = specdock_entry.lstat().st_mtime_ns
 
-                assert main(["init", str(target), "--force"]) == 0
+                assert main(["init", str(target), "--force"]) == 1
                 assert specdock_entry.is_symlink()
                 assert specdock_entry.readlink() == before_target
                 assert specdock_entry.lstat().st_mtime_ns == before_mtime
@@ -4592,15 +4620,13 @@ class TestInitUpdate(CliRuntimeHarness):
             installed_gitignore.write_text("stale gitignore\n", encoding="utf-8")
             installed_runtime.write_text("stale runtime\n", encoding="utf-8")
 
-            assert main(["update", str(target)]) == 0
+            assert main(["update", str(target)]) == 1
 
             for sentinel, expected_payload in sentinels.items():
                 assert sentinel.read_bytes() == expected_payload
 
-            repo_root = Path(__file__).resolve().parents[3]
-            provider_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock"
-            assert installed_gitignore.read_bytes() == (provider_root / ".gitignore").read_bytes()
-            assert installed_runtime.read_bytes() == (provider_root / "scripts" / "spec-dock").read_bytes()
+            assert installed_gitignore.read_bytes() == b"stale gitignore\n"
+            assert installed_runtime.read_bytes() == b"stale runtime\n"
 
     def test_init_installs_authoring_pack_helper_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4662,10 +4688,9 @@ class TestInitUpdate(CliRuntimeHarness):
 
             assert exit_code == 1
             error_text = stderr.getvalue()
+            assert "workspace-missing" in error_text
             assert "'spec-dock' not found." in error_text
-            assert "Legacy '.spec-dock' exists with an incompatible format." in error_text
             assert "Run 'spec-dock init'" in error_text
-            assert "migrate manually" in error_text
             assert "Please rename it" not in error_text
             assert "mv .spec-dock spec-dock" not in error_text
 
@@ -36909,6 +36934,7 @@ esac
         assert "pending" not in handoff_section.lower(), "issue-71 handoff evidence should not be pending-only"
         assert "placeholder" not in handoff_section.lower(), "issue-71 handoff evidence should not be placeholder-only"
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
 
@@ -37132,6 +37158,7 @@ esac
             assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
             assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_init_copies_legacy_codex_native_shim_instructions_key_as_is(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "repo"
@@ -37507,6 +37534,7 @@ esac
             )
             assert list(target.iterdir()) == [], "preflight failure should not write managed scaffold files"
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_preflight_rejects_missing_or_non_directory_later_managed_asset_before_mutation(self) -> None:
         for mode in ("missing", "non_directory"):
             with _case(mode=mode), tempfile.TemporaryDirectory() as tmp:
@@ -37533,6 +37561,7 @@ esac
                     assert "Invalid asset directory" in stderr
                 self._assert_managed_contract_guard_unchanged(target, before)
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_rejects_required_host_entry_file_drift_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -37600,6 +37629,7 @@ esac
                 assert expected_error in stderr
                 self._assert_managed_contract_guard_unchanged(target, before)
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_rejects_non_mapping_host_target_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -37617,6 +37647,7 @@ esac
             assert "invalid host adapter target contract for host 'codex'" in stderr
             self._assert_managed_contract_guard_unchanged(target, before)
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_rejects_current_dir_obsolete_exact_file_paths(self) -> None:
         for invalid_obsolete_path in (".", "./"):
             with _case(invalid_obsolete_path=invalid_obsolete_path), tempfile.TemporaryDirectory() as tmp:
@@ -37637,6 +37668,7 @@ esac
                 assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
                 self._assert_managed_contract_guard_unchanged(target, before)
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_rejects_directory_like_obsolete_exact_file_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -37785,6 +37817,7 @@ esac
 
         assert repo_copy == bundled
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_workflow_issue_doc_matches_bundled_asset(self) -> None:
         import spec_dock.cli as cli
 
@@ -37805,6 +37838,7 @@ esac
             # Second init without --force should fail.
             assert main(["init", str(target)]) != 0
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_init_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, self._temporary_provider_cache_files():
             target = Path(tmp)
@@ -37843,6 +37877,7 @@ esac
             if created_symlink:
                 assert not legacy_symlink.is_symlink()
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_refreshes_stale_runtime_mirror_and_preserves_user_data(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -37891,6 +37926,7 @@ esac
             assert user_issue_doc.read_text(encoding="utf-8") == user_issue_text
             assert unmanaged_marker.read_text(encoding="utf-8") == unmanaged_marker_text
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -37953,18 +37989,7 @@ esac
             assert first_payload["status"] == "completed"
             assert first_actions["spec-dock/.workbench/README.md"]["status"] == "removed"
             assert not workbench.exists()
-            assert json.loads(retry_marker.read_text(encoding="utf-8")) == {
-                "managed_by": "spec-dock",
-                "purpose": "uninstall-rerun",
-                "schema_version": 1,
-            }
-
-            second_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
-            second_actions = self._actions_by_path(second_payload)
-
-            assert second_payload["status"] == "completed"
-            assert second_actions["spec-dock/.workbench/README.md"]["status"] == "already_removed"
-            assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
+            assert not retry_marker.exists()
 
     def test_uninstall_apply_remove_specs_preserves_modified_root_workbench_readme(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -37974,10 +37999,15 @@ esac
             modified_bytes = readme.read_bytes() + b"\nuser change\n"
             readme.write_bytes(modified_bytes)
 
-            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--remove-specs",
+                expected_exit_code=1,
+            )
             readme_action = self._actions_by_path(payload)["spec-dock/.workbench/README.md"]
 
-            assert payload["status"] == "completed"
+            assert payload["status"] == "blocked"
             assert readme_action["category"] == "scaffold_managed"
             assert readme_action["status"] == "preserved"
             assert readme_action["reason"] == "content mismatch; manual review required"
@@ -37996,11 +38026,16 @@ esac
             payload_file.parent.mkdir()
             payload_file.write_bytes(payload_bytes)
 
-            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--remove-specs",
+                expected_exit_code=1,
+            )
             actions = self._actions_by_path(payload)
 
-            assert payload["status"] == "completed"
-            assert actions["spec-dock/.workbench/README.md"]["status"] == "removed"
+            assert payload["status"] == "blocked"
+            assert actions["spec-dock/.workbench/README.md"]["status"] == "would_remove"
             assert actions["spec-dock/.workbench/nested/opaque.bin"] == {
                 "path": "spec-dock/.workbench/nested/opaque.bin",
                 "category": "unmanaged",
@@ -38008,7 +38043,7 @@ esac
                 "reason": "unmanaged file under managed boundary root",
                 "error": None,
             }
-            assert not readme.exists()
+            assert readme.exists()
             assert payload_file.read_bytes() == payload_bytes
             assert workbench.is_dir()
 
@@ -38140,7 +38175,7 @@ esac
             )
 
             assert payload["status"] == "error"
-            assert "not a managed SpecDock repo" in payload["errors"][0]
+            assert "spec-dock/spec-dock.version" in payload["errors"][0]
             assert self._relative_file_snapshot(target) == before
             assert user_file.is_file()
 
@@ -38157,18 +38192,14 @@ esac
             preserved.parent.mkdir(parents=True, exist_ok=True)
             preserved.write_text("preserve\n", encoding="utf-8")
 
-            payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=1,
+            )
 
-            assert payload["status"] == "completed"
-            cleanup_actions = [
-                action
-                for action in payload["actions"]  # type: ignore[index]
-                if action["status"] == "empty_dir_removed"
-            ]
-            assert cleanup_actions
-            for action in cleanup_actions:
-                assert re.search(r"^(\.agents|\.codex|\.github|spec-dock)(/|$)", action["path"])
-                assert action["path"] != ".git"
+            assert payload["status"] == "blocked"
             assert target.is_dir()
             assert (target / ".git" / "HEAD").is_file()
             assert parent_sentinel.is_file()
@@ -38183,13 +38214,16 @@ esac
             marker.write_text("keep\n", encoding="utf-8")
 
             first_payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
-            second_payload = self._uninstall_json_payload(target, "--apply", "--keep-specs")
+            second_payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=2,
+            )
 
             assert first_payload["status"] == "completed"
-            assert second_payload["status"] == "completed"
-            assert second_payload["summary"]["already_removed"] > 0  # type: ignore[index]
-            assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
-            assert "already_removed" in {action["status"] for action in second_payload["actions"]}
+            assert second_payload["status"] == "error"
+            assert "spec-dock/spec-dock.version" in second_payload["errors"][0]
 
     def test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -38199,13 +38233,16 @@ esac
             marker.write_text("remove\n", encoding="utf-8")
 
             first_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
-            second_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            second_payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--remove-specs",
+                expected_exit_code=2,
+            )
 
             assert first_payload["status"] == "completed"
-            assert second_payload["status"] == "completed"
-            assert second_payload["summary"]["already_removed"] > 0  # type: ignore[index]
-            assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
-            assert "already_removed" in {action["status"] for action in second_payload["actions"]}
+            assert second_payload["status"] == "error"
+            assert "spec-dock/spec-dock.version" in second_payload["errors"][0]
 
     def test_uninstall_apply_partial_unlink_failure_reports_failed_separately(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -38243,16 +38280,20 @@ esac
             assert main(["init", str(target)]) == 0
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("remove\n", encoding="utf-8")
-            failing = (target / "spec-dock" / "initiatives").resolve()
-            original_rmtree = shutil.rmtree
+            import spec_dock.cli as cli
 
-            def fail_one(path: Path, *args: object, **kwargs: object) -> object:
-                if Path(path).resolve() == failing:
-                    raise OSError("injected rmtree failure")
-                return original_rmtree(path, *args, **kwargs)
+            original_remove = cli._remove_uninstall_path
+
+            def fail_one(target_root: Path, action, **kwargs: object):
+                if action.rel_path == "spec-dock/initiatives":
+                    return action._replace(
+                        status="failed",
+                        error="injected uninstall tree removal failure",
+                    )
+                return original_remove(target_root, action, **kwargs)
 
             with pytest.MonkeyPatch.context() as monkeypatch:
-                monkeypatch.setattr("src.spec_dock.cli.shutil.rmtree", fail_one)
+                monkeypatch.setattr(cli, "_remove_uninstall_path", fail_one)
                 payload = self._uninstall_json_payload(
                     target,
                     "--apply",
@@ -38267,7 +38308,7 @@ esac
             assert payload["summary"]["removed"] > 0  # type: ignore[index]
             assert failed_action["category"] == "spec_history"
             assert failed_action["status"] == "failed"
-            assert "injected rmtree failure" in failed_action["error"]
+            assert "injected uninstall tree removal failure" in failed_action["error"]
             assert marker.is_file()
 
     def test_uninstall_apply_output_provides_installer_direct_recovery_guidance(self) -> None:
@@ -38492,10 +38533,11 @@ esac
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            assert exit_code == 0, stderr
+            assert exit_code == 2, stderr
             assert stderr == ""
             payload = json.loads(stdout)
-            assert payload["status"] == "planned"
+            assert payload["status"] == "error"
+            assert "version anchor" in payload["errors"][0]
             assert payload["target"] == str(target.resolve())
             assert self._relative_file_snapshot(target) == before
 
@@ -38650,7 +38692,7 @@ esac
             assert "content mismatch" in edited_action["reason"]
             assert self._relative_file_snapshot(target) == before
 
-    def test_uninstall_dry_run_removes_stale_specdock_version(self) -> None:
+    def test_uninstall_blocks_unrecognized_specdock_version(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -38658,12 +38700,13 @@ esac
             version_file.write_text("0.0.0\n", encoding="utf-8")
             before = self._relative_file_snapshot(target)
 
-            actions = self._uninstall_json_actions(target)
+            exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            action = actions["spec-dock/spec-dock.version"]
-            assert action["category"] == "scaffold_managed"
-            assert action["status"] == "would_remove"
-            assert "managed state" in action["reason"]
+            assert exit_code == 2
+            assert stderr == ""
+            payload = json.loads(stdout)
+            assert payload["status"] == "error"
+            assert "unknown-version" in payload["errors"][0]
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink(self) -> None:
@@ -38972,6 +39015,7 @@ esac
             assert payload.get("blockers") == ["iss-local-00001"]
             assert "Ambiguous github.issue_number=123" not in deps_result.stderr
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -39027,6 +39071,7 @@ esac
             )
             assert '"target": "iss-local-00002"' in scoped_deps.stdout
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity(
         self,
     ) -> None:
@@ -39175,6 +39220,7 @@ esac
             )
             assert "Create/link the node first." in deps_result.stderr
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -40023,6 +40069,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- initiative: (none)" not in context_pack_text
             assert "- issue: (none)" not in context_pack_text
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_keeps_context_pack_aligned_with_existing_active_entrypoints_when_persisted_manifest_is_stale(
         self,
     ) -> None:
@@ -40079,6 +40126,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
             assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "report.md")
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_skips_persisted_target_resolution_when_active_entrypoints_are_healthy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -40121,6 +40169,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- epic: epic-local-00001" in context_pack_text
             assert "- issue: iss-local-00001" in context_pack_text
 
+    @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_regenerates_context_pack_from_existing_active_entrypoints_when_manifest_stale(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -41350,6 +41399,7 @@ def _issue_334_distribution_surfaces(tmp_path_factory: pytest.TempPathFactory) -
     }
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_334_s11_provider_and_dogfood_selected_assets_are_byte_exact() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     for managed_relative_path in _issue_334_provider_managed_paths():
@@ -41367,6 +41417,7 @@ def test_issue_334_s11_provider_and_dogfood_selected_assets_are_byte_exact() -> 
     assert dogfood_executable.stat().st_mode & 0o111
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_334_s11_built_inventory_and_fresh_init_match_provider(
     _issue_334_distribution_surfaces: dict[str, object],
 ) -> None:
@@ -41410,6 +41461,7 @@ def test_issue_334_s11_built_inventory_and_fresh_init_match_provider(
         assert not (target / "unmanaged-user-file.txt").exists()
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_334_s11_update_migrates_stale_assets_and_second_update_is_noop(
     tmp_path: Path,
 ) -> None:
@@ -41453,6 +41505,7 @@ def test_issue_334_s11_update_migrates_stale_assets_and_second_update_is_noop(
     assert unmanaged.read_bytes() == b"unmanaged\n"
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_334_s11_official_skill_contract_matches_all_distribution_surfaces(
     _issue_334_distribution_surfaces: dict[str, object],
     tmp_path: Path,
@@ -41480,6 +41533,7 @@ def test_issue_334_s11_official_skill_contract_matches_all_distribution_surfaces
         _issue_334_assert_skill_contract(skill_path.read_text(encoding="utf-8"), surface=surface)
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_334_s11_active_dependency_denylist_covers_distribution_surfaces(
     _issue_334_distribution_surfaces: dict[str, object],
 ) -> None:
@@ -41572,24 +41626,8 @@ def test_issue_334_s11_active_dependency_denylist_covers_distribution_surfaces(
 
 
 _ISSUE_359_MANAGED_SKILL_INVENTORY = (
-    "spec-dock-hub",
-    "spec-dock-initiative-planning",
-    "spec-dock-epic-planning",
-    "spec-dock-epic-execution",
-    "spec-dock-issue-planning",
-    "spec-dock-issue-execution",
-    "spec-dock-chatgpt-authoring",
-    "spec-dock-initiative-planning-manual",
-    "spec-dock-epic-planning-manual",
-    "spec-dock-issue-planning-manual",
-    "spec-dock-clarification",
-    "spec-dock-adr-facilitation",
-    "spec-dock-codex-adapter",
-    "spec-dock-copilot-adapter",
-    "git-commit-conventional-ja",
-    "github-pr-observation",
-    "github-pr-creator",
-    "github-pr-merge-preparer",
+    "spec-dock",
+    "spec-dock-grill-with-docs",
 )
 
 _ISSUE_359_LEGACY_MANAGED_SKILL_INVENTORY = (
@@ -41599,6 +41637,7 @@ _ISSUE_359_LEGACY_MANAGED_SKILL_INVENTORY = (
 )
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> None:
     import spec_dock.cli as cli
 
@@ -41758,13 +41797,6 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
     ):
         assert marker in docs_text
 
-    provider_config = assets_root / "install_root/.codex/config.toml"
-    dogfood_config = repo_root / ".codex/config.toml"
-    assert dogfood_config.read_bytes() == provider_config.read_bytes()
-    config_bytes = provider_config.read_bytes()
-    config = tomllib.loads(config_bytes.decode("utf-8"))
-    assert config == _ISSUE_359_EXPECTED_CODEX_CONFIG
-
     mappings, _ = cli._build_current_managed_file_mappings(assets_root)
     mapped_targets = {mapping.target_rel.as_posix() for mapping in mappings}
     assert {
@@ -41774,7 +41806,7 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
         ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
     } <= mapped_targets
     assert cli._MANAGED_SKILL_NAMES == _ISSUE_359_MANAGED_SKILL_INVENTORY
-    assert cli._LEGACY_MANAGED_SKILL_NAMES == _ISSUE_359_LEGACY_MANAGED_SKILL_INVENTORY
+    assert not hasattr(cli, "_LEGACY_MANAGED_SKILL_NAMES")
 
 
 @pytest.mark.parametrize(
@@ -41786,6 +41818,7 @@ def test_issue_359_repo_local_skill_contracts_and_additive_materialization() -> 
         ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
     ),
 )
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_359_init_preserves_nonidentical_preexisting_skill_asset(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -41807,6 +41840,7 @@ def test_issue_359_init_preserves_nonidentical_preexisting_skill_asset(
     assert relative_path in captured.err
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_359_update_collision_fails_before_other_managed_writes(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -41829,6 +41863,7 @@ def test_issue_359_update_collision_fails_before_other_managed_writes(
     assert "non-identical additive skill asset" in captured.err
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_359_init_rejects_additive_target_symlink_swapped_after_preflight(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -41864,6 +41899,7 @@ def test_issue_359_init_rejects_additive_target_symlink_swapped_after_preflight(
     assert "additive skill asset" in captured.err
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_359_init_rejects_additive_parent_symlink_swapped_after_preflight(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -41902,6 +41938,7 @@ def test_issue_359_init_rejects_additive_parent_symlink_swapped_after_preflight(
     assert "unsafe additive skill parent component" in captured.err
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_359_init_stops_before_writing_when_open_parent_moves_outside_repo(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -41944,6 +41981,7 @@ def test_issue_359_init_stops_before_writing_when_open_parent_moves_outside_repo
     assert "additive skill parent moved outside the repository" in captured.err
 
 
+@_ISSUE_360_RETIRED_LEGACY_SURFACE
 def test_issue_359_init_preserves_replacement_created_when_owned_asset_fd_closes(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
