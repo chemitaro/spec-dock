@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from spec_dock import cli
 from tests.cli_runtime.harness import main
 
@@ -442,3 +444,130 @@ def test_s55_update_prunes_known_legacy_and_preserves_node_local_data(tmp_path: 
     assert unknown.read_bytes() == b"user-owned\n"
     assert initiative.read_bytes() == b"keep initiative\n"
     assert issue_workbench.read_bytes() == b"keep workbench\n"
+
+
+def test_s60_update_forward_retry_marker_is_removed_after_success(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+
+    assert main(["update", str(tmp_path)]) == 0
+
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+    assert (tmp_path / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.3\n"
+
+
+def test_s60_atomic_regular_file_does_not_replace_racing_destination(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / ".distribution-retry.json"
+    original_link = cli.os.link
+
+    def race_publish(source, target, *, follow_symlinks=False):
+        Path(target).write_bytes(b"user replacement\n")
+        return original_link(source, target, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(cli.os, "link", race_publish)
+
+    with pytest.raises(RuntimeError, match="managed file write failed"):
+        cli._write_atomic_regular_file(destination, b"managed\n", mode=0o600)
+
+    assert destination.read_bytes() == b"user replacement\n"
+
+
+def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    version = tmp_path / "spec-dock/spec-dock.version"
+    before_version = version.read_bytes()
+    original = cli._install_spec_dock
+
+    def fail_after_scaffold(*args, **kwargs):
+        original(*args, **kwargs)
+        raise RuntimeError("credential=secret /private/outside/source.txt")
+
+    monkeypatch.setattr(cli, "_install_spec_dock", fail_after_scaffold)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr().err
+    assert "credential=secret" not in captured
+    assert "/private/outside/source.txt" not in captured
+    assert "distribution partial failure during scaffold-refresh" in captured
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    payload = json.loads(marker.read_text(encoding="utf-8"))
+    assert payload["operation"] == "update"
+    assert payload["last_completed_phase"] == "distribution-applied"
+    assert version.read_bytes() == before_version
+
+    monkeypatch.setattr(cli, "_install_spec_dock", original)
+    assert main(["update", str(tmp_path)]) == 0
+    assert not marker.exists()
+
+
+def test_s60_root_rebind_preserves_replacement_and_original_retry_marker(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    original = cli._install_spec_dock
+    displaced = tmp_path.with_name(f"{tmp_path.name}-displaced")
+
+    def rebind_before_scaffold(*args, **kwargs):
+        tmp_path.rename(displaced)
+        tmp_path.mkdir()
+        (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(cli, "_install_spec_dock", rebind_before_scaffold)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during scaffold-refresh" in captured
+    assert "replacement-sentinel.txt" not in captured
+
+    marker = displaced / "spec-dock/.distribution-retry.json"
+    payload = json.loads(marker.read_text(encoding="utf-8"))
+    displaced_stat = displaced.stat()
+    assert payload["target_root"] == {
+        "device": displaced_stat.st_dev,
+        "inode": displaced_stat.st_ino,
+    }
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not (tmp_path / "spec-dock").exists()
+
+    monkeypatch.setattr(cli, "_install_spec_dock", original)
+    replacement_before_retry = _filesystem_snapshot(tmp_path)
+    assert main(["update", str(tmp_path)]) == 1
+    assert _filesystem_snapshot(tmp_path) == replacement_before_retry
+    assert marker.exists()
+
+
+def test_s60_post_verify_failure_keeps_marker_until_forward_retry(tmp_path: Path, monkeypatch, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    version = tmp_path / "spec-dock/spec-dock.version"
+    before_version = version.read_bytes()
+    original = cli._write_spec_dock_version
+
+    def fail_version_write(*args, **kwargs):
+        raise RuntimeError("source bytes secret /private/outside/source.txt")
+
+    monkeypatch.setattr(cli, "_write_spec_dock_version", fail_version_write)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr().err
+    assert "source bytes secret" not in captured
+    assert "/private/outside/source.txt" not in captured
+    assert "distribution partial failure during version-write" in captured
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    payload = json.loads(marker.read_text(encoding="utf-8"))
+    assert payload["last_completed_phase"] == "post-verified"
+    assert version.read_bytes() == before_version
+
+    monkeypatch.setattr(cli, "_write_spec_dock_version", original)
+    assert main(["update", str(tmp_path)]) == 0
+    assert not marker.exists()
