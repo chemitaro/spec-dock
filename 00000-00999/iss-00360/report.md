@@ -221,8 +221,8 @@ root identityはoperation開始時に固定し、marker更新、scaffold refresh
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| S60指定契約 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q -k "retry or fault or rebind or cross_root or post_verify or diagnostic"` → `16 passed` |
-| S55 + S60 + S65 + S70対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `108 passed`（unit 65、CLI 43。S55 baseline 87＝unit 65、CLI 22からS60〜S70の21ケースを追加） |
+| S60指定契約 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q -k "retry or fault or rebind or cross_root or post_verify or diagnostic"` → `20 passed, 101 deselected` |
+| S55 + S60 + S65 + S70対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `121 passed`（unit 65、CLI 56。S55 baseline 87＝unit 65、CLI 22からS60〜S70の34ケースを追加） |
 | Fault / diagnostic sanitation | pass | distribution-apply、scaffold、post-verify / version faultでphase marker保持・旧version保持・same-operation retry収束を確認し、credential風文字列・source bytes・repository外absolute pathをstderrへ出さないことを確認 |
 | Root rebind / no-replace | pass | descriptor-bound marker / scaffold / version mutationをroot差し替え中に実行してもreplacement sentinelを変更せず、旧root markerを保持し、retry側replacementへのwriteを0件にした。atomic regular-file publishでrace destinationを上書きしないことも確認 |
 
@@ -244,7 +244,7 @@ S70では、S65のdry-run分類をapplyへ引き継ぎ、preservedなownership c
 | S70 preservation boundary | pass | `--keep-specs`でinitiative bytesを保持し、`--remove-specs`でのみspec historyを削除。空のpreserved / unknown directoryも削除候補へ昇格させず、clean boundaryのcurrent / obsolete action、unknown sibling、root shortcutを分類どおり処理 |
 | S70 static checks | pass | `uv run ruff check src/spec_dock/cli.py src/spec_dock/managed_distribution.py tests/cli_runtime/test_distribution_cutover.py tests/unit/infra/test_init_update.py`、`uv run mypy src/spec_dock/cli.py src/spec_dock/managed_distribution.py`、`git diff --check` |
 
-S60〜S70の直接契約はCLI 43件、distribution unit 65件、および旧installer uninstall契約を現行仕様へ移行した28件のfocused regressionで閉じた。旧uninstall群のmarker保持、modified Workbench続行、version marker欠損後の無条件rerunという矛盾した期待は現行fail-closed契約へ更新し、legacy host-adapter/native-shim前提の旧テストはretired selectorとして明示した。
+S60〜S70の直接契約はCLI 56件、distribution unit 65件、および旧installer uninstall契約を現行仕様へ移行した28件のfocused regressionで閉じた。uninstallでは計画時のregular-file digest / device / inode / ctime / size、symlink target、directory identityをapply直前に再検証し、差し替えられたreplacementを削除しない。recognized updateではmanaged scaffold各directoryのdevice / inodeをpreflight後のrecursive refresh直前に再検証し、消失した`spec-dock`親をretry marker作成時に再生成しない。旧uninstall群のmarker保持、modified Workbench続行、version marker欠損後の無条件rerunという矛盾した期待は現行fail-closed契約へ更新し、legacy host-adapter/native-shim前提の旧テストはretired selectorとして明示した。
 
 ### S80 Dogfood projection / package parity
 
