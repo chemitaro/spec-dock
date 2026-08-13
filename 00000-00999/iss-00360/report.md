@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認した。S00 / S10、S40A / S40B、S20 / S25 / S30を完了し、S35でversion / retry marker admissionとCLIのzero-write rejectionを実装・検証した。S45ではGenuine FreshのCurrent配布計画、S50ではrecognized update / `init --force`の共通plan/applyを実装した。S55では、Issue 359 final commitから再現できる旧managed資産をexact SHAでcatalog化し、既知旧資産のprune、変更済み・不明・unsafe候補のpreserve-and-block、既存dogfood consumerのcutoverを実装・検証した。S60では、init / updateのphase marker、same-root / same-package / same-operationのforward retry、post-verify前のversion確定抑止、root rebind検知、markerのno-replace原子公開、fault診断のサニタイズを実装・検証した。S60のfresh code review、step commit、clean/upstream一致後にS65へ進む。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
+Issue 360のRequirement / Design / Planを、Issue 357〜359の実装handoff、IC-1 / IC-2、現行installer、ChatGPT-Use-Strictのexact-main authoring分析に基づいて具体化した。S20のCurrent catalog検証をS40A / S40Bのphysical cutover後へ移すPlan amendmentを完了し、fresh local `spec-reviewer`とcurrent exact-upstream `ChatGPT-SpecReview-Strict`のP0 / P1なし`pass`を確認した。S00 / S10、S40A / S40B、S20 / S25 / S30を完了し、S35でversion / retry marker admissionとCLIのzero-write rejectionを実装・検証した。S45ではGenuine FreshのCurrent配布計画、S50ではrecognized update / `init --force`の共通plan/applyを実装した。S55では、Issue 359 final commitから再現できる旧managed資産をexact SHAでcatalog化し、既知旧資産のprune、変更済み・不明・unsafe候補のpreserve-and-block、既存dogfood consumerのcutoverを実装・検証した。S60では、init / updateのphase marker、same-root / same-package / same-operationのforward retry、post-verify前のversion確定抑止、root rebind検知、markerのno-replace原子公開、fault診断のサニタイズを実装・検証した。S65ではuninstall admission / dry-runを共通classifierへ接続し、S70ではapply前の全計画検証、所有権不明時の全mutation停止、legacy marker-last retry、keep/remove specs境界、root identity再検証を実装・検証した。PR、Issue close、IC-3判定は実装・最終品質gate後まで開始しない。
 
 ## Verification
 
@@ -221,19 +221,28 @@ root identityはoperation開始時に固定し、marker更新、scaffold refresh
 | 観測 | 結果 | 証拠 |
 |---|---|---|
 | S60指定契約 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q -k "retry or fault or rebind or cross_root or post_verify or diagnostic"` → `16 passed` |
-| S55 + S60 + S65対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `102 passed`（unit 65、CLI 37。S55 baseline 87＝unit 65、CLI 22からS60/S65の15ケースを追加） |
+| S55 + S60 + S65 + S70対象回帰 | pass | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `107 passed`（unit 65、CLI 42。S55 baseline 87＝unit 65、CLI 22からS60〜S70の20ケースを追加） |
 | Fault / diagnostic sanitation | pass | distribution-apply、scaffold、post-verify / version faultでphase marker保持・旧version保持・same-operation retry収束を確認し、credential風文字列・source bytes・repository外absolute pathをstderrへ出さないことを確認 |
 | Root rebind / no-replace | pass | descriptor-bound marker / scaffold / version mutationをroot差し替え中に実行してもreplacement sentinelを変更せず、旧root markerを保持し、retry側replacementへのwriteを0件にした。atomic regular-file publishでrace destinationを上書きしないことも確認 |
 
 ### S65 Uninstall admission / dry-run
 
-S65では、uninstall入口がdistribution retry marker、dual marker、invalid / newer / anchor-mismatch versionを既存uninstall planへ渡す前に拒否し、version欠損でも正規のlegacy `.uninstall-retry.json` だけをread-only retryとしてadmitすることを確認した。dry-runの外部配布候補は`managed_distribution.json`と共通classifierから投影し、known historical obsoleteは`would_remove`、modified / unknown collisionは`preserved`として表示する。`--apply` の実削除やmarker書き換えはS70へ残し、S65ではdry-run / admission以外のmutationを追加していない。distribution retry markerの`last_completed_phase`もwriterが出力する5値へallowlistした。
+S65では、uninstall入口がdistribution retry marker、dual marker、invalid / newer / anchor-mismatch versionを既存uninstall planへ渡す前に拒否し、version欠損でも正規のlegacy `.uninstall-retry.json` だけをread-only retryとしてadmitすることを確認した。dry-runの外部配布候補は`managed_distribution.json`と共通classifierから投影し、known historical obsoleteは`would_remove`、modified / unknown collisionは`preserved`として表示する。distribution retry markerの`last_completed_phase`もwriterが出力する5値へallowlistした。実削除とlegacy markerのapply順序は後続S70で閉じた。
 
 | S65指定契約 | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_distribution_cutover.py -q -k "dry_run or admission or marker"` → `12 passed, 33 deselected` |
 | S65 zero-write / ownership projection | pass | invalid version、distribution / dual markerのuninstallをfilesystem snapshot不変で拒否し、legacy uninstall markerのみversion欠損のrerun admissionを許可。modified current skillはpreserved、known obsolete identityは`would_remove`としてdry-runへ表示 |
 | Static checks | pass | `uv run ruff check src/spec_dock/cli.py tests/cli_runtime/test_distribution_cutover.py`、`uv run mypy src/spec_dock/cli.py src/spec_dock/managed_distribution.py`、`python3 -m json.tool src/spec_dock/assets/managed_distribution.json`、`git diff --check`、`./spec-dock/scripts/spec-dock validate` |
 
-S60の広範な`tests/unit/infra/test_init_update.py`は、S55で物理退役したlegacy assetや旧anchor mismatchを前提とする既存テストを含むためstep gateには採用しない。S60/S65の直接契約は上記102件のfocused regressionで閉じ、旧テスト群の仕様移行はS70以降の別作業として扱う。
+### S70 Uninstall apply / preservation / retry
+
+S70では、S65のdry-run分類をapplyへ引き継ぎ、preservedなownership collision、modified / unknown asset、symlink / hard-link / boundary collisionが1件でもある場合はretry marker作成前に全mutationを停止するようにした。applyableなplanだけが既存`.uninstall-retry.json`を最初のmutationとして作成し、各remove / empty-boundary cleanupでroot device / inodeを再検証する。部分失敗時はmarkerを保持して再実行を許可し、post-verify完了後にmarkerを最後のmanaged fileとして除去する。`--keep-specs`では`initiatives/**`を保持し、`--remove-specs`だけが明示的に削除する。
+
+| S70指定契約 | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_distribution_cutover.py -q -k "keep_specs or remove_specs or legacy or repeated or partial or retry"` → `11 passed, 39 deselected` |
+| S70 fail-closed / marker ordering | pass | modified current、known obsolete + unknown mixed candidateのapply前block、marker未作成、partial failureでmarker保持、same-package rerunでmarker-last除去を確認 |
+| S70 preservation boundary | pass | `--keep-specs`でinitiative bytesを保持し、`--remove-specs`でのみspec historyを削除。clean boundaryのcurrent / obsolete action、unknown sibling、root shortcutを分類どおり処理 |
+| S70 static checks | pass | `uv run ruff check src/spec_dock/cli.py src/spec_dock/managed_distribution.py tests/cli_runtime/test_distribution_cutover.py`、`uv run mypy src/spec_dock/cli.py src/spec_dock/managed_distribution.py`、`git diff --check` |
+
+S60〜S70の直接契約は上記107件のfocused regressionで閉じた。`tests/unit/infra/test_init_update.py`の旧uninstall群には、markerを成功後も保持する契約、modified Workbenchを保存して続行する契約、version marker欠損後の無条件rerunなど、Issue 360 Design §7.4 / §8.1と異なる期待が残るため、S95の全回帰で仕様移行対象として扱う。
 
 ## Residual Risks / Follow-ups
 
