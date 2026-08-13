@@ -1,25 +1,36 @@
-"""Distribution catalog, historical identity validation, and read-only plans.
+"""Distribution catalog, identity validation, and safe distribution plans.
 
-The module owns the provider physical catalog and the shared S20/S25
-classification boundary.  It never mutates a consumer tree.  Later Issue 360
-steps may consume the returned plan, but apply, prune, and CLI orchestration
-remain outside this module for now.
+The module owns the provider physical catalog and the shared S20/S25/S30
+distribution boundary.  Plan construction remains read-only; the S30 apply
+seam mutates only a validated target through descriptor-relative, no-follow
+operations and fails closed when an identity changes.
 """
 
 from __future__ import annotations
 
+import ctypes
 from dataclasses import dataclass
+import errno
 import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import secrets
 import stat
-from typing import Any, Literal
+import sys
+from typing import TYPE_CHECKING, Any, Literal, NoReturn
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class DistributionManifestError(ValueError):
     """Raised when the provider-private distribution manifest is unsafe."""
+
+
+class DistributionApplyError(RuntimeError):
+    """Raised when a distribution plan cannot be applied safely."""
 
 
 @dataclass(frozen=True)
@@ -107,19 +118,55 @@ class DistributionManifest:
 
 
 @dataclass(frozen=True)
+class PathIdentitySnapshot:
+    """No-follow identity of one repository-relative filesystem component."""
+
+    relative_path: str
+    exists: bool
+    device: int | None = None
+    inode: int | None = None
+    ctime_ns: int | None = None
+    file_type: str | None = None
+    link_count: int | None = None
+    identity: DistributionIdentity | None = None
+
+
+@dataclass(frozen=True)
+class DistributionTargetSnapshot:
+    """Root, parent, and exact-target identities captured during preflight."""
+
+    root: PathIdentitySnapshot
+    parents: tuple[PathIdentitySnapshot, ...]
+    target: PathIdentitySnapshot
+
+
+@dataclass(frozen=True)
 class DistributionPlan:
-    """Read-only S20/S25 plan surface for later apply steps."""
+    """Read-only S20/S25 plan surface consumed by the S30 apply seam."""
 
     current_assets: tuple[DistributionAsset, ...]
     actions: tuple[DistributionAction, ...]
     manifest: DistributionManifest
     scaffold_root: Path | None = None
+    install_root: Path | None = None
+    manifest_path: Path | None = None
+    target_root: Path | None = None
+    operation: DistributionOperation = "fresh"
+    target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...] = ()
 
     @property
     def blocked(self) -> bool:
         """Whether any classified action requires preserve-and-block."""
 
         return any(action.blocked for action in self.actions)
+
+
+@dataclass(frozen=True)
+class DistributionResult:
+    """Result of a completed, identity-checked distribution apply."""
+
+    status: Literal["complete"]
+    actions: tuple[DistributionAction, ...]
 
 
 _SCHEMA_VERSION = 1
@@ -138,7 +185,7 @@ _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 _GLOB_CHARS = frozenset("*?[]{}")
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     raise DistributionManifestError(message)
 
 
@@ -451,6 +498,7 @@ class _TargetObservation:
     state: str
     identity: DistributionIdentity | None = None
     link_count: int | None = None
+    snapshot: DistributionTargetSnapshot | None = None
 
 
 def _identity_matches(actual: DistributionIdentity, record: dict[str, Any]) -> bool:
@@ -470,6 +518,46 @@ def _normalized_link_target(value: str) -> str | None:
         return None
 
 
+def _file_type(mode: int) -> str:
+    if stat.S_ISREG(mode):
+        return "regular"
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    return "special"
+
+
+def _missing_snapshot(relative_path: str) -> PathIdentitySnapshot:
+    return PathIdentitySnapshot(relative_path=relative_path, exists=False)
+
+
+def _snapshot_from_stat(
+    relative_path: str,
+    info: os.stat_result,
+    *,
+    identity: DistributionIdentity | None = None,
+) -> PathIdentitySnapshot:
+    return PathIdentitySnapshot(
+        relative_path=relative_path,
+        exists=True,
+        device=info.st_dev,
+        inode=info.st_ino,
+        ctime_ns=info.st_ctime_ns,
+        file_type=_file_type(info.st_mode),
+        link_count=info.st_nlink,
+        identity=identity,
+    )
+
+
+def _target_snapshot(
+    root: PathIdentitySnapshot,
+    parents: list[PathIdentitySnapshot],
+    target: PathIdentitySnapshot,
+) -> DistributionTargetSnapshot:
+    return DistributionTargetSnapshot(root=root, parents=tuple(parents), target=target)
+
+
 def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation:
     """Inspect one target path without following a symlink component."""
 
@@ -477,63 +565,117 @@ def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation
     try:
         root_stat = os.lstat(current)
     except FileNotFoundError:
-        return _TargetObservation("missing")
+        return _TargetObservation(
+            "missing",
+            snapshot=_target_snapshot(
+                _missing_snapshot("."),
+                [],
+                _missing_snapshot(relative_path),
+            ),
+        )
     except OSError:
         return _TargetObservation("root-error")
+    root_snapshot = _snapshot_from_stat(".", root_stat)
     if stat.S_ISLNK(root_stat.st_mode):
-        return _TargetObservation("root-symlink")
+        return _TargetObservation(
+            "root-symlink",
+            snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
+        )
     if not stat.S_ISDIR(root_stat.st_mode):
-        return _TargetObservation("root-non-directory")
+        return _TargetObservation(
+            "root-non-directory",
+            snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
+        )
 
     parts = PurePosixPath(relative_path).parts
+    parents: list[PathIdentitySnapshot] = []
+    parent_parts: list[str] = []
     for component in parts[:-1]:
         current = current / component
+        parent_parts.append(component)
+        parent_relative = "/".join(parent_parts)
         try:
             component_stat = os.lstat(current)
         except FileNotFoundError:
-            return _TargetObservation("missing")
+            parents.append(_missing_snapshot(parent_relative))
+            return _TargetObservation(
+                "missing",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
         except OSError:
-            return _TargetObservation("parent-error")
+            return _TargetObservation(
+                "parent-error",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
+        component_snapshot = _snapshot_from_stat(parent_relative, component_stat)
+        parents.append(component_snapshot)
         if stat.S_ISLNK(component_stat.st_mode):
-            return _TargetObservation("symlink-container")
+            return _TargetObservation(
+                "symlink-container",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
         if not stat.S_ISDIR(component_stat.st_mode):
-            return _TargetObservation("non-directory-container")
+            return _TargetObservation(
+                "non-directory-container",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
 
     exact = current / parts[-1]
     try:
         exact_stat = os.lstat(exact)
     except FileNotFoundError:
-        return _TargetObservation("missing")
+        return _TargetObservation(
+            "missing",
+            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+        )
     except OSError:
-        return _TargetObservation("target-error")
+        return _TargetObservation(
+            "target-error",
+            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+        )
 
     if stat.S_ISLNK(exact_stat.st_mode):
         try:
-            link_target = _normalized_link_target(os.readlink(exact))
+            link_target = _normalized_link_target(str(exact.readlink()))
         except OSError:
             link_target = None
+        identity = DistributionIdentity(kind="symlink", target=link_target)
         return _TargetObservation(
             "symlink",
-            DistributionIdentity(kind="symlink", target=link_target),
+            identity,
             exact_stat.st_nlink,
+            _target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat, identity=identity)),
         )
     if stat.S_ISREG(exact_stat.st_mode):
         try:
             digest = hashlib.sha256(exact.read_bytes()).hexdigest()
         except OSError:
-            return _TargetObservation("target-error")
+            return _TargetObservation(
+                "target-error",
+                snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
+            )
+        identity = DistributionIdentity(
+            kind="regular",
+            sha256=digest,
+            mode=stat.S_IMODE(exact_stat.st_mode),
+        )
         return _TargetObservation(
             "regular",
-            DistributionIdentity(
-                kind="regular",
-                sha256=digest,
-                mode=stat.S_IMODE(exact_stat.st_mode),
-            ),
+            identity,
             exact_stat.st_nlink,
+            _target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat, identity=identity)),
         )
     if stat.S_ISDIR(exact_stat.st_mode):
-        return _TargetObservation("directory", link_count=exact_stat.st_nlink)
-    return _TargetObservation("special", link_count=exact_stat.st_nlink)
+        return _TargetObservation(
+            "directory",
+            link_count=exact_stat.st_nlink,
+            snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
+        )
+    return _TargetObservation(
+        "special",
+        link_count=exact_stat.st_nlink,
+        snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
+    )
 
 
 def _historical_records(manifest: DistributionManifest) -> tuple[dict[str, Any], ...]:
@@ -607,8 +749,10 @@ def _classify_current_target(
     expected: DistributionIdentity,
     operation: DistributionOperation,
     manifest: DistributionManifest,
+    observation: _TargetObservation | None = None,
 ) -> DistributionAction:
-    observation = _observe_target(target_root, path)
+    if observation is None:
+        observation = _observe_target(target_root, path)
     if observation.state == "missing":
         if operation == "uninstall":
             return DistributionAction(path, operation, "prune", "missing", "already-absent")
@@ -690,9 +834,11 @@ def _classify_obsolete_target(
     item: dict[str, Any],
     operation: DistributionOperation,
     manifest: DistributionManifest,
+    observation: _TargetObservation | None = None,
 ) -> DistributionAction | None:
     path = item["path"]
-    observation = _observe_target(target_root, path)
+    if observation is None:
+        observation = _observe_target(target_root, path)
     if observation.state == "missing":
         return None
     if observation.state == "directory":
@@ -720,32 +866,45 @@ def _classify_target(
     current_assets: tuple[DistributionAsset, ...],
     operation: DistributionOperation,
     manifest: DistributionManifest,
-) -> tuple[DistributionAction, ...]:
+) -> tuple[tuple[DistributionAction, ...], tuple[tuple[str, DistributionTargetSnapshot], ...]]:
     specs = _target_identity_specs(current_assets)
-    actions = [
-        _classify_current_target(
-            target_root=target_root,
-            path=path,
-            expected=expected,
-            operation=operation,
-            manifest=manifest,
+    actions: list[DistributionAction] = []
+    observations: dict[str, _TargetObservation] = {}
+    for path, expected in sorted(specs.items()):
+        observation = _observe_target(target_root, path)
+        observations[path] = observation
+        actions.append(
+            _classify_current_target(
+                target_root=target_root,
+                path=path,
+                expected=expected,
+                operation=operation,
+                manifest=manifest,
+                observation=observation,
+            )
         )
-        for path, expected in sorted(specs.items())
-    ]
     if operation in {"update", "init-force", "uninstall"}:
         current_paths = set(specs)
         for item in manifest.obsolete_exact_files:
             if item["path"] in current_paths:
                 continue
+            observation = _observe_target(target_root, item["path"])
+            observations[item["path"]] = observation
             action = _classify_obsolete_target(
                 target_root=target_root,
                 item=item,
                 operation=operation,
                 manifest=manifest,
+                observation=observation,
             )
             if action is not None:
                 actions.append(action)
-    return tuple(actions)
+    snapshots: list[tuple[str, DistributionTargetSnapshot]] = []
+    for path in sorted(observations):
+        snapshot = observations[path].snapshot
+        if snapshot is not None:
+            snapshots.append((path, snapshot))
+    return tuple(actions), tuple(snapshots)
 
 
 def build_distribution_plan(
@@ -775,8 +934,9 @@ def build_distribution_plan(
         manifest,
     )
     actions: tuple[DistributionAction, ...] = ()
+    target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...] = ()
     if target_root is not None:
-        actions = _classify_target(
+        actions, target_snapshots = _classify_target(
             target_root=Path(target_root),
             current_assets=current_assets,
             operation=operation,
@@ -787,18 +947,846 @@ def build_distribution_plan(
         actions=actions,
         manifest=manifest,
         scaffold_root=Path(scaffold_root) if scaffold_root is not None else None,
+        install_root=install_root,
+        manifest_path=manifest_path,
+        target_root=Path(target_root) if target_root is not None else None,
+        operation=operation,
+        target_snapshots=target_snapshots,
     )
 
 
+def _distribution_directory_flags() -> int:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if not isinstance(nofollow, int) or not isinstance(directory, int):
+        raise DistributionApplyError("platform lacks required no-follow directory support")
+    return os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+
+
+def _open_distribution_parent_chain(
+    target_root: Path,
+    target_rel: str,
+    *,
+    create_missing: bool = False,
+    expected_snapshot: DistributionTargetSnapshot | None = None,
+) -> tuple[int, ...]:
+    flags = _distribution_directory_flags()
+    fds: list[int] = []
+    created_missing = False
+    try:
+        fds.append(os.open(target_root, flags))
+        if expected_snapshot is not None:
+            _assert_distribution_chain_bound(
+                tuple(fds),
+                expected_snapshot,
+                target_rel,
+                exact=not created_missing,
+            )
+        parts = PurePosixPath(target_rel).parts
+        for component_index, component in enumerate(parts[:-1]):
+            component_relative = "/".join(parts[: component_index + 1])
+            expected_parent = None
+            if expected_snapshot is not None:
+                expected_parent = next(
+                    (
+                        parent
+                        for parent in expected_snapshot.parents
+                        if parent.relative_path == component_relative
+                    ),
+                    None,
+                )
+            try:
+                next_fd = os.open(component, flags, dir_fd=fds[-1])
+                if expected_parent is not None and not expected_parent.exists:
+                    os.close(next_fd)
+                    raise DistributionApplyError(
+                        f"managed target parent appeared during apply for '{target_rel}'"
+                    )
+            except FileNotFoundError:
+                if not create_missing:
+                    raise DistributionApplyError(
+                        f"managed target parent is missing for '{target_rel}'"
+                    ) from None
+                if expected_snapshot is not None:
+                    _assert_distribution_chain_bound(
+                        tuple(fds),
+                        expected_snapshot,
+                        target_rel,
+                        exact=not created_missing,
+                    )
+                _assert_visible_distribution_chain_bound(target_root, target_rel, tuple(fds))
+                try:
+                    os.mkdir(component, dir_fd=fds[-1])
+                except FileExistsError:
+                    if expected_parent is not None and not expected_parent.exists:
+                        raise DistributionApplyError(
+                            f"managed target parent appeared during apply for '{target_rel}'"
+                        ) from None
+                else:
+                    created_missing = True
+                next_fd = os.open(component, flags, dir_fd=fds[-1])
+            except OSError as exc:
+                raise DistributionApplyError(
+                    f"managed target parent is unsafe for '{target_rel}'"
+                ) from exc
+            fds.append(next_fd)
+            _assert_visible_distribution_chain_bound(target_root, target_rel, tuple(fds))
+            if expected_snapshot is not None:
+                _assert_distribution_chain_bound(
+                    tuple(fds),
+                    expected_snapshot,
+                    target_rel,
+                    exact=not created_missing,
+                )
+        return tuple(fds)
+    except DistributionApplyError:
+        for fd in reversed(fds):
+            os.close(fd)
+        raise
+    except OSError as exc:
+        for fd in reversed(fds):
+            os.close(fd)
+        raise DistributionApplyError("managed target root cannot be opened safely") from exc
+
+
+def _close_distribution_parent_chain(fds: tuple[int, ...]) -> None:
+    for fd in reversed(fds):
+        os.close(fd)
+
+
+def _same_stat_identity(left: os.stat_result, right: PathIdentitySnapshot) -> bool:
+    return (
+        right.exists
+        and left.st_dev == right.device
+        and left.st_ino == right.inode
+        and left.st_ctime_ns == right.ctime_ns
+        and _file_type(left.st_mode) == right.file_type
+        and left.st_nlink == right.link_count
+    )
+
+
+def _same_stat_structure(left: os.stat_result, right: PathIdentitySnapshot) -> bool:
+    return (
+        right.exists
+        and left.st_dev == right.device
+        and left.st_ino == right.inode
+        and _file_type(left.st_mode) == right.file_type
+    )
+
+
+def _assert_distribution_chain_bound(
+    fds: tuple[int, ...],
+    snapshot: DistributionTargetSnapshot,
+    target_rel: str,
+    *,
+    exact: bool = False,
+) -> None:
+    if not snapshot.root.exists:
+        raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
+    root_matches = (
+        _same_stat_identity(os.fstat(fds[0]), snapshot.root)
+        if exact
+        else _same_stat_structure(os.fstat(fds[0]), snapshot.root)
+    )
+    if not root_matches:
+        raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
+    for fd, expected in zip(fds[1:], snapshot.parents, strict=False):
+        if not expected.exists:
+            continue
+        parent_matches = (
+            _same_stat_identity(os.fstat(fd), expected)
+            if exact
+            else _same_stat_structure(os.fstat(fd), expected)
+        )
+        if not parent_matches:
+            raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
+
+
+def _assert_visible_distribution_chain_bound(
+    target_root: Path,
+    target_rel: str,
+    fds: tuple[int, ...],
+) -> None:
+    parts = PurePosixPath(target_rel).parts
+    for index, fd in enumerate(fds):
+        visible = target_root.joinpath(*parts[:index]) if index else target_root
+        try:
+            visible_stat = os.lstat(visible)
+            held_stat = os.fstat(fd)
+        except OSError as exc:
+            raise DistributionApplyError(f"managed target identity changed for '{target_rel}'") from exc
+        if (
+            visible_stat.st_dev != held_stat.st_dev
+            or visible_stat.st_ino != held_stat.st_ino
+            or _file_type(visible_stat.st_mode) != _file_type(held_stat.st_mode)
+        ):
+            raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
+
+
+def _assert_regular_fd_safe(
+    fd: int,
+    snapshot: PathIdentitySnapshot,
+    path: str,
+    *,
+    exact: bool,
+) -> None:
+    actual = os.fstat(fd)
+    matches = _same_stat_identity(actual, snapshot) if exact else _same_stat_structure(actual, snapshot)
+    if not matches or actual.st_nlink != 1:
+        raise DistributionApplyError(f"managed target identity changed for '{path}'")
+
+
+def _read_fd_bytes(fd: int) -> bytes:
+    os.lseek(fd, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(fd, 1024 * 64)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+
+
+def _source_asset_bytes(source_path: Path) -> tuple[bytes, int]:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise DistributionApplyError("platform lacks required no-follow file support")
+    try:
+        source_stat = os.lstat(source_path)
+        if not stat.S_ISREG(source_stat.st_mode):
+            raise DistributionApplyError("provider Current asset is not a regular file")
+        fd = os.open(source_path, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0))
+    except DistributionApplyError:
+        raise
+    except OSError as exc:
+        raise DistributionApplyError("provider Current asset cannot be read safely") from exc
+    try:
+        actual = os.fstat(fd)
+        if not stat.S_ISREG(actual.st_mode):
+            raise DistributionApplyError("provider Current asset changed type")
+        return _read_fd_bytes(fd), stat.S_IMODE(actual.st_mode)
+    finally:
+        os.close(fd)
+
+
+def _write_fd_bytes(
+    fd: int,
+    content: bytes,
+    *,
+    before_mutation: Callable[[], None] | None = None,
+) -> None:
+    if before_mutation is not None:
+        before_mutation()
+    os.ftruncate(fd, 0)
+    os.lseek(fd, 0, os.SEEK_SET)
+    view = memoryview(content)
+    offset = 0
+    while offset < len(view):
+        if before_mutation is not None:
+            before_mutation()
+        written = os.write(fd, view[offset:])
+        if written <= 0:
+            raise DistributionApplyError("managed target write made no progress")
+        offset += written
+    os.fsync(fd)
+
+
+def _resolve_distribution_no_replace_rename() -> tuple[Any, int]:
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform.startswith("linux"):
+        rename = getattr(library, "renameat2", None)
+        flag = 0x00000001  # RENAME_NOREPLACE
+    elif sys.platform == "darwin":
+        rename = getattr(library, "renameatx_np", None)
+        flag = 0x00000004  # RENAME_EXCL
+    else:
+        raise DistributionApplyError("platform lacks required no-replace rename support")
+    if rename is None:
+        raise DistributionApplyError("platform lacks required no-replace rename support")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    return rename, flag
+
+
+def _rename_distribution_no_replace(
+    source_parent_fd: int,
+    source_name: str,
+    destination_parent_fd: int,
+    destination_name: str,
+) -> None:
+    rename, flag = _resolve_distribution_no_replace_rename()
+    result = rename(
+        source_parent_fd,
+        os.fsencode(source_name),
+        destination_parent_fd,
+        os.fsencode(destination_name),
+        flag,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in (errno.EEXIST, errno.ENOTEMPTY):
+        raise FileExistsError(error_number, os.strerror(error_number), destination_name)
+    raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _resolve_distribution_swap_rename() -> tuple[Any, int]:
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform.startswith("linux"):
+        rename = getattr(library, "renameat2", None)
+        flag = 0x00000002  # RENAME_EXCHANGE
+    elif sys.platform == "darwin":
+        rename = getattr(library, "renameatx_np", None)
+        flag = 0x00000002  # RENAME_SWAP
+    else:
+        raise DistributionApplyError("platform lacks required atomic replace support")
+    if rename is None:
+        raise DistributionApplyError("platform lacks required atomic replace support")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    return rename, flag
+
+
+def _rename_distribution_swap(
+    source_parent_fd: int,
+    source_name: str,
+    destination_parent_fd: int,
+    destination_name: str,
+) -> None:
+    rename, flag = _resolve_distribution_swap_rename()
+    result = rename(
+        source_parent_fd,
+        os.fsencode(source_name),
+        destination_parent_fd,
+        os.fsencode(destination_name),
+        flag,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _remove_distribution_stage_if_owned(
+    parent_fd: int,
+    stage_name: str,
+    created: os.stat_result,
+) -> None:
+    try:
+        current = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            current.st_dev == created.st_dev
+            and current.st_ino == created.st_ino
+            and current.st_ctime_ns == created.st_ctime_ns
+            and _file_type(current.st_mode) == _file_type(created.st_mode)
+            and current.st_nlink == created.st_nlink == 1
+        ):
+            os.unlink(stage_name, dir_fd=parent_fd)
+    except OSError:
+        return
+
+
+def _expected_target_identity(plan: DistributionPlan, path: str) -> DistributionIdentity | None:
+    return _target_identity_specs(plan.current_assets).get(path)
+
+
+def _plan_snapshot_map(plan: DistributionPlan) -> dict[str, DistributionTargetSnapshot]:
+    return dict(plan.target_snapshots)
+
+
+def _assert_plan_target_snapshot(
+    target_root: Path,
+    path: str,
+    expected: DistributionTargetSnapshot,
+) -> _TargetObservation:
+    observation = _observe_target(target_root, path)
+    if observation.snapshot != expected:
+        raise DistributionApplyError(f"managed target identity changed for '{path}'")
+    return observation
+
+
+def _same_structure_identity(actual: PathIdentitySnapshot, expected: PathIdentitySnapshot) -> bool:
+    if not expected.exists or not actual.exists:
+        return actual.exists == expected.exists
+    return (
+        actual.device == expected.device
+        and actual.inode == expected.inode
+        and actual.file_type == expected.file_type
+    )
+
+
+def _assert_pending_snapshot_stable(
+    actual: DistributionTargetSnapshot,
+    expected: DistributionTargetSnapshot,
+    path: str,
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+) -> None:
+    if not _same_structure_identity(actual.root, expected.root):
+        raise DistributionApplyError(f"managed target identity changed for '{path}'")
+    actual_parents = {parent.relative_path: parent for parent in actual.parents}
+    for expected_parent in expected.parents:
+        actual_parent = actual_parents.get(expected_parent.relative_path, _missing_snapshot(expected_parent.relative_path))
+        if expected_parent.exists:
+            if not _same_structure_identity(actual_parent, expected_parent):
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+        elif actual_parent.exists:
+            bound_parent = created_parent_bindings.get(expected_parent.relative_path)
+            if bound_parent is None:
+                created_parent_bindings[expected_parent.relative_path] = actual_parent
+            elif not _same_structure_identity(actual_parent, bound_parent):
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+    if actual.target != expected.target:
+        raise DistributionApplyError(f"managed target identity changed for '{path}'")
+
+
+def _bind_created_parent_identities(
+    target_rel: str,
+    snapshot: DistributionTargetSnapshot,
+    parent_chain: tuple[int, ...],
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+) -> None:
+    for index, expected_parent in enumerate(snapshot.parents, start=1):
+        if expected_parent.exists or index >= len(parent_chain):
+            continue
+        current = _snapshot_from_stat(
+            expected_parent.relative_path,
+            os.fstat(parent_chain[index]),
+        )
+        bound_parent = created_parent_bindings.get(expected_parent.relative_path)
+        if bound_parent is None:
+            created_parent_bindings[expected_parent.relative_path] = current
+        elif not _same_structure_identity(current, bound_parent):
+            raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
+
+
+def _apply_regular_action(
+    *,
+    target_root: Path,
+    action: DistributionAction,
+    snapshot: DistributionTargetSnapshot,
+    expected: DistributionIdentity,
+    source_bytes: bytes | None,
+    source_mode: int | None,
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+) -> None:
+    path = action.path
+    if action.action == "prune" and not snapshot.target.exists:
+        return
+    parent_chain = _open_distribution_parent_chain(
+        target_root,
+        path,
+        create_missing=action.action == "create",
+        expected_snapshot=snapshot,
+    )
+    try:
+        _assert_distribution_chain_bound(parent_chain, snapshot, path)
+        _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+        _bind_created_parent_identities(path, snapshot, parent_chain, created_parent_bindings)
+        parent_fd = parent_chain[-1]
+        target_name = PurePosixPath(path).name
+        try:
+            target_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+            target_exists = True
+        except FileNotFoundError:
+            target_stat = None
+            target_exists = False
+
+        if action.action == "create":
+            if target_exists:
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+            if expected.kind != "regular" or source_bytes is None or source_mode is None:
+                raise DistributionApplyError(f"unsupported managed create action for '{path}'")
+            _resolve_distribution_no_replace_rename()
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("platform lacks required no-follow file support")
+            staging_name = f".spec-dock-file-{os.getpid()}-{secrets.token_hex(8)}"
+            fd = os.open(
+                staging_name,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                source_mode,
+                dir_fd=parent_fd,
+            )
+            created = os.fstat(fd)
+            stage_identity = created
+            try:
+                if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
+                    raise DistributionApplyError(f"managed target is unsafe for '{path}'")
+                mutation_phase = "pre"
+
+                def check_before_write() -> None:
+                    nonlocal mutation_phase
+                    _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                    current = os.fstat(fd)
+                    if not stat.S_ISREG(current.st_mode) or current.st_nlink != 1:
+                        raise DistributionApplyError(f"managed target identity changed for '{path}'")
+                    mutation_phase = "post"
+
+                _write_fd_bytes(fd, source_bytes, before_mutation=check_before_write)
+                _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                if os.fstat(fd).st_nlink != 1:
+                    raise DistributionApplyError(f"managed target identity changed for '{path}'")
+                os.fchmod(fd, source_mode)
+                verified = os.fstat(fd)
+                if (
+                    verified.st_nlink != 1
+                    or stat.S_IMODE(verified.st_mode) != source_mode
+                    or hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != expected.sha256
+                ):
+                    raise DistributionApplyError(f"managed target verification failed for '{path}'")
+                stage_identity = verified
+            finally:
+                os.close(fd)
+            try:
+                _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
+            finally:
+                _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)
+            published_fd = os.open(target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
+            try:
+                published = os.fstat(published_fd)
+                if (
+                    published.st_nlink != 1
+                    or stat.S_IMODE(published.st_mode) != source_mode
+                    or hashlib.sha256(_read_fd_bytes(published_fd)).hexdigest() != expected.sha256
+                ):
+                    raise DistributionApplyError(f"managed target verification failed for '{path}'")
+            finally:
+                os.close(published_fd)
+            return
+
+        if not target_exists or target_stat is None:
+            if action.action == "prune":
+                return
+            raise DistributionApplyError(f"managed target identity changed for '{path}'")
+
+        if expected.kind != "regular":
+            raise DistributionApplyError(f"unsupported regular managed action for '{path}'")
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise DistributionApplyError("platform lacks required no-follow file support")
+        flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
+        if action.action == "upgrade":
+            flags = os.O_RDWR | nofollow | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(target_name, flags, dir_fd=parent_fd)
+        try:
+            opened = os.fstat(fd)
+            if not _same_stat_identity(opened, snapshot.target) or opened.st_nlink != 1:
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+            if action.action == "prune":
+                target_identity = snapshot.target.identity
+                if target_identity is None or target_identity.kind != "regular":
+                    raise DistributionApplyError(f"managed target identity changed for '{path}'")
+                if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
+                    raise DistributionApplyError(f"managed target identity changed for '{path}'")
+                _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
+                os.unlink(target_name, dir_fd=parent_fd)
+                return
+            if source_bytes is None or source_mode is None:
+                raise DistributionApplyError(f"missing provider bytes for '{path}'")
+            mutation_phase = "pre"
+
+            def check_before_write() -> None:
+                nonlocal mutation_phase
+                _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                _assert_regular_fd_safe(
+                    fd,
+                    snapshot.target,
+                    path,
+                    exact=mutation_phase == "pre",
+                )
+                mutation_phase = "post"
+
+            _write_fd_bytes(fd, source_bytes, before_mutation=check_before_write)
+            _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+            _assert_regular_fd_safe(fd, snapshot.target, path, exact=False)
+            os.fchmod(fd, source_mode)
+            verified = os.fstat(fd)
+            if (
+                verified.st_nlink != 1
+                or
+                stat.S_IMODE(verified.st_mode) != source_mode
+                or hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != expected.sha256
+            ):
+                raise DistributionApplyError(f"managed target verification failed for '{path}'")
+        finally:
+            os.close(fd)
+    except FileNotFoundError as exc:
+        raise DistributionApplyError(f"managed target identity changed for '{path}'") from exc
+    except OSError as exc:
+        raise DistributionApplyError(f"managed target apply failed for '{path}'") from exc
+    finally:
+        _close_distribution_parent_chain(parent_chain)
+
+
+def _apply_symlink_action(
+    *,
+    target_root: Path,
+    action: DistributionAction,
+    snapshot: DistributionTargetSnapshot,
+    expected: DistributionIdentity,
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+) -> None:
+    if expected.target is None:
+        raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
+    expected_target = expected.target
+    if action.action == "prune" and not snapshot.target.exists:
+        return
+    parent_chain = _open_distribution_parent_chain(
+        target_root,
+        action.path,
+        create_missing=action.action == "create",
+        expected_snapshot=snapshot,
+    )
+    try:
+        _assert_distribution_chain_bound(parent_chain, snapshot, action.path)
+        _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
+        _bind_created_parent_identities(action.path, snapshot, parent_chain, created_parent_bindings)
+        parent_fd = parent_chain[-1]
+        target_name = PurePosixPath(action.path).name
+        try:
+            current_target = os.readlink(target_name, dir_fd=parent_fd)
+            target_exists = True
+        except FileNotFoundError:
+            current_target = None
+            target_exists = False
+        except OSError as exc:
+            raise DistributionApplyError(f"managed target is unsafe for '{action.path}'") from exc
+
+        if action.action == "create":
+            if target_exists:
+                raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+            _resolve_distribution_no_replace_rename()
+            staging_name = f".spec-dock-symlink-{os.getpid()}-{secrets.token_hex(8)}"
+            os.symlink(expected_target, staging_name, dir_fd=parent_fd)
+            staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            try:
+                staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
+                if staged_target != expected_target or staging_stat.st_nlink != 1:
+                    raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
+                _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
+                _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
+            finally:
+                _remove_distribution_stage_if_owned(parent_fd, staging_name, staging_stat)
+            created_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
+            if created_target != expected_target:
+                raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
+            return
+        if action.action == "prune":
+            if not target_exists:
+                return
+            if snapshot.target.identity is None or current_target != snapshot.target.identity.target:
+                raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+            latest_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+            if not _same_stat_identity(latest_stat, snapshot.target) or latest_stat.st_nlink != 1:
+                raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+            _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
+            latest_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
+            if latest_target != snapshot.target.identity.target:
+                raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+            os.unlink(target_name, dir_fd=parent_fd)
+            return
+        if action.action == "upgrade":
+            if not target_exists or snapshot.target.identity is None:
+                raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+            if current_target != snapshot.target.identity.target:
+                raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+            _resolve_distribution_swap_rename()
+            staging_name = f".spec-dock-symlink-{os.getpid()}-{secrets.token_hex(8)}"
+            os.symlink(expected_target, staging_name, dir_fd=parent_fd)
+            staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            swapped = False
+            try:
+                staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
+                if staged_target != expected_target:
+                    raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
+                latest_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+                if not _same_stat_identity(latest_stat, snapshot.target) or latest_stat.st_nlink != 1:
+                    raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                latest_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
+                if latest_target != snapshot.target.identity.target:
+                    raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
+                _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+                swapped = True
+                published_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
+                if published_target != expected_target:
+                    raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
+            finally:
+                if not swapped:
+                    _remove_distribution_stage_if_owned(parent_fd, staging_name, staging_stat)
+                else:
+                    try:
+                        old_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
+                        old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                        if (
+                            snapshot.target.identity is not None
+                            and old_target == snapshot.target.identity.target
+                            and _same_stat_structure(old_stat, snapshot.target)
+                            and old_stat.st_nlink == 1
+                        ):
+                            os.unlink(staging_name, dir_fd=parent_fd)
+                    except FileNotFoundError:
+                        pass
+            return
+        raise DistributionApplyError(f"unsupported symlink action for '{action.path}'")
+    except FileNotFoundError as exc:
+        raise DistributionApplyError(f"managed target identity changed for '{action.path}'") from exc
+    except OSError as exc:
+        raise DistributionApplyError(f"managed target apply failed for '{action.path}'") from exc
+    finally:
+        _close_distribution_parent_chain(parent_chain)
+
+
+def _apply_distribution_action(
+    plan: DistributionPlan,
+    target_root: Path,
+    action: DistributionAction,
+    snapshot: DistributionTargetSnapshot,
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+) -> None:
+    if action.action in {"adopt", "preserve"}:
+        return
+    expected = _expected_target_identity(plan, action.path)
+    if expected is None and action.action != "prune":
+        raise DistributionApplyError(f"managed action has no Current identity for '{action.path}'")
+    if action.action == "create" and expected is not None:
+        _resolve_distribution_no_replace_rename()
+    elif action.action == "upgrade" and expected is not None and expected.kind == "symlink":
+        _resolve_distribution_swap_rename()
+
+    source_bytes: bytes | None = None
+    source_mode: int | None = None
+    if action.action in {"create", "upgrade"}:
+        if expected is None or expected.kind != "regular":
+            source_bytes = None
+        else:
+            if plan.install_root is None:
+                raise DistributionApplyError("distribution plan has no provider source root")
+            source_bytes, source_mode = _source_asset_bytes(plan.install_root / action.path)
+
+    target_kind = snapshot.target.file_type
+    if expected is not None and expected.kind == "symlink":
+        if expected.target is None:
+            raise DistributionApplyError(f"managed action has no symlink target for '{action.path}'")
+        _apply_symlink_action(
+            target_root=target_root,
+            action=action,
+            snapshot=snapshot,
+            expected=expected,
+            created_parent_bindings=created_parent_bindings,
+        )
+        return
+    if expected is None and target_kind == "symlink":
+        historical_identity = snapshot.target.identity
+        if historical_identity is None or historical_identity.kind != "symlink":
+            raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+        if historical_identity.target is None:
+            raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+        _apply_symlink_action(
+            target_root=target_root,
+            action=action,
+            snapshot=snapshot,
+            expected=historical_identity,
+            created_parent_bindings=created_parent_bindings,
+        )
+        return
+    if expected is None and target_kind != "regular":
+        raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+    _apply_regular_action(
+        target_root=target_root,
+        action=action,
+        snapshot=snapshot,
+        expected=expected if expected is not None else snapshot.target.identity,  # type: ignore[arg-type]
+        source_bytes=source_bytes,
+        source_mode=source_mode,
+        created_parent_bindings=created_parent_bindings,
+    )
+
+
+def apply_distribution_plan(plan: DistributionPlan) -> DistributionResult:
+    """Apply a validated plan with no-follow identity checks at every action.
+
+    This S30 seam intentionally does not perform CLI admission, version-marker
+    handling, retry persistence, or recursive cleanup.  Any preflight or
+    identity mismatch raises before the corresponding action writes or removes
+    a target path.
+    """
+
+    target_root = plan.target_root
+    if target_root is None or plan.install_root is None:
+        raise DistributionApplyError("distribution plan is missing target or provider roots")
+    if plan.blocked:
+        raise DistributionApplyError("distribution plan is blocked")
+    try:
+        root_stat = os.lstat(target_root)
+    except OSError as exc:
+        raise DistributionApplyError("managed target root cannot be opened safely") from exc
+    if not stat.S_ISDIR(root_stat.st_mode) or stat.S_ISLNK(root_stat.st_mode):
+        raise DistributionApplyError("managed target root is not a real directory")
+
+    snapshots = _plan_snapshot_map(plan)
+    created_parent_bindings: dict[str, PathIdentitySnapshot] = {}
+    for action in plan.actions:
+        snapshot = snapshots.get(action.path)
+        if snapshot is None:
+            raise DistributionApplyError("distribution plan is missing a target identity snapshot")
+        _assert_plan_target_snapshot(target_root, action.path, snapshot)
+
+    for index, action in enumerate(plan.actions):
+        if action.action in {"adopt", "preserve"}:
+            continue
+        snapshot = snapshots[action.path]
+        _assert_plan_target_snapshot(target_root, action.path, snapshot)
+        _apply_distribution_action(
+            plan,
+            target_root,
+            action,
+            snapshot,
+            created_parent_bindings,
+        )
+        for pending in plan.actions[index + 1 :]:
+            pending_snapshot = snapshots[pending.path]
+            pending_observation = _observe_target(target_root, pending.path)
+            if pending_observation.snapshot is None:
+                raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
+            _assert_pending_snapshot_stable(
+                pending_observation.snapshot,
+                pending_snapshot,
+                pending.path,
+                created_parent_bindings,
+            )
+            snapshots[pending.path] = pending_observation.snapshot
+
+    return DistributionResult(status="complete", actions=plan.actions)
+
+
 __all__ = [
-    "DistributionAsset",
     "DistributionAction",
     "DistributionActionName",
+    "DistributionApplyError",
+    "DistributionAsset",
     "DistributionIdentity",
     "DistributionManifest",
     "DistributionManifestError",
     "DistributionOperation",
     "DistributionPlan",
     "DistributionProvenance",
+    "DistributionResult",
+    "DistributionTargetSnapshot",
+    "PathIdentitySnapshot",
+    "apply_distribution_plan",
     "build_distribution_plan",
 ]
