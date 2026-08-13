@@ -873,6 +873,30 @@ def _install_fresh_distribution(target_root: Path) -> None:
             raise RuntimeError(f"distribution post-verify incomplete: {joined}")
 
 
+def _install_recognized_distribution(
+    target_root: Path, *, operation: DistributionOperation
+) -> None:
+    """Apply a recognized external distribution and refresh the managed scaffold."""
+    with _assets_dir() as assets_dir:
+        plan = build_distribution_plan(
+            assets_dir / "install_root",
+            manifest_path=assets_dir / "managed_distribution.json",
+            scaffold_root=assets_dir / "spec_dock",
+            target_root=target_root,
+            operation=operation,
+        )
+        if plan.blocked:
+            reasons = ", ".join(
+                f"{action.path}: {action.reason}"
+                for action in plan.actions
+                if action.blocked
+            )
+            raise RuntimeError(f"distribution preflight blocked: {reasons}")
+
+        apply_distribution_plan(plan)
+        _install_spec_dock(target_root, force=True)
+
+
 def _managed_skill_names() -> tuple[str, ...]:
     """Return the managed bundled skill set."""
     return _MANAGED_SKILL_NAMES
@@ -2244,17 +2268,15 @@ def main(argv: list[str] | None = None) -> int:
                 target_root,
                 operation="init-force" if bool(ns.force) else "fresh",
             )
-            if not ns.force and not os.path.lexists(_specdock_dir(target_root)):
+            if not ns.force:
+                if os.path.lexists(_specdock_dir(target_root)):
+                    raise RuntimeError("'spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
                 _install_fresh_distribution(target_root)
             else:
-                skill_install_plan = _preflight_managed_skill_install_plan(target_root)
-                _install_spec_dock(target_root, force=bool(ns.force))
-                _install_skill(target_root, plan=skill_install_plan)
+                _install_recognized_distribution(target_root, operation="init-force")
         elif ns.command == "update":
             _admit_distribution_cli(target_root, operation="update")
-            skill_install_plan = _preflight_managed_skill_install_plan(target_root)
-            _install_spec_dock(target_root, force=True)
-            _install_skill(target_root, plan=skill_install_plan)
+            _install_recognized_distribution(target_root, operation="update")
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:

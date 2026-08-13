@@ -307,3 +307,71 @@ def test_s45_fresh_rerun_through_force_converges(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path), "--force"]) == 0
 
     assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s50_update_restores_missing_current_asset_and_preserves_user_data(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    stale_asset = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    stale_asset.unlink()
+    initiative = tmp_path / "spec-dock/initiatives/user-owned.md"
+    initiative.parent.mkdir(parents=True, exist_ok=True)
+    initiative.write_bytes(b"keep initiative\n")
+    workbench_sentinel = tmp_path / "spec-dock/.workbench/sentinel.txt"
+    workbench_sentinel.write_bytes(b"keep workbench\n")
+
+    assert main(["update", str(tmp_path)]) == 0
+
+    assert stale_asset.read_bytes() == (INSTALL_ROOT / ".agents/skills/spec-dock/SKILL.md").read_bytes()
+    assert initiative.read_bytes() == b"keep initiative\n"
+    assert workbench_sentinel.read_bytes() == b"keep workbench\n"
+
+
+def test_s50_force_init_restores_missing_current_asset_and_preserves_user_data(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    stale_asset = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    stale_asset.unlink()
+    initiative = tmp_path / "spec-dock/initiatives/user-owned.md"
+    initiative.parent.mkdir(parents=True, exist_ok=True)
+    initiative.write_bytes(b"keep initiative\n")
+    workbench_sentinel = tmp_path / "spec-dock/.workbench/sentinel.txt"
+    workbench_sentinel.write_bytes(b"keep workbench\n")
+
+    assert main(["init", str(tmp_path), "--force"]) == 0
+
+    assert stale_asset.read_bytes() == (INSTALL_ROOT / ".agents/skills/spec-dock/SKILL.md").read_bytes()
+    assert initiative.read_bytes() == b"keep initiative\n"
+    assert workbench_sentinel.read_bytes() == b"keep workbench\n"
+
+
+def test_s50_update_unknown_current_collision_is_zero_write(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    collision = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    collision.write_bytes(b"unknown current collision\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    assert "unknown-current-collision" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s50_force_init_unknown_current_collision_is_zero_write(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    collision = tmp_path / ".agents/skills/spec-dock/SKILL.md"
+    collision.write_bytes(b"unknown current collision\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path), "--force"]) == 1
+
+    assert "unknown-current-collision" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s50_force_init_directory_only_current_collision_is_zero_write(tmp_path: Path) -> None:
+    collision = tmp_path / ".github/workflows/ci.yml"
+    collision.mkdir(parents=True)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path), "--force"]) == 1
+
+    assert _filesystem_snapshot(tmp_path) == before
