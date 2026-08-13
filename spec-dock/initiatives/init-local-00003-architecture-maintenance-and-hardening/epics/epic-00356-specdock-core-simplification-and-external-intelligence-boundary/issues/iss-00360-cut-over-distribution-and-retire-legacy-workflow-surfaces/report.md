@@ -69,11 +69,26 @@ S10はread-onlyで完了した。基準HEADは`9916af139e01a322d092e6fc0434b49f6
 
 Provider / dogfoodの現行二skill、CI、`.gitignore`、`scripts/spec-dock`のselected bytes/modeは一致した。dogfood固有のgenerated filesは`spec-dock.version`、active/agent derived views、dashboard/deps/tree projectionに限定される。`meta.json`のowner/path claims、workspace marker、directory名だけでは個別ownershipを証明しない。S10で再現できない「過去wheel/sdistのpackage digest」は未採用候補としてpreserve-and-blockに記録し、S20のmanifestへ推測値を登録しない。
 
+### S40A Legacy planning Runtime physical retirement
+
+S40Aの実装候補を、S10でlockしたexact targetとPlanの共有symbol境界に従って作成した。候補はまだcommitしていないため、実装baselineは直前のclean HEAD `befad5d3c7fc453f9784679feb4c3fe60f10dda3` とする。
+
+| 観測 | 結果 | 証拠 |
+|---|---|---|
+| Old-only Runtime / wrapper removal | pass | provider / dogfoodそれぞれ63 path（60削除 + contracts/ports/bootstrap 3変更）。`spec-dock-chatgpt`、`scripts/authoring-pack/**`、runtimeのplanning / authoring_pack treeを除去 |
+| Shared boundary safety | pass | `application/contracts.py` の planning use case 4 fields、`application/ports.py` の planning-only ports、`cli/bootstrap.py` の planning gateway / callback / importだけを除去。Storage Core / Artifact / lifecycle / sync / validate assemblyは保持 |
+| Route / import absence | pass | `tests/cli_runtime/test_storage_core_cli.py` の removed module / help-route characterizationを更新 |
+| Retained Storage Core characterization | pass | `uv run pytest --run-full-regression tests/cli_runtime/test_storage_core_cli.py -q` → `4 passed` |
+| Adjacent retained surfaces | pass | `uv run pytest tests/cli_runtime/test_wrappers.py tests/unit/infra/test_authoring_kit_assets.py -q` → `304 passed, 9 skipped` |
+| Formatting / review | pass | `git diff --check`、fresh `code-reviewer` pass（P0/P1なし、provider/dogfood parity確認） |
+
+S40AのREDは、共有契約を先に切断した状態で旧planning modulesをretained listへ残したため、Storage Core testが旧存在期待で失敗したこと。GREENではremoved module / use case fieldへ期待値を移し、物理削除後に4件すべてpassした。旧専用test / fixture 53件も削除し、S40B対象の`test_wrappers.py`、`test_authoring_kit_assets.py`、`test_init_update.py`、`authoring_kit` fixtureは保持した。S40Bのinstaller / asset catalog / docs / templatesは未変更であり、次のstepはS40Bである。
+
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lockを完了した。次はS40A physical Runtime retirementである。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、exact-current Strict pass、S00再確認、S10 inventory lock、S40A code review / focused testを完了した。S40Aのcommit後にS40B physical Target catalog cutoverへ進む。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
 
 ## Notes
