@@ -2277,9 +2277,7 @@ def _apply_regular_action(
                                 # former target.  Persist that new identity
                                 # before cleanup so a failed unlink can be
                                 # recovered by the next retry.
-                                stage_ownership_recorder(
-                                    _distribution_stage_ownership(path, staging_name, old_stat)
-                                )
+                                stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, old_stat))
                             _remove_distribution_stage_if_owned(
                                 parent_fd,
                                 staging_name,
