@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、初回実装コミット群に加えて、最終品質ゲートで検出した4件のP1（regular upgradeの非原子的write、mode不一致の未修復、Fresh initの再実行不能、partial failure診断不足）を `109999c6147cd4e1da8119f74ff128f4b687beb3` で修正した。通常テスト・lint・Issue 360 focused regression・package integration・`spec-dock validate`は修正後もpassした一方、全リポジトリのfull regressionにはIssue 360の物理退役対象外にあたる既存runtime/import/active/shellおよびlegacy manual helper参照の失敗が76件残る。最終ChatGPT-final-quality-gate-strictはこの修正後HEADに対して再実行中であり、P0/P1が残る場合は追加修正して再実行する。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、初回実装コミット群に加えて、最終品質ゲートで検出したP1を段階的に修正した。`109999c6147cd4e1da8119f74ff128f4b687beb3` で初回の4件（regular upgradeの非原子的write、mode不一致の未修復、Fresh initの再実行不能、partial failure診断不足）を修正し、`9a231dc3` で再レビューで検出した4件（apply時のprovider mode再束縛、既知staging残骸のretry cleanup、marker公開後失敗のpartial化、recognized retry時の`.gitignore` no-follow identity再検証）を修正した。通常テスト・lint・Issue 360 focused regressionは最新コミットでもpassした一方、全リポジトリのfull regressionにはIssue 360の物理退役対象外にあたる既存runtime/import/active/shellおよびlegacy manual helper参照の失敗が76件残る。最終ChatGPT-final-quality-gate-strictは`a6ded0d9a838b40cdcd741fa473cd264b801f245`から現行HEADまでの差分に対して再実行し、P0/P1が残る場合は追加修正して再実行する。
 
 ### Latest P1 repair candidate (2026-08-14)
 
@@ -22,10 +22,16 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * partial failureの診断にrelative target、`last_completed_phase`、operation別retry commandを追加し、credentialやhost absolute pathを再出力しない。
 * 修正テスト: atomic staging failure、mode repair、Fresh same-package retry、partial failure diagnostic。
 
+### Latest P1 repair candidate 2 (2026-08-14)
+
+* apply時にplan取得後のprovider bytes / modeを再観測し、計画時modeと不一致なら公開せず停止する。regular upgradeのold staging cleanupはstrict化し、既知のregular / symlink stage identityだけをdescriptor-relativeに再検出・cleanupして同一package retryを収束させる。
+* markerを公開した後のtemporary cleanup失敗でも、marker実体を再確認してpartial failure診断へ遷移させる。recognized updateの`spec-dock/.gitignore`はprovider bytesとのidentityをpreflightとwrite直前にno-follow再検証し、未知内容を上書きしない。
+* 修正テスト: provider mode rebind、known stale stage retry cleanup、unknown scaffold `.gitignore` preserve-and-block、retry identity recheck、marker publish partial diagnostic。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `109999c6147cd4e1da8119f74ff128f4b687beb3`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
+* Final implementation commit: `9a231dc3`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
 * Integrated main baseline: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
@@ -293,14 +299,14 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | `uv run pytest` → `988 passed, 1517 skipped` |
+| Fast lane | pass | `uv run pytest -q` → `990 passed, 1520 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
-| Issue 360 focused regression | pass (Issue 360 suites) | Installer/distribution cutover, managed distribution, init/update, mode repair, atomic staging failure, Fresh retry, and partial-failure diagnostics pass (`69 passed, 57 skipped` for the final focused command). |
+| Issue 360 focused regression | pass (Issue 360 suites) | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `129 passed`; installer/distribution cutover, mode repair, atomic staging failure, Fresh retry, stale-stage retry cleanup, `.gitignore` identity recheck, and partial-failure diagnosticsを確認 |
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
 | Full repository regression | not adopted | `uv run pytest --run-full-regression -q` → `1913 passed, 516 skipped, 76 failed`。失敗は旧active/import/shell/runtime契約と退役済み`authoring-pack` / legacy helper参照に集中し、Issue 360 focused suiteとは別分類。全体passとは主張しない |
-| Final ChatGPT-final-quality-gate-strict | pending / rerun | 前回reviewはP1×4（109999c6で修正）。修正後HEAD `109999c6147cd4e1da8119f74ff128f4b687beb3`をmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分として、fresh browser sessionで再確認する |
+| Final ChatGPT-final-quality-gate-strict | pending / rerun | 前回の出力契約不成立レビューでP1×4を検出し、`109999c6`と`9a231dc3`で修正。現行HEAD `9a231dc3`をmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分として、fresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
 ## Residual Risks / Follow-ups
