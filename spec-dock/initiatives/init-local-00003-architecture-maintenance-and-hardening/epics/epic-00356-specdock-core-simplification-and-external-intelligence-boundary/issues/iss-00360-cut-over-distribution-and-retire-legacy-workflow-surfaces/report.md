@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`07c77b1ee33070180ada54972cce2579a19d9bf0` では、初回distribution markerをhard-link + unlinkではなくdescriptor-relativeなno-replace renameで公開し、marker hard-link残留を防止するとともに、regular upgradeのpost-swap stage ownership再記録とcleanupを限定的に再試行して同一package retryの収束を維持する回帰テストを追加した。先行する`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d` の初回marker再発行、`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14` の必須nested runtime preflight、`57d6091a7c190cb8ea868a5504333156b5a0fa10` のFresh root-bound workspace作成、root Workbench identity分類・更新時preserve、`3618a41796b9b4a52a008e18d9a0db8f63bfd851` の多段欠落parent snapshot、hard-linked symlink mutation拒否、recognized updateの全scaffold source preflight、`48779d16935546d818e003cf33a7b2e97d0832c8` の未登録parent拒否、`a6c420985bb7cd9d2e04984e3825ba62383229fe` のFresh create partial-stage retry identity / strict cleanupも維持している。クリーンな最終実装HEADのS95 v19 full regressionは `27 failed, 1948 passed, 516 skipped` で、v17とのfailure node集合差分は0件、現行failure path 27件すべてがmerge前固定点でも再現する`approved-no-op`、current-only 0件としてledgerへ記録した。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対してv19を実行する。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`07c77b1ee33070180ada54972cce2579a19d9bf0` では、初回distribution markerをhard-link + unlinkではなくdescriptor-relativeなno-replace renameで公開し、marker hard-link残留を防止するとともに、regular upgradeのpost-swap stage ownership再記録とcleanupを限定的に再試行して同一package retryの収束を維持する回帰テストを追加した。先行する`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d` の初回marker再発行、`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14` の必須nested runtime preflight、`57d6091a7c190cb8ea868a5504333156b5a0fa10` のFresh root-bound workspace作成、root Workbench identity分類・更新時preserve、`3618a41796b9b4a52a008e18d9a0db8f63bfd851` の多段欠落parent snapshot、hard-linked symlink mutation拒否、recognized updateの全scaffold source preflight、`48779d16935546d818e003cf33a7b2e97d0832c8` の未登録parent拒否、`a6c420985bb7cd9d2e04984e3825ba62383229fe` のFresh create partial-stage retry identity / strict cleanupも維持している。クリーンな最終実装HEADのS95 v22 full regressionは `27 failed, 1949 passed, 516 skipped` で、v19とのfailure node集合差分は0件、現行failure path 27件すべてがmerge前固定点でも再現する`approved-no-op`、current-only 0件としてledgerへ記録した。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対してv22を実行する。
 
 ### Latest P1 repair candidate (2026-08-14)
 
@@ -124,18 +124,18 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * regular upgradeのatomic swap後にstage ownership再記録が失敗した場合、current stage identityのmarker再記録を一度再試行し、cleanup失敗も限定的に再試行してからpartial errorを返すようにした。recorder / cleanupを同時注入しても、再記録またはownership-checked removalの一方が成立し、次回same-package retryがstage identity mismatchで停止しない。
 * 回帰テスト: post-swap recorder failureとstage cleanup二回失敗を同時注入し、current stage identityを保持したretry markerで次回cleanupが収束することを確認した。
 
-### Latest S95 v19 evidence (2026-08-15)
+### Latest S95 v22 evidence (2026-08-15)
 
 * no-replace publish seamへfault-injection hookを追従させ、v18で一時unlink / `os.link` hookが無効化していた2テストを修正した。
-* S95 v19は `27 failed, 1948 passed, 516 skipped`。v17とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v22は `27 failed, 1949 passed, 516 skipped`。v19とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `07c77b1ee33070180ada54972cce2579a19d9bf0`（markerのno-replace rename、post-swap stage ownership再記録 / cleanup再試行、recorder / cleanup複合故障回帰。初回marker再発行は親コミット`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`、nested runtime preflightは`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`）
+* Final implementation commit: `332deeb1e00dc406865cda87838f467515f92659`（symlink stageのownership再記録 / strict cleanup、pre-swap retry、およびpost-swap recorder / cleanup再試行。初回marker再発行は親コミット`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`、nested runtime preflightは`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`、regular stage修正は`07c77b1ee33070180ada54972cce2579a19d9bf0`）
 * Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
-* Final quality-gate evidence commit: `0644e030fa30ab8a98d30e1a34c74cba979d787b`（S95 v17 ledger / report refresh）。v19のledger / report refreshはこの実装treeで別途更新する。
-* S95 v19 full regression: 実装tree `b660924deccb0ccf595218815cef83c8483e7298`に対して `27 failed, 1948 passed, 516 skipped`。v17とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* Final quality-gate evidence commit: `0644e030fa30ab8a98d30e1a34c74cba979d787b`（S95 v17 ledger / report refresh）。v22のledger / report refreshはこの実装treeで別途更新する。
+* S95 v22 full regression: 実装tree `332deeb1e00dc406865cda87838f467515f92659`に対して `27 failed, 1949 passed, 516 skipped`。v19とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
@@ -412,8 +412,8 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | not adopted / ledgered | 最終実装HEAD `b660924deccb0ccf595218815cef83c8483e7298`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/codex-agent-work/501/session-20260814t205804z-issue360-s95-v19-016828e2/issue360-current-v19.xml` → `27 failed, 1948 passed, 516 skipped`（12分43秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を固定点subsetで再実行し、27件すべてが同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。v17とのfailure node集合差分は0件。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
-| Final ChatGPT-final-quality-gate-strict | pending / v19 | v17で検出されたmarker hard-link残留とpost-swap stage ownership消失のP1を、`07c77b1ee33070180ada54972cce2579a19d9bf0`のno-replace publishおよびrecorder / cleanup再試行へ反映した。現行HEADとmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、clean exact-upstreamのfresh browser sessionで再確認する |
+| Full repository regression | not adopted / ledgered | 最終実装HEAD `332deeb1e00dc406865cda87838f467515f92659`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v22.xml` → `27 failed, 1949 passed, 516 skipped`（12分43秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を固定点subsetで再実行し、27件すべてが同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。v19とのfailure node集合差分は0件。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
+| Final ChatGPT-final-quality-gate-strict | pending / v22 | v21で検出されたFresh symlink stageのownership未記録とcleanup非strictのP1を、`332deeb1e00dc406865cda87838f467515f92659`のsymlink stage再記録 / strict cleanup / retryへ反映した。現行HEADとmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、clean exact-upstreamのfresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
 ## Residual Risks / Follow-ups
