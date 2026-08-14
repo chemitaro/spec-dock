@@ -3,7 +3,7 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "b660924d5f6f9dce6cbec8ed5a3a4b6f8d9c1a2be",
+  "current_head_sha": "b660924deccb0ccf595218815cef83c8483e7298",
   "commands": {
     "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/codex-agent-work/501/session-20260814t205804z-issue360-s95-v19-016828e2/issue360-current-v19.xml",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
