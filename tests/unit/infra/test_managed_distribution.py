@@ -670,6 +670,69 @@ def test_s25_current_hard_link_is_blocked_for_uninstall(tmp_path: Path) -> None:
     assert action.blocked is True
 
 
+def test_s25_current_hard_linked_shortcut_is_blocked_for_uninstall(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    assert shortcut.lstat().st_nlink == 2
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    action = next(item for item in plan.actions if item.path == "spec")
+    assert action.action == "block"
+    assert action.provenance == "current"
+    assert action.reason == "hard-link-mutation-unsafe"
+    assert action.blocked is True
+
+
+def test_s25_historical_hard_linked_shortcut_is_blocked_for_update(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old_target = "legacy/spec-dock"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            historical_current_identities=[
+                {
+                    "path": "spec",
+                    "kind": "symlink",
+                    "target": old_target,
+                    "source": {"kind": "test-fixture", "ref": "issue-360-test"},
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to(old_target)
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    assert shortcut.lstat().st_nlink == 2
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == "spec")
+    assert action.action == "block"
+    assert action.provenance == "historical"
+    assert action.reason == "hard-link-mutation-unsafe"
+    assert action.blocked is True
+
+
 def test_s25_shortcut_uses_link_identity_without_following_target(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     shortcut = {
@@ -1278,6 +1341,53 @@ def test_s30_apply_rejects_external_parent_created_after_preflight(
 
     assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"first\n"
     assert not (target_root / "zz" / "second.yml").exists()
+
+
+def test_s30_apply_rejects_external_nested_parent_after_operation_parent_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"first\n")
+    first_source = install_root / "zz" / "first.yml"
+    first_source.parent.mkdir(parents=True)
+    first_source.write_bytes(b"first nested\n")
+    second_source = install_root / "zz" / "yy" / "second.yml"
+    second_source.parent.mkdir(parents=True)
+    second_source.write_bytes(b"second nested\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    original_apply = managed_distribution._apply_distribution_action
+    injected = False
+
+    def apply_then_create_external_nested_parent(
+        current_plan: object,
+        root: Path,
+        action: object,
+        snapshot: object,
+        bindings: dict[str, object],
+    ) -> None:
+        nonlocal injected
+        original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
+        if not injected and getattr(action, "path", "") == "zz/first.yml":
+            injected = True
+            (root / "zz" / "yy").mkdir()
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", apply_then_create_external_nested_parent)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert (target_root / "zz" / "first.yml").read_bytes() == b"first nested\n"
+    assert (target_root / "zz" / "yy").is_dir()
+    assert not (target_root / "zz" / "yy" / "second.yml").exists()
 
 
 def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(

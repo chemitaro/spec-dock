@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 from pathlib import Path
@@ -344,6 +345,33 @@ def test_s50_update_restores_missing_current_asset_and_preserves_user_data(tmp_p
     assert stale_asset.read_bytes() == (INSTALL_ROOT / ".agents/skills/spec-dock/SKILL.md").read_bytes()
     assert initiative.read_bytes() == b"keep initiative\n"
     assert workbench_sentinel.read_bytes() == b"keep workbench\n"
+
+
+def test_s50_update_preflights_all_scaffold_sources_before_distribution_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+
+    assets_copy = tmp_path / "provider-assets"
+    shutil.copytree(PROVIDER_ROOT, assets_copy)
+    shutil.rmtree(assets_copy / "spec_dock" / "docs")
+
+    @contextmanager
+    def patched_assets_dir():
+        yield assets_copy
+
+    monkeypatch.setattr(cli, "_assets_dir", patched_assets_dir)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr().err
+    assert "Invalid asset directory: spec_dock/docs" in captured
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
 def test_s50_force_init_restores_missing_current_asset_and_preserves_user_data(tmp_path: Path) -> None:

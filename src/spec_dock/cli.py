@@ -1636,6 +1636,10 @@ def _install_recognized_distribution(
     )
     with _assets_dir() as assets_dir:
         try:
+            # Recognized updates may mutate external distribution files before
+            # the scaffold refresh. Validate the complete scaffold source
+            # catalog before publishing the retry marker or touching targets.
+            _preflight_fresh_spec_dock_assets(assets_dir)
             src_gitignore = assets_dir / "spec_dock" / ".gitignore"
             if not src_gitignore.is_file() or src_gitignore.is_symlink():
                 raise RuntimeError("Missing asset file: spec_dock/.gitignore")
