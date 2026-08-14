@@ -1553,6 +1553,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
     marker_started = False
     last_completed_phase = "not-started"
     root_identity = _distribution_root_identity(target_root)
+    retry_recovery = _distribution_retry_marker_present(target_root)
     with _assets_dir() as assets_dir:
         try:
             src_gitignore = assets_dir / "spec_dock" / ".gitignore"
@@ -1589,7 +1590,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
 
             phase = "distribution-apply"
             _assert_distribution_root_identity(target_root, root_identity)
-            apply_distribution_plan(plan)
+            apply_distribution_plan(plan, allow_stale_stage_cleanup=retry_recovery)
             _write_distribution_retry_marker(
                 target_root,
                 operation=operation,

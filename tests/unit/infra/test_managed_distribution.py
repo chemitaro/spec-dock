@@ -88,13 +88,22 @@ def _write_manifest(tmp_path: Path, manifest: dict[str, object]) -> Path:
     return path
 
 
-def _regular_record(path: str, content: bytes, *, source_kind: str = "test-fixture") -> dict[str, object]:
-    return {
+def _regular_record(
+    path: str,
+    content: bytes,
+    *,
+    source_kind: str = "test-fixture",
+    mode: int | None = None,
+) -> dict[str, object]:
+    record: dict[str, object] = {
         "path": path,
         "kind": "regular",
         "sha256": hashlib.sha256(content).hexdigest(),
         "source": {"kind": source_kind, "ref": "issue-360-test"},
     }
+    if mode is not None:
+        record["mode"] = mode
+    return record
 
 
 def _minimal_install_root(tmp_path: Path, content: bytes = b"current\n") -> Path:
@@ -846,6 +855,44 @@ def test_s25_update_repairs_mode_when_content_is_current(tmp_path: Path) -> None
     assert stat.S_IMODE(target.stat().st_mode) == 0o755
 
 
+def test_s55_obsolete_identity_ownership_ignores_mode_drift(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    obsolete = tmp_path / "legacy-managed.md"
+    obsolete.write_bytes(b"legacy\n")
+    obsolete.chmod(0o755)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": "legacy-managed.md",
+                    "surface": "legacy-test-surface",
+                    "identities": [_regular_record("legacy-managed.md", b"legacy\n", mode=0o644)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / "legacy-managed.md"
+    target_root.mkdir()
+    target.write_bytes(obsolete.read_bytes())
+    target.chmod(0o755)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == "legacy-managed.md")
+    assert action.action == "prune"
+    assert action.reason == "direct-obsolete-identity-match"
+    assert apply_distribution_plan(plan).status == "complete"
+    assert not target.exists()
+
+
 def test_s30_apply_rejects_provider_mode_change_after_plan(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -923,7 +970,7 @@ def test_s30_apply_retries_cleanup_of_known_stale_stage(
         target_root=target_root,
         operation="update",
     )
-    assert apply_distribution_plan(retry_plan).status == "complete"
+    assert apply_distribution_plan(retry_plan, allow_stale_stage_cleanup=True).status == "complete"
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
@@ -938,7 +985,16 @@ def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_actio
     first_target = target_root / ".github" / "workflows" / "ci.yml"
     first_target.parent.mkdir(parents=True)
     first_target.write_bytes(b"current\n")
-    stale_stage = first_target.parent / ".spec-dock-file-stale"
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    stale_identity = managed_distribution.DistributionIdentity(
+        kind="regular",
+        sha256=hashlib.sha256(b"current\n").hexdigest(),
+        mode=stat.S_IMODE(source.stat().st_mode),
+    )
+    stale_stage = first_target.parent / managed_distribution._distribution_stage_name(
+        ".github/workflows/ci.yml",
+        stale_identity,
+    )
     stale_stage.write_bytes(b"current\n")
 
     plan = build_distribution_plan(
@@ -948,7 +1004,7 @@ def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_actio
         operation="update",
     )
 
-    assert apply_distribution_plan(plan).status == "complete"
+    assert apply_distribution_plan(plan, allow_stale_stage_cleanup=True).status == "complete"
     assert first_target.read_bytes() == b"current\n"
     assert (target_root / ".github/workflows/second.yml").read_bytes() == b"second\n"
     assert not list(first_target.parent.glob(".spec-dock-file-*"))
@@ -1061,7 +1117,7 @@ def test_s55_apply_prunes_proven_obsolete_target_during_update(tmp_path: Path) -
     assert not target.exists()
 
 
-def test_s55_mode_mismatch_preserves_obsolete_target_and_blocks(tmp_path: Path) -> None:
+def test_s55_mode_mismatch_still_prunes_obsolete_target(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     old = b"legacy-managed\n"
     record = _regular_record(".codex/config.toml", old)
@@ -1084,8 +1140,6 @@ def test_s55_mode_mismatch_preserves_obsolete_target_and_blocks(tmp_path: Path) 
     target.parent.mkdir(parents=True)
     target.write_bytes(old)
     target.chmod(0o755)
-    before = target.read_bytes(), stat.S_IMODE(target.stat().st_mode)
-
     plan = build_distribution_plan(
         install_root,
         manifest_path=manifest_path,
@@ -1094,13 +1148,11 @@ def test_s55_mode_mismatch_preserves_obsolete_target_and_blocks(tmp_path: Path) 
     )
 
     action = next(item for item in plan.actions if item.path == ".codex/config.toml")
-    assert action.action == "preserve"
-    assert action.reason == "obsolete-identity-unknown"
-    assert action.blocked is True
-    with pytest.raises(DistributionApplyError, match="blocked"):
-        apply_distribution_plan(plan)
-
-    assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
+    assert action.action == "prune"
+    assert action.reason == "direct-obsolete-identity-match"
+    assert action.blocked is False
+    assert apply_distribution_plan(plan).status == "complete"
+    assert not target.exists()
 
 
 @pytest.mark.parametrize(
@@ -1476,7 +1528,10 @@ def test_s30_apply_retries_cleanup_of_known_stale_symlink_stage(tmp_path: Path) 
     target_root.mkdir()
     shortcut = target_root / "spec"
     shortcut.symlink_to("legacy/spec-dock")
-    stale_stage = target_root / ".spec-dock-symlink-stale"
+    stale_stage = target_root / managed_distribution._distribution_stage_name(
+        "spec",
+        managed_distribution.DistributionIdentity(kind="symlink", target="spec-dock/scripts/spec-dock"),
+    )
     stale_stage.symlink_to("spec-dock/scripts/spec-dock")
 
     plan = build_distribution_plan(
@@ -1486,9 +1541,28 @@ def test_s30_apply_retries_cleanup_of_known_stale_symlink_stage(tmp_path: Path) 
         operation="update",
     )
 
-    assert apply_distribution_plan(plan).status == "complete"
+    assert apply_distribution_plan(plan, allow_stale_stage_cleanup=True).status == "complete"
     assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
     assert not list(target_root.glob(".spec-dock-symlink-*"))
+
+
+def test_s30_apply_preserves_unknown_stage_like_sibling(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    unknown = target_root / ".github" / "workflows" / ".spec-dock-file-user"
+    unknown.parent.mkdir(parents=True)
+    unknown.write_bytes(b"current\n")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    assert apply_distribution_plan(plan).status == "complete"
+    assert unknown.read_bytes() == b"current\n"
 
 
 def test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support(

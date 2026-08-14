@@ -725,12 +725,12 @@ def test_s60_fresh_init_forward_retry_reuses_marker_and_converges(
     original_apply = cli.apply_distribution_plan
     failed = False
 
-    def fail_once(plan):
+    def fail_once(plan, **kwargs):
         nonlocal failed
         if not failed:
             failed = True
             raise RuntimeError("credential=secret /private/outside/source.txt")
-        return original_apply(plan)
+        return original_apply(plan, **kwargs)
 
     monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
 
