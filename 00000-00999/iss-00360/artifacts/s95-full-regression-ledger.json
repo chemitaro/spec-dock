@@ -3,18 +3,18 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "3dbd56f7706ad7756d61fb9d247b241c1c517921",
+  "current_head_sha": "0f56c0063e07e281200961c7f1dd274874569d0b",
   "commands": {
-    "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v10.xml",
+    "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v12.xml",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
-    "fixed_point_subset": "uv run python -c '<current failure node ids> with pytest.main(...)'"
+    "fixed_point_subset": "uv run python -c \"<current v12 failure node ids> with pytest.main(...)\""
   },
   "full_run_summary": {
     "current": {
-      "failed": 75,
-      "passed": 1934,
+      "failed": 27,
+      "passed": 1935,
       "skipped": 516,
-      "duration": "12m43s"
+      "duration": "12m49s"
     },
     "fixed_point": {
       "failed": 452,
@@ -24,12 +24,12 @@
     }
   },
   "subset_comparison": {
-    "current_failure_paths": 75,
+    "current_failure_paths": 27,
     "fixed_point_failure_paths": 27,
     "same_failure_behavior": 27,
-    "expected_retirement_paths": 48,
+    "expected_retirement_paths": 0,
     "comparison_incomplete_paths": 0,
-    "fixed_point_subset_total": 75
+    "fixed_point_subset_total": 27
   },
   "classification_policy": {
     "approved-no-op": {
@@ -38,9 +38,9 @@
       "follow_up": "Issue 360では修正せず、別Issueで原因とownerを追跡"
     },
     "expected-retirement": {
-      "rationale": "Issue 360で物理退役したauthoring-pack/wrapper面を旧期待するテスト",
+      "rationale": "旧authoring-pack/wrapper専用テストはIssue 360のS40Aで物理退役済みで、current-only failureは残っていない",
       "owner": "Issue 360の退役surface移行",
-      "follow_up": "後続のテスト棚卸しでobsolete testをskip/削除し、現行cutover suiteを正本化"
+      "follow_up": "なし（current-only failure paths=0）"
     },
     "comparison-incomplete": {
       "rationale": "固定点subsetでnode idを収集できなかった",
@@ -206,301 +206,12 @@
       "disposition": "approved-no-op"
     },
     {
-      "nodeid": "tests/cli_runtime/test_wrappers.py::TestCliRulesContract::test_chatgpt_and_authoring_pack_handoff_wrappers_remain_installed",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
       "nodeid": "tests/cli_runtime/test_wrappers.py::TestCliRulesContract::test_scaffold_docs_point_to_runtime_commands_and_rules_docs",
       "current_status": "failed",
       "fixed_point_status": "failed",
       "disposition": "approved-no-op"
-    },
-    {
-      "nodeid": "tests/cli_runtime/test_wrappers.py::TestCliRulesContract::test_scaffolded_pr_merge_preparer_uses_evidence_gated_repair_continuation_policy",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_authorized_profile_claim_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_boundary_metadata_extra_key_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_duplicate_candidate_scope_is_reported_not_silently_passed",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_forbidden_authority_claim_in_markdown_is_rejected_without_echo",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_missing_boundary_metadata_is_blocked",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_missing_candidate_scope_dependency_or_non_scope_is_fail",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_missing_parent_trace_is_blocked",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_output_directory_ownership_guard_and_redaction",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_pack_digest_mismatch_is_stale",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_profile_recommendation_must_be_advisory_only",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_profile_specific_metadata_key_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_profile_specific_template_body_or_all_profile_variants_are_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_profiles_path_segment_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_review_report_not_pass_propagates_status_without_candidate_validation",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_selected_skeleton_fill_path_is_rejected_in_candidate_pack",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_unsafe_boundary_value_is_rejected[update0]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_unsafe_boundary_value_is_rejected[update1]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_valid_candidate_pack_passes_generic_review_before_candidate_validation",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_issue_candidates.py::test_valid_issue_candidates_pack_writes_report_and_comparison_summary",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_allowed_section_ids_must_be_subset_of_inventory",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_candidate_authorized_profile_field_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_candidate_issue_id_mismatch_is_stale",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_extra_section_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_missing_required_section_fails",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_nested_candidate_authorized_profile_field_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_non_pass_review_input_does_not_validate",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_output_directory_ownership_guard_and_redaction",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_pack_digest_mismatch_is_stale",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_parent_trace_drives_validation_report_trace",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_parent_trace_invalid_inputs_fail_closed[not-an-object-selected-skeleton.parent_trace must be an object when present-None]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_parent_trace_invalid_inputs_fail_closed[trace1-selected-skeleton.parent_trace.requirements must be a string array when present-None]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_parent_trace_invalid_inputs_fail_closed[trace2-selected-skeleton.parent_trace contains unsafe text-spec-reviewer passed]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_parent_trace_invalid_inputs_fail_closed[trace3-selected-skeleton.parent_trace contains unsafe text-raw transcript]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_parent_trace_invalid_inputs_fail_closed[trace4-selected-skeleton.parent_trace contains unsafe text-/Users/example/project]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_parent_trace_issue_mismatch_fails",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_selected_skeleton_profile_drift_is_stale",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_target_profile_or_hash_mismatch_is_stale[target_update0-candidate target.profile does not match local authorized_profile]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_target_profile_or_hash_mismatch_is_stale[target_update1-candidate target.template_sha256 does not match selected skeleton]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_target_profile_or_hash_mismatch_is_stale[target_update2-candidate target.skeleton_sha256 does not match selected skeleton]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_target_profile_or_hash_mismatch_is_stale[target_update3-candidate target.section_inventory_sha256 does not match selected skeleton]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_unsafe_authority_claim_in_candidate_metadata_is_rejected",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_unsafe_authority_claim_in_section_body_is_rejected[.assurance.json updated]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_unsafe_authority_claim_in_section_body_is_rejected[adoption_status: adopted]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_unsafe_authority_claim_in_section_body_is_rejected[canonical overwrite]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_unsafe_authority_claim_in_section_body_is_rejected[spec-reviewer passed]",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
-    },
-    {
-      "nodeid": "tests/manual_tests/test_validate_selected_skeleton_fill.py::test_valid_fill_passes_with_advisory_profile_suggestion_and_no_mutation",
-      "current_status": "failed",
-      "fixed_point_status": "passed",
-      "disposition": "expected-retirement"
     }
   ],
-  "conclusion": "current failure paths are either fixed-point pre-existing approved-no-op failures or explicitly classified expected-retirement tests; no unclassified changed-surface failure remains"
+  "conclusion": "current failure paths are all reproduced at the fixed point as approved-no-op failures; no expected-retirement or comparison-incomplete path remains"
 }
-
 
