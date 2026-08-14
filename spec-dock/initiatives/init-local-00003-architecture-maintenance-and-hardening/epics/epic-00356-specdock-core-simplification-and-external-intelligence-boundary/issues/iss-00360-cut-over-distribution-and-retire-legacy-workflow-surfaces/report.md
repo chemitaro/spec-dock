@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`3618a41796b9b4a52a008e18d9a0db8f63bfd851` では、preflight後に出現した多段欠落parentを全件snapshotへ記録し、hard-linked symlinkのmutationをfail-closedで拒否し、recognized updateの全scaffold sourceを外部distribution mutation前に検証する境界と回帰テストを追加した。`48779d16935546d818e003cf33a7b2e97d0832c8` の未登録parent拒否、`a6c420985bb7cd9d2e04984e3825ba62383229fe` のFresh create partial-stage retry identity / strict cleanup、`0f56c0063e07e281200961c7f1dd274874569d0b` のregular upgrade同種修正とS40A退役テスト削除も維持している。クリーンな最終実装HEADのfull regressionは `27 failed, 1941 passed, 516 skipped` で、現行failure path 27件すべてがmerge前固定点でも再現する`approved-no-op`、current-only 0件としてS95 v14 ledgerへ記録した。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対してv14を実行する。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`57d6091a7c190cb8ea868a5504333156b5a0fa10` では、Freshの最初の`spec-dock/`作成をheld root FD内のno-replace操作へ束縛し、root Workbench seedをmissing / provider-identical regular / preserve-and-blockへ分類し、recognized updateではWorkbenchを完全preserveする境界と回帰テストを追加した。先行する`3618a41796b9b4a52a008e18d9a0db8f63bfd851` の多段欠落parent snapshot、hard-linked symlink mutation拒否、recognized updateの全scaffold source preflight、`48779d16935546d818e003cf33a7b2e97d0832c8` の未登録parent拒否、`a6c420985bb7cd9d2e04984e3825ba62383229fe` のFresh create partial-stage retry identity / strict cleanupも維持している。クリーンな最終実装HEADのS95 full regressionは `27 failed, 1944 passed, 516 skipped` で、現行failure path 27件すべてがmerge前固定点でも再現する`approved-no-op`、current-only 0件としてS95 v15 ledgerへ記録した。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対してv15を実行する。
 
 ### Latest P1 repair candidate (2026-08-14)
 
@@ -98,11 +98,18 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * recognized update / `init --force`でdistribution planやretry markerを作成する前に、Freshと同じ全scaffold source catalog（managed directories、`.gitignore`、root Workbench seed）をpreflightする。
 * 回帰テスト: 多段parent競合、current / historical hard-linked shortcut、recognized updateの欠落scaffold sourceによるzero-write停止。S95 v14現行HEADでは`27 failed, 1941 passed, 516 skipped`、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 
+### Latest P1 repair candidate 14 (2026-08-15)
+
+* Fresh開始時の`spec-dock/`境界作成をheld root FD配下の相対no-replace `mkdir`へ移し、preflight後に出現したworkspaceをreplacement rootへ書かずfail-closedで停止するようにした。
+* root Workbench seedを`exists()`のbool判定からno-follow identity / provider bytes / modeの分類へ変更した。Freshはmissingならseed、provider-identicalなsingle-link regularならadopt、その他はpreserve-and-blockとし、recognized update / `init --force`ではsymlinkを含むWorkbenchを検査・変更しない。
+* 回帰テスト: provider-identical Fresh retryのadopt、recognized updateのsymlinked root Workbench preserve、Fresh root rebind中のreplacement zero-write。S95 v15では`27 failed, 1944 passed, 516 skipped`、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `3618a41796b9b4a52a008e18d9a0db8f63bfd851`（多段欠落parent snapshot、hard-linked symlink mutation拒否、recognized updateの全scaffold source preflight、回帰テスト）
+* Final implementation commit: `57d6091a7c190cb8ea868a5504333156b5a0fa10`（Fresh root-bound workspace作成、root Workbench identity分類・更新時preserve、回帰テスト）
 * Final quality-gate evidence commit: `0765d5d3c4ae997a4f1a577d2cc5280be328f9cb`（S95 v14 ledger / report refresh）。今回のS95 v14現行full regression実行対象は実装tree `3618a41796b9b4a52a008e18d9a0db8f63bfd851`で、現行failure 27件は固定点subsetで同一failure behaviorとなった。
+* S95 v15 full regression: 実装tree `57d6091a7c190cb8ea868a5504333156b5a0fa10`に対して `27 failed, 1944 passed, 516 skipped`。固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
