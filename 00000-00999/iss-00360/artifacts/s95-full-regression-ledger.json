@@ -3,18 +3,18 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "0f56c0063e07e281200961c7f1dd274874569d0b",
+  "current_head_sha": "a6c420985bb7cd9d2e04984e3825ba62383229fe",
   "commands": {
-    "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v12.xml",
+    "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v13.xml",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
-    "fixed_point_subset": "uv run python -c \"<current v12 failure node ids> with pytest.main(...)\""
+    "fixed_point_subset": "uv run python -c '<current failure node ids> with pytest.main(...)'"
   },
   "full_run_summary": {
     "current": {
       "failed": 27,
-      "passed": 1935,
+      "passed": 1936,
       "skipped": 516,
-      "duration": "12m49s"
+      "duration": "12m47s"
     },
     "fixed_point": {
       "failed": 452,
@@ -38,9 +38,9 @@
       "follow_up": "Issue 360では修正せず、別Issueで原因とownerを追跡"
     },
     "expected-retirement": {
-      "rationale": "旧authoring-pack/wrapper専用テストはIssue 360のS40Aで物理退役済みで、current-only failureは残っていない",
+      "rationale": "Issue 360で物理退役したauthoring-pack/wrapper面を旧期待するテスト",
       "owner": "Issue 360の退役surface移行",
-      "follow_up": "なし（current-only failure paths=0）"
+      "follow_up": "後続のテスト棚卸しでobsolete testをskip/削除し、現行cutover suiteを正本化"
     },
     "comparison-incomplete": {
       "rationale": "固定点subsetでnode idを収集できなかった",
@@ -212,6 +212,6 @@
       "disposition": "approved-no-op"
     }
   ],
-  "conclusion": "current failure paths are all reproduced at the fixed point as approved-no-op failures; no expected-retirement or comparison-incomplete path remains"
+  "conclusion": "current failure paths are either fixed-point pre-existing approved-no-op failures or explicitly classified expected-retirement tests; no unclassified changed-surface failure remains"
 }
 
