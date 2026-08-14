@@ -522,6 +522,45 @@ def test_s60_marker_published_before_temporary_cleanup_failure_is_partial(
     assert not marker.exists()
 
 
+def test_s60_fresh_marker_publication_recovers_after_write_and_cleanup_faults(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    original_write = cli.os.write
+    original_unlink = Path.unlink
+    write_failed = False
+    cleanup_failed = False
+
+    def fail_marker_write(fd, view):
+        nonlocal write_failed
+        if not write_failed:
+            write_failed = True
+            raise OSError("simulated marker write failure")
+        return original_write(fd, view)
+
+    def fail_marker_temp_cleanup(path, *args, **kwargs):
+        nonlocal cleanup_failed
+        if not cleanup_failed and path.name.startswith("..distribution-retry.json."):
+            cleanup_failed = True
+            raise OSError("simulated marker temp cleanup failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(cli.os, "write", fail_marker_write)
+    monkeypatch.setattr(Path, "unlink", fail_marker_temp_cleanup)
+
+    assert main(["init", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during preflight" in captured
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    assert marker.exists()
+    assert not (tmp_path / "spec-dock/spec-dock.version").exists()
+    assert not list((tmp_path / "spec-dock").glob("..distribution-retry.json.*"))
+
+    assert main(["init", str(tmp_path)]) == 0
+    assert not marker.exists()
+
+
 def test_s50_update_unknown_current_collision_is_zero_write(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     collision = tmp_path / ".agents/skills/spec-dock/SKILL.md"

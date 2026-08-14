@@ -892,6 +892,88 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
         (specdock_dir / name).unlink(missing_ok=True)
 
 
+def _retry_unpublished_atomic_regular_file(
+    temporary: Path,
+    destination: Path,
+    payload: bytes,
+    *,
+    mode: int,
+    expected_identity: tuple[int, int],
+) -> tuple[bool, bool]:
+    """Retry one failed no-replace publication while retaining temp ownership."""
+    try:
+        temporary_info = os.lstat(temporary)
+    except OSError:
+        return False, False
+    if (
+        stat.S_ISLNK(temporary_info.st_mode)
+        or not stat.S_ISREG(temporary_info.st_mode)
+        or temporary_info.st_nlink != 1
+        or (temporary_info.st_dev, temporary_info.st_ino) != expected_identity
+    ):
+        return False, False
+    try:
+        os.lstat(destination)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        return False, False
+    else:
+        return False, False
+
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        return False, False
+    flags = os.O_WRONLY | os.O_TRUNC | nofollow | getattr(os, "O_CLOEXEC", 0)
+    fd: int | None = None
+    published = False
+    try:
+        fd = os.open(temporary, flags)
+        current = os.fstat(fd)
+        if (
+            stat.S_ISLNK(current.st_mode)
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or (current.st_dev, current.st_ino) != expected_identity
+        ):
+            return False, False
+        os.fchmod(fd, mode)
+        view = memoryview(payload)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                return False, False
+            view = view[written:]
+        os.fsync(fd)
+        os.close(fd)
+        fd = None
+
+        try:
+            os.lstat(destination)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return False, False
+        else:
+            return False, False
+        os.link(temporary, destination, follow_symlinks=False)
+        published = True
+        try:
+            temporary.unlink()
+        except OSError:
+            # A published marker is already a valid forward-retry boundary;
+            # leave the owned temp for the next retry rather than losing the
+            # recovery record when cleanup itself is transiently unavailable.
+            return True, False
+        return True, True
+    except OSError:
+        return published, False
+    finally:
+        if fd is not None:
+            with suppress(OSError):
+                os.close(fd)
+
+
 def _write_atomic_regular_file(
     path: Path,
     payload: bytes,
@@ -930,6 +1012,8 @@ def _write_atomic_regular_file(
     # opened directory, otherwise a root rename would make the absolute name
     # point at the now-empty original pathname.
     temporary_ref = parent / temporary.name if not parent.is_absolute() else temporary
+    temporary_info = os.lstat(temporary_ref)
+    temporary_identity = (temporary_info.st_dev, temporary_info.st_ino)
     closed = False
     try:
         os.fchmod(fd, mode)
@@ -962,8 +1046,24 @@ def _write_atomic_regular_file(
             os.link(temporary_ref, path, follow_symlinks=False)
             temporary_ref.unlink()
         temporary = None  # type: ignore[assignment]
-    except OSError as exc:
-        raise RuntimeError("managed file write failed") from exc
+    except Exception as exc:
+        if not closed:
+            with suppress(OSError):
+                os.close(fd)
+            closed = True
+        if existing is None and temporary is not None:
+            published, removed = _retry_unpublished_atomic_regular_file(
+                temporary_ref,
+                path,
+                payload,
+                mode=mode,
+                expected_identity=temporary_identity,
+            )
+            if published and removed:
+                temporary = None  # type: ignore[assignment]
+        if isinstance(exc, OSError):
+            raise RuntimeError("managed file write failed") from exc
+        raise
     finally:
         if not closed:
             with suppress(OSError):
