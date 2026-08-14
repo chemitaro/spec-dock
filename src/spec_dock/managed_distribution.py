@@ -2020,8 +2020,13 @@ def _assert_pending_snapshot_stable(
         elif actual_parent.exists:
             bound_parent = created_parent_bindings.get(expected_parent.relative_path)
             if bound_parent is None:
-                created_parent_bindings[expected_parent.relative_path] = actual_parent
-            elif not _same_structure_identity(actual_parent, bound_parent):
+                # A parent that was absent during preflight may only become
+                # acceptable after this operation creates and binds it through
+                # `_bind_created_parent_identities`.  Accepting an unbound
+                # inode here would turn a user- or concurrently-created
+                # directory into an operation-owned parent after preflight.
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+            if not _same_structure_identity(actual_parent, bound_parent):
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
     if actual.target != expected.target:
         raise DistributionApplyError(f"managed target identity changed for '{path}'")

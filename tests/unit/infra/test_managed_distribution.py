@@ -1237,6 +1237,49 @@ def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_actio
     assert not list(first_target.parent.glob(".spec-dock-file-*"))
 
 
+def test_s30_apply_rejects_external_parent_created_after_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"first\n")
+    second_source = install_root / "zz" / "second.yml"
+    second_source.parent.mkdir(parents=True)
+    second_source.write_bytes(b"second\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    original_apply = managed_distribution._apply_distribution_action
+    injected = False
+
+    def apply_then_create_external_parent(
+        current_plan: object,
+        root: Path,
+        action: object,
+        snapshot: object,
+        bindings: dict[str, object],
+    ) -> None:
+        nonlocal injected
+        original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
+        if not injected:
+            injected = True
+            (root / "zz").mkdir()
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", apply_then_create_external_parent)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"first\n"
+    assert not (target_root / "zz" / "second.yml").exists()
+
+
 def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
