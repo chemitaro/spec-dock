@@ -2262,6 +2262,13 @@ def _apply_regular_action(
                 finally:
                     os.close(published_fd)
             finally:
+                if not swapped:
+                    # A failed write may mutate the stage before raising.  The
+                    # creation-time stat is then stale (ctime changes), so
+                    # refresh the no-follow identity before closing the fd and
+                    # attempting ownership-checked cleanup.
+                    with suppress(OSError):
+                        stage_identity = os.fstat(staging_fd)
                 os.close(staging_fd)
                 if not swapped:
                     _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)

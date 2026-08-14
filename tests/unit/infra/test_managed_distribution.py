@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import stat
 import subprocess
@@ -1258,7 +1259,8 @@ def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
         operation="update",
     )
 
-    def fail_staging_write(*_args: object, **_kwargs: object) -> None:
+    def fail_staging_write(fd: int, *_args: object, **_kwargs: object) -> None:
+        os.write(fd, b"partial\n")
         raise OSError("no space left on device")
 
     monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
