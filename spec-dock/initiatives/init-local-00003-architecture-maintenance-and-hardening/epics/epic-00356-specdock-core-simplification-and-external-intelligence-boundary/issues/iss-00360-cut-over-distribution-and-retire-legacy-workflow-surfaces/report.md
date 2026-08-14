@@ -3,7 +3,7 @@
 ID: "iss-00360"
 タイトル: "Cut Over Distribution and Retire Legacy Workflow Surfaces"
 関連GitHub: ["#360"]
-最終更新: "2026-08-13"
+最終更新: "2026-08-14"
 親: ["epic-00356", "init-local-00003"]
 依存: ["requirement.md", "design.md", "plan.md"]
 ---
@@ -12,12 +12,20 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、実装コミット `7736daec83cfc4a9e60843a080d1404fb57160cf` と安全境界のfollow-up `ff3dcc52ca91a1629753344354a17f4d0e59f46b` を作成した。Issue 360対象の最終品質確認は、通常テスト・lint・focused distribution regression・package integration・`spec-dock validate`までpassした一方、全リポジトリのfull regressionにはIssue 360対象外の既存runtime回帰が残り、最終ChatGPT-SpecReview-Strictはブラウザ側のprompt reconstruction / rate-limitで送信前に成立しなかった。そのためS99/H10、Issue close、IC-3判定は未実施のまま、レビュー可能な実装PRとしてhandoffする。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、初回実装コミット群に加えて、最終品質ゲートで検出した4件のP1（regular upgradeの非原子的write、mode不一致の未修復、Fresh initの再実行不能、partial failure診断不足）を `109999c6147cd4e1da8119f74ff128f4b687beb3` で修正した。通常テスト・lint・Issue 360 focused regression・package integration・`spec-dock validate`は修正後もpassした一方、全リポジトリのfull regressionにはIssue 360の物理退役対象外にあたる既存runtime/import/active/shellおよびlegacy manual helper参照の失敗が76件残る。最終ChatGPT-final-quality-gate-strictはこの修正後HEADに対して再実行中であり、P0/P1が残る場合は追加修正して再実行する。
+
+### Latest P1 repair candidate (2026-08-14)
+
+* `src/spec_dock/managed_distribution.py`のrecognized regular upgradeを同一親directoryのstaging fileへ書き込み、no-follow identity再検証後にatomic swapで公開する方式へ変更した。staging write失敗時は既存targetを保持する。
+* Current bytesが一致してもprovider modeと不一致の場合、`update` / `init --force`で`upgrade`へ分類し、expected modeを修復する。Freshの既存pathは従来どおり無変更である。
+* Fresh initは`spec-dock/.distribution-retry.json`をapply前に作成し、通常の同じ`spec-dock init .`をforward retryとして再開できるようにした。marker parent作成後はroot ctimeを再取得してapply snapshotを再構築する。
+* partial failureの診断にrelative target、`last_completed_phase`、operation別retry commandを追加し、credentialやhost absolute pathを再出力しない。
+* 修正テスト: atomic staging failure、mode repair、Fresh same-package retry、partial failure diagnostic。
 
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `7736daec83cfc4a9e60843a080d1404fb57160cf`（local HEAD = configured upstream、clean）
+* Final implementation commit: `109999c6147cd4e1da8119f74ff128f4b687beb3`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
 * Integrated main baseline: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
@@ -285,14 +293,14 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | `uv run pytest` → `986 passed, 1516 skipped` |
+| Fast lane | pass | `uv run pytest` → `988 passed, 1517 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
-| Issue 360 focused regression | pass (Issue 360 suites) | The installer/distribution suites pass (`239 passed, 468 skipped` across cutover, managed distribution, and init/update; artifact templates `54 passed`; archive integration `13 passed`). The combined command also exercised `tests/integration/test_epic_00343_distribution.py`; it produced `305 passed, 468 skipped` plus one existing cross-filesystem privacy-sentinel failure caused by a timestamp digit collision, so that aggregate command is not claimed as a full pass. |
+| Issue 360 focused regression | pass (Issue 360 suites) | Installer/distribution cutover, managed distribution, init/update, mode repair, atomic staging failure, Fresh retry, and partial-failure diagnostics pass (`69 passed, 57 skipped` for the final focused command). |
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | not adopted | `uv run pytest --run-full-regression`の試行ではIssue 360対象外のlegacy runtime/import/active/shell回帰を検出。対象Issueのfocused suiteへ縮小し、全体passとは主張しない |
-| Final ChatGPT-SpecReview-Strict | blocked before review | `issue360-final-spec-review` / `issue360-final-strict-correct-root` はprompt reconstruction mismatch、`issue360-correct-root-smoke` はrate-limit dialogでいずれも`promptSubmitted=false`・conversationなし。既存のplanning Strict passを現実装のfinal passへ流用しない |
+| Full repository regression | not adopted | `uv run pytest --run-full-regression -q` → `1913 passed, 516 skipped, 76 failed`。失敗は旧active/import/shell/runtime契約と退役済み`authoring-pack` / legacy helper参照に集中し、Issue 360 focused suiteとは別分類。全体passとは主張しない |
+| Final ChatGPT-final-quality-gate-strict | pending / rerun | 前回reviewはP1×4（109999c6で修正）。修正後HEAD `109999c6147cd4e1da8119f74ff128f4b687beb3`をmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分として、fresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
 ## Residual Risks / Follow-ups
