@@ -544,7 +544,8 @@ S20はS40Bのprovider物理cutover後に実行する。S10でlockしたbaseline�
 9. `git diff --check`と`git status --short`
 
 - Concrete evidence seed: 各commandのexit、test counts、archive hashes、consumer matrix、Target/obsolete/preserve inventory、before/after preservation hashをIssue reportのclosure IDsへ結ぶ。
-- Close condition: required verificationがpassし、skip / platform exceptionは理由・代替証拠・residual risk付きでS99 reviewerが判定可能。Unknown obsolete、package parity未確認、preservation failure、dirty worktreeを残さない。
+- Full-regression boundary: `uv run pytest --run-full-regression`は必ず実行して結果を記録する。ただしProvider Full Regressionは`.github/workflows/provider-full-regression.yml`の`main` push / `workflow_dispatch`で独立して実行され、PR fast gateの代替ではない。固定点でも同一のtest path・failure behaviorが再現し、Issue 360のchanged hunk / required selection外であるfailureは、全体回帰の不具合を隠さず`approved-no-op`の残課題としてcount、path、owner、follow-upをreportへ記録できる。固定点にない新規failure、Issue 360のchanged pathでのfailure、またはrequired selectionのfailureはS95 blockerとしてowner stepへ戻す。この扱いはfull-regression workflowの実行・可視化・post-merge修正を免除しない。
+- Close condition: required verificationを実行し、Issue 360のchanged surfaceとrequired selectionがpassし、固定点再現の対象外full-regression failureは上記boundaryに従う理由・代替証拠・residual risk付きでS99 reviewerが判定可能であること。Unknown obsolete、package parity未確認、preservation failure、dirty worktreeを残さない。
 - Reviewer / fix: このstep自体はS99三者reviewの入力準備でありreview代替ではない。Failureは該当owner stepへ戻す。
 - Commit candidate / clean: 実装差分のcatch-up commitは禁止。Report ledger差分だけをcommit候補とし、全step commitとpost-commit cleanを確認する。
 
