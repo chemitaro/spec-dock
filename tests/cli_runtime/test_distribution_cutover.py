@@ -229,6 +229,27 @@ def test_s45_fresh_preserves_unrelated_and_obsolete_looking_external_paths(tmp_p
     assert (tmp_path / "spec-dock/.gitignore").read_bytes() == (SCAFFOLD_ROOT / ".gitignore").read_bytes()
 
 
+@pytest.mark.parametrize("collision_kind", ("file", "symlink"))
+def test_s45_fresh_preserves_legacy_named_workflow_without_ownership_proof(
+    tmp_path: Path,
+    collision_kind: str,
+) -> None:
+    workflow = tmp_path / ".github/workflows/spec-dock-close.yml"
+    workflow.parent.mkdir(parents=True)
+    if collision_kind == "file":
+        workflow.write_bytes(b"user-owned legacy workflow\n")
+    else:
+        target = tmp_path / "user-owned-close-target.yml"
+        target.write_bytes(b"user-owned workflow target\n")
+        workflow.symlink_to(target)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path)]) == 0
+
+    after = _filesystem_snapshot(tmp_path)
+    assert after[".github/workflows/spec-dock-close.yml"] == before[".github/workflows/spec-dock-close.yml"]
+
+
 def test_s45_fresh_current_collision_blocks_before_any_write(tmp_path: Path, capsys) -> None:
     collision = tmp_path / ".github/workflows/ci.yml"
     collision.parent.mkdir(parents=True)

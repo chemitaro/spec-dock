@@ -927,6 +927,33 @@ def test_s30_apply_retries_cleanup_of_known_stale_stage(
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
+def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_action(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    second_source = install_root / ".github" / "workflows" / "second.yml"
+    second_source.write_bytes(b"second\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    first_target = target_root / ".github" / "workflows" / "ci.yml"
+    first_target.parent.mkdir(parents=True)
+    first_target.write_bytes(b"current\n")
+    stale_stage = first_target.parent / ".spec-dock-file-stale"
+    stale_stage.write_bytes(b"current\n")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    assert apply_distribution_plan(plan).status == "complete"
+    assert first_target.read_bytes() == b"current\n"
+    assert (target_root / ".github/workflows/second.yml").read_bytes() == b"second\n"
+    assert not list(first_target.parent.glob(".spec-dock-file-*"))
+
+
 def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1426,6 +1453,40 @@ def test_s30_apply_upgrades_canonical_shortcut_with_no_replace_publish(tmp_path:
 
     assert result.status == "complete"
     assert shortcut.is_symlink()
+    assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
+    assert not list(target_root.glob(".spec-dock-symlink-*"))
+
+
+def test_s30_apply_retries_cleanup_of_known_stale_symlink_stage(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            historical_shortcuts=[
+                {
+                    "path": "spec",
+                    "kind": "symlink",
+                    "target": "legacy/spec-dock",
+                    "source": {"kind": "test-fixture", "ref": "issue-360-test"},
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("legacy/spec-dock")
+    stale_stage = target_root / ".spec-dock-symlink-stale"
+    stale_stage.symlink_to("spec-dock/scripts/spec-dock")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    assert apply_distribution_plan(plan).status == "complete"
     assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
     assert not list(target_root.glob(".spec-dock-symlink-*"))
 

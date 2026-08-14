@@ -830,10 +830,6 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
             if d.is_dir():
                 shutil.rmtree(d, ignore_errors=True)
 
-    # v1 installed a workflow that moved `current/` -> `completed/` on issue close.
-    legacy_workflow = specdock_dir.parent / ".github" / "workflows" / "spec-dock-close.yml"
-    legacy_workflow.unlink(missing_ok=True)
-
     # v1 created root-level symlinks as shortcuts. v2 uses `spec-dock/active/`,
     # so these are always safe to remove when they are symlinks (never delete real dirs).
     for name in ("current-initiative", "current-epic", "current-issue"):

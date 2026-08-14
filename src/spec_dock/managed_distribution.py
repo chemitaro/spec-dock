@@ -1843,7 +1843,7 @@ def _cleanup_stale_distribution_stages(
         except OSError as exc:
             raise DistributionApplyError("managed staging directory cannot be listed safely") from exc
         for stage_name in names:
-            if not stage_name.startswith(".spec-dock-file-"):
+            if not stage_name.startswith((".spec-dock-file-", ".spec-dock-symlink-")):
                 continue
             candidate = _distribution_stage_identity(parent_fd, stage_name)
             if candidate is None or not _stage_identity_matches_known(
@@ -2384,6 +2384,27 @@ def apply_distribution_plan(plan: DistributionPlan) -> DistributionResult:
         snapshot = snapshots[action.path]
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
         _cleanup_stale_distribution_stages(plan, target_root, action, snapshot)
+        # Removing a known stale stage mutates the parent directory ctime.  The
+        # target itself must remain unchanged, but every later action needs the
+        # refreshed parent snapshot before it can be applied or adopted.
+        refreshed = _observe_target(target_root, action.path)
+        if refreshed.snapshot is None:
+            raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+        _assert_pending_snapshot_stable(refreshed.snapshot, snapshot, action.path, created_parent_bindings)
+        snapshot = refreshed.snapshot
+        snapshots[action.path] = snapshot
+        for pending in plan.actions[index + 1 :]:
+            pending_snapshot = snapshots[pending.path]
+            pending_observation = _observe_target(target_root, pending.path)
+            if pending_observation.snapshot is None:
+                raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
+            _assert_pending_snapshot_stable(
+                pending_observation.snapshot,
+                pending_snapshot,
+                pending.path,
+                created_parent_bindings,
+            )
+            snapshots[pending.path] = pending_observation.snapshot
         if action.action in {"adopt", "preserve"}:
             continue
         _apply_distribution_action(
