@@ -699,13 +699,13 @@ def test_s60_atomic_regular_file_does_not_replace_racing_destination(
     monkeypatch,
 ) -> None:
     destination = tmp_path / ".distribution-retry.json"
-    original_link = cli.os.link
+    original_rename = cli._rename_distribution_no_replace
 
-    def race_publish(source, target, *, follow_symlinks=False):
-        Path(target).write_bytes(b"user replacement\n")
-        return original_link(source, target, follow_symlinks=follow_symlinks)
+    def race_publish(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        Path(destination).write_bytes(b"user replacement\n")
+        return original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
-    monkeypatch.setattr(cli.os, "link", race_publish)
+    monkeypatch.setattr(cli, "_rename_distribution_no_replace", race_publish)
 
     with pytest.raises(RuntimeError, match="managed file write failed"):
         cli._write_atomic_regular_file(destination, b"managed\n", mode=0o600)

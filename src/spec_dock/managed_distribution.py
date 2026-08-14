@@ -2351,6 +2351,16 @@ def _apply_regular_action(
                                         _distribution_stage_ownership(path, staging_name, old_stat)
                                     )
                                 except Exception as record_error:
+                                    # The swap has already published the new
+                                    # target, so the stage pathname now owns
+                                    # the former target inode.  A transient
+                                    # marker-write failure must not strand the
+                                    # pre-swap identity: retry the recorder
+                                    # once before falling back to cleanup.
+                                    with suppress(Exception):
+                                        stage_ownership_recorder(
+                                            _distribution_stage_ownership(path, staging_name, old_stat)
+                                        )
                                     try:
                                         _remove_distribution_stage_if_owned(
                                             parent_fd,
@@ -2359,6 +2369,15 @@ def _apply_regular_action(
                                             strict=True,
                                         )
                                     except DistributionApplyError as cleanup_error:
+                                        try:
+                                            _remove_distribution_stage_if_owned(
+                                                parent_fd,
+                                                staging_name,
+                                                old_stat,
+                                                strict=True,
+                                            )
+                                        except DistributionApplyError as retry_cleanup_error:
+                                            raise retry_cleanup_error from record_error
                                         raise cleanup_error from record_error
                                     raise
                             _remove_distribution_stage_if_owned(

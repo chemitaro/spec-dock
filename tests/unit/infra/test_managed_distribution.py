@@ -1114,6 +1114,79 @@ def test_s30_apply_rebinds_stage_ownership_after_swap_for_retry(
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
+def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    record_calls = 0
+    original_unlink = managed_distribution.os.unlink
+    cleanup_failures = 0
+
+    def fail_post_swap_record(record: managed_distribution.DistributionStageOwnership) -> None:
+        nonlocal record_calls
+        record_calls += 1
+        if record_calls == 2:
+            raise RuntimeError("simulated post-swap marker write failure")
+        recorded.append(record)
+
+    def fail_stage_cleanup_twice(name, *args, **kwargs):
+        nonlocal cleanup_failures
+        if isinstance(name, str) and name.startswith(".spec-dock-file-") and cleanup_failures < 2:
+            cleanup_failures += 1
+            raise OSError("simulated repeated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup_twice)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=fail_post_swap_record)
+
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert len(recorded) == 2
+    rebound = recorded[-1]
+    stage_stat = stage_files[0].lstat()
+    assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+    assert target.read_bytes() == b"new\n"
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
 def test_s30_apply_cleans_rebound_stage_when_marker_update_fails(
     tmp_path: Path,
 ) -> None:

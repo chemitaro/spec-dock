@@ -31,6 +31,7 @@ from spec_dock.managed_distribution import (
     DistributionOperation,
     DistributionRootIdentity,
     DistributionStageOwnership,
+    _rename_distribution_no_replace,
     admit_distribution_operation,
     apply_distribution_plan,
     build_distribution_plan,
@@ -901,34 +902,48 @@ def _retry_unpublished_atomic_regular_file(
     expected_identity: tuple[int, int],
 ) -> tuple[bool, bool]:
     """Retry one failed no-replace publication while retaining temp ownership."""
+    parent = temporary.parent
     try:
-        temporary_info = os.lstat(temporary)
+        parent_info = os.lstat(parent)
+        if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
+            return False, False
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            return False, False
+        parent_fd = os.open(
+            parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | nofollow | getattr(os, "O_CLOEXEC", 0),
+        )
     except OSError:
         return False, False
-    if (
-        stat.S_ISLNK(temporary_info.st_mode)
-        or not stat.S_ISREG(temporary_info.st_mode)
-        or temporary_info.st_nlink != 1
-        or (temporary_info.st_dev, temporary_info.st_ino) != expected_identity
-    ):
-        return False, False
-    try:
-        os.lstat(destination)
-    except FileNotFoundError:
-        pass
-    except OSError:
-        return False, False
-    else:
-        return False, False
-
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int):
-        return False, False
-    flags = os.O_WRONLY | os.O_TRUNC | nofollow | getattr(os, "O_CLOEXEC", 0)
     fd: int | None = None
-    published = False
     try:
-        fd = os.open(temporary, flags)
+        parent_current = os.fstat(parent_fd)
+        if (
+            stat.S_ISLNK(parent_current.st_mode)
+            or not stat.S_ISDIR(parent_current.st_mode)
+            or (parent_current.st_dev, parent_current.st_ino) != (parent_info.st_dev, parent_info.st_ino)
+        ):
+            return False, False
+        temporary_info = os.stat(temporary.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(temporary_info.st_mode)
+            or not stat.S_ISREG(temporary_info.st_mode)
+            or temporary_info.st_nlink != 1
+            or (temporary_info.st_dev, temporary_info.st_ino) != expected_identity
+        ):
+            return False, False
+        try:
+            os.stat(destination.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return False, False
+        else:
+            return False, False
+
+        flags = os.O_WRONLY | os.O_TRUNC | nofollow | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(temporary.name, flags, dir_fd=parent_fd)
         current = os.fstat(fd)
         if (
             stat.S_ISLNK(current.st_mode)
@@ -949,29 +964,56 @@ def _retry_unpublished_atomic_regular_file(
         fd = None
 
         try:
-            os.lstat(destination)
+            os.stat(destination.name, dir_fd=parent_fd, follow_symlinks=False)
         except FileNotFoundError:
             pass
         except OSError:
             return False, False
         else:
             return False, False
-        os.link(temporary, destination, follow_symlinks=False)
-        published = True
-        try:
-            temporary.unlink()
-        except OSError:
-            # A published marker is already a valid forward-retry boundary;
-            # leave the owned temp for the next retry rather than losing the
-            # recovery record when cleanup itself is transiently unavailable.
-            return True, False
+        _rename_distribution_no_replace(parent_fd, temporary.name, parent_fd, destination.name)
         return True, True
     except OSError:
-        return published, False
+        return False, False
     finally:
         if fd is not None:
             with suppress(OSError):
                 os.close(fd)
+        with suppress(OSError):
+            os.close(parent_fd)
+
+
+def _publish_new_atomic_regular_file(temporary: Path, destination: Path) -> None:
+    """Move a new regular file into place without replacing a race winner."""
+    parent = temporary.parent
+    try:
+        parent_info = os.lstat(parent)
+    except OSError as exc:
+        raise RuntimeError("managed file parent cannot be inspected safely") from exc
+    if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
+        raise RuntimeError("managed file parent must be a real directory")
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed file parent cannot be opened safely")
+    try:
+        parent_fd = os.open(
+            parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | nofollow | getattr(os, "O_CLOEXEC", 0),
+        )
+    except OSError as exc:
+        raise RuntimeError("managed file parent cannot be opened safely") from exc
+    try:
+        current_parent = os.fstat(parent_fd)
+        if (
+            stat.S_ISLNK(current_parent.st_mode)
+            or not stat.S_ISDIR(current_parent.st_mode)
+            or (current_parent.st_dev, current_parent.st_ino) != (parent_info.st_dev, parent_info.st_ino)
+        ):
+            raise RuntimeError("managed file parent identity changed")
+        _rename_distribution_no_replace(parent_fd, temporary.name, parent_fd, destination.name)
+    finally:
+        with suppress(OSError):
+            os.close(parent_fd)
 
 
 def _write_atomic_regular_file(
@@ -1043,8 +1085,7 @@ def _write_atomic_regular_file(
         else:
             # A destination that was absent during preflight must not be
             # replaced if another actor creates it before publication.
-            os.link(temporary_ref, path, follow_symlinks=False)
-            temporary_ref.unlink()
+            _publish_new_atomic_regular_file(temporary_ref, path)
         temporary = None  # type: ignore[assignment]
     except Exception as exc:
         if not closed:
