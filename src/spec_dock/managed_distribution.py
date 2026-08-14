@@ -2442,6 +2442,7 @@ def _apply_symlink_action(
             staging_name = _distribution_stage_name(action.path, expected)
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            published = False
             try:
                 staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
                 if staged_target != expected_target or staging_stat.st_nlink != 1:
@@ -2450,8 +2451,28 @@ def _apply_symlink_action(
                     stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
+                published = True
             finally:
-                _remove_distribution_stage_if_owned(parent_fd, staging_name, staging_stat)
+                if not published:
+                    # A recorder failure or publish failure may leave the
+                    # symlink stage behind.  Refresh its no-follow identity
+                    # before retrying the marker record and use strict,
+                    # ownership-checked cleanup so a transient unlink error
+                    # remains recoverable by the next same-package retry.
+                    with suppress(OSError):
+                        staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                    try:
+                        if stage_ownership_recorder is not None:
+                            stage_ownership_recorder(
+                                _distribution_stage_ownership(action.path, staging_name, staging_stat)
+                            )
+                    finally:
+                        _remove_distribution_stage_if_owned(
+                            parent_fd,
+                            staging_name,
+                            staging_stat,
+                            strict=True,
+                        )
             created_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
             if created_target != expected_target:
                 raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
@@ -2500,7 +2521,23 @@ def _apply_symlink_action(
                     raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
             finally:
                 if not swapped:
-                    _remove_distribution_stage_if_owned(parent_fd, staging_name, staging_stat)
+                    # Match regular-file staging semantics: retry the
+                    # ownership record after a pre-swap failure, then clean
+                    # only the refreshed no-follow identity strictly.
+                    with suppress(OSError):
+                        staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                    try:
+                        if stage_ownership_recorder is not None:
+                            stage_ownership_recorder(
+                                _distribution_stage_ownership(action.path, staging_name, staging_stat)
+                            )
+                    finally:
+                        _remove_distribution_stage_if_owned(
+                            parent_fd,
+                            staging_name,
+                            staging_stat,
+                            strict=True,
+                        )
                 else:
                     try:
                         old_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
@@ -2520,17 +2557,43 @@ def _apply_symlink_action(
                                     stage_ownership_recorder(
                                         _distribution_stage_ownership(action.path, staging_name, old_stat)
                                     )
-                                except Exception:
+                                except Exception as record_error:
+                                    # The swap already published the new
+                                    # target.  Retry the marker record once,
+                                    # then fall back to strict cleanup; if
+                                    # cleanup also fails, retry it once so
+                                    # either durable ownership or removal is
+                                    # established before returning partial
+                                    # failure.
+                                    with suppress(Exception):
+                                        stage_ownership_recorder(
+                                            _distribution_stage_ownership(action.path, staging_name, old_stat)
+                                        )
                                     try:
-                                        os.unlink(staging_name, dir_fd=parent_fd)
-                                    except FileNotFoundError:
-                                        pass
-                                    except OSError as cleanup_error:
-                                        raise DistributionApplyError(
-                                            "managed staging cleanup failed"
-                                        ) from cleanup_error
+                                        _remove_distribution_stage_if_owned(
+                                            parent_fd,
+                                            staging_name,
+                                            old_stat,
+                                            strict=True,
+                                        )
+                                    except DistributionApplyError as cleanup_error:
+                                        try:
+                                            _remove_distribution_stage_if_owned(
+                                                parent_fd,
+                                                staging_name,
+                                                old_stat,
+                                                strict=True,
+                                            )
+                                        except DistributionApplyError as retry_cleanup_error:
+                                            raise retry_cleanup_error from record_error
+                                        raise cleanup_error from record_error
                                     raise
-                            os.unlink(staging_name, dir_fd=parent_fd)
+                            _remove_distribution_stage_if_owned(
+                                parent_fd,
+                                staging_name,
+                                old_stat,
+                                strict=True,
+                            )
                     except FileNotFoundError:
                         pass
             return
