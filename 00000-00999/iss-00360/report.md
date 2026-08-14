@@ -118,7 +118,7 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
 * Final implementation commit: `6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`（初回marker未公開故障からのowned temp再発行とFresh forward-retry回帰テスト。nested runtime preflightは親コミット`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`で実装）
-* Final quality-gate evidence commit: `9499e3753080d805337aa4fcb80e0f9afb6029f6`（S95 v16 ledger / report refresh）。S95 v17の現行ledger / report refreshは後続のenclosing HEADであり、実装tree `6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`と外部verified rangeへ束縛する。
+* Final quality-gate evidence commit: `0644e030fa30ab8a98d30e1a34c74cba979d787b`（S95 v17 ledger / report refresh）。実装tree `6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`と外部verified rangeへ束縛する。
 * S95 v17 full regression: 実装tree `6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`に対して `27 failed, 1947 passed, 516 skipped`。v16とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
