@@ -1050,6 +1050,144 @@ def test_s30_apply_rebinds_stage_ownership_after_swap_for_retry(
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
+def test_s30_apply_cleans_rebound_stage_when_marker_update_fails(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+
+    def fail_marker_update(record: managed_distribution.DistributionStageOwnership) -> None:
+        if recorded:
+            raise RuntimeError("simulated retry marker write failure")
+        recorded.append(record)
+
+    with pytest.raises(RuntimeError, match="retry marker write failure"):
+        apply_distribution_plan(plan, stage_ownership_recorder=fail_marker_update)
+
+    assert target.read_bytes() == b"new\n"
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+
+
+def test_s30_apply_retries_stage_cleanup_for_trusted_manifest_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    trusted_bytes = b'{"managed":true}\n'
+    trusted_manifest = _regular_record(".agents/host-adapters/meta.json", trusted_bytes)
+    trusted_manifest["claims"] = [_regular_record(".github/workflows/ci.yml", old)]
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(trusted_consumer_manifests=[trusted_manifest]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    trusted_target = target_root / ".agents" / "host-adapters" / "meta.json"
+    trusted_target.parent.mkdir(parents=True)
+    trusted_target.write_bytes(trusted_bytes)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert next(item for item in plan.actions if item.path == ".github/workflows/ci.yml").action == "upgrade"
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_unlink = managed_distribution.os.unlink
+    failed = False
+
+    def fail_stage_cleanup(name, *args, **kwargs):
+        nonlocal failed
+        if not failed and isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            failed = True
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=recorded.append)
+    assert list(target.parent.glob(".spec-dock-file-*"))
+
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_historical_stage_identities_include_recognized_anchor(
+    tmp_path: Path,
+) -> None:
+    old = b"old\n"
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            recognized_workspace_versions=[
+                {
+                    "version": "0.1.0",
+                    "anchors": [_regular_record("legacy.txt", old)],
+                }
+            ]
+        ),
+    )
+    plan = build_distribution_plan(install_root, manifest_path=manifest_path)
+
+    historical = managed_distribution._historical_stage_identities(plan, "legacy.txt")
+
+    assert historical == (
+        managed_distribution.DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(old).hexdigest(),
+            mode=None,
+        ),
+    )
+
+
 def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_action(
     tmp_path: Path,
 ) -> None:

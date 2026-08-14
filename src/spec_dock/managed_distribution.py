@@ -1897,7 +1897,7 @@ def _distribution_stage_name(path: str, identity: DistributionIdentity) -> str:
 
 def _historical_stage_identities(plan: DistributionPlan, path: str) -> tuple[DistributionIdentity, ...]:
     identities: list[DistributionIdentity] = []
-    for record in plan.manifest.historical_current_identities:
+    for record in _historical_records(plan.manifest):
         if record["path"] != path:
             continue
         if record["kind"] == "regular":
@@ -1909,9 +1909,6 @@ def _historical_stage_identities(plan: DistributionPlan, path: str) -> tuple[Dis
                 )
             )
         else:
-            identities.append(DistributionIdentity(kind="symlink", target=record["target"]))
-    for record in plan.manifest.historical_shortcuts:
-        if record["path"] == path:
             identities.append(DistributionIdentity(kind="symlink", target=record["target"]))
     return tuple(identities)
 
@@ -1948,6 +1945,8 @@ def _cleanup_stale_distribution_stages(
         except OSError as exc:
             raise DistributionApplyError("managed staging directory cannot be listed safely") from exc
         known_identities = tuple(item for item in (expected, *historical) if item is not None)
+        mismatch_detected = False
+        cleaned = False
         for owned in stage_ownership:
             if owned.path != action.path or owned.stage_name not in names:
                 continue
@@ -1968,13 +1967,21 @@ def _cleanup_stale_distribution_stages(
                 or _file_type(current.st_mode) != owned.file_type
                 or current.st_nlink != 1
             ):
+                mismatch_detected = True
                 continue
             candidate = _distribution_stage_identity(parent_fd, owned.stage_name)
-            if candidate is None or not _stage_identity_matches_known(
-                candidate,
-                expected=expected,
-                historical=historical,
+            if candidate is None:
+                mismatch_detected = True
+                continue
+            if (
+                not _stage_identity_matches_known(
+                    candidate,
+                    expected=expected,
+                    historical=historical,
+                )
+                and _historical_provenance(target_root, action.path, candidate, plan.manifest) is None
             ):
+                mismatch_detected = True
                 continue
             try:
                 os.unlink(owned.stage_name, dir_fd=parent_fd)
@@ -1982,6 +1989,9 @@ def _cleanup_stale_distribution_stages(
                 continue
             except OSError as exc:
                 raise DistributionApplyError("managed staging cleanup failed") from exc
+            cleaned = True
+        if mismatch_detected and not cleaned:
+            raise DistributionApplyError("managed staging identity changed")
     finally:
         _close_distribution_parent_chain(parent_chain)
 
@@ -2276,8 +2286,25 @@ def _apply_regular_action(
                                 # The swap rebinds the stage pathname to the
                                 # former target.  Persist that new identity
                                 # before cleanup so a failed unlink can be
-                                # recovered by the next retry.
-                                stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, old_stat))
+                                # recovered by the next retry.  If marker
+                                # publication itself fails, remove the old
+                                # target immediately so the stale pre-swap
+                                # marker cannot hide a managed payload.
+                                try:
+                                    stage_ownership_recorder(
+                                        _distribution_stage_ownership(path, staging_name, old_stat)
+                                    )
+                                except Exception as record_error:
+                                    try:
+                                        _remove_distribution_stage_if_owned(
+                                            parent_fd,
+                                            staging_name,
+                                            old_stat,
+                                            strict=True,
+                                        )
+                                    except DistributionApplyError as cleanup_error:
+                                        raise cleanup_error from record_error
+                                    raise
                             _remove_distribution_stage_if_owned(
                                 parent_fd,
                                 staging_name,
@@ -2414,9 +2441,20 @@ def _apply_symlink_action(
                                 # owns the former target.  Record that inode
                                 # before unlink so a failed cleanup remains
                                 # safely retryable.
-                                stage_ownership_recorder(
-                                    _distribution_stage_ownership(action.path, staging_name, old_stat)
-                                )
+                                try:
+                                    stage_ownership_recorder(
+                                        _distribution_stage_ownership(action.path, staging_name, old_stat)
+                                    )
+                                except Exception:
+                                    try:
+                                        os.unlink(staging_name, dir_fd=parent_fd)
+                                    except FileNotFoundError:
+                                        pass
+                                    except OSError as cleanup_error:
+                                        raise DistributionApplyError(
+                                            "managed staging cleanup failed"
+                                        ) from cleanup_error
+                                    raise
                             os.unlink(staging_name, dir_fd=parent_fd)
                     except FileNotFoundError:
                         pass
