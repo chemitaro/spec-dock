@@ -16,7 +16,6 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
-import secrets
 import stat
 import sys
 from typing import TYPE_CHECKING, Any, Literal, NoReturn
@@ -896,14 +895,19 @@ class _TargetObservation:
     snapshot: DistributionTargetSnapshot | None = None
 
 
-def _identity_matches(actual: DistributionIdentity, record: dict[str, Any]) -> bool:
+def _identity_matches(
+    actual: DistributionIdentity,
+    record: dict[str, Any],
+    *,
+    include_mode: bool = True,
+) -> bool:
     if actual.kind != record.get("kind"):
         return False
     if actual.kind == "regular":
         if actual.sha256 != record.get("sha256"):
             return False
         expected_mode = record.get("mode")
-        return expected_mode is None or actual.mode == expected_mode
+        return not include_mode or expected_mode is None or actual.mode == expected_mode
     return actual.target == record.get("target")
 
 
@@ -1095,10 +1099,10 @@ def _trusted_manifest_matches(
     for trusted in manifest.trusted_consumer_manifests:
         manifest_observation = _observe_target(target_root, trusted["path"])
         manifest_identity = manifest_observation.identity
-        if manifest_identity is None or not _identity_matches(manifest_identity, trusted):
+        if manifest_identity is None or not _identity_matches(manifest_identity, trusted, include_mode=False):
             continue
         for claim in trusted["claims"]:
-            if claim["path"] == path and _identity_matches(actual, claim):
+            if claim["path"] == path and _identity_matches(actual, claim, include_mode=False):
                 return True
     return False
 
@@ -1110,7 +1114,7 @@ def _historical_provenance(
     manifest: DistributionManifest,
 ) -> str | None:
     for record in _historical_records(manifest):
-        if record["path"] == path and _identity_matches(actual, record):
+        if record["path"] == path and _identity_matches(actual, record, include_mode=False):
             return "direct"
     if _trusted_manifest_matches(target_root, path, actual, manifest):
         return "trusted-manifest"
@@ -1275,7 +1279,7 @@ def _classify_obsolete_target(
     actual = observation.identity
     if actual is None:
         return _blocked_action(path, operation, "unsafe-target-path")
-    direct = any(_identity_matches(actual, identity) for identity in item["identities"])
+    direct = any(_identity_matches(actual, identity, include_mode=False) for identity in item["identities"])
     trusted = _trusted_manifest_matches(target_root, path, actual, manifest)
     if not direct and not trusted:
         return _blocked_action(path, operation, "obsolete-identity-unknown", action="preserve")
@@ -1791,6 +1795,18 @@ def _stage_identity_matches_known(
     return False
 
 
+def _distribution_stage_name(path: str, identity: DistributionIdentity) -> str:
+    """Return the stable private stage name owned by one planned target."""
+    if identity.kind == "regular":
+        identity_key = f"regular:{identity.sha256}"
+        prefix = ".spec-dock-file-"
+    else:
+        identity_key = f"symlink:{identity.target}"
+        prefix = ".spec-dock-symlink-"
+    digest = hashlib.sha256(f"{path}\0{identity_key}".encode()).hexdigest()[:24]
+    return f"{prefix}{digest}"
+
+
 def _historical_stage_identities(plan: DistributionPlan, path: str) -> tuple[DistributionIdentity, ...]:
     identities: list[DistributionIdentity] = []
     for record in plan.manifest.historical_current_identities:
@@ -1842,8 +1858,13 @@ def _cleanup_stale_distribution_stages(
             names = os.listdir(parent_fd)  # noqa: PTH208 - descriptor-relative scan is required for no-follow safety
         except OSError as exc:
             raise DistributionApplyError("managed staging directory cannot be listed safely") from exc
+        owned_stage_names = {
+            _distribution_stage_name(action.path, identity)
+            for identity in (expected, *historical)
+            if identity is not None
+        }
         for stage_name in names:
-            if not stage_name.startswith((".spec-dock-file-", ".spec-dock-symlink-")):
+            if stage_name not in owned_stage_names:
                 continue
             candidate = _distribution_stage_identity(parent_fd, stage_name)
             if candidate is None or not _stage_identity_matches_known(
@@ -1976,7 +1997,7 @@ def _apply_regular_action(
             nofollow = getattr(os, "O_NOFOLLOW", None)
             if not isinstance(nofollow, int):
                 raise DistributionApplyError("platform lacks required no-follow file support")
-            staging_name = f".spec-dock-file-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_name = _distribution_stage_name(path, expected)
             fd = os.open(
                 staging_name,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -2069,7 +2090,7 @@ def _apply_regular_action(
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
 
             _resolve_distribution_swap_rename()
-            staging_name = f".spec-dock-file-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_name = _distribution_stage_name(path, expected)
             staging_fd = os.open(
                 staging_name,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -2199,7 +2220,7 @@ def _apply_symlink_action(
             if target_exists:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_no_replace_rename()
-            staging_name = f".spec-dock-symlink-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_name = _distribution_stage_name(action.path, expected)
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
             try:
@@ -2234,7 +2255,7 @@ def _apply_symlink_action(
             if current_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_swap_rename()
-            staging_name = f".spec-dock-symlink-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_name = _distribution_stage_name(action.path, expected)
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
             swapped = False
@@ -2351,13 +2372,18 @@ def _apply_distribution_action(
     )
 
 
-def apply_distribution_plan(plan: DistributionPlan) -> DistributionResult:
+def apply_distribution_plan(
+    plan: DistributionPlan,
+    *,
+    allow_stale_stage_cleanup: bool = False,
+) -> DistributionResult:
     """Apply a validated plan with no-follow identity checks at every action.
 
     This S30 seam intentionally does not perform CLI admission, version-marker
-    handling, retry persistence, or recursive cleanup.  Any preflight or
-    identity mismatch raises before the corresponding action writes or removes
-    a target path.
+    handling, retry persistence, or recursive cleanup.  Stale private-stage
+    cleanup is opt-in for a validated same-package retry; ordinary runs leave
+    unknown stage-like siblings untouched.  Any preflight or identity mismatch
+    raises before the corresponding action writes or removes a target path.
     """
 
     target_root = plan.target_root
@@ -2383,7 +2409,8 @@ def apply_distribution_plan(plan: DistributionPlan) -> DistributionResult:
     for index, action in enumerate(plan.actions):
         snapshot = snapshots[action.path]
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
-        _cleanup_stale_distribution_stages(plan, target_root, action, snapshot)
+        if allow_stale_stage_cleanup:
+            _cleanup_stale_distribution_stages(plan, target_root, action, snapshot)
         # Removing a known stale stage mutates the parent directory ctime.  The
         # target itself must remain unchanged, but every later action needs the
         # refreshed parent snapshot before it can be applied or adopted.
