@@ -142,6 +142,17 @@ class _ManagedPathIdentity(NamedTuple):
     ctime_ns: int
 
 
+class _ManagedFileIdentity(NamedTuple):
+    """No-follow identity and content digest for one managed scaffold file."""
+
+    device: int
+    inode: int
+    ctime_ns: int
+    link_count: int
+    mode: int
+    sha256: str
+
+
 def _managed_path_identity(path: Path) -> _ManagedPathIdentity:
     try:
         info = os.lstat(path)
@@ -150,6 +161,60 @@ def _managed_path_identity(path: Path) -> _ManagedPathIdentity:
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or info.st_nlink < 1:
         raise RuntimeError(f"managed scaffold target is not a safe directory: {path}")
     return _ManagedPathIdentity(info.st_dev, info.st_ino, info.st_ctime_ns)
+
+
+def _managed_file_identity(path: Path) -> _ManagedFileIdentity | None:
+    """Capture one regular file without following the final path component."""
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file cannot be inspected safely") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise RuntimeError("managed scaffold file is not a safe regular file")
+
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed scaffold file no-follow support is unavailable")
+    try:
+        fd = os.open(path, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0))
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file cannot be opened safely") from exc
+    try:
+        opened = os.fstat(fd)
+        if (
+            opened.st_dev != info.st_dev
+            or opened.st_ino != info.st_ino
+            or opened.st_ctime_ns != info.st_ctime_ns
+            or opened.st_nlink != 1
+            or not stat.S_ISREG(opened.st_mode)
+        ):
+            raise RuntimeError("managed scaffold file identity changed")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1024 * 64)
+            if not chunk:
+                break
+            digest.update(chunk)
+        return _ManagedFileIdentity(
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_ctime_ns,
+            opened.st_nlink,
+            stat.S_IMODE(opened.st_mode),
+            digest.hexdigest(),
+        )
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file cannot be read safely") from exc
+    finally:
+        os.close(fd)
+
+
+def _assert_managed_file_identity(path: Path, expected: _ManagedFileIdentity | None) -> None:
+    """Reject a managed file that appeared or changed after preflight."""
+    if _managed_file_identity(path) != expected:
+        raise RuntimeError("managed scaffold file identity changed")
 
 
 def _assert_managed_path_identity(path: Path, expected: _ManagedPathIdentity | None) -> None:
@@ -781,7 +846,14 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
         (specdock_dir / name).unlink(missing_ok=True)
 
 
-def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None:
+def _write_atomic_regular_file(
+    path: Path,
+    payload: bytes,
+    *,
+    mode: int,
+    expected_identity: _ManagedFileIdentity | None = None,
+    identity_checked: bool = False,
+) -> None:
     """Write one managed regular file without following a destination link."""
     parent = path.parent
     try:
@@ -802,6 +874,8 @@ def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None
         stat.S_ISLNK(existing.st_mode) or not stat.S_ISREG(existing.st_mode) or existing.st_nlink != 1
     ):
         raise RuntimeError("managed file destination is not a safe regular file")
+    if identity_checked:
+        _assert_managed_file_identity(path, expected_identity)
 
     fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=parent)
     temporary = Path(temporary_name)
@@ -824,6 +898,8 @@ def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None
         closed = True
 
         if existing is not None:
+            if identity_checked:
+                _assert_managed_file_identity(path, expected_identity)
             current = os.lstat(path)
             if (
                 stat.S_ISLNK(current.st_mode)
@@ -947,6 +1023,19 @@ def _distribution_retry_marker_path(target_root: Path) -> Path:
     return target_root / _DISTRIBUTION_RETRY_MARKER_REL
 
 
+def _distribution_retry_marker_present(target_root: Path) -> bool:
+    """Detect a published retry marker without following its final path."""
+    try:
+        os.lstat(_distribution_retry_marker_path(target_root))
+    except FileNotFoundError:
+        return False
+    except OSError:
+        # An unreadable or unsafe marker must still be treated as partial state;
+        # the admission path will fail closed on the next invocation.
+        return True
+    return True
+
+
 def _write_distribution_retry_marker(
     target_root: Path,
     *,
@@ -1016,6 +1105,8 @@ def _install_spec_dock_bound(
     expected_root_identity: DistributionRootIdentity | None = None,
     root_identity_path: Path | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
+    managed_gitignore_identity_checked: bool = False,
     seed_root_workbench: bool | None = None,
 ) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
@@ -1041,7 +1132,7 @@ def _install_spec_dock_bound(
         # embedded copy: a package that omits it is incomplete and must fail
         # before creating or replacing any consumer state.
         src_gitignore = src_spec_dock / ".gitignore"
-        if not src_gitignore.is_file():
+        if not src_gitignore.is_file() or src_gitignore.is_symlink():
             raise RuntimeError(f"Missing asset file: {src_gitignore}")
 
         # Preflight all managed scaffold directories before any write.
@@ -1089,7 +1180,14 @@ def _install_spec_dock_bound(
             guard_root()
 
         guard_root()
-        _copy_file(src_gitignore, specdock_dir / ".gitignore")
+        gitignore_mode = stat.S_IMODE(src_gitignore.stat().st_mode)
+        _write_atomic_regular_file(
+            specdock_dir / ".gitignore",
+            src_gitignore.read_bytes(),
+            mode=gitignore_mode,
+            expected_identity=expected_managed_gitignore_identity,
+            identity_checked=managed_gitignore_identity_checked,
+        )
         guard_root()
 
         if should_seed_root_workbench:
@@ -1153,6 +1251,8 @@ def _install_spec_dock(
     write_version: bool = True,
     expected_root_identity: DistributionRootIdentity | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
+    managed_gitignore_identity_checked: bool = False,
     seed_root_workbench: bool | None = None,
 ) -> None:
     """Install/update scaffold while binding all writes to the opened root."""
@@ -1169,6 +1269,8 @@ def _install_spec_dock(
             expected_root_identity=bound_identity,
             root_identity_path=visible_root,
             expected_managed_scaffold_identities=expected_managed_scaffold_identities,
+            expected_managed_gitignore_identity=expected_managed_gitignore_identity,
+            managed_gitignore_identity_checked=managed_gitignore_identity_checked,
             seed_root_workbench=seed_root_workbench,
         )
 
@@ -1195,7 +1297,9 @@ def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
 
 def _preflight_managed_scaffold_target_paths(
     target_root: Path,
-) -> dict[Path, _ManagedPathIdentity | None]:
+    *,
+    expected_gitignore_bytes: bytes,
+) -> tuple[dict[Path, _ManagedPathIdentity | None], _ManagedFileIdentity | None]:
     """Reject unsafe existing scaffold targets before a recognized update.
 
     The scaffold refresh replaces the four provider-managed directories and
@@ -1247,7 +1351,14 @@ def _preflight_managed_scaffold_target_paths(
                 unsafe_path = (current / first_entry).relative_to(specdock_dir).as_posix()
                 raise RuntimeError(f"managed scaffold target contains symlinked entry: spec-dock/{unsafe_path}")
 
-    require_regular_file(specdock_dir / ".gitignore", label="spec-dock/.gitignore")
+    gitignore_path = specdock_dir / ".gitignore"
+    require_regular_file(gitignore_path, label="spec-dock/.gitignore")
+    gitignore_identity = _managed_file_identity(gitignore_path)
+    if (
+        gitignore_identity is not None
+        and gitignore_identity.sha256 != hashlib.sha256(expected_gitignore_bytes).hexdigest()
+    ):
+        raise RuntimeError("managed scaffold target 'spec-dock/.gitignore' has unknown content; preserve-and-block")
     require_regular_file(specdock_dir / "spec-dock.version", label="spec-dock/spec-dock.version")
 
     # These directories hold persistent or generated state and are only
@@ -1258,7 +1369,7 @@ def _preflight_managed_scaffold_target_paths(
     require_regular_file(specdock_dir / "active" / "context-pack.md", label="spec-dock/active/context-pack.md")
     require_regular_file(specdock_dir / ".agent" / "active.json", label="spec-dock/.agent/active.json")
 
-    return identities
+    return identities, gitignore_identity
 
 
 def _distribution_retry_command(operation: DistributionOperation) -> str:
@@ -1424,6 +1535,8 @@ def _install_fresh_distribution(target_root: Path) -> None:
             last_completed_phase = "version-written"
             _remove_distribution_retry_marker(target_root, expected_root_identity=root_identity)
         except Exception as exc:
+            if _distribution_retry_marker_present(target_root):
+                marker_started = True
             if marker_started:
                 _raise_distribution_partial_failure(
                     exc,
@@ -1446,6 +1559,10 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
     root_identity = _distribution_root_identity(target_root)
     with _assets_dir() as assets_dir:
         try:
+            src_gitignore = assets_dir / "spec_dock" / ".gitignore"
+            if not src_gitignore.is_file() or src_gitignore.is_symlink():
+                raise RuntimeError(f"Missing asset file: {src_gitignore}")
+            expected_gitignore_bytes = src_gitignore.read_bytes()
             plan = build_distribution_plan(
                 assets_dir / "install_root",
                 manifest_path=assets_dir / "managed_distribution.json",
@@ -1458,7 +1575,10 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 raise RuntimeError(f"distribution preflight blocked: {reasons}")
 
             _assert_distribution_root_identity(target_root, root_identity)
-            absolute_scaffold_identities = _preflight_managed_scaffold_target_paths(target_root)
+            absolute_scaffold_identities, gitignore_identity = _preflight_managed_scaffold_target_paths(
+                target_root,
+                expected_gitignore_bytes=expected_gitignore_bytes,
+            )
             managed_scaffold_identities = {
                 path.relative_to(target_root): identity for path, identity in absolute_scaffold_identities.items()
             }
@@ -1490,6 +1610,8 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 write_version=False,
                 expected_root_identity=root_identity,
                 expected_managed_scaffold_identities=managed_scaffold_identities,
+                expected_managed_gitignore_identity=gitignore_identity,
+                managed_gitignore_identity_checked=True,
                 seed_root_workbench=(
                     operation == "fresh" and not (_specdock_dir(target_root) / ".workbench" / "README.md").exists()
                 ),
@@ -1540,6 +1662,8 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 expected_root_identity=root_identity,
             )
         except Exception as exc:
+            if _distribution_retry_marker_present(target_root):
+                marker_started = True
             if marker_started:
                 _raise_distribution_partial_failure(
                     exc,

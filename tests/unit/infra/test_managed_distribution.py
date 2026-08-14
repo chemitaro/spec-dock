@@ -846,6 +846,87 @@ def test_s25_update_repairs_mode_when_content_is_current(tmp_path: Path) -> None
     assert stat.S_IMODE(target.stat().st_mode) == 0o755
 
 
+def test_s30_apply_rejects_provider_mode_change_after_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    original_source = managed_distribution._source_asset_bytes
+
+    def changed_source(path: Path) -> tuple[bytes, int]:
+        content, mode = original_source(path)
+        return content, 0o755 if mode != 0o755 else 0o644
+
+    monkeypatch.setattr(managed_distribution, "_source_asset_bytes", changed_source)
+
+    with pytest.raises(DistributionApplyError, match="provider Current asset mode changed"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == old
+
+
+def test_s30_apply_retries_cleanup_of_known_stale_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    original_unlink = managed_distribution.os.unlink
+
+    def fail_stage_cleanup(name, *args, **kwargs):
+        if isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan)
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert target.read_bytes() == b"new\n"
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert apply_distribution_plan(retry_plan).status == "complete"
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
 def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
