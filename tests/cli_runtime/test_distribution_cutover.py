@@ -591,6 +591,33 @@ def test_s60_atomic_regular_file_does_not_replace_racing_destination(
     assert destination.read_bytes() == b"user replacement\n"
 
 
+def test_s60_atomic_root_workbench_seed_does_not_leave_partial_destination(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / ".workbench" / "README.md"
+    payload = b"seed content\n" * 1024
+    original_write = cli.os.write
+    calls = 0
+
+    def fail_after_partial_write(fd, view):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            partial = max(1, len(view) // 2)
+            return original_write(fd, view[:partial])
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(cli.os, "write", fail_after_partial_write)
+
+    with pytest.raises(RuntimeError, match="managed file write failed"):
+        destination.parent.mkdir(parents=True)
+        cli._write_atomic_regular_file(destination, payload, mode=0o644)
+
+    assert not destination.exists()
+    assert not list(destination.parent.glob(".README.md.*"))
+
+
 def test_s60_root_rebind_during_marker_publication(
     tmp_path: Path,
     monkeypatch,

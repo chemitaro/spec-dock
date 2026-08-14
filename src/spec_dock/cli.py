@@ -1240,9 +1240,13 @@ def _install_spec_dock_bound(
             _assert_root_workbench_seed_target_safe(specdock_dir)
             assert root_workbench_readme is not None
             guard_root()
-            _copy_file(
-                root_workbench_readme,
-                specdock_dir / ".workbench" / "README.md",
+            workbench_seed_target = specdock_dir / ".workbench" / "README.md"
+            workbench_seed_target.parent.mkdir(parents=True, exist_ok=True)
+            source_info = os.lstat(root_workbench_readme)
+            _write_atomic_regular_file(
+                workbench_seed_target,
+                root_workbench_readme.read_bytes(),
+                mode=stat.S_IMODE(source_info.st_mode),
             )
             guard_root()
 
