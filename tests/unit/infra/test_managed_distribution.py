@@ -2095,6 +2095,75 @@ def test_s30_apply_materializes_canonical_shortcut_without_following_target(tmp_
     assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
 
 
+def test_s30_apply_retries_symlink_create_stage_record_and_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_unlink = managed_distribution.os.unlink
+    recorder_failed = False
+    cleanup_failed = False
+
+    def record_stage(record: managed_distribution.DistributionStageOwnership) -> None:
+        nonlocal recorder_failed
+        if record.file_type == "symlink" and not recorder_failed:
+            recorder_failed = True
+            raise OSError("simulated symlink stage recorder failure")
+        recorded.append(record)
+
+    def fail_symlink_cleanup_once(name, *args, **kwargs):
+        nonlocal cleanup_failed
+        if not cleanup_failed and isinstance(name, str) and name.startswith(".spec-dock-symlink-"):
+            cleanup_failed = True
+            raise OSError("simulated symlink stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_symlink_cleanup_once)
+
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=record_stage)
+
+    stage_files = list(target_root.rglob(".spec-dock-symlink-*"))
+    assert len(stage_files) == 1
+    symlink_record = next(item for item in recorded if item.file_type == "symlink")
+    stage_stat = stage_files[0].lstat()
+    assert (symlink_record.device, symlink_record.inode, symlink_record.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(symlink_record,),
+        ).status
+        == "complete"
+    )
+    shortcut = target_root / "spec"
+    assert shortcut.is_symlink()
+    assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
+    assert not list(target_root.rglob(".spec-dock-symlink-*"))
+
+
 def test_s30_apply_upgrades_canonical_shortcut_with_no_replace_publish(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(
