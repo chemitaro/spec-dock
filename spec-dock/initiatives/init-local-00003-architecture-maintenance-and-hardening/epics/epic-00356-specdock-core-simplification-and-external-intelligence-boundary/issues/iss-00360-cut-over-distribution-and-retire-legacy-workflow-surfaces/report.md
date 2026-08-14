@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、初回実装コミット群に加えて、最終品質ゲートで検出したP1を段階的に修正した。`109999c6147cd4e1da8119f74ff128f4b687beb3` で初回の4件（regular upgradeの非原子的write、mode不一致の未修復、Fresh initの再実行不能、partial failure診断不足）を修正し、`9a231dc3` で再レビューで検出した4件（apply時のprovider mode再束縛、既知staging残骸のretry cleanup、marker公開後失敗のpartial化、recognized retry時の`.gitignore` no-follow identity再検証）を修正した。さらに `b5fe5f8c` で再レビューの3件（Freshでの旧名workflow無条件削除、staging cleanup後のsnapshot失効、symlink staging残骸未回収）を修正し、`2a6cc009` で空targetへの公開 `init --force` をFresh導線へ分岐させた。`757fa7b9` では未知stage-like siblingを通常実行で触らず、validated retry時だけ計画由来の安定stage名を掃除するようにし、historical ownership判定からmode差を除外した。さらに `e17c2bdc` でretry markerへstageの作成時no-follow identityを記録し、記録のない同名stage collisionを保持・停止するようにした。`3fc0af0f` ではFresh createのstaging write失敗時に現在のstage identityを再取得してowned stageだけをcleanupし、Fresh retryのroot Workbench parentをmutation前にno-follow検証し、provider asset診断からhost absolute pathを除去した。`a44908d4` / `73b7a20f` ではswap後に旧targetへ再束縛されたstage ownershipを記録し、Workbench seedをatomic materializationへ切り替えた。`8a212ba6c` ではmarker更新失敗時の旧target stage即時cleanup、recognized / obsolete / trusted provenanceを含むretry cleanup、ownership identity mismatchのfail-closed判定を追加した。`26031b6a` ではIssue 360のpreserve契約（所有権証明のない同名workflowを保持）に合わせ、既存installerテストの旧期待値を更新した。`3dbd56f7` ではregular upgradeの部分書き込み後に変化したstage identityをclose前に再取得し、ownership-checked cleanupと同一package retryを収束させる回帰を追加した。最終HEADのfull regressionは `75 failed, 1934 passed, 516 skipped` で完走し、固定点の同一failure path 27件を`approved-no-op`、Issue 360で物理退役したauthoring-pack / wrapper面のcurrent-only 48件を`expected-retirement`として、path・owner・follow-up付きのS95 ledgerへ記録した。最終ChatGPT-final-quality-gate-strictは`a6ded0d9a838b40cdcd741fa473cd264b801f245`から現行HEADまでの差分に対して再実行し、P0/P1が残る場合は追加修正して再実行する。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`0f56c0063e07e281200961c7f1dd274874569d0b` では、regular upgradeの部分書き込み後に変化したstage identityをretry markerへ再記録し、strict cleanupとsame-package retry収束を追加した。またS40Aで退役したauthoring-pack / ChatGPT wrapperの専用テストとmanual validatorテストを物理削除した。クリーンな最終HEADのfull regressionは `27 failed, 1935 passed, 516 skipped` で、現行failure path 27件すべてがmerge前固定点でも再現する`approved-no-op`、current-only 0件としてS95 ledgerへ記録した。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対してv11を再実行する。
 
 ### Latest P1 repair candidate (2026-08-14)
 
@@ -71,12 +71,18 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 * regular upgradeのstage writeが部分的に進んでから失敗した場合、close前にstage fdのno-follow identityを再取得してからownership-checked cleanupするようにした。作成時ctimeが更新されたstageを古いsnapshotで誤って残さず、同一packageのforward retryを停止させない。
 * 回帰テストを「write前に即時raise」から「partial bytesを書いてからraise」へ強化し、既存targetの保持とstage残骸cleanupを確認した。
-* S95では最終HEADの全回帰、固定点の全回帰、現行failure node id 75件の固定点subset再実行を行い、27件の既存failureと48件の物理退役期待差を [`s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) にpath・owner・follow-up付きで記録した。
+* S95では`0f56c0063e07e281200961c7f1dd274874569d0b`の全回帰、固定点の全回帰、現行failure node id 27件の固定点subset再実行を行い、27件すべてが固定点でも再現する`approved-no-op`であることを [`s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) にpath・owner・follow-up付きで記録した。旧authoring-pack / wrapper専用テストはS40Aの物理退役として本差分から削除し、current-only failureは残していない。
+
+### Latest P1 repair candidate 10 (2026-08-14)
+
+* regular upgradeの部分書き込み後、close前に取得したstageのno-follow device / inode / `ctime_ns` / typeをretry markerへ再記録し、cleanup失敗をstrictに通知するようにした。markerの正確な所有identityが一致するstageはpayloadがpartialでも同一package retryで回収でき、unknown siblingは従来どおり触らない。
+* S40Aで退役したauthoring-pack / ChatGPT wrapperの専用テストとmanual validatorテストを物理削除し、S95でcurrent-only failureが0件になるよう回帰選択を現行cutover suiteへ揃えた。
+* 修正テスト: partial bytes + stage unlink failure後のmarker identity再記録とretry収束、旧wrapper / manual validator testの退役。
 
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `3dbd56f7706ad7756d61fb9d247b241c1c517921`（code / distribution regression tests）
+* Final implementation commit: `0f56c0063e07e281200961c7f1dd274874569d0b`（partial-stage retry identity / cleanup修正、退役テスト削除、distribution regression tests）
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
@@ -353,8 +359,8 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | not adopted / ledgered | 最終HEAD `3dbd56f7706ad7756d61fb9d247b241c1c517921`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v10.xml` → `75 failed, 1934 passed, 516 skipped`（12分43秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`を独立Git cloneで同じ全回帰にかけ、`452 failed, 3350 passed, 52 skipped`（28分51秒）を得た。現行のfailure node id 75件を固定点でsubset再実行し、27件は同一failure behaviorの`approved-no-op`、48件はIssue 360で物理退役したauthoring-pack / wrapper面を旧期待する`expected-retirement`、比較未完了0件となった。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
-| Final ChatGPT-final-quality-gate-strict | pending / v10 | v9で検出されたP1（部分書き込み後のstage identity陳腐化、S95 final-head full regression台帳欠落）を`3dbd56f7`、最終HEADの全回帰、固定点subset比較、[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)へ反映した。現行HEADとmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、fresh browser sessionで再確認する |
+| Full repository regression | not adopted / ledgered | 最終HEAD `0f56c0063e07e281200961c7f1dd274874569d0b`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v12.xml` → `27 failed, 1935 passed, 516 skipped`（12分49秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`を独立Git cloneで同じ全回帰にかけ、`452 failed, 3350 passed, 52 skipped`（28分51秒）を得た。現行failure node id 27件を固定点でsubset再実行し、27件すべてが同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
+| Final ChatGPT-final-quality-gate-strict | pending / v11 | v10で検出されたP1（部分書き込み後のstage identity再記録不足、S95でcurrent-only旧テストを未退役）を`0f56c0063e07e281200961c7f1dd274874569d0b`とS95 v12 ledgerへ反映した。現行HEADとmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、clean exact-upstreamのfresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
 ## Residual Risks / Follow-ups
