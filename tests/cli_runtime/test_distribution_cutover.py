@@ -374,6 +374,61 @@ def test_s50_update_preflights_all_scaffold_sources_before_distribution_write(
     assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
+def test_s50_update_preflights_required_nested_runtime_before_distribution_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+
+    assets_copy = tmp_path / "provider-assets"
+    shutil.copytree(PROVIDER_ROOT, assets_copy)
+    (assets_copy / "spec_dock" / "scripts" / "spec-dock").unlink()
+
+    @contextmanager
+    def patched_assets_dir():
+        yield assets_copy
+
+    monkeypatch.setattr(cli, "_assets_dir", patched_assets_dir)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr().err
+    assert "Missing asset file: spec_dock/scripts/spec-dock" in captured
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_s50_update_preflights_required_nested_runtime_mode_before_distribution_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+
+    assets_copy = tmp_path / "provider-assets"
+    shutil.copytree(PROVIDER_ROOT, assets_copy)
+    runtime_script = assets_copy / "spec_dock" / "scripts" / "spec-dock"
+    runtime_script.chmod(0o644)
+
+    @contextmanager
+    def patched_assets_dir():
+        yield assets_copy
+
+    monkeypatch.setattr(cli, "_assets_dir", patched_assets_dir)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr().err
+    assert "Invalid asset file: spec_dock/scripts/spec-dock" in captured
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
 def test_s50_force_init_restores_missing_current_asset_and_preserves_user_data(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
     stale_asset = tmp_path / ".agents/skills/spec-dock/SKILL.md"

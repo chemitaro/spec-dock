@@ -1362,6 +1362,21 @@ def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
         if not source.is_dir() or source.is_symlink():
             raise RuntimeError(f"Invalid asset directory: spec_dock/{name}")
 
+    runtime_script = src_spec_dock / "scripts" / "spec-dock"
+    try:
+        runtime_info = os.lstat(runtime_script)
+    except FileNotFoundError as exc:
+        raise RuntimeError("Missing asset file: spec_dock/scripts/spec-dock") from exc
+    except OSError as exc:
+        raise RuntimeError("Cannot inspect asset file: spec_dock/scripts/spec-dock") from exc
+    if (
+        stat.S_ISLNK(runtime_info.st_mode)
+        or not stat.S_ISREG(runtime_info.st_mode)
+        or runtime_info.st_nlink != 1
+        or (stat.S_IMODE(runtime_info.st_mode) & 0o111) == 0
+    ):
+        raise RuntimeError("Invalid asset file: spec_dock/scripts/spec-dock")
+
     root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
     if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
         raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
