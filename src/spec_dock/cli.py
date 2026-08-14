@@ -3724,7 +3724,10 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     _install_fresh_distribution(target_root)
             else:
-                _install_recognized_distribution(target_root, operation="init-force")
+                if admission.status == "fresh":
+                    _install_fresh_distribution(target_root)
+                else:
+                    _install_recognized_distribution(target_root, operation="init-force")
         elif ns.command == "update":
             _admit_distribution_cli(target_root, operation="update")
             _install_recognized_distribution(target_root, operation="update")
