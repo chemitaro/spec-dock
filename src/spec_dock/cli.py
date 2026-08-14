@@ -241,6 +241,26 @@ def _managed_file_identity(path: Path) -> _ManagedFileIdentity | None:
         os.close(fd)
 
 
+def _root_workbench_seed_decision(specdock_dir: Path, source: Path) -> bool:
+    """Classify the Fresh root Workbench seed without following user paths."""
+    _assert_root_workbench_parent_safe(specdock_dir)
+    target = specdock_dir / ".workbench" / "README.md"
+    target_identity = _managed_file_identity(target)
+    if target_identity is None:
+        return True
+
+    try:
+        source_info = os.lstat(source)
+    except OSError as exc:
+        raise RuntimeError("managed root Workbench seed source cannot be inspected safely") from exc
+    if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISREG(source_info.st_mode) or source_info.st_nlink != 1:
+        raise RuntimeError("managed root Workbench seed source is not a safe regular file")
+    source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    if target_identity.sha256 != source_digest or target_identity.mode != stat.S_IMODE(source_info.st_mode):
+        raise RuntimeError("managed root Workbench seed target has unknown content; preserve-and-block")
+    return False
+
+
 def _assert_managed_file_identity(path: Path, expected: _ManagedFileIdentity | None) -> None:
     """Reject a managed file that appeared or changed after preflight."""
     if _managed_file_identity(path) != expected:
@@ -1498,7 +1518,18 @@ def _install_fresh_distribution(target_root: Path) -> None:
             _assert_distribution_root_identity(target_root, root_identity)
             specdock_dir = _specdock_dir(target_root)
             if not os.path.lexists(specdock_dir):
-                specdock_dir.mkdir()
+                # Create the first workspace boundary relative to the held
+                # root directory.  A concurrent pathname replacement must
+                # not redirect this mutation to an unrelated visible root.
+                with _bound_distribution_root(target_root, root_identity) as (
+                    bound_root,
+                    _visible_root,
+                    _bound_identity,
+                ):
+                    try:
+                        _specdock_dir(bound_root).mkdir()
+                    except FileExistsError as exc:
+                        raise RuntimeError("Fresh distribution workspace appeared during preflight") from exc
                 fresh_workspace_created = True
             _write_distribution_retry_marker(
                 target_root,
@@ -1555,7 +1586,10 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 install_root_shortcut=False,
                 write_version=False,
                 expected_root_identity=root_identity,
-                seed_root_workbench=not (specdock_dir / ".workbench" / "README.md").exists(),
+                seed_root_workbench=_root_workbench_seed_decision(
+                    specdock_dir,
+                    assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
+                ),
             )
             _write_distribution_retry_marker(
                 target_root,
@@ -1721,7 +1755,12 @@ def _install_recognized_distribution(
                 expected_managed_gitignore_identity=gitignore_identity,
                 managed_gitignore_identity_checked=True,
                 seed_root_workbench=(
-                    operation == "fresh" and not (_specdock_dir(target_root) / ".workbench" / "README.md").exists()
+                    _root_workbench_seed_decision(
+                        _specdock_dir(target_root),
+                        assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
+                    )
+                    if operation == "fresh"
+                    else None
                 ),
             )
             _write_distribution_retry_marker(
