@@ -497,17 +497,17 @@ def test_s60_marker_published_before_temporary_cleanup_failure_is_partial(
     monkeypatch,
     capsys,
 ) -> None:
-    original_unlink = Path.unlink
+    original_rename = cli._rename_distribution_no_replace
     failed = False
 
-    def fail_marker_stage_cleanup(path, *args, **kwargs):
+    def fail_marker_publish_once(source_parent_fd, source_name, destination_parent_fd, destination_name):
         nonlocal failed
-        if not failed and path.name.startswith("..distribution-retry.json."):
+        if not failed:
             failed = True
-            raise OSError("simulated temporary cleanup failure")
-        return original_unlink(path, *args, **kwargs)
+            raise OSError("simulated marker publish failure")
+        return original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
-    monkeypatch.setattr(Path, "unlink", fail_marker_stage_cleanup)
+    monkeypatch.setattr(cli, "_rename_distribution_no_replace", fail_marker_publish_once)
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
@@ -515,9 +515,11 @@ def test_s60_marker_published_before_temporary_cleanup_failure_is_partial(
     assert "target=distribution" in captured
     marker = tmp_path / "spec-dock/.distribution-retry.json"
     assert marker.exists()
+    assert marker.stat().st_nlink == 1
+    assert not list((tmp_path / "spec-dock").glob("..distribution-retry.json.*"))
     assert not (tmp_path / "spec-dock/spec-dock.version").exists()
 
-    monkeypatch.setattr(Path, "unlink", original_unlink)
+    monkeypatch.setattr(cli, "_rename_distribution_no_replace", original_rename)
     assert main(["init", str(tmp_path)]) == 0
     assert not marker.exists()
 
@@ -747,19 +749,19 @@ def test_s60_root_rebind_during_marker_publication(
 ) -> None:
     assert main(["init", str(tmp_path)]) == 0
     displaced = tmp_path.with_name(f"{tmp_path.name}-marker-displaced")
-    original_link = cli.os.link
+    original_rename = cli._rename_distribution_no_replace
     switched = False
 
-    def rebind_before_publish(source, target, *, follow_symlinks=False):
+    def rebind_before_publish(source_parent_fd, source_name, destination_parent_fd, destination_name):
         nonlocal switched
         if not switched:
             switched = True
             tmp_path.rename(displaced)
             tmp_path.mkdir()
             (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
-        return original_link(source, target, follow_symlinks=follow_symlinks)
+        return original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
-    monkeypatch.setattr(cli.os, "link", rebind_before_publish)
+    monkeypatch.setattr(cli, "_rename_distribution_no_replace", rebind_before_publish)
 
     assert main(["update", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
