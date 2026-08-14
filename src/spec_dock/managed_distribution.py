@@ -1695,19 +1695,171 @@ def _remove_distribution_stage_if_owned(
     parent_fd: int,
     stage_name: str,
     created: os.stat_result,
+    *,
+    strict: bool = False,
 ) -> None:
     try:
         current = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
-        if (
-            current.st_dev == created.st_dev
-            and current.st_ino == created.st_ino
-            and current.st_ctime_ns == created.st_ctime_ns
-            and _file_type(current.st_mode) == _file_type(created.st_mode)
-            and current.st_nlink == created.st_nlink == 1
-        ):
-            os.unlink(stage_name, dir_fd=parent_fd)
-    except OSError:
+    except FileNotFoundError:
         return
+    except OSError as exc:
+        if strict:
+            raise DistributionApplyError("managed staging cleanup failed") from exc
+        return
+    owned = (
+        current.st_dev == created.st_dev
+        and current.st_ino == created.st_ino
+        and current.st_ctime_ns == created.st_ctime_ns
+        and _file_type(current.st_mode) == _file_type(created.st_mode)
+        and current.st_nlink == created.st_nlink == 1
+    )
+    if not owned:
+        if strict:
+            raise DistributionApplyError("managed staging identity changed")
+        return
+    try:
+        os.unlink(stage_name, dir_fd=parent_fd)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        if strict:
+            raise DistributionApplyError("managed staging cleanup failed") from exc
+
+
+def _distribution_stage_identity(parent_fd: int, stage_name: str) -> DistributionIdentity | None:
+    """Read a private stage identity without following its final path."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise DistributionApplyError("platform lacks required no-follow file support")
+    try:
+        info = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise DistributionApplyError("managed staging artifact cannot be inspected safely") from exc
+    if info.st_nlink != 1:
+        return None
+    kind = _file_type(info.st_mode)
+    if kind == "regular":
+        try:
+            fd = os.open(stage_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError("managed staging artifact cannot be opened safely") from exc
+        try:
+            opened = os.fstat(fd)
+            if (
+                opened.st_dev != info.st_dev
+                or opened.st_ino != info.st_ino
+                or opened.st_ctime_ns != info.st_ctime_ns
+                or opened.st_nlink != 1
+                or not stat.S_ISREG(opened.st_mode)
+            ):
+                raise DistributionApplyError("managed staging identity changed")
+            return DistributionIdentity(
+                kind="regular",
+                sha256=hashlib.sha256(_read_fd_bytes(fd)).hexdigest(),
+                mode=stat.S_IMODE(opened.st_mode),
+            )
+        finally:
+            os.close(fd)
+    if kind == "symlink":
+        try:
+            target = os.readlink(stage_name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError("managed staging symlink cannot be read safely") from exc
+        normalized = _normalized_link_target(target)
+        if normalized is None:
+            raise DistributionApplyError("managed staging symlink target is unsafe")
+        return DistributionIdentity(kind="symlink", target=normalized)
+    return None
+
+
+def _stage_identity_matches_known(
+    candidate: DistributionIdentity,
+    *,
+    expected: DistributionIdentity | None,
+    historical: tuple[DistributionIdentity, ...],
+) -> bool:
+    known = tuple(item for item in (expected, *historical) if item is not None)
+    for identity in known:
+        if candidate.kind != identity.kind:
+            continue
+        if candidate.kind == "regular" and candidate.sha256 == identity.sha256:
+            return True
+        if candidate.kind == "symlink" and candidate.target == identity.target:
+            return True
+    return False
+
+
+def _historical_stage_identities(plan: DistributionPlan, path: str) -> tuple[DistributionIdentity, ...]:
+    identities: list[DistributionIdentity] = []
+    for record in plan.manifest.historical_current_identities:
+        if record["path"] != path:
+            continue
+        if record["kind"] == "regular":
+            identities.append(
+                DistributionIdentity(
+                    kind="regular",
+                    sha256=record["sha256"],
+                    mode=record.get("mode"),
+                )
+            )
+        else:
+            identities.append(DistributionIdentity(kind="symlink", target=record["target"]))
+    for record in plan.manifest.historical_shortcuts:
+        if record["path"] == path:
+            identities.append(DistributionIdentity(kind="symlink", target=record["target"]))
+    return tuple(identities)
+
+
+def _cleanup_stale_distribution_stages(
+    plan: DistributionPlan,
+    target_root: Path,
+    action: DistributionAction,
+    snapshot: DistributionTargetSnapshot,
+) -> None:
+    """Retry cleanup of known private stages left by an earlier failed apply."""
+    if action.action not in {"create", "adopt", "upgrade", "prune"}:
+        return
+    expected = _expected_target_identity(plan, action.path)
+    historical = _historical_stage_identities(plan, action.path)
+    if expected is None and not historical:
+        return
+    try:
+        parent_chain = _open_distribution_parent_chain(
+            target_root,
+            action.path,
+            create_missing=False,
+            expected_snapshot=snapshot,
+        )
+    except DistributionApplyError as exc:
+        if "parent is missing" in str(exc):
+            return
+        raise
+    try:
+        parent_fd = parent_chain[-1]
+        try:
+            names = os.listdir(parent_fd)  # noqa: PTH208 - descriptor-relative scan is required for no-follow safety
+        except OSError as exc:
+            raise DistributionApplyError("managed staging directory cannot be listed safely") from exc
+        for stage_name in names:
+            if not stage_name.startswith(".spec-dock-file-"):
+                continue
+            candidate = _distribution_stage_identity(parent_fd, stage_name)
+            if candidate is None or not _stage_identity_matches_known(
+                candidate,
+                expected=expected,
+                historical=historical,
+            ):
+                continue
+            try:
+                os.unlink(stage_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise DistributionApplyError("managed staging cleanup failed") from exc
+    finally:
+        _close_distribution_parent_chain(parent_chain)
 
 
 def _expected_target_identity(plan: DistributionPlan, path: str) -> DistributionIdentity | None:
@@ -1989,8 +2141,15 @@ def _apply_regular_action(
                             and old_stat.st_nlink == 1
                             and old_digest == target_identity.sha256
                         ):
-                            os.unlink(staging_name, dir_fd=parent_fd)
-                    except (FileNotFoundError, OSError):
+                            _remove_distribution_stage_if_owned(
+                                parent_fd,
+                                staging_name,
+                                old_stat,
+                                strict=True,
+                            )
+                        else:
+                            raise DistributionApplyError("managed staging identity changed")
+                    except FileNotFoundError:
                         pass
         finally:
             os.close(fd)
@@ -2146,7 +2305,12 @@ def _apply_distribution_action(
         else:
             if plan.install_root is None:
                 raise DistributionApplyError("distribution plan has no provider source root")
-            source_bytes, source_mode = _source_asset_bytes(plan.install_root / action.path)
+            source_bytes, observed_source_mode = _source_asset_bytes(plan.install_root / action.path)
+            if expected.mode is None or observed_source_mode != expected.mode:
+                raise DistributionApplyError(f"provider Current asset mode changed for '{action.path}'")
+            # Bind the mutation to the mode captured in the read-only plan;
+            # never publish a mode observed after plan construction.
+            source_mode = expected.mode
 
     target_kind = snapshot.target.file_type
     if expected is not None and expected.kind == "symlink":
@@ -2217,10 +2381,11 @@ def apply_distribution_plan(plan: DistributionPlan) -> DistributionResult:
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
 
     for index, action in enumerate(plan.actions):
-        if action.action in {"adopt", "preserve"}:
-            continue
         snapshot = snapshots[action.path]
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
+        _cleanup_stale_distribution_stages(plan, target_root, action, snapshot)
+        if action.action in {"adopt", "preserve"}:
+            continue
         _apply_distribution_action(
             plan,
             target_root,

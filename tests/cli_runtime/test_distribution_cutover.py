@@ -335,6 +335,82 @@ def test_s50_force_init_restores_missing_current_asset_and_preserves_user_data(t
     assert workbench_sentinel.read_bytes() == b"keep workbench\n"
 
 
+def test_s50_update_unknown_scaffold_gitignore_is_preserve_and_blocked(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    gitignore = tmp_path / "spec-dock/.gitignore"
+    gitignore.write_bytes(b"user-owned ignore rules\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr().err
+    assert "anchor-mismatch" in captured
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_s60_retry_rechecks_scaffold_gitignore_identity_before_write(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    original_write = cli._write_atomic_regular_file
+    changed = False
+
+    def mutate_gitignore_before_publish(path, payload, *, mode, **kwargs):
+        nonlocal changed
+        if not changed and Path(path).name == ".gitignore":
+            changed = True
+            Path(path).write_bytes(b"user-owned retry content\n")
+        return original_write(path, payload, mode=mode, **kwargs)
+
+    monkeypatch.setattr(cli, "_write_atomic_regular_file", mutate_gitignore_before_publish)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during scaffold-refresh" in captured
+    assert "target=spec-dock" in captured
+    assert (tmp_path / "spec-dock/.gitignore").read_bytes() == b"user-owned retry content\n"
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "distribution-applied"
+
+    monkeypatch.setattr(cli, "_write_atomic_regular_file", original_write)
+    assert main(["update", str(tmp_path)]) == 1
+    assert "distribution partial failure during preflight" in capsys.readouterr().err
+    assert marker.exists()
+
+
+def test_s60_marker_published_before_temporary_cleanup_failure_is_partial(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    original_unlink = Path.unlink
+    failed = False
+
+    def fail_marker_stage_cleanup(path, *args, **kwargs):
+        nonlocal failed
+        if not failed and path.name.startswith("..distribution-retry.json."):
+            failed = True
+            raise OSError("simulated temporary cleanup failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_marker_stage_cleanup)
+
+    assert main(["init", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during preflight" in captured
+    assert "target=distribution" in captured
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    assert marker.exists()
+    assert not (tmp_path / "spec-dock/spec-dock.version").exists()
+
+    monkeypatch.setattr(Path, "unlink", original_unlink)
+    assert main(["init", str(tmp_path)]) == 0
+    assert not marker.exists()
+
+
 def test_s50_update_unknown_current_collision_is_zero_write(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     collision = tmp_path / ".agents/skills/spec-dock/SKILL.md"
@@ -556,14 +632,14 @@ def test_s60_root_rebind_during_version_publication(
     original_write = cli._write_atomic_regular_file
     switched = False
 
-    def rebind_before_version_write(path, payload, *, mode):
+    def rebind_before_version_write(path, payload, *, mode, **kwargs):
         nonlocal switched
         if not switched and Path(path).name == "spec-dock.version":
             switched = True
             tmp_path.rename(displaced)
             tmp_path.mkdir()
             (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
-        return original_write(path, payload, mode=mode)
+        return original_write(path, payload, mode=mode, **kwargs)
 
     monkeypatch.setattr(cli, "_write_atomic_regular_file", rebind_before_version_write)
 
