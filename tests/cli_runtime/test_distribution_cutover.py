@@ -322,6 +322,13 @@ def test_s45_fresh_rerun_through_force_converges(tmp_path: Path) -> None:
     assert _filesystem_snapshot(tmp_path) == before
 
 
+def test_s45_force_init_on_empty_target_uses_fresh_distribution(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path), "--force"]) == 0
+
+    assert (tmp_path / "spec-dock/.gitignore").is_file()
+    assert (tmp_path / "spec-dock/spec-dock.version").is_file()
+
+
 def test_s50_update_restores_missing_current_asset_and_preserves_user_data(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
     stale_asset = tmp_path / ".agents/skills/spec-dock/SKILL.md"
