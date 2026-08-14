@@ -601,6 +601,9 @@ def test_s60_distribution_apply_fault_keeps_marker_and_old_version(
     assert "credential=secret" not in captured
     assert "/private/outside/source.txt" not in captured
     assert "distribution partial failure during distribution-apply" in captured
+    assert "target=distribution" in captured
+    assert "last_completed_phase=preflight-complete" in captured
+    assert "retry=spec-dock update ." in captured
     payload = json.loads(marker.read_text(encoding="utf-8"))
     assert payload["last_completed_phase"] == "preflight-complete"
     assert version.read_bytes() == before_version
@@ -608,6 +611,40 @@ def test_s60_distribution_apply_fault_keeps_marker_and_old_version(
     monkeypatch.setattr(cli, "apply_distribution_plan", original_apply)
     assert main(["update", str(tmp_path)]) == 0
     assert not marker.exists()
+
+
+def test_s60_fresh_init_forward_retry_reuses_marker_and_converges(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    original_apply = cli.apply_distribution_plan
+    failed = False
+
+    def fail_once(plan):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise RuntimeError("credential=secret /private/outside/source.txt")
+        return original_apply(plan)
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+
+    assert main(["init", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "credential=secret" not in captured
+    assert "/private/outside/source.txt" not in captured
+    assert "distribution partial failure during distribution-apply" in captured
+    assert "target=distribution" in captured
+    assert "last_completed_phase=preflight-complete" in captured
+    assert "retry=spec-dock init ." in captured
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    assert marker.exists()
+    assert not (tmp_path / "spec-dock/spec-dock.version").exists()
+
+    assert main(["init", str(tmp_path)]) == 0
+    assert not marker.exists()
+    assert (tmp_path / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.3\n"
 
 
 def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(

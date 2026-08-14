@@ -1221,6 +1221,22 @@ def _classify_current_target(
 
     if (
         actual.kind == "regular"
+        and actual.sha256 == expected.sha256
+        and expected.mode is not None
+        and actual.mode != expected.mode
+        and operation in {"update", "init-force"}
+    ):
+        if observation.link_count is not None and observation.link_count > 1:
+            return _blocked_action(
+                path,
+                operation,
+                "hard-link-mutation-unsafe",
+                provenance="current",
+            )
+        return DistributionAction(path, operation, "upgrade", "current", "current-mode-mismatch")
+
+    if (
+        actual.kind == "regular"
         and observation.link_count is not None
         and observation.link_count > 1
         and operation == "uninstall"
@@ -1874,8 +1890,6 @@ def _apply_regular_action(
         if not isinstance(nofollow, int):
             raise DistributionApplyError("platform lacks required no-follow file support")
         flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
-        if action.action == "upgrade":
-            flags = os.O_RDWR | nofollow | getattr(os, "O_CLOEXEC", 0)
         fd = os.open(target_name, flags, dir_fd=parent_fd)
         try:
             opened = os.fstat(fd)
@@ -1891,32 +1905,93 @@ def _apply_regular_action(
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
                 os.unlink(target_name, dir_fd=parent_fd)
                 return
+            if action.action != "upgrade":
+                raise DistributionApplyError(f"unsupported regular action for '{path}'")
             if source_bytes is None or source_mode is None:
                 raise DistributionApplyError(f"missing provider bytes for '{path}'")
-            mutation_phase = "pre"
+            _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
+            target_identity = snapshot.target.identity
+            if target_identity is None or target_identity.kind != "regular":
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+            if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
 
-            def check_before_write() -> None:
-                nonlocal mutation_phase
+            _resolve_distribution_swap_rename()
+            staging_name = f".spec-dock-file-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_fd = os.open(
+                staging_name,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                source_mode,
+                dir_fd=parent_fd,
+            )
+            staging_stat = os.fstat(staging_fd)
+            stage_identity = staging_stat
+            swapped = False
+            try:
+                if not stat.S_ISREG(staging_stat.st_mode) or staging_stat.st_nlink != 1:
+                    raise DistributionApplyError(f"managed target staging failed for '{path}'")
+
+                def check_before_stage_write() -> None:
+                    _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                    current = os.fstat(staging_fd)
+                    if not stat.S_ISREG(current.st_mode) or current.st_nlink != 1:
+                        raise DistributionApplyError(f"managed target staging failed for '{path}'")
+
+                _write_fd_bytes(staging_fd, source_bytes, before_mutation=check_before_stage_write)
+                os.fchmod(staging_fd, source_mode)
+                staged = os.fstat(staging_fd)
+                if (
+                    staged.st_nlink != 1
+                    or stat.S_IMODE(staged.st_mode) != source_mode
+                    or hashlib.sha256(_read_fd_bytes(staging_fd)).hexdigest() != expected.sha256
+                ):
+                    raise DistributionApplyError(f"managed target staging verification failed for '{path}'")
+                stage_identity = staged
+
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
-                _assert_regular_fd_safe(
-                    fd,
-                    snapshot.target,
-                    path,
-                    exact=mutation_phase == "pre",
-                )
-                mutation_phase = "post"
+                _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
+                if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
+                    raise DistributionApplyError(f"managed target identity changed for '{path}'")
+                _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+                swapped = True
 
-            _write_fd_bytes(fd, source_bytes, before_mutation=check_before_write)
-            _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
-            _assert_regular_fd_safe(fd, snapshot.target, path, exact=False)
-            os.fchmod(fd, source_mode)
-            verified = os.fstat(fd)
-            if (
-                verified.st_nlink != 1
-                or stat.S_IMODE(verified.st_mode) != source_mode
-                or hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != expected.sha256
-            ):
-                raise DistributionApplyError(f"managed target verification failed for '{path}'")
+                published_fd = os.open(
+                    target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd
+                )
+                try:
+                    published = os.fstat(published_fd)
+                    if (
+                        published.st_nlink != 1
+                        or stat.S_IMODE(published.st_mode) != source_mode
+                        or hashlib.sha256(_read_fd_bytes(published_fd)).hexdigest() != expected.sha256
+                    ):
+                        raise DistributionApplyError(f"managed target verification failed for '{path}'")
+                finally:
+                    os.close(published_fd)
+            finally:
+                os.close(staging_fd)
+                if not swapped:
+                    _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)
+                else:
+                    try:
+                        old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                        old_fd = os.open(
+                            staging_name,
+                            os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                            dir_fd=parent_fd,
+                        )
+                        try:
+                            old_digest = hashlib.sha256(_read_fd_bytes(old_fd)).hexdigest()
+                        finally:
+                            os.close(old_fd)
+                        if (
+                            _same_stat_structure(old_stat, snapshot.target)
+                            and old_stat.st_nlink == 1
+                            and old_digest == target_identity.sha256
+                        ):
+                            os.unlink(staging_name, dir_fd=parent_fd)
+                    except (FileNotFoundError, OSError):
+                        pass
         finally:
             os.close(fd)
     except FileNotFoundError as exc:
@@ -2060,7 +2135,7 @@ def _apply_distribution_action(
         raise DistributionApplyError(f"managed action has no Current identity for '{action.path}'")
     if action.action == "create" and expected is not None:
         _resolve_distribution_no_replace_rename()
-    elif action.action == "upgrade" and expected is not None and expected.kind == "symlink":
+    elif action.action == "upgrade" and expected is not None:
         _resolve_distribution_swap_rename()
 
     source_bytes: bytes | None = None

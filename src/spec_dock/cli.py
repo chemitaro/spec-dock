@@ -23,10 +23,11 @@ import shutil
 import stat
 import sys
 import tempfile
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 
 from spec_dock import __version__
 from spec_dock.managed_distribution import (
+    DistributionAdmission,
     DistributionOperation,
     DistributionRootIdentity,
     admit_distribution_operation,
@@ -87,10 +88,10 @@ def _tool_version() -> str:
     return match.group(1) if match else __version__
 
 
-def _admit_distribution_cli(target_root: Path, *, operation: DistributionOperation) -> None:
+def _admit_distribution_cli(target_root: Path, *, operation: DistributionOperation) -> DistributionAdmission:
     """Run version/marker admission before any installer mutation."""
     with _assets_dir() as assets_dir:
-        admit_distribution_operation(
+        return admit_distribution_operation(
             target_root,
             operation=operation,
             package_version=_tool_version(),
@@ -1015,6 +1016,7 @@ def _install_spec_dock_bound(
     expected_root_identity: DistributionRootIdentity | None = None,
     root_identity_path: Path | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    seed_root_workbench: bool | None = None,
 ) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
     identity_path = root_identity_path or target_root
@@ -1026,6 +1028,7 @@ def _install_spec_dock_bound(
     guard_root()
     specdock_dir = _specdock_dir(target_root)
     fresh_specdock = not os.path.lexists(specdock_dir)
+    should_seed_root_workbench = fresh_specdock if seed_root_workbench is None else seed_root_workbench
     if specdock_dir.exists() and not force:
         raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'.")
 
@@ -1089,7 +1092,7 @@ def _install_spec_dock_bound(
         _copy_file(src_gitignore, specdock_dir / ".gitignore")
         guard_root()
 
-        if fresh_specdock:
+        if should_seed_root_workbench:
             guard_root()
             _copy_file(
                 src_spec_dock / "templates" / "root" / ".workbench" / "README.md",
@@ -1150,6 +1153,7 @@ def _install_spec_dock(
     write_version: bool = True,
     expected_root_identity: DistributionRootIdentity | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    seed_root_workbench: bool | None = None,
 ) -> None:
     """Install/update scaffold while binding all writes to the opened root."""
     with _bound_distribution_root(target_root, expected_root_identity) as (
@@ -1165,6 +1169,7 @@ def _install_spec_dock(
             expected_root_identity=bound_identity,
             root_identity_path=visible_root,
             expected_managed_scaffold_identities=expected_managed_scaffold_identities,
+            seed_root_workbench=seed_root_workbench,
         )
 
 
@@ -1256,44 +1261,188 @@ def _preflight_managed_scaffold_target_paths(
     return identities
 
 
+def _distribution_retry_command(operation: DistributionOperation) -> str:
+    if operation == "fresh":
+        return "spec-dock init ."
+    if operation == "init-force":
+        return "spec-dock init --force ."
+    return "spec-dock update ."
+
+
+def _safe_distribution_failure_target(exc: BaseException, phase: str) -> str:
+    """Return a repository-relative diagnostic target without leaking host paths."""
+    match = re.search(r"for '([^']+)'", str(exc))
+    if match:
+        candidate = match.group(1)
+        try:
+            relative = Path(candidate)
+            if (
+                not relative.is_absolute()
+                and "\\" not in candidate
+                and ".." not in relative.parts
+                and relative.as_posix() == candidate
+            ):
+                return candidate
+        except (OSError, ValueError):
+            pass
+    return {
+        "preflight": "distribution",
+        "distribution-apply": "distribution",
+        "scaffold-refresh": "spec-dock",
+        "post-verify": "distribution",
+        "version-write": "spec-dock/spec-dock.version",
+    }.get(phase, "spec-dock/.distribution-retry.json")
+
+
+def _raise_distribution_partial_failure(
+    exc: BaseException,
+    *,
+    operation: DistributionOperation,
+    phase: str,
+    last_completed_phase: str,
+) -> NoReturn:
+    target = _safe_distribution_failure_target(exc, phase)
+    retry = _distribution_retry_command(operation)
+    raise RuntimeError(
+        f"distribution partial failure during {phase}; "
+        f"target={target}; last_completed_phase={last_completed_phase}; "
+        f"retry={retry}"
+    ) from None
+
+
 def _install_fresh_distribution(target_root: Path) -> None:
-    """Apply one validated Fresh distribution, then verify its Current assets."""
+    """Apply one validated Fresh distribution with forward-retry recovery."""
+    phase = "preflight"
+    marker_started = False
+    last_completed_phase = "not-started"
+    root_identity = _distribution_root_identity(target_root)
+    fresh_workspace_created = False
     with _assets_dir() as assets_dir:
-        _preflight_fresh_spec_dock_assets(assets_dir)
-        plan = build_distribution_plan(
-            assets_dir / "install_root",
-            manifest_path=assets_dir / "managed_distribution.json",
-            scaffold_root=assets_dir / "spec_dock",
-            target_root=target_root,
-            operation="fresh",
-        )
-        if plan.blocked:
-            reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
-            raise RuntimeError(f"distribution preflight blocked: {reasons}")
+        try:
+            _preflight_fresh_spec_dock_assets(assets_dir)
+            plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                operation="fresh",
+            )
+            if plan.blocked:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
+                raise RuntimeError(f"distribution preflight blocked: {reasons}")
 
-        apply_distribution_plan(plan)
-        _install_spec_dock(target_root, force=False, install_root_shortcut=False)
+            _assert_distribution_root_identity(target_root, root_identity)
+            specdock_dir = _specdock_dir(target_root)
+            if not os.path.lexists(specdock_dir):
+                specdock_dir.mkdir()
+                fresh_workspace_created = True
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="preflight-complete",
+                expected_root_identity=root_identity,
+            )
+            marker_started = True
+            last_completed_phase = "preflight-complete"
 
-        post_plan = build_distribution_plan(
-            assets_dir / "install_root",
-            manifest_path=assets_dir / "managed_distribution.json",
-            scaffold_root=assets_dir / "spec_dock",
-            target_root=target_root,
-            operation="fresh",
-        )
-        if post_plan.blocked:
-            reasons = ", ".join(f"{action.path}: {action.reason}" for action in post_plan.actions if action.blocked)
-            raise RuntimeError(f"distribution post-verify blocked: {reasons}")
-        non_adopted = [action.path for action in post_plan.actions if action.action != "adopt"]
-        if non_adopted:
-            joined = ", ".join(non_adopted)
-            raise RuntimeError(f"distribution post-verify incomplete: {joined}")
+            # Creating the marker's `spec-dock/` parent is itself a target-root
+            # mutation and therefore updates the root ctime.  Rebuild the
+            # read-only plan after that first mutation so apply-time snapshots
+            # remain bound to the current root identity.
+            plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                operation="fresh",
+            )
+            if plan.blocked:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
+                raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
+
+            phase = "distribution-apply"
+            _assert_distribution_root_identity(target_root, root_identity)
+            apply_distribution_plan(plan)
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="distribution-applied",
+                expected_root_identity=root_identity,
+            )
+            last_completed_phase = "distribution-applied"
+
+            phase = "scaffold-refresh"
+            _assert_distribution_root_identity(target_root, root_identity)
+            _install_spec_dock(
+                target_root,
+                force=True,
+                install_root_shortcut=False,
+                write_version=False,
+                expected_root_identity=root_identity,
+                seed_root_workbench=not (specdock_dir / ".workbench" / "README.md").exists(),
+            )
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="scaffold-refreshed",
+                expected_root_identity=root_identity,
+            )
+            last_completed_phase = "scaffold-refreshed"
+
+            phase = "post-verify"
+            _assert_distribution_root_identity(target_root, root_identity)
+            post_plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                operation="fresh",
+            )
+            if post_plan.blocked:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in post_plan.actions if action.blocked)
+                raise RuntimeError(f"distribution post-verify blocked: {reasons}")
+            non_adopted = [action.path for action in post_plan.actions if action.action != "adopt"]
+            if non_adopted:
+                joined = ", ".join(non_adopted)
+                raise RuntimeError(f"distribution post-verify incomplete: {joined}")
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="post-verified",
+                expected_root_identity=root_identity,
+            )
+            last_completed_phase = "post-verified"
+
+            phase = "version-write"
+            _write_spec_dock_version(target_root, expected_root_identity=root_identity)
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="version-written",
+                expected_root_identity=root_identity,
+            )
+            last_completed_phase = "version-written"
+            _remove_distribution_retry_marker(target_root, expected_root_identity=root_identity)
+        except Exception as exc:
+            if marker_started:
+                _raise_distribution_partial_failure(
+                    exc,
+                    operation="fresh",
+                    phase=phase,
+                    last_completed_phase=last_completed_phase,
+                )
+            if fresh_workspace_created:
+                with suppress(OSError):
+                    _assert_distribution_root_identity(target_root, root_identity)
+                    _specdock_dir(target_root).rmdir()
+            raise
 
 
 def _install_recognized_distribution(target_root: Path, *, operation: DistributionOperation) -> None:
     """Apply a recognized distribution with same-package forward recovery."""
     phase = "preflight"
     marker_started = False
+    last_completed_phase = "not-started"
     root_identity = _distribution_root_identity(target_root)
     with _assets_dir() as assets_dir:
         try:
@@ -1320,6 +1469,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 expected_root_identity=root_identity,
             )
             marker_started = True
+            last_completed_phase = "preflight-complete"
 
             phase = "distribution-apply"
             _assert_distribution_root_identity(target_root, root_identity)
@@ -1330,6 +1480,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 last_completed_phase="distribution-applied",
                 expected_root_identity=root_identity,
             )
+            last_completed_phase = "distribution-applied"
 
             phase = "scaffold-refresh"
             _assert_distribution_root_identity(target_root, root_identity)
@@ -1339,6 +1490,9 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 write_version=False,
                 expected_root_identity=root_identity,
                 expected_managed_scaffold_identities=managed_scaffold_identities,
+                seed_root_workbench=(
+                    operation == "fresh" and not (_specdock_dir(target_root) / ".workbench" / "README.md").exists()
+                ),
             )
             _write_distribution_retry_marker(
                 target_root,
@@ -1346,6 +1500,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 last_completed_phase="scaffold-refreshed",
                 expected_root_identity=root_identity,
             )
+            last_completed_phase = "scaffold-refreshed"
 
             phase = "post-verify"
             _assert_distribution_root_identity(target_root, root_identity)
@@ -1366,6 +1521,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 last_completed_phase="post-verified",
                 expected_root_identity=root_identity,
             )
+            last_completed_phase = "post-verified"
 
             phase = "version-write"
             _write_spec_dock_version(
@@ -1378,16 +1534,19 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 last_completed_phase="version-written",
                 expected_root_identity=root_identity,
             )
+            last_completed_phase = "version-written"
             _remove_distribution_retry_marker(
                 target_root,
                 expected_root_identity=root_identity,
             )
         except Exception as exc:
             if marker_started:
-                raise RuntimeError(
-                    f"distribution partial failure during {phase}; "
-                    "rerun the same package and operation to continue recovery"
-                ) from None
+                _raise_distribution_partial_failure(
+                    exc,
+                    operation=operation,
+                    phase=phase,
+                    last_completed_phase=last_completed_phase,
+                )
             raise exc
 
 
@@ -3433,14 +3592,17 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if ns.command == "init":
-            _admit_distribution_cli(
+            admission = _admit_distribution_cli(
                 target_root,
                 operation="init-force" if bool(ns.force) else "fresh",
             )
             if not ns.force:
-                if os.path.lexists(_specdock_dir(target_root)):
+                if admission.status == "retry":
+                    _install_recognized_distribution(target_root, operation="fresh")
+                elif os.path.lexists(_specdock_dir(target_root)):
                     raise RuntimeError("'spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
-                _install_fresh_distribution(target_root)
+                else:
+                    _install_fresh_distribution(target_root)
             else:
                 _install_recognized_distribution(target_root, operation="init-force")
         elif ns.command == "update":
