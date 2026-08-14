@@ -839,6 +839,76 @@ def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypat
     assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
+def test_s60_fresh_retry_adopts_provider_identical_workbench_seed(tmp_path: Path, monkeypatch, capsys) -> None:
+    original_apply = cli.apply_distribution_plan
+    failed = False
+
+    def fail_once(plan, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise RuntimeError("simulated distribution failure")
+        return original_apply(plan, **kwargs)
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    assert main(["init", str(tmp_path)]) == 1
+    capsys.readouterr()
+
+    source = SCAFFOLD_ROOT / "templates/root/.workbench/README.md"
+    target = tmp_path / "spec-dock/.workbench/README.md"
+    target.parent.mkdir(parents=True)
+    shutil.copy2(source, target)
+
+    assert main(["init", str(tmp_path)]) == 0
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+    assert target.read_bytes() == source.read_bytes()
+
+
+def test_s50_update_preserves_symlinked_root_workbench(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    external = tmp_path / "external-workbench"
+    external.mkdir()
+    external_readme = external / "README.md"
+    external_readme.write_bytes(b"external-owned\n")
+    workbench = tmp_path / "spec-dock/.workbench"
+    shutil.rmtree(workbench)
+    workbench.symlink_to(external, target_is_directory=True)
+
+    assert main(["update", str(tmp_path)]) == 0
+    assert workbench.is_symlink()
+    assert external_readme.read_bytes() == b"external-owned\n"
+
+
+def test_s60_fresh_root_workspace_creation_stays_on_held_root(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    original_bound_root = cli._bound_distribution_root
+    displaced = tmp_path.with_name(f"{tmp_path.name}-fresh-displaced")
+    switched = False
+
+    @contextmanager
+    def rebind_after_open(target_root: Path, expected=None):
+        nonlocal switched
+        with original_bound_root(target_root, expected) as bound:
+            if not switched:
+                switched = True
+                tmp_path.rename(displaced)
+                tmp_path.mkdir()
+                (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
+            yield bound
+
+    monkeypatch.setattr(cli, "_bound_distribution_root", rebind_after_open)
+
+    assert main(["init", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution target root identity changed" in captured
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not (tmp_path / "spec-dock").exists()
+    assert (displaced / "spec-dock").is_dir()
+
+
 def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(
     tmp_path: Path,
     monkeypatch,
