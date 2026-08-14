@@ -1061,18 +1061,23 @@ def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation
     parts = PurePosixPath(relative_path).parts
     parents: list[PathIdentitySnapshot] = []
     parent_parts: list[str] = []
+    missing_parent = False
     for component in parts[:-1]:
         current = current / component
         parent_parts.append(component)
         parent_relative = "/".join(parent_parts)
+        if missing_parent:
+            # Keep every remaining parent in the preflight snapshot. A later
+            # component is also absent once an ancestor is missing; omitting
+            # it would leave an unbound race window during apply.
+            parents.append(_missing_snapshot(parent_relative))
+            continue
         try:
             component_stat = os.lstat(current)
         except FileNotFoundError:
             parents.append(_missing_snapshot(parent_relative))
-            return _TargetObservation(
-                "missing",
-                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-            )
+            missing_parent = True
+            continue
         except OSError:
             return _TargetObservation(
                 "parent-error",
@@ -1090,6 +1095,12 @@ def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation
                 "non-directory-container",
                 snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
             )
+
+    if missing_parent:
+        return _TargetObservation(
+            "missing",
+            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+        )
 
     exact = current / parts[-1]
     try:
@@ -1252,8 +1263,22 @@ def _classify_current_target(
     if actual.kind == "symlink" and actual.target != expected.target:
         provenance = _historical_provenance(target_root, path, actual, manifest)
         if provenance is not None and operation in {"update", "init-force"}:
+            if observation.link_count is not None and observation.link_count > 1:
+                return _blocked_action(
+                    path,
+                    operation,
+                    "hard-link-mutation-unsafe",
+                    provenance="historical",
+                )
             return DistributionAction(path, operation, "upgrade", "historical", "direct-historical-identity-match")
         if provenance is not None and operation == "uninstall":
+            if observation.link_count is not None and observation.link_count > 1:
+                return _blocked_action(
+                    path,
+                    operation,
+                    "hard-link-mutation-unsafe",
+                    provenance="historical",
+                )
             return DistributionAction(path, operation, "prune", "historical", "historical-identity-match")
         if provenance is not None:
             return _blocked_action(
@@ -1309,6 +1334,19 @@ def _classify_current_target(
         return DistributionAction(path, operation, "upgrade", "current", "current-mode-mismatch")
 
     if (
+        actual.kind == "symlink"
+        and observation.link_count is not None
+        and observation.link_count > 1
+        and operation == "uninstall"
+    ):
+        return _blocked_action(
+            path,
+            operation,
+            "hard-link-mutation-unsafe",
+            provenance="current",
+        )
+
+    if (
         actual.kind == "regular"
         and observation.link_count is not None
         and observation.link_count > 1
@@ -1353,6 +1391,8 @@ def _classify_obsolete_target(
     if not direct and not trusted:
         return _blocked_action(path, operation, "obsolete-identity-unknown", action="preserve")
     if actual.kind == "regular" and observation.link_count is not None and observation.link_count > 1:
+        return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="historical")
+    if actual.kind == "symlink" and observation.link_count is not None and observation.link_count > 1:
         return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="historical")
     reason = "trusted-manifest-identity-match" if trusted and not direct else "direct-obsolete-identity-match"
     return DistributionAction(path, operation, "prune", "historical", reason)
