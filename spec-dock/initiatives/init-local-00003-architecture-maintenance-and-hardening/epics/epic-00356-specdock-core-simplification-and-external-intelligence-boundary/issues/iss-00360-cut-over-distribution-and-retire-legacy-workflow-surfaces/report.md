@@ -3,7 +3,7 @@
 ID: "iss-00360"
 タイトル: "Cut Over Distribution and Retire Legacy Workflow Surfaces"
 関連GitHub: ["#360"]
-最終更新: "2026-08-14"
+最終更新: "2026-08-15"
 親: ["epic-00356", "init-local-00003"]
 依存: ["requirement.md", "design.md", "plan.md"]
 ---
@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`48779d16935546d818e003cf33a7b2e97d0832c8` では、preflight後に未登録のparent directoryが出現した場合、operation所有として採用せずfail-closedで停止する境界と回帰テストを追加した。`a6c420985bb7cd9d2e04984e3825ba62383229fe` のFresh create partial-stage retry identity / strict cleanup、`0f56c0063e07e281200961c7f1dd274874569d0b` のregular upgrade同種修正とS40A退役テスト削除も維持している。クリーンな最終HEADのfull regressionは `27 failed, 1937 passed, 516 skipped` で、現行failure path 27件すべてがmerge前固定点でも再現する`approved-no-op`、current-only 0件としてS95 v14 ledgerへ記録した。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対してv13を実行する。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`3618a41796b9b4a52a008e18d9a0db8f63bfd851` では、preflight後に出現した多段欠落parentを全件snapshotへ記録し、hard-linked symlinkのmutationをfail-closedで拒否し、recognized updateの全scaffold sourceを外部distribution mutation前に検証する境界と回帰テストを追加した。`48779d16935546d818e003cf33a7b2e97d0832c8` の未登録parent拒否、`a6c420985bb7cd9d2e04984e3825ba62383229fe` のFresh create partial-stage retry identity / strict cleanup、`0f56c0063e07e281200961c7f1dd274874569d0b` のregular upgrade同種修正とS40A退役テスト削除も維持している。クリーンな最終実装HEADのfull regressionは `27 failed, 1941 passed, 516 skipped` で、現行failure path 27件すべてがmerge前固定点でも再現する`approved-no-op`、current-only 0件としてS95 v14 ledgerへ記録した。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対してv14を実行する。
 
 ### Latest P1 repair candidate (2026-08-14)
 
@@ -91,11 +91,18 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * 先行actionの実行後、後続actionの当初欠落parentを外部作成する競合を再現する回帰テストを追加し、先行actionの結果を保持したまま後続managed fileを作成しないことを確認した。
 * S95 v14では`48779d16935546d818e003cf33a7b2e97d0832c8`の全回帰、固定点subset再実行を行い、27件すべてが固定点でも再現する`approved-no-op`、expected-retirement 0件、比較未完了0件となった。
 
+### Latest P1 repair candidate 13 (2026-08-15)
+
+* `_observe_target`が最初の欠落componentで停止せず、残りの欠落parentもsnapshotへ記録するよう変更した。先行actionが作成した上位parentの下に外部processが下位parentを作成した場合も、未登録identityとして後続mutation前に停止する。
+* Current / historical / obsoleteのsymlink prune・upgradeでlink countを確認し、hard-linked symlinkは`hard-link-mutation-unsafe`として分類してzero-writeでblockする。regularの既存hard-link保護は維持した。
+* recognized update / `init --force`でdistribution planやretry markerを作成する前に、Freshと同じ全scaffold source catalog（managed directories、`.gitignore`、root Workbench seed）をpreflightする。
+* 回帰テスト: 多段parent競合、current / historical hard-linked shortcut、recognized updateの欠落scaffold sourceによるzero-write停止。S95 v14現行HEADでは`27 failed, 1941 passed, 516 skipped`、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `48779d16935546d818e003cf33a7b2e97d0832c8`（preflight後の未所有parent拒否、Fresh createのpartial-stage retry identity / strict cleanup、退役テスト削除、distribution regression tests）
-* Final quality-gate evidence commit: `0765d5d3c4ae997a4f1a577d2cc5280be328f9cb`（S95 v14 ledger / report refresh）。S95のfull regression実行対象は親の実装tree `48779d16935546d818e003cf33a7b2e97d0832c8`であり、このcommitはcanonical evidenceのみを更新した。
+* Final implementation commit: `3618a41796b9b4a52a008e18d9a0db8f63bfd851`（多段欠落parent snapshot、hard-linked symlink mutation拒否、recognized updateの全scaffold source preflight、回帰テスト）
+* Final quality-gate evidence commit: `0765d5d3c4ae997a4f1a577d2cc5280be328f9cb`（S95 v14 ledger / report refresh）。今回のS95 v14現行full regression実行対象は実装tree `3618a41796b9b4a52a008e18d9a0db8f63bfd851`で、現行failure 27件は固定点subsetで同一failure behaviorとなった。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
@@ -372,8 +379,8 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | not adopted / ledgered | 最終HEAD `48779d16935546d818e003cf33a7b2e97d0832c8`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v14.xml` → `27 failed, 1937 passed, 516 skipped`（12分45秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を固定点subsetで再実行し、27件すべてが同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
-| Final ChatGPT-final-quality-gate-strict | pending / v13 | v12で検出されたpreflight後の未所有parent受理を`48779d16935546d818e003cf33a7b2e97d0832c8`へ反映した。現行HEADとmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、clean exact-upstreamのfresh browser sessionで再確認する |
+| Full repository regression | not adopted / ledgered | 最終実装HEAD `3618a41796b9b4a52a008e18d9a0db8f63bfd851`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v14b.xml` → `27 failed, 1941 passed, 516 skipped`（12分43秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を固定点subsetで再実行し、27件すべてが同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
+| Final ChatGPT-final-quality-gate-strict | pending / v14 | v13で検出された多段欠落parent、hard-linked symlink mutation、recognized updateのscaffold source preflight欠落を`3618a41796b9b4a52a008e18d9a0db8f63bfd851`へ反映した。現行HEADとmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、clean exact-upstreamのfresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
 ## Residual Risks / Follow-ups
