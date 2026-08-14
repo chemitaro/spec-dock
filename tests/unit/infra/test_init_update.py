@@ -37855,7 +37855,8 @@ esac
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
-            # Simulate legacy (v1) leftovers that v2 should prune on update.
+            # Simulate legacy (v1) leftovers. Without an ownership proof, the
+            # same-name workflow is user-owned and must be preserved on update.
             legacy_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
             legacy_workflow.parent.mkdir(parents=True, exist_ok=True)
             legacy_workflow.write_text("legacy\n", encoding="utf-8")
@@ -37873,7 +37874,7 @@ esac
             assert main(["update", str(target)]) == 0
             assert marker.is_file()
             self._assert_version_file(target)
-            assert not legacy_workflow.exists()
+            assert legacy_workflow.read_text(encoding="utf-8") == "legacy\n"
             if created_symlink:
                 assert not legacy_symlink.is_symlink()
 
