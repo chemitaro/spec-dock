@@ -127,6 +127,35 @@ def _copy_file(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
+def _assert_root_workbench_parent_safe(specdock_dir: Path) -> None:
+    """Reject a Fresh root Workbench parent that can redirect writes."""
+    workbench_dir = specdock_dir / ".workbench"
+    try:
+        parent_info = os.lstat(workbench_dir)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise RuntimeError("managed root Workbench boundary cannot be inspected safely") from exc
+    if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_nlink < 1:
+        raise RuntimeError("managed root Workbench boundary is not a safe directory")
+
+
+def _assert_root_workbench_seed_target_safe(specdock_dir: Path) -> None:
+    """Reject symlinked or pre-existing Fresh root Workbench seed boundaries."""
+    _assert_root_workbench_parent_safe(specdock_dir)
+    workbench_dir = specdock_dir / ".workbench"
+    target = workbench_dir / "README.md"
+    try:
+        target_info = os.lstat(target)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise RuntimeError("managed root Workbench seed target cannot be inspected safely") from exc
+    if stat.S_ISLNK(target_info.st_mode) or not stat.S_ISREG(target_info.st_mode) or target_info.st_nlink != 1:
+        raise RuntimeError("managed root Workbench seed target is not a safe regular file")
+    raise RuntimeError("managed root Workbench seed target already exists; preserve-and-block")
+
+
 def _is_generated_python_cache_path(path: Path) -> bool:
     return "__pycache__" in path.parts or path.name.endswith(".pyc")
 
@@ -1135,24 +1164,32 @@ def _install_spec_dock_bound(
     with _assets_dir() as assets_dir:
         src_spec_dock = assets_dir / "spec_dock"
         if not src_spec_dock.is_dir():
-            raise RuntimeError(f"Missing asset directory: {src_spec_dock}")
+            raise RuntimeError("Missing asset directory: spec_dock")
 
         # `.gitignore` is a required shipped asset.  Do not fall back to an
         # embedded copy: a package that omits it is incomplete and must fail
         # before creating or replacing any consumer state.
         src_gitignore = src_spec_dock / ".gitignore"
         if not src_gitignore.is_file() or src_gitignore.is_symlink():
-            raise RuntimeError(f"Missing asset file: {src_gitignore}")
+            raise RuntimeError("Missing asset file: spec_dock/.gitignore")
 
         # Preflight all managed scaffold directories before any write.
         managed_scaffold_sync_plan: list[tuple[Path, Path]] = []
         for name in _MANAGED_DIRS:
             src = src_spec_dock / name
             if not src.exists():
-                raise RuntimeError(f"Missing asset directory: {src}")
+                raise RuntimeError(f"Missing asset directory: spec_dock/{name}")
             if not src.is_dir():
-                raise RuntimeError(f"Invalid asset directory: {src}")
+                raise RuntimeError(f"Invalid asset directory: spec_dock/{name}")
             managed_scaffold_sync_plan.append((src, specdock_dir / name))
+
+        root_workbench_readme: Path | None = None
+        if seed_root_workbench is not None:
+            _assert_root_workbench_parent_safe(specdock_dir)
+            if seed_root_workbench:
+                root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
+                if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
+                    raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
 
         guard_root()
         if expected_managed_scaffold_identities is not None:
@@ -1200,9 +1237,11 @@ def _install_spec_dock_bound(
         guard_root()
 
         if should_seed_root_workbench:
+            _assert_root_workbench_seed_target_safe(specdock_dir)
+            assert root_workbench_readme is not None
             guard_root()
             _copy_file(
-                src_spec_dock / "templates" / "root" / ".workbench" / "README.md",
+                root_workbench_readme,
                 specdock_dir / ".workbench" / "README.md",
             )
             guard_root()
@@ -1288,20 +1327,20 @@ def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
     """Validate the Fresh scaffold sources before the first target write."""
     src_spec_dock = assets_dir / "spec_dock"
     if not src_spec_dock.is_dir() or src_spec_dock.is_symlink():
-        raise RuntimeError(f"Missing asset directory: {src_spec_dock}")
+        raise RuntimeError("Missing asset directory: spec_dock")
 
     src_gitignore = src_spec_dock / ".gitignore"
     if not src_gitignore.is_file() or src_gitignore.is_symlink():
-        raise RuntimeError(f"Missing asset file: {src_gitignore}")
+        raise RuntimeError("Missing asset file: spec_dock/.gitignore")
 
     for name in _MANAGED_DIRS:
         source = src_spec_dock / name
         if not source.is_dir() or source.is_symlink():
-            raise RuntimeError(f"Invalid asset directory: {source}")
+            raise RuntimeError(f"Invalid asset directory: spec_dock/{name}")
 
     root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
     if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
-        raise RuntimeError(f"Missing asset file: {root_workbench_readme}")
+        raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
 
 
 def _preflight_managed_scaffold_target_paths(
@@ -1595,7 +1634,7 @@ def _install_recognized_distribution(
         try:
             src_gitignore = assets_dir / "spec_dock" / ".gitignore"
             if not src_gitignore.is_file() or src_gitignore.is_symlink():
-                raise RuntimeError(f"Missing asset file: {src_gitignore}")
+                raise RuntimeError("Missing asset file: spec_dock/.gitignore")
             expected_gitignore_bytes = src_gitignore.read_bytes()
             plan = build_distribution_plan(
                 assets_dir / "install_root",
@@ -2409,7 +2448,7 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
     for managed_dir in _MANAGED_DIRS:
         src_root = src_spec_dock / managed_dir
         if not src_root.is_dir():
-            raise RuntimeError(f"Missing asset directory: {src_root}")
+            raise RuntimeError(f"Missing asset directory: spec_dock/{managed_dir}")
         for source_path in sorted(
             (
                 path
@@ -2423,9 +2462,11 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
 
     src_gitignore = src_spec_dock / ".gitignore"
     if not src_gitignore.is_file():
-        raise RuntimeError(f"Missing asset file: {src_gitignore}")
+        raise RuntimeError("Missing asset file: spec_dock/.gitignore")
     sources.append((Path("spec-dock/.gitignore"), src_gitignore.read_bytes()))
     root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
+    if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
+        raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
     sources.append((Path("spec-dock/.workbench/README.md"), root_workbench_readme.read_bytes()))
     sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode()))
     return tuple(sources)
@@ -3200,7 +3241,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
 def _iter_install_root_files(assets_dir: Path) -> tuple[Path, ...]:
     install_root = assets_dir / "install_root"
     if not install_root.is_dir():
-        raise RuntimeError(f"Missing asset directory: {install_root}")
+        raise RuntimeError("Missing asset directory: install_root")
     return tuple(
         sorted(
             (
@@ -3486,10 +3527,10 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
         target_rel = Path(".agents") / "skills" / skill_name / "SKILL.md"
         source_rel = source_by_target.get(target_rel)
         if source_rel is None:
-            raise RuntimeError(f"Missing asset file: {assets_dir / 'install_root' / target_rel}")
+            raise RuntimeError(f"Missing asset file: install_root/{target_rel.as_posix()}")
         src_skill = assets_dir / source_rel
         if not src_skill.is_file():
-            raise RuntimeError(f"Missing asset file: {src_skill}")
+            raise RuntimeError(f"Missing asset file: {source_rel.as_posix()}")
 
     return _ManagedSkillInstallPlan(
         current_file_mappings=current_file_mappings,
@@ -3630,7 +3671,7 @@ def _apply_managed_skill_install_plan(
     for mapping in plan.current_file_mappings:
         source_path = assets_dir / mapping.source_asset_rel
         if not source_path.is_file():
-            raise RuntimeError(f"Missing asset file: {source_path}")
+            raise RuntimeError(f"Missing asset file: {mapping.source_asset_rel.as_posix()}")
         target_path = target_root / mapping.target_rel
         current_sync_plan.append((mapping.target_rel, source_path, target_path))
 

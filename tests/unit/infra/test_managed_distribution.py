@@ -1067,6 +1067,32 @@ def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
+def test_s30_apply_create_cleans_stage_when_staging_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    def fail_staging_write(*_args: object, **_kwargs: object) -> None:
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
+
+    with pytest.raises(DistributionApplyError, match=r"apply failed|staging"):
+        apply_distribution_plan(plan)
+
+    assert not list(target_root.rglob(".spec-dock-file-*"))
+
+
 def test_s30_apply_prunes_historical_target_without_following_symlink(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     old = b"old\n"

@@ -751,6 +751,39 @@ def test_s60_fresh_init_forward_retry_reuses_marker_and_converges(
     assert (tmp_path / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.3\n"
 
 
+def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypatch, capsys) -> None:
+    original_apply = cli.apply_distribution_plan
+    failed = False
+
+    def fail_once(plan, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise RuntimeError("simulated distribution failure")
+        return original_apply(plan, **kwargs)
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    assert main(["init", str(tmp_path)]) == 1
+
+    external = tmp_path / "external-workbench"
+    external.mkdir()
+    external_readme = external / "README.md"
+    external_readme.write_bytes(b"external-owned\n")
+    workbench = tmp_path / "spec-dock/.workbench"
+    workbench.symlink_to(external, target_is_directory=True)
+
+    assert main(["init", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during scaffold-refresh" in captured
+    assert "target=spec-dock" in captured
+    assert external_readme.read_bytes() == b"external-owned\n"
+    assert (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+    workbench.unlink()
+    assert main(["init", str(tmp_path)]) == 0
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
 def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(
     tmp_path: Path,
     monkeypatch,
