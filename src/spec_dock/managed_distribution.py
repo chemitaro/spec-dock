@@ -8,6 +8,7 @@ operations and fails closed when an identity changes.
 
 from __future__ import annotations
 
+from contextlib import suppress
 import ctypes
 from dataclasses import dataclass
 import errno
@@ -2137,13 +2138,15 @@ def _apply_regular_action(
                 ):
                     raise DistributionApplyError(f"managed target verification failed for '{path}'")
                 stage_identity = verified
-            finally:
-                os.close(fd)
-            try:
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
             finally:
-                _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)
+                with suppress(OSError):
+                    stage_identity = os.fstat(fd)
+                try:
+                    os.close(fd)
+                finally:
+                    _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)
             published_fd = os.open(target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
             try:
                 published = os.fstat(published_fd)
