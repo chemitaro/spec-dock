@@ -1866,23 +1866,6 @@ def _distribution_stage_ownership(
     )
 
 
-def _stage_identity_matches_known(
-    candidate: DistributionIdentity,
-    *,
-    expected: DistributionIdentity | None,
-    historical: tuple[DistributionIdentity, ...],
-) -> bool:
-    known = tuple(item for item in (expected, *historical) if item is not None)
-    for identity in known:
-        if candidate.kind != identity.kind:
-            continue
-        if candidate.kind == "regular" and candidate.sha256 == identity.sha256:
-            return True
-        if candidate.kind == "symlink" and candidate.target == identity.target:
-            return True
-    return False
-
-
 def _distribution_stage_name(path: str, identity: DistributionIdentity) -> str:
     """Return the stable private stage name owned by one planned target."""
     if identity.kind == "regular":
@@ -1973,16 +1956,11 @@ def _cleanup_stale_distribution_stages(
             if candidate is None:
                 mismatch_detected = True
                 continue
-            if (
-                not _stage_identity_matches_known(
-                    candidate,
-                    expected=expected,
-                    historical=historical,
-                )
-                and _historical_provenance(target_root, action.path, candidate, plan.manifest) is None
-            ):
-                mismatch_detected = True
-                continue
+            # The retry marker's exact no-follow device/inode/ctime identity
+            # proves ownership of this private stage.  Its payload may be
+            # partial after a failed write, so requiring a known package
+            # digest here would strand the same-package retry.  Content and
+            # ownership checks still apply to ordinary target mutations.
             try:
                 os.unlink(owned.stage_name, dir_fd=parent_fd)
             except FileNotFoundError:
@@ -2265,14 +2243,25 @@ def _apply_regular_action(
                 if not swapped:
                     # A failed write may mutate the stage before raising.  The
                     # creation-time stat is then stale (ctime changes), so
-                    # refresh the no-follow identity before closing the fd and
+                    # refresh and publish the no-follow identity before
                     # attempting ownership-checked cleanup.
                     with suppress(OSError):
                         stage_identity = os.fstat(staging_fd)
-                os.close(staging_fd)
-                if not swapped:
-                    _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)
+                    try:
+                        if stage_ownership_recorder is not None:
+                            stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, stage_identity))
+                    finally:
+                        try:
+                            os.close(staging_fd)
+                        finally:
+                            _remove_distribution_stage_if_owned(
+                                parent_fd,
+                                staging_name,
+                                stage_identity,
+                                strict=True,
+                            )
                 else:
+                    os.close(staging_fd)
                     try:
                         old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
                         old_fd = os.open(
