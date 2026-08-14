@@ -985,6 +985,71 @@ def test_s30_apply_retries_cleanup_of_known_stale_stage(
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
+def test_s30_apply_rebinds_stage_ownership_after_swap_for_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_unlink = managed_distribution.os.unlink
+    failed = False
+
+    def fail_once_after_swap(name, *args, **kwargs):
+        nonlocal failed
+        if not failed and isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            failed = True
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_once_after_swap)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=recorded.append)
+
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert target.read_bytes() == b"new\n"
+    assert len(recorded) == 2
+    rebound = recorded[-1]
+    stage_stat = stage_files[0].lstat()
+    assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
 def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_action(
     tmp_path: Path,
 ) -> None:

@@ -2272,6 +2272,14 @@ def _apply_regular_action(
                             and old_stat.st_nlink == 1
                             and old_digest == target_identity.sha256
                         ):
+                            if stage_ownership_recorder is not None:
+                                # The swap rebinds the stage pathname to the
+                                # former target.  Persist that new identity
+                                # before cleanup so a failed unlink can be
+                                # recovered by the next retry.
+                                stage_ownership_recorder(
+                                    _distribution_stage_ownership(path, staging_name, old_stat)
+                                )
                             _remove_distribution_stage_if_owned(
                                 parent_fd,
                                 staging_name,
@@ -2403,6 +2411,14 @@ def _apply_symlink_action(
                             and _same_stat_structure(old_stat, snapshot.target)
                             and old_stat.st_nlink == 1
                         ):
+                            if stage_ownership_recorder is not None:
+                                # After the atomic swap, the stage pathname
+                                # owns the former target.  Record that inode
+                                # before unlink so a failed cleanup remains
+                                # safely retryable.
+                                stage_ownership_recorder(
+                                    _distribution_stage_ownership(action.path, staging_name, old_stat)
+                                )
                             os.unlink(staging_name, dir_fd=parent_fd)
                     except FileNotFoundError:
                         pass
