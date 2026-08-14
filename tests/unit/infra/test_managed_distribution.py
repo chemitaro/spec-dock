@@ -791,7 +791,7 @@ def test_s30_apply_materializes_missing_regular_target_without_replacing_existin
     assert target.stat().st_nlink == 1
 
 
-def test_s30_apply_upgrades_historical_regular_target_in_place(tmp_path: Path) -> None:
+def test_s30_apply_upgrades_historical_regular_target_atomically(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"new\n")
     old = b"old\n"
     manifest_path = _write_manifest(
@@ -815,7 +815,69 @@ def test_s30_apply_upgrades_historical_regular_target_in_place(tmp_path: Path) -
 
     assert result.status == "complete"
     assert target.read_bytes() == b"new\n"
-    assert target.stat().st_ino == before_inode
+    assert target.stat().st_ino != before_inode
+
+
+def test_s25_update_repairs_mode_when_content_is_current(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    source.chmod(0o755)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"current\n")
+    target.chmod(0o600)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "upgrade"
+    assert action.reason == "current-mode-mismatch"
+
+    apply_distribution_plan(plan)
+
+    assert target.read_bytes() == b"current\n"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o755
+
+
+def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    def fail_staging_write(*_args: object, **_kwargs: object) -> None:
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
+
+    with pytest.raises(DistributionApplyError, match=r"apply failed|staging"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == old
+    assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
 def test_s30_apply_prunes_historical_target_without_following_symlink(tmp_path: Path) -> None:
