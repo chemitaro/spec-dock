@@ -133,9 +133,9 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
 * Final implementation commit: `07c77b1ee33070180ada54972cce2579a19d9bf0`（markerのno-replace rename、post-swap stage ownership再記録 / cleanup再試行、recorder / cleanup複合故障回帰。初回marker再発行は親コミット`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`、nested runtime preflightは`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`）
-* Test alignment commit: `b660924d5f6f9dce6cbec8ed5a3a4b6f8d9c1a2be`（no-replace publish seamにfault-injectionテストを追従）
+* Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
 * Final quality-gate evidence commit: `0644e030fa30ab8a98d30e1a34c74cba979d787b`（S95 v17 ledger / report refresh）。v19のledger / report refreshはこの実装treeで別途更新する。
-* S95 v19 full regression: 実装tree `b660924d5f6f9dce6cbec8ed5a3a4b6f8d9c1a2be`に対して `27 failed, 1948 passed, 516 skipped`。v17とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v19 full regression: 実装tree `b660924deccb0ccf595218815cef83c8483e7298`に対して `27 failed, 1948 passed, 516 skipped`。v17とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
@@ -412,7 +412,7 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | not adopted / ledgered | 最終実装HEAD `b660924d5f6f9dce6cbec8ed5a3a4b6f8d9c1a2be`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/codex-agent-work/501/session-20260814t205804z-issue360-s95-v19-016828e2/issue360-current-v19.xml` → `27 failed, 1948 passed, 516 skipped`（12分43秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を固定点subsetで再実行し、27件すべてが同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。v17とのfailure node集合差分は0件。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
+| Full repository regression | not adopted / ledgered | 最終実装HEAD `b660924deccb0ccf595218815cef83c8483e7298`で `uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/codex-agent-work/501/session-20260814t205804z-issue360-s95-v19-016828e2/issue360-current-v19.xml` → `27 failed, 1948 passed, 516 skipped`（12分43秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を固定点subsetで再実行し、27件すべてが同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。v17とのfailure node集合差分は0件。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
 | Final ChatGPT-final-quality-gate-strict | pending / v19 | v17で検出されたmarker hard-link残留とpost-swap stage ownership消失のP1を、`07c77b1ee33070180ada54972cce2579a19d9bf0`のno-replace publishおよびrecorder / cleanup再試行へ反映した。現行HEADとmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、clean exact-upstreamのfresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
