@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、初回実装コミット群に加えて、最終品質ゲートで検出したP1を段階的に修正した。`109999c6147cd4e1da8119f74ff128f4b687beb3` で初回の4件（regular upgradeの非原子的write、mode不一致の未修復、Fresh initの再実行不能、partial failure診断不足）を修正し、`9a231dc3` で再レビューで検出した4件（apply時のprovider mode再束縛、既知staging残骸のretry cleanup、marker公開後失敗のpartial化、recognized retry時の`.gitignore` no-follow identity再検証）を修正した。さらに `b5fe5f8c` で再レビューの3件（Freshでの旧名workflow無条件削除、staging cleanup後のsnapshot失効、symlink staging残骸未回収）を修正し、`2a6cc009` で空targetへの公開 `init --force` をFresh導線へ分岐させた。`757fa7b9` では未知stage-like siblingを通常実行で触らず、validated retry時だけ計画由来の安定stage名を掃除するようにし、historical ownership判定からmode差を除外した。さらに `e17c2bdc` でretry markerへstageの作成時no-follow identityを記録し、記録のない同名stage collisionを保持・停止するようにした。通常テスト・lint・Issue 360 focused regressionは最新コミットでもpassした一方、全リポジトリのfull regressionにはIssue 360の物理退役対象外にあたる既存runtime/import/active/shellおよびlegacy manual helper参照の失敗が76件残る。最終ChatGPT-final-quality-gate-strictは`a6ded0d9a838b40cdcd741fa473cd264b801f245`から現行HEADまでの差分に対して再実行し、P0/P1が残る場合は追加修正して再実行する。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、初回実装コミット群に加えて、最終品質ゲートで検出したP1を段階的に修正した。`109999c6147cd4e1da8119f74ff128f4b687beb3` で初回の4件（regular upgradeの非原子的write、mode不一致の未修復、Fresh initの再実行不能、partial failure診断不足）を修正し、`9a231dc3` で再レビューで検出した4件（apply時のprovider mode再束縛、既知staging残骸のretry cleanup、marker公開後失敗のpartial化、recognized retry時の`.gitignore` no-follow identity再検証）を修正した。さらに `b5fe5f8c` で再レビューの3件（Freshでの旧名workflow無条件削除、staging cleanup後のsnapshot失効、symlink staging残骸未回収）を修正し、`2a6cc009` で空targetへの公開 `init --force` をFresh導線へ分岐させた。`757fa7b9` では未知stage-like siblingを通常実行で触らず、validated retry時だけ計画由来の安定stage名を掃除するようにし、historical ownership判定からmode差を除外した。さらに `e17c2bdc` でretry markerへstageの作成時no-follow identityを記録し、記録のない同名stage collisionを保持・停止するようにした。`3fc0af0f` ではFresh createのstaging write失敗時に現在のstage identityを再取得してowned stageだけをcleanupし、Fresh retryのroot Workbench parentをmutation前にno-follow検証し、provider asset診断からhost absolute pathを除去した。通常テスト・lint・Issue 360 focused regressionは最新コミットでもpassした一方、全リポジトリのfull regressionにはIssue 360の物理退役対象外にあたる既存runtime/import/active/shellおよびlegacy manual helper参照の失敗が76件残る。S95計画は全体回帰を必ず実行し、固定点で再現するIssue 360対象外の失敗だけを`approved-no-op`残課題として台帳化し、新規・変更された失敗をblockerとする境界へ明記した。最終ChatGPT-final-quality-gate-strictは`a6ded0d9a838b40cdcd741fa473cd264b801f245`から現行HEADまでの差分に対して再実行し、P0/P1が残る場合は追加修正して再実行する。
 
 ### Latest P1 repair candidate (2026-08-14)
 
@@ -50,10 +50,16 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * retry markerにexclusive create直後のstage target、filename、device / inode / `ctime_ns`、file typeを記録し、retry cleanupはその作成時identityと計画由来のstage名が一致するentryだけを削除するようにした。記録のない同名stage-like siblingは保持し、collisionとして停止する。
 * 修正テスト: 未記録の正確なstage名collisionを二回のapplyで保持する回帰、regular / symlink stale stageの記録済みidentity cleanup、marker schemaのstage ownership受理。
 
+### Latest P1 repair candidate 7 (2026-08-14)
+
+* Fresh createのstaging write / fchmod / verify / publish例外を一つのcleanup境界で処理し、例外発生後に取得したno-follow identityと一致するstageだけを回収する。既存targetを変更するupgrade経路は従来どおり保持する。
+* Fresh retryではroot Workbench親をseed判定の前後で検証し、既存READMEが外部symlink先にあってもcopyを成功扱いにせずpreserve-and-blockする。provider assetの欠損診断は論理relative pathだけを返す。
+* 修正テスト: Fresh create staging write failure cleanup、外部READMEを持つWorkbench symlink retryのzero-external-write / marker保持 / 修復後収束。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `e17c2bdc`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
+* Final implementation commit: `3fc0af0f`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
 * Integrated main baseline: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
@@ -321,14 +327,14 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | `uv run pytest -q` → `995 passed, 1523 skipped` |
+| Fast lane | pass | `uv run pytest -q` → `996 passed, 1524 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
-| Issue 360 focused regression | pass (Issue 360 suites) | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `137 passed`; installer/distribution cutover, mode repair, atomic staging failure、Fresh retry、Fresh legacy workflow preservation、same-parent snapshot refresh、記録済みregular/symlink stale-stage retry cleanup、unknown stage-like sibling preservation、未記録の正確なstage名collision保持、historical mode-only drift、empty-target `init --force`、`.gitignore` identity recheck、およびpartial-failure diagnosticsを確認 |
+| Issue 360 focused regression | pass (Issue 360 suites) | `uv run pytest --run-full-regression tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py -q` → `139 passed`; installer/distribution cutover、Fresh create staging failure cleanup、mode repair、atomic staging failure、Fresh retry、Fresh Workbench symlink preserve-and-block、Fresh legacy workflow preservation、same-parent snapshot refresh、記録済みregular/symlink stale-stage retry cleanup、unknown stage-like sibling preservation、未記録の正確なstage名collision保持、historical mode-only drift、empty-target `init --force`、`.gitignore` identity recheck、およびpartial-failure diagnosticsを確認 |
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
 | Full repository regression | not adopted | `uv run pytest --run-full-regression -q` → `1913 passed, 516 skipped, 76 failed`。失敗は旧active/import/shell/runtime契約と退役済み`authoring-pack` / legacy helper参照に集中し、Issue 360 focused suiteとは別分類。全体passとは主張しない |
-| Final ChatGPT-final-quality-gate-strict | pending / rerun | 前回のStrict reviewはP1×1（deterministic stage名と既知bytesだけで未記録の同名siblingをretry cleanupする経路）でfail。`e17c2bdc`で作成時stage identityをmarkerへ束縛した現行HEADをmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分として、fresh browser sessionで再確認する |
+| Final ChatGPT-final-quality-gate-strict | pending / v7 | 前回のStrict reviewで検出されたP1（未記録stage collision）は`e17c2bdc`で修正し、追加のFresh create cleanup、Workbench parent no-follow、provider diagnostic sanitationを`3fc0af0f`へ反映した。S95 boundary amendmentと現行HEADをmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分として、fresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
 ## Residual Risks / Follow-ups
