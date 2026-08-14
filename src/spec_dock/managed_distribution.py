@@ -2132,9 +2132,24 @@ def _apply_regular_action(
                 with suppress(OSError):
                     stage_identity = os.fstat(fd)
                 try:
-                    os.close(fd)
+                    # A failed write may mutate the stage before raising.  The
+                    # creation-time stat is then stale (ctime changes), so
+                    # refresh and publish the no-follow identity before
+                    # attempting ownership-checked cleanup.  The refreshed
+                    # marker lets the next same-package retry identify a
+                    # partial stage even when cleanup fails here.
+                    if stage_ownership_recorder is not None:
+                        stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, stage_identity))
                 finally:
-                    _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)
+                    try:
+                        os.close(fd)
+                    finally:
+                        _remove_distribution_stage_if_owned(
+                            parent_fd,
+                            staging_name,
+                            stage_identity,
+                            strict=True,
+                        )
             published_fd = os.open(target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
             try:
                 published = os.fstat(published_fd)
