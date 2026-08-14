@@ -1272,6 +1272,80 @@ def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
+def test_s30_apply_records_partial_stage_identity_when_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_write = managed_distribution._write_fd_bytes
+    original_unlink = managed_distribution.os.unlink
+    cleanup_failed = False
+
+    def fail_stage_cleanup_once(name, *args, **kwargs):
+        nonlocal cleanup_failed
+        if not cleanup_failed and isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            cleanup_failed = True
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    def fail_staging_write(fd: int, *_args: object, **_kwargs: object) -> None:
+        os.write(fd, b"partial\n")
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup_once)
+
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=recorded.append)
+
+    assert target.read_bytes() == old
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert len(recorded) == 2
+    refreshed = recorded[-1]
+    stage_stat = stage_files[0].lstat()
+    assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", original_write)
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(refreshed,),
+        ).status
+        == "complete"
+    )
+    assert target.read_bytes() == b"new\n"
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
 def test_s30_apply_create_cleans_stage_when_staging_write_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
