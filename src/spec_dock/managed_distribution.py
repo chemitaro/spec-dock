@@ -185,6 +185,18 @@ class DistributionRootIdentity:
 
 
 @dataclass(frozen=True)
+class DistributionStageOwnership:
+    """Recorded identity of one private staging entry created by an apply."""
+
+    path: str
+    stage_name: str
+    device: int
+    inode: int
+    ctime_ns: int
+    file_type: Literal["regular", "symlink"]
+
+
+@dataclass(frozen=True)
 class DistributionRetryMarker:
     """Validated init/update retry marker without absolute paths or secrets."""
 
@@ -193,6 +205,7 @@ class DistributionRetryMarker:
     target_root: DistributionRootIdentity
     last_completed_phase: str
     purpose: Literal["distribution-rerun"]
+    stage_ownership: tuple[DistributionStageOwnership, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -645,7 +658,8 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         "last_completed_phase",
         "purpose",
     }
-    if set(raw) != expected_fields:
+    raw_fields = set(raw)
+    if raw_fields != expected_fields and raw_fields != expected_fields | {"stage_ownership"}:
         _admission_block("marker-invalid", "distribution retry marker fields are invalid")
     if raw.get("schema_version") != _DISTRIBUTION_RETRY_SCHEMA_VERSION:
         _admission_block("marker-invalid", "distribution retry marker schema is unsupported")
@@ -675,12 +689,66 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         _admission_block("marker-invalid", "distribution retry marker phase is invalid")
     if raw.get("purpose") != _DISTRIBUTION_RETRY_PURPOSE:
         _admission_block("marker-invalid", "distribution retry marker purpose is unsupported")
+    stage_ownership: list[DistributionStageOwnership] = []
+    raw_stage_ownership = raw.get("stage_ownership", [])
+    if not isinstance(raw_stage_ownership, list):
+        _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+    for item in raw_stage_ownership:
+        if not isinstance(item, dict) or set(item) != {
+            "path",
+            "stage_name",
+            "device",
+            "inode",
+            "ctime_ns",
+            "file_type",
+        }:
+            _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+        stage_path = item.get("path")
+        stage_name = item.get("stage_name")
+        file_type = item.get("file_type")
+        if (
+            not isinstance(stage_path, str)
+            or not stage_path
+            or PurePosixPath(stage_path).is_absolute()
+            or ".." in PurePosixPath(stage_path).parts
+            or PurePosixPath(stage_path).as_posix() != stage_path
+            or not isinstance(stage_name, str)
+            or not stage_name
+            or PurePosixPath(stage_name).name != stage_name
+            or not isinstance(file_type, str)
+            or file_type not in {"regular", "symlink"}
+        ):
+            _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+        stage_device = item.get("device")
+        stage_inode = item.get("inode")
+        stage_ctime_ns = item.get("ctime_ns")
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for value in (stage_device, stage_inode, stage_ctime_ns)
+        ):
+            _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+        assert isinstance(stage_device, int)
+        assert isinstance(stage_inode, int)
+        assert isinstance(stage_ctime_ns, int)
+        assert file_type in {"regular", "symlink"}
+        stage_file_type: Literal["regular", "symlink"] = "regular" if file_type == "regular" else "symlink"
+        stage_ownership.append(
+            DistributionStageOwnership(
+                path=stage_path,
+                stage_name=stage_name,
+                device=stage_device,
+                inode=stage_inode,
+                ctime_ns=stage_ctime_ns,
+                file_type=stage_file_type,
+            )
+        )
     return DistributionRetryMarker(
         operation=operation,
         package_version=package_version,
         target_root=DistributionRootIdentity(device=device, inode=inode),
         last_completed_phase=phase,
         purpose=_DISTRIBUTION_RETRY_PURPOSE,
+        stage_ownership=tuple(stage_ownership),
     )
 
 
@@ -1778,6 +1846,25 @@ def _distribution_stage_identity(parent_fd: int, stage_name: str) -> Distributio
     return None
 
 
+def _distribution_stage_ownership(
+    path: str,
+    stage_name: str,
+    info: os.stat_result,
+) -> DistributionStageOwnership:
+    kind = _file_type(info.st_mode)
+    if kind not in {"regular", "symlink"} or info.st_nlink != 1:
+        raise DistributionApplyError("managed staging artifact is not safe to record")
+    file_type: Literal["regular", "symlink"] = "regular" if kind == "regular" else "symlink"
+    return DistributionStageOwnership(
+        path=path,
+        stage_name=stage_name,
+        device=info.st_dev,
+        inode=info.st_ino,
+        ctime_ns=info.st_ctime_ns,
+        file_type=file_type,
+    )
+
+
 def _stage_identity_matches_known(
     candidate: DistributionIdentity,
     *,
@@ -1833,8 +1920,9 @@ def _cleanup_stale_distribution_stages(
     target_root: Path,
     action: DistributionAction,
     snapshot: DistributionTargetSnapshot,
+    stage_ownership: tuple[DistributionStageOwnership, ...],
 ) -> None:
-    """Retry cleanup of known private stages left by an earlier failed apply."""
+    """Retry cleanup of private stages recorded by an earlier failed apply."""
     if action.action not in {"create", "adopt", "upgrade", "prune"}:
         return
     expected = _expected_target_identity(plan, action.path)
@@ -1858,15 +1946,29 @@ def _cleanup_stale_distribution_stages(
             names = os.listdir(parent_fd)  # noqa: PTH208 - descriptor-relative scan is required for no-follow safety
         except OSError as exc:
             raise DistributionApplyError("managed staging directory cannot be listed safely") from exc
-        owned_stage_names = {
-            _distribution_stage_name(action.path, identity)
-            for identity in (expected, *historical)
-            if identity is not None
-        }
-        for stage_name in names:
-            if stage_name not in owned_stage_names:
+        known_identities = tuple(item for item in (expected, *historical) if item is not None)
+        for owned in stage_ownership:
+            if owned.path != action.path or owned.stage_name not in names:
                 continue
-            candidate = _distribution_stage_identity(parent_fd, stage_name)
+            if not any(
+                owned.stage_name == _distribution_stage_name(action.path, identity) for identity in known_identities
+            ):
+                continue
+            try:
+                current = os.stat(owned.stage_name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise DistributionApplyError("managed staging artifact cannot be inspected safely") from exc
+            if (
+                current.st_dev != owned.device
+                or current.st_ino != owned.inode
+                or current.st_ctime_ns != owned.ctime_ns
+                or _file_type(current.st_mode) != owned.file_type
+                or current.st_nlink != 1
+            ):
+                continue
+            candidate = _distribution_stage_identity(parent_fd, owned.stage_name)
             if candidate is None or not _stage_identity_matches_known(
                 candidate,
                 expected=expected,
@@ -1874,7 +1976,7 @@ def _cleanup_stale_distribution_stages(
             ):
                 continue
             try:
-                os.unlink(stage_name, dir_fd=parent_fd)
+                os.unlink(owned.stage_name, dir_fd=parent_fd)
             except FileNotFoundError:
                 continue
             except OSError as exc:
@@ -1965,6 +2067,7 @@ def _apply_regular_action(
     source_bytes: bytes | None,
     source_mode: int | None,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
@@ -2009,6 +2112,8 @@ def _apply_regular_action(
             try:
                 if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
                     raise DistributionApplyError(f"managed target is unsafe for '{path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, created))
                 mutation_phase = "pre"
 
                 def check_before_write() -> None:
@@ -2103,6 +2208,8 @@ def _apply_regular_action(
             try:
                 if not stat.S_ISREG(staging_stat.st_mode) or staging_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target staging failed for '{path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, staging_stat))
 
                 def check_before_stage_write() -> None:
                     _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
@@ -2189,6 +2296,7 @@ def _apply_symlink_action(
     snapshot: DistributionTargetSnapshot,
     expected: DistributionIdentity,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
@@ -2227,6 +2335,8 @@ def _apply_symlink_action(
                 staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
                 if staged_target != expected_target or staging_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
             finally:
@@ -2263,6 +2373,8 @@ def _apply_symlink_action(
                 staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
                 if staged_target != expected_target:
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
                 latest_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
                 if not _same_stat_identity(latest_stat, snapshot.target) or latest_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
@@ -2307,6 +2419,7 @@ def _apply_distribution_action(
     action: DistributionAction,
     snapshot: DistributionTargetSnapshot,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
 ) -> None:
     if action.action in {"adopt", "preserve"}:
         return
@@ -2343,6 +2456,7 @@ def _apply_distribution_action(
             snapshot=snapshot,
             expected=expected,
             created_parent_bindings=created_parent_bindings,
+            stage_ownership_recorder=stage_ownership_recorder,
         )
         return
     if expected is None and target_kind == "symlink":
@@ -2357,6 +2471,7 @@ def _apply_distribution_action(
             snapshot=snapshot,
             expected=historical_identity,
             created_parent_bindings=created_parent_bindings,
+            stage_ownership_recorder=stage_ownership_recorder,
         )
         return
     if expected is None and target_kind != "regular":
@@ -2369,6 +2484,7 @@ def _apply_distribution_action(
         source_bytes=source_bytes,
         source_mode=source_mode,
         created_parent_bindings=created_parent_bindings,
+        stage_ownership_recorder=stage_ownership_recorder,
     )
 
 
@@ -2376,14 +2492,18 @@ def apply_distribution_plan(
     plan: DistributionPlan,
     *,
     allow_stale_stage_cleanup: bool = False,
+    stage_ownership: tuple[DistributionStageOwnership, ...] = (),
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
 ) -> DistributionResult:
     """Apply a validated plan with no-follow identity checks at every action.
 
     This S30 seam intentionally does not perform CLI admission, version-marker
     handling, retry persistence, or recursive cleanup.  Stale private-stage
-    cleanup is opt-in for a validated same-package retry; ordinary runs leave
-    unknown stage-like siblings untouched.  Any preflight or identity mismatch
-    raises before the corresponding action writes or removes a target path.
+    cleanup is opt-in for a validated same-package retry and only removes
+    stage entries whose no-follow identity was recorded immediately after
+    creation by that retry marker; ordinary runs leave unknown stage-like
+    siblings untouched.  Any preflight or identity mismatch raises before the
+    corresponding action writes or removes a target path.
     """
 
     target_root = plan.target_root
@@ -2410,7 +2530,7 @@ def apply_distribution_plan(
         snapshot = snapshots[action.path]
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
         if allow_stale_stage_cleanup:
-            _cleanup_stale_distribution_stages(plan, target_root, action, snapshot)
+            _cleanup_stale_distribution_stages(plan, target_root, action, snapshot, stage_ownership)
         # Removing a known stale stage mutates the parent directory ctime.  The
         # target itself must remain unchanged, but every later action needs the
         # refreshed parent snapshot before it can be applied or adopted.
@@ -2434,13 +2554,17 @@ def apply_distribution_plan(
             snapshots[pending.path] = pending_observation.snapshot
         if action.action in {"adopt", "preserve"}:
             continue
-        _apply_distribution_action(
-            plan,
-            target_root,
-            action,
-            snapshot,
-            created_parent_bindings,
-        )
+        if stage_ownership_recorder is None:
+            _apply_distribution_action(plan, target_root, action, snapshot, created_parent_bindings)
+        else:
+            _apply_distribution_action(
+                plan,
+                target_root,
+                action,
+                snapshot,
+                created_parent_bindings,
+                stage_ownership_recorder,
+            )
         for pending in plan.actions[index + 1 :]:
             pending_snapshot = snapshots[pending.path]
             pending_observation = _observe_target(target_root, pending.path)
@@ -2469,6 +2593,7 @@ __all__ = [
     "DistributionPlan",
     "DistributionProvenance",
     "DistributionResult",
+    "DistributionStageOwnership",
     "DistributionTargetSnapshot",
     "PathIdentitySnapshot",
     "apply_distribution_plan",

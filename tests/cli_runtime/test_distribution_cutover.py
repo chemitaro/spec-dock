@@ -695,7 +695,7 @@ def test_s60_distribution_apply_fault_keeps_marker_and_old_version(
     marker = tmp_path / "spec-dock/.distribution-retry.json"
     original_apply = cli.apply_distribution_plan
 
-    def fail_distribution_apply(_plan):
+    def fail_distribution_apply(_plan, **_kwargs):
         raise RuntimeError("credential=secret /private/outside/source.txt")
 
     monkeypatch.setattr(cli, "apply_distribution_plan", fail_distribution_apply)

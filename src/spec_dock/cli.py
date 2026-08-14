@@ -30,6 +30,7 @@ from spec_dock.managed_distribution import (
     DistributionAdmission,
     DistributionOperation,
     DistributionRootIdentity,
+    DistributionStageOwnership,
     admit_distribution_operation,
     apply_distribution_plan,
     build_distribution_plan,
@@ -1038,6 +1039,7 @@ def _write_distribution_retry_marker(
     operation: DistributionOperation,
     last_completed_phase: str,
     expected_root_identity: DistributionRootIdentity,
+    stage_ownership: tuple[DistributionStageOwnership, ...] = (),
 ) -> None:
     """Create or atomically advance the init/update forward-retry marker."""
     with _bound_distribution_root(target_root, expected_root_identity) as (bound_root, visible_root, bound_identity):
@@ -1062,6 +1064,17 @@ def _write_distribution_retry_marker(
             },
             "last_completed_phase": last_completed_phase,
             "purpose": _DISTRIBUTION_RETRY_MARKER_PURPOSE,
+            "stage_ownership": [
+                {
+                    "path": item.path,
+                    "stage_name": item.stage_name,
+                    "device": item.device,
+                    "inode": item.inode,
+                    "ctime_ns": item.ctime_ns,
+                    "file_type": item.file_type,
+                }
+                for item in stage_ownership
+            ],
         }
         marker_bytes = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
         _write_atomic_regular_file(marker, marker_bytes, mode=0o600)
@@ -1424,6 +1437,7 @@ def _install_fresh_distribution(target_root: Path) -> None:
     last_completed_phase = "not-started"
     root_identity = _distribution_root_identity(target_root)
     fresh_workspace_created = False
+    stage_ownership: list[DistributionStageOwnership] = []
     with _assets_dir() as assets_dir:
         try:
             _preflight_fresh_spec_dock_assets(assets_dir)
@@ -1448,9 +1462,20 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 operation="fresh",
                 last_completed_phase="preflight-complete",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             marker_started = True
             last_completed_phase = "preflight-complete"
+
+            def record_stage_ownership(record: DistributionStageOwnership) -> None:
+                stage_ownership.append(record)
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation="fresh",
+                    last_completed_phase=last_completed_phase,
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
 
             # Creating the marker's `spec-dock/` parent is itself a target-root
             # mutation and therefore updates the root ctime.  Rebuild the
@@ -1469,12 +1494,13 @@ def _install_fresh_distribution(target_root: Path) -> None:
 
             phase = "distribution-apply"
             _assert_distribution_root_identity(target_root, root_identity)
-            apply_distribution_plan(plan)
+            apply_distribution_plan(plan, stage_ownership_recorder=record_stage_ownership)
             _write_distribution_retry_marker(
                 target_root,
                 operation="fresh",
                 last_completed_phase="distribution-applied",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "distribution-applied"
 
@@ -1493,6 +1519,7 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 operation="fresh",
                 last_completed_phase="scaffold-refreshed",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "scaffold-refreshed"
 
@@ -1517,6 +1544,7 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 operation="fresh",
                 last_completed_phase="post-verified",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "post-verified"
 
@@ -1527,6 +1555,7 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 operation="fresh",
                 last_completed_phase="version-written",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "version-written"
             _remove_distribution_retry_marker(target_root, expected_root_identity=root_identity)
@@ -1547,13 +1576,21 @@ def _install_fresh_distribution(target_root: Path) -> None:
             raise
 
 
-def _install_recognized_distribution(target_root: Path, *, operation: DistributionOperation) -> None:
+def _install_recognized_distribution(
+    target_root: Path,
+    *,
+    operation: DistributionOperation,
+    retry_marker: DistributionAdmission | None = None,
+) -> None:
     """Apply a recognized distribution with same-package forward recovery."""
     phase = "preflight"
     marker_started = False
     last_completed_phase = "not-started"
     root_identity = _distribution_root_identity(target_root)
     retry_recovery = _distribution_retry_marker_present(target_root)
+    stage_ownership: list[DistributionStageOwnership] = list(
+        retry_marker.marker.stage_ownership if retry_marker is not None and retry_marker.marker is not None else ()
+    )
     with _assets_dir() as assets_dir:
         try:
             src_gitignore = assets_dir / "spec_dock" / ".gitignore"
@@ -1584,18 +1621,45 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 operation=operation,
                 last_completed_phase="preflight-complete",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             marker_started = True
             last_completed_phase = "preflight-complete"
 
+            def record_stage_ownership(record: DistributionStageOwnership) -> None:
+                existing = next(
+                    (
+                        item
+                        for item in stage_ownership
+                        if item.path == record.path and item.stage_name == record.stage_name
+                    ),
+                    None,
+                )
+                if existing is not None:
+                    stage_ownership.remove(existing)
+                stage_ownership.append(record)
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation=operation,
+                    last_completed_phase=last_completed_phase,
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+
             phase = "distribution-apply"
             _assert_distribution_root_identity(target_root, root_identity)
-            apply_distribution_plan(plan, allow_stale_stage_cleanup=retry_recovery)
+            apply_distribution_plan(
+                plan,
+                allow_stale_stage_cleanup=retry_recovery,
+                stage_ownership=tuple(stage_ownership),
+                stage_ownership_recorder=record_stage_ownership,
+            )
             _write_distribution_retry_marker(
                 target_root,
                 operation=operation,
                 last_completed_phase="distribution-applied",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "distribution-applied"
 
@@ -1618,6 +1682,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 operation=operation,
                 last_completed_phase="scaffold-refreshed",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "scaffold-refreshed"
 
@@ -1639,6 +1704,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 operation=operation,
                 last_completed_phase="post-verified",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "post-verified"
 
@@ -1652,6 +1718,7 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 operation=operation,
                 last_completed_phase="version-written",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "version-written"
             _remove_distribution_retry_marker(
@@ -3719,7 +3786,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             if not ns.force:
                 if admission.status == "retry":
-                    _install_recognized_distribution(target_root, operation="fresh")
+                    _install_recognized_distribution(target_root, operation="fresh", retry_marker=admission)
                 elif os.path.lexists(_specdock_dir(target_root)):
                     raise RuntimeError("'spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
                 else:
@@ -3728,10 +3795,10 @@ def main(argv: list[str] | None = None) -> int:
                 if admission.status == "fresh":
                     _install_fresh_distribution(target_root)
                 else:
-                    _install_recognized_distribution(target_root, operation="init-force")
+                    _install_recognized_distribution(target_root, operation="init-force", retry_marker=admission)
         elif ns.command == "update":
-            _admit_distribution_cli(target_root, operation="update")
-            _install_recognized_distribution(target_root, operation="update")
+            admission = _admit_distribution_cli(target_root, operation="update")
+            _install_recognized_distribution(target_root, operation="update", retry_marker=admission)
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:

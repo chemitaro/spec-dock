@@ -369,7 +369,6 @@ def test_s25_fresh_classifies_missing_and_current_identical_without_mutation(tmp
         target_root=target_root,
         operation="fresh",
     )
-
     by_path = {action.path: action for action in plan.actions}
     assert by_path[".github/workflows/ci.yml"].action == "adopt"
     assert by_path[".github/workflows/ci.yml"].provenance == "current"
@@ -970,7 +969,19 @@ def test_s30_apply_retries_cleanup_of_known_stale_stage(
         target_root=target_root,
         operation="update",
     )
-    assert apply_distribution_plan(retry_plan, allow_stale_stage_cleanup=True).status == "complete"
+    stage_ownership = managed_distribution._distribution_stage_ownership(
+        ".github/workflows/ci.yml",
+        stage_files[0].name,
+        stage_files[0].lstat(),
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(stage_ownership,),
+        ).status
+        == "complete"
+    )
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
@@ -1004,7 +1015,19 @@ def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_actio
         operation="update",
     )
 
-    assert apply_distribution_plan(plan, allow_stale_stage_cleanup=True).status == "complete"
+    stage_ownership = managed_distribution._distribution_stage_ownership(
+        ".github/workflows/ci.yml",
+        stale_stage.name,
+        stale_stage.lstat(),
+    )
+    assert (
+        apply_distribution_plan(
+            plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(stage_ownership,),
+        ).status
+        == "complete"
+    )
     assert first_target.read_bytes() == b"current\n"
     assert (target_root / ".github/workflows/second.yml").read_bytes() == b"second\n"
     assert not list(first_target.parent.glob(".spec-dock-file-*"))
@@ -1541,7 +1564,15 @@ def test_s30_apply_retries_cleanup_of_known_stale_symlink_stage(tmp_path: Path) 
         operation="update",
     )
 
-    assert apply_distribution_plan(plan, allow_stale_stage_cleanup=True).status == "complete"
+    stage_ownership = managed_distribution._distribution_stage_ownership("spec", stale_stage.name, stale_stage.lstat())
+    assert (
+        apply_distribution_plan(
+            plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(stage_ownership,),
+        ).status
+        == "complete"
+    )
     assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
     assert not list(target_root.glob(".spec-dock-symlink-*"))
 
@@ -1563,6 +1594,46 @@ def test_s30_apply_preserves_unknown_stage_like_sibling(tmp_path: Path) -> None:
 
     assert apply_distribution_plan(plan).status == "complete"
     assert unknown.read_bytes() == b"current\n"
+
+
+def test_s30_apply_preserves_unrecorded_exact_stage_collision(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    initial_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    action = next(item for item in initial_plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "create"
+    expected = next(item.identity for item in initial_plan.current_assets if item.path == action.path)
+    stage = target_root / ".github" / "workflows" / managed_distribution._distribution_stage_name(action.path, expected)
+    stage.parent.mkdir(parents=True, exist_ok=True)
+    stage.write_bytes(b"current\n")
+    before = stage.lstat()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    assert next(item for item in plan.actions if item.path == ".github/workflows/ci.yml").action == "create"
+    assert stage.name == managed_distribution._distribution_stage_name(
+        action.path,
+        next(item.identity for item in plan.current_assets if item.path == action.path),
+    )
+    with pytest.raises(DistributionApplyError, match="managed target apply failed"):
+        apply_distribution_plan(plan, allow_stale_stage_cleanup=True)
+    with pytest.raises(DistributionApplyError, match="managed target apply failed"):
+        apply_distribution_plan(plan, allow_stale_stage_cleanup=True)
+
+    after = stage.lstat()
+    assert (after.st_dev, after.st_ino, after.st_ctime_ns) == (before.st_dev, before.st_ino, before.st_ctime_ns)
+    assert stage.read_bytes() == b"current\n"
 
 
 def test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support(
