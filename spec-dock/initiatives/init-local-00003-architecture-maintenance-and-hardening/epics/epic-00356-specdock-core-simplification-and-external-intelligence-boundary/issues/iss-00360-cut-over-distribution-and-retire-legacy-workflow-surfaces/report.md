@@ -83,6 +83,7 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
 * Final implementation commit: `0f56c0063e07e281200961c7f1dd274874569d0b`（partial-stage retry identity / cleanup修正、退役テスト削除、distribution regression tests）
+* Final quality-gate evidence commit: `0a03cc5d2e6a8219d6ee21858facc39cfd655e89`（S95 v12 ledger / report refresh）。S95のfull regression実行対象は親の実装tree `0f56c0063e07e281200961c7f1dd274874569d0b`であり、後続commitはcanonical evidenceのみを変更した。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
