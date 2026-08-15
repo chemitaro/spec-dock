@@ -3,7 +3,7 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "774e12612b5d7390f60f41ee2cf704d89470205e",
+  "current_head_sha": "774e126124bd5a297c4ff193b40e0c6e11061888",
   "commands": {
     "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v32.xml",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
