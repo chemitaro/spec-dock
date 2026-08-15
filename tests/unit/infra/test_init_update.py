@@ -37993,7 +37993,7 @@ esac
             assert not workbench.exists()
             assert not retry_marker.exists()
 
-    def test_uninstall_apply_remove_specs_removes_empty_generated_roots_and_specdock_root(self) -> None:
+    def test_uninstall_apply_remove_specs_removes_empty_generated_roots_and_keeps_workspace_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -38005,7 +38005,8 @@ esac
             assert actions["spec-dock/.agent"]["status"] == "empty_dir_removed"
             assert not (target / "spec-dock/.agent").exists()
             assert not (target / "spec-dock/active").exists()
-            assert not (target / "spec-dock").exists()
+            assert (target / "spec-dock").is_dir()
+            assert list((target / "spec-dock").iterdir()) == []
 
     def test_uninstall_apply_remove_specs_preserves_modified_root_workbench_readme(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -38241,7 +38242,7 @@ esac
             assert second_payload["status"] == "error"
             assert "spec-dock/spec-dock.version" in second_payload["errors"][0]
 
-    def test_uninstall_apply_remove_specs_rerun_reports_already_removed_and_succeeds(self) -> None:
+    def test_uninstall_apply_remove_specs_rerun_requires_managed_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -38258,7 +38259,7 @@ esac
 
             assert first_payload["status"] == "completed"
             assert second_payload["status"] == "error"
-            assert "workspace-missing" in second_payload["errors"][0]
+            assert "missing-version" in second_payload["errors"][0]
 
     def test_uninstall_apply_partial_unlink_failure_reports_failed_separately(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
