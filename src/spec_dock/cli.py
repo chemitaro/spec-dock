@@ -19,8 +19,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
@@ -1284,20 +1286,41 @@ def _remove_distribution_retry_marker(
     """Remove the init/update marker only when it is a safe regular file."""
     with _bound_distribution_root(target_root, expected_root_identity) as (bound_root, visible_root, bound_identity):
         marker = _distribution_retry_marker_path(bound_root)
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise RuntimeError("distribution retry marker no-follow support is unavailable")
+        parent_flags = os.O_RDONLY | nofollow | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+        parent_fd: int | None = None
         try:
-            info = os.lstat(marker)
-        except FileNotFoundError:
-            return
+            parent_fd = os.open(marker.parent.as_posix(), parent_flags)
+            try:
+                info = os.stat(marker.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise RuntimeError("distribution retry marker is not a safe regular file")
+            _assert_distribution_root_identity(visible_root, bound_identity)
+            # Re-observe the marker through the held parent immediately before
+            # unlink so a replacement marker is never removed by pathname.
+            try:
+                current = os.stat(marker.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError as exc:
+                raise RuntimeError("distribution retry marker disappeared before removal") from exc
+            if (current.st_dev, current.st_ino, current.st_mode, current.st_nlink, current.st_ctime_ns) != (
+                info.st_dev,
+                info.st_ino,
+                info.st_mode,
+                info.st_nlink,
+                info.st_ctime_ns,
+            ):
+                raise RuntimeError("distribution retry marker identity changed")
+            os.unlink(marker.name, dir_fd=parent_fd)
         except OSError as exc:
-            raise RuntimeError("distribution retry marker cannot be inspected safely") from exc
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise RuntimeError("distribution retry marker is not a safe regular file")
-        _assert_distribution_root_identity(visible_root, bound_identity)
-        try:
-            marker.unlink()
-        except OSError as exc:
-            raise RuntimeError("distribution retry marker could not be removed") from exc
-        _assert_distribution_root_identity(visible_root, bound_identity)
+            raise RuntimeError("distribution retry marker could not be removed safely") from exc
+        finally:
+            if parent_fd is not None:
+                with suppress(OSError):
+                    os.close(parent_fd)
 
 
 def _install_spec_dock_bound(
@@ -1605,12 +1628,49 @@ def _preflight_managed_scaffold_target_paths(
     return identities, gitignore_identity
 
 
-def _distribution_retry_command(operation: DistributionOperation) -> str:
+def _shell_join(argv: list[str]) -> str:
+    """Serialize an argv vector for a copy/paste-safe retry command."""
+    if os.name == "nt":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
+
+
+def _safe_retry_target_label(target_root: Path) -> str | None:
+    """Return a caller-CWD-relative target or None when it cannot be represented."""
+    try:
+        label = os.path.relpath(target_root, Path.cwd())
+    except (OSError, ValueError):
+        return None
+    if not label:
+        label = "."
+    if "\x00" in label or any(ord(char) < 0x20 for char in label):
+        return None
+    if os.name != "nt":
+        label = Path(label).as_posix()
+    if not label or Path(label).is_absolute():
+        return None
+    return label
+
+
+def _require_retry_target_label(target_root: Path) -> str:
+    label = _safe_retry_target_label(target_root)
+    if label is None:
+        raise RuntimeError("retry target cannot be represented safely from the current working directory")
+    return label
+
+
+def _distribution_retry_command(operation: DistributionOperation, *, target_label: str = ".") -> str:
+    argv = ["spec-dock"]
     if operation == "fresh":
-        return "spec-dock init ."
-    if operation == "init-force":
-        return "spec-dock init --force ."
-    return "spec-dock update ."
+        argv.append("init")
+    elif operation == "init-force":
+        argv.extend(("init", "--force"))
+    else:
+        argv.append("update")
+    if target_label.startswith("-"):
+        argv.append("--")
+    argv.append(target_label)
+    return _shell_join(argv)
 
 
 def _safe_distribution_failure_target(exc: BaseException, phase: str) -> str:
@@ -1642,12 +1702,16 @@ def _safe_distribution_failure_target(exc: BaseException, phase: str) -> str:
 def _raise_distribution_partial_failure(
     exc: BaseException,
     *,
+    target_root: Path,
     operation: DistributionOperation,
     phase: str,
     last_completed_phase: str,
 ) -> NoReturn:
     target = _safe_distribution_failure_target(exc, phase)
-    retry = _distribution_retry_command(operation)
+    target_label = _safe_retry_target_label(target_root)
+    retry = (
+        _distribution_retry_command(operation, target_label=target_label) if target_label is not None else "unavailable"
+    )
     raise RuntimeError(
         f"distribution partial failure during {phase}; "
         f"target={target}; last_completed_phase={last_completed_phase}; "
@@ -1657,6 +1721,7 @@ def _raise_distribution_partial_failure(
 
 def _install_fresh_distribution(target_root: Path) -> None:
     """Apply one validated Fresh distribution with forward-retry recovery."""
+    _require_retry_target_label(target_root)
     phase = "preflight"
     marker_started = False
     last_completed_phase = "not-started"
@@ -1806,6 +1871,7 @@ def _install_fresh_distribution(target_root: Path) -> None:
             if marker_started:
                 _raise_distribution_partial_failure(
                     exc,
+                    target_root=target_root,
                     operation="fresh",
                     phase=phase,
                     last_completed_phase=last_completed_phase,
@@ -1824,6 +1890,7 @@ def _install_recognized_distribution(
     retry_marker: DistributionAdmission | None = None,
 ) -> None:
     """Apply a recognized distribution with same-package forward recovery."""
+    _require_retry_target_label(target_root)
     phase = "preflight"
     marker_started = False
     last_completed_phase = "not-started"
@@ -1983,6 +2050,7 @@ def _install_recognized_distribution(
             if marker_started:
                 _raise_distribution_partial_failure(
                     exc,
+                    target_root=target_root,
                     operation=operation,
                     phase=phase,
                     last_completed_phase=last_completed_phase,
@@ -3598,24 +3666,15 @@ def _verify_uninstall_postcondition(
     _assert_distribution_root_identity(target_root, expected_root_identity)
 
 
-def _safe_uninstall_target_label(target_root: Path) -> str:
-    """Return a runnable relative target without exposing a host absolute path."""
-    try:
-        label = Path(os.path.relpath(target_root, Path.cwd())).as_posix()
-    except (OSError, ValueError):
-        return "."
-    if not label or label == ".":
-        return "."
-    if label.startswith("/") or "\x00" in label:
-        return "."
-    return label
-
-
 def _uninstall_retry_command(specs_mode: str | None, *, target_label: str = ".") -> str | None:
     if specs_mode not in {"keep", "remove"}:
         return None
     mode = "keep-specs" if specs_mode == "keep" else "remove-specs"
-    return f"spec-dock uninstall {target_label} --apply --{mode}"
+    argv = ["spec-dock", "uninstall", "--apply", f"--{mode}"]
+    if target_label.startswith("-"):
+        argv.append("--")
+    argv.append(target_label)
+    return _shell_join(argv)
 
 
 def _uninstall_failure_paths(
@@ -3653,10 +3712,10 @@ def _uninstall_payload(
     resolved_status = status or ("completed" if apply else "planned")
     is_sanitized_failure = resolved_status in {"partial_failure", "blocked"}
     failure_paths = _uninstall_failure_paths(actions, diagnostic_paths)
-    target_label = _safe_uninstall_target_label(target_root)
+    target_label = _safe_retry_target_label(target_root)
     return {
         "schema_version": 1,
-        "target": target_label if is_sanitized_failure else str(target_root),
+        "target": (target_label or "unavailable") if is_sanitized_failure else str(target_root),
         "mode": "apply" if apply else "dry-run",
         "apply": apply,
         "specs_mode": specs_mode,
@@ -3666,7 +3725,7 @@ def _uninstall_payload(
         or ("marker-finalized" if resolved_status == "completed" else "not-started"),
         "retry_command": _uninstall_retry_command(
             specs_mode,
-            target_label=target_label if is_sanitized_failure else ".",
+            target_label=target_label or "unavailable" if is_sanitized_failure else ".",
         ),
         "failed_paths": failure_paths,
         "pending_paths": [action.rel_path for action in actions if action.status == "pending"],
@@ -3764,6 +3823,17 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             specs_mode=specs_mode,
             json_requested=json_requested,
             message=f"target path is not a directory: {target_root}",
+        )
+
+    try:
+        _require_retry_target_label(target_root)
+    except RuntimeError as exc:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=str(exc),
         )
 
     if apply_requested and specs_mode is None:

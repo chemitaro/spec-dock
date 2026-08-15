@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 
 import pytest
@@ -748,6 +749,60 @@ def test_s60_marker_removal_failure_reports_marker_finalization_target(
     monkeypatch.setattr(cli, "_remove_distribution_retry_marker", original_remove)
     assert main(command) == 0
     assert not marker.exists()
+
+
+def test_s60_marker_removal_preserves_replacement_marker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specdock = tmp_path / "spec-dock"
+    specdock.mkdir()
+    marker = specdock / ".distribution-retry.json"
+    marker.write_bytes(b"original\n")
+    original_stat = cli.os.stat
+    replaced = False
+
+    def replace_after_first_observation(path, *args, **kwargs):
+        nonlocal replaced
+        observed = original_stat(path, *args, **kwargs)
+        if not replaced and kwargs.get("dir_fd") is not None and path == marker.name:
+            marker.write_bytes(b"replacement\n")
+            replaced = True
+        return observed
+
+    monkeypatch.setattr(cli.os, "stat", replace_after_first_observation)
+    with pytest.raises(RuntimeError, match="identity changed"):
+        cli._remove_distribution_retry_marker(tmp_path)
+
+    assert marker.read_bytes() == b"replacement\n"
+
+
+def test_s60_distribution_retry_command_runs_for_special_explicit_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    parent = tmp_path.parent
+    target = parent / "-distribution target"
+    target.mkdir()
+    monkeypatch.chdir(parent)
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+
+    original_apply = cli.apply_distribution_plan
+
+    def fail_once(_plan, **_kwargs):
+        monkeypatch.setattr(cli, "apply_distribution_plan", original_apply)
+        raise RuntimeError("simulated distribution failure")
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    assert main(["update", str(target)]) == 1
+    captured = capsys.readouterr().err
+    retry = "retry=spec-dock update -- '-distribution target'"
+    assert retry in captured
+
+    assert main(shlex.split(retry.removeprefix("retry="))[1:]) == 0
+    assert not (target / "spec-dock/.distribution-retry.json").exists()
 
 
 def test_s60_atomic_regular_file_does_not_replace_racing_destination(
@@ -1732,7 +1787,7 @@ def test_s70_uninstall_marker_is_removed_last_after_success(tmp_path: Path, caps
     assert payload["status"] == "completed"
     assert payload["phase"] == "complete"
     assert payload["last_completed_phase"] == "marker-finalized"
-    assert payload["retry_command"] == "spec-dock uninstall . --apply --keep-specs"
+    assert payload["retry_command"] == "spec-dock uninstall --apply --keep-specs ."
     assert payload["pending_paths"] == []
     marker_action = next(action for action in payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json")
     assert marker_action["status"] == "removed"
@@ -1801,7 +1856,7 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
     assert first_payload["phase"] == "uninstall-apply"
     assert first_payload["last_completed_phase"] == "marker-written"
     expected_target = Path(os.path.relpath(tmp_path, Path.cwd())).as_posix()
-    assert first_payload["retry_command"] == f"spec-dock uninstall {expected_target} --apply --keep-specs"
+    assert first_payload["retry_command"] == f"spec-dock uninstall --apply --keep-specs {expected_target}"
     assert first_payload["pending_paths"]
     assert first_payload["summary"]["pending"] == len(first_payload["pending_paths"])
     assert marker.is_file()
@@ -1844,7 +1899,7 @@ def test_s70_uninstall_partial_failure_json_sanitizes_target_and_error(
 
     assert payload["status"] == "partial_failure"
     assert payload["target"] == expected_target
-    assert payload["retry_command"] == f"spec-dock uninstall {expected_target} --apply --keep-specs"
+    assert payload["retry_command"] == f"spec-dock uninstall --apply --keep-specs {expected_target}"
     assert ".agents/skills/spec-dock/SKILL.md" in payload["failed_paths"]
     assert not payload["target"].startswith("/")
     assert "secret" not in serialized
@@ -1873,11 +1928,41 @@ def test_s70_uninstall_partial_failure_text_shows_recovery_contract(
     assert "phase: uninstall-apply" in output
     assert "last_completed_phase: marker-written" in output
     expected_target = Path(os.path.relpath(tmp_path, Path.cwd())).as_posix()
-    assert f"retry_command: spec-dock uninstall {expected_target} --apply --keep-specs" in output
+    assert f"retry_command: spec-dock uninstall --apply --keep-specs {expected_target}" in output
     assert "failed_paths: .agents/skills/spec-dock/SKILL.md" in output
     assert "uninstall action failed safely" in output
     assert "credential=should-not-leak" not in output
     assert f"-> {tmp_path}" not in output
+
+
+def test_s70_uninstall_retry_command_runs_for_special_explicit_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    parent = tmp_path.parent
+    target = parent / "-uninstall target"
+    target.mkdir()
+    monkeypatch.chdir(parent)
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    original_remove = cli._remove_uninstall_path
+
+    def fail_once(target_root: Path, action, **kwargs):
+        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
+            monkeypatch.setattr(cli, "_remove_uninstall_path", original_remove)
+            raise OSError("injected uninstall unlink failure")
+        return original_remove(target_root, action, **kwargs)
+
+    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_once)
+    assert main(["uninstall", str(target), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    retry = "spec-dock uninstall --apply --keep-specs -- '-uninstall target'"
+    assert payload["retry_command"] == retry
+
+    assert main(shlex.split(retry)[1:]) == 0
+    capsys.readouterr()
+    assert not (target / "spec-dock/.uninstall-retry.json").exists()
 
 
 def test_s70_uninstall_marker_write_failure_is_retryable(
