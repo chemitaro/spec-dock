@@ -1547,7 +1547,8 @@ def test_s70_uninstall_apply_rejects_same_target_symlink_replacement_after_plan(
     assert payload["status"] == "partial_failure"
     action = next(item for item in payload["actions"] if item["path"] == "spec-dock/active/issue")
     assert action["status"] == "failed"
-    assert "identity changed" in action["error"]
+    assert action["error"] == "uninstall action failed safely; inspect the relative action and retry command"
+    assert "spec-dock/active/issue" in payload["failed_paths"]
     assert active_issue.is_symlink()
     assert active_issue.readlink() == original_target
     assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
@@ -1815,6 +1816,64 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
         == "removed"
     )
     assert not marker.exists()
+
+
+def test_s70_uninstall_partial_failure_json_sanitizes_target_and_error(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    original_remove = cli._remove_uninstall_path
+
+    def fail_with_sensitive_error(target_root: Path, action, **kwargs):
+        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
+            return action._replace(
+                status="failed",
+                error=f"token=secret source=/outside/source {tmp_path}/private.txt",
+            )
+        return original_remove(target_root, action, **kwargs)
+
+    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_with_sensitive_error)
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    serialized = json.dumps(payload, sort_keys=True)
+
+    assert payload["status"] == "partial_failure"
+    assert payload["target"] == "."
+    assert ".agents/skills/spec-dock/SKILL.md" in payload["failed_paths"]
+    assert "secret" not in serialized
+    assert "/outside/source" not in serialized
+    assert str(tmp_path) not in serialized
+
+
+def test_s70_uninstall_partial_failure_text_shows_recovery_contract(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    original_remove = cli._remove_uninstall_path
+
+    def fail_one(target_root: Path, action, **kwargs):
+        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
+            return action._replace(status="failed", error="credential=should-not-leak")
+        return original_remove(target_root, action, **kwargs)
+
+    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_one)
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs"]) == 1
+    output = capsys.readouterr().out
+
+    assert "status: partial_failure" in output
+    assert "phase: uninstall-apply" in output
+    assert "last_completed_phase: marker-written" in output
+    assert "retry_command: spec-dock uninstall . --apply --keep-specs" in output
+    assert "failed_paths: .agents/skills/spec-dock/SKILL.md" in output
+    assert "uninstall action failed safely" in output
+    assert "credential=should-not-leak" not in output
+    assert str(tmp_path) not in output
 
 
 def test_s70_uninstall_marker_write_failure_is_retryable(

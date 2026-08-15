@@ -3600,6 +3600,26 @@ def _uninstall_retry_command(specs_mode: str | None) -> str | None:
     return f"spec-dock uninstall . --apply --{mode}"
 
 
+def _uninstall_failure_paths(
+    actions: tuple[_UninstallAction, ...],
+    explicit_paths: tuple[str, ...],
+) -> list[str]:
+    paths = set(explicit_paths)
+    paths.update(action.rel_path for action in actions if action.status in {"failed", "pending"})
+    return sorted(paths)
+
+
+def _sanitize_uninstall_action_error(error: str | None) -> str | None:
+    if error is None:
+        return None
+    return "uninstall action failed safely; inspect the relative action and retry command"
+
+
+def _sanitize_uninstall_operation_error(phase: str | None) -> str:
+    phase_name = phase or "unknown phase"
+    return f"uninstall operation failed during {phase_name}; retry required"
+
+
 def _uninstall_payload(
     target_root: Path,
     *,
@@ -3610,11 +3630,14 @@ def _uninstall_payload(
     errors: list[str] | None = None,
     phase: str | None = None,
     last_completed_phase: str | None = None,
+    diagnostic_paths: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     resolved_status = status or ("completed" if apply else "planned")
+    is_sanitized_failure = resolved_status in {"partial_failure", "blocked"}
+    failure_paths = _uninstall_failure_paths(actions, diagnostic_paths)
     return {
         "schema_version": 1,
-        "target": str(target_root),
+        "target": "." if is_sanitized_failure else str(target_root),
         "mode": "apply" if apply else "dry-run",
         "apply": apply,
         "specs_mode": specs_mode,
@@ -3623,6 +3646,7 @@ def _uninstall_payload(
         "last_completed_phase": last_completed_phase
         or ("marker-finalized" if resolved_status == "completed" else "not-started"),
         "retry_command": _uninstall_retry_command(specs_mode),
+        "failed_paths": failure_paths,
         "pending_paths": [action.rel_path for action in actions if action.status == "pending"],
         "summary": _summarize_uninstall_actions(actions),
         "actions": [
@@ -3631,7 +3655,7 @@ def _uninstall_payload(
                 "category": action.category,
                 "status": action.status,
                 "reason": action.reason,
-                "error": action.error,
+                "error": _sanitize_uninstall_action_error(action.error) if is_sanitized_failure else action.error,
             }
             for action in actions
         ],
@@ -3643,7 +3667,11 @@ def _uninstall_payload(
             ),
             "reinstall or refresh with installer CLI: spec-dock init <target> or spec-dock update <target>",
         ],
-        "errors": errors or [],
+        "errors": (
+            [_sanitize_uninstall_operation_error(phase) for _ in (errors or ["uninstall operation failed"])]
+            if is_sanitized_failure
+            else errors or []
+        ),
     }
 
 
@@ -3675,13 +3703,25 @@ def _render_uninstall_text(payload: dict[str, Any]) -> str:
     lines = [
         f"spec-dock: uninstall {noun} ({payload['mode']}) -> {payload['target']}",
         f"specs_mode: {payload['specs_mode'] or 'unspecified'}",
+        f"status: {payload['status']}",
+        f"phase: {payload['phase']}",
+        f"last_completed_phase: {payload['last_completed_phase']}",
+        f"retry_command: {payload['retry_command'] or 'unavailable'}",
+        f"failed_paths: {', '.join(payload.get('failed_paths', [])) or 'none'}",
         "summary:",
     ]
     for key, value in payload["summary"].items():
         lines.append(f"  {key}: {value}")
     lines.append("actions:")
     for action in payload["actions"]:
-        lines.append(f"  [{action['status']}] {action['path']} category={action['category']} reason={action['reason']}")
+        line = f"  [{action['status']}] {action['path']} category={action['category']} reason={action['reason']}"
+        if action.get("error"):
+            line += f" error={action['error']}"
+        lines.append(line)
+    if payload.get("errors"):
+        lines.append("errors:")
+        for error in payload["errors"]:
+            lines.append(f"  - {error}")
     lines.append("guidance:")
     for item in payload["guidance"]:
         lines.append(f"  - {item}")
@@ -3783,6 +3823,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                     "uninstall apply blocked before mutation: "
                     + "; ".join(f"{action.rel_path}: {action.reason}" for action in blockers)
                 ],
+                diagnostic_paths=tuple(action.rel_path for action in blockers),
             )
             if json_requested:
                 print(json.dumps(payload, sort_keys=True))
@@ -3816,6 +3857,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 phase=phase,
                 last_completed_phase=last_completed_phase,
                 errors=[str(e)],
+                diagnostic_paths=((_UNINSTALL_RETRY_MARKER_REL.as_posix(),) if phase == "marker-write" else ()),
             )
             if json_requested:
                 print(json.dumps(payload, sort_keys=True))
@@ -3884,6 +3926,9 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 phase=phase,
                 last_completed_phase=last_completed_phase,
                 errors=[str(e)],
+                diagnostic_paths=(
+                    (_UNINSTALL_RETRY_MARKER_REL.as_posix(),) if phase == "marker-finalization" else ("spec-dock",)
+                ),
             )
             if json_requested:
                 print(json.dumps(payload, sort_keys=True))

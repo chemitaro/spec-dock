@@ -38325,7 +38325,11 @@ esac
             assert payload["summary"]["removed"] > 0  # type: ignore[index]
             assert failed_action["category"] == "spec_history"
             assert failed_action["status"] == "failed"
-            assert "injected uninstall tree removal failure" in failed_action["error"]
+            assert (
+                failed_action["error"]
+                == "uninstall action failed safely; inspect the relative action and retry command"
+            )
+            assert "spec-dock/initiatives" in payload["failed_paths"]
             assert marker.is_file()
 
     def test_uninstall_apply_output_provides_installer_direct_recovery_guidance(self) -> None:
