@@ -35,7 +35,10 @@ Read these first before changing code or tests:
 - `src/spec_dock/`: installer package for the top-level `spec-dock` CLI.
 - `src/spec_dock/cli.py`: installer entrypoint for `init` / `update`.
 - `src/spec_dock/assets/`: shipped scaffold assets copied into target repos.
-- `src/spec_dock/assets/install_root/`: current provider-side authority for installed agent-tooling assets such as `.agents/`, `.codex/`, and `.github/`.
+- `src/spec_dock/assets/install_root/`: current provider-side authority for the two installed skills under `.agents/` and the retained `.github/workflows/ci.yml`.
+  - `.agents/skills/spec-dock/SKILL.md`
+  - `.agents/skills/spec-dock-grill-with-docs/SKILL.md`
+  - `.github/workflows/ci.yml`
 - Legacy `src/spec_dock/assets/codex_skills/` tree was retired and removed from the current repo; use historical issue records under `spec-dock/initiatives/**` when legacy context is needed.
 - `src/spec_dock/assets/spec_dock/`: provider-side scaffold source of truth for files that are generated into managed repos.
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`: provider-side runtime CLI shipped into managed repos.
@@ -50,7 +53,6 @@ src/spec_dock/
 |-- assets/
 |   |-- install_root/
 |   |   |-- .agents/
-|   |   |-- .codex/
 |   |   `-- .github/
 |   `-- spec_dock/
 |       |-- docs/
@@ -78,8 +80,8 @@ tests/
 Read it like this:
 
 - Change installer behavior: start at `src/spec_dock/cli.py`.
-- Change installed agent-tooling assets or host adapter handoff files: start at `src/spec_dock/assets/install_root/`.
-- Treat `src/spec_dock/assets/install_root/` as the only current authority for agent-tooling assets.
+- Change the two installed skills or retained CI workflow: start at `src/spec_dock/assets/install_root/`.
+- Treat `src/spec_dock/assets/install_root/` as the only current authority for the installed skills and retained CI workflow.
 - Change shipped docs/templates/system files: start at `src/spec_dock/assets/spec_dock/{docs,templates,system}/`.
 - Change runtime command entrypoints: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{cli,commands}/`.
 - Change orchestration or use cases: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`.
@@ -115,7 +117,7 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 1. Read the relevant docs under `spec-dock/active/`, or `spec-dock/system/active-none/` if no active context is set.
 2. Identify the layer or surface you are changing:
    - installer: `src/spec_dock/cli.py`, asset sync/update behavior
-   - installed agent-tooling assets / host adapters: `src/spec_dock/assets/install_root/` is the current authority; use historical issue records for legacy-artifact context
+   - installed skills / retained CI workflow: `src/spec_dock/assets/install_root/` is the current authority; use historical issue records for retired-artifact context
    - runtime command surface: `.../spec_dock_runtime/cli/` and `.../commands/`
    - orchestration or business logic: `.../application/` and `.../domain/`
    - external adapters or persistence: `.../infra/`
