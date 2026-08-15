@@ -39,6 +39,8 @@ spec-dock init /path/to/project
 
 `--remove-specs` は仕様履歴を削除する明示操作です。実行前に `--keep-specs` で残すデータと unknown content を確認してください。uninstall の部分失敗では `.uninstall-retry.json` が post-verify まで残り、同じ対象へ再実行して forward recovery します。
 
+成功した `--remove-specs` uninstall は、再初期化の境界として空の `spec-dock/` ディレクトリを残すことがあります。空境界には利用者データがないため、同じ対象で `spec-dock init /path/to/project` を実行して現行配布面を再作成できます。部分失敗のJSON / text診断に表示されるretry commandは、元の対象を失わないよう現在の作業ディレクトリからの相対パスを使います。同じ作業ディレクトリで、表示されたコマンドをそのまま再実行してください。
+
 ## 4. Artifact の取り込み
 
 現行の generic import は `artifact import file` です。一件の明示 regular file を opaque Artifact として保存し、source は変更・削除しません。

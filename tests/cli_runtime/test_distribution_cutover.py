@@ -1800,7 +1800,8 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
     assert first_payload["status"] == "partial_failure"
     assert first_payload["phase"] == "uninstall-apply"
     assert first_payload["last_completed_phase"] == "marker-written"
-    assert first_payload["retry_command"] == "spec-dock uninstall . --apply --keep-specs"
+    expected_target = Path(os.path.relpath(tmp_path, Path.cwd())).as_posix()
+    assert first_payload["retry_command"] == f"spec-dock uninstall {expected_target} --apply --keep-specs"
     assert first_payload["pending_paths"]
     assert first_payload["summary"]["pending"] == len(first_payload["pending_paths"])
     assert marker.is_file()
@@ -1839,13 +1840,15 @@ def test_s70_uninstall_partial_failure_json_sanitizes_target_and_error(
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     serialized = json.dumps(payload, sort_keys=True)
+    expected_target = Path(os.path.relpath(tmp_path, Path.cwd())).as_posix()
 
     assert payload["status"] == "partial_failure"
-    assert payload["target"] == "."
+    assert payload["target"] == expected_target
+    assert payload["retry_command"] == f"spec-dock uninstall {expected_target} --apply --keep-specs"
     assert ".agents/skills/spec-dock/SKILL.md" in payload["failed_paths"]
+    assert not payload["target"].startswith("/")
     assert "secret" not in serialized
     assert "/outside/source" not in serialized
-    assert str(tmp_path) not in serialized
 
 
 def test_s70_uninstall_partial_failure_text_shows_recovery_contract(
@@ -1869,11 +1872,12 @@ def test_s70_uninstall_partial_failure_text_shows_recovery_contract(
     assert "status: partial_failure" in output
     assert "phase: uninstall-apply" in output
     assert "last_completed_phase: marker-written" in output
-    assert "retry_command: spec-dock uninstall . --apply --keep-specs" in output
+    expected_target = Path(os.path.relpath(tmp_path, Path.cwd())).as_posix()
+    assert f"retry_command: spec-dock uninstall {expected_target} --apply --keep-specs" in output
     assert "failed_paths: .agents/skills/spec-dock/SKILL.md" in output
     assert "uninstall action failed safely" in output
     assert "credential=should-not-leak" not in output
-    assert str(tmp_path) not in output
+    assert f"-> {tmp_path}" not in output
 
 
 def test_s70_uninstall_marker_write_failure_is_retryable(
@@ -1942,6 +1946,23 @@ def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, c
     capsys.readouterr()
     assert not remove_initiative.exists()
     assert not (remove_target / "spec-dock/.uninstall-retry.json").exists()
+
+
+def test_s70_uninstall_empty_boundary_allows_fresh_reinit_and_safe_rerun(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 0
+    capsys.readouterr()
+    assert (tmp_path / "spec-dock").is_dir()
+    assert list((tmp_path / "spec-dock").iterdir()) == []
+
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    assert (tmp_path / "spec-dock/spec-dock.version").is_file()
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 0
+    capsys.readouterr()
 
 
 def test_s70_uninstall_remove_specs_cleans_nested_generated_directories(tmp_path: Path, capsys) -> None:

@@ -866,6 +866,18 @@ def admit_distribution_operation(
     if specdock_info is not None and stat.S_ISLNK(specdock_info.st_mode):
         _admission_block("workspace-invalid", "spec-dock is a symlink; a real directory is required")
 
+    # A successful uninstall may intentionally leave an empty workspace
+    # boundary after the retry marker is finalized.  Treat that exact empty
+    # directory as a fresh admission so the documented `init` recovery path
+    # can recreate the managed scaffold without requiring `--force`.
+    if specdock_info is not None:
+        try:
+            empty_workspace_boundary = not any(specdock_path.iterdir())
+        except OSError:
+            _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+        if empty_workspace_boundary:
+            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
+
     distribution_marker_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
     uninstall_marker_present = _path_present_no_follow(target_root / _UNINSTALL_RETRY_MARKER_REL)
     if distribution_marker_present and uninstall_marker_present:

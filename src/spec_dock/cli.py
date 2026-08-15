@@ -2102,10 +2102,15 @@ def _require_managed_specdock_for_uninstall(target_root: Path) -> Path:
 
     version_file = specdock_dir / "spec-dock.version"
     if not version_file.is_file() and not _has_valid_uninstall_retry_marker(specdock_dir):
-        raise RuntimeError(
-            "target is not a managed SpecDock repo: missing managed "
-            "'spec-dock/spec-dock.version' state or SpecDock uninstall retry marker"
-        )
+        try:
+            empty_post_uninstall_boundary = not any(specdock_dir.iterdir())
+        except OSError as exc:
+            raise RuntimeError("target is not a managed SpecDock repo: workspace cannot be inspected safely") from exc
+        if not empty_post_uninstall_boundary:
+            raise RuntimeError(
+                "target is not a managed SpecDock repo: missing managed "
+                "'spec-dock/spec-dock.version' state or SpecDock uninstall retry marker"
+            )
     return specdock_dir
 
 
@@ -3593,11 +3598,24 @@ def _verify_uninstall_postcondition(
     _assert_distribution_root_identity(target_root, expected_root_identity)
 
 
-def _uninstall_retry_command(specs_mode: str | None) -> str | None:
+def _safe_uninstall_target_label(target_root: Path) -> str:
+    """Return a runnable relative target without exposing a host absolute path."""
+    try:
+        label = Path(os.path.relpath(target_root, Path.cwd())).as_posix()
+    except (OSError, ValueError):
+        return "."
+    if not label or label == ".":
+        return "."
+    if label.startswith("/") or "\x00" in label:
+        return "."
+    return label
+
+
+def _uninstall_retry_command(specs_mode: str | None, *, target_label: str = ".") -> str | None:
     if specs_mode not in {"keep", "remove"}:
         return None
     mode = "keep-specs" if specs_mode == "keep" else "remove-specs"
-    return f"spec-dock uninstall . --apply --{mode}"
+    return f"spec-dock uninstall {target_label} --apply --{mode}"
 
 
 def _uninstall_failure_paths(
@@ -3635,9 +3653,10 @@ def _uninstall_payload(
     resolved_status = status or ("completed" if apply else "planned")
     is_sanitized_failure = resolved_status in {"partial_failure", "blocked"}
     failure_paths = _uninstall_failure_paths(actions, diagnostic_paths)
+    target_label = _safe_uninstall_target_label(target_root)
     return {
         "schema_version": 1,
-        "target": "." if is_sanitized_failure else str(target_root),
+        "target": target_label if is_sanitized_failure else str(target_root),
         "mode": "apply" if apply else "dry-run",
         "apply": apply,
         "specs_mode": specs_mode,
@@ -3645,7 +3664,10 @@ def _uninstall_payload(
         "phase": phase or ("complete" if resolved_status == "completed" else "preflight"),
         "last_completed_phase": last_completed_phase
         or ("marker-finalized" if resolved_status == "completed" else "not-started"),
-        "retry_command": _uninstall_retry_command(specs_mode),
+        "retry_command": _uninstall_retry_command(
+            specs_mode,
+            target_label=target_label if is_sanitized_failure else ".",
+        ),
         "failed_paths": failure_paths,
         "pending_paths": [action.rel_path for action in actions if action.status == "pending"],
         "summary": _summarize_uninstall_actions(actions),
@@ -4542,6 +4564,8 @@ def main(argv: list[str] | None = None) -> int:
             if not ns.force:
                 if admission.status == "retry":
                     _install_recognized_distribution(target_root, operation="fresh", retry_marker=admission)
+                elif admission.status == "fresh":
+                    _install_fresh_distribution(target_root)
                 elif os.path.lexists(_specdock_dir(target_root)):
                     raise RuntimeError("'spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
                 else:
@@ -4553,7 +4577,10 @@ def main(argv: list[str] | None = None) -> int:
                     _install_recognized_distribution(target_root, operation="init-force", retry_marker=admission)
         elif ns.command == "update":
             admission = _admit_distribution_cli(target_root, operation="update")
-            _install_recognized_distribution(target_root, operation="update", retry_marker=admission)
+            if admission.status == "fresh":
+                _install_fresh_distribution(target_root)
+            else:
+                _install_recognized_distribution(target_root, operation="update", retry_marker=admission)
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:
