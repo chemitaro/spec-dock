@@ -715,6 +715,43 @@ def test_s60_atomic_regular_file_does_not_replace_racing_destination(
     assert destination.read_bytes() == b"user replacement\n"
 
 
+def test_s60_atomic_retry_rejects_hard_link_replacement_before_truncate(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    parent = tmp_path / "spec-dock"
+    parent.mkdir()
+    temporary = parent / "..distribution-retry.json.temp"
+    temporary.write_bytes(b"managed old payload\n")
+    expected_identity = (temporary.stat().st_dev, temporary.stat().st_ino)
+    destination = parent / ".distribution-retry.json"
+    external = tmp_path / "external.txt"
+    external.write_bytes(b"must remain intact\n")
+    original_stat = cli.os.stat
+    swapped = False
+
+    def race_temporary_stat(path, *args, **kwargs):
+        nonlocal swapped
+        result = original_stat(path, *args, **kwargs)
+        if not swapped and path == temporary.name:
+            swapped = True
+            temporary.unlink()
+            temporary.hardlink_to(external)
+        return result
+
+    monkeypatch.setattr(cli.os, "stat", race_temporary_stat)
+
+    assert cli._retry_unpublished_atomic_regular_file(
+        temporary,
+        destination,
+        b"managed replacement\n",
+        mode=0o600,
+        expected_identity=expected_identity,
+    ) == (False, False)
+    assert external.read_bytes() == b"must remain intact\n"
+    assert not destination.exists()
+
+
 def test_s60_atomic_root_workbench_seed_does_not_leave_partial_destination(
     tmp_path: Path,
     monkeypatch,
