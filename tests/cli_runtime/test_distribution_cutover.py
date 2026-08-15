@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 
@@ -1574,6 +1575,74 @@ def test_s70_uninstall_apply_blocks_generated_hard_link_before_marker_write(tmp_
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert generated.is_file()
     assert external.read_bytes() == generated.read_bytes()
+
+
+def test_s70_uninstall_apply_blocks_hard_linked_generated_symlink_before_marker_write(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    generated = tmp_path / "spec-dock/active/issue"
+    alias = tmp_path / "active-issue-alias"
+    try:
+        os.link(generated, alias, follow_symlinks=False)
+    except (OSError, NotImplementedError):
+        pytest.skip("hard-linked symlinks are unavailable")
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/active/issue")
+    assert action["status"] == "preserved"
+    assert "unsafe identity" in action["reason"]
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert generated.is_symlink()
+    assert alias.is_symlink()
+
+
+def test_s70_uninstall_apply_blocks_agent_symlink_before_marker_write(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    external = tmp_path / "external-agent-state.txt"
+    external.write_text("keep\n", encoding="utf-8")
+    unsafe = tmp_path / "spec-dock/.agent/unsafe-link"
+    unsafe.symlink_to(external)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/.agent/unsafe-link")
+    assert action["status"] == "preserved"
+    assert "symlink identity" in action["reason"]
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert unsafe.is_symlink()
+    assert external.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_s70_uninstall_remove_specs_blocks_unsafe_descendant_before_marker_write(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    external = tmp_path / "external-history.txt"
+    external.write_text("keep\n", encoding="utf-8")
+    unsafe = tmp_path / "spec-dock/initiatives/unsafe-link"
+    unsafe.symlink_to(external)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/initiatives")
+    assert action["status"] == "preserved"
+    assert "symlink" in action["reason"]
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert unsafe.is_symlink()
+    assert external.read_text(encoding="utf-8") == "keep\n"
 
 
 def test_s70_uninstall_apply_does_not_recreate_vanished_specdock_parent(

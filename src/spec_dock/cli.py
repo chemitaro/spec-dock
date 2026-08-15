@@ -2456,7 +2456,7 @@ def _capture_uninstall_target_identity(target_root: Path, rel_path: Path) -> _Un
             return None
         if stat.S_ISLNK(info.st_mode):
             return _UninstallTargetIdentity(
-                "symlink",
+                "symlink" if info.st_nlink == 1 else "unsafe",
                 info.st_dev,
                 info.st_ino,
                 info.st_ctime_ns,
@@ -2658,13 +2658,20 @@ def _add_generated_state_uninstall_actions(
             rel_path = path.relative_to(target_root)
             known_rel_paths.add(rel_path)
             identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
-            if identity is not None and identity.kind == "unsafe":
+            if identity is not None and (
+                identity.kind == "unsafe" or (identity.kind == "symlink" and rel_root != Path("spec-dock/active"))
+            ):
+                reason = (
+                    "generated state has unsafe identity; manual review required"
+                    if identity.kind == "unsafe"
+                    else "generated state has unsafe symlink identity; manual review required"
+                )
                 actions.append(
                     _UninstallAction(
                         rel_path=rel_path.as_posix(),
                         category="generated_state",
                         status="preserved",
-                        reason="generated state has unsafe identity; manual review required",
+                        reason=reason,
                     )
                 )
                 continue
@@ -2692,6 +2699,27 @@ def _add_spec_history_uninstall_action(
         return
     if specs_mode == "remove":
         identity, expected_absent = _planned_uninstall_identity(target_root, spec_history_path)
+        if identity is not None and identity.kind != "directory":
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="preserved",
+                    reason="spec history root is not a safe real directory; manual review required",
+                )
+            )
+            return
+        safety_issue = _managed_scaffold_tree_safety_issue(target_root, spec_history_path)
+        if safety_issue is not None:
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="preserved",
+                    reason=f"{safety_issue}; manual review required",
+                )
+            )
+            return
         actions.append(
             _UninstallAction(
                 rel_path=spec_history_path.as_posix(),
@@ -2743,6 +2771,16 @@ def _add_shortcut_uninstall_action(actions: list[_UninstallAction], target_root:
         shortcut.is_symlink() and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"  # noqa: PTH115 - raw exact target.
     ):
         identity, expected_absent = _planned_uninstall_identity(target_root, Path("spec"))
+        if identity is not None and identity.kind == "unsafe":
+            actions.append(
+                _UninstallAction(
+                    rel_path="spec",
+                    category="shortcut",
+                    status="preserved",
+                    reason="repo-root shortcut has unsafe identity; manual review required",
+                )
+            )
+            return
         actions.append(
             _UninstallAction(
                 rel_path="spec",
@@ -2826,7 +2864,13 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
 def _managed_scaffold_tree_safety_issue(target_root: Path, rel_root: Path) -> str | None:
     """Return a preflight diagnostic for unsafe recursive scaffold entries."""
     root = target_root / rel_root
-    for current, directories, file_names in os.walk(root, topdown=True, followlinks=False):
+    walk_errors: list[OSError] = []
+    for current, directories, file_names in os.walk(
+        root,
+        topdown=True,
+        followlinks=False,
+        onerror=walk_errors.append,
+    ):
         for name in (*directories, *file_names):
             path = Path(current) / name
             try:
@@ -2839,6 +2883,8 @@ def _managed_scaffold_tree_safety_issue(target_root: Path, rel_root: Path) -> st
                 continue
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 return f"managed scaffold tree contains unsafe entry: {path.relative_to(target_root)}"
+    if walk_errors:
+        return f"managed scaffold tree cannot be inspected safely: {rel_root.as_posix()}"
     return None
 
 
