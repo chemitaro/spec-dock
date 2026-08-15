@@ -296,6 +296,50 @@ def _assert_managed_path_identity(path: Path, expected: _ManagedPathIdentity | N
         raise RuntimeError(f"managed scaffold target identity changed: {path}")
 
 
+def _assert_managed_scaffold_tree_safe(specdock_dir: Path) -> None:
+    """Reject unsafe entries before a managed scaffold tree replacement."""
+    for name in _MANAGED_DIRS:
+        managed_dir = specdock_dir / name
+        try:
+            root_info = os.lstat(managed_dir)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise RuntimeError(f"managed scaffold target cannot be inspected safely: {managed_dir}") from exc
+        if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+            raise RuntimeError(f"managed scaffold target is not a safe directory: {managed_dir}")
+        for current_root, dir_names, file_names in os.walk(managed_dir, topdown=True, followlinks=False):
+            current = Path(current_root)
+            for entry_name in (*dir_names, *file_names):
+                entry = current / entry_name
+                try:
+                    info = os.lstat(entry)
+                except OSError as exc:
+                    raise RuntimeError(f"managed scaffold target cannot be inspected safely: {entry}") from exc
+                if stat.S_ISLNK(info.st_mode):
+                    raise RuntimeError(f"managed scaffold target contains symlinked entry: {entry}")
+                if stat.S_ISREG(info.st_mode):
+                    if info.st_nlink != 1:
+                        raise RuntimeError(f"managed scaffold target contains hard-linked file: {entry}")
+                elif not stat.S_ISDIR(info.st_mode):
+                    raise RuntimeError(f"managed scaffold target contains special entry: {entry}")
+
+
+def _assert_managed_scaffold_file_identities(
+    expected_identities: dict[Path, _ManagedFileIdentity | None] | None,
+    *,
+    root: Path | None = None,
+) -> None:
+    """Revalidate every exact scaffold file before a recursive replacement."""
+    if expected_identities is None:
+        return
+    root_absolute = root.absolute() if root is not None else None
+    for path, expected in expected_identities.items():
+        if root_absolute is not None and not path.absolute().is_relative_to(root_absolute):
+            continue
+        _assert_managed_file_identity(path, expected)
+
+
 def _sync_tree(
     src: Path,
     dest: Path,
@@ -1345,6 +1389,7 @@ def _install_spec_dock_bound(
     expected_root_identity: DistributionRootIdentity | None = None,
     root_identity_path: Path | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    expected_managed_scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] | None = None,
     expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
     managed_gitignore_identity_checked: bool = False,
     seed_root_workbench: bool | None = None,
@@ -1394,6 +1439,8 @@ def _install_spec_dock_bound(
                     raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
 
         guard_root()
+        _assert_managed_scaffold_tree_safe(specdock_dir)
+        _assert_managed_scaffold_file_identities(expected_managed_scaffold_file_identities)
         if expected_managed_scaffold_identities is not None:
             _assert_managed_path_identity(
                 specdock_dir,
@@ -1407,6 +1454,11 @@ def _install_spec_dock_bound(
         # never removed by this installer.
         for src, dest in managed_scaffold_sync_plan:
             guard_root()
+            _assert_managed_scaffold_tree_safe(specdock_dir)
+            _assert_managed_scaffold_file_identities(
+                expected_managed_scaffold_file_identities,
+                root=dest,
+            )
             if expected_managed_scaffold_identities is not None:
                 _assert_managed_path_identity(
                     dest,
@@ -1505,6 +1557,7 @@ def _install_spec_dock(
     write_version: bool = True,
     expected_root_identity: DistributionRootIdentity | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    expected_managed_scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] | None = None,
     expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
     managed_gitignore_identity_checked: bool = False,
     seed_root_workbench: bool | None = None,
@@ -1523,6 +1576,7 @@ def _install_spec_dock(
             expected_root_identity=bound_identity,
             root_identity_path=visible_root,
             expected_managed_scaffold_identities=expected_managed_scaffold_identities,
+            expected_managed_scaffold_file_identities=expected_managed_scaffold_file_identities,
             expected_managed_gitignore_identity=expected_managed_gitignore_identity,
             managed_gitignore_identity_checked=managed_gitignore_identity_checked,
             seed_root_workbench=seed_root_workbench,
@@ -1568,7 +1622,12 @@ def _preflight_managed_scaffold_target_paths(
     target_root: Path,
     *,
     expected_gitignore_bytes: bytes,
-) -> tuple[dict[Path, _ManagedPathIdentity | None], _ManagedFileIdentity | None]:
+    expected_scaffold_file_paths: tuple[str, ...] = (),
+) -> tuple[
+    dict[Path, _ManagedPathIdentity | None],
+    dict[Path, _ManagedFileIdentity | None],
+    _ManagedFileIdentity | None,
+]:
     """Reject unsafe existing scaffold targets before a recognized update.
 
     The scaffold refresh replaces the four provider-managed directories and
@@ -1602,23 +1661,18 @@ def _preflight_managed_scaffold_target_paths(
 
     require_directory(specdock_dir, label="spec-dock")
     identities[specdock_dir] = _managed_path_identity(specdock_dir) if os.path.lexists(specdock_dir) else None
+    _assert_managed_scaffold_tree_safe(specdock_dir)
     for name in _MANAGED_DIRS:
         managed_dir = specdock_dir / name
         require_directory(managed_dir, label=f"spec-dock/{name}")
         identities[managed_dir] = _managed_path_identity(managed_dir) if os.path.lexists(managed_dir) else None
         if not managed_dir.exists():
             continue
-        # `_sync_tree` removes and recreates this whole directory.  Refuse any
-        # nested symlink so a managed refresh cannot silently delete a user link
-        # or traverse a replacement path during the pathname-based copy helper.
-        for current_root, dir_names, file_names in os.walk(managed_dir, topdown=True, followlinks=False):
-            current = Path(current_root)
-            unsafe_dirs = [name for name in dir_names if (current / name).is_symlink()]
-            unsafe_files = [name for name in file_names if (current / name).is_symlink()]
-            if unsafe_dirs or unsafe_files:
-                first_entry = (unsafe_dirs or unsafe_files)[0]
-                unsafe_path = (current / first_entry).relative_to(specdock_dir).as_posix()
-                raise RuntimeError(f"managed scaffold target contains symlinked entry: spec-dock/{unsafe_path}")
+
+    scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] = {}
+    for relative_path in expected_scaffold_file_paths:
+        path = target_root / relative_path
+        scaffold_file_identities[path] = _managed_file_identity(path)
 
     gitignore_path = specdock_dir / ".gitignore"
     require_regular_file(gitignore_path, label="spec-dock/.gitignore")
@@ -1638,7 +1692,7 @@ def _preflight_managed_scaffold_target_paths(
     require_regular_file(specdock_dir / "active" / "context-pack.md", label="spec-dock/active/context-pack.md")
     require_regular_file(specdock_dir / ".agent" / "active.json", label="spec-dock/.agent/active.json")
 
-    return identities, gitignore_identity
+    return identities, scaffold_file_identities, gitignore_identity
 
 
 def _shell_join(argv: list[str]) -> str:
@@ -1960,9 +2014,12 @@ def _install_recognized_distribution_unlocked(
                 raise RuntimeError(f"distribution preflight blocked: {reasons}")
 
             _assert_distribution_root_identity(target_root, root_identity)
-            absolute_scaffold_identities, gitignore_identity = _preflight_managed_scaffold_target_paths(
-                target_root,
-                expected_gitignore_bytes=expected_gitignore_bytes,
+            absolute_scaffold_identities, scaffold_file_identities, gitignore_identity = (
+                _preflight_managed_scaffold_target_paths(
+                    target_root,
+                    expected_gitignore_bytes=expected_gitignore_bytes,
+                    expected_scaffold_file_paths=tuple(asset.path for asset in plan.scaffold_assets),
+                )
             )
             managed_scaffold_identities = {
                 path.relative_to(target_root): identity for path, identity in absolute_scaffold_identities.items()
@@ -2033,6 +2090,7 @@ def _install_recognized_distribution_unlocked(
                     write_version=False,
                     expected_root_identity=root_identity,
                     expected_managed_scaffold_identities=managed_scaffold_identities,
+                    expected_managed_scaffold_file_identities=scaffold_file_identities,
                     expected_managed_gitignore_identity=gitignore_identity,
                     managed_gitignore_identity_checked=True,
                     seed_root_workbench=(
