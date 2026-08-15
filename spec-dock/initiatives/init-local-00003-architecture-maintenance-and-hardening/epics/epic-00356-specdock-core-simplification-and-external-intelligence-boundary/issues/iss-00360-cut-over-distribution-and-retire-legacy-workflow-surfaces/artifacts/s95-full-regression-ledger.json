@@ -3,18 +3,18 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "68ee1c67d7d770e7684751f7f07289a80e27f80a",
+  "current_head_sha": "774e12612b5d7390f60f41ee2cf704d89470205e",
   "commands": {
-    "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v30.xml",
+    "current_full": "uv run pytest --run-full-regression -p no:cacheprovider --tb=no -q --junitxml=/private/tmp/issue360-current-v32.xml",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
     "fixed_point_subset": "uv run python -c '<current failure node ids> with pytest.main(...)'"
   },
   "full_run_summary": {
     "current": {
       "failed": 27,
-      "passed": 1957,
+      "passed": 1958,
       "skipped": 516,
-      "duration": "12m34s"
+      "duration": "12m39s"
     },
     "fixed_point": {
       "failed": 452,
