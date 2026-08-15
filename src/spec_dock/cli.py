@@ -2699,6 +2699,17 @@ def _add_spec_history_uninstall_action(
         return
     if specs_mode == "remove":
         identity, expected_absent = _planned_uninstall_identity(target_root, spec_history_path)
+        if identity is None and expected_absent:
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="would_remove",
+                    reason="explicit remove-specs mode; spec history already absent",
+                    expected_absent=True,
+                )
+            )
+            return
         if identity is not None and identity.kind != "directory":
             actions.append(
                 _UninstallAction(
@@ -3544,6 +3555,107 @@ def _finalize_uninstall_retry_marker(
     return tuple(sorted(finalized, key=lambda action: (action.rel_path, action.status)))
 
 
+def _restore_uninstall_retry_marker_action(
+    actions: tuple[_UninstallAction, ...],
+) -> tuple[_UninstallAction, ...]:
+    """Reflect a safely recreated retry marker after terminal cleanup failure."""
+
+    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
+    restored = [
+        action._replace(
+            status="preserved",
+            reason="SpecDock uninstall retry marker preserved after terminal cleanup failure",
+            error=None,
+        )
+        if action.rel_path == marker_path
+        else action
+        for action in actions
+    ]
+    return tuple(sorted(restored, key=lambda action: (action.rel_path, action.status)))
+
+
+def _workspace_root_contains_only_uninstall_marker(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity,
+) -> bool:
+    """Check whether the workspace root can be the single terminal rmdir."""
+
+    workspace_rel = Path(_SPEC_DOCK_DIRNAME)
+    marker_name = _UNINSTALL_RETRY_MARKER_REL.name
+    with _open_uninstall_parent_chain(
+        target_root,
+        workspace_rel,
+        expected_root_identity=expected_root_identity,
+    ) as fds:
+        parent_fd = fds[-1]
+        workspace_fd = os.open(workspace_rel.name, _uninstall_directory_flags(), dir_fd=parent_fd)
+        try:
+            _assert_uninstall_visible_chain(target_root, workspace_rel, (*fds, workspace_fd))
+            entries = os.listdir(workspace_fd)  # noqa: PTH208 - fd-based no-follow enumeration.
+            if entries != [marker_name]:
+                return False
+            marker = os.stat(marker_name, dir_fd=workspace_fd, follow_symlinks=False)
+            if not stat.S_ISREG(marker.st_mode) or marker.st_nlink != 1:
+                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+            _assert_uninstall_directory_binding(target_root, workspace_rel, workspace_fd)
+            return True
+        finally:
+            with suppress(OSError):
+                os.close(workspace_fd)
+
+
+def _remove_uninstall_workspace_root(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity,
+) -> _UninstallAction:
+    """Perform the only fallible mutation allowed after marker finalization."""
+
+    workspace_rel = Path(_SPEC_DOCK_DIRNAME)
+    try:
+        with _open_uninstall_parent_chain(
+            target_root,
+            workspace_rel,
+            expected_root_identity=expected_root_identity,
+        ) as fds:
+            parent_fd = fds[-1]
+            _assert_uninstall_visible_chain(target_root, workspace_rel, fds)
+            try:
+                info = os.stat(workspace_rel.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return _UninstallAction(
+                    rel_path=workspace_rel.as_posix(),
+                    category="empty_dir",
+                    status="empty_dir_removed",
+                    reason="workspace root was already removed before terminal cleanup",
+                )
+            if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+                return _UninstallAction(
+                    rel_path=workspace_rel.as_posix(),
+                    category="empty_dir",
+                    status="failed",
+                    reason="workspace root changed during terminal cleanup; retry required",
+                    error="workspace root is no longer a real directory",
+                )
+            os.rmdir(workspace_rel.name, dir_fd=parent_fd)
+            _assert_uninstall_visible_chain(target_root, workspace_rel, fds)
+    except (OSError, RuntimeError) as exc:
+        return _UninstallAction(
+            rel_path=workspace_rel.as_posix(),
+            category="empty_dir",
+            status="failed",
+            reason="workspace root cleanup failed; retry required",
+            error=str(exc),
+        )
+    return _UninstallAction(
+        rel_path=workspace_rel.as_posix(),
+        category="empty_dir",
+        status="empty_dir_removed",
+        reason="terminal workspace root cleanup after marker finalization",
+    )
+
+
 def _verify_uninstall_postcondition(
     target_root: Path,
     actions: tuple[_UninstallAction, ...],
@@ -3804,22 +3916,11 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 expected_root_identity=uninstall_root_identity,
             )
             last_completed_phase = "post-verified"
-            phase = "marker-finalization"
-            actions = _finalize_uninstall_retry_marker(
-                target_root,
-                actions,
-                expected_root_identity=uninstall_root_identity,
-            )
-            last_completed_phase = "marker-finalized"
-            # Marker removal can make the final managed root empty.  Re-run the
-            # bounded empty-directory cleanup after marker finalization, then
-            # verify the newly produced actions before reporting success.
             phase = "root-cleanup"
             cleanup_actions = _cleanup_empty_uninstall_dirs(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
-                include_workspace_root=True,
             )
             actions = tuple(
                 sorted(
@@ -3838,8 +3939,34 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
+            last_completed_phase = "post-verified"
+            terminal_workspace_cleanup = _workspace_root_contains_only_uninstall_marker(
+                target_root,
+                expected_root_identity=uninstall_root_identity,
+            )
+            phase = "marker-finalization"
+            actions = _finalize_uninstall_retry_marker(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+            )
+            last_completed_phase = "marker-finalized"
+            if terminal_workspace_cleanup:
+                phase = "root-cleanup"
+                workspace_action = _remove_uninstall_workspace_root(
+                    target_root,
+                    expected_root_identity=uninstall_root_identity,
+                )
+                actions = tuple(
+                    sorted(
+                        (*actions, workspace_action),
+                        key=lambda action: (action.rel_path, action.status),
+                    )
+                )
+                if workspace_action.status == "failed":
+                    raise RuntimeError(workspace_action.error or workspace_action.reason)
         except (OSError, RuntimeError) as e:
-            if phase in {"root-cleanup", "post-verify"} and not _path_exists_for_uninstall(
+            if phase in {"root-cleanup", "post-verify", "marker-finalization"} and not _path_exists_for_uninstall(
                 target_root / _UNINSTALL_RETRY_MARKER_REL
             ):
                 with suppress(OSError, RuntimeError):
@@ -3847,6 +3974,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                         target_root,
                         expected_root_identity=uninstall_root_identity,
                     )
+                if _path_exists_for_uninstall(target_root / _UNINSTALL_RETRY_MARKER_REL):
+                    actions = _restore_uninstall_retry_marker_action(actions)
             payload = _uninstall_payload(
                 target_root,
                 apply=True,

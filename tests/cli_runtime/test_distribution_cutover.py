@@ -1738,6 +1738,50 @@ def test_s70_uninstall_marker_is_removed_last_after_success(tmp_path: Path, caps
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
+def test_s70_uninstall_terminal_workspace_cleanup_failure_restores_marker(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    original_rmdir = cli.os.rmdir
+    target_identity = (tmp_path.stat().st_dev, tmp_path.stat().st_ino)
+    failed = False
+
+    def fail_terminal_workspace_cleanup(name, *, dir_fd=None):
+        nonlocal failed
+        is_target_root_parent = (
+            dir_fd is not None and (os.fstat(dir_fd).st_dev, os.fstat(dir_fd).st_ino) == target_identity
+        )
+        if name == "spec-dock" and is_target_root_parent and not failed:
+            failed = True
+            raise OSError("injected terminal workspace cleanup failure")
+        return original_rmdir(name, dir_fd=dir_fd)
+
+    monkeypatch.setattr(cli.os, "rmdir", fail_terminal_workspace_cleanup)
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 1
+    first_payload = json.loads(capsys.readouterr().out)
+
+    marker = tmp_path / "spec-dock/.uninstall-retry.json"
+    assert first_payload["status"] == "partial_failure"
+    assert first_payload["phase"] == "root-cleanup"
+    assert first_payload["last_completed_phase"] == "marker-finalized"
+    assert marker.is_file()
+    assert (tmp_path / "spec-dock").is_dir()
+    marker_action = next(
+        action for action in first_payload["actions"] if action["path"] == marker.relative_to(tmp_path).as_posix()
+    )
+    assert marker_action["status"] == "preserved"
+
+    monkeypatch.setattr(cli.os, "rmdir", original_rmdir)
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 0
+    second_payload = json.loads(capsys.readouterr().out)
+    assert second_payload["status"] == "completed"
+    assert not marker.exists()
+    assert not (tmp_path / "spec-dock").exists()
+
+
 def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
     tmp_path: Path,
     monkeypatch,
