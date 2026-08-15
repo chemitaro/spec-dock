@@ -2329,14 +2329,39 @@ def _create_uninstall_retry_marker(
             if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file") from None
             return
+        marker_identity: tuple[int, int] | None = None
+        completed = False
         try:
+            created = os.fstat(marker_fd)
+            if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
+                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+            marker_identity = (created.st_dev, created.st_ino)
             _write_file_descriptor(marker_fd, payload)
             os.fsync(marker_fd)
             written = os.fstat(marker_fd)
-            if not stat.S_ISREG(written.st_mode) or written.st_nlink != 1:
+            if (
+                not stat.S_ISREG(written.st_mode)
+                or written.st_nlink != 1
+                or (written.st_dev, written.st_ino) != marker_identity
+            ):
                 raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+            completed = True
         finally:
-            os.close(marker_fd)
+            with suppress(OSError):
+                os.close(marker_fd)
+            if not completed and marker_identity is not None:
+                try:
+                    current = os.stat(marker_rel.name, dir_fd=parent_fd, follow_symlinks=False)
+                except OSError:
+                    pass
+                else:
+                    if (
+                        stat.S_ISREG(current.st_mode)
+                        and current.st_nlink == 1
+                        and (current.st_dev, current.st_ino) == marker_identity
+                    ):
+                        with suppress(OSError):
+                            os.unlink(marker_rel.name, dir_fd=parent_fd)
         _assert_uninstall_visible_chain(target_root, marker_rel, fds)
 
 

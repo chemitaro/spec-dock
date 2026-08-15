@@ -1597,6 +1597,38 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
     assert not marker.exists()
 
 
+def test_s70_uninstall_marker_write_failure_is_retryable(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    original_write = cli._write_file_descriptor
+    failed = False
+
+    def fail_marker_write(fd, content, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise OSError("injected uninstall marker write failure")
+        return original_write(fd, content, **kwargs)
+
+    monkeypatch.setattr(cli, "_write_file_descriptor", fail_marker_write)
+    marker = tmp_path / "spec-dock/.uninstall-retry.json"
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    first_payload = json.loads(capsys.readouterr().out)
+    assert first_payload["status"] == "partial_failure"
+    assert not marker.exists()
+
+    monkeypatch.setattr(cli, "_write_file_descriptor", original_write)
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    second_payload = json.loads(capsys.readouterr().out)
+    assert second_payload["status"] == "completed"
+    assert not marker.exists()
+
+
 def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
