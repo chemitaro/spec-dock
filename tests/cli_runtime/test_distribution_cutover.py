@@ -1522,6 +1522,60 @@ def test_s70_uninstall_apply_rejects_rewritten_target_after_plan(
     assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
 
 
+def test_s70_uninstall_apply_rejects_same_target_symlink_replacement_after_plan(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    active_issue = tmp_path / "spec-dock/active/issue"
+    original_target = active_issue.readlink()
+    original_write_marker = cli._write_uninstall_retry_marker
+
+    def replace_after_marker(*args, **kwargs):
+        original_write_marker(*args, **kwargs)
+        active_issue.unlink()
+        active_issue.symlink_to(original_target)
+
+    monkeypatch.setattr(cli, "_write_uninstall_retry_marker", replace_after_marker)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "partial_failure"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/active/issue")
+    assert action["status"] == "failed"
+    assert "identity changed" in action["error"]
+    assert active_issue.is_symlink()
+    assert active_issue.readlink() == original_target
+    assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
+
+
+def test_s70_uninstall_apply_blocks_generated_hard_link_before_marker_write(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    generated = tmp_path / "spec-dock/active/context-pack.md"
+    external = tmp_path / "outside-context-pack.md"
+    external.write_bytes(generated.read_bytes())
+    generated.unlink()
+    try:
+        generated.hardlink_to(external)
+    except OSError:
+        pytest.skip("hard links are unavailable")
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/active/context-pack.md")
+    assert action["status"] == "preserved"
+    assert "unsafe identity" in action["reason"]
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert generated.is_file()
+    assert external.read_bytes() == generated.read_bytes()
+
+
 def test_s70_uninstall_apply_does_not_recreate_vanished_specdock_parent(
     tmp_path: Path,
     monkeypatch,
@@ -1606,6 +1660,10 @@ def test_s70_uninstall_marker_is_removed_last_after_success(tmp_path: Path, caps
     payload = json.loads(capsys.readouterr().out)
 
     assert payload["status"] == "completed"
+    assert payload["phase"] == "complete"
+    assert payload["last_completed_phase"] == "marker-finalized"
+    assert payload["retry_command"] == "spec-dock uninstall . --apply --keep-specs"
+    assert payload["pending_paths"] == []
     marker_action = next(action for action in payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json")
     assert marker_action["status"] == "removed"
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
@@ -1635,6 +1693,11 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
     first_payload = json.loads(capsys.readouterr().out)
     marker = tmp_path / "spec-dock/.uninstall-retry.json"
     assert first_payload["status"] == "partial_failure"
+    assert first_payload["phase"] == "uninstall-apply"
+    assert first_payload["last_completed_phase"] == "marker-written"
+    assert first_payload["retry_command"] == "spec-dock uninstall . --apply --keep-specs"
+    assert first_payload["pending_paths"]
+    assert first_payload["summary"]["pending"] == len(first_payload["pending_paths"])
     assert marker.is_file()
 
     monkeypatch.setattr(cli, "_remove_uninstall_path", original_remove)
@@ -1716,6 +1779,28 @@ def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, c
     capsys.readouterr()
     assert not remove_initiative.exists()
     assert not (remove_target / "spec-dock/.uninstall-retry.json").exists()
+
+
+def test_s70_uninstall_remove_specs_cleans_nested_generated_directories(tmp_path: Path, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    nested_active = tmp_path / "spec-dock/active/nested/empty/deeper"
+    nested_agent = tmp_path / "spec-dock/.agent/nested/empty"
+    nested_active.mkdir(parents=True)
+    nested_agent.mkdir(parents=True)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    removed_empty_paths = {action["path"] for action in payload["actions"] if action["status"] == "empty_dir_removed"}
+
+    assert payload["status"] == "completed"
+    assert "spec-dock/active/nested/empty/deeper" in removed_empty_paths
+    assert "spec-dock/active/nested/empty" in removed_empty_paths
+    assert "spec-dock/active/nested" in removed_empty_paths
+    assert "spec-dock/.agent/nested/empty" in removed_empty_paths
+    assert not nested_active.exists()
+    assert not nested_agent.exists()
+    assert not (tmp_path / "spec-dock").exists()
 
 
 def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
