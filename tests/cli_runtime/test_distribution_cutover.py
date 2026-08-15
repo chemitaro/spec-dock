@@ -1333,6 +1333,34 @@ def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marke
     assert external.read_text(encoding="utf-8") == "user-owned\n"
 
 
+def test_s70_uninstall_apply_blocks_managed_scaffold_rebind_before_external_delete(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    moved = tmp_path.with_name(f"{tmp_path.name}-moved-scaffold")
+    sentinel = tmp_path / "spec-dock/docs/rebind-sentinel.md"
+    sentinel.write_text("preserve outside repository\n", encoding="utf-8")
+    original_remove_tree = cli._remove_uninstall_tree_fd
+
+    def move_before_recursive_remove(target_root, rel_path, directory_fd, visible_fds):
+        if rel_path == Path("spec-dock/docs"):
+            (target_root / rel_path).rename(moved)
+        return original_remove_tree(target_root, rel_path, directory_fd, visible_fds)
+
+    monkeypatch.setattr(cli, "_remove_uninstall_tree_fd", move_before_recursive_remove)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "partial_failure"
+    assert moved.is_dir()
+    assert (moved / "rebind-sentinel.md").read_text(encoding="utf-8") == "preserve outside repository\n"
+    assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
+
+
 def test_s60_retry_marker_phase_allowlist_rejects_unknown_phase_without_writes(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     root_stat = tmp_path.stat()
