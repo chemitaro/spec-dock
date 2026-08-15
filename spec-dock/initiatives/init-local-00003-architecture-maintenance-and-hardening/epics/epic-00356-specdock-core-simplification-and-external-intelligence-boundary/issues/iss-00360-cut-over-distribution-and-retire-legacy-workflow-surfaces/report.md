@@ -134,16 +134,17 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * managed scaffoldの再帰uninstallで、保持したdirectory FDだけを信頼して外部へ移動されたtreeを削除しないよう、各再帰mutation直前に可視パスのno-follow root binding（device / inode）とentry identityを再検証する実装を `91f8b824e1a6839ee8e81030b6ae20f76b143fa1` に追加した。rename fault injectionで外部treeを削除しないことを確認した。
 * atomic regular-file retryで一時ファイルをO_TRUNC付きで開く前にidentityを検証できるよう、O_TRUNCを外してfstat後にftruncateする実装とhard-link差し替え回帰テストを `9b9e53e968f48c5883a04ef4fbd71aaac096aca8` に追加した。差し替え先外部inodeが不変であることを確認した。
 * uninstall retry markerのwrite/fsync失敗時に作成inodeをidentity確認して除去し、通常rerunでmarkerを再作成できるようにした実装を `b0763b5fa743a6f11b14718eb5cd65b17926134b` に追加した。write failure注入後のmarker残留なし・同一package retry成功を確認した。
-* S95 v28は実装tree `b0763b5fa743a6f11b14718eb5cd65b17926134b`に対して `27 failed, 1955 passed, 516 skipped`（12分30秒）。v27とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
+* uninstall retry markerの既存競合時にdescriptorからcanonical payload・stable identityを検証し、不完全markerを再利用しない実装を `194b793acb015a9c564bde0aa1dc480b8e188b84` に追加した。partial markerのreuse拒否回帰を確認した。
+* S95 v29は実装tree `194b793acb015a9c564bde0aa1dc480b8e188b84`に対して `27 failed, 1956 passed, 516 skipped`（12分34秒）。v28とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
 
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Evidence refresh HEAD: `b0763b5fa743a6f11b14718eb5cd65b17926134b`（P1修正を含む実装tree。S95 v28はこのtreeで実行し、report / ledger更新は証跡のみの後続コミットである）
-* Final implementation commit: `b0763b5fa743a6f11b14718eb5cd65b17926134b`（uninstall retry markerのwrite/fsync失敗時identity-checked cleanupと再実行回帰テスト。atomic regular-file retryのidentity検証後ftruncateは`9b9e53e968f48c5883a04ef4fbd71aaac096aca8`、managed scaffold再帰uninstallの各mutation直前root binding / entry identity再検証は`91f8b824e1a6839ee8e81030b6ae20f76b143fa1`、先行するsymlink stageのownership再記録 / strict cleanup、pre-swap retry、およびpost-swap recorder / cleanup再試行は`332deeb1e00dc406865cda87838f467515f92659`、初回marker再発行は親コミット`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`、nested runtime preflightは`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`、regular stage修正は`07c77b1ee33070180ada54972cce2579a19d9bf0`）
+* Evidence refresh HEAD: `194b793acb015a9c564bde0aa1dc480b8e188b84`（P1修正を含む実装tree。S95 v29はこのtreeで実行し、report / ledger更新は証跡のみの後続コミットである）
+* Final implementation commit: `194b793acb015a9c564bde0aa1dc480b8e188b84`（uninstall retry marker競合時のcanonical payload・stable identity検証と回帰テスト。write/fsync失敗時identity-checked cleanupは`b0763b5fa743a6f11b14718eb5cd65b17926134b`、atomic regular-file retryのidentity検証後ftruncateは`9b9e53e968f48c5883a04ef4fbd71aaac096aca8`、managed scaffold再帰uninstallの各mutation直前root binding / entry identity再検証は`91f8b824e1a6839ee8e81030b6ae20f76b143fa1`、先行するsymlink stageのownership再記録 / strict cleanup、pre-swap retry、およびpost-swap recorder / cleanup再試行は`332deeb1e00dc406865cda87838f467515f92659`、初回marker再発行は親コミット`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`、nested runtime preflightは`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`、regular stage修正は`07c77b1ee33070180ada54972cce2579a19d9bf0`）
 * Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
-* Final quality-gate evidence commit: `b0763b5fa743a6f11b14718eb5cd65b17926134b`（P1修正を含む実装treeのS95 v28実行。ledger / report更新は証跡のみの後続コミット）
-* S95 v28 full regression: 実装tree `b0763b5fa743a6f11b14718eb5cd65b17926134b`に対して `27 failed, 1955 passed, 516 skipped`。v27とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* Final quality-gate evidence commit: `194b793acb015a9c564bde0aa1dc480b8e188b84`（P1修正を含む実装treeのS95 v29実行。ledger / report更新は証跡のみの後続コミット）
+* S95 v29 full regression: 実装tree `194b793acb015a9c564bde0aa1dc480b8e188b84`に対して `27 failed, 1956 passed, 516 skipped`。v28とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
