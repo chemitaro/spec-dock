@@ -1279,6 +1279,60 @@ def test_s65_uninstall_dry_run_surfaces_known_obsolete_identity(tmp_path: Path, 
     assert obsolete.exists()
 
 
+def test_s70_uninstall_apply_removes_legacy_managed_scaffold_tree(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    legacy = tmp_path / "spec-dock/scripts/spec-dock-chatgpt"
+    legacy.write_text("legacy managed scaffold\n", encoding="utf-8")
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "completed"
+    assert not legacy.exists()
+    assert not (tmp_path / "spec-dock/scripts").exists()
+
+
+def test_s70_uninstall_apply_removes_modified_managed_scaffold_tree(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    managed = tmp_path / "spec-dock/docs/README.md"
+    managed.write_text("locally modified managed scaffold\n", encoding="utf-8")
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "completed"
+    assert not managed.exists()
+    assert not (tmp_path / "spec-dock/docs").exists()
+
+
+def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marker(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    external = tmp_path / "external.md"
+    external.write_text("user-owned\n", encoding="utf-8")
+    unsafe = tmp_path / "spec-dock/docs/external.md"
+    unsafe.symlink_to(external)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert unsafe.is_symlink()
+    assert external.read_text(encoding="utf-8") == "user-owned\n"
+
+
 def test_s60_retry_marker_phase_allowlist_rejects_unknown_phase_without_writes(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     root_stat = tmp_path.stat()

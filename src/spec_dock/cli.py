@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
+_MANAGED_SCAFFOLD_ROOTS = tuple(Path(_SPEC_DOCK_DIRNAME) / name for name in _MANAGED_DIRS)
 # Keep managed skill installation aligned with the shipped Target catalog.
 _MANAGED_SKILL_NAMES = (
     "spec-dock",
@@ -2213,7 +2214,7 @@ def _open_uninstall_parent_chain(
 
 
 def _remove_uninstall_tree_fd(directory_fd: int) -> None:
-    """Remove a spec-history directory tree through held directory fds."""
+    """Remove an installer-owned directory tree through held directory fds."""
 
     for name in os.listdir(directory_fd):
         entry = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
@@ -2635,6 +2636,11 @@ def _add_unknown_boundary_uninstall_actions(
                 continue
             if rel_path.parts[:2] in {("spec-dock", "active"), ("spec-dock", ".agent")}:
                 continue
+            if any(
+                rel_path == managed_root or _is_path_prefix(managed_root, rel_path)
+                for managed_root in _MANAGED_SCAFFOLD_ROOTS
+            ):
+                continue
             actions.append(
                 _UninstallAction(
                     rel_path=rel_path.as_posix(),
@@ -2673,6 +2679,69 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
     sources.append((Path("spec-dock/.workbench/README.md"), root_workbench_readme.read_bytes()))
     sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode()))
     return tuple(sources)
+
+
+def _managed_scaffold_tree_safety_issue(target_root: Path, rel_root: Path) -> str | None:
+    """Return a preflight diagnostic for unsafe recursive scaffold entries."""
+    root = target_root / rel_root
+    for current, directories, file_names in os.walk(root, topdown=True, followlinks=False):
+        for name in (*directories, *file_names):
+            path = Path(current) / name
+            try:
+                info = os.lstat(path)
+            except OSError:
+                return f"managed scaffold entry cannot be inspected safely: {path.relative_to(target_root)}"
+            if stat.S_ISLNK(info.st_mode):
+                return f"managed scaffold tree contains symlink: {path.relative_to(target_root)}"
+            if stat.S_ISDIR(info.st_mode):
+                continue
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                return f"managed scaffold tree contains unsafe entry: {path.relative_to(target_root)}"
+    return None
+
+
+def _add_managed_scaffold_uninstall_actions(
+    actions: list[_UninstallAction],
+    target_root: Path,
+    known_rel_paths: set[Path],
+) -> None:
+    """Plan each managed scaffold tree as one safe recursive removal."""
+    for rel_root in _MANAGED_SCAFFOLD_ROOTS:
+        known_rel_paths.add(rel_root)
+        if not _path_exists_for_uninstall(target_root / rel_root):
+            continue
+        identity, expected_absent = _planned_uninstall_identity(target_root, rel_root)
+        if identity is None or identity.kind != "directory":
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="scaffold_managed",
+                    status="preserved",
+                    reason="managed scaffold root is not a safe real directory; manual review required",
+                )
+            )
+            continue
+        safety_issue = _managed_scaffold_tree_safety_issue(target_root, rel_root)
+        if safety_issue is not None:
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="scaffold_managed",
+                    status="preserved",
+                    reason=f"{safety_issue}; manual review required",
+                )
+            )
+            continue
+        actions.append(
+            _UninstallAction(
+                rel_path=rel_root.as_posix(),
+                category="scaffold_managed",
+                status="would_remove",
+                reason="SpecDock managed scaffold tree",
+                expected_identity=identity,
+                expected_absent=expected_absent,
+            )
+        )
 
 
 def _append_distribution_uninstall_actions(
@@ -2800,7 +2869,14 @@ def _build_uninstall_plan(
             known_rel_paths=known_rel_paths,
         )
 
+        _add_managed_scaffold_uninstall_actions(actions, target_root, known_rel_paths)
+
         for rel_path, expected in _build_scaffold_uninstall_sources(assets_dir):
+            if any(
+                rel_path == managed_root or _is_path_prefix(managed_root, rel_path)
+                for managed_root in _MANAGED_SCAFFOLD_ROOTS
+            ):
+                continue
             known_rel_paths.add(rel_path)
             if _is_delete_even_if_mismatch_uninstall_path(rel_path):
                 if _path_exists_for_uninstall(target_root / rel_path) or include_missing_removals:
@@ -2943,7 +3019,7 @@ def _remove_uninstall_path(
                         )
                 os.unlink(rel_path.name, dir_fd=parent_fd)
             elif stat.S_ISDIR(info.st_mode):
-                if action.category != "spec_history":
+                if action.category not in {"spec_history", "scaffold_managed"}:
                     return action._replace(
                         status="failed",
                         error="unexpected uninstall directory requires manual review",
