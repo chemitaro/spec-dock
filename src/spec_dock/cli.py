@@ -2213,25 +2213,89 @@ def _open_uninstall_parent_chain(
                 os.close(fd)
 
 
-def _remove_uninstall_tree_fd(directory_fd: int) -> None:
-    """Remove an installer-owned directory tree through held directory fds."""
+def _assert_uninstall_directory_binding(target_root: Path, rel_path: Path, directory_fd: int) -> None:
+    """Require a held directory descriptor to remain at its repository path."""
+    try:
+        visible = os.lstat(target_root / rel_path)
+        held = os.fstat(directory_fd)
+    except OSError as exc:
+        raise RuntimeError("uninstall target path changed during safe operation") from exc
+    if (
+        stat.S_ISLNK(visible.st_mode)
+        or not stat.S_ISDIR(visible.st_mode)
+        or not stat.S_ISDIR(held.st_mode)
+        or visible.st_dev != held.st_dev
+        or visible.st_ino != held.st_ino
+    ):
+        raise RuntimeError("uninstall target path changed during safe operation")
+
+
+def _assert_uninstall_tree_entry_identity(
+    directory_fd: int,
+    name: str,
+    expected: os.stat_result,
+) -> None:
+    """Reject a recursive entry that was replaced after it was observed."""
+    try:
+        current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise RuntimeError("uninstall target changed during safe operation") from exc
+    identity_matches = (
+        current.st_dev,
+        current.st_ino,
+        current.st_mode,
+    ) == (
+        expected.st_dev,
+        expected.st_ino,
+        expected.st_mode,
+    )
+    if not stat.S_ISDIR(expected.st_mode):
+        identity_matches = identity_matches and current.st_ctime_ns == expected.st_ctime_ns
+    if not identity_matches:
+        raise RuntimeError("uninstall target changed during safe operation")
+
+
+def _remove_uninstall_tree_fd(
+    target_root: Path,
+    rel_path: Path,
+    directory_fd: int,
+    visible_fds: tuple[int, ...],
+) -> None:
+    """Remove an installer-owned tree while preserving repository binding."""
+    _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+    _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
 
     for name in os.listdir(directory_fd):
+        _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+        _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
         entry = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
         if stat.S_ISLNK(entry.st_mode):
             raise RuntimeError("refusing to remove symlink inside uninstall target")
         if stat.S_ISDIR(entry.st_mode):
+            child_rel_path = rel_path / name
             child_fd = os.open(name, _uninstall_directory_flags(), dir_fd=directory_fd)
             try:
-                _remove_uninstall_tree_fd(child_fd)
+                _remove_uninstall_tree_fd(
+                    target_root,
+                    child_rel_path,
+                    child_fd,
+                    (*visible_fds, child_fd),
+                )
+                _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+                _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+                _assert_uninstall_directory_binding(target_root, child_rel_path, child_fd)
+                _assert_uninstall_tree_entry_identity(directory_fd, name, entry)
+                os.rmdir(name, dir_fd=directory_fd)
             finally:
                 os.close(child_fd)
-            os.rmdir(name, dir_fd=directory_fd)
             continue
         if stat.S_ISREG(entry.st_mode) and entry.st_nlink != 1:
             raise RuntimeError("refusing to remove hard-linked uninstall target")
         if not stat.S_ISREG(entry.st_mode):
             raise RuntimeError("refusing to remove unsafe entry inside uninstall target")
+        _assert_uninstall_tree_entry_identity(directory_fd, name, entry)
+        _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+        _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
         os.unlink(name, dir_fd=directory_fd)
 
 
@@ -3026,7 +3090,7 @@ def _remove_uninstall_path(
                     )
                 directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
                 try:
-                    _remove_uninstall_tree_fd(directory_fd)
+                    _remove_uninstall_tree_fd(target_root, rel_path, directory_fd, (*fds, directory_fd))
                 finally:
                     os.close(directory_fd)
                 os.rmdir(rel_path.name, dir_fd=parent_fd)
