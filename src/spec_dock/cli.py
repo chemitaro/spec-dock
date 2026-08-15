@@ -3522,7 +3522,6 @@ def _remove_uninstall_retry_marker(
         if expected_identity is not None:
             _assert_uninstall_target_identity(parent_fd, marker_rel.name, info, expected_identity)
         os.unlink(marker_rel.name, dir_fd=parent_fd)
-        _assert_uninstall_visible_chain(target_root, marker_rel, fds)
 
 
 def _finalize_uninstall_retry_marker(
@@ -3558,7 +3557,7 @@ def _finalize_uninstall_retry_marker(
 def _restore_uninstall_retry_marker_action(
     actions: tuple[_UninstallAction, ...],
 ) -> tuple[_UninstallAction, ...]:
-    """Reflect a safely recreated retry marker after terminal cleanup failure."""
+    """Reflect a safely recreated retry marker after a postcondition failure."""
 
     marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
     restored = [
@@ -3572,88 +3571,6 @@ def _restore_uninstall_retry_marker_action(
         for action in actions
     ]
     return tuple(sorted(restored, key=lambda action: (action.rel_path, action.status)))
-
-
-def _workspace_root_contains_only_uninstall_marker(
-    target_root: Path,
-    *,
-    expected_root_identity: DistributionRootIdentity,
-) -> bool:
-    """Check whether the workspace root can be the single terminal rmdir."""
-
-    workspace_rel = Path(_SPEC_DOCK_DIRNAME)
-    marker_name = _UNINSTALL_RETRY_MARKER_REL.name
-    with _open_uninstall_parent_chain(
-        target_root,
-        workspace_rel,
-        expected_root_identity=expected_root_identity,
-    ) as fds:
-        parent_fd = fds[-1]
-        workspace_fd = os.open(workspace_rel.name, _uninstall_directory_flags(), dir_fd=parent_fd)
-        try:
-            _assert_uninstall_visible_chain(target_root, workspace_rel, (*fds, workspace_fd))
-            entries = os.listdir(workspace_fd)  # noqa: PTH208 - fd-based no-follow enumeration.
-            if entries != [marker_name]:
-                return False
-            marker = os.stat(marker_name, dir_fd=workspace_fd, follow_symlinks=False)
-            if not stat.S_ISREG(marker.st_mode) or marker.st_nlink != 1:
-                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
-            _assert_uninstall_directory_binding(target_root, workspace_rel, workspace_fd)
-            return True
-        finally:
-            with suppress(OSError):
-                os.close(workspace_fd)
-
-
-def _remove_uninstall_workspace_root(
-    target_root: Path,
-    *,
-    expected_root_identity: DistributionRootIdentity,
-) -> _UninstallAction:
-    """Perform the only fallible mutation allowed after marker finalization."""
-
-    workspace_rel = Path(_SPEC_DOCK_DIRNAME)
-    try:
-        with _open_uninstall_parent_chain(
-            target_root,
-            workspace_rel,
-            expected_root_identity=expected_root_identity,
-        ) as fds:
-            parent_fd = fds[-1]
-            _assert_uninstall_visible_chain(target_root, workspace_rel, fds)
-            try:
-                info = os.stat(workspace_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                return _UninstallAction(
-                    rel_path=workspace_rel.as_posix(),
-                    category="empty_dir",
-                    status="empty_dir_removed",
-                    reason="workspace root was already removed before terminal cleanup",
-                )
-            if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
-                return _UninstallAction(
-                    rel_path=workspace_rel.as_posix(),
-                    category="empty_dir",
-                    status="failed",
-                    reason="workspace root changed during terminal cleanup; retry required",
-                    error="workspace root is no longer a real directory",
-                )
-            os.rmdir(workspace_rel.name, dir_fd=parent_fd)
-            _assert_uninstall_visible_chain(target_root, workspace_rel, fds)
-    except (OSError, RuntimeError) as exc:
-        return _UninstallAction(
-            rel_path=workspace_rel.as_posix(),
-            category="empty_dir",
-            status="failed",
-            reason="workspace root cleanup failed; retry required",
-            error=str(exc),
-        )
-    return _UninstallAction(
-        rel_path=workspace_rel.as_posix(),
-        category="empty_dir",
-        status="empty_dir_removed",
-        reason="terminal workspace root cleanup after marker finalization",
-    )
 
 
 def _verify_uninstall_postcondition(
@@ -3940,10 +3857,6 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 expected_root_identity=uninstall_root_identity,
             )
             last_completed_phase = "post-verified"
-            terminal_workspace_cleanup = _workspace_root_contains_only_uninstall_marker(
-                target_root,
-                expected_root_identity=uninstall_root_identity,
-            )
             phase = "marker-finalization"
             actions = _finalize_uninstall_retry_marker(
                 target_root,
@@ -3951,22 +3864,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 expected_root_identity=uninstall_root_identity,
             )
             last_completed_phase = "marker-finalized"
-            if terminal_workspace_cleanup:
-                phase = "root-cleanup"
-                workspace_action = _remove_uninstall_workspace_root(
-                    target_root,
-                    expected_root_identity=uninstall_root_identity,
-                )
-                actions = tuple(
-                    sorted(
-                        (*actions, workspace_action),
-                        key=lambda action: (action.rel_path, action.status),
-                    )
-                )
-                if workspace_action.status == "failed":
-                    raise RuntimeError(workspace_action.error or workspace_action.reason)
         except (OSError, RuntimeError) as e:
-            if phase in {"root-cleanup", "post-verify", "marker-finalization"} and not _path_exists_for_uninstall(
+            if phase in {"post-verify", "marker-finalization"} and not _path_exists_for_uninstall(
                 target_root / _UNINSTALL_RETRY_MARKER_REL
             ):
                 with suppress(OSError, RuntimeError):
