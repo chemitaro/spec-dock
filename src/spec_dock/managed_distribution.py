@@ -1324,6 +1324,10 @@ def _classify_current_target(
         and actual.mode != expected.mode
     ):
         if operation == "fresh":
+            if observation.link_count is not None and observation.link_count > 1:
+                # Byte-identical hard links may be adopted read-only; changing
+                # their mode would mutate the user's other hard-link name.
+                return DistributionAction(path, operation, "adopt", "current", "current-identity-match")
             return _blocked_action(
                 path,
                 operation,
