@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
 import shlex
 import shutil
+import threading
+import time
 
 import pytest
 
@@ -122,6 +125,51 @@ def test_s40b_retained_skill_identity_matches_issue359_final_source() -> None:
     for relative_path, expected_sha256 in CURRENT_SKILL_SHA256.items():
         actual_sha256 = hashlib.sha256((INSTALL_ROOT / relative_path).read_bytes()).hexdigest()
         assert actual_sha256 == expected_sha256
+
+
+def test_s40b_legacy_bootstrap_and_skill_apply_paths_are_retired() -> None:
+    source = inspect.getsource(cli)
+
+    assert "_migrate_bootstrap_only_config_if_stale" not in source
+    assert "def _install_skill(" not in source
+    assert "def _apply_managed_skill_install_plan(" not in source
+
+
+def test_s60_distribution_operations_share_an_exclusive_root_lock(tmp_path: Path) -> None:
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    second_entered = threading.Event()
+    errors: list[BaseException] = []
+
+    def hold_first_operation() -> None:
+        try:
+            with cli._exclusive_distribution_operation(tmp_path):
+                first_entered.set()
+                assert release_first.wait(timeout=2)
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    def enter_second_operation() -> None:
+        try:
+            assert first_entered.wait(timeout=2)
+            with cli._exclusive_distribution_operation(tmp_path):
+                second_entered.set()
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    first = threading.Thread(target=hold_first_operation)
+    second = threading.Thread(target=enter_second_operation)
+    first.start()
+    assert first_entered.wait(timeout=2)
+    second.start()
+    time.sleep(0.1)
+    assert not second_entered.is_set()
+    release_first.set()
+    first.join(timeout=2)
+    second.join(timeout=2)
+
+    assert not errors
+    assert second_entered.is_set()
 
 
 def test_s35_cli_blocks_unknown_version_before_any_update_write(tmp_path: Path, capsys) -> None:
@@ -1457,6 +1505,30 @@ def test_s70_uninstall_apply_removes_modified_managed_scaffold_tree(
     assert payload["status"] == "completed"
     assert not managed.exists()
     assert not (tmp_path / "spec-dock/docs").exists()
+
+
+def test_s70_keep_specs_uninstall_allows_reinit_without_losing_history(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    history = tmp_path / "spec-dock/initiatives/init-preserved/requirement.md"
+    history.parent.mkdir(parents=True)
+    history.write_text("preserved history\n", encoding="utf-8")
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "completed"
+    assert (tmp_path / "spec-dock").is_dir()
+    assert (tmp_path / "spec-dock/initiatives").is_dir()
+    assert not (tmp_path / "spec-dock/spec-dock.version").exists()
+
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    assert history.read_text(encoding="utf-8") == "preserved history\n"
+    assert (tmp_path / "spec-dock/spec-dock.version").is_file()
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
 def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marker(

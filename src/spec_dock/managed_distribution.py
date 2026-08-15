@@ -57,6 +57,7 @@ class DistributionAsset:
 
     path: str
     identity: DistributionIdentity
+    source_path: str | None = None
 
 
 DistributionOperation = Literal["fresh", "update", "init-force", "uninstall"]
@@ -161,6 +162,13 @@ class DistributionPlan:
     target_root: Path | None = None
     operation: DistributionOperation = "fresh"
     target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...] = ()
+    scaffold_assets: tuple[DistributionAsset, ...] = ()
+
+    @property
+    def scaffold_paths(self) -> frozenset[str]:
+        """Return target paths owned by the provider scaffold portion."""
+
+        return frozenset(asset.path for asset in self.scaffold_assets)
 
     @property
     def blocked(self) -> bool:
@@ -538,6 +546,7 @@ _UNINSTALL_RETRY_MARKER_PAYLOAD = {
     "purpose": "uninstall-rerun",
 }
 _VERSION_ANCHOR_PATHS = frozenset({"spec-dock/scripts/spec-dock", "spec-dock/.gitignore"})
+_SCAFFOLD_MANAGED_ROOTS = ("docs", "templates", "scripts", "system")
 
 
 def _admission_block(reason: str, detail: str) -> NoReturn:
@@ -622,6 +631,45 @@ def _root_identity_for_admission(target_root: Path) -> DistributionRootIdentity:
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
         _admission_block("target-root-invalid", "target root must be a real directory")
     return DistributionRootIdentity(device=info.st_dev, inode=info.st_ino)
+
+
+def _is_preserved_specs_workspace(target_root: Path) -> bool:
+    """Recognize only the exact boundary left by a successful keep-specs uninstall."""
+
+    specdock_path = target_root / "spec-dock"
+    try:
+        specdock_info = os.lstat(specdock_path)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+    if stat.S_ISLNK(specdock_info.st_mode) or not stat.S_ISDIR(specdock_info.st_mode):
+        return False
+    try:
+        children = list(os.scandir(specdock_path))
+    except OSError:
+        _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+    if {entry.name for entry in children} != {"initiatives"}:
+        return False
+    initiatives = children[0]
+    if initiatives.name != "initiatives" or initiatives.is_symlink() or not initiatives.is_dir(follow_symlinks=False):
+        return False
+    pending = [initiatives.path]
+    while pending:
+        current = pending.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError:
+            _admission_block("workspace-invalid", "preserved spec history cannot be inspected safely")
+        for entry in entries:
+            if entry.is_symlink():
+                return False
+            if entry.is_dir(follow_symlinks=False):
+                pending.append(entry.path)
+                continue
+            if not entry.is_file(follow_symlinks=False):
+                return False
+    return True
 
 
 def _assert_real_parent_chain(target_root: Path, relative_path: str, *, label: str) -> bool:
@@ -877,6 +925,8 @@ def admit_distribution_operation(
             _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
         if empty_workspace_boundary:
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
+        if operation != "uninstall" and _is_preserved_specs_workspace(target_root):
+            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
 
     distribution_marker_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
     uninstall_marker_present = _path_present_no_follow(target_root / _UNINSTALL_RETRY_MARKER_REL)
@@ -956,6 +1006,82 @@ def _current_assets(install_root: Path) -> tuple[DistributionAsset, ...]:
                     kind="regular",
                     sha256=digest,
                     mode=stat.S_IMODE(file_stat.st_mode),
+                ),
+            )
+        )
+    return tuple(assets)
+
+
+def _scaffold_assets(scaffold_root: Path, *, operation: DistributionOperation) -> tuple[DistributionAsset, ...]:
+    """Build the managed scaffold portion of the shared distribution catalog."""
+
+    def is_pruned_by_scaffold_refresh(relative: Path) -> bool:
+        parts = relative.parts
+        if parts[0] == "scripts" and parts[-1].startswith("spec-dock-close") and parts[-1].endswith(".sh"):
+            return True
+        if parts[0] != "templates":
+            return False
+        if len(parts) == 2 and parts[1] in {"requirement.md", "design.md", "plan.md", "report.md"}:
+            return True
+        if len(parts) >= 2 and parts[1] in {"current", "completed"}:
+            return True
+        if (
+            len(parts) >= 3
+            and parts[1] in {"initiative", "epic", "issue"}
+            and (parts[2] == "deps.json" or parts[2] in {"adrs", "artifacts", "current", "completed"})
+        ):
+            return True
+        preserved_readmes = {
+            PurePosixPath("templates/README.md"),
+            PurePosixPath("templates/root/.workbench/README.md"),
+            PurePosixPath("templates/initiative/.workbench/README.md"),
+            PurePosixPath("templates/epic/.workbench/README.md"),
+            PurePosixPath("templates/issue/.workbench/README.md"),
+        }
+        return parts[-1] == "README.md" and relative not in preserved_readmes
+
+    if not scaffold_root.is_dir() or scaffold_root.is_symlink():
+        return ()
+    if not (scaffold_root / ".gitignore").is_file() or (scaffold_root / ".gitignore").is_symlink():
+        return ()
+    source_entries: list[tuple[str, Path]] = [(".gitignore", scaffold_root / ".gitignore")]
+    for root_name in _SCAFFOLD_MANAGED_ROOTS:
+        source_root = scaffold_root / root_name
+        if not source_root.is_dir() or source_root.is_symlink():
+            return ()
+        for candidate in sorted(source_root.rglob("*"), key=lambda item: item.relative_to(scaffold_root).as_posix()):
+            relative = candidate.relative_to(scaffold_root)
+            if "__pycache__" in relative.parts or relative.suffix in {".pyc", ".pyo"}:
+                continue
+            if is_pruned_by_scaffold_refresh(relative):
+                continue
+            if candidate.is_file() and not candidate.is_symlink():
+                source_entries.append((relative.as_posix(), candidate))
+    seed_readme = scaffold_root / "templates" / "root" / ".workbench" / "README.md"
+    if operation == "fresh" and seed_readme.is_file() and not seed_readme.is_symlink():
+        source_entries.append((".workbench/README.md", seed_readme))
+
+    assets: list[DistributionAsset] = []
+    for source_path, candidate in sorted(source_entries):
+        try:
+            info = candidate.stat()
+            digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise DistributionManifestError(f"unable to read scaffold asset: {source_path}") from exc
+        mode = stat.S_IMODE(info.st_mode)
+        if source_path == "scripts/spec-dock":
+            mode |= 0o111
+        if source_path.startswith("system/active-none/"):
+            mode &= ~0o222
+        target_path = f"spec-dock/{source_path}"
+        assets.append(
+            DistributionAsset(
+                path=target_path,
+                source_path=source_path,
+                identity=DistributionIdentity(
+                    kind="regular",
+                    sha256=digest,
+                    mode=mode,
                 ),
             )
         )
@@ -1215,6 +1341,7 @@ def _historical_provenance(
 
 def _target_identity_specs(
     current_assets: tuple[DistributionAsset, ...],
+    scaffold_assets: tuple[DistributionAsset, ...] = (),
 ) -> dict[str, DistributionIdentity]:
     # Historical shortcut records are evidence only.  They must never create
     # a new Fresh target; the shipped canonical shortcut is the sole Current
@@ -1222,6 +1349,7 @@ def _target_identity_specs(
     return {
         **_CURRENT_SHORTCUTS,
         **{asset.path: asset.identity for asset in current_assets},
+        **{asset.path: asset.identity for asset in scaffold_assets},
     }
 
 
@@ -1428,8 +1556,9 @@ def _classify_target(
     current_assets: tuple[DistributionAsset, ...],
     operation: DistributionOperation,
     manifest: DistributionManifest,
+    scaffold_assets: tuple[DistributionAsset, ...] = (),
 ) -> tuple[tuple[DistributionAction, ...], tuple[tuple[str, DistributionTargetSnapshot], ...]]:
-    specs = _target_identity_specs(current_assets)
+    specs = _target_identity_specs(current_assets, scaffold_assets)
     actions: list[DistributionAction] = []
     observations: dict[str, _TargetObservation] = {}
     for path, expected in sorted(specs.items()):
@@ -1490,6 +1619,11 @@ def build_distribution_plan(
     if operation not in _OPERATIONS:
         raise DistributionManifestError(f"unsupported distribution operation: {operation!r}")
     current_assets = _current_assets(install_root)
+    scaffold_assets = (
+        _scaffold_assets(Path(scaffold_root), operation=operation)
+        if scaffold_root is not None and operation != "uninstall"
+        else ()
+    )
     manifest = _load_manifest(manifest_path)
     _assert_no_manifest_overlap(
         {asset.path for asset in current_assets} | set(_CURRENT_SHORTCUTS),
@@ -1503,6 +1637,7 @@ def build_distribution_plan(
             current_assets=current_assets,
             operation=operation,
             manifest=manifest,
+            scaffold_assets=scaffold_assets,
         )
     return DistributionPlan(
         current_assets=current_assets,
@@ -1514,6 +1649,7 @@ def build_distribution_plan(
         target_root=Path(target_root) if target_root is not None else None,
         operation=operation,
         target_snapshots=target_snapshots,
+        scaffold_assets=scaffold_assets,
     )
 
 
@@ -2039,7 +2175,15 @@ def _cleanup_stale_distribution_stages(
 
 
 def _expected_target_identity(plan: DistributionPlan, path: str) -> DistributionIdentity | None:
-    return _target_identity_specs(plan.current_assets).get(path)
+    return _target_identity_specs(plan.current_assets, plan.scaffold_assets).get(path)
+
+
+def _asset_for_target(plan: DistributionPlan, path: str) -> DistributionAsset | None:
+    for asset in (*plan.current_assets, *plan.scaffold_assets):
+        target_path = asset.path
+        if target_path == path:
+            return asset
+    return None
 
 
 def _plan_snapshot_map(plan: DistributionPlan) -> dict[str, DistributionTargetSnapshot]:
@@ -2654,9 +2798,14 @@ def _apply_distribution_action(
         if expected is None or expected.kind != "regular":
             source_bytes = None
         else:
-            if plan.install_root is None:
+            asset = _asset_for_target(plan, action.path)
+            if asset is None:
+                raise DistributionApplyError(f"distribution plan has no provider source for '{action.path}'")
+            source_root = plan.scaffold_root if asset.source_path is not None else plan.install_root
+            if source_root is None:
                 raise DistributionApplyError("distribution plan has no provider source root")
-            source_bytes, observed_source_mode = _source_asset_bytes(plan.install_root / action.path)
+            source_rel = asset.source_path or asset.path
+            source_bytes, observed_source_mode = _source_asset_bytes(source_root / source_rel)
             if expected.mode is None or observed_source_mode != expected.mode:
                 raise DistributionApplyError(f"provider Current asset mode changed for '{action.path}'")
             # Bind the mutation to the mode captured in the read-only plan;
@@ -2711,6 +2860,7 @@ def apply_distribution_plan(
     allow_stale_stage_cleanup: bool = False,
     stage_ownership: tuple[DistributionStageOwnership, ...] = (),
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
+    scaffold_applier: Callable[[], None] | None = None,
 ) -> DistributionResult:
     """Apply a validated plan with no-follow identity checks at every action.
 
@@ -2726,7 +2876,11 @@ def apply_distribution_plan(
     target_root = plan.target_root
     if target_root is None or plan.install_root is None:
         raise DistributionApplyError("distribution plan is missing target or provider roots")
-    if plan.blocked:
+    permitted_scaffold_paths = plan.scaffold_paths if scaffold_applier is not None else frozenset()
+    blocked_actions = [
+        action for action in plan.actions if action.blocked and action.path not in permitted_scaffold_paths
+    ]
+    if blocked_actions:
         raise DistributionApplyError("distribution plan is blocked")
     try:
         root_stat = os.lstat(target_root)
@@ -2737,13 +2891,17 @@ def apply_distribution_plan(
 
     snapshots = _plan_snapshot_map(plan)
     created_parent_bindings: dict[str, PathIdentitySnapshot] = {}
+    scaffold_paths = plan.scaffold_paths if scaffold_applier is not None else frozenset()
     for action in plan.actions:
+        if action.path in scaffold_paths:
+            continue
         snapshot = snapshots.get(action.path)
         if snapshot is None:
             raise DistributionApplyError("distribution plan is missing a target identity snapshot")
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
 
-    for index, action in enumerate(plan.actions):
+    actions_to_apply = tuple(action for action in plan.actions if action.path not in scaffold_paths)
+    for index, action in enumerate(actions_to_apply):
         snapshot = snapshots[action.path]
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
         if allow_stale_stage_cleanup:
@@ -2757,7 +2915,7 @@ def apply_distribution_plan(
         _assert_pending_snapshot_stable(refreshed.snapshot, snapshot, action.path, created_parent_bindings)
         snapshot = refreshed.snapshot
         snapshots[action.path] = snapshot
-        for pending in plan.actions[index + 1 :]:
+        for pending in actions_to_apply[index + 1 :]:
             pending_snapshot = snapshots[pending.path]
             pending_observation = _observe_target(target_root, pending.path)
             if pending_observation.snapshot is None:
@@ -2782,7 +2940,7 @@ def apply_distribution_plan(
                 created_parent_bindings,
                 stage_ownership_recorder,
             )
-        for pending in plan.actions[index + 1 :]:
+        for pending in actions_to_apply[index + 1 :]:
             pending_snapshot = snapshots[pending.path]
             pending_observation = _observe_target(target_root, pending.path)
             if pending_observation.snapshot is None:
@@ -2794,6 +2952,19 @@ def apply_distribution_plan(
                 created_parent_bindings,
             )
             snapshots[pending.path] = pending_observation.snapshot
+
+    if scaffold_applier is not None and scaffold_paths:
+        scaffold_applier()
+        for action in plan.actions:
+            if action.path not in scaffold_paths:
+                continue
+            refreshed = _observe_target(target_root, action.path)
+            if refreshed.snapshot is None:
+                raise DistributionApplyError(f"managed scaffold post-apply path is missing for '{action.path}'")
+            expected = _expected_target_identity(plan, action.path)
+            if expected is None or refreshed.identity != expected:
+                raise DistributionApplyError(f"managed scaffold post-apply verification failed for '{action.path}'")
+            snapshots[action.path] = refreshed.snapshot
 
     return DistributionResult(status="complete", actions=plan.actions)
 

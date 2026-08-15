@@ -27,6 +27,11 @@ import sys
 import tempfile
 from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows has no POSIX flock module.
+    fcntl = None  # type: ignore[assignment]
+
 from spec_dock import __version__
 from spec_dock.managed_distribution import (
     DistributionAdmission,
@@ -52,10 +57,6 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock",
     "spec-dock-grill-with-docs",
 )
-_COLLISION_AWARE_ADDITIVE_SKILL_NAMES = frozenset({
-    "spec-dock",
-    "spec-dock-grill-with-docs",
-})
 _MANAGED_OBSOLETE_EXACT_PATH_PREFIXES = (
     ".agents/skills/",
     ".agents/host-adapters/",
@@ -68,6 +69,24 @@ _UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
 _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _DISTRIBUTION_RETRY_MARKER_PAYLOAD_VERSION = 1
 _DISTRIBUTION_RETRY_MARKER_PURPOSE = "distribution-rerun"
+
+
+@contextmanager
+def _exclusive_distribution_operation(target_root: Path) -> Iterator[None]:
+    """Serialize installer mutations for one repository root without a lock file."""
+
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if fcntl is None or not nofollow or not directory:
+        raise RuntimeError("platform lacks required no-follow operation lock support")
+    fd = os.open(target_root, os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0))
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        with suppress(OSError):
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 @contextmanager
@@ -124,12 +143,6 @@ def _require_specdock(target_root: Path) -> Path:
             )
         raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' not found. Run 'spec-dock init' first.")
     return specdock_dir
-
-
-def _copy_file(src: Path, dest: Path) -> None:
-    """Copy a file while creating parent directories."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
 
 
 def _assert_root_workbench_parent_safe(specdock_dir: Path) -> None:
@@ -1719,7 +1732,7 @@ def _raise_distribution_partial_failure(
     ) from None
 
 
-def _install_fresh_distribution(target_root: Path) -> None:
+def _install_fresh_distribution_unlocked(target_root: Path) -> None:
     """Apply one validated Fresh distribution with forward-retry recovery."""
     _require_retry_target_label(target_root)
     phase = "preflight"
@@ -1738,8 +1751,11 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 target_root=target_root,
                 operation="fresh",
             )
-            if plan.blocked:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
+            blocked_actions = [
+                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
+            ]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked: {reasons}")
 
             _assert_distribution_root_identity(target_root, root_identity)
@@ -1789,43 +1805,52 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 target_root=target_root,
                 operation="fresh",
             )
-            if plan.blocked:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
+            blocked_actions = [
+                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
+            ]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
+
+            def apply_scaffold() -> None:
+                nonlocal phase, last_completed_phase
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation="fresh",
+                    last_completed_phase="distribution-applied",
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+                last_completed_phase = "distribution-applied"
+                phase = "scaffold-refresh"
+                _assert_distribution_root_identity(target_root, root_identity)
+                _install_spec_dock(
+                    target_root,
+                    force=True,
+                    install_root_shortcut=False,
+                    write_version=False,
+                    expected_root_identity=root_identity,
+                    seed_root_workbench=_root_workbench_seed_decision(
+                        specdock_dir,
+                        assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
+                    ),
+                )
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation="fresh",
+                    last_completed_phase="scaffold-refreshed",
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+                last_completed_phase = "scaffold-refreshed"
 
             phase = "distribution-apply"
             _assert_distribution_root_identity(target_root, root_identity)
-            apply_distribution_plan(plan, stage_ownership_recorder=record_stage_ownership)
-            _write_distribution_retry_marker(
-                target_root,
-                operation="fresh",
-                last_completed_phase="distribution-applied",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
+            apply_distribution_plan(
+                plan,
+                stage_ownership_recorder=record_stage_ownership,
+                scaffold_applier=apply_scaffold,
             )
-            last_completed_phase = "distribution-applied"
-
-            phase = "scaffold-refresh"
-            _assert_distribution_root_identity(target_root, root_identity)
-            _install_spec_dock(
-                target_root,
-                force=True,
-                install_root_shortcut=False,
-                write_version=False,
-                expected_root_identity=root_identity,
-                seed_root_workbench=_root_workbench_seed_decision(
-                    specdock_dir,
-                    assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
-                ),
-            )
-            _write_distribution_retry_marker(
-                target_root,
-                operation="fresh",
-                last_completed_phase="scaffold-refreshed",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            last_completed_phase = "scaffold-refreshed"
 
             phase = "post-verify"
             _assert_distribution_root_identity(target_root, root_identity)
@@ -1883,7 +1908,18 @@ def _install_fresh_distribution(target_root: Path) -> None:
             raise
 
 
-def _install_recognized_distribution(
+def _install_fresh_distribution(target_root: Path) -> None:
+    with _exclusive_distribution_operation(target_root):
+        admission = _admit_distribution_cli(target_root, operation="fresh")
+        if admission.status == "retry":
+            _install_recognized_distribution_unlocked(target_root, operation="fresh", retry_marker=admission)
+            return
+        if admission.status != "fresh":
+            raise RuntimeError("Fresh distribution target changed during operation admission")
+        _install_fresh_distribution_unlocked(target_root)
+
+
+def _install_recognized_distribution_unlocked(
     target_root: Path,
     *,
     operation: DistributionOperation,
@@ -1916,8 +1952,11 @@ def _install_recognized_distribution(
                 target_root=target_root,
                 operation=operation,
             )
-            if plan.blocked:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
+            blocked_actions = [
+                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
+            ]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked: {reasons}")
 
             _assert_distribution_root_identity(target_root, root_identity)
@@ -1937,6 +1976,24 @@ def _install_recognized_distribution(
             )
             marker_started = True
             last_completed_phase = "preflight-complete"
+
+            # Publishing the retry marker mutates the `spec-dock/` parent
+            # directory. Rebuild the complete distribution plan after that
+            # mutation so scaffold target snapshots are bound to the state
+            # that apply will actually observe.
+            plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                operation=operation,
+            )
+            blocked_actions = [
+                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
+            ]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
+                raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
 
             def record_stage_ownership(record: DistributionStageOwnership) -> None:
                 existing = next(
@@ -1958,6 +2015,44 @@ def _install_recognized_distribution(
                     stage_ownership=tuple(stage_ownership),
                 )
 
+            def apply_scaffold() -> None:
+                nonlocal phase, last_completed_phase
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation=operation,
+                    last_completed_phase="distribution-applied",
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+                last_completed_phase = "distribution-applied"
+                phase = "scaffold-refresh"
+                _assert_distribution_root_identity(target_root, root_identity)
+                _install_spec_dock(
+                    target_root,
+                    force=True,
+                    write_version=False,
+                    expected_root_identity=root_identity,
+                    expected_managed_scaffold_identities=managed_scaffold_identities,
+                    expected_managed_gitignore_identity=gitignore_identity,
+                    managed_gitignore_identity_checked=True,
+                    seed_root_workbench=(
+                        _root_workbench_seed_decision(
+                            _specdock_dir(target_root),
+                            assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
+                        )
+                        if operation == "fresh"
+                        else None
+                    ),
+                )
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation=operation,
+                    last_completed_phase="scaffold-refreshed",
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+                last_completed_phase = "scaffold-refreshed"
+
             phase = "distribution-apply"
             _assert_distribution_root_identity(target_root, root_identity)
             apply_distribution_plan(
@@ -1965,43 +2060,8 @@ def _install_recognized_distribution(
                 allow_stale_stage_cleanup=retry_recovery,
                 stage_ownership=tuple(stage_ownership),
                 stage_ownership_recorder=record_stage_ownership,
+                scaffold_applier=apply_scaffold,
             )
-            _write_distribution_retry_marker(
-                target_root,
-                operation=operation,
-                last_completed_phase="distribution-applied",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            last_completed_phase = "distribution-applied"
-
-            phase = "scaffold-refresh"
-            _assert_distribution_root_identity(target_root, root_identity)
-            _install_spec_dock(
-                target_root,
-                force=True,
-                write_version=False,
-                expected_root_identity=root_identity,
-                expected_managed_scaffold_identities=managed_scaffold_identities,
-                expected_managed_gitignore_identity=gitignore_identity,
-                managed_gitignore_identity_checked=True,
-                seed_root_workbench=(
-                    _root_workbench_seed_decision(
-                        _specdock_dir(target_root),
-                        assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
-                    )
-                    if operation == "fresh"
-                    else None
-                ),
-            )
-            _write_distribution_retry_marker(
-                target_root,
-                operation=operation,
-                last_completed_phase="scaffold-refreshed",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            last_completed_phase = "scaffold-refreshed"
 
             phase = "post-verify"
             _assert_distribution_root_identity(target_root, root_identity)
@@ -2058,14 +2118,28 @@ def _install_recognized_distribution(
             raise exc
 
 
+def _install_recognized_distribution(
+    target_root: Path,
+    *,
+    operation: DistributionOperation,
+) -> None:
+    with _exclusive_distribution_operation(target_root):
+        admission = _admit_distribution_cli(target_root, operation=operation)
+        if admission.status == "fresh":
+            _install_fresh_distribution_unlocked(target_root)
+            return
+        if admission.status not in {"recognized", "retry", "uninstall-retry"}:
+            raise RuntimeError("recognized distribution target changed during operation admission")
+        _install_recognized_distribution_unlocked(
+            target_root,
+            operation=operation,
+            retry_marker=admission if admission.status == "retry" else None,
+        )
+
+
 def _managed_skill_names() -> tuple[str, ...]:
     """Return the managed bundled skill set."""
     return _MANAGED_SKILL_NAMES
-
-
-def _managed_skill_ownership_names() -> tuple[str, ...]:
-    """Return skill directory names owned by the installer for pruning decisions."""
-    return _managed_skill_names()
 
 
 def _is_within_managed_obsolete_exact_path_prefixes(path: Path) -> bool:
@@ -2118,17 +2192,6 @@ def _prune_empty_obsolete_parent_dirs(
         except OSError:
             return
         current = current.parent
-
-
-class _ManagedCurrentFileMapping(NamedTuple):
-    source_asset_rel: Path
-    target_rel: Path
-
-
-class _ManagedSkillInstallPlan(NamedTuple):
-    current_file_mappings: tuple[_ManagedCurrentFileMapping, ...]
-    bootstrap_only_rel_paths: tuple[Path, ...]
-    obsolete_exact_rel_paths: tuple[Path, ...]
 
 
 class _UninstallTargetIdentity(NamedTuple):
@@ -2380,6 +2443,32 @@ def _remove_uninstall_tree_fd(
         _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
         _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
         os.unlink(name, dir_fd=directory_fd)
+
+
+def _read_file_descriptor(fd: int) -> bytes:
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(fd, 1024 * 64)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+
+
+def _write_file_descriptor(
+    fd: int,
+    content: bytes,
+    *,
+    before_first_write: Callable[[], None] | None = None,
+) -> None:
+    if before_first_write is not None:
+        before_first_write()
+    view = memoryview(content)
+    written = 0
+    while written < len(view):
+        count = os.write(fd, view[written:])
+        if count <= 0:
+            raise RuntimeError("uninstall marker write made no progress")
+        written += count
 
 
 def _create_uninstall_retry_marker(
@@ -3809,7 +3898,7 @@ def _render_uninstall_text(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
+def _run_uninstall_unlocked(target_root: Path, ns: argparse.Namespace) -> int:
     specs_mode = _uninstall_specs_mode(ns)
     apply_requested = bool(ns.apply)
     json_requested = bool(ns.json)
@@ -4044,541 +4133,19 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     return 1 if has_failures else 0
 
 
-def _iter_install_root_files(assets_dir: Path) -> tuple[Path, ...]:
-    install_root = assets_dir / "install_root"
-    if not install_root.is_dir():
-        raise RuntimeError("Missing asset directory: install_root")
-    return tuple(
-        sorted(
-            (
-                candidate
-                for candidate in install_root.rglob("*")
-                if candidate.is_file() and not _is_generated_python_cache_path(candidate.relative_to(install_root))
-            ),
-            key=lambda candidate: candidate.relative_to(install_root).as_posix(),
-        )
-    )
-
-
-def _build_current_managed_file_mappings(
-    assets_dir: Path,
-) -> tuple[tuple[_ManagedCurrentFileMapping, ...], dict[Path, Path]]:
-    install_root = assets_dir / "install_root"
-    mappings: list[_ManagedCurrentFileMapping] = []
-    source_by_target: dict[Path, Path] = {}
-    for source_path in _iter_install_root_files(assets_dir):
-        target_rel = source_path.relative_to(install_root)
-        source_asset_rel = Path("install_root") / target_rel
-        existing_source = source_by_target.get(target_rel)
-        if existing_source is not None and existing_source != source_asset_rel:
-            raise RuntimeError(
-                "duplicate current managed file mapping for target "
-                f"'{target_rel.as_posix()}' from '{existing_source.as_posix()}' and "
-                f"'{source_asset_rel.as_posix()}'"
-            )
-        source_by_target[target_rel] = source_asset_rel
-        mappings.append(
-            _ManagedCurrentFileMapping(
-                source_asset_rel=source_asset_rel,
-                target_rel=target_rel,
-            )
-        )
-    return tuple(mappings), source_by_target
-
-
-def _is_collision_aware_additive_skill_path(target_rel: Path) -> bool:
-    parts = target_rel.parts
-    return len(parts) >= 4 and parts[:2] == (".agents", "skills") and parts[2] in _COLLISION_AWARE_ADDITIVE_SKILL_NAMES
-
-
-def _preflight_collision_aware_additive_skill_assets(
-    target_root: Path,
-    *,
-    assets_dir: Path,
-    mappings: tuple[_ManagedCurrentFileMapping, ...],
-) -> None:
-    for mapping in mappings:
-        if not _is_collision_aware_additive_skill_path(mapping.target_rel):
-            continue
-        target_path = target_root / mapping.target_rel
-        if not target_path.exists():
-            if target_path.is_symlink():
-                raise RuntimeError(
-                    "target path conflict for additive skill asset "
-                    f"'{mapping.target_rel.as_posix()}' (dangling symlink)"
-                )
-            continue
-        if target_path.is_symlink() or not target_path.is_file():
-            raise RuntimeError(
-                "target path conflict for additive skill asset "
-                f"'{mapping.target_rel.as_posix()}' (expected an ordinary file)"
-            )
-        source_path = assets_dir / mapping.source_asset_rel
-        if target_path.read_bytes() != source_path.read_bytes():
-            raise RuntimeError(
-                "refusing to overwrite non-identical additive skill asset "
-                f"'{mapping.target_rel.as_posix()}'; preserve or relocate the existing file first"
-            )
-
-
-def _additive_skill_directory_flags() -> int:
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    directory = getattr(os, "O_DIRECTORY", None)
-    if not isinstance(nofollow, int) or not isinstance(directory, int):
-        raise RuntimeError("platform lacks required no-follow directory support for additive skill assets")
-    return os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
-
-
-def _open_additive_skill_parent(target_root: Path, target_rel: Path, *, create_missing: bool) -> int:
-    flags = _additive_skill_directory_flags()
+def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
+    if not bool(ns.apply):
+        return _run_uninstall_unlocked(target_root, ns)
     try:
-        current_fd = os.open(target_root, flags)
-    except OSError as exc:
-        raise RuntimeError(f"cannot open additive skill target root without following symlinks: {exc}") from exc
-
-    try:
-        for component in target_rel.parts[:-1]:
-            try:
-                next_fd = os.open(component, flags, dir_fd=current_fd)
-            except FileNotFoundError:
-                if not create_missing:
-                    raise RuntimeError(
-                        f"missing additive skill parent component '{component}' for '{target_rel.as_posix()}'"
-                    ) from None
-                with suppress(FileExistsError):
-                    os.mkdir(component, dir_fd=current_fd)
-                try:
-                    next_fd = os.open(component, flags, dir_fd=current_fd)
-                except OSError as exc:
-                    raise RuntimeError(
-                        f"unsafe additive skill parent component '{component}' for '{target_rel.as_posix()}': {exc}"
-                    ) from exc
-            except OSError as exc:
-                raise RuntimeError(
-                    f"unsafe additive skill parent component '{component}' for '{target_rel.as_posix()}': {exc}"
-                ) from exc
-            os.close(current_fd)
-            current_fd = next_fd
-        return current_fd
-    except BaseException:
-        os.close(current_fd)
-        raise
-
-
-def _read_file_descriptor(fd: int) -> bytes:
-    chunks: list[bytes] = []
-    while True:
-        chunk = os.read(fd, 1024 * 64)
-        if not chunk:
-            return b"".join(chunks)
-        chunks.append(chunk)
-
-
-def _write_file_descriptor(
-    fd: int,
-    content: bytes,
-    *,
-    before_first_write: Callable[[], None] | None = None,
-) -> None:
-    if before_first_write is not None:
-        before_first_write()
-    view = memoryview(content)
-    written = 0
-    while written < len(view):
-        count = os.write(fd, view[written:])
-        if count <= 0:
-            raise RuntimeError("additive skill asset write made no progress")
-        written += count
-
-
-def _require_additive_skill_parent_still_bound(
-    *,
-    target_root: Path,
-    target_rel: Path,
-    parent_fd: int,
-) -> None:
-    try:
-        rebound_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=False)
-    except RuntimeError as exc:
-        raise RuntimeError(
-            f"additive skill parent moved outside the repository for '{target_rel.as_posix()}': {exc}"
-        ) from exc
-    try:
-        opened = os.fstat(parent_fd)
-        rebound = os.fstat(rebound_fd)
-        if (opened.st_dev, opened.st_ino) != (rebound.st_dev, rebound.st_ino):
-            raise RuntimeError(f"additive skill parent moved outside the repository for '{target_rel.as_posix()}'")
-    finally:
-        os.close(rebound_fd)
-
-
-def _verify_existing_additive_skill_asset(
-    *,
-    source_bytes: bytes,
-    target_root: Path,
-    target_rel: Path,
-) -> None:
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int):
-        raise RuntimeError("platform lacks required no-follow file support for additive skill assets")
-    parent_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=False)
-    file_fd: int | None = None
-    try:
-        try:
-            file_fd = os.open(
-                target_rel.name,
-                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
-                dir_fd=parent_fd,
-            )
-        except OSError as exc:
-            raise RuntimeError(
-                "target path conflict for additive skill asset "
-                f"'{target_rel.as_posix()}' (symlink or unreadable entry): {exc}"
-            ) from exc
-        info = os.fstat(file_fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise RuntimeError(
-                f"target path conflict for additive skill asset '{target_rel.as_posix()}' (expected an ordinary file)"
-            )
-        if _read_file_descriptor(file_fd) != source_bytes:
-            raise RuntimeError(
-                "refusing to overwrite non-identical additive skill asset "
-                f"'{target_rel.as_posix()}'; preserve or relocate the existing file first"
-            )
-        observed = os.stat(target_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-        if (observed.st_dev, observed.st_ino) != (info.st_dev, info.st_ino):
-            raise RuntimeError(f"target path changed while adopting additive skill asset '{target_rel.as_posix()}'")
-    finally:
-        if file_fd is not None:
-            os.close(file_fd)
-        os.close(parent_fd)
-
-
-def _materialize_collision_aware_additive_skill_asset(
-    *,
-    source_path: Path,
-    target_root: Path,
-    target_rel: Path,
-) -> None:
-    source_bytes = source_path.read_bytes()
-    source_mode = stat.S_IMODE(source_path.stat().st_mode)
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int):
-        raise RuntimeError("platform lacks required no-follow file support for additive skill assets")
-
-    parent_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=True)
-    file_fd: int | None = None
-    try:
-        _require_additive_skill_parent_still_bound(
-            target_root=target_root,
-            target_rel=target_rel,
-            parent_fd=parent_fd,
-        )
-        try:
-            file_fd = os.open(
-                target_rel.name,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
-                source_mode,
-                dir_fd=parent_fd,
-            )
-        except FileExistsError:
-            os.close(parent_fd)
-            parent_fd = -1
-            _verify_existing_additive_skill_asset(
-                source_bytes=source_bytes,
-                target_root=target_root,
-                target_rel=target_rel,
-            )
-            return
-
-        created = os.fstat(file_fd)
-        if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
-            raise RuntimeError(f"new additive skill asset is not a safe ordinary file: '{target_rel.as_posix()}'")
-        _write_file_descriptor(
-            file_fd,
-            source_bytes,
-            before_first_write=lambda: _require_additive_skill_parent_still_bound(
-                target_root=target_root,
-                target_rel=target_rel,
-                parent_fd=parent_fd,
-            ),
-        )
-        os.fsync(file_fd)
-        _require_additive_skill_parent_still_bound(
-            target_root=target_root,
-            target_rel=target_rel,
-            parent_fd=parent_fd,
-        )
-        observed = os.stat(target_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-        if (
-            not stat.S_ISREG(observed.st_mode)
-            or observed.st_nlink != 1
-            or (observed.st_dev, observed.st_ino) != (created.st_dev, created.st_ino)
-        ):
-            raise RuntimeError(f"target path changed while creating additive skill asset '{target_rel.as_posix()}'")
-    except OSError as exc:
-        raise RuntimeError(f"cannot safely materialize additive skill asset '{target_rel.as_posix()}': {exc}") from exc
-    finally:
-        if file_fd is not None:
-            os.close(file_fd)
-        if parent_fd >= 0:
-            os.close(parent_fd)
-
-
-def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallPlan:
-    managed_skill_names = _managed_skill_names()
-    current_file_mappings, source_by_target = _build_current_managed_file_mappings(assets_dir)
-
-    for skill_name in managed_skill_names:
-        target_rel = Path(".agents") / "skills" / skill_name / "SKILL.md"
-        source_rel = source_by_target.get(target_rel)
-        if source_rel is None:
-            raise RuntimeError(f"Missing asset file: install_root/{target_rel.as_posix()}")
-        src_skill = assets_dir / source_rel
-        if not src_skill.is_file():
-            raise RuntimeError(f"Missing asset file: {source_rel.as_posix()}")
-
-    return _ManagedSkillInstallPlan(
-        current_file_mappings=current_file_mappings,
-        bootstrap_only_rel_paths=(),
-        obsolete_exact_rel_paths=(),
-    )
-
-
-def _preflight_target_path_conflicts(
-    target_root: Path,
-    *,
-    current_target_rel_paths: tuple[Path, ...],
-    obsolete_target_rel_paths: tuple[Path, ...],
-    bootstrap_only_target_rel_paths: tuple[Path, ...] = (),
-) -> None:
-    bootstrap_only_target_rel_path_set = set(bootstrap_only_target_rel_paths)
-
-    def _assert_exact_file_path_safe(
-        target_rel: Path,
-        *,
-        path_kind: str,
-        reject_exact_symlink: bool,
-        allow_exact_file_symlink: bool = False,
-    ) -> None:
-        target_path = target_root / target_rel
-        rel_posix = target_rel.as_posix()
-
-        for parent in target_path.parents:
-            if parent == target_root:
-                break
-            if parent.is_symlink():
-                parent_rel = parent.relative_to(target_root).as_posix()
-                raise RuntimeError(
-                    "target directory/container conflict for "
-                    f"{path_kind} '{rel_posix}' (symlink container: '{parent_rel}')"
-                )
-            if parent.exists() and not parent.is_dir():
-                parent_rel = parent.relative_to(target_root).as_posix()
-                raise RuntimeError(
-                    "target directory/container conflict for "
-                    f"{path_kind} '{rel_posix}' (non-directory container: '{parent_rel}')"
-                )
-
-        if target_path.is_symlink():
-            if reject_exact_symlink:
-                if allow_exact_file_symlink and target_path.exists() and target_path.is_file():
-                    return
-                raise RuntimeError(
-                    f"target directory/container conflict for {path_kind} '{rel_posix}' (symlink at exact file path)"
-                )
-            return
-
-        if target_path.exists() and target_path.is_dir():
-            raise RuntimeError(
-                "target directory/container conflict for "
-                f"{path_kind} '{rel_posix}' (existing directory at exact file path)"
-            )
-
-    for current_rel in current_target_rel_paths:
-        _assert_exact_file_path_safe(
-            current_rel,
-            path_kind="current managed path",
-            reject_exact_symlink=True,
-            allow_exact_file_symlink=current_rel in bootstrap_only_target_rel_path_set,
-        )
-    for obsolete_rel in obsolete_target_rel_paths:
-        _assert_exact_file_path_safe(
-            obsolete_rel,
-            path_kind="obsolete managed path",
-            reject_exact_symlink=False,
-        )
-
-
-def _preflight_managed_skill_install_plan(target_root: Path | None = None) -> _ManagedSkillInstallPlan:
-    with _assets_dir() as assets_dir:
-        plan = _build_managed_skill_install_plan(assets_dir)
-        if target_root is not None:
-            current_target_rel_paths = tuple(
-                sorted(
-                    {mapping.target_rel for mapping in plan.current_file_mappings},
-                    key=lambda path: path.as_posix(),
-                )
-            )
-            obsolete_target_rel_paths = tuple(
-                sorted(
-                    set(plan.obsolete_exact_rel_paths),
-                    key=lambda path: path.as_posix(),
-                )
-            )
-            _preflight_target_path_conflicts(
-                target_root,
-                current_target_rel_paths=current_target_rel_paths,
-                obsolete_target_rel_paths=obsolete_target_rel_paths,
-                bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
-            )
-            _preflight_collision_aware_additive_skill_assets(
-                target_root,
-                assets_dir=assets_dir,
-                mappings=plan.current_file_mappings,
-            )
-
-    return plan
-
-
-def _apply_managed_skill_install_plan(
-    target_root: Path,
-    *,
-    assets_dir: Path,
-    plan: _ManagedSkillInstallPlan,
-) -> None:
-    current_sync_plan: list[tuple[Path, Path, Path]] = []
-    bootstrap_only_target_rel_paths = set(plan.bootstrap_only_rel_paths)
-    current_target_rel_paths = tuple(
-        sorted(
-            {mapping.target_rel for mapping in plan.current_file_mappings},
-            key=lambda path: path.as_posix(),
-        )
-    )
-    obsolete_target_rel_paths = tuple(
-        sorted(
-            set(plan.obsolete_exact_rel_paths),
-            key=lambda path: path.as_posix(),
-        )
-    )
-
-    _preflight_target_path_conflicts(
-        target_root,
-        current_target_rel_paths=current_target_rel_paths,
-        obsolete_target_rel_paths=obsolete_target_rel_paths,
-        bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
-    )
-    _preflight_collision_aware_additive_skill_assets(
-        target_root,
-        assets_dir=assets_dir,
-        mappings=plan.current_file_mappings,
-    )
-
-    for mapping in plan.current_file_mappings:
-        source_path = assets_dir / mapping.source_asset_rel
-        if not source_path.is_file():
-            raise RuntimeError(f"Missing asset file: {mapping.source_asset_rel.as_posix()}")
-        target_path = target_root / mapping.target_rel
-        current_sync_plan.append((mapping.target_rel, source_path, target_path))
-
-    for target_rel, source_path, target_path in current_sync_plan:
-        if _is_collision_aware_additive_skill_path(target_rel):
-            _materialize_collision_aware_additive_skill_asset(
-                source_path=source_path,
-                target_root=target_root,
-                target_rel=target_rel,
-            )
-            continue
-        if target_rel in bootstrap_only_target_rel_paths and target_path.exists():
-            if target_path.is_file():
-                _migrate_bootstrap_only_config_if_stale(target_rel, target_path)
-                continue
-            raise RuntimeError(
-                "target directory/container conflict for current managed path "
-                f"'{target_rel.as_posix()}' (non-file entry at exact file path)"
-            )
-        _copy_file(source_path, target_path)
-
-    missing_current_targets: list[str] = []
-    for target_rel, source_path, target_path in current_sync_plan:
-        if _is_collision_aware_additive_skill_path(target_rel):
-            _verify_existing_additive_skill_asset(
-                source_bytes=source_path.read_bytes(),
-                target_root=target_root,
-                target_rel=target_rel,
-            )
-        elif not target_path.is_file():
-            missing_current_targets.append(target_rel.as_posix())
-    if missing_current_targets:
-        joined = ", ".join(sorted(missing_current_targets))
-        raise RuntimeError(f"managed current sync incomplete (missing target): {joined}")
-
-    current_target_rel_path_set = {target_rel for target_rel, _src, _dest in current_sync_plan}
-    protected_current_parent_dirs: set[Path] = set()
-    for current_target_rel in current_target_rel_path_set:
-        protected_current_parent_dirs.update(_parent_dirs_for(current_target_rel))
-    for obsolete_rel in obsolete_target_rel_paths:
-        if obsolete_rel in current_target_rel_path_set:
-            continue
-        obsolete_path = target_root / obsolete_rel
-        if not obsolete_path.exists() and not obsolete_path.is_symlink():
-            continue
-        if obsolete_path.is_symlink() or obsolete_path.is_file():
-            obsolete_path.unlink(missing_ok=True)
-            _prune_empty_obsolete_parent_dirs(
-                target_root,
-                obsolete_rel,
-                protected_rel_dirs=protected_current_parent_dirs,
-            )
-            continue
-        if obsolete_path.is_dir():
-            raise RuntimeError(
-                "target directory/container conflict for obsolete managed path "
-                f"'{obsolete_rel.as_posix()}' (existing directory at exact file path)"
-            )
-        raise RuntimeError(
-            "target directory/container conflict for obsolete managed path "
-            f"'{obsolete_rel.as_posix()}' (non-file entry at exact file path)"
-        )
-
-
-def _migrate_bootstrap_only_config_if_stale(target_rel: Path, target_path: Path) -> None:
-    if target_rel.as_posix() != ".codex/config.toml":
-        return
-    if target_path.is_symlink():
-        return
-    try:
-        target_text = target_path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return
-    migrated_text = target_text
-    replacements = (
-        (
-            "PR 作成後の checks / statuses / Codex review 監視は pr-monitor",
-            "PR 作成後の checks / statuses / Codex review 監視は "
-            "`github-pr-observation` skill の "
-            "`./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` direct invocation",
-        ),
-    )
-    for old, new in replacements:
-        migrated_text = migrated_text.replace(old, new)
-    if migrated_text != target_text:
-        target_path.write_text(migrated_text, encoding="utf-8")
-
-
-def _install_skill(target_root: Path, *, plan: _ManagedSkillInstallPlan | None = None) -> None:
-    """Install/update managed agent skills and host-native shims.
-
-    Notes:
-    - Codex CLI discovers repository skills by scanning for `.agents/skills/`.
-    - Other agents may adopt the same convention (Agent Skills open standard).
-    """
-    with _assets_dir() as assets_dir:
-        install_plan = plan if plan is not None else _build_managed_skill_install_plan(assets_dir)
-        _apply_managed_skill_install_plan(
+        with _exclusive_distribution_operation(target_root):
+            return _run_uninstall_unlocked(target_root, ns)
+    except (OSError, RuntimeError) as exc:
+        return _emit_uninstall_preflight_error(
             target_root,
-            assets_dir=assets_dir,
-            plan=install_plan,
+            apply=True,
+            specs_mode=_uninstall_specs_mode(ns),
+            json_requested=bool(ns.json),
+            message=str(exc),
         )
 
 
@@ -4633,7 +4200,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             if not ns.force:
                 if admission.status == "retry":
-                    _install_recognized_distribution(target_root, operation="fresh", retry_marker=admission)
+                    _install_recognized_distribution(target_root, operation="fresh")
                 elif admission.status == "fresh":
                     _install_fresh_distribution(target_root)
                 elif os.path.lexists(_specdock_dir(target_root)):
@@ -4644,13 +4211,13 @@ def main(argv: list[str] | None = None) -> int:
                 if admission.status == "fresh":
                     _install_fresh_distribution(target_root)
                 else:
-                    _install_recognized_distribution(target_root, operation="init-force", retry_marker=admission)
+                    _install_recognized_distribution(target_root, operation="init-force")
         elif ns.command == "update":
             admission = _admit_distribution_cli(target_root, operation="update")
             if admission.status == "fresh":
                 _install_fresh_distribution(target_root)
             else:
-                _install_recognized_distribution(target_root, operation="update", retry_marker=admission)
+                _install_recognized_distribution(target_root, operation="update")
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:
