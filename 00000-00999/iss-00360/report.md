@@ -129,14 +129,19 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * no-replace publish seamへfault-injection hookを追従させ、v18で一時unlink / `os.link` hookが無効化していた2テストを修正した。
 * S95 v22は `27 failed, 1949 passed, 516 skipped`。v19とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 
+### Latest P0/P1 repair evidence (2026-08-15)
+
+* managed scaffoldの再帰uninstallで、保持したdirectory FDだけを信頼して外部へ移動されたtreeを削除しないよう、各再帰mutation直前に可視パスのno-follow root binding（device / inode）とentry identityを再検証する実装を `91f8b824e1a6839ee8e81030b6ae20f76b143fa1` に追加した。rename fault injectionで外部treeを削除しないことを確認した。
+* S95 v25は実装tree `91f8b824e1a6839ee8e81030b6ae20f76b143fa1`に対して `27 failed, 1953 passed, 516 skipped`（12分32秒）。v22とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Evidence refresh HEAD: `5280c36881699faea8835d3d8185839f86133ef4`（S95 v22 ledger / report refreshを含む現行clean upstream tip）
-* Final implementation commit: `332deeb1e00dc406865cda87838f467515f92659`（symlink stageのownership再記録 / strict cleanup、pre-swap retry、およびpost-swap recorder / cleanup再試行。初回marker再発行は親コミット`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`、nested runtime preflightは`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`、regular stage修正は`07c77b1ee33070180ada54972cce2579a19d9bf0`）
+* Evidence refresh HEAD: `91f8b824e1a6839ee8e81030b6ae20f76b143fa1`（P0修正を含む実装tree。S95 v25はこのtreeで実行し、report / ledger更新は証跡のみの後続コミットである）
+* Final implementation commit: `91f8b824e1a6839ee8e81030b6ae20f76b143fa1`（managed scaffold再帰uninstallの各mutation直前root binding / entry identity再検証とrename fault回帰テスト。先行するsymlink stageのownership再記録 / strict cleanup、pre-swap retry、およびpost-swap recorder / cleanup再試行は`332deeb1e00dc406865cda87838f467515f92659`、初回marker再発行は親コミット`6c16a2ea4426ff70d7c41ec8ffd70c9eeb56b13d`、nested runtime preflightは`b57eceb0bc3fa0351ebcfd3294d625e857f3eb14`、regular stage修正は`07c77b1ee33070180ada54972cce2579a19d9bf0`）
 * Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
-* Final quality-gate evidence commit: `5280c36881699faea8835d3d8185839f86133ef4`（S95 v22 ledger / report refresh。S95の実行対象treeは`332deeb1e00dc406865cda87838f467515f92659`）
-* S95 v22 full regression: 実装tree `332deeb1e00dc406865cda87838f467515f92659`に対して `27 failed, 1949 passed, 516 skipped`。v19とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* Final quality-gate evidence commit: `91f8b824e1a6839ee8e81030b6ae20f76b143fa1`（P0修正を含む実装treeのS95 v25実行。ledger / report更新は証跡のみの後続コミット）
+* S95 v25 full regression: 実装tree `91f8b824e1a6839ee8e81030b6ae20f76b143fa1`に対して `27 failed, 1953 passed, 516 skipped`。v22とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
