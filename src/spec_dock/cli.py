@@ -44,6 +44,7 @@ _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
 _MANAGED_SCAFFOLD_ROOTS = tuple(Path(_SPEC_DOCK_DIRNAME) / name for name in _MANAGED_DIRS)
+_GENERATED_STATE_ROOTS = (Path("spec-dock/active"), Path("spec-dock/.agent"))
 # Keep managed skill installation aligned with the shipped Target catalog.
 _MANAGED_SKILL_NAMES = (
     "spec-dock",
@@ -3205,6 +3206,14 @@ def _cleanup_empty_uninstall_dirs(
             candidates.add(current)
             current = current.parent
 
+    # Fresh installs create these generated-state roots even when no state has
+    # been written yet.  Include the known roots explicitly so a successful
+    # uninstall can remove empty directories without scanning or deleting
+    # unknown user-owned paths.
+    for rel_root in _GENERATED_STATE_ROOTS:
+        if _path_exists_for_uninstall(target_root / rel_root):
+            candidates.add(rel_root)
+
     for rel_path in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
         if not _is_uninstall_cleanup_boundary_path(rel_path):
             continue
@@ -3606,6 +3615,27 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 expected_root_identity=uninstall_root_identity,
             )
             actions = _finalize_uninstall_retry_marker(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+            )
+            # Marker removal can make the final managed root empty.  Re-run the
+            # bounded empty-directory cleanup after marker finalization, then
+            # verify the newly produced actions before reporting success.
+            actions = tuple(
+                sorted(
+                    (
+                        *actions,
+                        *_cleanup_empty_uninstall_dirs(
+                            target_root,
+                            actions,
+                            expected_root_identity=uninstall_root_identity,
+                        ),
+                    ),
+                    key=lambda action: (action.rel_path, action.status),
+                )
+            )
+            _verify_uninstall_postcondition(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,

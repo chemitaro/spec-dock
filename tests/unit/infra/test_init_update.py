@@ -625,6 +625,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
         "spec-dock/docs/README.md": "src/spec_dock/assets/spec_dock/docs/README.md",
         "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
+        "spec-dock/docs/migration.md": "src/spec_dock/assets/spec_dock/docs/migration.md",
         "spec-dock/docs/reference_deps.md": "src/spec_dock/assets/spec_dock/docs/reference_deps.md",
         "spec-dock/docs/reference_github.md": "src/spec_dock/assets/spec_dock/docs/reference_github.md",
         "spec-dock/docs/reference_naming.md": "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
@@ -37991,6 +37992,20 @@ esac
             assert first_actions["spec-dock/.workbench/README.md"]["status"] == "removed"
             assert not workbench.exists()
             assert not retry_marker.exists()
+
+    def test_uninstall_apply_remove_specs_removes_empty_generated_roots_and_specdock_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            actions = self._actions_by_path(payload)
+
+            assert payload["status"] == "completed"
+            assert actions["spec-dock/.agent"]["status"] == "empty_dir_removed"
+            assert not (target / "spec-dock/.agent").exists()
+            assert not (target / "spec-dock/active").exists()
+            assert not (target / "spec-dock").exists()
 
     def test_uninstall_apply_remove_specs_preserves_modified_root_workbench_readme(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
