@@ -13,6 +13,7 @@ AUTHORING_ROOT = DOCS_ROOT / "authoring"
 DOGFOOD_DOCS_ROOT = REPO_ROOT / "spec-dock" / "docs"
 TEMPLATES_ROOT = DOCS_ROOT.parent / "templates"
 DOGFOOD_TEMPLATES_ROOT = DOGFOOD_DOCS_ROOT.parent / "templates"
+REPOSITORY_GUIDELINES_PATH = REPO_ROOT / "AGENTS.md"
 
 OVERVIEW_LINK_TARGETS = (
     "requirement.md",
@@ -990,6 +991,18 @@ def test_current_navigation_vocabulary_excludes_legacy_authoring_contracts(relat
     content = (DOCS_ROOT.parent / relative_path).read_text(encoding="utf-8")
 
     assert not _current_vocabulary_violations(relative_path, content)
+
+
+def test_s90_retained_repository_guidelines_match_current_distribution_surface() -> None:
+    content = REPOSITORY_GUIDELINES_PATH.read_text(encoding="utf-8")
+
+    assert "src/spec_dock/assets/install_root/" in content
+    assert ".agents/skills/spec-dock/SKILL.md" in content
+    assert ".agents/skills/spec-dock-grill-with-docs/SKILL.md" in content
+    assert ".github/workflows/ci.yml" in content
+    assert ".codex/" not in content
+    assert ".github/agents/" not in content
+    assert "host adapter" not in content.lower()
 
 
 @pytest.mark.parametrize(
