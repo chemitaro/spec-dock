@@ -146,6 +146,17 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * Fresh uninstall完了時に、生成された`spec-dock/active`と`spec-dock/.agent`をboundedな空directory cleanup対象へ明示的に含め、retry markerのfinalization後にcleanup / postcondition verifyを再実行する実装を`415b0564a`に追加した。Fresh `uninstall --apply --remove-specs`でmanaged rootを残さない回帰テストと、既に除去済みworkspaceの再実行期待値を`f99340169`で整合させた。
 * S95 v34はbranch tip `f99340169b9d2e0352b9422b3376a4e2f9fd3f1a`に対して `27 failed, 1966 passed, 516 skipped`（12分38秒）。v33とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
 
+### Latest P1 repair candidate 19 (2026-08-15)
+
+* Uninstallのsymlink identityにdevice / inode / ctime / link count / targetを含め、同じtargetへ差し替えたsymlinkをmutation直前にfail-closedで停止するようにした。
+* Generated state・managed assetのhard linkをmarker作成前に`preserved`としてblockし、uninstall applyは最初の安全性失敗後のremovalを`pending`として停止するようにした。
+* Generated root配下をno-followでbottom-up走査し、入れ子の空directoryをbounded cleanupし、残存・検査失敗をpartial failureとして扱うようにした。Partial resultへphase、last completed phase、pending paths、relative retry commandを追加した。
+* 回帰テスト: 同一target symlink差し替え、generated hard link事前停止、失敗後pending、入れ子generated directory cleanup、phase/retry JSONを追加した。
+
+### Latest S95 v35 evidence (2026-08-15)
+
+* S95 v35はuninstall安全性修正を含むbranch tip `e6dfe3aa2733f906786bb8a409c0acf22c6c2038`に対して `27 failed, 1969 passed, 516 skipped`（12分45秒）。v34とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
@@ -160,6 +171,7 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * S95 v33 full regression: branch tip `fa5b354c8a70f63d87d0e4e44240d920a36c0e9b`に対して `27 failed, 1961 passed, 516 skipped`。v32とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
 * S95 v34 full regression: branch tip `f99340169b9d2e0352b9422b3376a4e2f9fd3f1a`に対して `27 failed, 1966 passed, 516 skipped`（12分38秒）。v33とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v35 full regression: branch tip `e6dfe3aa2733f906786bb8a409c0acf22c6c2038`に対して `27 failed, 1969 passed, 516 skipped`（12分45秒）。v34とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
