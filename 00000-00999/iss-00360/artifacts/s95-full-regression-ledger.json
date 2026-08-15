@@ -3,7 +3,7 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "7cb830ad8ccf1700c408abbd17f5261a53aa0214",
+  "current_head_sha": "a30afda01b8a2307c8a55bfa4ccb758021b41620",
   "commands": {
     "current_full": "uv run pytest --run-full-regression -q",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
@@ -12,9 +12,9 @@
   "full_run_summary": {
     "current": {
       "failed": 27,
-      "passed": 1973,
+      "passed": 1975,
       "skipped": 516,
-      "duration": "12m37s"
+      "duration": "12m36s"
     },
     "fixed_point": {
       "failed": 452,
