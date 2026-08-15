@@ -38258,7 +38258,7 @@ esac
 
             assert first_payload["status"] == "completed"
             assert second_payload["status"] == "error"
-            assert "spec-dock/spec-dock.version" in second_payload["errors"][0]
+            assert "workspace-missing" in second_payload["errors"][0]
 
     def test_uninstall_apply_partial_unlink_failure_reports_failed_separately(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
