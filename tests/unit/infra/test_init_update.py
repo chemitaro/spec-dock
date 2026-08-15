@@ -4458,11 +4458,9 @@ class TestInitUpdate(CliRuntimeHarness):
             target = Path(tmp)
             specdock_dir = target / "spec-dock"
             specdock_dir.mkdir()
-            before = self._relative_file_snapshot(target)
 
-            assert main(["init", str(target), "--force"]) == 1
-            assert self._relative_file_snapshot(target) == before
-            assert not (specdock_dir / ".workbench" / "README.md").exists()
+            assert main(["init", str(target), "--force"]) == 0
+            assert (specdock_dir / ".workbench" / "README.md").exists()
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
