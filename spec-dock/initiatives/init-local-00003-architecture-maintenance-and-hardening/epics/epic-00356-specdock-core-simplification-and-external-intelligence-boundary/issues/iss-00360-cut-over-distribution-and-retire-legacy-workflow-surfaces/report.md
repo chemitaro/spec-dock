@@ -12,7 +12,7 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`7cb830ad8ccf1700c408abbd17f5261a53aa0214` では、uninstall marker最終化後にfallibleなworkspace root rmdirを行わないよう処理を単純化し、成功時はmarkerを除去した空の`spec-dock`境界を残すことで、terminal cleanup failureとmarker再発行 failureの複合状態でもdurable retry admissionを失わないようにした。`a30afda01b8a2307c8a55bfa4ccb758021b41620` では、partial uninstallのJSON / text診断からcredential・host absolute path・raw exceptionを除外し、relative failed path、phase、last completed phase、retry commandを安定した契約として出力するようにした。`cc1b42a4742e5d5c9efca042f29c506258013822` では、成功した`uninstall --remove-specs`後に残る空の`spec-dock`境界をFresh admissionとして安全に再初期化できるようにし、明示targetのpartial retry診断で元のtarget文脈を保持するようにした。`ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8` では、この再初期化契約に旧回帰テストの期待値を合わせた。Fresh / update / uninstallの既存no-follow境界、partial diagnostics、同一package retry収束も維持している。S95 v40は `27 failed, 1976 passed, 516 skipped` で、既存ledgerの27 failure nodeと一致し、current-only failureは0件である。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対して再実行する。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP1を段階的に修正した。`7cb830ad8ccf1700c408abbd17f5261a53aa0214` では、uninstall marker最終化後にfallibleなworkspace root rmdirを行わないよう処理を単純化し、成功時はmarkerを除去した空の`spec-dock`境界を残すことで、terminal cleanup failureとmarker再発行 failureの複合状態でもdurable retry admissionを失わないようにした。`a30afda01b8a2307c8a55bfa4ccb758021b41620` では、partial uninstallのJSON / text診断からcredential・host absolute path・raw exceptionを除外し、relative failed path、phase、last completed phase、retry commandを安定した契約として出力するようにした。`cc1b42a4742e5d5c9efca042f29c506258013822` では、成功した`uninstall --remove-specs`後に残る空の`spec-dock`境界をFresh admissionとして安全に再初期化できるようにし、明示targetのpartial retry診断で元のtarget文脈を保持するようにした。`34e77724b5af9b1eb742185c3eb131f4c9944606` では、配布 marker のheld-parent identity再検証、distribution/uninstall retryの元target伝搬、特殊パスを含むargv-safeなretry commandと実行回帰を追加した。Fresh / update / uninstallの既存no-follow境界、partial diagnostics、同一package retry収束も維持している。S95 v41は `27 failed, 1979 passed, 516 skipped` で、既存ledgerの27 failure nodeと一致し、current-only failureは0件である。最終ChatGPT-final-quality-gate-strictはこのclean exact-upstream HEADとmerge前固定点との差分に対して再実行する。
 
 ### Latest P1 repair candidate (2026-08-14)
 
@@ -198,11 +198,19 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 * S95 v40は空のpost-uninstall boundary再初期化修正と旧テスト期待値更新を含むbranch tip `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`に対して `27 failed, 1976 passed, 516 skipped`（12分43秒）。v39とのfailure node集合差分は0件（new 0 / missing 0）、現行の27件を確認し、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。追加のIssue 360 focused regressionとarchive distribution integrationはpassした。
 
+### Latest P1 repair candidate 24 (2026-08-16)
+
+* distribution markerの削除をheld parent directory descriptor経由に限定し、unlink直前にregular-file identity（device / inode / mode / link count / ctime）を再検証して、差し替えられたmarkerを削除しないようにした。distribution partial failureのretry commandへ開始時targetを伝搬し、uninstallを含むretry commandはshell/argv-safe quotingと先頭hyphen用`--` terminatorを使う。特殊targetで表示commandをargvへ戻して同一targetへ再実行する回帰を追加した。
+
+### Latest S95 v41 evidence (2026-08-16)
+
+* S95 v41はmarker identity再検証、distribution/uninstall retry serialization、特殊target回帰を含むbranch tip `34e77724b5af9b1eb742185c3eb131f4c9944606`に対して `27 failed, 1979 passed, 516 skipped`（12分40秒）。v40とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。Issue 360 focused suiteは`302 passed, 468 skipped`、archive distribution integrationは`13 passed`、通常テストは`1013 passed, 1509 skipped`である。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Latest implementation commit: `cc1b42a4742e5d5c9efca042f29c506258013822`（空のpost-uninstall boundary再初期化と明示target partial retry contextを追加した修正）
-* Latest evidence refresh HEAD: `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`（再初期化仕様に旧回帰テスト期待値を合わせたclean exact-upstream tree。S95 v40はこのHEADで実行した）
+* Latest implementation commit: `34e77724b5af9b1eb742185c3eb131f4c9944606`（marker identity再検証、retry target伝搬、argv-safe serializationと特殊target回帰を追加した修正）
+* Latest evidence refresh HEAD: `34e77724b5af9b1eb742185c3eb131f4c9944606`（Strict v41 P1修正を含むclean exact-upstream tree。S95 v41はこのHEADで実行した）
 * Evidence refresh HEAD: `fa5b354c8a70f63d87d0e4e44240d920a36c0e9b`（marker-finalization修正を含む現行branch tip。S95 v33はこのclean exact-upstream treeで実行した）
 * Final implementation commit: `5fe6ddb6543fc896e54bc110e67da1bfb53c7663`（marker削除失敗時のphase / target診断とFresh / update / init-force回帰テスト。Fresh mode mismatch保護は`ff7ebb904d6cdcf5f281d6300a5d20de603a4712`、hard-link read-only adoption契約は`774e126124bd5a297c4ff193b40e0c6e11061888`、uninstall retry marker競合時のcanonical payload・stable identity検証は`194b793acb015a9c564bde0aa1dc480b8e188b84`、write/fsync失敗時identity-checked cleanupは`b0763b5fa743a6f11b14718eb5cd65b17926134b`、atomic regular-file retryのidentity検証後ftruncateは`9b9e53e968f48c5883a04ef4fbd71aaac096aca8`、managed scaffold再帰uninstallの各mutation直前root binding / entry identity再検証は`91f8b824e1a6839ee8e81030b6ae20f76b143fa1`）
 * Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
@@ -219,6 +227,7 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * S95 v38 full regression: branch tip `7cb830ad8ccf1700c408abbd17f5261a53aa0214`に対して `27 failed, 1973 passed, 516 skipped`（12分37秒）。v37とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * S95 v39 full regression: branch tip `a30afda01b8a2307c8a55bfa4ccb758021b41620`に対して `27 failed, 1975 passed, 516 skipped`（12分36秒）。v38とのfailure node集合差分は0件、現行failure path 27件の`--lf`再実行とledger照合は一致し、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * S95 v40 full regression: branch tip `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`に対して `27 failed, 1976 passed, 516 skipped`（12分43秒）。v39とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1506 skipped`、Issue 360 focused distribution suiteは`180 passed`、archive distribution integrationは`13 passed`。
+* S95 v41 full regression: branch tip `34e77724b5af9b1eb742185c3eb131f4c9944606`に対して `27 failed, 1979 passed, 516 skipped`（12分40秒）。v40とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1509 skipped`、Issue 360 focused suiteは`302 passed, 468 skipped`、archive distribution integrationは`13 passed`。
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
@@ -494,8 +503,8 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | not adopted / ledgered | 最終実装HEAD `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`で `uv run pytest --run-full-regression -q` → `27 failed, 1976 passed, 516 skipped`（12分43秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を確認し、ledgerの27件と一致した。27件すべてが固定点でも同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。v39とのfailure node集合差分は0件。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
-| Final ChatGPT-final-quality-gate-strict | pending / reboot-resumed | P0/P1修正後の現行evidence refresh HEAD `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`とmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、plan指定の追加観点を保持したfresh browser sessionで再確認する |
+| Full repository regression | not adopted / ledgered | 最終実装HEAD `34e77724b5af9b1eb742185c3eb131f4c9944606`で `uv run pytest --run-full-regression -q` → `27 failed, 1979 passed, 516 skipped`（12分40秒）。固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`の全回帰は`452 failed, 3350 passed, 52 skipped`（28分51秒）で、現行failure node id 27件を確認し、ledgerの27件と一致した。27件すべてが固定点でも同一failure behaviorの`approved-no-op`、expected-retirement 0件、比較未完了0件となった。v40とのfailure node集合差分は0件。各path・owner・follow-up・根拠は [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) に記録し、全体passとは主張しない |
+| Final ChatGPT-final-quality-gate-strict | pending / reboot-resumed | P0/P1修正後の現行evidence refresh HEAD `34e77724b5af9b1eb742185c3eb131f4c9944606`とmerge前固定点 `a6ded0d9a838b40cdcd741fa473cd264b801f245`との差分を、plan指定の追加観点を保持したfresh browser sessionで再確認する |
 | S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
 
 ## Residual Risks / Follow-ups
