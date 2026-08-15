@@ -2325,9 +2325,34 @@ def _create_uninstall_retry_marker(
                 dir_fd=parent_fd,
             )
         except FileExistsError:
-            info = os.stat(marker_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file") from None
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise RuntimeError("SpecDock uninstall retry marker no-follow support is unavailable") from None
+            try:
+                existing_fd = os.open(
+                    marker_rel.name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=parent_fd,
+                )
+            except OSError as exc:
+                raise RuntimeError("SpecDock uninstall retry marker cannot be opened safely") from exc
+            try:
+                before = os.fstat(existing_fd)
+                if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+                    raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+                existing_payload = _read_file_descriptor(existing_fd)
+                after = os.fstat(existing_fd)
+                if (
+                    not stat.S_ISREG(after.st_mode)
+                    or after.st_nlink != 1
+                    or (after.st_dev, after.st_ino, after.st_ctime_ns, after.st_size)
+                    != (before.st_dev, before.st_ino, before.st_ctime_ns, before.st_size)
+                    or existing_payload != payload
+                ):
+                    raise RuntimeError("SpecDock uninstall retry marker is incomplete or invalid")
+            finally:
+                with suppress(OSError):
+                    os.close(existing_fd)
             return
         marker_identity: tuple[int, int] | None = None
         completed = False

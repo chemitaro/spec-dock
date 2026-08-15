@@ -1629,6 +1629,18 @@ def test_s70_uninstall_marker_write_failure_is_retryable(
     assert not marker.exists()
 
 
+def test_s70_uninstall_existing_partial_marker_is_rejected_before_reuse(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    marker = tmp_path / "spec-dock/.uninstall-retry.json"
+    marker.write_bytes(b'{"managed_by":"spec-dock"')
+
+    with pytest.raises(RuntimeError, match="incomplete or invalid"):
+        cli._create_uninstall_retry_marker(
+            tmp_path,
+            expected_root_identity=cli._distribution_root_identity(tmp_path),
+        )
+
+
 def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
