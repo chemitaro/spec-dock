@@ -38673,7 +38673,7 @@ esac
                 assert str(workflow.readlink()) == "../product-ci.yml"
             assert self._relative_file_snapshot(target) == before
 
-    def test_uninstall_dry_run_scaffold_managed_exact_match_removes_and_mismatch_preserves(self) -> None:
+    def test_uninstall_dry_run_scaffold_managed_roots_remove_recursively(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -38683,14 +38683,13 @@ esac
 
             actions = self._uninstall_json_actions(target)
 
-            exact_action = actions["spec-dock/scripts/spec-dock"]
-            assert exact_action["category"] == "scaffold_managed"
-            assert exact_action["status"] == "would_remove"
-            assert "exact match" in exact_action["reason"]
-            edited_action = actions["spec-dock/docs/guide.md"]
-            assert edited_action["category"] == "scaffold_managed"
-            assert edited_action["status"] == "preserved"
-            assert "content mismatch" in edited_action["reason"]
+            for rel in ("spec-dock/docs", "spec-dock/scripts", "spec-dock/system", "spec-dock/templates"):
+                with _case(rel=rel):
+                    action = actions[rel]
+                    assert action["category"] == "scaffold_managed"
+                    assert action["status"] == "would_remove"
+                    assert "managed scaffold tree" in action["reason"]
+            assert "spec-dock/docs/guide.md" not in actions
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_blocks_unrecognized_specdock_version(self) -> None:
