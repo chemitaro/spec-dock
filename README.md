@@ -50,6 +50,8 @@ preserves user-owned and unknown paths, blocks before writing when ownership or 
 ambiguous, and records a same-root retry marker when an apply is interrupted. It is distinct from
 `init --force`; older or incompatible workspaces may still require manual normalization or rebuild.
 
+既存環境の更新手順と、旧配布面からの移行・復旧方針は [移行ガイド](spec-dock/docs/migration.md) を参照してください。
+
 ## Worktree Root Setup
 
 `./spec-dock/scripts/spec-dock worktree create` requires `SPEC_DOCK_WORKTREE_ROOT`.
@@ -105,9 +107,9 @@ review, and execution orchestration are not shipped as repository-local workflow
 # Copy one Initiative/Epic/Issue Workbench to an existing linked worktree (experimental, one-shot).
 ./spec-dock/scripts/spec-dock workbench copy --scope iss-00123 --to /path/to/linked-worktree
 
-# Preserve a completed ChatGPT Markdown report as byte-identical, evidence-only Artifact content.
-./spec-dock/scripts/spec-dock artifact import chatgpt-output \
-  --issue iss-00123 --file spec-dock/initiatives/.../.workbench/report.md --title "Planning report"
+# Preserve one explicit evidence file as opaque, evidence-only Artifact content.
+./spec-dock/scripts/spec-dock artifact import file \
+  --issue iss-00123 --file spec-dock/initiatives/.../.workbench/report.md
 
 # Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
 ./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
@@ -167,11 +169,10 @@ Notes:
   worktree. This is a source-wins, one-shot copy, not automatic synchronization or copy-back.
 - Workbench copy applies to the complete directory without language, extension, MIME, or content
   classification. Keep material that must survive outside Workbench in an Artifact or canonical doc.
-- `artifact import chatgpt-output` accepts one Markdown file from an approved Workbench, preserves the
-  source and its bytes, and stores it with blank Artifact identity. `chatgpt-output` is an import kind,
-  not a reserved typed Artifact token; `new artifact` and import coexist. Imported content remains
-  evidence-only until its adoption is recorded in the Evidence Adoption Ledger and accepted claims are
-  rewritten into canonical docs.
+- `artifact import file` accepts one explicit regular file, preserves the source and its bytes, and
+  stores it as an opaque generic Artifact. Imported content remains evidence-only until its adoption is
+  recorded in the Evidence Adoption Ledger and accepted claims are rewritten into canonical docs. See
+  [移行ガイド](spec-dock/docs/migration.md) for the replacement route and recovery notes.
 - `update` preserves existing Workbench directories as unmanaged local content. It does not migrate,
   normalize, delete, or promote them.
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.

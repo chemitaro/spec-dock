@@ -4,6 +4,7 @@
 
 Storage Core の操作は、現存する runtime command と次の参照を使います。
 
+- [移行ガイド](migration.md)
 - [命名参照](reference_naming.md)
 - [依存関係管理参照](reference_deps.md)
 - [状態集計参照](reference_sync.md)
