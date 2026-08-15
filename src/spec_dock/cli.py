@@ -943,7 +943,9 @@ def _retry_unpublished_atomic_regular_file(
         else:
             return False, False
 
-        flags = os.O_WRONLY | os.O_TRUNC | nofollow | getattr(os, "O_CLOEXEC", 0)
+        # Open without truncation so a race replacement is only inspected by
+        # fstat; truncate the held descriptor only after its identity matches.
+        flags = os.O_WRONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
         fd = os.open(temporary.name, flags, dir_fd=parent_fd)
         current = os.fstat(fd)
         if (
@@ -953,6 +955,7 @@ def _retry_unpublished_atomic_regular_file(
             or (current.st_dev, current.st_ino) != expected_identity
         ):
             return False, False
+        os.ftruncate(fd, 0)
         os.fchmod(fd, mode)
         view = memoryview(payload)
         while view:
