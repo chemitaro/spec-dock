@@ -689,6 +689,26 @@ def test_s50_update_scaffold_boundary_collision_is_zero_write(
     assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
+def test_s50_update_scaffold_exact_file_directory_collision_is_zero_write(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    collision = tmp_path / "spec-dock/docs/README.md"
+    collision.unlink()
+    collision.mkdir()
+    sentinel = collision / "user-sentinel.txt"
+    sentinel.write_bytes(b"preserve this directory\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    capsys.readouterr()
+    assert sentinel.read_bytes() == b"preserve this directory\n"
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
 def test_s55_update_prunes_proven_historical_managed_file(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
     legacy = tmp_path / ".codex/config.toml"
