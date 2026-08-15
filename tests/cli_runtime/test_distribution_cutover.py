@@ -713,6 +713,42 @@ def test_s60_update_forward_retry_marker_is_removed_after_success(tmp_path: Path
     assert (tmp_path / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.3\n"
 
 
+@pytest.mark.parametrize("operation", ("fresh", "update", "init-force"))
+def test_s60_marker_removal_failure_reports_marker_finalization_target(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+    operation: str,
+) -> None:
+    if operation != "fresh":
+        assert main(["init", str(tmp_path)]) == 0
+
+    original_remove = cli._remove_distribution_retry_marker
+
+    def fail_marker_removal(*args, **kwargs):
+        raise OSError("simulated marker removal failure")
+
+    monkeypatch.setattr(cli, "_remove_distribution_retry_marker", fail_marker_removal)
+    command = {
+        "fresh": ["init", str(tmp_path)],
+        "update": ["update", str(tmp_path)],
+        "init-force": ["init", str(tmp_path), "--force"],
+    }[operation]
+
+    assert main(command) == 1
+
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during marker-finalization" in captured
+    assert "target=spec-dock/.distribution-retry.json" in captured
+    assert "last_completed_phase=version-written" in captured
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    assert marker.exists()
+
+    monkeypatch.setattr(cli, "_remove_distribution_retry_marker", original_remove)
+    assert main(command) == 0
+    assert not marker.exists()
+
+
 def test_s60_atomic_regular_file_does_not_replace_racing_destination(
     tmp_path: Path,
     monkeypatch,
