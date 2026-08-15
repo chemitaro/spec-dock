@@ -1634,6 +1634,7 @@ def _safe_distribution_failure_target(exc: BaseException, phase: str) -> str:
         "scaffold-refresh": "spec-dock",
         "post-verify": "distribution",
         "version-write": "spec-dock/spec-dock.version",
+        "marker-finalization": "spec-dock/.distribution-retry.json",
     }.get(phase, "spec-dock/.distribution-retry.json")
 
 
@@ -1795,7 +1796,9 @@ def _install_fresh_distribution(target_root: Path) -> None:
                 stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "version-written"
+            phase = "marker-finalization"
             _remove_distribution_retry_marker(target_root, expected_root_identity=root_identity)
+            last_completed_phase = "marker-finalized"
         except Exception as exc:
             if _distribution_retry_marker_present(target_root):
                 marker_started = True
@@ -1967,10 +1970,12 @@ def _install_recognized_distribution(
                 stage_ownership=tuple(stage_ownership),
             )
             last_completed_phase = "version-written"
+            phase = "marker-finalization"
             _remove_distribution_retry_marker(
                 target_root,
                 expected_root_identity=root_identity,
             )
+            last_completed_phase = "marker-finalized"
         except Exception as exc:
             if _distribution_retry_marker_present(target_root):
                 marker_started = True
