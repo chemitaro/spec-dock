@@ -2070,6 +2070,7 @@ class _UninstallTargetIdentity(NamedTuple):
     device: int
     inode: int
     ctime_ns: int
+    nlink: int = 0
     size: int = 0
     sha256: str | None = None
     link_target: str | None = None
@@ -2459,6 +2460,7 @@ def _capture_uninstall_target_identity(target_root: Path, rel_path: Path) -> _Un
                 info.st_dev,
                 info.st_ino,
                 info.st_ctime_ns,
+                nlink=info.st_nlink,
                 link_target=os.readlink(rel_path.name, dir_fd=parent_fd),
             )
         if stat.S_ISDIR(info.st_mode):
@@ -2492,7 +2494,14 @@ def _assert_uninstall_target_identity(
 ) -> None:
     """Fail closed when a planned uninstall entry was replaced or rewritten."""
     if expected.kind == "symlink":
-        if not stat.S_ISLNK(info.st_mode) or os.readlink(name, dir_fd=parent_fd) != expected.link_target:
+        if (
+            not stat.S_ISLNK(info.st_mode)
+            or info.st_dev != expected.device
+            or info.st_ino != expected.inode
+            or info.st_ctime_ns != expected.ctime_ns
+            or info.st_nlink != expected.nlink
+            or os.readlink(name, dir_fd=parent_fd) != expected.link_target
+        ):
             raise RuntimeError("uninstall target identity changed during safe operation")
         return
     if expected.kind == "directory":
@@ -2649,6 +2658,16 @@ def _add_generated_state_uninstall_actions(
             rel_path = path.relative_to(target_root)
             known_rel_paths.add(rel_path)
             identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
+            if identity is not None and identity.kind == "unsafe":
+                actions.append(
+                    _UninstallAction(
+                        rel_path=rel_path.as_posix(),
+                        category="generated_state",
+                        status="preserved",
+                        reason="generated state has unsafe identity; manual review required",
+                    )
+                )
+                continue
             actions.append(
                 _UninstallAction(
                     rel_path=rel_path.as_posix(),
@@ -2899,6 +2918,16 @@ def _append_distribution_uninstall_actions(
         )
         if distribution_action.action == "prune":
             identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
+            if identity is not None and identity.kind == "unsafe":
+                actions.append(
+                    _UninstallAction(
+                        rel_path=rel_path.as_posix(),
+                        category=category,
+                        status="preserved",
+                        reason="managed asset has unsafe identity; manual review required",
+                    )
+                )
+                continue
             if rel_path in obsolete_paths:
                 reason = (
                     "known obsolete SpecDock-managed asset"
@@ -3004,6 +3033,16 @@ def _build_uninstall_plan(
             if _is_delete_even_if_mismatch_uninstall_path(rel_path):
                 if _path_exists_for_uninstall(target_root / rel_path) or include_missing_removals:
                     identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
+                    if identity is not None and identity.kind == "unsafe":
+                        actions.append(
+                            _UninstallAction(
+                                rel_path=rel_path.as_posix(),
+                                category="scaffold_managed",
+                                status="preserved",
+                                reason="managed state has unsafe identity; manual review required",
+                            )
+                        )
+                        continue
                     actions.append(
                         _UninstallAction(
                             rel_path=rel_path.as_posix(),
@@ -3046,6 +3085,7 @@ def _summarize_uninstall_actions(actions: tuple[_UninstallAction, ...]) -> dict[
         "already_removed": 0,
         "preserved": 0,
         "failed": 0,
+        "pending": 0,
         "empty_dir_removed": 0,
     }
     for action in actions:
@@ -3184,6 +3224,7 @@ def _cleanup_empty_uninstall_dirs(
     actions: tuple[_UninstallAction, ...],
     *,
     expected_root_identity: DistributionRootIdentity | None = None,
+    include_workspace_root: bool = False,
 ) -> tuple[_UninstallAction, ...]:
     cleanup_actions: list[_UninstallAction] = []
     candidates: set[Path] = set()
@@ -3211,13 +3252,52 @@ def _cleanup_empty_uninstall_dirs(
     # uninstall can remove empty directories without scanning or deleting
     # unknown user-owned paths.
     for rel_root in _GENERATED_STATE_ROOTS:
-        if _path_exists_for_uninstall(target_root / rel_root):
-            candidates.add(rel_root)
+        root = target_root / rel_root
+        if not _path_exists_for_uninstall(root):
+            continue
+        if root.is_symlink() or not root.is_dir():
+            cleanup_actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="empty_dir",
+                    status="failed",
+                    reason="generated state root changed during cleanup",
+                    error="generated state root is no longer a real directory",
+                )
+            )
+            continue
+        walk_errors: list[OSError] = []
+
+        for current_raw, _directories, _files in os.walk(
+            root,
+            topdown=False,
+            followlinks=False,
+            onerror=walk_errors.append,
+        ):
+            current_path = Path(current_raw)
+            if not current_path.is_symlink():
+                candidates.add(current_path.relative_to(target_root))
+        if walk_errors:
+            cleanup_actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="empty_dir",
+                    status="failed",
+                    reason="generated state cleanup could not inspect the managed tree",
+                    error="generated state directory inspection failed",
+                )
+            )
+        candidates.add(rel_root)
+
+    if not include_workspace_root:
+        candidates.discard(Path("spec-dock"))
 
     for rel_path in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
         if not _is_uninstall_cleanup_boundary_path(rel_path):
             continue
         if rel_path in protected:
+            continue
+        if not _path_exists_for_uninstall(target_root / rel_path):
             continue
         try:
             with _open_uninstall_parent_chain(
@@ -3235,7 +3315,24 @@ def _cleanup_empty_uninstall_dirs(
                     continue
                 os.rmdir(rel_path.name, dir_fd=parent_fd)
                 _assert_uninstall_visible_chain(target_root, rel_path, fds)
+        except FileNotFoundError:
+            continue
         except (OSError, RuntimeError):
+            strict_generated_cleanup = any(
+                rel_path == generated_root or _is_path_prefix(generated_root, rel_path)
+                for generated_root in _GENERATED_STATE_ROOTS
+            ) or (include_workspace_root and rel_path == Path("spec-dock"))
+            if not strict_generated_cleanup:
+                continue
+            cleanup_actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category="empty_dir",
+                    status="failed",
+                    reason="empty directory cleanup failed; retry required",
+                    error="managed empty directory could not be removed safely",
+                )
+            )
             continue
         cleanup_actions.append(
             _UninstallAction(
@@ -3255,24 +3352,42 @@ def _apply_uninstall_plan(
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> tuple[_UninstallAction, ...]:
     results: list[_UninstallAction] = []
+    halted = False
     for action in actions:
         if action.status == "would_remove":
-            results.append(
-                _remove_uninstall_path(
+            if halted:
+                results.append(
+                    action._replace(
+                        status="pending",
+                        reason="not attempted after an earlier uninstall safety failure",
+                        error=None,
+                    )
+                )
+                continue
+            try:
+                result = _remove_uninstall_path(
                     target_root,
                     action,
                     expected_root_identity=expected_root_identity,
                 )
-            )
+            except (OSError, RuntimeError):
+                result = action._replace(
+                    status="failed",
+                    reason="uninstall action failed; retry required",
+                    error="uninstall action failed safely",
+                )
+            results.append(result)
+            halted = result.status == "failed"
         else:
             results.append(action)
-    results.extend(
-        _cleanup_empty_uninstall_dirs(
-            target_root,
-            tuple(results),
-            expected_root_identity=expected_root_identity,
+    if not halted:
+        results.extend(
+            _cleanup_empty_uninstall_dirs(
+                target_root,
+                tuple(results),
+                expected_root_identity=expected_root_identity,
+            )
         )
-    )
     return tuple(sorted(results, key=lambda action: (action.rel_path, action.status)))
 
 
@@ -3403,6 +3518,13 @@ def _verify_uninstall_postcondition(
     _assert_distribution_root_identity(target_root, expected_root_identity)
 
 
+def _uninstall_retry_command(specs_mode: str | None) -> str | None:
+    if specs_mode not in {"keep", "remove"}:
+        return None
+    mode = "keep-specs" if specs_mode == "keep" else "remove-specs"
+    return f"spec-dock uninstall . --apply --{mode}"
+
+
 def _uninstall_payload(
     target_root: Path,
     *,
@@ -3411,14 +3533,22 @@ def _uninstall_payload(
     actions: tuple[_UninstallAction, ...],
     status: str | None = None,
     errors: list[str] | None = None,
+    phase: str | None = None,
+    last_completed_phase: str | None = None,
 ) -> dict[str, Any]:
+    resolved_status = status or ("completed" if apply else "planned")
     return {
         "schema_version": 1,
         "target": str(target_root),
         "mode": "apply" if apply else "dry-run",
         "apply": apply,
         "specs_mode": specs_mode,
-        "status": status or ("completed" if apply else "planned"),
+        "status": resolved_status,
+        "phase": phase or ("complete" if resolved_status == "completed" else "preflight"),
+        "last_completed_phase": last_completed_phase
+        or ("marker-finalized" if resolved_status == "completed" else "not-started"),
+        "retry_command": _uninstall_retry_command(specs_mode),
+        "pending_paths": [action.rel_path for action in actions if action.status == "pending"],
         "summary": _summarize_uninstall_actions(actions),
         "actions": [
             {
@@ -3487,6 +3617,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     specs_mode = _uninstall_specs_mode(ns)
     apply_requested = bool(ns.apply)
     json_requested = bool(ns.json)
+    phase = "preflight"
+    last_completed_phase = "not-started"
 
     if not target_root.exists() or not target_root.is_dir():
         return _emit_uninstall_preflight_error(
@@ -3541,6 +3673,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             json_requested=json_requested,
             message=str(e),
         )
+    last_completed_phase = "preflight-complete"
 
     try:
         # The complete plan must be validated before the first apply mutation.
@@ -3569,6 +3702,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 specs_mode=specs_mode,
                 actions=actions,
                 status="blocked",
+                phase="preflight",
+                last_completed_phase=last_completed_phase,
                 errors=[
                     "uninstall apply blocked before mutation: "
                     + "; ".join(f"{action.rel_path}: {action.reason}" for action in blockers)
@@ -3581,16 +3716,21 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             return 1
 
         try:
+            phase = "marker-write"
             _write_uninstall_retry_marker(
                 target_root,
                 expected_root_identity=uninstall_root_identity,
             )
+            last_completed_phase = "marker-written"
             actions = _ensure_uninstall_retry_marker_action(actions)
+            phase = "uninstall-apply"
             actions = _apply_uninstall_plan(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
+            if not any(action.status == "failed" for action in actions):
+                last_completed_phase = "uninstall-applied"
         except (OSError, RuntimeError) as e:
             payload = _uninstall_payload(
                 target_root,
@@ -3598,6 +3738,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 specs_mode=specs_mode,
                 actions=actions,
                 status="partial_failure",
+                phase=phase,
+                last_completed_phase=last_completed_phase,
                 errors=[str(e)],
             )
             if json_requested:
@@ -3609,44 +3751,64 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     has_failures = any(action.status == "failed" for action in actions)
     if apply_requested and not has_failures:
         try:
+            phase = "post-verify"
             _verify_uninstall_postcondition(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
+            last_completed_phase = "post-verified"
+            phase = "marker-finalization"
             actions = _finalize_uninstall_retry_marker(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
+            last_completed_phase = "marker-finalized"
             # Marker removal can make the final managed root empty.  Re-run the
             # bounded empty-directory cleanup after marker finalization, then
             # verify the newly produced actions before reporting success.
+            phase = "root-cleanup"
+            cleanup_actions = _cleanup_empty_uninstall_dirs(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+                include_workspace_root=True,
+            )
             actions = tuple(
                 sorted(
                     (
                         *actions,
-                        *_cleanup_empty_uninstall_dirs(
-                            target_root,
-                            actions,
-                            expected_root_identity=uninstall_root_identity,
-                        ),
+                        *cleanup_actions,
                     ),
                     key=lambda action: (action.rel_path, action.status),
                 )
             )
+            if any(action.status == "failed" for action in cleanup_actions):
+                raise RuntimeError("uninstall empty directory cleanup failed; retry required")
+            phase = "post-verify"
             _verify_uninstall_postcondition(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
         except (OSError, RuntimeError) as e:
+            if phase in {"root-cleanup", "post-verify"} and not _path_exists_for_uninstall(
+                target_root / _UNINSTALL_RETRY_MARKER_REL
+            ):
+                with suppress(OSError, RuntimeError):
+                    _write_uninstall_retry_marker(
+                        target_root,
+                        expected_root_identity=uninstall_root_identity,
+                    )
             payload = _uninstall_payload(
                 target_root,
                 apply=True,
                 specs_mode=specs_mode,
                 actions=actions,
                 status="partial_failure",
+                phase=phase,
+                last_completed_phase=last_completed_phase,
                 errors=[str(e)],
             )
             if json_requested:
@@ -3661,6 +3823,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
         specs_mode=specs_mode,
         actions=actions,
         status="partial_failure" if has_failures else None,
+        phase="complete" if apply_requested and not has_failures else phase,
+        last_completed_phase="marker-finalized" if apply_requested and not has_failures else last_completed_phase,
     )
     if json_requested:
         print(json.dumps(payload, sort_keys=True))
