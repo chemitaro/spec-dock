@@ -1322,16 +1322,24 @@ def _classify_current_target(
         and actual.sha256 == expected.sha256
         and expected.mode is not None
         and actual.mode != expected.mode
-        and operation in {"update", "init-force"}
     ):
-        if observation.link_count is not None and observation.link_count > 1:
+        if operation == "fresh":
+            return _blocked_action(
+                path,
+                operation,
+                "current-mode-mismatch",
+                provenance="current",
+                action="preserve",
+            )
+        if operation in {"update", "init-force"} and observation.link_count is not None and observation.link_count > 1:
             return _blocked_action(
                 path,
                 operation,
                 "hard-link-mutation-unsafe",
                 provenance="current",
             )
-        return DistributionAction(path, operation, "upgrade", "current", "current-mode-mismatch")
+        if operation in {"update", "init-force"}:
+            return DistributionAction(path, operation, "upgrade", "current", "current-mode-mismatch")
 
     if (
         actual.kind == "symlink"

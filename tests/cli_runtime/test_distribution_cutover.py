@@ -298,6 +298,23 @@ def test_s45_fresh_adopts_identical_current_assets_without_rewriting_them(tmp_pa
         assert after[relative_path] == before[relative_path]
 
 
+def test_s45_fresh_preserves_same_bytes_wrong_mode_current_asset(tmp_path: Path, capsys) -> None:
+    relative_path = ".agents/skills/spec-dock/SKILL.md"
+    source = INSTALL_ROOT / relative_path
+    destination = tmp_path / relative_path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(source.read_bytes())
+    source_mode = source.stat().st_mode & 0o777
+    destination.chmod(0o600 if source_mode != 0o600 else 0o644)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "current-mode-mismatch" in captured.err
+    assert _filesystem_snapshot(tmp_path) == before
+
+
 def test_s45_fresh_current_symlink_or_directory_collision_is_zero_write(tmp_path: Path) -> None:
     for collision_kind in ("symlink", "directory"):
         target = tmp_path / collision_kind
