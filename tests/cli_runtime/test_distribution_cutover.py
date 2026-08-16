@@ -181,6 +181,49 @@ def test_s60_distribution_operations_share_an_exclusive_root_lock(tmp_path: Path
     assert second_entered.is_set()
 
 
+def test_s60_root_bound_operations_serialize_process_cwd_across_roots(tmp_path: Path) -> None:
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    first_root.mkdir()
+    second_root.mkdir()
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    second_entered = threading.Event()
+    errors: list[BaseException] = []
+
+    def hold_first_root() -> None:
+        try:
+            with cli._bound_distribution_root(first_root):
+                first_entered.set()
+                assert release_first.wait(timeout=2)
+                assert Path.cwd() == first_root
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    def enter_second_root() -> None:
+        try:
+            assert first_entered.wait(timeout=2)
+            with cli._bound_distribution_root(second_root):
+                second_entered.set()
+                assert Path.cwd() == second_root
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    first = threading.Thread(target=hold_first_root)
+    second = threading.Thread(target=enter_second_root)
+    first.start()
+    assert first_entered.wait(timeout=2)
+    second.start()
+    time.sleep(0.1)
+    assert not second_entered.is_set()
+    release_first.set()
+    first.join(timeout=2)
+    second.join(timeout=2)
+
+    assert not errors
+    assert second_entered.is_set()
+
+
 def test_s35_cli_blocks_unknown_version_before_any_update_write(tmp_path: Path, capsys) -> None:
     target = tmp_path / "consumer"
     target.mkdir()
@@ -1542,6 +1585,31 @@ def test_s65_uninstall_root_rebind_before_marker_write_is_zero_write(
     assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert not (displaced / "spec-dock/.uninstall-retry.json").exists()
+
+
+@pytest.mark.parametrize("relative_root", ("spec-dock/active", "spec-dock/.agent"))
+def test_s65_uninstall_generated_root_type_collision_is_zero_write(
+    tmp_path: Path,
+    capsys,
+    relative_root: str,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    generated_root = tmp_path / relative_root
+    if generated_root.is_symlink() or generated_root.is_file():
+        generated_root.unlink()
+    else:
+        shutil.rmtree(generated_root)
+    generated_root.write_text("operator-owned replacement\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "blocked"
+    assert payload["phase"] == "preflight"
+    assert relative_root in payload["failed_paths"]
+    assert _filesystem_snapshot(tmp_path) == before
 
 
 def test_s70_uninstall_cleanup_rebind_keeps_replacement_untouched(tmp_path: Path, monkeypatch) -> None:
