@@ -1551,6 +1551,47 @@ def test_s70_keep_specs_uninstall_allows_reinit_without_losing_history(
     assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
+@pytest.mark.parametrize(
+    ("operation", "expected_status"),
+    (("update", 1), ("uninstall", 2)),
+)
+def test_s70_empty_workspace_blocks_non_init_operations_without_writes(
+    tmp_path: Path,
+    operation: str,
+    expected_status: int,
+    capsys,
+) -> None:
+    specdock = tmp_path / "spec-dock"
+    specdock.mkdir()
+    external = tmp_path / ".agents/skills/user-owned.md"
+    external.parent.mkdir(parents=True)
+    external.write_text("user-owned\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
+
+    args = [operation, str(tmp_path)]
+    assert main(args) == expected_status
+    assert _filesystem_snapshot(tmp_path) == before
+    assert "missing-version" in capsys.readouterr().err
+
+
+def test_s70_preserved_specs_workspace_blocks_update_without_writes(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    history = tmp_path / "spec-dock/initiatives/init-preserved/requirement.md"
+    history.parent.mkdir(parents=True)
+    history.write_text("preserved history\n", encoding="utf-8")
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    capsys.readouterr()
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+    assert _filesystem_snapshot(tmp_path) == before
+    assert "version" in capsys.readouterr().err or "workspace" in capsys.readouterr().err
+
+
 def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marker(
     tmp_path: Path,
     capsys,
