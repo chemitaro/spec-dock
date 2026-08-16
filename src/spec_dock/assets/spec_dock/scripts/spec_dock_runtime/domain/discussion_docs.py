@@ -7,18 +7,18 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-DRAFT_DISCUSSION_DOC_TYPES = ("draft-requirement", "draft-design", "draft-plan")
-CREATABLE_DISCUSSION_DOC_TYPES = (
+HISTORICAL_TIMESTAMP_DISCUSSION_DOC_TYPES = (
     "adr",
     "disc",
     "research",
     "interview",
     "scratch",
     "pr-repair-batch",
-    *DRAFT_DISCUSSION_DOC_TYPES,
+    "draft-requirement",
+    "draft-design",
+    "draft-plan",
+    "note",
 )
-RETIRED_DISCUSSION_DOC_TYPES = ("note",)
-TIMESTAMP_DISCUSSION_DOC_TYPES = (*CREATABLE_DISCUSSION_DOC_TYPES, *RETIRED_DISCUSSION_DOC_TYPES)
 LEGACY_DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
 
 _DISCUSSION_DOC_TIMESTAMP_INTENT_TOKEN_RE = re.compile(
@@ -50,21 +50,13 @@ def _doc_type_pattern(doc_types: tuple[str, ...]) -> str:
 
 DISCUSSION_DOC_TIMESTAMP_FILENAME_RE = re.compile(
     r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?"
-    rf"-(?P<doc_type>{_doc_type_pattern(TIMESTAMP_DISCUSSION_DOC_TYPES)})-"
+    rf"-(?P<doc_type>{_doc_type_pattern(HISTORICAL_TIMESTAMP_DISCUSSION_DOC_TYPES)})-"
     r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
 DISCUSSION_DOC_LEGACY_FILENAME_RE = re.compile(
     rf"^(?P<seq>[0-9]{{3}})-(?P<doc_type>{_doc_type_pattern(LEGACY_DISCUSSION_DOC_TYPES)})-"
     r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
-
-
-def is_creatable_discussion_doc_type(doc_type: str) -> bool:
-    return doc_type in CREATABLE_DISCUSSION_DOC_TYPES
-
-
-def is_retired_discussion_doc_type(doc_type: str) -> bool:
-    return doc_type in RETIRED_DISCUSSION_DOC_TYPES
 
 
 def parse_timestamp_discussion_doc_filename(name: str) -> TimestampDiscussionDocFilename | None:
@@ -109,7 +101,7 @@ def discussion_filename_expectation() -> str:
 
 
 def _is_discussion_doc_type_candidate(token: str) -> bool:
-    return bool(token) and token.lower() in TIMESTAMP_DISCUSSION_DOC_TYPES
+    return bool(token) and token.lower() in HISTORICAL_TIMESTAMP_DISCUSSION_DOC_TYPES
 
 
 def _find_discussion_doc_type_slot(parts: list[str]) -> int | None:
@@ -141,7 +133,7 @@ def is_malformed_discussion_doc_candidate(path: Path) -> bool:
         return True
     if _DISCUSSION_DOC_LEGACY_SEQUENCE_INTENT_PREFIX_RE.fullmatch(stem) is not None:
         return True
-    for doc_type in TIMESTAMP_DISCUSSION_DOC_TYPES:
+    for doc_type in HISTORICAL_TIMESTAMP_DISCUSSION_DOC_TYPES:
         if lowered.startswith(f"{doc_type}-") or lowered.startswith(f"{doc_type}_"):
             return True
     if _DISCUSSION_DOC_TIMESTAMP_INTENT_TOKEN_RE.fullmatch(first) is not None:

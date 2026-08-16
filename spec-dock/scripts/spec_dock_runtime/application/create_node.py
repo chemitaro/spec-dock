@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import ctypes
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import date
 import errno
 import os
 from pathlib import Path
@@ -11,12 +11,10 @@ import shlex
 import stat
 import sys
 import time
-from typing import TYPE_CHECKING, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Literal, cast
 import uuid
 
 from spec_dock_runtime.application.contracts import (
-    CreateDiscussionDocRequest,
-    CreateDiscussionDocResult,
     CreateNodeRequest,
     CreateNodeResult,
     CreatePlan,
@@ -27,25 +25,16 @@ from spec_dock_runtime.application.repo_context import (
     split_repo_slug,
 )
 from spec_dock_runtime.application.sync_state import post_mutation_sync
-from spec_dock_runtime.domain.discussion_docs import (
-    CREATABLE_DISCUSSION_DOC_TYPES as _CREATABLE_DISCUSSION_DOC_TYPES,
-    DRAFT_DISCUSSION_DOC_TYPES as _DRAFT_DISCUSSION_DOC_TYPES,
-    RETIRED_DISCUSSION_DOC_TYPES as _RETIRED_DISCUSSION_DOC_TYPES,
-    discussion_doc_id_from_path,
-    parse_timestamp_discussion_doc_filename,
-)
 from spec_dock_runtime.domain.ids import (
     find_existing_id_by_num,
     format_id,
     parse_id,
     resolve_id_input,
     resolve_input_title_and_slug,
-    slugify,
-    validate_input_slug_kebab,
 )
 from spec_dock_runtime.domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from spec_dock_runtime.domain.tree import build_graph
-from spec_dock_runtime.domain.validation import find_malformed_discussion_doc_filename_error, validate_graph_and_deps
+from spec_dock_runtime.domain.validation import validate_graph_and_deps
 from spec_dock_runtime.infra.contracts import StoredMetaRecord
 
 if TYPE_CHECKING:
@@ -54,26 +43,7 @@ if TYPE_CHECKING:
     from spec_dock_runtime.application.ports import Ports
 
 
-class _AssuranceStoreLike(Protocol):
-    def resolve_issue_target(self, issue: str | None = None): ...
-
-    def verify_contract(self, target): ...
-
-
-class _ArtifactStoreLike(Protocol):
-    def load_profile_artifact_template_text(
-        self,
-        artifact: Literal["design", "plan"],
-        profile: Literal["lite", "standard", "strict", "critical"],
-    ) -> str: ...
-
-
 _META_FILENAME = ".meta.json"
-_DRAFT_TARGET_BY_DOC_TYPE = {
-    "draft-requirement": "requirement",
-    "draft-design": "design",
-    "draft-plan": "plan",
-}
 _CREATE_LOCK_DIRNAME = ".runtime"
 _CREATE_LOCK_FILENAME = "create.lock"
 _ENV_CREATE_LOCK_WAIT_SECONDS = "SPEC_DOCK_CREATE_LOCK_WAIT_SECONDS"
@@ -82,11 +52,6 @@ _ENV_CREATE_LOCK_STALE_SECONDS = "SPEC_DOCK_CREATE_LOCK_STALE_SECONDS"
 _DEFAULT_CREATE_LOCK_WAIT_SECONDS = 3.0
 _DEFAULT_CREATE_LOCK_POLL_SECONDS = 0.05
 _DEFAULT_CREATE_LOCK_STALE_SECONDS = 600.0
-_ENV_DISCUSSION_TIMESTAMP_WAIT_SECONDS = "SPEC_DOCK_DISCUSSION_TIMESTAMP_WAIT_SECONDS"
-_ENV_DISCUSSION_TIMESTAMP_POLL_SECONDS = "SPEC_DOCK_DISCUSSION_TIMESTAMP_POLL_SECONDS"
-_DEFAULT_DISCUSSION_TIMESTAMP_WAIT_SECONDS = 1.1
-_DEFAULT_DISCUSSION_TIMESTAMP_POLL_SECONDS = 0.05
-
 CreateWritePhase = Literal["none", "scaffold_copied", "meta_written", "post_write_verified"]
 _PARTIAL_LOCAL_WRITE_PHASES: tuple[CreateWritePhase, ...] = (
     "scaffold_copied",
@@ -329,70 +294,6 @@ def _post_write_duplicate_guard(ports: Ports, *, node_id: str) -> None:
         raise RuntimeError(f"post-write duplicate guard failed: {exc}") from exc
     if node_id not in graph.nodes_by_id:
         raise RuntimeError(f"post-write duplicate guard failed: created id not found: {node_id}")
-
-
-def _scan_discussion_timestamp_duplicate_state(discussions_dir: Path) -> tuple[str | None, set[str]]:
-    malformed_error = find_malformed_discussion_doc_filename_error(discussions_dir)
-    if malformed_error is not None:
-        return malformed_error, set()
-    refs = _scan_discussion_timestamp_sources(discussions_dir)
-    by_standard_slot: dict[str, list[Path]] = {}
-    by_suffix_slot: dict[tuple[str, int], list[Path]] = {}
-    doc_ids: set[str] = set()
-    for timestamp, suffix, doc_type, path in refs:
-        if suffix is None:
-            by_standard_slot.setdefault(timestamp, []).append(path)
-            doc_ids.add(f"{timestamp}-{doc_type}")
-            continue
-        by_suffix_slot.setdefault((timestamp, suffix), []).append(path)
-        doc_ids.add(f"{timestamp}-{suffix:02d}-{doc_type}")
-
-    duplicate_standard_slots = sorted(slot for slot, paths in by_standard_slot.items() if len(paths) > 1)
-    if duplicate_standard_slots:
-        dup_slot = duplicate_standard_slots[0]
-        files = ", ".join(path.name for path in sorted(by_standard_slot[dup_slot], key=lambda p: p.as_posix()))
-        return (
-            f"Duplicate discussion timestamp slot detected under {discussions_dir}: slot={dup_slot} files=[{files}]",
-            doc_ids,
-        )
-
-    duplicate_suffix_slots = sorted(slot for slot, paths in by_suffix_slot.items() if len(paths) > 1)
-    if duplicate_suffix_slots:
-        dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
-        files = ", ".join(
-            path.name for path in sorted(by_suffix_slot[dup_timestamp, dup_suffix], key=lambda p: p.as_posix())
-        )
-        return (
-            f"Duplicate discussion timestamp suffix detected under {discussions_dir}: "
-            f"slot={dup_timestamp}-{dup_suffix:02d} files=[{files}]",
-            doc_ids,
-        )
-    return None, doc_ids
-
-
-def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
-    duplicate_error, doc_ids = _scan_discussion_timestamp_duplicate_state(discussions_dir)
-    if duplicate_error is not None:
-        raise RuntimeError(f"post-write duplicate guard failed: {duplicate_error}")
-    if doc_id not in doc_ids:
-        raise RuntimeError(f"post-write duplicate guard failed: created discussion id not found: {doc_id}")
-
-
-def _preflight_discussion_duplicate_guard(
-    req: CreateDiscussionDocRequest,
-    ports: Ports,
-    *,
-    specdock_dir: Path,
-) -> None:
-    _normalize_discussion_doc_inputs(req)
-    lock_path = _resolve_create_lock_path(specdock_dir)
-    if lock_path.exists():
-        return
-    graph = load_graph(ports, validate=False)
-    discussions_dir = _resolve_scope_node(req, graph).path / "discussions"
-    duplicate_error, _doc_ids = _scan_discussion_timestamp_duplicate_state(discussions_dir)
-    if duplicate_error is not None:
-        raise RuntimeError(duplicate_error)
 
 
 def _resolve_specdock_dir(ports: Ports) -> Path:
@@ -1320,488 +1221,6 @@ def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
                 _close_node_tree_parent_fd(destination_parent_fd)
     created_non_meta_paths = sorted([*created_paths, *created_rule_links], key=lambda path: path.as_posix())
     return [*created_non_meta_paths, Path(plan.meta.meta_path)]
-
-
-def _resolve_scope_node(req: CreateDiscussionDocRequest, graph: SpecGraph) -> SpecNode:
-    scope_node_id = req.scope_node_id
-    if req.scope_kind is not None:
-        scope_prefix = _prefix_for_kind(req.scope_kind)
-        scope_node_id = resolve_id_input(
-            req.scope_node_id,
-            prefix=scope_prefix,
-            field=f"--{req.scope_kind}",
-            nodes=graph.nodes_by_id,
-        )
-
-    scope = graph.nodes_by_id.get(scope_node_id)
-    if scope is None:
-        raise RuntimeError(f"Scope node not found: {scope_node_id}")
-    if req.scope_kind is not None and scope.kind != req.scope_kind:
-        raise RuntimeError(f"Scope kind mismatch: expected {req.scope_kind}, got {scope.kind}")
-    if scope.kind not in ("initiative", "epic", "issue"):
-        raise RuntimeError(f"Unsupported scope kind for discussion docs: {scope.kind}")
-    return scope
-
-
-def _normalize_discussion_doc_inputs(req: CreateDiscussionDocRequest) -> tuple[str, str, str]:
-    doc_type = str(req.doc_type).strip().lower()
-    if doc_type in _RETIRED_DISCUSSION_DOC_TYPES:
-        raise RuntimeError(
-            "Discussion doc type 'note' is retired for new documents; "
-            "use 'scratch' for new raw capture docs. Existing note artifacts remain valid."
-        )
-    if doc_type not in _CREATABLE_DISCUSSION_DOC_TYPES:
-        allowed = ", ".join(_CREATABLE_DISCUSSION_DOC_TYPES)
-        raise RuntimeError(f"Unknown discussion doc type: {doc_type} (allowed: {allowed})")
-
-    title = str(req.title).strip()
-    if not title:
-        raise RuntimeError("--title is required")
-
-    slug = str(req.slug).strip() if req.slug is not None else slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = validate_input_slug_kebab(slug, field="--slug")
-    return doc_type, title, slug
-
-
-def _resolve_discussion_instant_utc(now_iso: str | None = None) -> datetime:
-    if now_iso is None:
-        return datetime.now(timezone.utc)
-    normalized = now_iso.strip()
-    if normalized.endswith("Z"):
-        normalized = normalized[:-1] + "+00:00"
-    dt = datetime.fromisoformat(normalized)
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
-def _format_discussion_timestamp(now_iso: str | None = None) -> str:
-    return _resolve_discussion_instant_utc(now_iso).strftime("%Y%m%dt%H%M%S") + "z"
-
-
-def _format_discussion_date(now_iso: str | None = None) -> str:
-    return _resolve_discussion_instant_utc(now_iso).date().isoformat()
-
-
-def _format_discussion_date_from_doc_id(doc_id: str) -> str:
-    timestamp = doc_id.split("-", 1)[0]
-    return datetime.strptime(timestamp, "%Y%m%dt%H%M%Sz").date().isoformat()
-
-
-def _scan_discussion_timestamp_sources(
-    discussions_dir: Path,
-) -> list[tuple[str, int | None, str, Path]]:
-    refs: list[tuple[str, int | None, str, Path]] = []
-    if not discussions_dir.exists():
-        return refs
-    for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
-        parsed = parse_timestamp_discussion_doc_filename(path.name)
-        if parsed is None:
-            continue
-        refs.append((
-            parsed.timestamp,
-            parsed.suffix,
-            parsed.doc_type,
-            path,
-        ))
-    return refs
-
-
-def _format_discussion_doc_identity(*, timestamp: str, doc_type: str, slug: str, suffix: int | None) -> tuple[str, str]:
-    stem_prefix = f"{timestamp}-{doc_type}" if suffix is None else f"{timestamp}-{suffix:02d}-{doc_type}"
-    return f"{stem_prefix}-{slug}", stem_prefix
-
-
-def _sleep_discussion_timestamp_poll(seconds: float) -> None:
-    time.sleep(seconds)
-
-
-def _resolve_discussion_timestamp_wait_config() -> tuple[float, float]:
-    wait_seconds = _resolve_duration_seconds_exclusive(
-        _ENV_DISCUSSION_TIMESTAMP_WAIT_SECONDS,
-        _DEFAULT_DISCUSSION_TIMESTAMP_WAIT_SECONDS,
-        minimum=0.0,
-    )
-    poll_seconds = _resolve_duration_seconds(
-        _ENV_DISCUSSION_TIMESTAMP_POLL_SECONDS,
-        _DEFAULT_DISCUSSION_TIMESTAMP_POLL_SECONDS,
-        minimum=0.001,
-    )
-    return wait_seconds, poll_seconds
-
-
-def _discussion_standard_slot_is_free(discussions_dir: Path, timestamp: str) -> bool:
-    refs = _scan_discussion_timestamp_sources(discussions_dir)
-    return not any(existing_timestamp == timestamp for existing_timestamp, _suffix, _doc_type, _path in refs)
-
-
-def _allocate_discussion_doc_filename_for_timestamp(
-    discussions_dir: Path,
-    *,
-    timestamp: str,
-    doc_type: str,
-    slug: str,
-) -> tuple[Path, str]:
-    refs = _scan_discussion_timestamp_sources(discussions_dir)
-    matching = [(suffix, path) for ts, suffix, _existing_doc_type, path in refs if ts == timestamp]
-    if not matching:
-        stem, doc_id = _format_discussion_doc_identity(
-            timestamp=timestamp,
-            doc_type=doc_type,
-            slug=slug,
-            suffix=None,
-        )
-        return discussions_dir / f"{stem}.md", doc_id
-
-    used_suffixes = {suffix for suffix, _path in matching if suffix is not None}
-    for suffix in range(1, 100):
-        if suffix in used_suffixes:
-            continue
-        stem, doc_id = _format_discussion_doc_identity(
-            timestamp=timestamp,
-            doc_type=doc_type,
-            slug=slug,
-            suffix=suffix,
-        )
-        return discussions_dir / f"{stem}.md", doc_id
-    raise RuntimeError(
-        "Discussion timestamp suffix exhaustion: "
-        f"timestamp={timestamp} under {discussions_dir}. "
-        "Suffix allocation is limited to 01..99 within a single-second discussion-doc family."
-    )
-
-
-def _allocate_discussion_doc_filename(
-    discussions_dir: Path,
-    *,
-    timestamp: str,
-    doc_type: str,
-    slug: str,
-    now_iso_provider: Callable[[], str | None] | None = None,
-    sleep_fn: Callable[[float], None] | None = None,
-) -> tuple[Path, str]:
-    wait_config = _resolve_discussion_timestamp_wait_config() if now_iso_provider is not None else None
-    if _discussion_standard_slot_is_free(discussions_dir, timestamp):
-        return _allocate_discussion_doc_filename_for_timestamp(
-            discussions_dir,
-            timestamp=timestamp,
-            doc_type=doc_type,
-            slug=slug,
-        )
-    if now_iso_provider is None:
-        return _allocate_discussion_doc_filename_for_timestamp(
-            discussions_dir,
-            timestamp=timestamp,
-            doc_type=doc_type,
-            slug=slug,
-        )
-
-    assert wait_config is not None
-    wait_seconds, poll_seconds = wait_config
-    effective_sleep_fn = sleep_fn if sleep_fn is not None else _sleep_discussion_timestamp_poll
-    remaining_seconds = wait_seconds
-    while remaining_seconds > 0:
-        sleep_seconds = min(poll_seconds, remaining_seconds)
-        if sleep_seconds <= 0:
-            break
-        effective_sleep_fn(sleep_seconds)
-        remaining_seconds -= sleep_seconds
-        next_timestamp = _format_discussion_timestamp(now_iso_provider())
-        if next_timestamp > timestamp and _discussion_standard_slot_is_free(discussions_dir, next_timestamp):
-            return _allocate_discussion_doc_filename_for_timestamp(
-                discussions_dir,
-                timestamp=next_timestamp,
-                doc_type=doc_type,
-                slug=slug,
-            )
-
-    return _allocate_discussion_doc_filename_for_timestamp(
-        discussions_dir,
-        timestamp=timestamp,
-        doc_type=doc_type,
-        slug=slug,
-    )
-
-
-def _resolve_specdock_root(path: Path) -> Path:
-    for current in [path, *path.parents]:
-        if current.name == "spec-dock":
-            return current
-    raise RuntimeError(f"spec-dock root not found from scope path: {path}")
-
-
-def _doc_id_from_path(path: Path) -> str:
-    return discussion_doc_id_from_path(path)
-
-
-def _draft_canonical_template_path(*, specdock_dir: Path, scope_kind: SpecNodeKind, doc_type: str) -> Path | None:
-    target = _DRAFT_TARGET_BY_DOC_TYPE.get(doc_type)
-    if target is None:
-        return None
-    return specdock_dir / "templates" / scope_kind / f"{target}.md"
-
-
-def _normalize_draft_discussion_text(rendered_text: str, *, doc_type: str) -> str:
-    if doc_type not in _DRAFT_DISCUSSION_DOC_TYPES:
-        return rendered_text
-    if "artifact_state: awaiting-assurance-compose" not in rendered_text:
-        return rendered_text
-
-    text = rendered_text.replace('状態: "draft"\n', '状態: "draft | approved"\n', 1)
-    text = text.replace("artifact_state: awaiting-assurance-compose\n", "", 1)
-    parts = text.split("---", 2)
-    if len(parts) != 3:
-        return text
-    _prefix, frontmatter, body = parts
-    current_heading, _body_separator, _rest = body.partition("\n\n")
-    heading_prefix = current_heading.split(" — ", 1)[0] if current_heading.startswith("# ") else "# <SCOPE_ID>"
-    if doc_type == "draft-design":
-        body = (
-            f"{heading_prefix} — 設計（どう実現するか）\n\n## 目的・制約\n- ...\n\n## 採用方針 / トレードオフ\n- ...\n"
-        )
-    elif doc_type == "draft-plan":
-        body = (
-            f"{heading_prefix} — 実装計画（実行契約 / Execution Contract）\n\n"
-            "## 計画（Issue と実施順序）\n"
-            "- ...\n\n"
-            "## 検証\n"
-            "- ...\n"
-        )
-    else:
-        return text
-    return f"---{frontmatter}---\n{body.lstrip()}"
-
-
-def _draft_profile_artifact(doc_type: str) -> Literal["design", "plan"] | None:
-    if doc_type == "draft-design":
-        return "design"
-    if doc_type == "draft-plan":
-        return "plan"
-    return None
-
-
-def _resolve_issue_profile_draft_template_text(
-    *,
-    scope: SpecNode,
-    doc_type: str,
-    assurance_store: _AssuranceStoreLike | None,
-    artifact_store: _ArtifactStoreLike | None,
-) -> str | None:
-    artifact = _draft_profile_artifact(doc_type)
-    if scope.kind != "issue" or artifact is None:
-        return None
-    if assurance_store is None and artifact_store is None:
-        return None
-    if assurance_store is None:
-        raise RuntimeError(f"assurance_store is required for issue {doc_type}")
-    if artifact_store is None:
-        raise RuntimeError(f"artifact_store is required for issue {doc_type}")
-    target = assurance_store.resolve_issue_target(scope.id)
-    store_result = assurance_store.verify_contract(target)
-    if store_result.status != "valid" or store_result.contract is None:
-        details = "; ".join(getattr(store_result, "details", ()) or ())
-        suffix = f" details={details}" if details else ""
-        raise RuntimeError(
-            f"Valid assurance contract is required before creating issue {doc_type}: "
-            f"reason={store_result.reason}{suffix}"
-        )
-    profile = store_result.contract.classification.authorized_profile.value
-    return artifact_store.load_profile_artifact_template_text(artifact, profile)
-
-
-def _plan_discussion_doc_extended(
-    req: CreateDiscussionDocRequest,
-    graph: SpecGraph,
-    *,
-    assurance_store: _AssuranceStoreLike | None = None,
-    artifact_store: _ArtifactStoreLike | None = None,
-    today: str | None = None,
-    timestamp: str | None = None,
-    now_iso_provider: Callable[[], str | None] | None = None,
-    sleep_fn: Callable[[float], None] | None = None,
-) -> tuple[Path, Path, dict[str, str], str | None, bool]:
-    del today
-
-    scope = _resolve_scope_node(req, graph)
-    doc_type, title, slug = _normalize_discussion_doc_inputs(req)
-
-    specdock_dir = _resolve_specdock_root(scope.path)
-    template_text_override = _resolve_issue_profile_draft_template_text(
-        scope=scope,
-        doc_type=doc_type,
-        assurance_store=assurance_store,
-        artifact_store=artifact_store,
-    )
-    profile_sourced = template_text_override is not None
-    if doc_type in _DRAFT_DISCUSSION_DOC_TYPES:
-        if profile_sourced:
-            template_path = (
-                specdock_dir
-                / "templates"
-                / "issue-profiles"
-                / "<authorized_profile>"
-                / (f"{_draft_profile_artifact(doc_type)}.md")
-            )
-        else:
-            canonical_template_path = _draft_canonical_template_path(
-                specdock_dir=specdock_dir,
-                scope_kind=scope.kind,
-                doc_type=doc_type,
-            )
-            if canonical_template_path is None or not canonical_template_path.is_file():
-                raise RuntimeError(
-                    f"Missing canonical template source for {scope.kind} {doc_type}: {canonical_template_path}"
-                )
-            template_path = canonical_template_path
-    else:
-        template_path = specdock_dir / "templates" / "discussions" / f"{doc_type}.md"
-    discussions_dir = scope.path / "discussions"
-    effective_timestamp = timestamp if timestamp is not None else _format_discussion_timestamp()
-    dest_path, doc_id = _allocate_discussion_doc_filename(
-        discussions_dir,
-        timestamp=effective_timestamp,
-        doc_type=doc_type,
-        slug=slug,
-        now_iso_provider=now_iso_provider,
-        sleep_fn=sleep_fn,
-    )
-    if dest_path.exists():
-        raise RuntimeError(f"Discussion doc already exists: {dest_path}")
-
-    rendered_date = _format_discussion_date_from_doc_id(doc_id)
-    if doc_type in _DRAFT_DISCUSSION_DOC_TYPES:
-        replacements = _replacements(
-            kind=scope.kind,
-            node_id=scope.id,
-            title=scope.title,
-            parent_id=scope.parent_id,
-            initiative_id=scope.initiative_id,
-            github_issue_number=scope.github_issue_number,
-            today=rendered_date,
-        )
-        replacements["<SCOPE_ID>"] = scope.id
-    else:
-        replacements = {
-            "<ADR_ID>": doc_id,
-            "<ADR_TITLE>": title,
-            "<DISC_ID>": doc_id,
-            "<DISC_TITLE>": title,
-            "<RESEARCH_ID>": doc_id,
-            "<RESEARCH_TITLE>": title,
-            "<INTERVIEW_ID>": doc_id,
-            "<INTERVIEW_TITLE>": title,
-            "<SCRATCH_ID>": doc_id,
-            "<SCRATCH_TITLE>": title,
-            "<PR_REPAIR_BATCH_ID>": doc_id,
-            "<PR_REPAIR_BATCH_TITLE>": title,
-            "<NOTE_ID>": doc_id,
-            "<NOTE_TITLE>": title,
-            "<SCOPE_ID>": scope.id,
-            "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
-            "YYYY-MM-DD": rendered_date,
-        }
-    return template_path, dest_path, replacements, template_text_override, profile_sourced
-
-
-def plan_discussion_doc(
-    req: CreateDiscussionDocRequest,
-    graph: SpecGraph,
-    *,
-    assurance_store: _AssuranceStoreLike | None = None,
-    artifact_store: _ArtifactStoreLike | None = None,
-    today: str | None = None,
-    timestamp: str | None = None,
-    now_iso_provider: Callable[[], str | None] | None = None,
-    sleep_fn: Callable[[float], None] | None = None,
-) -> tuple[Path, Path, dict[str, str]]:
-    template_path, dest_path, replacements, _template_text_override, _profile_sourced = _plan_discussion_doc_extended(
-        req,
-        graph,
-        assurance_store=assurance_store,
-        artifact_store=artifact_store,
-        today=today,
-        timestamp=timestamp,
-        now_iso_provider=now_iso_provider,
-        sleep_fn=sleep_fn,
-    )
-    return template_path, dest_path, replacements
-
-
-def create_discussion_doc(
-    req: CreateDiscussionDocRequest,
-    ports: Ports,
-    *,
-    assurance_store: _AssuranceStoreLike | None = None,
-    artifact_store: _ArtifactStoreLike | None = None,
-) -> CreateDiscussionDocResult:
-    template_scaffolder = _resolve_template_scaffolder(ports)
-    specdock_dir = _resolve_specdock_dir(ports)
-    _preflight_discussion_duplicate_guard(req, ports, specdock_dir=specdock_dir)
-    lock_path, lock_token = _acquire_create_lock(specdock_dir)
-    result: CreateDiscussionDocResult | None = None
-    body_error: Exception | None = None
-    try:
-        graph = load_graph(ports, validate=False)
-
-        def _now_iso() -> str | None:
-            return ports.clock.now_iso() if ports.clock is not None else None
-
-        now_iso = _now_iso()
-        today = _format_discussion_date(now_iso)
-        timestamp = _format_discussion_timestamp(now_iso)
-        template_path, dest_path, replacements, template_text_override, profile_sourced = _plan_discussion_doc_extended(
-            req,
-            graph,
-            assurance_store=assurance_store,
-            artifact_store=artifact_store,
-            today=today,
-            timestamp=timestamp,
-            now_iso_provider=_now_iso,
-        )
-        duplicate_error, _doc_ids = _scan_discussion_timestamp_duplicate_state(dest_path.parent)
-        if duplicate_error is not None:
-            raise RuntimeError(duplicate_error)
-
-        template_text = (
-            template_text_override
-            if template_text_override is not None
-            else template_scaffolder.load_template_text(template_path)
-        )
-        rendered_text = template_scaffolder.render_text(template_text, replacements)
-        doc_type, _title, _slug = _normalize_discussion_doc_inputs(req)
-        if not profile_sourced:
-            rendered_text = _normalize_draft_discussion_text(rendered_text, doc_type=doc_type)
-        template_scaffolder.write_text(dest_path, rendered_text)
-        doc_id = _doc_id_from_path(dest_path)
-        _post_write_discussion_duplicate_guard(dest_path.parent, doc_id=doc_id)
-        result = CreateDiscussionDocResult(
-            doc_id=doc_id,
-            doc_type=doc_type,
-            scope_node_id=replacements["<SCOPE_ID>"],
-            path=dest_path,
-            warnings=[],
-        )
-    except Exception as exc:
-        body_error = exc
-    finally:
-        release_error: Exception | None = None
-        try:
-            _release_create_lock(lock_path, lock_token, specdock_dir=specdock_dir)
-        except Exception as exc:
-            release_error = exc
-
-        if body_error is not None:
-            if release_error is not None:
-                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
-            raise body_error
-        if release_error is not None:
-            raise release_error
-
-    if result is None:
-        raise RuntimeError("discussion doc create failed without result")
-    return result
 
 
 def _github_issue_body(
