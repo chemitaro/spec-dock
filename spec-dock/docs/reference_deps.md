@@ -174,4 +174,4 @@ unknown は fail-closed です。unknown high-level target や unknown descendan
   - `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` の実測 evidence
 - manual fix は checked-in data の修正に限定し、runtime fallback / dual-read / auto-migration は導入しません。
 - hard cutover judgment の primary owner は T3 integration issue（`iss-00062`）です。T4 closure issue（`iss-00063`）は T3 judgment を参照して final parity / close review を実施します。
-- cutover evidence の fixed-key contract（`cutover_entry.*` / `cutover_judgment.*`、`targeted_regression_summary` 含む）は `workflow_issue.md` を正本として追跡します。
+- cutover evidence の fixed-key contract（`cutover_entry.*` / `cutover_judgment.*`、`targeted_regression_summary` 含む）は、担当 issue の canonical requirement / design / plan / report を正本として追跡します。

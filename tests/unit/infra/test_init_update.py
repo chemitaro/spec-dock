@@ -1217,6 +1217,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/__pycache__/fixture.cpython-312.pyo",
     )
     _ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",
+        "spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md",
+        "spec_dock/assets/spec_dock/scripts/authoring-pack/README.md",
         "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
         "spec_dock/assets/github/workflows/spec-dock-close.yml",
         "spec_dock/assets/spec_dock/templates/initiative/current/stale.md",
@@ -5097,7 +5100,7 @@ class TestInitUpdate(CliRuntimeHarness):
                     f"missing issue-69 representative install_root asset in {surface_name}: {artifact_relative_path}"
                 )
 
-    def test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources(self) -> None:
+    def test_distribution_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources(self) -> None:
         surfaces = self._issue_69_collect_install_root_artifact_surfaces()
         source_inventory = surfaces["source"]
         assert source_inventory, "issue-69 source install_root inventory must be non-empty"
@@ -5554,7 +5557,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"missing={missing[:10]} unexpected={unexpected[:10]}"
             )
 
-    def test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
+    def test_distribution_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
