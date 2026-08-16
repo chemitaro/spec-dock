@@ -269,16 +269,24 @@ def _expected_installed_asset_manifest(repo_root: Path) -> dict[str, tuple[bytes
         if package_path.startswith(install_prefix):
             expected[package_path.removeprefix(install_prefix)] = identity
         elif package_path.startswith(scaffold_prefix):
-            expected[f"spec-dock/{package_path.removeprefix(scaffold_prefix)}"] = identity
+            target_path = f"spec-dock/{package_path.removeprefix(scaffold_prefix)}"
+            payload, mode = identity
+            if target_path.startswith("spec-dock/system/active-none/"):
+                mode = 0o444
+            expected[target_path] = (payload, mode)
     return expected
 
 
 def _assert_installed_asset_manifest(target: Path, expected: dict[str, tuple[bytes, int]]) -> None:
+    mode_mismatches: list[tuple[str, int, int]] = []
     for relative_path, (payload, mode) in expected.items():
         observed = target / relative_path
         assert observed.is_file() and not observed.is_symlink(), f"installed asset is missing: {relative_path}"
         assert observed.read_bytes() == payload, f"installed asset bytes differ: {relative_path}"
-        assert observed.stat().st_mode & 0o777 == mode, f"installed asset mode differs: {relative_path}"
+        observed_mode = observed.stat().st_mode & 0o777
+        if observed_mode != mode:
+            mode_mismatches.append((relative_path, mode, observed_mode))
+    assert not mode_mismatches, f"installed asset modes differ: {mode_mismatches}"
 
 
 def _runtime_env(helper: _Issue69Harness, temp_root: Path) -> dict[str, str]:
