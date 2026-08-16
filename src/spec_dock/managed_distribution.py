@@ -32,6 +32,19 @@ class DistributionManifestError(ValueError):
 class DistributionApplyError(RuntimeError):
     """Raised when a distribution plan cannot be applied safely."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        phase: str | None = None,
+        applied_paths: tuple[str, ...] = (),
+        pending_paths: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.phase = phase
+        self.applied_paths = applied_paths
+        self.pending_paths = pending_paths
+
 
 class DistributionAdmissionError(RuntimeError):
     """Raised when a consumer cannot safely enter a distribution operation."""
@@ -547,8 +560,9 @@ _DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
 _DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
 _DISTRIBUTION_RETRY_PHASES = frozenset({
     "preflight-complete",
-    "distribution-applied",
-    "scaffold-refreshed",
+    "managed-scaffold-refreshed",
+    "current-external-materialized",
+    "obsolete-pruned",
     "post-verified",
     "version-written",
 })
@@ -2963,6 +2977,7 @@ def apply_distribution_plan(
     stage_ownership: tuple[DistributionStageOwnership, ...] = (),
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     scaffold_applier: Callable[[], None] | None = None,
+    progress_recorder: Callable[[str, tuple[str, ...], tuple[str, ...], bool], None] | None = None,
 ) -> DistributionResult:
     """Apply a validated plan with no-follow identity checks at every action.
 
@@ -3002,71 +3017,139 @@ def apply_distribution_plan(
             raise DistributionApplyError("distribution plan is missing a target identity snapshot")
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
 
-    actions_to_apply = tuple(action for action in plan.actions if action.path not in scaffold_paths)
-    for index, action in enumerate(actions_to_apply):
-        snapshot = snapshots[action.path]
-        _assert_plan_target_snapshot(target_root, action.path, snapshot)
-        if allow_stale_stage_cleanup:
-            _cleanup_stale_distribution_stages(plan, target_root, action, snapshot, stage_ownership)
-        # Removing a known stale stage mutates the parent directory ctime.  The
-        # target itself must remain unchanged, but every later action needs the
-        # refreshed parent snapshot before it can be applied or adopted.
-        refreshed = _observe_target(target_root, action.path)
-        if refreshed.snapshot is None:
-            raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
-        _assert_pending_snapshot_stable(refreshed.snapshot, snapshot, action.path, created_parent_bindings)
-        snapshot = refreshed.snapshot
-        snapshots[action.path] = snapshot
-        for pending in actions_to_apply[index + 1 :]:
-            pending_snapshot = snapshots[pending.path]
-            pending_observation = _observe_target(target_root, pending.path)
-            if pending_observation.snapshot is None:
-                raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
-            _assert_pending_snapshot_stable(
-                pending_observation.snapshot,
-                pending_snapshot,
-                pending.path,
-                created_parent_bindings,
-            )
-            snapshots[pending.path] = pending_observation.snapshot
-        if action.action in {"adopt", "preserve"}:
-            continue
-        if stage_ownership_recorder is None:
-            _apply_distribution_action(plan, target_root, action, snapshot, created_parent_bindings)
-        else:
-            _apply_distribution_action(
-                plan,
-                target_root,
-                action,
-                snapshot,
-                created_parent_bindings,
-                stage_ownership_recorder,
-            )
-        for pending in actions_to_apply[index + 1 :]:
-            pending_snapshot = snapshots[pending.path]
-            pending_observation = _observe_target(target_root, pending.path)
-            if pending_observation.snapshot is None:
-                raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
-            _assert_pending_snapshot_stable(
-                pending_observation.snapshot,
-                pending_snapshot,
-                pending.path,
-                created_parent_bindings,
-            )
-            snapshots[pending.path] = pending_observation.snapshot
+    applied_paths: list[str] = []
+    pending_paths = [action.path for action in plan.actions]
 
     if scaffold_applier is not None and scaffold_paths:
-        scaffold_applier()
-        for action in plan.actions:
-            if action.path not in scaffold_paths:
-                continue
-            refreshed = _observe_target(target_root, action.path)
-            if refreshed.snapshot is None:
-                raise DistributionApplyError(f"managed scaffold post-apply path is missing for '{action.path}'")
-            expected = _expected_target_identity(plan, action.path)
-            if expected is None or refreshed.identity != expected:
-                raise DistributionApplyError(f"managed scaffold post-apply verification failed for '{action.path}'")
-            snapshots[action.path] = refreshed.snapshot
+        if progress_recorder is not None:
+            progress_recorder("managed-scaffold-refresh", tuple(applied_paths), tuple(pending_paths), False)
+        try:
+            scaffold_applier()
+            for action in plan.actions:
+                if action.path not in scaffold_paths:
+                    continue
+                refreshed = _observe_target(target_root, action.path)
+                if refreshed.snapshot is None:
+                    raise DistributionApplyError(f"managed scaffold post-apply path is missing for '{action.path}'")
+                expected = _expected_target_identity(plan, action.path)
+                if expected is None or refreshed.identity != expected:
+                    raise DistributionApplyError(f"managed scaffold post-apply verification failed for '{action.path}'")
+                snapshots[action.path] = refreshed.snapshot
+                applied_paths.append(action.path)
+                pending_paths.remove(action.path)
+            for action in plan.actions:
+                if action.path in scaffold_paths:
+                    continue
+                refreshed = _observe_target(target_root, action.path)
+                if refreshed.snapshot is None:
+                    raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                scaffold_owned_obsolete = (
+                    action.action == "prune"
+                    and any(action.path.startswith(f"spec-dock/{root}/") for root in _SCAFFOLD_MANAGED_ROOTS)
+                    and refreshed.state == "missing"
+                )
+                if not scaffold_owned_obsolete:
+                    _assert_pending_snapshot_stable(
+                        refreshed.snapshot,
+                        snapshots[action.path],
+                        action.path,
+                        created_parent_bindings,
+                    )
+                snapshots[action.path] = refreshed.snapshot
+        except Exception as exc:
+            if isinstance(exc, DistributionApplyError) and exc.phase is not None:
+                raise
+            raise DistributionApplyError(
+                str(exc),
+                phase="managed-scaffold-refresh",
+                applied_paths=tuple(applied_paths),
+                pending_paths=tuple(pending_paths),
+            ) from exc
+        if progress_recorder is not None:
+            progress_recorder("managed-scaffold-refresh", tuple(applied_paths), tuple(pending_paths), True)
+
+    current_paths = {asset.path for asset in plan.current_assets} | set(_CURRENT_SHORTCUTS)
+    external_actions = tuple(action for action in plan.actions if action.path not in scaffold_paths)
+    action_groups = (
+        ("current-external-materialize", tuple(action for action in external_actions if action.path in current_paths)),
+        ("obsolete-prune", tuple(action for action in external_actions if action.path not in current_paths)),
+    )
+    actions_to_apply = tuple(action for _, actions in action_groups for action in actions)
+    action_index = {id(action): index for index, action in enumerate(actions_to_apply)}
+    for phase, actions in action_groups:
+        if not actions:
+            if progress_recorder is not None:
+                progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), True)
+            continue
+        if progress_recorder is not None:
+            progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), False)
+        for action in actions:
+            index = action_index[id(action)]
+            try:
+                snapshot = snapshots[action.path]
+                _assert_plan_target_snapshot(target_root, action.path, snapshot)
+                if allow_stale_stage_cleanup:
+                    _cleanup_stale_distribution_stages(plan, target_root, action, snapshot, stage_ownership)
+                # Removing a known stale stage mutates the parent directory ctime.  The
+                # target itself must remain unchanged, but every later action needs the
+                # refreshed parent snapshot before it can be applied or adopted.
+                refreshed = _observe_target(target_root, action.path)
+                if refreshed.snapshot is None:
+                    raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                _assert_pending_snapshot_stable(refreshed.snapshot, snapshot, action.path, created_parent_bindings)
+                snapshot = refreshed.snapshot
+                snapshots[action.path] = snapshot
+                for pending in actions_to_apply[index + 1 :]:
+                    pending_snapshot = snapshots[pending.path]
+                    pending_observation = _observe_target(target_root, pending.path)
+                    if pending_observation.snapshot is None:
+                        raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
+                    _assert_pending_snapshot_stable(
+                        pending_observation.snapshot,
+                        pending_snapshot,
+                        pending.path,
+                        created_parent_bindings,
+                    )
+                    snapshots[pending.path] = pending_observation.snapshot
+                if action.action not in {"adopt", "preserve"}:
+                    if stage_ownership_recorder is None:
+                        _apply_distribution_action(plan, target_root, action, snapshot, created_parent_bindings)
+                    else:
+                        _apply_distribution_action(
+                            plan,
+                            target_root,
+                            action,
+                            snapshot,
+                            created_parent_bindings,
+                            stage_ownership_recorder,
+                        )
+                applied_paths.append(action.path)
+                pending_paths.remove(action.path)
+                if progress_recorder is not None:
+                    progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), False)
+                for pending in actions_to_apply[index + 1 :]:
+                    pending_snapshot = snapshots[pending.path]
+                    pending_observation = _observe_target(target_root, pending.path)
+                    if pending_observation.snapshot is None:
+                        raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
+                    _assert_pending_snapshot_stable(
+                        pending_observation.snapshot,
+                        pending_snapshot,
+                        pending.path,
+                        created_parent_bindings,
+                    )
+                    snapshots[pending.path] = pending_observation.snapshot
+            except Exception as exc:
+                if isinstance(exc, DistributionApplyError) and exc.phase is not None:
+                    raise
+                raise DistributionApplyError(
+                    str(exc),
+                    phase=phase,
+                    applied_paths=tuple(applied_paths),
+                    pending_paths=tuple(pending_paths),
+                ) from exc
+        if progress_recorder is not None:
+            progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), True)
 
     return DistributionResult(status="complete", actions=plan.actions)
 
