@@ -38240,7 +38240,7 @@ esac
             assert second_payload["status"] == "error"
             assert "spec-dock/spec-dock.version" in second_payload["errors"][0]
 
-    def test_uninstall_apply_remove_specs_rerun_accepts_empty_post_uninstall_boundary(self) -> None:
+    def test_uninstall_apply_remove_specs_rerun_blocks_markerless_empty_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -38248,10 +38248,16 @@ esac
             marker.write_text("remove\n", encoding="utf-8")
 
             first_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
-            second_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            second_payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--remove-specs",
+                expected_exit_code=2,
+            )
 
             assert first_payload["status"] == "completed"
-            assert second_payload["status"] == "completed"
+            assert second_payload["status"] == "error"
+            assert "spec-dock/spec-dock.version" in second_payload["errors"][0]
             assert (target / "spec-dock").is_dir()
             assert list((target / "spec-dock").iterdir()) == []
 

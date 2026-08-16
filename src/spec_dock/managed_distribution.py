@@ -458,6 +458,10 @@ def _assert_no_manifest_overlap(
     *,
     protected_paths: set[str] | frozenset[str] = frozenset(),
 ) -> None:
+    for current_path in current_paths:
+        if any(_path_overlaps(current_path, protected_path) for protected_path in protected_paths):
+            _fail(f"physical Current path overlaps protected workspace surface: {current_path}")
+
     seen_historical: set[tuple[str, str, str | None, str | None]] = set()
     for item in manifest.historical_current_identities:
         signature = (item["path"], item["kind"], item.get("sha256"), item.get("target"))
@@ -695,27 +699,6 @@ def _is_preserved_specs_workspace(target_root: Path) -> bool:
             if not entry.is_file(follow_symlinks=False):
                 return False
     return True
-
-
-def _is_empty_post_uninstall_boundary(
-    target_root: Path,
-    *,
-    manifest_path: Path,
-    manifest: DistributionManifest,
-) -> bool:
-    """Recognize an empty uninstall boundary only when managed assets are gone."""
-
-    install_root = Path(manifest_path).parent / "install_root"
-    try:
-        current_paths = tuple(asset.path for asset in _current_assets(install_root))
-    except DistributionManifestError:
-        return False
-    managed_paths = (
-        *current_paths,
-        *_CURRENT_SHORTCUTS,
-        *(item["path"] for item in manifest.obsolete_exact_files),
-    )
-    return not any(_path_present_no_follow(target_root / relative_path) for relative_path in managed_paths)
 
 
 def _assert_real_parent_chain(target_root: Path, relative_path: str, *, label: str) -> bool:
@@ -971,20 +954,6 @@ def admit_distribution_operation(
             _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
         if empty_workspace_boundary and operation in {"fresh", "init-force"}:
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
-        if (
-            empty_workspace_boundary
-            and operation == "uninstall"
-            and _is_empty_post_uninstall_boundary(
-                target_root,
-                manifest_path=Path(manifest_path),
-                manifest=manifest,
-            )
-        ):
-            # A completed `uninstall --remove-specs` intentionally retains an
-            # empty boundary.  Admit only this no-managed-assets state so a
-            # rerun remains a safe no-op; arbitrary empty workspaces with any
-            # managed asset still fail the normal version gate below.
-            return DistributionAdmission(operation=operation, status="recognized", package_version=package_version)
         if operation in {"fresh", "init-force"} and _is_preserved_specs_workspace(target_root):
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
 
@@ -1227,12 +1196,29 @@ def _target_snapshot(
     return DistributionTargetSnapshot(root=root, parents=tuple(parents), target=target)
 
 
-def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation:
-    """Inspect one target path without following a symlink component."""
+def _same_observed_node(before: os.stat_result, after: os.stat_result) -> bool:
+    return (
+        before.st_dev == after.st_dev
+        and before.st_ino == after.st_ino
+        and before.st_ctime_ns == after.st_ctime_ns
+        and stat.S_IFMT(before.st_mode) == stat.S_IFMT(after.st_mode)
+    )
 
-    current = target_root
+
+def _digest_open_file(fd: int) -> str:
+    digest = hashlib.sha256()
+    while True:
+        chunk = os.read(fd, 1024 * 1024)
+        if not chunk:
+            return digest.hexdigest()
+        digest.update(chunk)
+
+
+def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation:
+    """Inspect one target through held directory descriptors without following links."""
+
     try:
-        root_stat = os.lstat(current)
+        root_stat = os.lstat(target_root)
     except FileNotFoundError:
         return _TargetObservation(
             "missing",
@@ -1256,106 +1242,164 @@ def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation
             snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
         )
 
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        parent_fd = os.open(target_root, directory_flags)
+        opened_root = os.fstat(parent_fd)
+    except OSError:
+        return _TargetObservation(
+            "root-error",
+            snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
+        )
+    if not _same_observed_node(root_stat, opened_root):
+        os.close(parent_fd)
+        return _TargetObservation(
+            "root-error",
+            snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
+        )
+
     parts = PurePosixPath(relative_path).parts
     parents: list[PathIdentitySnapshot] = []
     parent_parts: list[str] = []
     missing_parent = False
-    for component in parts[:-1]:
-        current = current / component
-        parent_parts.append(component)
-        parent_relative = "/".join(parent_parts)
-        if missing_parent:
-            # Keep every remaining parent in the preflight snapshot. A later
-            # component is also absent once an ancestor is missing; omitting
-            # it would leave an unbound race window during apply.
-            parents.append(_missing_snapshot(parent_relative))
-            continue
-        try:
-            component_stat = os.lstat(current)
-        except FileNotFoundError:
-            parents.append(_missing_snapshot(parent_relative))
-            missing_parent = True
-            continue
-        except OSError:
-            return _TargetObservation(
-                "parent-error",
-                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-            )
-        component_snapshot = _snapshot_from_stat(parent_relative, component_stat)
-        parents.append(component_snapshot)
-        if stat.S_ISLNK(component_stat.st_mode):
-            return _TargetObservation(
-                "symlink-container",
-                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-            )
-        if not stat.S_ISDIR(component_stat.st_mode):
-            return _TargetObservation(
-                "non-directory-container",
-                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-            )
-
-    if missing_parent:
-        return _TargetObservation(
-            "missing",
-            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-        )
-
-    exact = current / parts[-1]
     try:
-        exact_stat = os.lstat(exact)
-    except FileNotFoundError:
-        return _TargetObservation(
-            "missing",
-            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-        )
-    except OSError:
-        return _TargetObservation(
-            "target-error",
-            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-        )
+        for component in parts[:-1]:
+            parent_parts.append(component)
+            parent_relative = "/".join(parent_parts)
+            if missing_parent:
+                parents.append(_missing_snapshot(parent_relative))
+                continue
+            try:
+                component_stat = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                parents.append(_missing_snapshot(parent_relative))
+                missing_parent = True
+                continue
+            except OSError:
+                return _TargetObservation(
+                    "parent-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            component_snapshot = _snapshot_from_stat(parent_relative, component_stat)
+            parents.append(component_snapshot)
+            if stat.S_ISLNK(component_stat.st_mode):
+                return _TargetObservation(
+                    "symlink-container",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            if not stat.S_ISDIR(component_stat.st_mode):
+                return _TargetObservation(
+                    "non-directory-container",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            try:
+                next_fd = os.open(component, directory_flags, dir_fd=parent_fd)
+                opened_component = os.fstat(next_fd)
+            except OSError:
+                return _TargetObservation(
+                    "parent-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            if not _same_observed_node(component_stat, opened_component):
+                os.close(next_fd)
+                return _TargetObservation(
+                    "parent-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            os.close(parent_fd)
+            parent_fd = next_fd
 
-    if stat.S_ISLNK(exact_stat.st_mode):
+        if missing_parent:
+            return _TargetObservation(
+                "missing",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
+
+        exact_name = parts[-1]
         try:
-            link_target = _normalized_link_target(str(exact.readlink()))
-        except OSError:
-            link_target = None
-        identity = DistributionIdentity(kind="symlink", target=link_target)
-        return _TargetObservation(
-            "symlink",
-            identity,
-            exact_stat.st_nlink,
-            _target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat, identity=identity)),
-        )
-    if stat.S_ISREG(exact_stat.st_mode):
-        try:
-            digest = hashlib.sha256(exact.read_bytes()).hexdigest()
+            exact_stat = os.stat(exact_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return _TargetObservation(
+                "missing",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
         except OSError:
             return _TargetObservation(
                 "target-error",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
+
+        if stat.S_ISLNK(exact_stat.st_mode):
+            try:
+                link_target = _normalized_link_target(str(os.readlink(exact_name, dir_fd=parent_fd)))
+                after_link = os.stat(exact_name, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError:
+                link_target = None
+                after_link = exact_stat
+            if not _same_observed_node(exact_stat, after_link):
+                return _TargetObservation(
+                    "target-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
+                )
+            identity = DistributionIdentity(kind="symlink", target=link_target)
+            return _TargetObservation(
+                "symlink",
+                identity,
+                exact_stat.st_nlink,
+                _target_snapshot(
+                    root_snapshot,
+                    parents,
+                    _snapshot_from_stat(relative_path, exact_stat, identity=identity),
+                ),
+            )
+        if stat.S_ISREG(exact_stat.st_mode):
+            file_fd: int | None = None
+            try:
+                file_fd = os.open(exact_name, file_flags, dir_fd=parent_fd)
+                opened_file = os.fstat(file_fd)
+                if not _same_observed_node(exact_stat, opened_file) or not stat.S_ISREG(opened_file.st_mode):
+                    raise OSError(errno.ESTALE, "managed target identity changed")
+                digest = _digest_open_file(file_fd)
+                after_read = os.fstat(file_fd)
+                if not _same_observed_node(opened_file, after_read):
+                    raise OSError(errno.ESTALE, "managed target identity changed")
+            except OSError:
+                return _TargetObservation(
+                    "target-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
+                )
+            finally:
+                if file_fd is not None:
+                    os.close(file_fd)
+            identity = DistributionIdentity(
+                kind="regular",
+                sha256=digest,
+                mode=stat.S_IMODE(opened_file.st_mode),
+            )
+            return _TargetObservation(
+                "regular",
+                identity,
+                opened_file.st_nlink,
+                _target_snapshot(
+                    root_snapshot,
+                    parents,
+                    _snapshot_from_stat(relative_path, opened_file, identity=identity),
+                ),
+            )
+        if stat.S_ISDIR(exact_stat.st_mode):
+            return _TargetObservation(
+                "directory",
+                link_count=exact_stat.st_nlink,
                 snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
             )
-        identity = DistributionIdentity(
-            kind="regular",
-            sha256=digest,
-            mode=stat.S_IMODE(exact_stat.st_mode),
-        )
         return _TargetObservation(
-            "regular",
-            identity,
-            exact_stat.st_nlink,
-            _target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat, identity=identity)),
-        )
-    if stat.S_ISDIR(exact_stat.st_mode):
-        return _TargetObservation(
-            "directory",
+            "special",
             link_count=exact_stat.st_nlink,
             snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
         )
-    return _TargetObservation(
-        "special",
-        link_count=exact_stat.st_nlink,
-        snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
-    )
+    finally:
+        os.close(parent_fd)
 
 
 def _historical_records(manifest: DistributionManifest) -> tuple[dict[str, Any], ...]:
@@ -1524,10 +1568,6 @@ def _classify_current_target(
         and actual.mode != expected.mode
     ):
         if operation == "fresh":
-            if observation.link_count is not None and observation.link_count > 1:
-                # Byte-identical hard links may be adopted read-only; changing
-                # their mode would mutate the user's other hard-link name.
-                return DistributionAction(path, operation, "adopt", "current", "current-identity-match")
             return _blocked_action(
                 path,
                 operation,
@@ -2919,6 +2959,7 @@ def apply_distribution_plan(
     plan: DistributionPlan,
     *,
     allow_stale_stage_cleanup: bool = False,
+    allow_blocked_scaffold_paths: bool = False,
     stage_ownership: tuple[DistributionStageOwnership, ...] = (),
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     scaffold_applier: Callable[[], None] | None = None,
@@ -2937,7 +2978,9 @@ def apply_distribution_plan(
     target_root = plan.target_root
     if target_root is None or plan.install_root is None:
         raise DistributionApplyError("distribution plan is missing target or provider roots")
-    permitted_scaffold_paths = plan.scaffold_paths if scaffold_applier is not None else frozenset()
+    permitted_scaffold_paths = (
+        plan.scaffold_paths if scaffold_applier is not None and allow_blocked_scaffold_paths else frozenset()
+    )
     blocked_actions = [
         action for action in plan.actions if action.blocked and action.path not in permitted_scaffold_paths
     ]
@@ -2954,8 +2997,6 @@ def apply_distribution_plan(
     created_parent_bindings: dict[str, PathIdentitySnapshot] = {}
     scaffold_paths = plan.scaffold_paths if scaffold_applier is not None else frozenset()
     for action in plan.actions:
-        if action.path in scaffold_paths:
-            continue
         snapshot = snapshots.get(action.path)
         if snapshot is None:
             raise DistributionApplyError("distribution plan is missing a target identity snapshot")

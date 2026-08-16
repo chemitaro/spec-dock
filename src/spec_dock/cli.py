@@ -201,6 +201,10 @@ class _ManagedFileIdentity(NamedTuple):
     sha256: str
 
 
+def _is_root_workbench_seed_path(path: Path) -> bool:
+    return path.name == "README.md" and path.parent.name == ".workbench" and path.parent.parent.name == "spec-dock"
+
+
 def _managed_path_identity(path: Path) -> _ManagedPathIdentity:
     try:
         info = os.lstat(path)
@@ -211,7 +215,7 @@ def _managed_path_identity(path: Path) -> _ManagedPathIdentity:
     return _ManagedPathIdentity(info.st_dev, info.st_ino, info.st_ctime_ns)
 
 
-def _managed_file_identity(path: Path) -> _ManagedFileIdentity | None:
+def _managed_file_identity(path: Path, *, allow_hard_link: bool = False) -> _ManagedFileIdentity | None:
     """Capture one regular file without following the final path component."""
     try:
         info = os.lstat(path)
@@ -219,7 +223,7 @@ def _managed_file_identity(path: Path) -> _ManagedFileIdentity | None:
         return None
     except OSError as exc:
         raise RuntimeError("managed scaffold file cannot be inspected safely") from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or (not allow_hard_link and info.st_nlink != 1):
         raise RuntimeError("managed scaffold file is not a safe regular file")
 
     nofollow = getattr(os, "O_NOFOLLOW", None)
@@ -235,7 +239,7 @@ def _managed_file_identity(path: Path) -> _ManagedFileIdentity | None:
             opened.st_dev != info.st_dev
             or opened.st_ino != info.st_ino
             or opened.st_ctime_ns != info.st_ctime_ns
-            or opened.st_nlink != 1
+            or (not allow_hard_link and opened.st_nlink != 1)
             or not stat.S_ISREG(opened.st_mode)
         ):
             raise RuntimeError("managed scaffold file identity changed")
@@ -263,7 +267,7 @@ def _root_workbench_seed_decision(specdock_dir: Path, source: Path) -> bool:
     """Classify the Fresh root Workbench seed without following user paths."""
     _assert_root_workbench_parent_safe(specdock_dir)
     target = specdock_dir / ".workbench" / "README.md"
-    target_identity = _managed_file_identity(target)
+    target_identity = _managed_file_identity(target, allow_hard_link=True)
     if target_identity is None:
         return True
 
@@ -279,9 +283,14 @@ def _root_workbench_seed_decision(specdock_dir: Path, source: Path) -> bool:
     return False
 
 
-def _assert_managed_file_identity(path: Path, expected: _ManagedFileIdentity | None) -> None:
+def _assert_managed_file_identity(
+    path: Path,
+    expected: _ManagedFileIdentity | None,
+    *,
+    allow_hard_link: bool = False,
+) -> None:
     """Reject a managed file that appeared or changed after preflight."""
-    if _managed_file_identity(path) != expected:
+    if _managed_file_identity(path, allow_hard_link=allow_hard_link) != expected:
         raise RuntimeError("managed scaffold file identity changed")
 
 
@@ -337,7 +346,11 @@ def _assert_managed_scaffold_file_identities(
     for path, expected in expected_identities.items():
         if root_absolute is not None and not path.absolute().is_relative_to(root_absolute):
             continue
-        _assert_managed_file_identity(path, expected)
+        _assert_managed_file_identity(
+            path,
+            expected,
+            allow_hard_link=_is_root_workbench_seed_path(path),
+        )
 
 
 def _sync_tree(
@@ -1672,7 +1685,10 @@ def _preflight_managed_scaffold_target_paths(
     scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] = {}
     for relative_path in expected_scaffold_file_paths:
         path = target_root / relative_path
-        scaffold_file_identities[path] = _managed_file_identity(path)
+        scaffold_file_identities[path] = _managed_file_identity(
+            path,
+            allow_hard_link=_is_root_workbench_seed_path(path),
+        )
 
     gitignore_path = specdock_dir / ".gitignore"
     require_regular_file(gitignore_path, label="spec-dock/.gitignore")
@@ -1805,9 +1821,7 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
                 target_root=target_root,
                 operation="fresh",
             )
-            blocked_actions = [
-                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
-            ]
+            blocked_actions = [action for action in plan.actions if action.blocked]
             if blocked_actions:
                 reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked: {reasons}")
@@ -1859,9 +1873,7 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
                 target_root=target_root,
                 operation="fresh",
             )
-            blocked_actions = [
-                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
-            ]
+            blocked_actions = [action for action in plan.actions if action.blocked]
             if blocked_actions:
                 reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
@@ -1902,6 +1914,7 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
             _assert_distribution_root_identity(target_root, root_identity)
             apply_distribution_plan(
                 plan,
+                allow_blocked_scaffold_paths=False,
                 stage_ownership_recorder=record_stage_ownership,
                 scaffold_applier=apply_scaffold,
             )
@@ -2007,7 +2020,9 @@ def _install_recognized_distribution_unlocked(
                 operation=operation,
             )
             blocked_actions = [
-                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
+                action
+                for action in plan.actions
+                if action.blocked and (operation == "fresh" or action.path not in plan.scaffold_paths)
             ]
             if blocked_actions:
                 reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
@@ -2046,7 +2061,9 @@ def _install_recognized_distribution_unlocked(
                 operation=operation,
             )
             blocked_actions = [
-                action for action in plan.actions if action.blocked and action.path not in plan.scaffold_paths
+                action
+                for action in plan.actions
+                if action.blocked and (operation == "fresh" or action.path not in plan.scaffold_paths)
             ]
             if blocked_actions:
                 reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
@@ -2115,6 +2132,7 @@ def _install_recognized_distribution_unlocked(
             _assert_distribution_root_identity(target_root, root_identity)
             apply_distribution_plan(
                 plan,
+                allow_blocked_scaffold_paths=operation != "fresh",
                 allow_stale_stage_cleanup=retry_recovery,
                 stage_ownership=tuple(stage_ownership),
                 stage_ownership_recorder=record_stage_ownership,
@@ -2291,15 +2309,10 @@ def _require_managed_specdock_for_uninstall(target_root: Path) -> Path:
 
     version_file = specdock_dir / "spec-dock.version"
     if not version_file.is_file() and not _has_valid_uninstall_retry_marker(specdock_dir):
-        try:
-            empty_post_uninstall_boundary = not any(specdock_dir.iterdir())
-        except OSError as exc:
-            raise RuntimeError("target is not a managed SpecDock repo: workspace cannot be inspected safely") from exc
-        if not empty_post_uninstall_boundary:
-            raise RuntimeError(
-                "target is not a managed SpecDock repo: missing managed "
-                "'spec-dock/spec-dock.version' state or SpecDock uninstall retry marker"
-            )
+        raise RuntimeError(
+            "target is not a managed SpecDock repo: missing managed "
+            "'spec-dock/spec-dock.version' state or SpecDock uninstall retry marker"
+        )
     return specdock_dir
 
 
