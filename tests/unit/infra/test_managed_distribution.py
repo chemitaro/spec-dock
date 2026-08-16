@@ -300,6 +300,17 @@ def test_s20_protected_workspace_overlap_is_rejected(tmp_path: Path, protected_p
         build_distribution_plan(INSTALL_ROOT, manifest_path=manifest_path)
 
 
+def test_s20_physical_current_catalog_cannot_overlap_protected_workspace(tmp_path: Path) -> None:
+    install_root = tmp_path / "install_root"
+    protected = install_root / "spec-dock/initiatives/user-owned/requirement.md"
+    protected.parent.mkdir(parents=True)
+    protected.write_text("must remain user-owned\n", encoding="utf-8")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+
+    with pytest.raises(DistributionManifestError, match="protected workspace surface"):
+        build_distribution_plan(install_root, manifest_path=manifest_path)
+
+
 def test_s20_ancestor_overlap_between_historical_records_is_rejected(tmp_path: Path) -> None:
     manifest_path = _write_manifest(
         tmp_path,
@@ -477,6 +488,78 @@ def test_s25_unknown_current_collision_is_preserved_and_diagnostic_is_sanitized(
     assert external_path not in repr(diagnostic)
     assert "inspect ownership" in str(diagnostic["operator_action"])
     assert target.read_text(encoding="utf-8") == f"{secret}\n{external_path}\n"
+
+
+def test_s25_preflight_does_not_follow_final_component_swapped_to_symlink(tmp_path: Path, monkeypatch) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github/workflows/ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"user-owned\n")
+    external = tmp_path / "external.yml"
+    external.write_bytes(b"current\n")
+    real_open = managed_distribution.os.open
+    swapped = False
+
+    def swap_before_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped
+        if path == "ci.yml" and dir_fd is not None and not swapped:
+            swapped = True
+            target.unlink()
+            target.symlink_to(external)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(managed_distribution.os, "open", swap_before_open)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.blocked
+    assert action.reason == "unsafe-target-path"
+    assert target.is_symlink()
+
+
+def test_s25_preflight_does_not_follow_parent_swapped_to_symlink(tmp_path: Path, monkeypatch) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    workflows = target_root / ".github/workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_bytes(b"user-owned\n")
+    external = tmp_path / "external-workflows"
+    external.mkdir()
+    (external / "ci.yml").write_bytes(b"current\n")
+    displaced = tmp_path / "displaced-workflows"
+    real_open = managed_distribution.os.open
+    swapped = False
+
+    def swap_before_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped
+        if path == "workflows" and dir_fd is not None and not swapped:
+            swapped = True
+            workflows.rename(displaced)
+            workflows.symlink_to(external, target_is_directory=True)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(managed_distribution.os, "open", swap_before_open)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.blocked
+    assert action.reason == "unsafe-target-path"
+    assert workflows.is_symlink()
 
 
 def test_s25_update_upgrades_direct_historical_identity(tmp_path: Path) -> None:

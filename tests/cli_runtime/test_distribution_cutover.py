@@ -237,6 +237,16 @@ def test_s40b_provider_scaffold_excludes_removed_docs_and_templates() -> None:
     assert REMOVED_DOC_PATHS.isdisjoint(actual)
     assert all(not path.startswith(prefix) for path in actual for prefix in REMOVED_TEMPLATE_PREFIXES)
     assert "templates/artifacts/pr-repair-batch.md" not in actual
+    current_docs = tuple((SCAFFOLD_ROOT / "docs").rglob("*.md"))
+    for removed_path in REMOVED_DOC_PATHS:
+        removed_name = Path(removed_path).name
+        retired_routes = (f"`{removed_name}`", f"]({removed_name})", f"spec-dock/{removed_path}")
+        assert all(
+            all(route not in path.read_text(encoding="utf-8") for route in retired_routes)
+            for path in current_docs
+        ), (
+            f"Current documentation still routes to retired path: {removed_path}"
+        )
 
 
 def test_s40b_fresh_init_materializes_only_current_external_catalog(tmp_path: Path) -> None:
@@ -356,6 +366,25 @@ def test_s45_fresh_preserves_same_bytes_wrong_mode_current_asset(tmp_path: Path,
     destination.write_bytes(source.read_bytes())
     source_mode = source.stat().st_mode & 0o777
     destination.chmod(0o600 if source_mode != 0o600 else 0o644)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["init", str(tmp_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "current-mode-mismatch" in captured.err
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_s45_fresh_preserves_same_bytes_wrong_mode_hard_link_current_asset(tmp_path: Path, capsys) -> None:
+    relative_path = ".github/workflows/ci.yml"
+    source = INSTALL_ROOT / relative_path
+    destination = tmp_path / relative_path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(source.read_bytes())
+    source_mode = source.stat().st_mode & 0o777
+    destination.chmod(0o600 if source_mode != 0o600 else 0o644)
+    alias = tmp_path / "user-owned-ci-alias.yml"
+    os.link(destination, alias)
     before = _filesystem_snapshot(tmp_path)
 
     assert main(["init", str(tmp_path)]) == 1
@@ -1182,8 +1211,8 @@ def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypat
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during scaffold-refresh" in captured
-    assert "target=spec-dock" in captured
+    assert "distribution partial failure during distribution-apply" in captured
+    assert "target=distribution" in captured
     assert external_readme.read_bytes() == b"external-owned\n"
     assert (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
@@ -1215,6 +1244,65 @@ def test_s60_fresh_retry_adopts_provider_identical_workbench_seed(tmp_path: Path
     assert main(["init", str(tmp_path)]) == 0
     assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
     assert target.read_bytes() == source.read_bytes()
+
+
+def test_s60_fresh_retry_adopts_provider_identical_hard_link_workbench_seed(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    original_apply = cli.apply_distribution_plan
+    failed = False
+
+    def fail_once(plan, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise RuntimeError("simulated distribution failure")
+        return original_apply(plan, **kwargs)
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    assert main(["init", str(tmp_path)]) == 1
+    capsys.readouterr()
+
+    source = SCAFFOLD_ROOT / "templates/root/.workbench/README.md"
+    source_copy = tmp_path / "provider-workbench-seed"
+    shutil.copy2(source, source_copy)
+    target = tmp_path / "spec-dock/.workbench/README.md"
+    target.parent.mkdir(parents=True)
+    os.link(source_copy, target)
+    before_inode = target.stat().st_ino
+    assert target.stat().st_nlink == 2
+
+    assert main(["init", str(tmp_path)]) == 0
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+    assert target.stat().st_ino == before_inode
+    assert target.stat().st_nlink == 2
+    assert target.read_bytes() == source.read_bytes()
+
+
+def test_s60_fresh_retry_blocks_modified_scaffold_collision_before_refresh(tmp_path: Path, monkeypatch, capsys) -> None:
+    original_apply = cli.apply_distribution_plan
+    failed = False
+
+    def fail_once(plan, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise RuntimeError("simulated distribution failure")
+        return original_apply(plan, **kwargs)
+
+    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    assert main(["init", str(tmp_path)]) == 1
+    capsys.readouterr()
+
+    modified = tmp_path / "spec-dock/docs/README.md"
+    modified.parent.mkdir(parents=True)
+    modified.write_bytes(b"user-owned scaffold collision\n")
+
+    assert main(["init", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "distribution partial failure during preflight" in captured
+    assert modified.read_bytes() == b"user-owned scaffold collision\n"
+    assert (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
 def test_s50_update_preserves_symlinked_root_workbench(tmp_path: Path) -> None:
@@ -2209,12 +2297,18 @@ def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, c
     assert not (remove_target / "spec-dock/.uninstall-retry.json").exists()
 
 
-def test_s70_uninstall_empty_boundary_allows_fresh_reinit_and_safe_rerun(tmp_path: Path, capsys) -> None:
+def test_s70_uninstall_empty_boundary_allows_fresh_reinit_and_blocks_markerless_rerun(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
 
     assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 0
     capsys.readouterr()
+    assert (tmp_path / "spec-dock").is_dir()
+    assert list((tmp_path / "spec-dock").iterdir()) == []
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 2
+    captured = capsys.readouterr().err
+    assert "missing-version" in captured
     assert (tmp_path / "spec-dock").is_dir()
     assert list((tmp_path / "spec-dock").iterdir()) == []
 
@@ -2224,6 +2318,8 @@ def test_s70_uninstall_empty_boundary_allows_fresh_reinit_and_safe_rerun(tmp_pat
 
     assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 0
     capsys.readouterr()
+    assert (tmp_path / "spec-dock").is_dir()
+    assert list((tmp_path / "spec-dock").iterdir()) == []
 
 
 def test_s70_uninstall_remove_specs_cleans_nested_generated_directories(tmp_path: Path, capsys) -> None:
