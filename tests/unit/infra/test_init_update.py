@@ -1,5 +1,4 @@
 import ast
-from collections.abc import Callable
 from contextlib import contextmanager, redirect_stderr, redirect_stdout, suppress
 from datetime import datetime, timedelta, timezone
 import hashlib
