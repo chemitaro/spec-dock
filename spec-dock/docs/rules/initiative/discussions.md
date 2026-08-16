@@ -5,13 +5,12 @@
 - Artifact guidance: `spec-dock/docs/authoring/artifacts.md`
 - Naming rules: `spec-dock/docs/reference_naming.md`
 - Existing docs in this directory are timestamp-prefixed originals（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。legacy sequential files は grandfathered で、自動 rename しません。
-- Delegated authoring の future draft / analysis / artifact-local report は対象 scope の `artifacts/` direct child に flat Markdown として保存します。per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/`、`artifacts/delegated-authoring/` は新規出力先にしません。
-- Sub-agent-created draft は canonical docs への直接書き込みではなく、scope-local `artifacts/` 直下の flat Markdown として保存します。`draft-requirement` / `draft-design` / `draft-plan` は draft 専用 template を持たず、scope kind に応じた canonical template を直接 source として render します。canonical docs remain main-orchestrator-only. `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to` は自己主張しません。
+- Currentの新規作成catalogは`blank` / `research` / `interview` / `disc` / `decision-candidate` / `adr`だけです。新規working artifactは`artifacts/`直下へ保存します。
 - Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority です。artifact draft は evidence であり、採用は canonical `report.md` の Evidence Adoption Ledger と canonical docs への再記述で成立します。
 - `report.md` は canonical observed evidence ledger です。legacy discussion-local report artifact catalog には含めません。
 - Historical delegated-authoring manifest/Profile/probe/session artifacts は grandfathered evidence です。current delegated drafts が flat model を使うことだけを理由に削除、rename、validation failure 化しません。
 - 実行場所: コマンドはリポジトリ root から実行してください。`./spec-dock/scripts/spec-dock ...` はその位置で保証される実行経路で、nested directory では相対 path が変わります。
-- Legacy discussion catalog:
+- Historical discussion catalog（次のtypeは既存fileのvalidation用であり、このdirectoryへの新規作成routeではありません）:
   - `scratch`: raw capture。非 authoritative。未整理の発話、観察、思考、会話ログを置く。
   - `interview`: docs-aware clarification の正式質問シート。重要判断は一問一答で扱い、回答前に unanswered artifact を作成し、回答後に同じ artifact へ回答、採用判断、反映先を追記する。既存の複数質問 artifact は grandfathered で、自動分割や rename はしない。
   - `research`: source-grounded read。事実、推測、未検証、用語衝突、edge case、判断への含意を分ける。

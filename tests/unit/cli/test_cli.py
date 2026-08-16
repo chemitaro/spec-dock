@@ -18,7 +18,6 @@ class TestCliTestTreeSplitS12:
             repo_root / "tests" / "cli_runtime" / "test_runtime_validate_s02.py",
             repo_root / "tests" / "cli_runtime" / "test_runtime_deps_s04.py",
             repo_root / "tests" / "cli_runtime" / "test_runtime_active_s05.py",
-            repo_root / "tests" / "cli_runtime" / "test_runtime_new_doc_s09.py",
             repo_root / "tests" / "unit" / "commands" / "test_runtime_new_s08.py",
             repo_root / "tests" / "unit" / "domain" / "test_runtime_domain_s01.py",
             repo_root / "tests" / "unit" / "domain" / "test_runtime_domain_s03.py",
@@ -55,7 +54,6 @@ class TestCliTestTreeSplitS12:
             test_runtime_active_s06,
             test_runtime_deps_s04,
             test_runtime_import_s10,
-            test_runtime_new_doc_s09,
             test_runtime_shell_s11,
             test_runtime_validate_s02,
             test_sync,
@@ -81,7 +79,6 @@ class TestCliTestTreeSplitS12:
                 "test_import_then_sync_artifact_path_name_content_regression"
             ],
             test_runtime_new_s08.TestRuntimeNewS08: ["test_planning_regression_create_plan_contains_all_candidates"],
-            test_runtime_new_doc_s09.TestRuntimeNewDocS09: ["test_generated_path_name_content_regression"],
             test_runtime_validate_s02.TestRuntimeValidateS02: [
                 "test_validate_tree_use_case_returns_result_with_checked_node_count"
             ],

@@ -668,7 +668,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "docs/rules/initiative/artifacts.md": {
             "contains": (
                 "# 成果物ルール（artifacts/rules.md）",
-                "このディレクトリには initiative に紐づく future working artifacts を置きます。",
+                "このディレクトリには initiative に紐づく Current working artifacts を置きます。",
                 "Legacy `discussions/` は preservation surface です。",
                 "`blank`: 型を先に決めない working evidence。",
             ),
@@ -707,7 +707,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "docs/rules/epic/artifacts.md": {
             "contains": (
                 "# 成果物ルール（artifacts/rules.md）",
-                "このディレクトリには epic に紐づく future working artifacts を置きます。",
+                "このディレクトリには epic に紐づく Current working artifacts を置きます。",
                 "Legacy `discussions/` は preservation surface です。",
                 "`blank`: 型を先に決めない working evidence。",
             ),
@@ -746,7 +746,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "docs/rules/issue/artifacts.md": {
             "contains": (
                 "# 成果物ルール（artifacts/rules.md）",
-                "このディレクトリには issue に紐づく future working artifacts を置きます。",
+                "このディレクトリには issue に紐づく Current working artifacts を置きます。",
                 "Legacy `discussions/` は preservation surface です。",
                 "`blank`: 型を先に決めない working evidence。",
             ),
@@ -12931,7 +12931,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert fragment in text
             assert "new doc report" not in text
 
-    def test_issue_188_pr_repair_batch_readme_catalog_assets(self) -> None:
+    def test_issue_360_readme_catalog_excludes_historical_artifact_routes(self) -> None:
         import spec_dock.cli as cli
 
         with cli._assets_dir() as assets_dir:
@@ -12942,23 +12942,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             }
             texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
 
-        expected_fragments = {
-            "templates readme": (
-                "discussions/{scratch,interview,research,disc,adr,pr-repair-batch}.md",
-                "`scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch`",
-            ),
-            "scripts readme": (
-                "current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr` / `pr-repair-batch`",
-                './spec-dock/scripts/spec-dock new artifact pr-repair-batch --issue iss-00123 --title "PR Repair Batch"',
-                "typed artifact のファイル名 contract は `<ts>-<type>-<slug>.md`",
-            ),
-        }
-
-        for label, fragments in expected_fragments.items():
-            text = texts[label]
-            for fragment in fragments:
-                with _case(asset=label, fragment=fragment):
-                    assert fragment in text
+        scripts_readme = texts["scripts readme"]
+        assert (
+            "current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr`"
+            in scripts_readme
+        )
+        assert "`pr-repair-batch` / `draft-*` / `scratch` / `note` は Historical-only" in scripts_readme
+        assert "new artifact pr-repair-batch" not in scripts_readme
+        assert "new artifact draft-plan" not in scripts_readme
+        assert "typed artifact のファイル名 contract は `<ts>-<type>-<slug>.md`" in scripts_readme
 
     def test_issue_116_delegated_authoring_phase_gate_contract_assets(self) -> None:
         import spec_dock.cli as cli
