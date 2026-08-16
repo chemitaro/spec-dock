@@ -25,6 +25,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 
 try:
@@ -70,6 +71,7 @@ _UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
 _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _DISTRIBUTION_RETRY_MARKER_PAYLOAD_VERSION = 1
 _DISTRIBUTION_RETRY_MARKER_PURPOSE = "distribution-rerun"
+_DISTRIBUTION_CWD_LOCK = threading.RLock()
 
 
 @contextmanager
@@ -1225,38 +1227,42 @@ def _bound_distribution_root(
     replacement of the visible root cannot redirect those relative writes to
     the replacement repository.
     """
-    identity_path = Path(target_root).absolute()
-    bound_identity = expected or _distribution_root_identity(identity_path)
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int) or not hasattr(os, "fchdir"):
-        raise RuntimeError("root-bound distribution operations are unavailable")
-    root_flags = os.O_RDONLY | nofollow | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
-    try:
-        root_fd = os.open(identity_path, root_flags)
-    except OSError as exc:
-        raise RuntimeError("distribution target root cannot be opened safely") from exc
-    cwd_fd: int | None = None
-    try:
-        root_stat = os.fstat(root_fd)
-        if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_nlink < 1:
-            raise RuntimeError("distribution target root is not a real directory")
-        if (root_stat.st_dev, root_stat.st_ino) != (
-            bound_identity.device,
-            bound_identity.inode,
-        ):
-            raise RuntimeError("distribution target root identity changed")
-        cwd_fd = os.open(".", os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
-        os.fchdir(root_fd)
-        _assert_distribution_root_identity(identity_path, bound_identity)
-        yield Path(), identity_path, bound_identity
-    finally:
-        if cwd_fd is not None:
+    # ``cwd`` is process-global, so per-repository flock protection is not
+    # sufficient when two installer operations target different roots in the
+    # same process.  Serialize the complete absolute-path/bind/restore window.
+    with _DISTRIBUTION_CWD_LOCK:
+        identity_path = Path(target_root).absolute()
+        bound_identity = expected or _distribution_root_identity(identity_path)
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int) or not hasattr(os, "fchdir"):
+            raise RuntimeError("root-bound distribution operations are unavailable")
+        root_flags = os.O_RDONLY | nofollow | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+        try:
+            root_fd = os.open(identity_path, root_flags)
+        except OSError as exc:
+            raise RuntimeError("distribution target root cannot be opened safely") from exc
+        cwd_fd: int | None = None
+        try:
+            root_stat = os.fstat(root_fd)
+            if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_nlink < 1:
+                raise RuntimeError("distribution target root is not a real directory")
+            if (root_stat.st_dev, root_stat.st_ino) != (
+                bound_identity.device,
+                bound_identity.inode,
+            ):
+                raise RuntimeError("distribution target root identity changed")
+            cwd_fd = os.open(".", os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
+            os.fchdir(root_fd)
+            _assert_distribution_root_identity(identity_path, bound_identity)
+            yield Path(), identity_path, bound_identity
+        finally:
+            if cwd_fd is not None:
+                with suppress(OSError):
+                    os.fchdir(cwd_fd)
+                with suppress(OSError):
+                    os.close(cwd_fd)
             with suppress(OSError):
-                os.fchdir(cwd_fd)
-            with suppress(OSError):
-                os.close(cwd_fd)
-        with suppress(OSError):
-            os.close(root_fd)
+                os.close(root_fd)
 
 
 def _write_spec_dock_version(
@@ -2932,7 +2938,22 @@ def _add_generated_state_uninstall_actions(
     known_rel_paths: set[Path],
 ) -> None:
     for rel_root in (Path("spec-dock/active"), Path("spec-dock/.agent")):
-        for path in _iter_existing_files_or_symlinks(target_root / rel_root):
+        root_path = target_root / rel_root
+        known_rel_paths.add(rel_root)
+        if not _path_exists_for_uninstall(root_path):
+            continue
+        root_identity, _ = _planned_uninstall_identity(target_root, rel_root)
+        if root_identity is None or root_identity.kind != "directory":
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="generated_state",
+                    status="preserved",
+                    reason="generated state root is not a safe real directory; manual review required",
+                )
+            )
+            continue
+        for path in _iter_existing_files_or_symlinks(root_path):
             rel_path = path.relative_to(target_root)
             known_rel_paths.add(rel_path)
             identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
