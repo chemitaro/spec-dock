@@ -97,6 +97,14 @@ def _relative_files(root: Path) -> frozenset[str]:
     )
 
 
+def _executable_relative_files(root: Path) -> frozenset[str]:
+    return frozenset(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and not path.is_symlink() and path.stat().st_mode & 0o111
+    )
+
+
 def _filesystem_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
     snapshot: dict[str, tuple[object, ...]] = {}
     for path in sorted(root.rglob("*")):
@@ -232,6 +240,28 @@ def test_s40b_retained_ci_and_gitignore_are_deterministic_assets() -> None:
     assert "_DEFAULT_SPEC_DOCK_GITIGNORE" not in Path(cli.__file__).read_text(encoding="utf-8")
 
 
+def test_s40b_only_runtime_wrapper_is_executable_across_current_surfaces(tmp_path: Path) -> None:
+    assert _executable_relative_files(PROVIDER_ROOT) == frozenset({"spec_dock/scripts/spec-dock"})
+    dogfood_paths = {
+        *(REPO_ROOT / path for path in CURRENT_INSTALL_ROOT_FILES),
+        *(
+            path
+            for root in ("docs", "templates", "scripts", "system")
+            for path in (REPO_ROOT / "spec-dock" / root).rglob("*")
+            if path.is_file()
+        ),
+    }
+    dogfood_executables = {
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in dogfood_paths
+        if not path.is_symlink() and path.stat().st_mode & 0o111
+    }
+    assert dogfood_executables == {"spec-dock/scripts/spec-dock"}
+
+    assert main(["init", str(tmp_path)]) == 0
+    assert _executable_relative_files(tmp_path) == frozenset({"spec-dock/scripts/spec-dock"})
+
+
 def test_s40b_provider_scaffold_excludes_removed_docs_and_templates() -> None:
     actual = _relative_files(SCAFFOLD_ROOT)
     assert REMOVED_DOC_PATHS.isdisjoint(actual)
@@ -242,11 +272,8 @@ def test_s40b_provider_scaffold_excludes_removed_docs_and_templates() -> None:
         removed_name = Path(removed_path).name
         retired_routes = (f"`{removed_name}`", f"]({removed_name})", f"spec-dock/{removed_path}")
         assert all(
-            all(route not in path.read_text(encoding="utf-8") for route in retired_routes)
-            for path in current_docs
-        ), (
-            f"Current documentation still routes to retired path: {removed_path}"
-        )
+            all(route not in path.read_text(encoding="utf-8") for route in retired_routes) for path in current_docs
+        ), f"Current documentation still routes to retired path: {removed_path}"
 
 
 def test_s40b_fresh_init_materializes_only_current_external_catalog(tmp_path: Path) -> None:

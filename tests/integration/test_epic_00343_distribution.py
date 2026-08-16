@@ -9,6 +9,8 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
+import tarfile
 import tempfile
 import zipfile
 
@@ -53,6 +55,7 @@ _S04_UPDATE_EXPECTED_STATUS: set[str] = set()
 class CandidateWheel:
     repo_root: Path
     wheel_path: Path
+    sdist_path: Path
     venv_python: Path
     pre_head: str
     post_head: str
@@ -155,7 +158,7 @@ def candidate_wheel(tmp_path_factory: pytest.TempPathFactory) -> CandidateWheel:
     wheel_dir = temp_root / "wheelhouse"
     sdist_dir = temp_root / "sdist"
     helper._issue_69_prepare_build_context(repo_root, build_context)
-    wheel_path, _, venv_python = helper._issue_69_build_artifacts_with_local_wheelhouse(
+    wheel_path, sdist_path, venv_python = helper._issue_69_build_artifacts_with_local_wheelhouse(
         repo_root=repo_root,
         build_context=build_context,
         wheel_dir=wheel_dir,
@@ -179,6 +182,7 @@ def candidate_wheel(tmp_path_factory: pytest.TempPathFactory) -> CandidateWheel:
     return CandidateWheel(
         repo_root=repo_root,
         wheel_path=wheel_path,
+        sdist_path=sdist_path,
         venv_python=venv_python,
         pre_head=pre_head,
         post_head=post_head,
@@ -187,6 +191,94 @@ def candidate_wheel(tmp_path_factory: pytest.TempPathFactory) -> CandidateWheel:
         inventory=inventory,
         sha256=install_wheel_sha256,
     )
+
+
+def _provider_asset_manifest(repo_root: Path) -> dict[str, tuple[bytes, int]]:
+    source_root = repo_root / "src/spec_dock/assets"
+    manifest: dict[str, tuple[bytes, int]] = {}
+    for path in source_root.rglob("*"):
+        if not path.is_file() or "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+            continue
+        relative = path.relative_to(source_root).as_posix()
+        package_path = f"spec_dock/assets/{relative}"
+        template_prefix = "spec_dock/templates/"
+        if relative.startswith(template_prefix) and path.name == "README.md":
+            template_relative = relative.removeprefix(template_prefix)
+            if template_relative not in _WORKBENCH_TEMPLATE_READMES:
+                continue
+        if any(fnmatch.fnmatch(package_path, pattern) for pattern in _STALE_WHEEL_PATTERNS):
+            continue
+        manifest[package_path] = (path.read_bytes(), path.stat().st_mode & 0o777)
+    return manifest
+
+
+def _wheel_asset_manifest(path: Path) -> dict[str, tuple[bytes, int]]:
+    with zipfile.ZipFile(path) as archive:
+        return {
+            member.filename: (archive.read(member), (member.external_attr >> 16) & 0o777)
+            for member in archive.infolist()
+            if member.filename.startswith("spec_dock/assets/") and not member.is_dir()
+        }
+
+
+def _sdist_asset_manifest(path: Path) -> dict[str, tuple[bytes, int]]:
+    manifest: dict[str, tuple[bytes, int]] = {}
+    marker = "/src/spec_dock/assets/"
+    with tarfile.open(path, "r:gz") as archive:
+        for member in archive.getmembers():
+            if not member.isfile() or marker not in member.name:
+                continue
+            package_path = f"spec_dock/assets/{member.name.split(marker, 1)[1]}"
+            extracted = archive.extractfile(member)
+            assert extracted is not None
+            manifest[package_path] = (extracted.read(), member.mode & 0o777)
+    return manifest
+
+
+def _install_candidate_artifact(candidate: CandidateWheel, artifact: Path, environment_root: Path) -> Path:
+    helper = _Issue69Harness()
+    result = subprocess.run(
+        [sys.executable, "-m", "venv", str(environment_root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    venv_python = helper._issue_69_venv_python(environment_root)
+    wheelhouse = helper._issue_69_resolve_wheelhouse(candidate.repo_root)
+    helper._issue_69_install_target_packages(
+        python_executable=venv_python,
+        target_dir=helper._issue_69_site_packages_dir(environment_root),
+        requirements=list(helper._ISSUE_69_BUILD_BACKEND_REQUIREMENTS),
+        wheelhouse=wheelhouse,
+    )
+    helper._issue_69_install_target_packages(
+        python_executable=venv_python,
+        target_dir=helper._issue_69_site_packages_dir(environment_root),
+        requirements=[str(artifact)],
+        wheelhouse=wheelhouse,
+    )
+    return helper._issue_69_ensure_spec_dock_wrapper(venv_python)
+
+
+def _expected_installed_asset_manifest(repo_root: Path) -> dict[str, tuple[bytes, int]]:
+    expected: dict[str, tuple[bytes, int]] = {}
+    for package_path, identity in _provider_asset_manifest(repo_root).items():
+        install_prefix = "spec_dock/assets/install_root/"
+        scaffold_prefix = "spec_dock/assets/spec_dock/"
+        if package_path.startswith(install_prefix):
+            expected[package_path.removeprefix(install_prefix)] = identity
+        elif package_path.startswith(scaffold_prefix):
+            expected[f"spec-dock/{package_path.removeprefix(scaffold_prefix)}"] = identity
+    return expected
+
+
+def _assert_installed_asset_manifest(target: Path, expected: dict[str, tuple[bytes, int]]) -> None:
+    for relative_path, (payload, mode) in expected.items():
+        observed = target / relative_path
+        assert observed.is_file() and not observed.is_symlink(), f"installed asset is missing: {relative_path}"
+        assert observed.read_bytes() == payload, f"installed asset bytes differ: {relative_path}"
+        assert observed.stat().st_mode & 0o777 == mode, f"installed asset mode differs: {relative_path}"
 
 
 def _runtime_env(helper: _Issue69Harness, temp_root: Path) -> dict[str, str]:
@@ -771,6 +863,53 @@ def test_tc_346_s01_002_candidate_wheel_inventory(candidate_wheel: CandidateWhee
     forbidden_cache = "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/__pycache__/probe.pyc"
     with pytest.raises(AssertionError, match="denied stale assets"):
         _assert_candidate_inventory(inventory | {forbidden_cache})
+
+
+def test_tc_360_s80_wheel_and_sdist_catalog_bytes_and_modes_match_provider(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    expected = _provider_asset_manifest(candidate_wheel.repo_root)
+
+    assert _wheel_asset_manifest(candidate_wheel.wheel_path) == expected
+    assert _sdist_asset_manifest(candidate_wheel.sdist_path) == expected
+
+
+def test_tc_360_s80_wheel_and_sdist_fresh_and_updated_consumers_match_provider(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    expected = _expected_installed_asset_manifest(candidate_wheel.repo_root)
+    temp_root = candidate_wheel.wheel_path.parent
+    for artifact_kind, artifact in (
+        ("wheel", candidate_wheel.wheel_path),
+        ("sdist", candidate_wheel.sdist_path),
+    ):
+        environment_root = temp_root / f"s80-{artifact_kind}-venv"
+        command = _install_candidate_artifact(candidate_wheel, artifact, environment_root)
+        target = temp_root / f"s80-{artifact_kind}-target"
+        target.mkdir()
+        init_result = subprocess.run(
+            [str(command), "init", str(target)],
+            cwd=temp_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+        _assert_installed_asset_manifest(target, expected)
+
+        missing = target / ".github/workflows/ci.yml"
+        missing.unlink()
+        mode_drift = target / ".agents/skills/spec-dock/SKILL.md"
+        mode_drift.chmod(0o600 if (mode_drift.stat().st_mode & 0o777) != 0o600 else 0o644)
+        update_result = subprocess.run(
+            [str(command), "update", str(target)],
+            cwd=temp_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert update_result.returncode == 0, update_result.stdout + update_result.stderr
+        _assert_installed_asset_manifest(target, expected)
 
 
 def test_tc_346_s01_003_isolated_wheel_origin_rejects_checkout_fallback(candidate_wheel: CandidateWheel) -> None:
