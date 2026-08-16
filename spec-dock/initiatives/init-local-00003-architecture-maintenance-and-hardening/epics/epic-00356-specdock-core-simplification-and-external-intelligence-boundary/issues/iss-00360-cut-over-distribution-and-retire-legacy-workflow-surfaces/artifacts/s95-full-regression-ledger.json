@@ -3,7 +3,7 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "5488dc75882ce9f0fd2d1a20f3c4e23ecb1a8a48",
+  "current_head_sha": "c6beb7663665eb98a7488c6a938fc0bb02a773c3",
   "commands": {
     "current_full": "uv run pytest --run-full-regression -q",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
@@ -11,10 +11,10 @@
   },
   "full_run_summary": {
     "current": {
-      "failed": 27,
-      "passed": 1991,
-      "skipped": 516,
-      "duration": "15m04s"
+      "failed": 26,
+      "passed": 1942,
+      "skipped": 498,
+      "duration": "15m20.09s"
     },
     "fixed_point": {
       "failed": 452,
@@ -24,12 +24,12 @@
     }
   },
   "subset_comparison": {
-    "current_failure_paths": 27,
-    "fixed_point_failure_paths": 27,
-    "same_failure_behavior": 27,
+    "current_failure_paths": 26,
+    "fixed_point_failure_paths": 26,
+    "same_failure_behavior": 26,
     "expected_retirement_paths": 0,
     "comparison_incomplete_paths": 0,
-    "fixed_point_subset_total": 27
+    "fixed_point_subset_total": 26
   },
   "classification_policy": {
     "approved-no-op": {
@@ -201,12 +201,6 @@
     },
     {
       "nodeid": "tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands",
-      "current_status": "failed",
-      "fixed_point_status": "failed",
-      "disposition": "approved-no-op"
-    },
-    {
-      "nodeid": "tests/cli_runtime/test_wrappers.py::TestCliRulesContract::test_scaffold_docs_point_to_runtime_commands_and_rules_docs",
       "current_status": "failed",
       "fixed_point_status": "failed",
       "disposition": "approved-no-op"
