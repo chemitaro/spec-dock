@@ -185,6 +185,24 @@ def _ignore_generated_python_caches(_dir: str, names: list[str]) -> set[str]:
     return {name for name in names if name == "__pycache__" or name.endswith(".pyc")}
 
 
+def _ignore_retired_scaffold_entries(directory: str, names: list[str]) -> set[str]:
+    """Exclude retired scaffold entries before they reach a consumer tree."""
+    ignored = _ignore_generated_python_caches(directory, names)
+    path = Path(directory)
+    if path.name == "scripts":
+        ignored.update(name for name in names if name.startswith("spec-dock-close") and name.endswith(".sh"))
+    if "templates" not in path.parts:
+        return ignored
+    templates_index = len(path.parts) - 1 - path.parts[::-1].index("templates")
+    relative_parts = path.parts[templates_index + 1 :]
+    if not relative_parts:
+        ignored.update({"requirement.md", "design.md", "plan.md", "report.md"} & set(names))
+    if len(relative_parts) == 1 and relative_parts[0] in {"initiative", "epic", "issue"}:
+        ignored.update({"adrs", "artifacts", "deps.json"} & set(names))
+    ignored.update({"current", "completed"} & set(names))
+    return ignored
+
+
 class _ManagedPathIdentity(NamedTuple):
     """No-follow identity captured for one managed scaffold boundary."""
 
@@ -362,13 +380,22 @@ def _sync_tree(
     *,
     expected_identity: _ManagedPathIdentity | None = None,
     identity_checked: bool = False,
+    target_root: Path | None = None,
+    expected_root_identity: DistributionRootIdentity | None = None,
 ) -> None:
     """Replace `dest` directory with a full copy of `src`."""
     if expected_identity is not None or identity_checked:
         _assert_managed_path_identity(dest, expected_identity)
     if dest.exists():
-        shutil.rmtree(dest)
-    shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
+        if expected_identity is None or target_root is None:
+            raise RuntimeError("managed scaffold replacement requires a bound directory identity")
+        _remove_managed_scaffold_tree(
+            target_root,
+            dest,
+            expected_identity=expected_identity,
+            expected_root_identity=expected_root_identity,
+        )
+    shutil.copytree(src, dest, ignore=_ignore_retired_scaffold_entries)
 
 
 def _make_executable(path: Path) -> None:
@@ -831,8 +858,17 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
                 if link.is_symlink() or link.is_file():
                     link.unlink(missing_ok=True)
                 elif link.is_dir():
-                    with suppress(OSError):
-                        shutil.rmtree(link)
+                    with suppress(OSError, RuntimeError):
+                        target_root = specdock_dir.parent
+                        rel_path = link.absolute().relative_to(target_root.absolute())
+                        if rel_path.parts != (_SPEC_DOCK_DIRNAME, "active", layer):
+                            raise RuntimeError("active fallback path is outside the generated boundary")
+                        _remove_bound_directory_tree(
+                            target_root,
+                            rel_path,
+                            expected_identity=_managed_path_identity(link),
+                            expected_root_identity=_distribution_root_identity(target_root),
+                        )
             if link.exists() or link.is_symlink():
                 continue
             if pathfile.exists():
@@ -904,70 +940,30 @@ def _install_repo_root_shortcut(target_root: Path) -> None:
         print(f"spec-dock: (warn) failed to create repo-root shortcut symlink: {dest}: {e}", file=sys.stderr)
 
 
-def _prune_legacy_scaffold(specdock_dir: Path) -> None:
-    """Remove known legacy (v1) artifacts from generated scaffolding.
-
-    Why this exists:
-    - Some local clones may contain a stale `build/` directory from older versions.
-    - When building a wheel, setuptools can accidentally carry those stale files into the package.
-    - This makes `spec-dock init/update` resilient by removing legacy artifacts after copying.
-
-    Scope:
-    - Only touches generated scaffolding files (legacy scripts/templates/workflow/symlinks).
-    - Never deletes user-authored specs under `spec-dock/initiatives/**`.
-    """
-    scripts_dir = specdock_dir / "scripts"
-    for p in scripts_dir.glob("spec-dock-close*.sh"):
-        p.unlink(missing_ok=True)
-
-    templates_dir = specdock_dir / "templates"
-
-    preserved_readmes = {
-        Path("README.md"),
-        Path("root/.workbench/README.md"),
-        Path("initiative/.workbench/README.md"),
-        Path("epic/.workbench/README.md"),
-        Path("issue/.workbench/README.md"),
-    }
-
-    # Defensive: node templates should not generate unrecognized nested README.md files.
-    # These can reappear if a local clone has stale `build/` artifacts that get packaged.
-    for p in templates_dir.rglob("README.md"):
-        if p.relative_to(templates_dir) in preserved_readmes:
-            continue
-        p.unlink(missing_ok=True)
-
-    # Legacy node templates used per-scope `adrs/` and `artifacts/`; prune only those nested scopes.
-    for scope in ("initiative", "epic", "issue"):
-        for legacy_dir in ("adrs", "artifacts"):
-            d = templates_dir / scope / legacy_dir
-            if d.is_dir():
-                shutil.rmtree(d, ignore_errors=True)
-
-    # v1 used top-level templates/*.md; v2 uses templates/{initiative,epic,issue}/.
-    for name in ("requirement.md", "design.md", "plan.md", "report.md"):
-        (templates_dir / name).unlink(missing_ok=True)
-
-    # v1-era package contamination can leak template-scoped deps.json files.
-    for scope in ("initiative", "epic", "issue"):
-        (templates_dir / scope / "deps.json").unlink(missing_ok=True)
-
-    # v1 used nested `current/` and `completed/` directories under templates.
-    for dirname in ("current", "completed"):
-        for d in sorted(templates_dir.rglob(dirname), key=lambda x: len(str(x)), reverse=True):
-            if d.is_dir():
-                shutil.rmtree(d, ignore_errors=True)
-
-    # v1 created root-level symlinks as shortcuts. v2 uses `spec-dock/active/`,
-    # so these are always safe to remove when they are symlinks (never delete real dirs).
-    for name in ("current-initiative", "current-epic", "current-issue"):
-        p = specdock_dir / name
-        if p.is_symlink():
-            p.unlink(missing_ok=True)
-
-    # v2 used a `.path` fallback briefly during development; prune if present.
-    for name in ("current-initiative.path", "current-epic.path", "current-issue.path"):
-        (specdock_dir / name).unlink(missing_ok=True)
+def _prune_legacy_scaffold_entrypoints(specdock_dir: Path) -> None:
+    """Remove exact retired root entrypoints without recursive pathname deletion."""
+    directory_fd = os.open(specdock_dir, _uninstall_directory_flags())
+    try:
+        for name in ("current-initiative", "current-epic", "current-issue"):
+            try:
+                info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            if not stat.S_ISLNK(info.st_mode):
+                continue
+            _assert_uninstall_tree_entry_identity(directory_fd, name, info)
+            os.unlink(name, dir_fd=directory_fd)
+        for name in ("current-initiative.path", "current-epic.path", "current-issue.path"):
+            try:
+                info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                continue
+            _assert_uninstall_tree_entry_identity(directory_fd, name, info)
+            os.unlink(name, dir_fd=directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def _retry_unpublished_atomic_regular_file(
@@ -1494,9 +1490,11 @@ def _install_spec_dock_bound(
                         else None
                     ),
                     identity_checked=expected_managed_scaffold_identities is not None,
+                    target_root=target_root,
+                    expected_root_identity=expected_root_identity,
                 )
             else:
-                shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
+                shutil.copytree(src, dest, ignore=_ignore_retired_scaffold_entries)
             guard_root()
 
         guard_root()
@@ -1534,7 +1532,7 @@ def _install_spec_dock_bound(
         guard_root()
 
         guard_root()
-        _prune_legacy_scaffold(specdock_dir)
+        _prune_legacy_scaffold_entrypoints(specdock_dir)
         guard_root()
 
         # Ensure runtime scripts are executable (best-effort).
@@ -2565,6 +2563,75 @@ def _remove_uninstall_tree_fd(
         _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
         _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
         os.unlink(name, dir_fd=directory_fd)
+
+
+def _remove_bound_directory_tree(
+    target_root: Path,
+    rel_path: Path,
+    *,
+    expected_identity: _ManagedPathIdentity,
+    expected_root_identity: DistributionRootIdentity | None,
+) -> None:
+    """Remove one already-authorized directory through held no-follow descriptors."""
+    with _open_uninstall_parent_chain(
+        target_root,
+        rel_path,
+        expected_root_identity=expected_root_identity,
+    ) as fds:
+        parent_fd = fds[-1]
+        try:
+            visible = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise RuntimeError("managed scaffold target changed during safe replacement") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or (visible.st_dev, visible.st_ino, visible.st_ctime_ns)
+            != (expected_identity.device, expected_identity.inode, expected_identity.ctime_ns)
+        ):
+            raise RuntimeError("managed scaffold target identity changed")
+
+        directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
+        try:
+            held = os.fstat(directory_fd)
+            if not stat.S_ISDIR(held.st_mode) or (held.st_dev, held.st_ino, held.st_ctime_ns) != (
+                expected_identity.device,
+                expected_identity.inode,
+                expected_identity.ctime_ns,
+            ):
+                raise RuntimeError("managed scaffold target identity changed")
+            visible_fds = (*fds, directory_fd)
+            _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            _remove_uninstall_tree_fd(target_root, rel_path, directory_fd, visible_fds)
+            _assert_uninstall_visible_chain(target_root, rel_path, fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            _assert_uninstall_tree_entry_identity(parent_fd, rel_path.name, visible)
+            os.rmdir(rel_path.name, dir_fd=parent_fd)
+        finally:
+            os.close(directory_fd)
+
+
+def _remove_managed_scaffold_tree(
+    target_root: Path,
+    dest: Path,
+    *,
+    expected_identity: _ManagedPathIdentity,
+    expected_root_identity: DistributionRootIdentity | None,
+) -> None:
+    """Remove one managed scaffold root through held no-follow descriptors."""
+    try:
+        rel_path = dest.absolute().relative_to(target_root.absolute())
+    except ValueError as exc:
+        raise RuntimeError("managed scaffold target is outside the distribution root") from exc
+    if rel_path not in _MANAGED_SCAFFOLD_ROOTS:
+        raise RuntimeError("managed scaffold replacement is outside the managed roots")
+    _remove_bound_directory_tree(
+        target_root,
+        rel_path,
+        expected_identity=expected_identity,
+        expected_root_identity=expected_root_identity,
+    )
 
 
 def _read_file_descriptor(fd: int) -> bytes:

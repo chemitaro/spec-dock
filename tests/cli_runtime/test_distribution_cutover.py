@@ -2173,6 +2173,34 @@ def test_s50_update_rejects_managed_directory_replacement_after_preflight(
     assert (tmp_path / "spec-dock/docs/replacement-sentinel.md").read_text(encoding="utf-8") == "keep\n"
 
 
+def test_s50_update_rejects_managed_directory_replacement_after_descriptor_open(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    original_remove_tree = cli._remove_uninstall_tree_fd
+    switched = False
+
+    def replace_after_descriptor_open(target_root: Path, rel_path: Path, directory_fd: int, visible_fds):
+        nonlocal switched
+        if not switched and rel_path == Path("spec-dock/docs"):
+            switched = True
+            managed = tmp_path / rel_path
+            managed.rename(tmp_path / "displaced-docs")
+            managed.mkdir(parents=True)
+            (managed / "replacement-sentinel.md").write_text("keep\n", encoding="utf-8")
+        return original_remove_tree(target_root, rel_path, directory_fd, visible_fds)
+
+    monkeypatch.setattr(cli, "_remove_uninstall_tree_fd", replace_after_descriptor_open)
+
+    assert main(["update", str(tmp_path)]) == 1
+    capsys.readouterr()
+    assert (tmp_path / "spec-dock/docs/replacement-sentinel.md").read_text(encoding="utf-8") == "keep\n"
+    assert (tmp_path / "displaced-docs").is_dir()
+
+
 def test_s70_uninstall_apply_blocks_mixed_known_obsolete_and_unknown_before_mutation(
     tmp_path: Path,
     capsys,
