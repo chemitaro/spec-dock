@@ -455,6 +455,8 @@ def _path_overlaps(left: str, right: str) -> bool:
 def _assert_no_manifest_overlap(
     current_paths: set[str],
     manifest: DistributionManifest,
+    *,
+    protected_paths: set[str] | frozenset[str] = frozenset(),
 ) -> None:
     seen_historical: set[tuple[str, str, str | None, str | None]] = set()
     for item in manifest.historical_current_identities:
@@ -463,37 +465,39 @@ def _assert_no_manifest_overlap(
             _fail(f"duplicate historical identity: {item['path']}")
         seen_historical.add(signature)
 
-    records: list[tuple[str, str, bool]] = []
+    records: list[tuple[str, str, bool, bool]] = []
     for version_index, version in enumerate(manifest.recognized_workspace_versions):
         for anchor_index, anchor in enumerate(version["anchors"]):
             records.append((
                 anchor["path"],
                 f"recognized_workspace_versions[{version_index}].anchors[{anchor_index}]",
                 False,
+                True,
             ))
     for item in manifest.historical_current_identities:
         # A historical identity is intentionally allowed to describe the same
         # target path as a newly shipped Current asset.  It is the evidence
         # used to classify an existing consumer file for upgrade/prune.
-        records.append((item["path"], "historical_current_identities", True))
+        records.append((item["path"], "historical_current_identities", True, False))
     for item in manifest.obsolete_exact_files:
-        records.append((item["path"], "obsolete_exact_files", False))
+        records.append((item["path"], "obsolete_exact_files", False, False))
     for manifest_index, item in enumerate(manifest.trusted_consumer_manifests):
-        records.append((item["path"], f"trusted_consumer_manifests[{manifest_index}]", False))
+        records.append((item["path"], f"trusted_consumer_manifests[{manifest_index}]", False, False))
         for claim_index, claim in enumerate(item["claims"]):
             records.append((
                 claim["path"],
                 f"trusted_consumer_manifests[{manifest_index}].claims[{claim_index}]",
                 True,
+                False,
             ))
     for item in manifest.historical_shortcuts:
         # The canonical shortcut is a Current identity even though it is
         # synthesized rather than shipped as a regular file.  Historical
         # shortcut records may therefore share that exact path as evidence;
         # ancestor/descendant overlap remains invalid.
-        records.append((item["path"], "historical_shortcuts", True))
+        records.append((item["path"], "historical_shortcuts", True, False))
 
-    for index, (path, section, allows_current_overlap) in enumerate(records):
+    for index, (path, section, allows_current_overlap, allows_protected_overlap) in enumerate(records):
         if allows_current_overlap:
             current_overlap = any(
                 _path_overlaps(path, current_path) and path != current_path for current_path in current_paths
@@ -502,7 +506,11 @@ def _assert_no_manifest_overlap(
             current_overlap = any(_path_overlaps(path, current_path) for current_path in current_paths)
         if current_overlap:
             _fail(f"manifest path overlaps physical Current catalog: {path}")
-        for other_path, other_section, _ in records[:index]:
+        if not allows_protected_overlap and any(
+            _path_overlaps(path, protected_path) for protected_path in protected_paths
+        ):
+            _fail(f"manifest path overlaps protected workspace surface: {path}")
+        for other_path, other_section, _, _ in records[:index]:
             if section == "historical_current_identities" and other_section == section and path == other_path:
                 # Multiple releases may legitimately have different bytes at
                 # one reusable Current path; exact duplicates were rejected
@@ -547,6 +555,23 @@ _UNINSTALL_RETRY_MARKER_PAYLOAD = {
 }
 _VERSION_ANCHOR_PATHS = frozenset({"spec-dock/scripts/spec-dock", "spec-dock/.gitignore"})
 _SCAFFOLD_MANAGED_ROOTS = ("docs", "templates", "scripts", "system")
+_PROTECTED_WORKSPACE_ROOTS = frozenset({
+    *(f"spec-dock/{name}" for name in _SCAFFOLD_MANAGED_ROOTS),
+    "spec-dock/initiatives",
+    "spec-dock/active",
+    "spec-dock/.agent",
+    "spec-dock/.workbench",
+    "spec-dock/.gitignore",
+    "spec-dock/spec-dock.version",
+    "spec-dock/.distribution-retry.json",
+    "spec-dock/.uninstall-retry.json",
+})
+
+
+def _protected_workspace_paths(scaffold_assets: tuple[DistributionAsset, ...]) -> frozenset[str]:
+    """Return all provider-owned and user-preserve workspace boundaries."""
+
+    return _PROTECTED_WORKSPACE_ROOTS | frozenset(asset.path for asset in scaffold_assets)
 
 
 def _admission_block(reason: str, detail: str) -> NoReturn:
@@ -1628,6 +1653,7 @@ def build_distribution_plan(
     _assert_no_manifest_overlap(
         {asset.path for asset in current_assets} | set(_CURRENT_SHORTCUTS),
         manifest,
+        protected_paths=_protected_workspace_paths(scaffold_assets),
     )
     actions: tuple[DistributionAction, ...] = ()
     target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...] = ()
