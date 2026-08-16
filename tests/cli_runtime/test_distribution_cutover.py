@@ -1606,9 +1606,9 @@ def test_s70_empty_workspace_blocks_non_init_operations_without_writes(
 ) -> None:
     specdock = tmp_path / "spec-dock"
     specdock.mkdir()
-    external = tmp_path / ".agents/skills/user-owned.md"
+    external = tmp_path / ".agents/skills/spec-dock/SKILL.md"
     external.parent.mkdir(parents=True)
-    external.write_text("user-owned\n", encoding="utf-8")
+    external.write_bytes((INSTALL_ROOT / ".agents/skills/spec-dock/SKILL.md").read_bytes())
     before = _filesystem_snapshot(tmp_path)
 
     args = [operation, str(tmp_path)]

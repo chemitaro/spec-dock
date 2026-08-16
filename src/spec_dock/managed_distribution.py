@@ -697,6 +697,27 @@ def _is_preserved_specs_workspace(target_root: Path) -> bool:
     return True
 
 
+def _is_empty_post_uninstall_boundary(
+    target_root: Path,
+    *,
+    manifest_path: Path,
+    manifest: DistributionManifest,
+) -> bool:
+    """Recognize an empty uninstall boundary only when managed assets are gone."""
+
+    install_root = Path(manifest_path).parent / "install_root"
+    try:
+        current_paths = tuple(asset.path for asset in _current_assets(install_root))
+    except DistributionManifestError:
+        return False
+    managed_paths = (
+        *current_paths,
+        *_CURRENT_SHORTCUTS,
+        *(item["path"] for item in manifest.obsolete_exact_files),
+    )
+    return not any(_path_present_no_follow(target_root / relative_path) for relative_path in managed_paths)
+
+
 def _assert_real_parent_chain(target_root: Path, relative_path: str, *, label: str) -> bool:
     current = target_root
     for component in PurePosixPath(relative_path).parts[:-1]:
@@ -950,6 +971,20 @@ def admit_distribution_operation(
             _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
         if empty_workspace_boundary and operation in {"fresh", "init-force"}:
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
+        if (
+            empty_workspace_boundary
+            and operation == "uninstall"
+            and _is_empty_post_uninstall_boundary(
+                target_root,
+                manifest_path=Path(manifest_path),
+                manifest=manifest,
+            )
+        ):
+            # A completed `uninstall --remove-specs` intentionally retains an
+            # empty boundary.  Admit only this no-managed-assets state so a
+            # rerun remains a safe no-op; arbitrary empty workspaces with any
+            # managed asset still fail the normal version gate below.
+            return DistributionAdmission(operation=operation, status="recognized", package_version=package_version)
         if operation in {"fresh", "init-force"} and _is_preserved_specs_workspace(target_root):
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
 
