@@ -272,6 +272,34 @@ def test_s20_duplicate_and_current_obsolete_overlap_are_rejected(tmp_path: Path)
         build_distribution_plan(INSTALL_ROOT, manifest_path=shortcut_overlap_manifest)
 
 
+@pytest.mark.parametrize(
+    "protected_path",
+    (
+        "spec-dock/docs/README.md",
+        "spec-dock/initiatives/user-owned/requirement.md",
+        "spec-dock/active/issue/requirement.md",
+        "spec-dock/.workbench/README.md",
+    ),
+)
+def test_s20_protected_workspace_overlap_is_rejected(tmp_path: Path, protected_path: str) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": protected_path,
+                    "surface": "legacy-test",
+                    "identities": [],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+
+    with pytest.raises(DistributionManifestError, match="protected workspace surface"):
+        build_distribution_plan(INSTALL_ROOT, manifest_path=manifest_path)
+
+
 def test_s20_ancestor_overlap_between_historical_records_is_rejected(tmp_path: Path) -> None:
     manifest_path = _write_manifest(
         tmp_path,

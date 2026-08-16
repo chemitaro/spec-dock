@@ -774,6 +774,49 @@ def test_s55_update_prunes_known_legacy_and_preserves_node_local_data(tmp_path: 
     assert issue_workbench.read_bytes() == b"keep workbench\n"
 
 
+def test_s55_update_rejects_manifest_overlap_with_preserved_specs_before_write(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    initiative = tmp_path / "spec-dock/initiatives/user-owned.md"
+    initiative.write_bytes(b"keep initiative\n")
+
+    assets_copy = tmp_path / "provider-assets"
+    shutil.copytree(PROVIDER_ROOT, assets_copy)
+    manifest_path = assets_copy / "managed_distribution.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["obsolete_exact_files"].append({
+        "path": "spec-dock/initiatives/user-owned.md",
+        "surface": "protected-path-test",
+        "identities": [
+            {
+                "path": "spec-dock/initiatives/user-owned.md",
+                "kind": "regular",
+                "sha256": hashlib.sha256(initiative.read_bytes()).hexdigest(),
+                "mode": 0o644,
+                "source": {"kind": "test-fixture", "ref": "issue-360"},
+            }
+        ],
+        "on_unknown": "preserve-and-block",
+    })
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    @contextmanager
+    def patched_assets_dir():
+        yield assets_copy
+
+    monkeypatch.setattr(cli, "_assets_dir", patched_assets_dir)
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+    assert "protected workspace surface" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
 def test_s60_update_forward_retry_marker_is_removed_after_success(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
 
