@@ -14,6 +14,7 @@ import time
 import pytest
 
 from spec_dock import cli
+import spec_dock.managed_distribution as managed_distribution
 from tests.cli_runtime.harness import main
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -603,11 +604,11 @@ def test_s60_retry_rechecks_scaffold_gitignore_identity_before_write(
 
     assert main(["update", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during scaffold-refresh" in captured
+    assert "distribution partial failure during managed-scaffold-refresh" in captured
     assert "target=spec-dock" in captured
     assert (tmp_path / "spec-dock/.gitignore").read_bytes() == b"user-owned retry content\n"
     marker = tmp_path / "spec-dock/.distribution-retry.json"
-    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "distribution-applied"
+    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "preflight-complete"
 
     monkeypatch.setattr(cli, "_write_atomic_regular_file", original_write)
     assert main(["update", str(tmp_path)]) == 1
@@ -1107,11 +1108,11 @@ def test_s60_root_rebind_during_scaffold_mutation(
 
     assert main(["update", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during scaffold-refresh" in captured
+    assert "distribution partial failure during managed-scaffold-refresh" in captured
     assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
     assert not (tmp_path / "spec-dock").exists()
     marker = displaced / "spec-dock/.distribution-retry.json"
-    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "distribution-applied"
+    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == "preflight-complete"
 
 
 def test_s60_root_rebind_during_version_publication(
@@ -1168,8 +1169,8 @@ def test_s60_distribution_apply_fault_keeps_marker_and_old_version(
     captured = capsys.readouterr().err
     assert "credential=secret" not in captured
     assert "/private/outside/source.txt" not in captured
-    assert "distribution partial failure during distribution-apply" in captured
-    assert "target=distribution" in captured
+    assert "distribution partial failure during managed-scaffold-refresh" in captured
+    assert "target=spec-dock" in captured
     assert "last_completed_phase=preflight-complete" in captured
     assert "retry=spec-dock update ." in captured
     payload = json.loads(marker.read_text(encoding="utf-8"))
@@ -1178,6 +1179,70 @@ def test_s60_distribution_apply_fault_keeps_marker_and_old_version(
 
     monkeypatch.setattr(cli, "apply_distribution_plan", original_apply)
     assert main(["update", str(tmp_path)]) == 0
+    assert not marker.exists()
+
+
+def test_s60_current_materialize_fault_reports_applied_and_pending_paths(tmp_path: Path, monkeypatch, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    missing = tmp_path / ".github/workflows/ci.yml"
+    missing.unlink()
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    original_apply_action = managed_distribution._apply_distribution_action
+
+    def fail_current(plan, target_root, action, *args, **kwargs):
+        if action.path == ".github/workflows/ci.yml":
+            raise OSError("injected Current copy fault")
+        return original_apply_action(plan, target_root, action, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", fail_current)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "during current-external-materialize" in captured
+    assert "pending_paths=[" in captured
+    assert '".github/workflows/ci.yml"' in captured
+    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == ("managed-scaffold-refreshed")
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", original_apply_action)
+    assert main(["update", str(tmp_path)]) == 0
+    assert missing.is_file()
+    assert not marker.exists()
+
+
+def test_s60_obsolete_prune_fault_reports_applied_and_pending_paths(tmp_path: Path, monkeypatch, capsys) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    legacy = tmp_path / ".codex/config.toml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b'project_doc_fallback_filenames = [".codex/AGENTS.md"]\n')
+    legacy.chmod(0o644)
+    preserved = tmp_path / "spec-dock/initiatives/user-owned.md"
+    preserved.parent.mkdir(parents=True, exist_ok=True)
+    preserved.write_bytes(b"preserve\n")
+    marker = tmp_path / "spec-dock/.distribution-retry.json"
+    original_apply_action = managed_distribution._apply_distribution_action
+
+    def fail_prune(plan, target_root, action, *args, **kwargs):
+        if action.path == ".codex/config.toml":
+            raise OSError("injected obsolete prune fault")
+        return original_apply_action(plan, target_root, action, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", fail_prune)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    assert "during obsolete-prune" in captured
+    assert "applied_paths=[" in captured
+    assert "pending_paths=[" in captured
+    assert '".codex/config.toml"' in captured
+    assert preserved.read_bytes() == b"preserve\n"
+    assert json.loads(marker.read_text(encoding="utf-8"))["last_completed_phase"] == ("current-external-materialized")
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", original_apply_action)
+    assert main(["update", str(tmp_path)]) == 0
+    assert not legacy.exists()
+    assert preserved.read_bytes() == b"preserve\n"
     assert not marker.exists()
 
 
@@ -1202,8 +1267,8 @@ def test_s60_fresh_init_forward_retry_reuses_marker_and_converges(
     captured = capsys.readouterr().err
     assert "credential=secret" not in captured
     assert "/private/outside/source.txt" not in captured
-    assert "distribution partial failure during distribution-apply" in captured
-    assert "target=distribution" in captured
+    assert "distribution partial failure during managed-scaffold-refresh" in captured
+    assert "target=spec-dock" in captured
     assert "last_completed_phase=preflight-complete" in captured
     assert "retry=spec-dock init ." in captured
     marker = tmp_path / "spec-dock/.distribution-retry.json"
@@ -1238,8 +1303,8 @@ def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypat
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during distribution-apply" in captured
-    assert "target=distribution" in captured
+    assert "distribution partial failure during managed-scaffold-refresh" in captured
+    assert "target=spec-dock" in captured
     assert external_readme.read_bytes() == b"external-owned\n"
     assert (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
@@ -1398,11 +1463,11 @@ def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnos
     captured = capsys.readouterr().err
     assert "credential=secret" not in captured
     assert "/private/outside/source.txt" not in captured
-    assert "distribution partial failure during scaffold-refresh" in captured
+    assert "distribution partial failure during managed-scaffold-refresh" in captured
     marker = tmp_path / "spec-dock/.distribution-retry.json"
     payload = json.loads(marker.read_text(encoding="utf-8"))
     assert payload["operation"] == "update"
-    assert payload["last_completed_phase"] == "distribution-applied"
+    assert payload["last_completed_phase"] == "preflight-complete"
     assert version.read_bytes() == before_version
 
     monkeypatch.setattr(cli, "_install_spec_dock", original)
@@ -1429,7 +1494,7 @@ def test_s60_root_rebind_preserves_replacement_and_original_retry_marker(
 
     assert main(["update", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during scaffold-refresh" in captured
+    assert "distribution partial failure during managed-scaffold-refresh" in captured
     assert "replacement-sentinel.txt" not in captured
 
     marker = displaced / "spec-dock/.distribution-retry.json"
@@ -1568,7 +1633,7 @@ def test_s65_uninstall_distribution_or_dual_marker_is_zero_write(tmp_path: Path,
     distribution_marker.write_text(
         json.dumps(
             {
-                "last_completed_phase": "distribution-applied",
+                "last_completed_phase": "current-external-materialized",
                 "operation": "update",
                 "package_version": "0.2.3",
                 "purpose": "distribution-rerun",
