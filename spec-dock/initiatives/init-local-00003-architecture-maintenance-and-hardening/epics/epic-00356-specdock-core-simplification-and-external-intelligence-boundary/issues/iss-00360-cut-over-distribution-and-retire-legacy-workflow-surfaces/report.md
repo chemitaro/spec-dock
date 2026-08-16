@@ -531,7 +531,7 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
 | Full repository regression | pass (accepted nonzero / exact ledger match) | 実装コミット`62bd4855ea9a385d9764f426fe895bc04edddd51`で`uv run pytest --run-full-regression -q` → `26 failed, 1943 passed, 498 skipped`（15分06.07秒）。26件すべてが固定点でも同一failure behaviorの`approved-no-op`で、current-only failure 0件、expected-retirement 0件、比較未完了0件。各path・owner・follow-up・根拠は[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)に記録した |
 | Final ChatGPT-final-quality-gate-strict | remediation cycle 2 | candidate `8456ecd16a0c7a10f4e8b3478754ce44bd3dc4f2`のfresh browser reviewでreport identity driftをP1、後続candidate `a6288633d4decb182f2e5b97af7c0fdea29f2ca3`のbounded reviewでmanaged scaffold path-swap raceをP1として検出した。前者はreport同期、後者は実装`62bd4855ea9a385d9764f426fe895bc04edddd51`とfault-injection回帰で修正した。次candidateはstrict-v1の最終remediation cycleとして全laneを再実行する |
-| S99 / H10 | pending final certificate | bounded review・slow attestation・origin session closure・fresh full reviewをsuccessor candidateへ再固定し、repository外certificateを発行する。certificate後にrepositoryを変更しない |
+| S99 / H10 | pending final certificate | bounded review・slow attestation・fresh full reviewをsuccessor candidateへ再固定し、repository外certificateを発行する。origin session closureは直後candidate限定の診断であり、そのcandidateがbounded P1で停止したため認証要件へ持ち越さない。certificate後にrepositoryを変更しない |
 
 ## Residual Risks / Follow-ups
 
