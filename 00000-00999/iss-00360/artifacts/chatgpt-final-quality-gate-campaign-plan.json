@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "final_quality_gate_campaign_plan",
+  "task_id": "ISS-00360",
+  "target_branch": "iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces",
+  "fixed_point": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
+  "fast_profile_id": "specdock-fast-v1",
+  "slow_profile_id": "specdock-slow-v1",
+  "domain_ids": [
+    "ownership-path-identity",
+    "marker-retry-recovery",
+    "update-uninstall-reinit",
+    "retired-surface-package-parity",
+    "tests-release-evidence"
+  ],
+  "evidence_only_paths": [
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/artifacts/s95-full-regression-ledger.json",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/report.md"
+  ],
+  "supplementary_files": [
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/plan.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/report.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/artifacts/s95-full-regression-ledger.json"
+  ],
+  "model": "gpt-5.6-sol",
+  "timeout": "120m",
+  "budget_profile": "strict-v1"
+}
