@@ -923,9 +923,9 @@ def admit_distribution_operation(
             empty_workspace_boundary = not any(specdock_path.iterdir())
         except OSError:
             _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
-        if empty_workspace_boundary:
+        if empty_workspace_boundary and operation in {"fresh", "init-force"}:
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
-        if operation != "uninstall" and _is_preserved_specs_workspace(target_root):
+        if operation in {"fresh", "init-force"} and _is_preserved_specs_workspace(target_root):
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
 
     distribution_marker_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
