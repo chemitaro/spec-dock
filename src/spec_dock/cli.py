@@ -35,6 +35,7 @@ except ImportError:  # pragma: no cover - Windows has no POSIX flock module.
 from spec_dock import __version__
 from spec_dock.managed_distribution import (
     DistributionAdmission,
+    DistributionApplyError,
     DistributionOperation,
     DistributionRootIdentity,
     DistributionStageOwnership,
@@ -1775,6 +1776,9 @@ def _safe_distribution_failure_target(exc: BaseException, phase: str) -> str:
     return {
         "preflight": "distribution",
         "distribution-apply": "distribution",
+        "managed-scaffold-refresh": "spec-dock",
+        "current-external-materialize": "distribution",
+        "obsolete-prune": "distribution",
         "scaffold-refresh": "spec-dock",
         "post-verify": "distribution",
         "version-write": "spec-dock/spec-dock.version",
@@ -1789,6 +1793,8 @@ def _raise_distribution_partial_failure(
     operation: DistributionOperation,
     phase: str,
     last_completed_phase: str,
+    applied_paths: tuple[str, ...] = (),
+    pending_paths: tuple[str, ...] = (),
 ) -> NoReturn:
     target = _safe_distribution_failure_target(exc, phase)
     target_label = _safe_retry_target_label(target_root)
@@ -1798,6 +1804,8 @@ def _raise_distribution_partial_failure(
     raise RuntimeError(
         f"distribution partial failure during {phase}; "
         f"target={target}; last_completed_phase={last_completed_phase}; "
+        f"applied_paths={json.dumps(applied_paths, separators=(',', ':'))}; "
+        f"pending_paths={json.dumps(pending_paths, separators=(',', ':'))}; "
         f"retry={retry}"
     ) from None
 
@@ -1811,6 +1819,8 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
     root_identity = _distribution_root_identity(target_root)
     fresh_workspace_created = False
     stage_ownership: list[DistributionStageOwnership] = []
+    applied_paths: tuple[str, ...] = ()
+    pending_paths: tuple[str, ...] = ()
     with _assets_dir() as assets_dir:
         try:
             _preflight_fresh_spec_dock_assets(assets_dir)
@@ -1877,18 +1887,9 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
             if blocked_actions:
                 reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
+            pending_paths = tuple(action.path for action in plan.actions)
 
             def apply_scaffold() -> None:
-                nonlocal phase, last_completed_phase
-                _write_distribution_retry_marker(
-                    target_root,
-                    operation="fresh",
-                    last_completed_phase="distribution-applied",
-                    expected_root_identity=root_identity,
-                    stage_ownership=tuple(stage_ownership),
-                )
-                last_completed_phase = "distribution-applied"
-                phase = "scaffold-refresh"
                 _assert_distribution_root_identity(target_root, root_identity)
                 _install_spec_dock(
                     target_root,
@@ -1901,22 +1902,41 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
                         assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
                     ),
                 )
+
+            def record_progress(
+                progress_phase: str,
+                completed: tuple[str, ...],
+                pending: tuple[str, ...],
+                phase_complete: bool,
+            ) -> None:
+                nonlocal phase, last_completed_phase, applied_paths, pending_paths
+                phase = progress_phase
+                applied_paths = completed
+                pending_paths = pending
+                if not phase_complete:
+                    return
+                marker_phase = {
+                    "managed-scaffold-refresh": "managed-scaffold-refreshed",
+                    "current-external-materialize": "current-external-materialized",
+                    "obsolete-prune": "obsolete-pruned",
+                }[progress_phase]
                 _write_distribution_retry_marker(
                     target_root,
                     operation="fresh",
-                    last_completed_phase="scaffold-refreshed",
+                    last_completed_phase=marker_phase,
                     expected_root_identity=root_identity,
                     stage_ownership=tuple(stage_ownership),
                 )
-                last_completed_phase = "scaffold-refreshed"
+                last_completed_phase = marker_phase
 
-            phase = "distribution-apply"
+            phase = "managed-scaffold-refresh"
             _assert_distribution_root_identity(target_root, root_identity)
             apply_distribution_plan(
                 plan,
                 allow_blocked_scaffold_paths=False,
                 stage_ownership_recorder=record_stage_ownership,
                 scaffold_applier=apply_scaffold,
+                progress_recorder=record_progress,
             )
 
             phase = "post-verify"
@@ -1958,6 +1978,10 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
             _remove_distribution_retry_marker(target_root, expected_root_identity=root_identity)
             last_completed_phase = "marker-finalized"
         except Exception as exc:
+            if isinstance(exc, DistributionApplyError):
+                phase = exc.phase or phase
+                applied_paths = exc.applied_paths or applied_paths
+                pending_paths = exc.pending_paths or pending_paths
             if _distribution_retry_marker_present(target_root):
                 marker_started = True
             if marker_started:
@@ -1967,6 +1991,8 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
                     operation="fresh",
                     phase=phase,
                     last_completed_phase=last_completed_phase,
+                    applied_paths=applied_paths,
+                    pending_paths=pending_paths,
                 )
             if fresh_workspace_created:
                 with suppress(OSError):
@@ -1999,6 +2025,8 @@ def _install_recognized_distribution_unlocked(
     last_completed_phase = "not-started"
     root_identity = _distribution_root_identity(target_root)
     retry_recovery = _distribution_retry_marker_present(target_root)
+    applied_paths: tuple[str, ...] = ()
+    pending_paths: tuple[str, ...] = ()
     stage_ownership: list[DistributionStageOwnership] = list(
         retry_marker.marker.stage_ownership if retry_marker is not None and retry_marker.marker is not None else ()
     )
@@ -2068,6 +2096,7 @@ def _install_recognized_distribution_unlocked(
             if blocked_actions:
                 reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
+            pending_paths = tuple(action.path for action in plan.actions)
 
             def record_stage_ownership(record: DistributionStageOwnership) -> None:
                 existing = next(
@@ -2090,20 +2119,11 @@ def _install_recognized_distribution_unlocked(
                 )
 
             def apply_scaffold() -> None:
-                nonlocal phase, last_completed_phase
-                _write_distribution_retry_marker(
-                    target_root,
-                    operation=operation,
-                    last_completed_phase="distribution-applied",
-                    expected_root_identity=root_identity,
-                    stage_ownership=tuple(stage_ownership),
-                )
-                last_completed_phase = "distribution-applied"
-                phase = "scaffold-refresh"
                 _assert_distribution_root_identity(target_root, root_identity)
                 _install_spec_dock(
                     target_root,
                     force=True,
+                    install_root_shortcut=False,
                     write_version=False,
                     expected_root_identity=root_identity,
                     expected_managed_scaffold_identities=managed_scaffold_identities,
@@ -2119,16 +2139,34 @@ def _install_recognized_distribution_unlocked(
                         else None
                     ),
                 )
+
+            def record_progress(
+                progress_phase: str,
+                completed: tuple[str, ...],
+                pending: tuple[str, ...],
+                phase_complete: bool,
+            ) -> None:
+                nonlocal phase, last_completed_phase, applied_paths, pending_paths
+                phase = progress_phase
+                applied_paths = completed
+                pending_paths = pending
+                if not phase_complete:
+                    return
+                marker_phase = {
+                    "managed-scaffold-refresh": "managed-scaffold-refreshed",
+                    "current-external-materialize": "current-external-materialized",
+                    "obsolete-prune": "obsolete-pruned",
+                }[progress_phase]
                 _write_distribution_retry_marker(
                     target_root,
                     operation=operation,
-                    last_completed_phase="scaffold-refreshed",
+                    last_completed_phase=marker_phase,
                     expected_root_identity=root_identity,
                     stage_ownership=tuple(stage_ownership),
                 )
-                last_completed_phase = "scaffold-refreshed"
+                last_completed_phase = marker_phase
 
-            phase = "distribution-apply"
+            phase = "managed-scaffold-refresh"
             _assert_distribution_root_identity(target_root, root_identity)
             apply_distribution_plan(
                 plan,
@@ -2137,6 +2175,7 @@ def _install_recognized_distribution_unlocked(
                 stage_ownership=tuple(stage_ownership),
                 stage_ownership_recorder=record_stage_ownership,
                 scaffold_applier=apply_scaffold,
+                progress_recorder=record_progress,
             )
 
             phase = "post-verify"
@@ -2181,6 +2220,10 @@ def _install_recognized_distribution_unlocked(
             )
             last_completed_phase = "marker-finalized"
         except Exception as exc:
+            if isinstance(exc, DistributionApplyError):
+                phase = exc.phase or phase
+                applied_paths = exc.applied_paths or applied_paths
+                pending_paths = exc.pending_paths or pending_paths
             if _distribution_retry_marker_present(target_root):
                 marker_started = True
             if marker_started:
@@ -2190,6 +2233,8 @@ def _install_recognized_distribution_unlocked(
                     operation=operation,
                     phase=phase,
                     last_completed_phase=last_completed_phase,
+                    applied_paths=applied_paths,
+                    pending_paths=pending_paths,
                 )
             raise exc
 
