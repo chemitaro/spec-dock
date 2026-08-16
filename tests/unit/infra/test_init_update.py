@@ -41213,5 +41213,3 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert self._read_active_pointer_text(target, "initiative", "README.md") == placeholder.read_text(
                 encoding="utf-8"
             )
-
-
