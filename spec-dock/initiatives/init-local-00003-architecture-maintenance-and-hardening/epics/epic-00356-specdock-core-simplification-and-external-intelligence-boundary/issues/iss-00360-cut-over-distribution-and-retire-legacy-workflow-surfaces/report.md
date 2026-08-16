@@ -212,7 +212,7 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 ### Latest S95 v42 evidence (2026-08-16)
 
-* S95 v42はmanaged scaffold exact-path structural blockerのzero-write修正を含むbranch tip `6d06578511e8b1d54c997e25d5f19994ed50f1bd`に対して `27 failed, 1983 passed, 516 skipped`（13分53秒）。現行failure node 27件はS95 ledgerおよび固定点subsetと完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。Issue 360 focused suiteは`187 passed`、通常テストは`1013 passed, 1513 skipped`。archive distribution integrationは証跡ファイル更新前の作業ツリー汚れによりcandidate wheel receiptだけが失敗したため、証跡コミット後にclean treeで再実行する。
+* S95 v42はmanaged scaffold exact-path structural blockerのzero-write修正を含むbranch tip `6d06578511e8b1d54c997e25d5f19994ed50f1bd`に対して `27 failed, 1983 passed, 516 skipped`（13分53秒）。現行failure node 27件はS95 ledgerおよび固定点subsetと完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。Issue 360 focused suiteは`187 passed`、通常テストは`1013 passed, 1513 skipped`。証跡更新後のclean treeでarchive distribution integrationも`13 passed`となった。
 
 ## Verification
 
@@ -236,7 +236,7 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 * S95 v39 full regression: branch tip `a30afda01b8a2307c8a55bfa4ccb758021b41620`に対して `27 failed, 1975 passed, 516 skipped`（12分36秒）。v38とのfailure node集合差分は0件、現行failure path 27件の`--lf`再実行とledger照合は一致し、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
 * S95 v40 full regression: branch tip `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`に対して `27 failed, 1976 passed, 516 skipped`（12分43秒）。v39とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1506 skipped`、Issue 360 focused distribution suiteは`180 passed`、archive distribution integrationは`13 passed`。
 * S95 v41 full regression: branch tip `34e77724b5af9b1eb742185c3eb131f4c9944606`に対して `27 failed, 1979 passed, 516 skipped`（12分40秒）。v40とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1509 skipped`、Issue 360 focused suiteは`302 passed, 468 skipped`、archive distribution integrationは`13 passed`。
-* S95 v42 full regression: branch tip `6d06578511e8b1d54c997e25d5f19994ed50f1bd`に対して `27 failed, 1983 passed, 516 skipped`（13分53秒）。v41とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1513 skipped`、Issue 360 focused suiteは`187 passed`。archive distribution integrationは証跡ファイル更新によるdirty-treeのcandidate wheel receiptだけが失敗し、12件はpassしたため、証跡コミット後にclean treeで再実行する。
+* S95 v42 full regression: branch tip `6d06578511e8b1d54c997e25d5f19994ed50f1bd`に対して `27 failed, 1983 passed, 516 skipped`（13分53秒）。v41とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1513 skipped`、Issue 360 focused suiteは`187 passed`、clean tree archive distribution integrationは`13 passed`である。
 * Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
 * S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
