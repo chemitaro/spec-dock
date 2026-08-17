@@ -230,11 +230,19 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 * cleanな実装コミット`62bd4855ea9a385d9764f426fe895bc04edddd51`に対するfull regressionは`26 failed, 1943 passed, 498 skipped`（15分06.07秒）。failure node集合はS95 v47および固定点subsetの`approved-no-op` 26件と完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。ledger commitは`5e99e82d1bc6297a976adc2ae55598a258d923eb`。本reportを含むsuccessor review headはself-referential SHAを本文へ埋め込まず、campaign controllerと最終certificateをexact identity authorityとする。
 
+### Latest P1 repair candidate 28 (2026-08-17)
+
+* 所有権を証明できない`spec-dock/current-{initiative,epic,issue}`と`.path` 6件を独立削除処理から共通distribution plannerへ移し、regular file、symlink、directoryの全衝突をmutation前にpreserve-and-blockするよう修正した（`3b3b3c5e898f830c8b37676040eac95ab184dc29`）。さらにprovider assetをplan時のdevice / inode / ctime / mtime / size / modeとSHA-256へapply直前に再照合し、retry marker admissionをempty / preserved workspaceのFresh fast-pathより先に評価するよう修正した（`5edadf743b9ee99416cf7f9c0d93cda9deb39329`）。変更済みversion anchorの既存テスト期待もfail-closed契約へ同期し、最終実装コミットは`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`である。
+
+### Latest S95 v49 evidence (2026-08-17)
+
+* cleanな実装コミット`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`に対するfull regressionは`26 failed, 1964 passed, 498 skipped`（15分24.92秒）。failure node集合はS95 v48および固定点subsetの`approved-no-op` 26件と完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。通常テストは`1022 passed, 1466 skipped`、managed distributionは`96 passed`、distribution cut-over full laneは`133 passed`、静的解析・format・mypyもすべて成功した。本reportとledgerだけの後続commitはevidence-only deltaとし、campaign controllerと最終certificateをreview headのexact identity authorityとする。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Latest implementation commit: `62bd4855ea9a385d9764f426fe895bc04edddd51`（managed scaffold recursive replacementをheld no-follow descriptor chainへ固定し、retired scaffold pruningからpath-based recursive deletionを除去した修正）
-* Latest measured evidence commit: `5e99e82d1bc6297a976adc2ae55598a258d923eb`（実装コミット`62bd4855ea9a385d9764f426fe895bc04edddd51`に対するS95 v48 ledgerだけを更新したcommit。実装範囲とevidence-only deltaを区別する）
+* Latest implementation commit: `c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`（旧root entrypoint ownership、provider source identity、retry marker admission、anchor fail-closed test contractを収束させた修正）
+* Latest measured evidence: 実装コミット`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`に対するS95 v49。report / ledger更新commitはevidence-only deltaとしてcampaign controllerが識別する。
 * Evidence refresh HEAD: `fa5b354c8a70f63d87d0e4e44240d920a36c0e9b`（marker-finalization修正を含む現行branch tip。S95 v33はこのclean exact-upstream treeで実行した）
 * Final implementation commit: `5fe6ddb6543fc896e54bc110e67da1bfb53c7663`（marker削除失敗時のphase / target診断とFresh / update / init-force回帰テスト。Fresh mode mismatch保護は`ff7ebb904d6cdcf5f281d6300a5d20de603a4712`、hard-link read-only adoption契約は`774e126124bd5a297c4ff193b40e0c6e11061888`、uninstall retry marker競合時のcanonical payload・stable identity検証は`194b793acb015a9c564bde0aa1dc480b8e188b84`、write/fsync失敗時identity-checked cleanupは`b0763b5fa743a6f11b14718eb5cd65b17926134b`、atomic regular-file retryのidentity検証後ftruncateは`9b9e53e968f48c5883a04ef4fbd71aaac096aca8`、managed scaffold再帰uninstallの各mutation直前root binding / entry identity再検証は`91f8b824e1a6839ee8e81030b6ae20f76b143fa1`）
 * Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
