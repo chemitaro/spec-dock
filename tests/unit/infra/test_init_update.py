@@ -4621,7 +4621,7 @@ class TestInitUpdate(CliRuntimeHarness):
             installed_gitignore.write_text("stale gitignore\n", encoding="utf-8")
             installed_runtime.write_text("stale runtime\n", encoding="utf-8")
 
-            assert main(["update", str(target)]) == 1
+            assert main(["update", str(target)]) == 0
 
             for sentinel, expected_payload in sentinels.items():
                 assert sentinel.read_bytes() == expected_payload
@@ -37848,8 +37848,8 @@ esac
             marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
-            # Simulate legacy (v1) leftovers. Without an ownership proof, the
-            # same-name workflow is user-owned and must be preserved on update.
+            # Simulate legacy-looking leftovers. Without an ownership proof,
+            # both paths are user-owned and update must preserve them and block.
             legacy_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
             legacy_workflow.parent.mkdir(parents=True, exist_ok=True)
             legacy_workflow.write_text("legacy\n", encoding="utf-8")
@@ -37857,19 +37857,20 @@ esac
             legacy_symlink = target / "spec-dock" / "current-initiative"
             created_symlink = False
             try:
-                # v1 style link target (so v2 can safely prune without deleting v2-generated shortcuts).
                 Path(legacy_symlink).symlink_to("initiative/current")
                 created_symlink = True
             except OSError:
                 # Some environments may restrict symlinks; workflow pruning is still validated.
                 created_symlink = False
 
-            assert main(["update", str(target)]) == 0
+            expected_exit = 1 if created_symlink else 0
+            assert main(["update", str(target)]) == expected_exit
             assert marker.is_file()
             self._assert_version_file(target)
             assert legacy_workflow.read_text(encoding="utf-8") == "legacy\n"
             if created_symlink:
-                assert not legacy_symlink.is_symlink()
+                assert legacy_symlink.is_symlink()
+                assert legacy_symlink.readlink() == Path("initiative/current")
 
     @_ISSUE_360_RETIRED_LEGACY_SURFACE
     def test_update_refreshes_stale_runtime_mirror_and_preserves_user_data(self) -> None:

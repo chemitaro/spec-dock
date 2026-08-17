@@ -851,6 +851,86 @@ def test_s55_update_preserves_modified_historical_managed_file_and_blocks(
     assert _filesystem_snapshot(tmp_path) == before
 
 
+@pytest.mark.parametrize("operation", ("update", "init-force"))
+@pytest.mark.parametrize(
+    ("relative_path", "target_kind"),
+    [
+        *[(f"spec-dock/current-{scope}", "symlink") for scope in ("initiative", "epic", "issue")],
+        *[(f"spec-dock/current-{scope}.path", "regular") for scope in ("initiative", "epic", "issue")],
+    ],
+)
+def test_s55_unproven_legacy_root_entrypoint_is_preserved_and_blocks_zero_write(
+    tmp_path: Path,
+    capsys,
+    operation: str,
+    relative_path: str,
+    target_kind: str,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    target = tmp_path / relative_path
+    if target_kind == "symlink":
+        target.symlink_to("user-owned-target")
+    else:
+        target.write_bytes(b"user-owned entrypoint\n")
+    before = _filesystem_snapshot(tmp_path)
+
+    command = ["update", str(tmp_path)] if operation == "update" else ["init", str(tmp_path), "--force"]
+    assert main(command) == 1
+
+    assert "obsolete-identity-unknown" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        *[f"spec-dock/current-{scope}" for scope in ("initiative", "epic", "issue")],
+        *[f"spec-dock/current-{scope}.path" for scope in ("initiative", "epic", "issue")],
+    ],
+)
+def test_s55_legacy_root_entrypoint_directory_collision_blocks_zero_write(
+    tmp_path: Path,
+    capsys,
+    relative_path: str,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    target = tmp_path / relative_path
+    target.mkdir()
+    (target / "user-owned.txt").write_text("keep\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["update", str(tmp_path)]) == 1
+
+    assert "exact-path-directory" in capsys.readouterr().err
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_s55_uninstall_preserves_unproven_legacy_root_entrypoint_and_blocks(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    target = tmp_path / "spec-dock/current-initiative"
+    target.symlink_to("user-owned-target")
+    before = _filesystem_snapshot(tmp_path)
+
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "blocked"
+    assert any(
+        action["path"] == "spec-dock/current-initiative" and "obsolete-identity-unknown" in action["reason"]
+        for action in payload["actions"]
+    )
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+
+
 def test_s55_update_prunes_known_legacy_and_preserves_node_local_data(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
     legacy = tmp_path / ".codex/config.toml"

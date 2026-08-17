@@ -940,32 +940,6 @@ def _install_repo_root_shortcut(target_root: Path) -> None:
         print(f"spec-dock: (warn) failed to create repo-root shortcut symlink: {dest}: {e}", file=sys.stderr)
 
 
-def _prune_legacy_scaffold_entrypoints(specdock_dir: Path) -> None:
-    """Remove exact retired root entrypoints without recursive pathname deletion."""
-    directory_fd = os.open(specdock_dir, _uninstall_directory_flags())
-    try:
-        for name in ("current-initiative", "current-epic", "current-issue"):
-            try:
-                info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                continue
-            if not stat.S_ISLNK(info.st_mode):
-                continue
-            _assert_uninstall_tree_entry_identity(directory_fd, name, info)
-            os.unlink(name, dir_fd=directory_fd)
-        for name in ("current-initiative.path", "current-epic.path", "current-issue.path"):
-            try:
-                info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                continue
-            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                continue
-            _assert_uninstall_tree_entry_identity(directory_fd, name, info)
-            os.unlink(name, dir_fd=directory_fd)
-    finally:
-        os.close(directory_fd)
-
-
 def _retry_unpublished_atomic_regular_file(
     temporary: Path,
     destination: Path,
@@ -1529,10 +1503,6 @@ def _install_spec_dock_bound(
         (specdock_dir / "active").mkdir(parents=True, exist_ok=True)
         guard_root()
         (specdock_dir / ".agent").mkdir(parents=True, exist_ok=True)
-        guard_root()
-
-        guard_root()
-        _prune_legacy_scaffold_entrypoints(specdock_dir)
         guard_root()
 
         # Ensure runtime scripts are executable (best-effort).
