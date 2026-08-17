@@ -152,6 +152,28 @@ def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
         assert _managed_tree_bytes(dogfood) == _managed_tree_bytes(provider)
 
 
+def test_issue_360_spec_dock_guidance_is_agent_first_and_not_present_only() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    skill = (repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    repository_agents = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
+    root_readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    provider_docs = (repo_root / "src/spec_dock/assets/spec_dock/docs/README.md").read_text(encoding="utf-8")
+
+    assert "agent-first" in skill
+    assert "do not stop after merely presenting a command" in skill
+    assert "do not ask for command-by-command confirmation" in skill
+    assert "issue lifecycle" in skill
+    assert "managed update" in skill
+    assert "Artifact creation and content authoring are one outcome" in skill
+    assert "## Destructive boundary" in skill
+    assert "Present-only" not in skill
+    assert "SpecDock Agent-First Operations" in repository_agents
+    assert "Agent-first operation" in root_readme
+    assert "## Agent-first operations" in provider_docs
+
+
 _ISS_00031_STALE_WHEEL_PATHS = (
     "spec_dock/assets/spec_dock/templates/adr.md",
     "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",

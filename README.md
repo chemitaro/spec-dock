@@ -82,6 +82,20 @@ After `init`, Core operations use `./spec-dock/scripts/spec-dock`. The installed
 limited to the Storage Core guide and the optional operator-owned documentation grill; planning,
 review, and execution orchestration are not shipped as repository-local workflow engines.
 
+### Agent-first operation
+
+SpecDock is intended to be operated by a Codex agent. When a user requests a SpecDock outcome or
+approves a plan that requires one, the agent runs the applicable repository-local commands and
+verifies their results. The examples below are command references, not instructions to hand routine
+execution back to the user. Removing bundled orchestration does not make the CLI human-operated.
+
+Ordinary in-scope creation, import, Artifact, active, dependency, sync, issue lifecycle, worktree
+creation, Workbench copy, close, and managed update operations do not require command-by-command
+confirmation. Destructive operations (`delete`, `uninstall --apply`, `uninstall --remove-specs`,
+`worktree remove`, and guard-bypassing `--force`) require an exact target and destructive outcome in
+the user request or approved plan. PR merge remains human-operated where repository instructions say
+so.
+
 ```bash
 # Create nodes:
 # - initiative/epic/issue default: create and link a GitHub issue.
@@ -265,6 +279,8 @@ PR still requires a human to perform the merge.
 Codex 互換の二つの補助Skillを生成するためのスキャフォルディングツールです。
 
 実行は `uvx` を想定しており、導入後は生成されたファイル（Markdown/スクリプト/Skill）を使って運用します。
+
+SpecDockの通常操作はCodex agentが実行するagent-first運用を想定しています。利用者の依頼または承認済み計画に必要なコマンドはagentが実行・検証し、コマンド例の提示だけで利用者へ返しません。破壊的操作は対象と結果が依頼または承認済み計画に明記されている場合に限り、PRのmergeはrepositoryのhuman gateに従います。
 
 v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様ツリーを **常置**し、
 `spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。

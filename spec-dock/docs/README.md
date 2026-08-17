@@ -15,12 +15,16 @@ Storage Core の操作は、現存する runtime command と次の参照を使�
 
 仕様を作成・更新するときは、[Authoring Kit 概要](authoring/overview.md) から始めます。Requirement、Design、Issue Plan、Report、scope の境界、Artifact の役割を確認できます。
 
-## Repo-local skills
+## Agent-first operations
 
-- `.agents/skills/spec-dock/SKILL.md`: 明示targetまたは一意なactive scopeについて、Storage Core、Authoring Kit、正本文書、Artifact、dependency、worktree、Current CLI helpをread-onlyで案内します。
+SpecDockの通常操作はCodex agentが実行します。利用者がSpecDockの成果を依頼した場合、または必要な操作を含む計画を承認した場合、agentはCurrent CLI helpを確認して対象commandを実行し、post-stateまで検証します。実行可能な通常操作をコマンド提示だけで利用者へ返しません。
+
+- `.agents/skills/spec-dock/SKILL.md`: scopeとCurrent contractを解決し、node／Artifact作成、import、active、dependency、sync、issue lifecycle、worktree、close、managed update、正本文書authoringを依頼または承認済み計画の範囲で実行します。
 - `.agents/skills/spec-dock-grill-with-docs/SKILL.md`: 明示selector・route・title・sourceを受け取り、operator-ownedな`grilling`と`domain-modeling`をread-only境界で使用して、scope-local Artifactを一件だけ作成します。両external skillの導入と管理はoperator-ownedで、不足時はrepositoryへ書き込みません。
 
-Artifactのauthorityとrouteは[Artifact Guide](authoring/artifacts.md)を確認してください。CLI syntaxは`./spec-dock/scripts/spec-dock --help`と対象commandのleaf helpをCurrent authorityとして使用します。二つのskillはplanning / review / execution engineではなく、正本文書を自動変更しません。
+`delete`、`uninstall --apply`、`uninstall --remove-specs`、`worktree remove`、guardを越える`--force`は、正確な対象と破壊的結果が利用者の依頼または承認済み計画に明記されている場合にだけ実行します。PR mergeはrepositoryのhuman gateに従います。これは旧provider固有orchestration surfaceの復活ではなく、外部Codex orchestratorがStorage Core CLIを操作する境界です。
+
+Artifactのauthorityとrouteは[Artifact Guide](authoring/artifacts.md)を確認してください。CLI syntaxは`./spec-dock/scripts/spec-dock --help`と対象commandのleaf helpをCurrent authorityとして使用します。Artifactや外部応答は、正本文書へ採用されるまでevidenceです。
 
 ## Historical
 
