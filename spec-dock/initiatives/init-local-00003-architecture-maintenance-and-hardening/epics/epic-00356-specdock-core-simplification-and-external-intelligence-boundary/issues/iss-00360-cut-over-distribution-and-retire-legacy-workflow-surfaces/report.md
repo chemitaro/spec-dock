@@ -238,11 +238,16 @@ Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保�
 
 * cleanな実装コミット`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`に対するfull regressionは`26 failed, 1964 passed, 498 skipped`（15分24.92秒）。failure node集合はS95 v48および固定点subsetの`approved-no-op` 26件と完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。通常テストは`1022 passed, 1466 skipped`、managed distributionは`96 passed`、distribution cut-over full laneは`133 passed`、静的解析・format・mypyもすべて成功した。本reportとledgerだけの後続commitはevidence-only deltaとし、campaign controllerと最終certificateをreview headのexact identity authorityとする。
 
+### Latest P1 repair candidate 29 (2026-08-17)
+
+* bounded reviewで検出したempty-directory cleanupの2件を`ddd32f97b994a294cce0133e86a607cec356eb90`で修正した。uninstall cleanupは観測したdirectoryのdevice / inode / ctimeを保持し、no-followで開いたparent / target descriptor、空判定、削除直前identity、削除後visible chainを再検証する。Fresh pre-marker rollbackも、このoperationが作成したworkspace identityと一致する空directoryだけを削除し、同名のuser-owned replacementは保持する。競合回帰を追加したcut-over full laneは`135 passed`、通常テストは`1022 passed, 1468 skipped`、静的解析・format・mypyはpassした。
+* S95 ledgerの固定点subset commandを、immutableな`d81a12ef51dcbdf2e162d7480da0d3ba46de9b07`から26 node IDを読み、固定点`a6ded0d9a838b40cdcd741fa473cd264b801f245`でpytest終了コード1とfailure node集合の完全一致を機械判定する実行可能commandへ置換した。一時worktreeでの再実測はshared Git metadataの`Operation not permitted`により未実施であり、既存の固定点26件比較結果を置換していない。現行candidateのfull regressionはcampaign controllerのslow laneでexact SHAに対して再実行する。
+
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Latest implementation commit: `c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`（旧root entrypoint ownership、provider source identity、retry marker admission、anchor fail-closed test contractを収束させた修正）
-* Latest measured evidence: 実装コミット`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`に対するS95 v49。report / ledger更新commitはevidence-only deltaとしてcampaign controllerが識別する。
+* Latest implementation commit: `ddd32f97b994a294cce0133e86a607cec356eb90`（旧root entrypoint ownership、provider source identity、retry marker admission、anchor fail-closed、empty-directory cleanup identity、固定点subset verifierを収束させた修正）
+* Latest measured evidence: 実装コミット`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`に対するS95 v49、および`ddd32f97b994a294cce0133e86a607cec356eb90`に対するfast / cut-over検証。現行candidateのfull regressionはcampaign controller slow laneがexact SHAで再実行し、report / ledger更新commitはevidence-only deltaとして識別する。
 * Evidence refresh HEAD: `fa5b354c8a70f63d87d0e4e44240d920a36c0e9b`（marker-finalization修正を含む現行branch tip。S95 v33はこのclean exact-upstream treeで実行した）
 * Final implementation commit: `5fe6ddb6543fc896e54bc110e67da1bfb53c7663`（marker削除失敗時のphase / target診断とFresh / update / init-force回帰テスト。Fresh mode mismatch保護は`ff7ebb904d6cdcf5f281d6300a5d20de603a4712`、hard-link read-only adoption契約は`774e126124bd5a297c4ff193b40e0c6e11061888`、uninstall retry marker競合時のcanonical payload・stable identity検証は`194b793acb015a9c564bde0aa1dc480b8e188b84`、write/fsync失敗時identity-checked cleanupは`b0763b5fa743a6f11b14718eb5cd65b17926134b`、atomic regular-file retryのidentity検証後ftruncateは`9b9e53e968f48c5883a04ef4fbd71aaac096aca8`、managed scaffold再帰uninstallの各mutation直前root binding / entry identity再検証は`91f8b824e1a6839ee8e81030b6ae20f76b143fa1`）
 * Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
@@ -531,14 +536,14 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | 実装コミット`62bd4855ea9a385d9764f426fe895bc04edddd51`で`uv run pytest -q` → `1020 passed, 1447 skipped` |
+| Fast lane | pass | 実装コミット`ddd32f97b994a294cce0133e86a607cec356eb90`で`uv run pytest -q` → `1022 passed, 1468 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
 | Issue 360 focused regression | pass (Issue 360 suites) | `uv run pytest --run-full-regression -q tests/unit/infra/test_managed_distribution.py tests/cli_runtime/test_distribution_cutover.py tests/unit/infra/test_init_update.py::TestInitUpdate::test_uninstall_apply_remove_specs_rerun_accepts_empty_post_uninstall_boundary` → `196 passed`; managed scaffoldのexact-path directory collision、全managed rootのsymlink / special type / hard-link safety、provider asset identityのrecursive refresh直前再検証、installer/distribution cutover、必須nested runtime sourceの欠落・非実行可能mode zero-write、Fresh create staging failure cleanup、Fresh markerのwrite / cleanup複合故障からのvalid marker再発行と通常init retry、mode repair、atomic staging failure、Fresh retry、Fresh Workbench symlink preserve-and-block、Fresh legacy workflow preservation、same-parent snapshot refresh、記録済みregular/symlink stale-stage retry cleanup、unknown stage-like sibling preservation、未記録の正確なstage名collision保持、historical mode-only drift、empty-target `init --force`、post-uninstall empty-boundary reinit、`.gitignore` identity recheck、marker更新失敗後cleanup、trusted manifest claim retry、recognized anchor収集、およびpartial-failure diagnosticsを確認 |
 | Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
 | Full repository regression | pass (accepted nonzero / exact ledger match) | 実装コミット`62bd4855ea9a385d9764f426fe895bc04edddd51`で`uv run pytest --run-full-regression -q` → `26 failed, 1943 passed, 498 skipped`（15分06.07秒）。26件すべてが固定点でも同一failure behaviorの`approved-no-op`で、current-only failure 0件、expected-retirement 0件、比較未完了0件。各path・owner・follow-up・根拠は[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)に記録した |
-| Final ChatGPT-final-quality-gate-strict | remediation cycle 2 | candidate `8456ecd16a0c7a10f4e8b3478754ce44bd3dc4f2`のfresh browser reviewでreport identity driftをP1、後続candidate `a6288633d4decb182f2e5b97af7c0fdea29f2ca3`のbounded reviewでmanaged scaffold path-swap raceをP1として検出した。前者はreport同期、後者は実装`62bd4855ea9a385d9764f426fe895bc04edddd51`とfault-injection回帰で修正した。次candidateはstrict-v1の最終remediation cycleとして全laneを再実行する |
+| Final ChatGPT-final-quality-gate-strict | remediation cycle 3 | candidate `d81a12ef51dcbdf2e162d7480da0d3ba46de9b07`のbounded reviewでempty-directory cleanup identity 2件と固定点subset command 1件をP1として検出した。実装`ddd32f97b994a294cce0133e86a607cec356eb90`、競合回帰、実行可能exact-set verifierで修正し、次candidateは全laneを再実行する |
 | S99 / H10 | pending final certificate | bounded review・slow attestation・fresh full reviewをsuccessor candidateへ再固定し、repository外certificateを発行する。origin session closureは直後candidate限定の診断であり、そのcandidateがbounded P1で停止したため認証要件へ持ち越さない。certificate後にrepositoryを変更しない |
 
 ## Residual Risks / Follow-ups
