@@ -730,6 +730,37 @@ def test_s60_fresh_marker_publication_recovers_after_write_and_cleanup_faults(
     assert not marker.exists()
 
 
+def test_s60_fresh_pre_marker_rollback_preserves_replacement_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    displaced = tmp_path.with_name(f"{tmp_path.name}-created-workspace")
+    swapped = False
+
+    def fail_marker_write(*args, **kwargs):
+        raise RuntimeError("simulated pre-marker failure")
+
+    def replace_workspace_before_rollback(target_root: Path) -> bool:
+        nonlocal swapped
+        if not swapped:
+            swapped = True
+            (target_root / "spec-dock").rename(displaced)
+            (target_root / "spec-dock").mkdir()
+        return False
+
+    monkeypatch.setattr(cli, "_write_distribution_retry_marker", fail_marker_write)
+    monkeypatch.setattr(cli, "_distribution_retry_marker_present", replace_workspace_before_rollback)
+
+    assert main(["init", str(tmp_path)]) == 1
+    capsys.readouterr()
+
+    assert swapped
+    assert (tmp_path / "spec-dock").is_dir()
+    assert list((tmp_path / "spec-dock").iterdir()) == []
+    assert displaced.is_dir()
+
+
 def test_s50_update_unknown_current_collision_is_zero_write(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     collision = tmp_path / ".agents/skills/spec-dock/SKILL.md"
@@ -1732,6 +1763,46 @@ def test_s70_uninstall_cleanup_rebind_keeps_replacement_untouched(tmp_path: Path
     assert result == ()
     assert (tmp_path / ".agents/replacement-sentinel.txt").read_text(encoding="utf-8") == replacement_sentinel
     assert not (tmp_path / ".agents/skills/spec-dock").exists()
+
+
+def test_s70_uninstall_cleanup_rechecks_empty_directory_identity_before_rmdir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / ".agents/skills/spec-dock"
+    candidate.mkdir(parents=True)
+    actions = (
+        cli._UninstallAction(
+            rel_path=".agents/skills/spec-dock/SKILL.md",
+            category="agent_skill",
+            status="removed",
+            reason="test cleanup race",
+        ),
+    )
+    displaced = candidate.with_name("spec-dock-displaced")
+    original_remove = cli._remove_empty_bound_directory
+    swapped = False
+
+    def replace_candidate_before_identity_recheck(target_root, rel_path, **kwargs):
+        nonlocal swapped
+        if not swapped and rel_path == Path(".agents/skills/spec-dock"):
+            swapped = True
+            candidate.rename(displaced)
+            candidate.mkdir()
+        return original_remove(target_root, rel_path, **kwargs)
+
+    monkeypatch.setattr(cli, "_remove_empty_bound_directory", replace_candidate_before_identity_recheck)
+
+    result = cli._cleanup_empty_uninstall_dirs(
+        tmp_path,
+        actions,
+        expected_root_identity=cli._distribution_root_identity(tmp_path),
+    )
+
+    assert result == ()
+    assert swapped
+    assert candidate.is_dir()
+    assert displaced.is_dir()
 
 
 def test_s60_post_verify_failure_keeps_marker_until_forward_retry(tmp_path: Path, monkeypatch, capsys) -> None:

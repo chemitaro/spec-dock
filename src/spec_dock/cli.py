@@ -1792,6 +1792,7 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
     last_completed_phase = "not-started"
     root_identity = _distribution_root_identity(target_root)
     fresh_workspace_created = False
+    fresh_workspace_identity: _ManagedPathIdentity | None = None
     stage_ownership: list[DistributionStageOwnership] = []
     applied_paths: tuple[str, ...] = ()
     pending_paths: tuple[str, ...] = ()
@@ -1825,6 +1826,7 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
                         _specdock_dir(bound_root).mkdir()
                     except FileExistsError as exc:
                         raise RuntimeError("Fresh distribution workspace appeared during preflight") from exc
+                    fresh_workspace_identity = _managed_path_identity(_specdock_dir(bound_root))
                 fresh_workspace_created = True
             _write_distribution_retry_marker(
                 target_root,
@@ -1968,10 +1970,15 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
                     applied_paths=applied_paths,
                     pending_paths=pending_paths,
                 )
-            if fresh_workspace_created:
-                with suppress(OSError):
+            if fresh_workspace_created and fresh_workspace_identity is not None:
+                with suppress(OSError, RuntimeError):
                     _assert_distribution_root_identity(target_root, root_identity)
-                    _specdock_dir(target_root).rmdir()
+                    _remove_empty_bound_directory(
+                        target_root,
+                        Path(_SPEC_DOCK_DIRNAME),
+                        expected_identity=fresh_workspace_identity,
+                        expected_root_identity=root_identity,
+                    )
             raise
 
 
@@ -2578,6 +2585,63 @@ def _remove_bound_directory_tree(
             _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
             _assert_uninstall_tree_entry_identity(parent_fd, rel_path.name, visible)
             os.rmdir(rel_path.name, dir_fd=parent_fd)
+        finally:
+            os.close(directory_fd)
+
+
+def _remove_empty_bound_directory(
+    target_root: Path,
+    rel_path: Path,
+    *,
+    expected_identity: _ManagedPathIdentity,
+    expected_root_identity: DistributionRootIdentity | None,
+) -> None:
+    """Remove an empty directory only while its captured identity remains bound."""
+    with _open_uninstall_parent_chain(
+        target_root,
+        rel_path,
+        expected_root_identity=expected_root_identity,
+    ) as fds:
+        parent_fd = fds[-1]
+        try:
+            visible = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise RuntimeError("empty directory target changed during safe cleanup") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or (visible.st_dev, visible.st_ino, visible.st_ctime_ns)
+            != (expected_identity.device, expected_identity.inode, expected_identity.ctime_ns)
+        ):
+            raise RuntimeError("empty directory target identity changed during safe cleanup")
+
+        directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
+        try:
+            held = os.fstat(directory_fd)
+            if not stat.S_ISDIR(held.st_mode) or (held.st_dev, held.st_ino, held.st_ctime_ns) != (
+                expected_identity.device,
+                expected_identity.inode,
+                expected_identity.ctime_ns,
+            ):
+                raise RuntimeError("empty directory target identity changed during safe cleanup")
+            visible_fds = (*fds, directory_fd)
+            _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            with os.scandir(directory_fd) as entries:
+                if next(entries, None) is not None:
+                    raise RuntimeError("empty directory target is no longer empty")
+            _assert_uninstall_visible_chain(target_root, rel_path, fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            _assert_uninstall_tree_entry_identity(parent_fd, rel_path.name, visible)
+            current = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
+            if (current.st_dev, current.st_ino, current.st_ctime_ns) != (
+                expected_identity.device,
+                expected_identity.inode,
+                expected_identity.ctime_ns,
+            ):
+                raise RuntimeError("empty directory target identity changed during safe cleanup")
+            os.rmdir(rel_path.name, dir_fd=parent_fd)
+            _assert_uninstall_visible_chain(target_root, rel_path, fds)
         finally:
             os.close(directory_fd)
 
@@ -3706,8 +3770,13 @@ def _cleanup_empty_uninstall_dirs(
                     continue
                 if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
                     continue
-                os.rmdir(rel_path.name, dir_fd=parent_fd)
-                _assert_uninstall_visible_chain(target_root, rel_path, fds)
+                expected_identity = _ManagedPathIdentity(info.st_dev, info.st_ino, info.st_ctime_ns)
+            _remove_empty_bound_directory(
+                target_root,
+                rel_path,
+                expected_identity=expected_identity,
+                expected_root_identity=expected_root_identity,
+            )
         except FileNotFoundError:
             continue
         except (OSError, RuntimeError):
