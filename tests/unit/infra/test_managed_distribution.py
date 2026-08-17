@@ -1082,7 +1082,6 @@ def test_s55_obsolete_identity_ownership_ignores_mode_drift(tmp_path: Path) -> N
 
 def test_s30_apply_rejects_provider_mode_change_after_plan(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"new\n")
     old = b"old\n"
@@ -1101,15 +1100,44 @@ def test_s30_apply_rejects_provider_mode_change_after_plan(
         target_root=target_root,
         operation="update",
     )
+    source = install_root / ".github/workflows/ci.yml"
+    source.chmod(0o755)
+
+    with pytest.raises(DistributionApplyError, match="provider Current asset identity changed"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == old
+
+
+def test_s30_apply_rejects_provider_content_change_with_same_planned_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
     original_source = managed_distribution._source_asset_bytes
 
-    def changed_source(path: Path) -> tuple[bytes, int]:
-        content, mode = original_source(path)
-        return content, 0o755 if mode != 0o755 else 0o644
+    def changed_source(path: Path) -> tuple[bytes, managed_distribution.DistributionSourceSnapshot]:
+        _content, snapshot = original_source(path)
+        return b"unplanned\n", snapshot
 
     monkeypatch.setattr(managed_distribution, "_source_asset_bytes", changed_source)
 
-    with pytest.raises(DistributionApplyError, match="provider Current asset mode changed"):
+    with pytest.raises(DistributionApplyError, match="provider Current asset content changed"):
         apply_distribution_plan(plan)
 
     assert target.read_bytes() == old
@@ -2670,3 +2698,25 @@ def test_s35_legacy_uninstall_marker_remains_admissible_without_version(tmp_path
     )
 
     assert admission.status == "uninstall-retry"
+
+
+def test_s35_retry_marker_authority_precedes_empty_workspace_fast_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    monkeypatch.setattr(
+        managed_distribution,
+        "_read_uninstall_retry_marker_for_admission",
+        lambda _target_root: True,
+    )
+
+    with pytest.raises(DistributionAdmissionError, match="uninstall-retry-present"):
+        admit_distribution_operation(
+            target_root,
+            operation="fresh",
+            package_version="1.2.3",
+            manifest_path=manifest_path,
+        )
