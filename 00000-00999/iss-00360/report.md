@@ -3,7 +3,7 @@
 ID: "iss-00360"
 タイトル: "Cut Over Distribution and Retire Legacy Workflow Surfaces"
 関連GitHub: ["#360"]
-最終更新: "2026-08-16"
+最終更新: "2026-08-17"
 親: ["epic-00356", "init-local-00003"]
 依存: ["requirement.md", "design.md", "plan.md"]
 ---
@@ -13,6 +13,12 @@ ID: "iss-00360"
 ## Outcome
 
 Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP0/P1を段階的に修正した。`7cb830ad8ccf1700c408abbd17f5261a53aa0214` では、uninstall marker最終化後にfallibleなworkspace root rmdirを行わないよう処理を単純化し、成功時はmarkerを除去した空の`spec-dock`境界を残すことで、terminal cleanup failureとmarker再発行 failureの複合状態でもdurable retry admissionを失わないようにした。`a30afda01b8a2307c8a55bfa4ccb758021b41620` では、partial uninstallのJSON / text診断からcredential・host absolute path・raw exceptionを除外し、relative failed path、phase、last completed phase、retry commandを安定した契約として出力するようにした。`cc1b42a4742e5d5c9efca042f29c506258013822` では、成功した`uninstall --remove-specs`後に残る空の`spec-dock`境界をFresh admissionとして安全に再初期化できるようにし、明示targetのpartial retry診断で元のtarget文脈を保持するようにした。`34e77724b5af9b1eb742185c3eb131f4c9944606` では、配布 marker のheld-parent identity再検証、distribution/uninstall retryの元target伝搬、特殊パスを含むargv-safeなretry commandと実行回帰を追加した。`6d06578511e8b1d54c997e25d5f19994ed50f1bd` では、managed scaffoldの全managed rootを再帰的に安全検査し、providerがregular fileを期待するexact pathのdirectory・symlink・special type・hard linkを、marker公開およびrecursive refresh前にzero-writeで停止する統合回帰を追加した。`3bb7a77c` では、managed scaffold・generated active・initiative・Workbench境界を配布manifestのmutation前重複検査で保護し、`5488dc75882ce9f0fd2d1a20f3c4e23ecb1a8a48` では、uninstall後に管理対象が完全に消えた空境界だけを安全な再実行として認め、管理対象が残る空workspaceのupdate/uninstallは引き続きzero-writeで拒否するようにした。Fresh / update / uninstallの既存no-follow境界、partial diagnostics、同一package retry収束も維持している。
+
+### Agent-first operation correction (2026-08-17)
+
+Issue 359でcurrent `spec-dock` skillがread-only / command-presentation中心になり、Issue 360で旧operator surfaceを退役した後に通常のSpecDock操作を実行する主体が不明確になった回帰を、Issue 360の責任範囲で修正した。Provider正本とdogfood projectionのskillをagent-first operator / authoring guideへ変更し、root `AGENTS.md`、root README、shipped docs READMEへ同じ運用境界を反映した。通常のcreate、import、Artifact、active、dependency、sync、issue lifecycle、worktree creation、Workbench copy、close、managed updateは、利用者依頼または承認済み計画の範囲でagentが実行・検証する。破壊的なdelete、適用を伴うuninstall、worktree remove、guardを越える`--force`は、正確な対象と結果が承認されている場合に限る。PR mergeのhuman gateは維持する。
+
+この契約を`test_issue_360_spec_dock_guidance_is_agent_first_and_not_present_only`で固定し、provider / dogfood parityを含むfocused testは`2 passed`、skill validation、`spec-dock validate`、通常test lane、Ruff、format、mypyはいずれもpassした。この回帰と補正はIssue 360で完結し、Epic 00365の未解決scopeには引き継がない。
 
 ### Latest P1 repair candidate (2026-08-14)
 
