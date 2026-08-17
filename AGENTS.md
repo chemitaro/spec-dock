@@ -5,6 +5,14 @@
 - This repository is now a `spec-dock` dogfooding repo: we develop `spec-dock` while also using `spec-dock` to manage this product's own specs and workflow.
 - Treat repo documents as the source of truth.
 
+## SpecDock Agent-First Operations
+
+- Codex agents are the default operators of `./spec-dock/scripts/spec-dock ...`. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results; do not stop at command suggestions or ask the user to type ordinary commands.
+- Treat the request or approved plan as authorization for the command's ordinary documented local, Git, and GitHub side effects. Inspect current root and leaf help, resolve exact targets, and preserve the CLI's fail-closed boundaries.
+- Require an exact target and explicit destructive outcome in the request or approved plan before running `delete`, `uninstall --apply`, `uninstall --remove-specs`, `worktree remove`, or a guard-bypassing `--force`. Once authorized, execute and verify them rather than handing them back for manual entry.
+- Use SpecDock commands instead of hand-editing metadata, active pointers, dependency storage, generated projections, or worktree records.
+- Keep the repository's human PR merge gate. That gate does not make node creation, Artifact creation, `issue start`, `issue finish`, `close`, `sync`, `update`, or other ordinary SpecDock operations human-only.
+
 ## Dogfooding Warning
 
 - This repo contains both provider code and a local consumer workspace.

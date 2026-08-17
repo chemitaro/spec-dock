@@ -1,97 +1,73 @@
 ---
 name: spec-dock
-description: Inspect and explain the current SpecDock scope, documents, artifacts, dependencies, worktrees, and CLI without starting workflow automation.
+description: Operate and author SpecDock scopes, documents, Artifacts, dependencies, lifecycle state, worktrees, and managed installation through the current repository-local CLI. Use when Codex needs to inspect SpecDock or execute an in-scope SpecDock outcome instead of handing commands back to the user.
 ---
 
 # SpecDock
 
-Use this skill as a thin, read-only guide to the repository's current SpecDock Storage Core and Authoring Kit. Treat local files and current CLI help as the authority. Do not infer workflow readiness, review status, or completion.
+Use this skill as the agent-first operating guide for the current SpecDock Storage Core and Authoring Kit. Treat local canonical files, current CLI help, and command results as the authority. Execute the SpecDock work covered by the user's request or approved plan; do not stop after merely presenting a command that can be run safely in the current environment.
 
-## Resolve one scope
+## Resolve the scope
 
-1. Prefer one explicit Initiative, Epic, or Issue target supplied by the user.
-2. When no target is supplied, run `./spec-dock/scripts/spec-dock active show` and select the deepest unambiguous active scope in its parent chain: Issue, then Epic, then Initiative.
-3. Stop and ask for one explicit target when the requested scope cannot be resolved uniquely. Do not mutate active state to resolve ambiguity.
-4. Resolve the canonical path under `spec-dock/initiatives/` and report the observed ID and path.
+1. Prefer an explicit Initiative, Epic, Issue, repository, or worktree target from the request or approved plan.
+2. When an existing scope is needed and no target is supplied, run `./spec-dock/scripts/spec-dock active show` and select the deepest unambiguous active scope in its parent chain: Issue, then Epic, then Initiative.
+3. Stop before mutation when the target or parent is ambiguous. Do not mutate active state to manufacture certainty.
+4. Resolve node targets to one canonical path under `spec-dock/initiatives/`. After creation or import, verify the reported ID and path from local files.
 
-Only this read-only skill may use active scope as a target fallback.
+## Execute the outcome
 
-## Read order
+1. Read root help and the relevant leaf help immediately before using a command. Current help owns syntax and available operations.
+2. Inspect only the canonical docs, references, metadata, Artifact rules, dependency state, and worktree facts needed to validate the operation.
+3. Execute every in-scope SpecDock command needed for the requested outcome. A user request or approved plan authorizes its ordinary documented local, Git, and GitHub side effects; do not ask for command-by-command confirmation.
+4. Verify command output and post-state. Run `validate`, `sync`, `active show`, `deps check`, or worktree inspection when the changed surface requires them.
+5. Continue through the requested SpecDock outcome. Keep lifecycle admission, implementation evidence, PR delivery, merge, and lifecycle closure distinct rather than treating one command as proof of all of them.
 
-Read only what the request needs, in this order:
+Ordinary agent execution includes read-only commands and the current create, import, Artifact, active, dependency, sync, issue lifecycle, worktree creation, Workbench copy, doctor, close, and managed update routes when the requested outcome needs them. This includes the documented GitHub issue create/read/close and Git checkout effects of those routes. `uninstall` without `--apply` is an ordinary dry-run.
 
-1. Scope identity, `.meta.json`, and parent chain.
-2. `requirement.md`, `design.md`, `plan.md`, and `report.md` at the resolved scope.
-3. The scope's direct-child `artifacts/`, its `rules.md`, and any Artifact the user identified.
-4. Direct dependency metadata and `deps check --no-github` output when readiness facts are requested.
-5. `worktree list` or `worktree show` when checkout placement matters.
-6. `spec-dock/docs/authoring/overview.md`, `spec-dock/docs/authoring/artifacts.md`, relevant `spec-dock/docs/reference_*.md`, root CLI help, and the relevant leaf help.
+For a future or unfamiliar command, inspect its leaf help and Current reference docs. Execute it when its semantics are non-destructive and in scope. Stop and explain the unresolved effect when the documentation is insufficient to classify it safely.
 
-Distinguish canonical documents from evidence Artifacts, generated projections, and CLI observations. Return exact paths and label missing or stale information instead of filling it in.
+## Destructive boundary
 
-## CLI side-effect classes
+Require the user's request or an approved plan to name the exact target and destructive outcome before executing:
 
-Inspect current root and leaf `--help` before presenting a command. If observed behavior conflicts with this classification, stop and report the mismatch without executing the disputed operation.
+- `delete`, including recursive deletion
+- `uninstall --apply`, especially `--remove-specs`
+- `worktree remove`
+- a `--force` option that bypasses a guard or validation failure
 
-### Execute-read-only
+Once that exact authorization exists, execute and verify the command rather than returning it for manual entry. Reconfirm only when the resolved target, deletion set, or effect is materially broader than authorized.
 
-The skill may execute only these operations:
+PR merge remains a human action in repositories whose `AGENTS.md` says so. Execute the preceding and following SpecDock commands under the authorization rules above.
 
-- root or leaf `--help`
-- `active show`
-- `deps check --no-github`
-- `worktree list`
-- `worktree show`
-- `validate`
-- bare `doctor`, with no GitHub target options
+## Documents and Artifacts
 
-### Present-only
+Read one resolved scope in this order when the task needs its contents:
 
-Explain the exact current command and its side effects, but leave execution to the operator:
+1. `.meta.json` and parent chain
+2. `requirement.md`, `design.md`, `plan.md`, and `report.md`
+3. direct-child `artifacts/`, `rules.md`, and named Artifacts
+4. direct dependencies and generated projections needed for observation
+5. relevant files under `spec-dock/docs/authoring/` and `spec-dock/docs/reference_*.md`
 
-- `new initiative`, `new epic`, and `new issue`
-- `import initiative`, `import epic`, and `import issue`
-- `active set` and `active clear`
-- `deps add` and `deps remove`
-- `deps check` when it can contact GitHub
-- `issue start`
-- `sync`
-- `artifact import file`
-- `worktree create` and `worktree remove`
-- `workbench copy`
-- `new artifact`
-- external GitHub capability diagnostics using the current options:
+Edit canonical Requirement, Design, Plan, Report, or ADR files when the user requests authoring or an approved plan assigns that work. Preserve their distinct roles and do not treat an Artifact, generated projection, external response, or Report as durable authority automatically.
 
-  ```text
-  ./spec-dock/scripts/spec-dock doctor \
-    --github-repo <owner/repo> \
-    --github-pr <pull-request-number> \
-    --github-head-sha <head-sha> \
-    [--github-extended]
-  ```
+Use `new artifact` for supported Markdown Artifact types and populate the returned path. For another requested evidence format, such as HTML, create it in the resolved scope's direct-child `artifacts/` directory and apply the format-specific validation skill. Artifact creation and content authoring are one outcome; do not leave an empty scaffold for the operator to finish.
 
-The explicitly invoked `spec-dock-grill-with-docs` skill owns the sole skill-level exception for one `new artifact` operation under its own write boundary.
+## Guardrails
 
-### Forbidden-from-skill
+- Use command-first mutation for metadata, active state, dependencies, generated projections, node lifecycle, and worktrees. Do not hand-edit their storage as a command fallback.
+- Preserve user-owned content and follow Current fail-closed diagnostics. Do not bypass a failed command with raw filesystem, low-level Git, or direct GitHub mutation.
+- Do not restore removed commands, retired bundled orchestration, provider-specific routes, or third-party composition as a fallback.
+- Distinguish canonical documents, evidence Artifacts, generated projections, CLI observations, Git state, and GitHub state in the result.
 
-Do not execute or directly perform:
+## Report
 
-- `close`, `delete`, `issue finish`, `update`, or `uninstall`
-- Git or GitHub mutation
-- raw edits to `.meta.json`, active state, or dependency sources
-- automatic edits to canonical Requirement, Design, Plan, Report, or ADR files
-- mutating CLI operations outside the one Artifact exception named above
-- removed commands, third-party workflow composition, or fallback automation
+Return the smallest useful evidence set:
 
-## Output
+- resolved target, parent chain, and canonical path
+- commands executed and their material side effects
+- created or changed IDs and paths
+- validation and post-state results
+- blockers, destructive scope mismatches, or remaining human gates
 
-Answer with the smallest useful set of:
-
-- resolved scope ID, kind, path, and parent chain
-- canonical document and Artifact locations with their authority class
-- observed dependencies and worktree placement
-- relevant Current docs and CLI help pointers
-- commands grouped by the side-effect classes above
-- ambiguity, missing data, or a side-effect mismatch that requires operator action
-
-This skill explains current structure and operations. It does not start planning, review, execution, installation, publication, migration, or rollback workflows.
+Command examples are supporting evidence, not a substitute for execution.
