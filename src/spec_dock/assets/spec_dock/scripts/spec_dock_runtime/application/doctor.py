@@ -120,7 +120,7 @@ def _finding_from_error(error_message: str) -> DoctorFinding:
             code="malformed_artifact",
             message=error_message,
             guidance=[
-                "対象 scope の artifacts 配下で明示 catalog に属さない Artifact filename を整理してください。",
+                "対象 scope の artifacts 配下で timestamp、separator、suffix、basename、ファイル種別を確認してください。",
                 "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
             ],
         )

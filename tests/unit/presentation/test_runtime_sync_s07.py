@@ -494,6 +494,14 @@ class TestRuntimeSyncS07:
                 authority="accepted",
                 mirror_eligible=True,
             )
+            untyped_adr_like_doc = self._write_valid_artifact_adr_doc(
+                issue_db_dir,
+                "20260312t010214z-analysis-accepted-adr-looking.md",
+                doc_id="20260312t010214z-adr",
+                scope_id="iss-local-00002",
+                authority="accepted",
+                mirror_eligible=True,
+            )
             self._write_valid_artifact_adr_doc(
                 issue_db_dir,
                 "20260312t010212z-disc-artifact-discussion.md",
@@ -577,6 +585,7 @@ class TestRuntimeSyncS07:
 
             assert {source.source_path for source in sources} == {initiative_doc, epic_doc, issue_doc, artifact_doc}
             assert draft_artifact_doc not in {source.source_path for source in sources}
+            assert untyped_adr_like_doc not in {source.source_path for source in sources}
             assert {source.basename for source in sources} == {
                 "20260312t010203z-adr-init-decision.md",
                 "20260312t010204z-adr-epic-decision.md",

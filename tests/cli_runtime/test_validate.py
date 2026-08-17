@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import tempfile
 import time
 
@@ -33,6 +34,10 @@ _S06_HISTORICAL_POSITIVE_FILENAMES = (
     ("artifacts", "20260810t010112z-disc-options.md"),
     ("artifacts", "20260810t010113z-decision-candidate-choice.md"),
     ("artifacts", "20260810t010114z-adr-decision.md"),
+    ("artifacts", "20260810t010117z-analysis-boundary-review.md"),
+    ("artifacts", "20260810t010118z-report-validation-result.md"),
+    ("artifacts", "20260810t010119z-review-final-gate.md"),
+    ("artifacts", "20260810t010120z-external-document.md"),
     ("discussions", "20260810t010115z-disc-legacy.md"),
     ("discussions", "20260810t010116z-01-note-legacy.md"),
     ("discussions", "001-adr-legacy.md"),
@@ -42,12 +47,22 @@ _S06_HISTORICAL_POSITIVE_FILENAMES = (
 )
 
 _S06_MALFORMED_ARTIFACT_FILENAMES = (
-    "20260810t010101z-analysis-unknown.md",
     "20260810T010101z-adr-upper-t.md",
+    "20260810t010101Z-adr-upper-z.md",
+    "20260810t010101-adr-missing-z.md",
+    "20260810t010101z_analysis-bad-separator.md",
+    "20260810t010101z-.md",
     "20260810t01010z-adr-short-time.md",
     "20261340t256199z-adr-impossible-time.md",
     "20260810t010101z-00-note-bad-slot.md",
+    "20260810t010101z-100-note-bad-slot.md",
     "001-scratch-not-in-sequential-catalog.md",
+)
+
+_OPEN_WORLD_ANALYSIS_FILENAMES = (
+    "20260811t091549z-analysis-operational-state-eventstore-readmodel-boundary.md",
+    "20260811t095606z-analysis-event-sourcing-synchronous-current-state-projection.md",
+    "20260811t113200z-analysis-existing-projection-uow-reuse.md",
 )
 
 
@@ -155,7 +170,7 @@ class TestCliValidate(CliRuntimeHarness):
         "malformed_name",
         (
             None,
-            "20260810t010101z-analysis-direct-control.md",
+            "20260810t010101z-100-analysis-direct-control.md",
             "20260230t120000z--capture.html",
         ),
     )
@@ -196,6 +211,24 @@ class TestCliValidate(CliRuntimeHarness):
             else:
                 assert validated.returncode == 0, validated.stdout + validated.stderr
                 assert diagnosed.returncode == 0, diagnosed.stdout + diagnosed.stderr
+            assert _path_sha256_snapshot(target) == before
+
+    def test_validate_and_doctor_accept_existing_analysis_artifacts_together_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            artifacts_dir = _s06_issue_dir(target) / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            for filename in _OPEN_WORLD_ANALYSIS_FILENAMES:
+                (artifacts_dir / filename).write_bytes(f"existing:{filename}\n".encode())
+            before = _path_sha256_snapshot(target)
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            diagnosed = self._run_runtime_capture(target, ["doctor"])
+
+            assert validated.returncode == 0, validated.stdout + validated.stderr
+            assert diagnosed.returncode == 0, diagnosed.stdout + diagnosed.stderr
             assert _path_sha256_snapshot(target) == before
 
     @pytest.mark.parametrize(("surface", "filename"), _S06_HISTORICAL_POSITIVE_FILENAMES)
@@ -258,6 +291,14 @@ class TestCliValidate(CliRuntimeHarness):
                 "Duplicate artifact timestamp slot detected",
             ),
             (
+                ("20260810t010101z-adr-first.md", "20260810t010101z-analysis-second.md"),
+                "Duplicate artifact timestamp slot detected",
+            ),
+            (
+                ("20260810t010101z-analysis-first.md", "20260810t010101z--second.bin"),
+                "Duplicate artifact timestamp slot detected",
+            ),
+            (
                 ("001-adr-first.md", "001-adr-second.md"),
                 "Duplicate artifact id detected",
             ),
@@ -292,6 +333,8 @@ class TestCliValidate(CliRuntimeHarness):
         "unsafe_kind",
         (
             "artifact-file-symlink",
+            "artifact-file-directory",
+            "artifact-file-fifo",
             "artifacts-directory-symlink",
             "dangling-artifacts-directory-symlink",
         ),
@@ -312,9 +355,17 @@ class TestCliValidate(CliRuntimeHarness):
             external_file = external / "outside.md"
             if external.exists():
                 external_file.write_bytes(b"external artifact\n")
-            if unsafe_kind == "artifact-file-symlink":
+            if unsafe_kind in ("artifact-file-symlink", "artifact-file-directory", "artifact-file-fifo"):
                 artifacts_dir.mkdir(parents=True, exist_ok=True)
-                (artifacts_dir / "20260810t010101z-note-external.md").symlink_to(external_file)
+                unsafe_path = artifacts_dir / "20260810t010101z-analysis-external.md"
+                if unsafe_kind == "artifact-file-symlink":
+                    unsafe_path.symlink_to(external_file)
+                elif unsafe_kind == "artifact-file-directory":
+                    unsafe_path.mkdir()
+                else:
+                    if not hasattr(os, "mkfifo"):
+                        pytest.skip("FIFO creation is unavailable")
+                    os.mkfifo(unsafe_path)
             else:
                 shutil.rmtree(artifacts_dir)
                 artifacts_dir.symlink_to(external, target_is_directory=True)
@@ -333,6 +384,8 @@ class TestCliValidate(CliRuntimeHarness):
             assert "[unsafe_artifact]" in diagnosed.stderr
             assert "Unsafe artifact" in diagnosed.stderr
             assert _path_sha256_snapshot(target) == before
+            if unsafe_kind == "artifact-file-fifo":
+                assert stat.S_ISFIFO(unsafe_path.stat(follow_symlinks=False).st_mode)
             if unsafe_kind == "dangling-artifacts-directory-symlink":
                 assert artifacts_dir.is_symlink()
                 assert artifacts_dir.readlink() == external

@@ -241,6 +241,27 @@ class TestArtifactImportFile(CliRuntimeHarness):
             assert generic.read_bytes() == b"generic sentinel"
             assert (target / payload["destination"]).read_bytes() == b"generic body"
 
+    def test_json_with_spaces_in_original_basename_remains_opaque_generic_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._write_runtime_clock(target)
+            source = target / "Evidence FINAL.json"
+            body = b'{"authority":"not-inferred"}\n'
+            source.write_bytes(body)
+
+            completed = self._run_runtime_capture(
+                target,
+                ["artifact", "import", "file", "--root", "--file", source.name, "--json"],
+            )
+
+            assert completed.returncode == 0, completed.stdout + completed.stderr
+            payload = json.loads(completed.stdout)
+            assert payload["artifact_id"] == "20260730t010203z--Evidence FINAL.json"
+            assert payload["canonical"] is False
+            assert (target / payload["destination"]).read_bytes() == body
+            assert source.read_bytes() == body
+
     def test_shared_slot_exhaustion_is_not_committed_and_preserves_existing_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
