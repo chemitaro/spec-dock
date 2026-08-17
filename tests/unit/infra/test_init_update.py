@@ -4621,7 +4621,9 @@ class TestInitUpdate(CliRuntimeHarness):
             installed_gitignore.write_text("stale gitignore\n", encoding="utf-8")
             installed_runtime.write_text("stale runtime\n", encoding="utf-8")
 
-            assert main(["update", str(target)]) == 0
+            # Both files are version anchors. Their mismatch must block before
+            # mutation while preserving every opaque workbench payload.
+            assert main(["update", str(target)]) == 1
 
             for sentinel, expected_payload in sentinels.items():
                 assert sentinel.read_bytes() == expected_payload
