@@ -19,6 +19,14 @@ Artifact は調査、対話、検討の evidence を残すための文書です�
 
 `decision-candidate` は未採用の選択肢です。判断を固定する必要がある場合は、明示的な判断を Requirement / Design / Plan に反映するか、ADR を使います。ADR も作成直後は `authority: draft`、`mirror_eligible: false` であり、明示的に `accepted` となるまで authority ではありません。
 
+## Stored Artifact validation
+
+Current creation catalogは`new artifact <type>`で選べるtypeを閉じるための契約です。一方、保存済みArtifactのvalidationはopen-worldです。有効なlowercase UTC timestamp、任意の`01..99` suffix、安全なnon-empty basenameを持つMarkdownは、既知typeに一致しなくてもuntyped evidenceとして受理します。`analysis`、`report`、`review`などのtype風ラベルや未知ラベルだけを理由にmalformedにはしません。
+
+untyped Artifactは後方互換のためruntime内部で`blank`と表現されますが、creation templateとしての`blank`とは別物です。known typed filenameはuntypedより先に認識され、ADR mirrorは明示的な`adr` filenameと必要なfrontmatter・eligibility条件を満たすものだけを対象にします。filenameがvalidであることやtype風ラベルを含むことは、内容の採用、review完了、canonical authorityを意味しません。
+
+`artifact import file`は`<ts>--<normalized-basename>`形式で任意拡張子とsource bytesをopaque evidenceとして保持します。generic importのfilenameや本文からtype、authority、採用状態を推測しません。
+
 ## Authority flow
 
 ```text
