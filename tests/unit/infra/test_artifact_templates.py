@@ -377,7 +377,7 @@ def test_templates_readme_stays_thin_without_restoring_legacy_artifact_workflow(
         assert legacy_marker not in readme
 
 
-def test_historical_initiative_and_epic_artifact_rules_remain_available() -> None:
+def test_current_initiative_and_epic_artifact_rules_keep_historical_types_non_creatable() -> None:
     for scope in ("initiative", "epic"):
         rules = _read_asset(PROVIDER_ASSET_ROOT, f"docs/rules/{scope}/artifacts.md")
 
@@ -385,36 +385,37 @@ def test_historical_initiative_and_epic_artifact_rules_remain_available() -> Non
             "artifacts/",
             "Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は artifacts ではありません",
             "Legacy `discussions/` は preservation surface",
-            "ADR originals may live under future `artifacts/` or legacy `discussions/`",
+            "ADR originals may live under Current `artifacts/` or legacy `discussions/`",
             "ADR mirror collection must collect both",
             "Direct artifact template catalog",
-            "Unsupported issue-only draft artifact types",
+            "Historical-only types",
+            "pr-repair-batch",
             "draft-requirement",
             "draft-design",
             "draft-plan",
-            "unsupported",
-            "no-write fail-closed",
-            "issue-only",
-            "scratch` is legacy-only",
-            "not part of the future `new artifact` catalog",
+            "Currentの新規作成catalogには含めません",
         ):
             assert expected in rules
 
         assert "templates/issue-profiles/<profile>" not in rules
+        assert "new artifact draft-" not in rules
+        assert "new artifact pr-repair-batch" not in rules
 
 
-def test_historical_issue_artifact_rules_remain_available() -> None:
+def test_current_issue_artifact_rules_keep_profile_routes_historical_only() -> None:
     rules = _read_asset(PROVIDER_ASSET_ROOT, "docs/rules/issue/artifacts.md")
 
     for expected in (
-        "Routing-only issue-only artifact types",
+        "Historical-only types",
+        "pr-repair-batch",
         "draft-requirement",
         "draft-design",
         "draft-plan",
-        "templates/issue-profiles/<profile>/design.md",
-        "templates/issue-profiles/<profile>/plan.md",
-        "authorized_profile",
-        "no-write fail-closed",
-        "issue-only",
+        ".assurance.json",
+        "Currentの新規作成catalogやtemplate routingには含めません",
     ):
         assert expected in rules
+
+    assert "templates/issue-profiles/<profile>" not in rules
+    assert "new artifact draft-" not in rules
+    assert "new artifact pr-repair-batch" not in rules

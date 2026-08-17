@@ -495,6 +495,7 @@ Markerはcredentialやabsolute pathを含めず、次だけを持つ。
 * target repository rootのdevice / inode identity
 * last completed phase
 * retry purpose
+* apply中にexclusive createしたprivate stageのrelative target、stage filename、device / inode / `ctime_ns`、file type。stage recordは作成直後にmarkerへatomic更新し、retry cleanupは記録済みidentityと計画由来のstage filenameが一致するentryだけを削除する。記録のない同名entryはunknown siblingとして保持し、collisionをblockする
 
 Markerはfull preflight後に作成し、phase境界ごとにatomic file replacementで更新する。成功時だけ削除する。
 

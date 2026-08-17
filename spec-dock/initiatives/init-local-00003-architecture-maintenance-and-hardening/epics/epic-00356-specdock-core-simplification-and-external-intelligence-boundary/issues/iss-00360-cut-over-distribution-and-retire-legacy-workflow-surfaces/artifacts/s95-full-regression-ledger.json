@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "kind": "issue360_s95_full_regression_failure_ledger",
+  "issue_id": "iss-00360",
+  "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
+  "current_head_sha": "1dcb7487e6f76013f7f975cdf0e0460010f12ef3",
+  "commands": {
+    "current_full": "uv run pytest --run-full-regression -q",
+    "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
+    "fixed_point_subset": "scratch=$(mktemp -d \"${TMPDIR:-/tmp}/specdock-s95-fixed.XXXXXX\") && trap 'git worktree remove --force \"$scratch/fixed-point\" >/dev/null 2>&1 || true; rmdir \"$scratch\" >/dev/null 2>&1 || true' EXIT HUP INT TERM && git worktree add --detach \"$scratch/fixed-point\" a6ded0d9a838b40cdcd741fa473cd264b801f245 && git show d81a12ef51dcbdf2e162d7480da0d3ba46de9b07:spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces/artifacts/s95-full-regression-ledger.json | jq -r '.failure_paths[].nodeid' | (cd \"$scratch/fixed-point\" && uv run python -c 'import sys, pytest; expected={line.strip() for line in sys.stdin if line.strip()}; failed=set(); non_call_failures=set(); plugin=type(\"FailureCollector\", (), {\"pytest_runtest_logreport\": lambda self, report: failed.add(report.nodeid) if report.when == \"call\" and report.failed else non_call_failures.add(f\"{report.nodeid}::{report.when}\") if report.failed else None})(); code=pytest.main([\"--run-full-regression\", \"-p\", \"no:cacheprovider\", \"-q\", *sorted(expected)], plugins=[plugin]); exact=failed == expected and not non_call_failures; print(f\"pytest_exit={int(code)} expected={len(expected)} call_failed={len(failed)} non_call_failed={len(non_call_failures)} exact={exact}\"); raise SystemExit(0 if int(code) == 1 and exact else 1)')"
+  },
+  "fixed_point_subset_verification": {
+    "working_tree_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
+    "materialization": "git worktree add --detach into a mktemp-owned directory before pytest starts",
+    "execution_directory": "the detached a6ded0d9a838b40cdcd741fa473cd264b801f245 worktree",
+    "nodeid_source_sha": "d81a12ef51dcbdf2e162d7480da0d3ba46de9b07",
+    "expected_nodeids": 26,
+    "expected_pytest_exit_code": 1,
+    "verifier_success_exit_code": 0,
+    "comparison": "pytest call-phase failures must equal the 26 ledger node IDs as an exact set; any missing, additional, setup, teardown, collection, or infrastructure failure makes the verifier nonzero"
+  },
+  "full_run_summary": {
+    "current": {
+      "failed": 26,
+      "passed": 1974,
+      "skipped": 48,
+      "duration": "15m24.45s"
+    },
+    "fixed_point": {
+      "failed": 452,
+      "passed": 3350,
+      "skipped": 52,
+      "duration": "28m51s"
+    }
+  },
+  "subset_comparison": {
+    "current_failure_paths": 26,
+    "fixed_point_failure_paths": 26,
+    "same_failure_behavior": 26,
+    "expected_retirement_paths": 0,
+    "comparison_incomplete_paths": 0,
+    "fixed_point_subset_total": 26
+  },
+  "classification_policy": {
+    "approved-no-op": {
+      "rationale": "固定点でも同一node idが失敗しており、Issue 360 changed hunk外の既存失敗",
+      "owner": "既存runtime/import/active/shell契約の保守担当",
+      "follow_up": "Issue 360では修正せず、別Issueで原因とownerを追跡"
+    },
+    "expected-retirement": {
+      "rationale": "Issue 360で物理退役したauthoring-pack/wrapper面を旧期待するテスト",
+      "owner": "Issue 360の退役surface移行",
+      "follow_up": "後続のテスト棚卸しでobsolete testをskip/削除し、現行cutover suiteを正本化"
+    },
+    "comparison-incomplete": {
+      "rationale": "固定点subsetでnode idを収集できなかった",
+      "owner": "Issue 360レビュー担当",
+      "follow_up": "固定点の同一node idを再実行して比較を完了"
+    }
+  },
+  "failure_paths": [
+    {
+      "nodeid": "tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_import.py::TestCliImport::test_import_accepts_canonical_url_when_origin_is_credentialed_https_remote",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_context_pack_marks_proposed_active_artifact_non_authoritative",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_render_context_pack_states_entry_default_and_escalation_contract",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_sync_auto_update_from_branch_writes_authority_context_pack",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_absorbs_github_issue_index_failure_as_warning",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_blocked_without_force_fails_before_snapshot",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_falls_back_to_current_repo_view_for_unscoped_linked_initiative_when_index_missing_key",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_falls_back_to_same_repo_repo_scoped_view_when_index_missing_key",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_force_commits_and_order_is_authoritative",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_github_prefers_foreign_snapshot_under_same_number_collision",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_github_resolves_current_unscoped_issue_with_current_repo_slug",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_execute_create_plan_reuse_seam",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_issue_uses_target_repo_slug_for_same_repo_url_when_present",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_numeric_target_uses_resolved_current_repo_slug_for_github_read",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_then_sync_artifact_path_name_content_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_load_active_manifest_chain_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_re_resolves_inside_lock_when_parent_drifts_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_post_import_sync_negative_path_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_sync.py::TestCliSync::test_new_and_active_and_sync",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_tree_puml_ready_board_at_spec_dock_root",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op"
+    }
+  ],
+  "conclusion": "current call-phase failure paths exactly match the 26 fixed-point pre-existing approved-no-op failures; there are no setup, teardown, collection, infrastructure, additional, missing, expected-retirement, or unclassified changed-surface failures"
+}

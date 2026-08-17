@@ -515,34 +515,6 @@ class ImportNodeResult:
 
 
 @dataclass(frozen=True)
-class CreateDiscussionDocRequest:
-    doc_type: Literal[
-        "adr",
-        "disc",
-        "research",
-        "interview",
-        "scratch",
-        "draft-requirement",
-        "draft-design",
-        "draft-plan",
-        "note",
-    ]
-    scope_node_id: str
-    title: str
-    slug: str | None
-    scope_kind: Literal["initiative", "epic", "issue"] | None = None
-
-
-@dataclass(frozen=True)
-class CreateDiscussionDocResult:
-    doc_id: str
-    doc_type: str
-    scope_node_id: str
-    path: Path
-    warnings: list[str]
-
-
-@dataclass(frozen=True)
 class CreateArtifactDocRequest:
     artifact_type: Literal[
         "blank",
@@ -550,13 +522,7 @@ class CreateArtifactDocRequest:
         "interview",
         "disc",
         "decision-candidate",
-        "pr-repair-batch",
         "adr",
-        "draft-requirement",
-        "draft-design",
-        "draft-plan",
-        "scratch",
-        "note",
     ]
     scope_node_id: str
     title: str

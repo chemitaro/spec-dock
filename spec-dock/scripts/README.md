@@ -8,8 +8,8 @@ v2 では、日常運用（initiative/epic/issue/artifact の作成、active 切
 - `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作成します。
 - 既存 current-repo Issue へ紐づける場合は `--github-issue <n>` を使います。
 - `--no-github` は node creation option ではありません。
-- working artifacts は `new artifact <type>` を使います（current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr` / `pr-repair-batch` / issue-only `draft-requirement` / `draft-design` / `draft-plan`）。
-- `scratch` / `note` は new artifact catalog には含めません。既存 artifact は grandfathered として壊さず、新規 untyped capture は `blank` を使います。
+- working artifacts は `new artifact <type>` を使います（current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr`）。
+- `pr-repair-batch` / `draft-*` / `scratch` / `note` は Historical-only です。既存 artifact は grandfathered として壊さず、新規 untyped capture は `blank` を使います。
 - `new/import {initiative,epic,issue}` と `new artifact <type>` の `--slug` は kebab-case が必要です（詳細は `spec-dock/docs/reference_naming.md`）。
 
 ## 使い方（例）
@@ -30,8 +30,6 @@ v2 では、日常運用（initiative/epic/issue/artifact の作成、active 切
 ./spec-dock/scripts/spec-dock new artifact disc --issue iss-00123 --title "API options"         # 20260329t123459z-disc-...
 ./spec-dock/scripts/spec-dock new artifact decision-candidate --issue iss-00123 --title "Token options" # 20260329t123500z-decision-candidate-...
 ./spec-dock/scripts/spec-dock new artifact adr --issue iss-00123 --title "Token rotation"       # 20260329t123501z-adr-...
-./spec-dock/scripts/spec-dock new artifact pr-repair-batch --issue iss-00123 --title "PR Repair Batch" # 20260329t123502z-pr-repair-batch-...
-./spec-dock/scripts/spec-dock new artifact draft-plan --issue iss-00123 --title "Step slicing"  # 20260329t123503z-draft-plan-...
 
 # active（現在作業中）を設定
 ./spec-dock/scripts/spec-dock active set 123

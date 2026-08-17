@@ -68,8 +68,8 @@ class TestValidateApplication:
         note = discussion_docs.parse_timestamp_discussion_doc_filename("20260329t123457z-note-current.md")
         assert note is not None
         assert note.doc_id == "20260329t123457z-note"
-        assert not discussion_docs.is_creatable_discussion_doc_type("note")
-        assert discussion_docs.is_retired_discussion_doc_type("note")
+        assert not hasattr(discussion_docs, "CREATABLE_DISCUSSION_DOC_TYPES")
+        assert not hasattr(discussion_docs, "is_creatable_discussion_doc_type")
 
         legacy = discussion_docs.parse_legacy_discussion_doc_filename("001-research-legacy-spike.md")
         assert legacy is not None

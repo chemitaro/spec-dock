@@ -1269,6 +1269,42 @@
         }
       ],
       "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": "spec-dock/current-epic",
+      "surface": "legacy-scaffold-entrypoint",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": "spec-dock/current-epic.path",
+      "surface": "legacy-scaffold-entrypoint",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": "spec-dock/current-initiative",
+      "surface": "legacy-scaffold-entrypoint",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": "spec-dock/current-initiative.path",
+      "surface": "legacy-scaffold-entrypoint",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": "spec-dock/current-issue",
+      "surface": "legacy-scaffold-entrypoint",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
+    },
+    {
+      "path": "spec-dock/current-issue.path",
+      "surface": "legacy-scaffold-entrypoint",
+      "identities": [],
+      "on_unknown": "preserve-and-block"
     }
   ],
   "historical_shortcuts": []

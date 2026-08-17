@@ -3,7 +3,7 @@
 ID: "iss-00360"
 タイトル: "Cut Over Distribution and Retire Legacy Workflow Surfaces"
 関連GitHub: ["#360"]
-最終更新: "2026-08-13"
+最終更新: "2026-08-17"
 親: ["epic-00356", "init-local-00003"]
 依存: ["requirement.md", "design.md", "plan.md"]
 ---
@@ -12,12 +12,284 @@ ID: "iss-00360"
 
 ## Outcome
 
-Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S90の実装証跡と決定台帳を更新し、実装コミット `7736daec83cfc4a9e60843a080d1404fb57160cf` と安全境界のfollow-up `ff3dcc52ca91a1629753344354a17f4d0e59f46b` を作成した。Issue 360対象の最終品質確認は、通常テスト・lint・focused distribution regression・package integration・`spec-dock validate`までpassした一方、全リポジトリのfull regressionにはIssue 360対象外の既存runtime回帰が残り、最終ChatGPT-SpecReview-Strictはブラウザ側のprompt reconstruction / rate-limitで送信前に成立しなかった。そのためS99/H10、Issue close、IC-3判定は未実施のまま、レビュー可能な実装PRとしてhandoffする。
+Issue 360の配布切替、旧workflow面の物理退役、既存consumerの保守的更新、uninstallのno-follow安全化、retry / root identity、provider・dogfood・archive parity、docs migrationを実装し、対象スイートを通過させた。S00〜S95の実装証跡と決定台帳を更新し、最終品質ゲートで検出したP0/P1を段階的に修正した。`7cb830ad8ccf1700c408abbd17f5261a53aa0214` では、uninstall marker最終化後にfallibleなworkspace root rmdirを行わないよう処理を単純化し、成功時はmarkerを除去した空の`spec-dock`境界を残すことで、terminal cleanup failureとmarker再発行 failureの複合状態でもdurable retry admissionを失わないようにした。`a30afda01b8a2307c8a55bfa4ccb758021b41620` では、partial uninstallのJSON / text診断からcredential・host absolute path・raw exceptionを除外し、relative failed path、phase、last completed phase、retry commandを安定した契約として出力するようにした。`cc1b42a4742e5d5c9efca042f29c506258013822` では、成功した`uninstall --remove-specs`後に残る空の`spec-dock`境界をFresh admissionとして安全に再初期化できるようにし、明示targetのpartial retry診断で元のtarget文脈を保持するようにした。`34e77724b5af9b1eb742185c3eb131f4c9944606` では、配布 marker のheld-parent identity再検証、distribution/uninstall retryの元target伝搬、特殊パスを含むargv-safeなretry commandと実行回帰を追加した。`6d06578511e8b1d54c997e25d5f19994ed50f1bd` では、managed scaffoldの全managed rootを再帰的に安全検査し、providerがregular fileを期待するexact pathのdirectory・symlink・special type・hard linkを、marker公開およびrecursive refresh前にzero-writeで停止する統合回帰を追加した。`3bb7a77c` では、managed scaffold・generated active・initiative・Workbench境界を配布manifestのmutation前重複検査で保護し、`5488dc75882ce9f0fd2d1a20f3c4e23ecb1a8a48` では、uninstall後に管理対象が完全に消えた空境界だけを安全な再実行として認め、管理対象が残る空workspaceのupdate/uninstallは引き続きzero-writeで拒否するようにした。Fresh / update / uninstallの既存no-follow境界、partial diagnostics、同一package retry収束も維持している。
+
+### Agent-first operation correction (2026-08-17)
+
+Issue 359でcurrent `spec-dock` skillがread-only / command-presentation中心になり、Issue 360で旧operator surfaceを退役した後に通常のSpecDock操作を実行する主体が不明確になった回帰を、Issue 360の責任範囲で修正した。Provider正本とdogfood projectionのskillをagent-first operator / authoring guideへ変更し、root `AGENTS.md`、root README、shipped docs READMEへ同じ運用境界を反映した。通常のcreate、import、Artifact、active、dependency、sync、issue lifecycle、worktree creation、Workbench copy、close、managed updateは、利用者依頼または承認済み計画の範囲でagentが実行・検証する。破壊的なdelete、適用を伴うuninstall、worktree remove、guardを越える`--force`は、正確な対象と結果が承認されている場合に限る。PR mergeのhuman gateは維持する。
+
+この契約を`test_issue_360_spec_dock_guidance_is_agent_first_and_not_present_only`で固定し、provider / dogfood parityを含むfocused testは`2 passed`、skill validation、`spec-dock validate`、通常test lane、Ruff、format、mypyはいずれもpassした。この回帰と補正はIssue 360で完結し、Epic 00365の未解決scopeには引き継がない。
+
+### Latest P1 repair candidate (2026-08-14)
+
+* `src/spec_dock/managed_distribution.py`のrecognized regular upgradeを同一親directoryのstaging fileへ書き込み、no-follow identity再検証後にatomic swapで公開する方式へ変更した。staging write失敗時は既存targetを保持する。
+* Current bytesが一致してもprovider modeと不一致の場合、`update` / `init --force`で`upgrade`へ分類し、expected modeを修復する。Freshの既存pathは従来どおり無変更である。
+* Fresh initは`spec-dock/.distribution-retry.json`をapply前に作成し、通常の同じ`spec-dock init .`をforward retryとして再開できるようにした。marker parent作成後はroot ctimeを再取得してapply snapshotを再構築する。
+* partial failureの診断にrelative target、`last_completed_phase`、operation別retry commandを追加し、credentialやhost absolute pathを再出力しない。
+* 修正テスト: atomic staging failure、mode repair、Fresh same-package retry、partial failure diagnostic。
+
+### Latest P1 repair candidate 2 (2026-08-14)
+
+* apply時にplan取得後のprovider bytes / modeを再観測し、計画時modeと不一致なら公開せず停止する。regular upgradeのold staging cleanupはstrict化し、既知のregular / symlink stage identityだけをdescriptor-relativeに再検出・cleanupして同一package retryを収束させる。
+* markerを公開した後のtemporary cleanup失敗でも、marker実体を再確認してpartial failure診断へ遷移させる。recognized updateの`spec-dock/.gitignore`はprovider bytesとのidentityをpreflightとwrite直前にno-follow再検証し、未知内容を上書きしない。
+* 修正テスト: provider mode rebind、known stale stage retry cleanup、unknown scaffold `.gitignore` preserve-and-block、retry identity recheck、marker publish partial diagnostic。
+
+### Latest P1 repair candidate 3 (2026-08-14)
+
+* Fresh scaffold pruningからrepository外側の`.github/workflows/spec-dock-close.yml`無条件unlinkを除去し、ownership proofのない同名file / symlinkを保持する回帰を追加した。obsolete pathのpruneはmanaged distributionのproven identity分類へ限定する。
+* 既知staging cleanup後にactionと後続actionのtarget snapshotを再観測し、親directory ctime更新を反映して同一package retryが収束するようにした。regular / symlink両方のprivate stage prefixをretry cleanup対象に含めた。
+* 修正テスト: Fresh legacy-named workflow file/symlink preservation、same-parent later-action snapshot refresh、known stale symlink stage retry cleanup。
+
+### Latest P1 repair candidate 4 (2026-08-14)
+
+* `init --force` のadmissionがFreshを返す空targetでは、recognized workspace installerへ進まずFresh distributionへ分岐させ、marker parent未作成によるmaterialization前失敗を防止した。
+* 修正テスト: 空targetへの公開 `init --force` がFresh scaffoldとversion markerを作成する回帰。
+
+### Latest P1 repair candidate 5 (2026-08-14)
+
+* stale-stage cleanupを`apply_distribution_plan`のretry opt-inへ限定し、通常Fresh / updateでprefixとbytesだけが一致する未知siblingを削除しないようにした。生成stage名はtarget pathと計画identityから安定導出し、retry時はその計画由来の名前だけを回収する。
+* obsolete/historical ownershipのdigest照合ではmodeを無視し、modeはCurrent assetのpostconditionおよびmode修復判定だけに利用する。production manifestのmode付きidentityとchmod driftの回帰を追加した。
+* 修正テスト: unknown stage-like sibling preservation、same-parent retry snapshot refresh、symlink stage cleanup、historical mode-only drift prune。
+
+### Latest P1 repair candidate 6 (2026-08-14)
+
+* retry markerにexclusive create直後のstage target、filename、device / inode / `ctime_ns`、file typeを記録し、retry cleanupはその作成時identityと計画由来のstage名が一致するentryだけを削除するようにした。記録のない同名stage-like siblingは保持し、collisionとして停止する。
+* 修正テスト: 未記録の正確なstage名collisionを二回のapplyで保持する回帰、regular / symlink stale stageの記録済みidentity cleanup、marker schemaのstage ownership受理。
+
+### Latest P1 repair candidate 7 (2026-08-14)
+
+* Fresh createのstaging write / fchmod / verify / publish例外を一つのcleanup境界で処理し、例外発生後に取得したno-follow identityと一致するstageだけを回収する。既存targetを変更するupgrade経路は従来どおり保持する。
+* Fresh retryではroot Workbench親をseed判定の前後で検証し、既存READMEが外部symlink先にあってもcopyを成功扱いにせずpreserve-and-blockする。provider assetの欠損診断は論理relative pathだけを返す。
+* 修正テスト: Fresh create staging write failure cleanup、外部READMEを持つWorkbench symlink retryのzero-external-write / marker保持 / 修復後収束。
+
+### Latest P1 repair candidate 8 (2026-08-14)
+
+* atomic swap後の旧target stage ownershipをmarkerへ再束縛する際、marker更新が失敗しても旧target stageを即時にstrict cleanupし、staleなpre-swap markerがmanaged payloadを隠したまま成功扱いにならないようにした。retry時にmarker ownership identityが現物と一致しない場合は、別の一致recordがない限りfail-closedで停止する。
+* retry cleanupのhistorical identity集合をdirect historical、recognized workspace anchor、obsolete identityへ広げ、trusted consumer manifest claimは現行classifierと同じmanifest identity検証で許可する。recognized anchorの収集とtrusted claim由来stage cleanupの回帰を追加した。
+* 修正テスト: marker更新失敗後のrebound stage cleanup、trusted manifest claim由来stageのsame-package retry、recognized anchor identity収集。
+
+### Latest contract-test alignment (2026-08-14)
+
+* `tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_keeps_initiatives_by_default` の期待値を、Issue 360のpreserve契約どおり所有権証明のないlegacy-named workflowを保持する内容へ更新した。実装コードは変更していない。
+* 修正テスト: `uv run pytest --run-full-regression -q tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_keeps_initiatives_by_default` → `1 passed`。
+
+### Latest P1 repair candidate 9 (2026-08-14)
+
+* regular upgradeのstage writeが部分的に進んでから失敗した場合、close前にstage fdのno-follow identityを再取得してからownership-checked cleanupするようにした。作成時ctimeが更新されたstageを古いsnapshotで誤って残さず、同一packageのforward retryを停止させない。
+* 回帰テストを「write前に即時raise」から「partial bytesを書いてからraise」へ強化し、既存targetの保持とstage残骸cleanupを確認した。
+* S95では`0f56c0063e07e281200961c7f1dd274874569d0b`の全回帰、固定点の全回帰、現行failure node id 27件の固定点subset再実行を行い、27件すべてが固定点でも再現する`approved-no-op`であることを [`s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json) にpath・owner・follow-up付きで記録した。旧authoring-pack / wrapper専用テストはS40Aの物理退役として本差分から削除し、current-only failureは残していない。
+
+### Latest P1 repair candidate 10 (2026-08-14)
+
+* regular upgradeの部分書き込み後、close前に取得したstageのno-follow device / inode / `ctime_ns` / typeをretry markerへ再記録し、cleanup失敗をstrictに通知するようにした。markerの正確な所有identityが一致するstageはpayloadがpartialでも同一package retryで回収でき、unknown siblingは従来どおり触らない。
+* S40Aで退役したauthoring-pack / ChatGPT wrapperの専用テストとmanual validatorテストを物理削除し、S95でcurrent-only failureが0件になるよう回帰選択を現行cutover suiteへ揃えた。
+* 修正テスト: partial bytes + stage unlink failure後のmarker identity再記録とretry収束、旧wrapper / manual validator testの退役。
+
+### Latest P1 repair candidate 11 (2026-08-14)
+
+* Fresh createの部分書き込み後、close前に取得したstageのno-follow device / inode / `ctime_ns` / typeをretry markerへ再記録し、cleanupをstrictに実行するようにした。markerの更新が失敗してもcleanupを継続し、cleanup失敗時は正確な所有identityを次回のsame-package retryへ引き渡す。
+* Fresh createのpartial bytes + stage unlink failureを同時に再現する回帰テストを追加し、更新済みmarkerでstale stageを回収してFresh scaffoldへ収束することを確認した。
+* S95 v13では`a6c420985bb7cd9d2e04984e3825ba62383229fe`の全回帰、固定点subset再実行を行い、27件すべてが固定点でも再現する`approved-no-op`、expected-retirement 0件、比較未完了0件となった。
+
+### Latest P1 repair candidate 12 (2026-08-14)
+
+* `_assert_pending_snapshot_stable`が、全action preflight後に外部processで作成された未登録parentを`created_parent_bindings`へ新規登録しないよう変更した。SpecDock自身が`_bind_created_parent_identities`で作成・束縛したparentだけを後続actionへ引き渡し、未所有parentの事後出現はidentity errorで停止する。
+* 先行actionの実行後、後続actionの当初欠落parentを外部作成する競合を再現する回帰テストを追加し、先行actionの結果を保持したまま後続managed fileを作成しないことを確認した。
+* S95 v14では`48779d16935546d818e003cf33a7b2e97d0832c8`の全回帰、固定点subset再実行を行い、27件すべてが固定点でも再現する`approved-no-op`、expected-retirement 0件、比較未完了0件となった。
+
+### Latest P1 repair candidate 13 (2026-08-15)
+
+* `_observe_target`が最初の欠落componentで停止せず、残りの欠落parentもsnapshotへ記録するよう変更した。先行actionが作成した上位parentの下に外部processが下位parentを作成した場合も、未登録identityとして後続mutation前に停止する。
+* Current / historical / obsoleteのsymlink prune・upgradeでlink countを確認し、hard-linked symlinkは`hard-link-mutation-unsafe`として分類してzero-writeでblockする。regularの既存hard-link保護は維持した。
+* recognized update / `init --force`でdistribution planやretry markerを作成する前に、Freshと同じ全scaffold source catalog（managed directories、`.gitignore`、root Workbench seed）をpreflightする。
+* 回帰テスト: 多段parent競合、current / historical hard-linked shortcut、recognized updateの欠落scaffold sourceによるzero-write停止。S95 v14現行HEADでは`27 failed, 1941 passed, 516 skipped`、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+
+### Latest P1 repair candidate 14 (2026-08-15)
+
+* Fresh開始時の`spec-dock/`境界作成をheld root FD配下の相対no-replace `mkdir`へ移し、preflight後に出現したworkspaceをreplacement rootへ書かずfail-closedで停止するようにした。
+* root Workbench seedを`exists()`のbool判定からno-follow identity / provider bytes / modeの分類へ変更した。Freshはmissingならseed、provider-identicalなsingle-link regularならadopt、その他はpreserve-and-blockとし、recognized update / `init --force`ではsymlinkを含むWorkbenchを検査・変更しない。
+* 回帰テスト: provider-identical Fresh retryのadopt、recognized updateのsymlinked root Workbench preserve、Fresh root rebind中のreplacement zero-write。S95 v15では`27 failed, 1944 passed, 516 skipped`、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+
+### Latest P1 repair candidate 15 (2026-08-15)
+
+* `_preflight_fresh_spec_dock_assets`で必須nested runtime `spec_dock/scripts/spec-dock`をno-follow regular、single-link、executable modeとして検証し、Fresh / recognized updateのmarker・distribution mutation前に欠落・不正sourceを拒否するようにした。
+* 回帰テスト: recognized updateでnested runtimeが欠落するケースと、実行bitが失われたsource packageのzero-write停止。S95 v16では`27 failed, 1946 passed, 516 skipped`、v15とのfailure node集合差分0件、固定点subset比較は同一failure behavior 27件。
+
+### Latest P1 repair candidate 16 (2026-08-15)
+
+* 初回`spec-dock/.distribution-retry.json`の公開前にwrite / sync / linkまたはowned temp cleanupが失敗した場合、tempのdevice / inode / regular・single-link identityを再検証して一度だけpayloadを再発行するようにした。valid markerを公開できた場合は、元の失敗をpartialとして返しつつ、次回の通常`spec-dock init .`が同一package・同一rootのforward retryとしてadmitできる状態を残す。
+* 回帰テスト: Fresh markerの初回write失敗とtemp cleanup失敗を同時注入し、marker公開、temp residueなし、通常init retryの成功を確認した。S95 v17では`27 failed, 1947 passed, 516 skipped`、v16とのfailure node集合差分0件、固定点subset比較は同一failure behavior 27件。
+
+### Latest P1 repair candidate 17 (2026-08-15)
+
+* 初回distribution markerの新規公開をhard-link + unlinkからdescriptor-relativeなno-replace renameへ変更し、公開後の一時ファイル削除失敗で`st_nlink=2`のmarkerが残る経路を除去した。markerは公開時点でsingle-link regular fileとなり、同じpackageのadmissionを阻害しない。
+* 回帰テスト: publish競合時のrace winnerを保持し、初回publish fault injection後もmarkerのsingle-link・temp residueなし・通常init retryを確認した。
+
+### Latest P1 repair candidate 18 (2026-08-15)
+
+* regular upgradeのatomic swap後にstage ownership再記録が失敗した場合、current stage identityのmarker再記録を一度再試行し、cleanup失敗も限定的に再試行してからpartial errorを返すようにした。recorder / cleanupを同時注入しても、再記録またはownership-checked removalの一方が成立し、次回same-package retryがstage identity mismatchで停止しない。
+* 回帰テスト: post-swap recorder failureとstage cleanup二回失敗を同時注入し、current stage identityを保持したretry markerで次回cleanupが収束することを確認した。
+
+### Latest S95 v22 evidence (2026-08-15)
+
+* no-replace publish seamへfault-injection hookを追従させ、v18で一時unlink / `os.link` hookが無効化していた2テストを修正した。
+* S95 v22は `27 failed, 1949 passed, 516 skipped`。v19とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+
+### Latest P0/P1 repair evidence (2026-08-15)
+
+* managed scaffoldの再帰uninstallで、保持したdirectory FDだけを信頼して外部へ移動されたtreeを削除しないよう、各再帰mutation直前に可視パスのno-follow root binding（device / inode）とentry identityを再検証する実装を `91f8b824e1a6839ee8e81030b6ae20f76b143fa1` に追加した。rename fault injectionで外部treeを削除しないことを確認した。
+* atomic regular-file retryで一時ファイルをO_TRUNC付きで開く前にidentityを検証できるよう、O_TRUNCを外してfstat後にftruncateする実装とhard-link差し替え回帰テストを `9b9e53e968f48c5883a04ef4fbd71aaac096aca8` に追加した。差し替え先外部inodeが不変であることを確認した。
+* uninstall retry markerのwrite/fsync失敗時に作成inodeをidentity確認して除去し、通常rerunでmarkerを再作成できるようにした実装を `b0763b5fa743a6f11b14718eb5cd65b17926134b` に追加した。write failure注入後のmarker残留なし・同一package retry成功を確認した。
+* uninstall retry markerの既存競合時にdescriptorからcanonical payload・stable identityを検証し、不完全markerを再利用しない実装を `194b793acb015a9c564bde0aa1dc480b8e188b84` に追加した。partial markerのreuse拒否回帰を確認した。
+* S95 v29は実装tree `194b793acb015a9c564bde0aa1dc480b8e188b84`に対して `27 failed, 1956 passed, 516 skipped`（12分34秒）。v28とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
+* S95 v30は配布面の運用指針と回帰テストを含むbranch tip `68ee1c67d7d770e7684751f7f07289a80e27f80a`に対して `27 failed, 1957 passed, 516 skipped`（12分34秒）。v29とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
+* S95 v32はFresh mode mismatch保護と既存hard-link read-only adoption契約を含む実装tree `774e126124bd5a297c4ff193b40e0c6e11061888`に対して `27 failed, 1958 passed, 516 skipped`（12分39秒）。v30とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
+* marker削除失敗時のdiagnostic phaseを`marker-finalization`へ分離し、targetを`spec-dock/.distribution-retry.json`へ固定する実装とFresh / update / init-forceの回帰テストを `5fe6ddb6543fc896e54bc110e67da1bfb53c7663` に追加した。
+* S95 v33はmarker-finalization修正を含むbranch tip `fa5b354c8a70f63d87d0e4e44240d920a36c0e9b`に対して `27 failed, 1961 passed, 516 skipped`（12分39秒）。v32とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
+
+### Latest S95 v34 evidence (2026-08-15)
+
+* Fresh uninstall完了時に、生成された`spec-dock/active`と`spec-dock/.agent`をboundedな空directory cleanup対象へ明示的に含め、retry markerのfinalization後にcleanup / postcondition verifyを再実行する実装を`415b0564a`に追加した。Fresh `uninstall --apply --remove-specs`でmanaged rootを残さない回帰テストと、既に除去済みworkspaceの再実行期待値を`f99340169`で整合させた。
+* S95 v34はbranch tip `f99340169b9d2e0352b9422b3376a4e2f9fd3f1a`に対して `27 failed, 1966 passed, 516 skipped`（12分38秒）。v33とのfailure node集合差分は0件（new 0 / missing 0）、S95 ledgerの27件と完全一致、current-only failure 0件、比較未完了0件である。
+
+### Latest P1 repair candidate 19 (2026-08-15)
+
+* Uninstallのsymlink identityにdevice / inode / ctime / link count / targetを含め、同じtargetへ差し替えたsymlinkをmutation直前にfail-closedで停止するようにした。
+* Generated state・managed assetのhard linkをmarker作成前に`preserved`としてblockし、uninstall applyは最初の安全性失敗後のremovalを`pending`として停止するようにした。
+* Generated root配下をno-followでbottom-up走査し、入れ子の空directoryをbounded cleanupし、残存・検査失敗をpartial failureとして扱うようにした。Partial resultへphase、last completed phase、pending paths、relative retry commandを追加した。
+* 回帰テスト: 同一target symlink差し替え、generated hard link事前停止、失敗後pending、入れ子generated directory cleanup、phase/retry JSONを追加した。
+
+### Latest S95 v35 evidence (2026-08-15)
+
+* S95 v35はuninstall安全性修正を含むbranch tip `e6dfe3aa2733f906786bb8a409c0acf22c6c2038`に対して `27 failed, 1969 passed, 516 skipped`（12分45秒）。v34とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。
+
+### Latest P1 repair candidate 20 (2026-08-15)
+
+* Uninstall対象のsymlinkをno-followで取得する際、link countが1でないsymlinkを`unsafe` identityとして分類し、hard-linked symlinkをmarker作成前にblockするようにした。
+* `spec-dock/.agent/**` のsymlinkをgenerated stateの事前block対象へ追加し、apply後のsymlink拒否によるpartial stateを防止した。repo-root shortcutもunsafe identityを事前分類する。
+* `--remove-specs` の `spec-dock/initiatives` をmanaged treeと同じno-follow再帰安全走査へ接続し、descendant symlink・hard link・special entry・検査失敗をmarker前にpreserve-and-blockするようにした。
+* 回帰テスト: hard-linked generated symlink、`.agent` symlink、unsafe `initiatives` descendantのzero-write blockerを追加した。
+
+### Latest S95 v36 evidence (2026-08-15)
+
+* S95 v36はuninstall preflight修正を含むbranch tip `e9759ba245643e2572a9917d48d7db43e5d26b4f`に対して `27 failed, 1972 passed, 516 skipped`（12分49秒）。v35とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。
+
+### Latest P1 repair candidate 21 (2026-08-16)
+
+* uninstallの空directory cleanupと2回目のpostcondition verifyをretry marker最終化より前に完了させ、markerが存在する状態で全managed payloadの除去結果を確認するようにした。marker最終化後のterminal workspace root `rmdir`だけを最後の操作に分離し、その操作が失敗した場合はmarkerを再発行して次回の同一package retryへ引き渡す。
+* 既に除去済みのspec history rootは「期待どおり欠落」として再試行可能に分類し、terminal cleanup failure後のmarker保持・phase診断・通常uninstall retry収束を回帰テストで固定した。
+
+### Latest S95 v37 evidence (2026-08-16)
+
+* S95 v37はterminal workspace cleanup後のmarker復旧修正を含むbranch tip `6315c9d4fc0267ca3b4434cfc0783e245c6563eb`に対して `27 failed, 1973 passed, 516 skipped`（12分36秒）。既存S95 ledgerのfailure node 27件と一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。
+
+### Latest P1 repair candidate 22 (2026-08-16)
+
+* uninstall marker最終化後のworkspace root rmdirを廃止し、全remove actionとpostcondition verifyが完了した後はmarker除去だけでcompleteとするようにした。これによりmarker削除後にfallibleなfilesystem mutationが残らず、terminal cleanup failureとmarker publish failureの複合状態でretry admissionを失う経路を閉じた。
+* 成功時はmanaged payloadと生成stateをbounded cleanupした空の`spec-dock`境界を保持し、markerは除去する。この空境界はownership markerではなく、次回Fresh admissionを誤認させないための無害なboundary residueとして扱う。回帰テストでmarker除去後にroot rmdirが呼ばれないことを確認した。
+
+### Latest S95 v38 evidence (2026-08-16)
+
+* S95 v38はmarker最終化後のfallible root cleanupを除去したbranch tip `7cb830ad8ccf1700c408abbd17f5261a53aa0214`に対して `27 failed, 1973 passed, 516 skipped`（12分37秒）。v37とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。
+
+### Latest S95 v39 evidence (2026-08-16)
+
+* S95 v39はpartial uninstall診断のsanitization / recovery contract修正を含むbranch tip `a30afda01b8a2307c8a55bfa4ccb758021b41620`に対して `27 failed, 1975 passed, 516 skipped`（12分36秒）。v38とのfailure node集合差分は0件（new 0 / missing 0）、現行の27件を`--lf`で再実行してledgerのfailure node集合と一致し、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。今回追加したuninstall診断テストを含む変更対象スイートはpassした。
+
+### Latest P1 repair candidate 23 (2026-08-16)
+
+* 成功した`uninstall --remove-specs`後に残る完全に空の`spec-dock`境界を、通常の`init` / `init --force` / `update`がFreshとして安全に再初期化できるようにした。version markerやmanaged payloadを含む非空の未認識workspaceは従来どおりfail-closedで保持する。明示targetのpartial uninstall診断は、host absolute pathやraw exceptionを露出せず、caller CWDからの相対targetと同じtargetを使うretry commandを返す。回帰テストでremove-specs後の再初期化と明示target retryを固定した。
+
+### Latest S95 v40 evidence (2026-08-16)
+
+* S95 v40は空のpost-uninstall boundary再初期化修正と旧テスト期待値更新を含むbranch tip `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`に対して `27 failed, 1976 passed, 516 skipped`（12分43秒）。v39とのfailure node集合差分は0件（new 0 / missing 0）、現行の27件を確認し、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。追加のIssue 360 focused regressionとarchive distribution integrationはpassした。
+
+### Latest P1 repair candidate 24 (2026-08-16)
+
+* distribution markerの削除をheld parent directory descriptor経由に限定し、unlink直前にregular-file identity（device / inode / mode / link count / ctime）を再検証して、差し替えられたmarkerを削除しないようにした。distribution partial failureのretry commandへ開始時targetを伝搬し、uninstallを含むretry commandはshell/argv-safe quotingと先頭hyphen用`--` terminatorを使う。特殊targetで表示commandをargvへ戻して同一targetへ再実行する回帰を追加した。
+
+### Latest S95 v41 evidence (2026-08-16)
+
+* S95 v41はmarker identity再検証、distribution/uninstall retry serialization、特殊target回帰を含むbranch tip `34e77724b5af9b1eb742185c3eb131f4c9944606`に対して `27 failed, 1979 passed, 516 skipped`（12分40秒）。v40とのfailure node集合差分は0件（new 0 / missing 0）、固定点subset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件である。Issue 360 focused suiteは`302 passed, 468 skipped`、archive distribution integrationは`13 passed`、通常テストは`1013 passed, 1509 skipped`である。
+
+### Latest P0 repair candidate 25 (2026-08-16)
+
+* Managed scaffoldのprovider asset pathを全件preflightし、regular fileを期待するexact pathがdirectory・symlink・special type・hard linkへ変化している場合は、retry marker作成およびrecursive refresh前に停止するよう修正した。managed root内の未知entryもsymlink・special type・hard linkを拒否し、各rootのrecursive replacement直前にtarget identityを再検証する。`spec-dock/docs/README.md`を利用者データ入りdirectoryへ置き換えたupdate回帰では、sentinelとconsumer snapshotが不変のまま終了する。
+
+### Latest S95 v42 evidence (2026-08-16)
+
+* S95 v42はmanaged scaffold exact-path structural blockerのzero-write修正を含むbranch tip `6d06578511e8b1d54c997e25d5f19994ed50f1bd`に対して `27 failed, 1983 passed, 516 skipped`（13分53秒）。現行failure node 27件はS95 ledgerおよび固定点subsetと完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。Issue 360 focused suiteは`187 passed`、通常テストは`1013 passed, 1513 skipped`。証跡更新後のclean treeでarchive distribution integrationも`13 passed`となった。
+
+### Latest P1 repair candidate 26 (2026-08-17)
+
+* Current Artifactを6種へ限定し、旧discussion / draft作成契約、profile template routing、専用CLIテストを物理退役した。Historical Artifactは既存文書のparse / validate / preserve用途だけを残し、provider assets、dogfood projection、rules docs、testsを同一hard-cutover契約へ同期した。実装コミットは`c6beb7663665eb98a7488c6a938fc0bb02a773c3`である。
+
+### Latest S95 v47 evidence (2026-08-17)
+
+* cleanな実装コミット`c6beb7663665eb98a7488c6a938fc0bb02a773c3`に対するfull regressionは`26 failed, 1942 passed, 498 skipped`（15分20.09秒）。解消した旧scaffold docs failureを除く26件は、固定点`a6ded0d9a838b40cdcd741fa473cd264b801f245`でも同一failure behaviorの`approved-no-op`である。ledgerだけを更新したevidence-only HEAD `8456ecd16a0c7a10f4e8b3478754ce44bd3dc4f2`に対してcampaign controllerが再実行した結果も、同一の`26 failed, 1942 passed, 498 skipped`（15分18.54秒）としてexact-set verifierを通過した。
+
+### Latest P1 repair candidate 27 (2026-08-17)
+
+* managed scaffold rootのpath-based `shutil.rmtree`を廃止し、repository root、parent chain、対象directoryを`O_NOFOLLOW` descriptorで保持したfd-relative recursive removalへ移行した。descriptor open後にvisible directoryを差し替えるfault injectionでは、置換先sentinelを削除せずidentity driftで停止する。生成active directory fallbackも同じ安全経路へ統合し、retired scaffoldはコピー前除外とfd-relative exact-entrypoint削除へ移した。実装コミットは`62bd4855ea9a385d9764f426fe895bc04edddd51`である。
+
+### Latest S95 v48 evidence (2026-08-17)
+
+* cleanな実装コミット`62bd4855ea9a385d9764f426fe895bc04edddd51`に対するfull regressionは`26 failed, 1943 passed, 498 skipped`（15分06.07秒）。failure node集合はS95 v47および固定点subsetの`approved-no-op` 26件と完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。ledger commitは`5e99e82d1bc6297a976adc2ae55598a258d923eb`。本reportを含むsuccessor review headはself-referential SHAを本文へ埋め込まず、campaign controllerと最終certificateをexact identity authorityとする。
+
+### Latest P1 repair candidate 28 (2026-08-17)
+
+* 所有権を証明できない`spec-dock/current-{initiative,epic,issue}`と`.path` 6件を独立削除処理から共通distribution plannerへ移し、regular file、symlink、directoryの全衝突をmutation前にpreserve-and-blockするよう修正した（`3b3b3c5e898f830c8b37676040eac95ab184dc29`）。さらにprovider assetをplan時のdevice / inode / ctime / mtime / size / modeとSHA-256へapply直前に再照合し、retry marker admissionをempty / preserved workspaceのFresh fast-pathより先に評価するよう修正した（`5edadf743b9ee99416cf7f9c0d93cda9deb39329`）。変更済みversion anchorの既存テスト期待もfail-closed契約へ同期し、最終実装コミットは`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`である。
+
+### Latest S95 v49 evidence (2026-08-17)
+
+* cleanな実装コミット`c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17`に対するfull regressionは`26 failed, 1964 passed, 498 skipped`（15分24.92秒）。failure node集合はS95 v48および固定点subsetの`approved-no-op` 26件と完全一致し、current-only failure 0件、expected-retirement 0件、比較未完了0件である。通常テストは`1022 passed, 1466 skipped`、managed distributionは`96 passed`、distribution cut-over full laneは`133 passed`、静的解析・format・mypyもすべて成功した。本reportとledgerだけの後続commitはevidence-only deltaとし、campaign controllerと最終certificateをreview headのexact identity authorityとする。
+
+### Latest P1 repair candidate 29 (2026-08-17)
+
+* bounded reviewで検出したempty-directory cleanupの2件を`ddd32f97b994a294cce0133e86a607cec356eb90`で修正した。uninstall cleanupは観測したdirectoryのdevice / inode / ctimeを保持し、no-followで開いたparent / target descriptor、空判定、削除直前identity、削除後visible chainを再検証する。Fresh pre-marker rollbackも、このoperationが作成したworkspace identityと一致する空directoryだけを削除し、同名のuser-owned replacementは保持する。競合回帰を追加したcut-over full laneは`135 passed`、通常テストは`1022 passed, 1468 skipped`、静的解析・format・mypyはpassした。
+* S95 ledgerの固定点subset commandを、immutableな`d81a12ef51dcbdf2e162d7480da0d3ba46de9b07`から26 node IDを読み、固定点`a6ded0d9a838b40cdcd741fa473cd264b801f245`でpytest終了コード1とfailure node集合の完全一致を機械判定する実行可能commandへ置換した。一時worktreeでの再実測はshared Git metadataの`Operation not permitted`により未実施であり、既存の固定点26件比較結果を置換していない。現行candidateのfull regressionはcampaign controllerのslow laneでexact SHAに対して再実行する。
+
+### Latest P1 repair candidate 30 (2026-08-17)
+
+* generation 3 bounded reviewの新規P1 3件を`89e801d7614e1edb3d4b7cd3b51d640d3697f258`で一括修正した。managed scaffoldの再帰preflightは`os.walk(..., onerror=...)`の走査失敗を即時blockし、未検査subtreeを含むtree replacementへ進まない。operation lockで保持したroot device / inodeはFresh、recognized update / force、apply uninstallの初回identityへ伝播し、lock後admission前のpathname replacementをmutation前に拒否する。固定点subset verifierは`git worktree add --detach a6ded0...`で実際の固定点treeをmaterializeし、そのworktree内でのみ26 node IDのpytestとexact-set比較を実行するcommandへ更新した。
+* 新規root rebind / incomplete walk回帰を含むfocused 5件はpass、distribution cut-over full laneは`137 passed`、通常テストは`1022 passed, 1470 skipped`、静的解析・format・mypyはpassした。ローカル環境ではshared Git metadataへのworktree登録が`Operation not permitted`となるため固定点commandの再実測は行わず、既存の固定点26件比較結果を維持する。successor campaignのslow laneは現行exact SHAのfull regressionを再実行する。
+
+### Latest P1 repair candidate 31 (2026-08-17)
+
+* successor bounded reviewで指摘されたpreserved workspace互換性は、実体が`pathlib.Path`ではなくPython 3.10–3.12でも`follow_symlinks`を受け取る`os.DirEntry`であることを確認した。そのうえで型の誤読を排除しno-follow分類を明示するため、`af90cbd8906cf6ffe3c5eaade6da5dc3f5407b14`で`DirEntry.stat(follow_symlinks=False)`と`stat.S_ISDIR/S_ISREG/S_ISLNK`へ統一した。keep-specs後のreinitとupdate block回帰2件はpassした。
+* 同じcommitで、`tests/unit/infra/test_init_update.py`に`_ISSUE_360_RETIRED_LEGACY_SURFACE`でskipされたまま残っていた旧host-adapter / native-shim / planning distribution専用テスト17関数（603行）とskip markerを物理削除した。現行cut-over testは維持され、distribution cut-over full laneは`137 passed`、通常テストは`1022 passed, 1453 skipped`、静的解析・format・mypyはpassした。
+
+### Latest P1 repair candidate 32 (2026-08-17)
+
+* successor generation 2 bounded reviewで検出した二つのfilesystem競合を`0c5532f42a3f5bb702d8ed02dcdb8473b263042a`で修正した。`active/*.path`と`context-pack.md`はpathname `write_text`を廃止し、全parent componentをno-followで開いたFD chainへstaging / publish / retry / cleanupを固定する。Dangling pathfile symlinkをfollowせず、親directoryがopen後にsymlinkへ差し替えられた場合は外部へ一切writeせずidentity mismatchで停止する。従来のmarker publication再試行とforward recoveryもFD-relativeに維持した。
+* 新規競合回帰を含むfocused 7件はpass、distribution cut-over full laneは`139 passed`、通常テストは`1022 passed, 1455 skipped`、静的解析・format・mypyはpassした。clean exact-upstream実装SHAに対するfull regressionは`26 failed, 1970 passed, 481 skipped`（15分23.80秒）で、ledger 26 node IDだけのcache無効再実行も`pytest_exit=1 expected=26 failed=26 exact=True`、added / missingはいずれも0件である。後続report commitはevidence-only deltaとする。
 
 ## Verification
 
 * Current branch: `iss-00360-cut-over-distribution-and-retire-legacy-workflow-surfaces`
-* Final implementation commit: `7736daec83cfc4a9e60843a080d1404fb57160cf`（local HEAD = configured upstream、clean）
+* Latest implementation commit: `0c5532f42a3f5bb702d8ed02dcdb8473b263042a`（旧root entrypoint ownership、provider source identity、retry marker admission、anchor fail-closed、empty-directory cleanup identity、walk completeness、locked root identity、obsolete test surface物理削除、active fallback / atomic managed-file parent FD bindingを収束させた修正）
+* Latest measured evidence: 実装コミット`0c5532f42a3f5bb702d8ed02dcdb8473b263042a`に対するfast / cut-over / full regressionと、ledger 26 node IDのcache無効exact-set再実行。report更新commitはevidence-only deltaとして識別し、successor campaign controllerが全laneを最終candidateへ再固定する。
+* Evidence refresh HEAD: `fa5b354c8a70f63d87d0e4e44240d920a36c0e9b`（marker-finalization修正を含む現行branch tip。S95 v33はこのclean exact-upstream treeで実行した）
+* Final implementation commit: `5fe6ddb6543fc896e54bc110e67da1bfb53c7663`（marker削除失敗時のphase / target診断とFresh / update / init-force回帰テスト。Fresh mode mismatch保護は`ff7ebb904d6cdcf5f281d6300a5d20de603a4712`、hard-link read-only adoption契約は`774e126124bd5a297c4ff193b40e0c6e11061888`、uninstall retry marker競合時のcanonical payload・stable identity検証は`194b793acb015a9c564bde0aa1dc480b8e188b84`、write/fsync失敗時identity-checked cleanupは`b0763b5fa743a6f11b14718eb5cd65b17926134b`、atomic regular-file retryのidentity検証後ftruncateは`9b9e53e968f48c5883a04ef4fbd71aaac096aca8`、managed scaffold再帰uninstallの各mutation直前root binding / entry identity再検証は`91f8b824e1a6839ee8e81030b6ae20f76b143fa1`）
+* Test alignment commit: `b660924deccb0ccf595218815cef83c8483e7298`（no-replace publish seamにfault-injectionテストを追従）
+* Final quality-gate evidence commit: `774e126124bd5a297c4ff193b40e0c6e11061888`（Fresh mode mismatch P1修正後の実装treeでS95 v32を実行。ledger / report更新は証跡のみの後続コミット）
+* S95 v29 full regression: 実装tree `194b793acb015a9c564bde0aa1dc480b8e188b84`に対して `27 failed, 1956 passed, 516 skipped`。v28とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v30 full regression: branch tip `68ee1c67d7d770e7684751f7f07289a80e27f80a`に対して `27 failed, 1957 passed, 516 skipped`。v29とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v32 full regression: 実装tree `774e126124bd5a297c4ff193b40e0c6e11061888`に対して `27 failed, 1958 passed, 516 skipped`。v30とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v33 full regression: branch tip `fa5b354c8a70f63d87d0e4e44240d920a36c0e9b`に対して `27 failed, 1961 passed, 516 skipped`。v32とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* Latest contract-test alignment commit: `26031b6a`（Issue 360 preserve契約に合わせた既存テスト期待値の更新）
+* S95 v34 full regression: branch tip `f99340169b9d2e0352b9422b3376a4e2f9fd3f1a`に対して `27 failed, 1966 passed, 516 skipped`（12分38秒）。v33とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v35 full regression: branch tip `e6dfe3aa2733f906786bb8a409c0acf22c6c2038`に対して `27 failed, 1969 passed, 516 skipped`（12分45秒）。v34とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v36 full regression: branch tip `e9759ba245643e2572a9917d48d7db43e5d26b4f`に対して `27 failed, 1972 passed, 516 skipped`（12分49秒）。v35とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v37 full regression: branch tip `6315c9d4fc0267ca3b4434cfc0783e245c6563eb`に対して `27 failed, 1973 passed, 516 skipped`（12分36秒）。v36とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v38 full regression: branch tip `7cb830ad8ccf1700c408abbd17f5261a53aa0214`に対して `27 failed, 1973 passed, 516 skipped`（12分37秒）。v37とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v39 full regression: branch tip `a30afda01b8a2307c8a55bfa4ccb758021b41620`に対して `27 failed, 1975 passed, 516 skipped`（12分36秒）。v38とのfailure node集合差分は0件、現行failure path 27件の`--lf`再実行とledger照合は一致し、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。
+* S95 v40 full regression: branch tip `ec36ef5ca0b56755f90be6ba2b7be6b3b87d0fc8`に対して `27 failed, 1976 passed, 516 skipped`（12分43秒）。v39とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1506 skipped`、Issue 360 focused distribution suiteは`180 passed`、archive distribution integrationは`13 passed`。
+* S95 v41 full regression: branch tip `34e77724b5af9b1eb742185c3eb131f4c9944606`に対して `27 failed, 1979 passed, 516 skipped`（12分40秒）。v40とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1509 skipped`、Issue 360 focused suiteは`302 passed, 468 skipped`、archive distribution integrationは`13 passed`。
+* S95 v42 full regression: branch tip `6d06578511e8b1d54c997e25d5f19994ed50f1bd`に対して `27 failed, 1983 passed, 516 skipped`（13分53秒）。v41とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、expected-retirement 0件、比較未完了0件。通常テストは`1013 passed, 1513 skipped`、Issue 360 focused suiteは`187 passed`、clean tree archive distribution integrationは`13 passed`である。
+* S95 v43 full regression: implementation candidate `5488dc75882ce9f0fd2d1a20f3c4e23ecb1a8a48`に対して `27 failed, 1991 passed, 516 skipped`（15分04秒）。v42とのfailure node集合差分は0件、固定点failure path 27件とのsubset比較は同一failure behavior 27件、current-only failure 0件、expected-retirement 0件、比較未完了0件。通常テストは`1017 passed, 1517 skipped`、Issue 360 focused suiteは`196 passed`、clean tree archive distribution integrationは`13 passed`である。
+* Prior report refresh commit: `a9178856`（remote branch tip verified by `git ls-remote`; linked-worktree tracking ref refresh is unavailable due shared Git metadata lock）
+* S95 failure ledger: [`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)
 * Initial planning baseline HEAD: `27b8682cb6e5262c980f3b04c7f01459a87685e9`
 * Integrated main baseline: `a6ded0d9a838b40cdcd741fa473cd264b801f245`
 * Issue 359 final head: `948d0cf0dedb84ca34e51a4adc0995820aa011f6`
@@ -285,22 +557,24 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | `uv run pytest` → `986 passed, 1516 skipped` |
+| Fast lane | pass | 実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest -q` → `1023 passed, 1025 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
-| Issue 360 focused regression | pass (Issue 360 suites) | The installer/distribution suites pass (`239 passed, 468 skipped` across cutover, managed distribution, and init/update; artifact templates `54 passed`; archive integration `13 passed`). The combined command also exercised `tests/integration/test_epic_00343_distribution.py`; it produced `305 passed, 468 skipped` plus one existing cross-filesystem privacy-sentinel failure caused by a timestamp digit collision, so that aggregate command is not claimed as a full pass. |
-| Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
+| Issue 360 focused regression | pass (Issue 360 suites) | 実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py tests/unit/infra/test_managed_distribution.py` → `239 passed`。scaffold recursive copy / executable / readonlyのdescriptor-bound no-follow mutation、uninstall mode mismatch preserve-and-blockを含む |
+| Archive distribution integration | pass | cleanな実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest --run-full-regression -q tests/integration/test_epic_00343_distribution.py` → `15 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | not adopted | `uv run pytest --run-full-regression`の試行ではIssue 360対象外のlegacy runtime/import/active/shell回帰を検出。対象Issueのfocused suiteへ縮小し、全体passとは主張しない |
-| Final ChatGPT-SpecReview-Strict | blocked before review | `issue360-final-spec-review` / `issue360-final-strict-correct-root` はprompt reconstruction mismatch、`issue360-correct-root-smoke` はrate-limit dialogでいずれも`promptSubmitted=false`・conversationなし。既存のplanning Strict passを現実装のfinal passへ流用しない |
-| S99 / H10 | pending | Strict再実行と三者final reviewer passが未成立のため、IC-3 input handoff・Issue close・Epic completionは実施しない |
+| Full repository regression | pass (accepted nonzero / exact ledger match) | 実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest --run-full-regression -q` → `26 failed, 1974 passed, 48 skipped`（15分24.45秒）。ledger 26 node IDのcache無効再実行は`call_failed=26`、`non_call_failed=0`、`exact=True`、additional / missing 0件。各path・owner・follow-up・根拠は[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)に記録した |
+| Retired test surface convergence | pass | 動的skipされていたIssue 360退役surfaceの414テストと専用helper / constantを物理削除し、`RETIRED_ISSUE360_INIT_UPDATE_PREFIXES`によるcollection-time skipを廃止した。残存fast suite、cut-over 139件、archive integration 15件、lintがpass |
+| Final ChatGPT-final-quality-gate-strict | successor remediation cycle 4 | generation 2 bounded reviewでownership / marker / update-uninstall / retired surfaceの4 domainがfinding 0件、coverage complete。残るtests-release P1に対し、最新実装SHAのfull regression exact-set証跡を取得し、後続evidence-only candidateへ固定する |
+| S99 / H10 | pending final certificate | bounded review・slow attestation・fresh full reviewをsuccessor candidateへ再固定し、repository外certificateを発行する。origin session closureは直後candidate限定の診断であり、そのcandidateがbounded P1で停止したため認証要件へ持ち越さない。certificate後にrepositoryを変更しない |
 
 ## Residual Risks / Follow-ups
 
 * Issue 359 final headとmain mergeへR/D/Pを再照合した。S10でCurrent branch HEAD、Target二skill、provider / dogfood / packageのexact inventoryをlockした。
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
-* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force tests、S55 obsolete prune / preserve tests、S60 forward-retry / root-binding tests、S65/S70 uninstall、S80 package parity、S85 installed smoke、S90 docs refreshを完了した。現実装SHAに対する最終Strictは外部ブラウザ制限で未成立、S99/H10は未完了として扱う。
+* Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force tests、S55 obsolete prune / preserve tests、S60 forward-retry / root-binding tests、S65/S70 uninstall、S80 package parity、S85 installed smoke、S90 docs refreshを完了した。最終Strict campaignは2件のP1を順に検出し、report identity driftとmanaged scaffold path-swap raceを修正した。S99/H10は最終candidateの全lane passとrepository外certificate発行まで未完了として扱う。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
+* `tests/conftest.py`の退役prefixによる動的skipは削除した。退役したlegacy distribution契約はtest bodyと専用fixtureを物理削除し、Current契約はfast / cut-over / archive integrationへ集約した。
 
 ## Notes
 
