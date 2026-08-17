@@ -551,14 +551,15 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | 実装コミット`0c5532f42a3f5bb702d8ed02dcdb8473b263042a`で`uv run pytest -q` → `1022 passed, 1455 skipped` |
+| Fast lane | pass | 実装コミット`30671587e22d0666ed785a880e402010aaeeac09`で`uv run pytest -q` → `1022 passed, 1022 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
 | Issue 360 focused regression | pass (Issue 360 suites) | `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` → `139 passed`。Dangling active pathfile symlink、managed-file parent rebind、marker再試行、root binding、no-follow / no-replace、Fresh / update / uninstall cut-overを確認 |
-| Archive distribution integration | pass | `uv run pytest --run-full-regression tests/integration/test_epic_00343_distribution.py -q` → `13 passed` |
+| Archive distribution integration | pass | cleanな実装コミット`30671587e22d0666ed785a880e402010aaeeac09`で`uv run pytest --run-full-regression -q tests/integration/test_epic_00343_distribution.py` → `15 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | pass (accepted nonzero / exact ledger match) | 実装コミット`0c5532f42a3f5bb702d8ed02dcdb8473b263042a`で`uv run pytest --run-full-regression -q` → `26 failed, 1970 passed, 481 skipped`（15分23.80秒）。ledger 26 node IDのcache無効再実行は`exact=True`、added / missing 0件。各path・owner・follow-up・根拠は[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)に記録した |
-| Final ChatGPT-final-quality-gate-strict | successor remediation cycle 2 | generation 2 bounded reviewのP1二件をFD-relative managed-file publicationで修正し、最新実装SHAでfull regression exact-set証跡を取得した。後続evidence-only candidateへ全laneを再固定する |
+| Full repository regression | pass (accepted nonzero / exact ledger match) | 実装コミット`30671587e22d0666ed785a880e402010aaeeac09`で`uv run pytest --run-full-regression -q` → `26 failed, 1970 passed, 48 skipped`（15分26.71秒）。ledger 26 node IDのcache無効再実行は`call_failed=26`、`non_call_failed=0`、`exact=True`、additional / missing 0件。各path・owner・follow-up・根拠は[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)に記録した |
+| Retired test surface convergence | pass | 動的skipされていたIssue 360退役surfaceの414テストと専用helper / constantを物理削除し、`RETIRED_ISSUE360_INIT_UPDATE_PREFIXES`によるcollection-time skipを廃止した。残存fast suite、cut-over 139件、archive integration 15件、lintがpass |
+| Final ChatGPT-final-quality-gate-strict | successor remediation cycle 3 | generation 3 bounded reviewのP1を受け、obsolete test surfaceを物理削除し、failure-ledger verifierをcall phase限定かつsetup / teardown fail-closedへ修正した。最新実装SHAの全証跡を後継campaignへ固定する |
 | S99 / H10 | pending final certificate | bounded review・slow attestation・fresh full reviewをsuccessor candidateへ再固定し、repository外certificateを発行する。origin session closureは直後candidate限定の診断であり、そのcandidateがbounded P1で停止したため認証要件へ持ち越さない。certificate後にrepositoryを変更しない |
 
 ## Residual Risks / Follow-ups
@@ -567,6 +568,7 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 * Formal `issue start`はapproved planning commit / push後に成功し、active Issueは`iss-00360`である。
 * Epic-local ArtifactとReportにIC-1 / IC-2 pass evidenceを記録し、Requirement / Design review、commit / push、formal start、Plan amendment、fresh local `spec-reviewer`、S00再確認、S10 inventory lock、S40A code review / focused test、S40B focused cutover / S20 catalog tests、S25 focused classifier tests、S30 no-follow apply、S35 admission focused tests、S45 Fresh preservation / collision tests、S50 recognized update / force tests、S55 obsolete prune / preserve tests、S60 forward-retry / root-binding tests、S65/S70 uninstall、S80 package parity、S85 installed smoke、S90 docs refreshを完了した。最終Strict campaignは2件のP1を順に検出し、report identity driftとmanaged scaffold path-swap raceを修正した。S99/H10は最終candidateの全lane passとrepository外certificate発行まで未完了として扱う。
 * Historical digestは実際の過去package bytesから再現できるものだけをS10でlockする。再現不能なcandidateは推測登録せずpreserve-and-blockする。
+* `tests/conftest.py`の退役prefixによる動的skipは削除した。退役したlegacy distribution契約はtest bodyと専用fixtureを物理削除し、Current契約はfast / cut-over / archive integrationへ集約した。
 
 ## Notes
 
