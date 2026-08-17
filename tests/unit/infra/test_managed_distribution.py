@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import stat
 import subprocess
@@ -58,6 +59,9 @@ EXPECTED_OBSOLETE_SKILL_PATHS = frozenset(
         "spec-dock-implementation-planner",
     )
 )
+EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS = frozenset(
+    f"spec-dock/current-{scope}{suffix}" for scope in ("initiative", "epic", "issue") for suffix in ("", ".path")
+)
 MANIFEST_FIELDS = {
     "schema_version",
     "recognized_workspace_versions",
@@ -88,13 +92,22 @@ def _write_manifest(tmp_path: Path, manifest: dict[str, object]) -> Path:
     return path
 
 
-def _regular_record(path: str, content: bytes, *, source_kind: str = "test-fixture") -> dict[str, object]:
-    return {
+def _regular_record(
+    path: str,
+    content: bytes,
+    *,
+    source_kind: str = "test-fixture",
+    mode: int | None = None,
+) -> dict[str, object]:
+    record: dict[str, object] = {
         "path": path,
         "kind": "regular",
         "sha256": hashlib.sha256(content).hexdigest(),
         "source": {"kind": source_kind, "ref": "issue-360-test"},
     }
+    if mode is not None:
+        record["mode"] = mode
+    return record
 
 
 def _minimal_install_root(tmp_path: Path, content: bytes = b"current\n") -> Path:
@@ -113,8 +126,9 @@ def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
     assert plan.manifest.schema_version == 1
     assert plan.manifest.historical_current_identities == ()
     obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files}
-    assert len(obsolete_paths) == 75
+    assert len(obsolete_paths) == 81
     assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
+    assert obsolete_paths >= EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
     assert ".agents/host-adapters/meta.json" in obsolete_paths
     assert any(path.startswith(".codex/") for path in obsolete_paths)
     assert any(path.startswith(".github/agents/") for path in obsolete_paths)
@@ -132,9 +146,18 @@ def test_s20_current_catalog_is_not_duplicated_in_historical_manifest() -> None:
     assert not any(key in raw for key in {"current", "current_assets", "current_catalog"})
     assert raw["historical_current_identities"] == []
     obsolete_paths = {item["path"] for item in raw["obsolete_exact_files"]}
-    assert len(obsolete_paths) == 75
+    assert len(obsolete_paths) == 81
     assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
+    assert obsolete_paths >= EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
     assert not any(item["path"] in EXPECTED_CURRENT_PATHS for item in raw["obsolete_exact_files"])
+    unproven_entrypoints = {
+        item["path"]: item
+        for item in raw["obsolete_exact_files"]
+        if item["path"] in EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
+    }
+    assert set(unproven_entrypoints) == EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
+    assert all(item["identities"] == [] for item in unproven_entrypoints.values())
+    assert all(item["on_unknown"] == "preserve-and-block" for item in unproven_entrypoints.values())
 
 
 def test_s55_obsolete_catalog_is_bound_to_reproducible_git_source() -> None:
@@ -262,6 +285,45 @@ def test_s20_duplicate_and_current_obsolete_overlap_are_rejected(tmp_path: Path)
         build_distribution_plan(INSTALL_ROOT, manifest_path=shortcut_overlap_manifest)
 
 
+@pytest.mark.parametrize(
+    "protected_path",
+    (
+        "spec-dock/docs/README.md",
+        "spec-dock/initiatives/user-owned/requirement.md",
+        "spec-dock/active/issue/requirement.md",
+        "spec-dock/.workbench/README.md",
+    ),
+)
+def test_s20_protected_workspace_overlap_is_rejected(tmp_path: Path, protected_path: str) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": protected_path,
+                    "surface": "legacy-test",
+                    "identities": [],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+
+    with pytest.raises(DistributionManifestError, match="protected workspace surface"):
+        build_distribution_plan(INSTALL_ROOT, manifest_path=manifest_path)
+
+
+def test_s20_physical_current_catalog_cannot_overlap_protected_workspace(tmp_path: Path) -> None:
+    install_root = tmp_path / "install_root"
+    protected = install_root / "spec-dock/initiatives/user-owned/requirement.md"
+    protected.parent.mkdir(parents=True)
+    protected.write_text("must remain user-owned\n", encoding="utf-8")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+
+    with pytest.raises(DistributionManifestError, match="protected workspace surface"):
+        build_distribution_plan(install_root, manifest_path=manifest_path)
+
+
 def test_s20_ancestor_overlap_between_historical_records_is_rejected(tmp_path: Path) -> None:
     manifest_path = _write_manifest(
         tmp_path,
@@ -360,7 +422,6 @@ def test_s25_fresh_classifies_missing_and_current_identical_without_mutation(tmp
         target_root=target_root,
         operation="fresh",
     )
-
     by_path = {action.path: action for action in plan.actions}
     assert by_path[".github/workflows/ci.yml"].action == "adopt"
     assert by_path[".github/workflows/ci.yml"].provenance == "current"
@@ -440,6 +501,78 @@ def test_s25_unknown_current_collision_is_preserved_and_diagnostic_is_sanitized(
     assert external_path not in repr(diagnostic)
     assert "inspect ownership" in str(diagnostic["operator_action"])
     assert target.read_text(encoding="utf-8") == f"{secret}\n{external_path}\n"
+
+
+def test_s25_preflight_does_not_follow_final_component_swapped_to_symlink(tmp_path: Path, monkeypatch) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github/workflows/ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"user-owned\n")
+    external = tmp_path / "external.yml"
+    external.write_bytes(b"current\n")
+    real_open = managed_distribution.os.open
+    swapped = False
+
+    def swap_before_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped
+        if path == "ci.yml" and dir_fd is not None and not swapped:
+            swapped = True
+            target.unlink()
+            target.symlink_to(external)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(managed_distribution.os, "open", swap_before_open)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.blocked
+    assert action.reason == "unsafe-target-path"
+    assert target.is_symlink()
+
+
+def test_s25_preflight_does_not_follow_parent_swapped_to_symlink(tmp_path: Path, monkeypatch) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    workflows = target_root / ".github/workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_bytes(b"user-owned\n")
+    external = tmp_path / "external-workflows"
+    external.mkdir()
+    (external / "ci.yml").write_bytes(b"current\n")
+    displaced = tmp_path / "displaced-workflows"
+    real_open = managed_distribution.os.open
+    swapped = False
+
+    def swap_before_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped
+        if path == "workflows" and dir_fd is not None and not swapped:
+            swapped = True
+            workflows.rename(displaced)
+            workflows.symlink_to(external, target_is_directory=True)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(managed_distribution.os, "open", swap_before_open)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.blocked
+    assert action.reason == "unsafe-target-path"
+    assert workflows.is_symlink()
 
 
 def test_s25_update_upgrades_direct_historical_identity(tmp_path: Path) -> None:
@@ -661,6 +794,98 @@ def test_s25_current_hard_link_is_blocked_for_uninstall(tmp_path: Path) -> None:
     assert action.blocked is True
 
 
+def test_s25_current_mode_mismatch_is_preserved_and_blocked_for_uninstall(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    source.chmod(0o755)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"current\n")
+    target.chmod(0o600)
+    before = target.read_bytes(), stat.S_IMODE(target.stat().st_mode)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "preserve"
+    assert action.provenance == "current"
+    assert action.reason == "current-mode-mismatch"
+    assert action.blocked is True
+    with pytest.raises(DistributionApplyError, match="blocked"):
+        apply_distribution_plan(plan)
+    assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
+
+
+def test_s25_current_hard_linked_shortcut_is_blocked_for_uninstall(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    assert shortcut.lstat().st_nlink == 2
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    action = next(item for item in plan.actions if item.path == "spec")
+    assert action.action == "block"
+    assert action.provenance == "current"
+    assert action.reason == "hard-link-mutation-unsafe"
+    assert action.blocked is True
+
+
+def test_s25_historical_hard_linked_shortcut_is_blocked_for_update(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old_target = "legacy/spec-dock"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            historical_current_identities=[
+                {
+                    "path": "spec",
+                    "kind": "symlink",
+                    "target": old_target,
+                    "source": {"kind": "test-fixture", "ref": "issue-360-test"},
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to(old_target)
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    assert shortcut.lstat().st_nlink == 2
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == "spec")
+    assert action.action == "block"
+    assert action.provenance == "historical"
+    assert action.reason == "hard-link-mutation-unsafe"
+    assert action.blocked is True
+
+
 def test_s25_shortcut_uses_link_identity_without_following_target(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     shortcut = {
@@ -791,7 +1016,7 @@ def test_s30_apply_materializes_missing_regular_target_without_replacing_existin
     assert target.stat().st_nlink == 1
 
 
-def test_s30_apply_upgrades_historical_regular_target_in_place(tmp_path: Path) -> None:
+def test_s30_apply_upgrades_historical_regular_target_atomically(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"new\n")
     old = b"old\n"
     manifest_path = _write_manifest(
@@ -815,7 +1040,810 @@ def test_s30_apply_upgrades_historical_regular_target_in_place(tmp_path: Path) -
 
     assert result.status == "complete"
     assert target.read_bytes() == b"new\n"
-    assert target.stat().st_ino == before_inode
+    assert target.stat().st_ino != before_inode
+
+
+def test_s25_update_repairs_mode_when_content_is_current(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    source.chmod(0o755)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"current\n")
+    target.chmod(0o600)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "upgrade"
+    assert action.reason == "current-mode-mismatch"
+
+    apply_distribution_plan(plan)
+
+    assert target.read_bytes() == b"current\n"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o755
+
+
+def test_s55_obsolete_identity_ownership_ignores_mode_drift(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    obsolete = tmp_path / "legacy-managed.md"
+    obsolete.write_bytes(b"legacy\n")
+    obsolete.chmod(0o755)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": "legacy-managed.md",
+                    "surface": "legacy-test-surface",
+                    "identities": [_regular_record("legacy-managed.md", b"legacy\n", mode=0o644)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / "legacy-managed.md"
+    target_root.mkdir()
+    target.write_bytes(obsolete.read_bytes())
+    target.chmod(0o755)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    action = next(item for item in plan.actions if item.path == "legacy-managed.md")
+    assert action.action == "prune"
+    assert action.reason == "direct-obsolete-identity-match"
+    assert apply_distribution_plan(plan).status == "complete"
+    assert not target.exists()
+
+
+def test_s30_apply_rejects_provider_mode_change_after_plan(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    source = install_root / ".github/workflows/ci.yml"
+    source.chmod(0o755)
+
+    with pytest.raises(DistributionApplyError, match="provider Current asset identity changed"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == old
+
+
+def test_s30_apply_rejects_provider_content_change_with_same_planned_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    original_source = managed_distribution._source_asset_bytes
+
+    def changed_source(path: Path) -> tuple[bytes, managed_distribution.DistributionSourceSnapshot]:
+        _content, snapshot = original_source(path)
+        return b"unplanned\n", snapshot
+
+    monkeypatch.setattr(managed_distribution, "_source_asset_bytes", changed_source)
+
+    with pytest.raises(DistributionApplyError, match="provider Current asset content changed"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == old
+
+
+def test_s30_apply_retries_cleanup_of_known_stale_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    original_unlink = managed_distribution.os.unlink
+
+    def fail_stage_cleanup(name, *args, **kwargs):
+        if isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan)
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert target.read_bytes() == b"new\n"
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    stage_ownership = managed_distribution._distribution_stage_ownership(
+        ".github/workflows/ci.yml",
+        stage_files[0].name,
+        stage_files[0].lstat(),
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(stage_ownership,),
+        ).status
+        == "complete"
+    )
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_apply_rebinds_stage_ownership_after_swap_for_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_unlink = managed_distribution.os.unlink
+    failed = False
+
+    def fail_once_after_swap(name, *args, **kwargs):
+        nonlocal failed
+        if not failed and isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            failed = True
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_once_after_swap)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=recorded.append)
+
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert target.read_bytes() == b"new\n"
+    assert len(recorded) == 2
+    rebound = recorded[-1]
+    stage_stat = stage_files[0].lstat()
+    assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    record_calls = 0
+    original_unlink = managed_distribution.os.unlink
+    cleanup_failures = 0
+
+    def fail_post_swap_record(record: managed_distribution.DistributionStageOwnership) -> None:
+        nonlocal record_calls
+        record_calls += 1
+        if record_calls == 2:
+            raise RuntimeError("simulated post-swap marker write failure")
+        recorded.append(record)
+
+    def fail_stage_cleanup_twice(name, *args, **kwargs):
+        nonlocal cleanup_failures
+        if isinstance(name, str) and name.startswith(".spec-dock-file-") and cleanup_failures < 2:
+            cleanup_failures += 1
+            raise OSError("simulated repeated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup_twice)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=fail_post_swap_record)
+
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert len(recorded) == 2
+    rebound = recorded[-1]
+    stage_stat = stage_files[0].lstat()
+    assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+    assert target.read_bytes() == b"new\n"
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_apply_cleans_rebound_stage_when_marker_update_fails(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+
+    def fail_marker_update(record: managed_distribution.DistributionStageOwnership) -> None:
+        if recorded:
+            raise RuntimeError("simulated retry marker write failure")
+        recorded.append(record)
+
+    with pytest.raises(RuntimeError, match="retry marker write failure"):
+        apply_distribution_plan(plan, stage_ownership_recorder=fail_marker_update)
+
+    assert target.read_bytes() == b"new\n"
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+
+
+def test_s30_apply_retries_stage_cleanup_for_trusted_manifest_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    trusted_bytes = b'{"managed":true}\n'
+    trusted_manifest = _regular_record(".agents/host-adapters/meta.json", trusted_bytes)
+    trusted_manifest["claims"] = [_regular_record(".github/workflows/ci.yml", old)]
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(trusted_consumer_manifests=[trusted_manifest]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    trusted_target = target_root / ".agents" / "host-adapters" / "meta.json"
+    trusted_target.parent.mkdir(parents=True)
+    trusted_target.write_bytes(trusted_bytes)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert next(item for item in plan.actions if item.path == ".github/workflows/ci.yml").action == "upgrade"
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_unlink = managed_distribution.os.unlink
+    failed = False
+
+    def fail_stage_cleanup(name, *args, **kwargs):
+        nonlocal failed
+        if not failed and isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            failed = True
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup)
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=recorded.append)
+    assert list(target.parent.glob(".spec-dock-file-*"))
+
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=tuple(recorded),
+        ).status
+        == "complete"
+    )
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_historical_stage_identities_include_recognized_anchor(
+    tmp_path: Path,
+) -> None:
+    old = b"old\n"
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            recognized_workspace_versions=[
+                {
+                    "version": "0.1.0",
+                    "anchors": [_regular_record("legacy.txt", old)],
+                }
+            ]
+        ),
+    )
+    plan = build_distribution_plan(install_root, manifest_path=manifest_path)
+
+    historical = managed_distribution._historical_stage_identities(plan, "legacy.txt")
+
+    assert historical == (
+        managed_distribution.DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(old).hexdigest(),
+            mode=None,
+        ),
+    )
+
+
+def test_s30_apply_refreshes_snapshots_after_stale_stage_cleanup_for_later_action(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    second_source = install_root / ".github" / "workflows" / "second.yml"
+    second_source.write_bytes(b"second\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    first_target = target_root / ".github" / "workflows" / "ci.yml"
+    first_target.parent.mkdir(parents=True)
+    first_target.write_bytes(b"current\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    stale_identity = managed_distribution.DistributionIdentity(
+        kind="regular",
+        sha256=hashlib.sha256(b"current\n").hexdigest(),
+        mode=stat.S_IMODE(source.stat().st_mode),
+    )
+    stale_stage = first_target.parent / managed_distribution._distribution_stage_name(
+        ".github/workflows/ci.yml",
+        stale_identity,
+    )
+    stale_stage.write_bytes(b"current\n")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    stage_ownership = managed_distribution._distribution_stage_ownership(
+        ".github/workflows/ci.yml",
+        stale_stage.name,
+        stale_stage.lstat(),
+    )
+    assert (
+        apply_distribution_plan(
+            plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(stage_ownership,),
+        ).status
+        == "complete"
+    )
+    assert first_target.read_bytes() == b"current\n"
+    assert (target_root / ".github/workflows/second.yml").read_bytes() == b"second\n"
+    assert not list(first_target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_apply_rejects_external_parent_created_after_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"first\n")
+    second_source = install_root / "zz" / "second.yml"
+    second_source.parent.mkdir(parents=True)
+    second_source.write_bytes(b"second\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    original_apply = managed_distribution._apply_distribution_action
+    injected = False
+
+    def apply_then_create_external_parent(
+        current_plan: object,
+        root: Path,
+        action: object,
+        snapshot: object,
+        bindings: dict[str, object],
+    ) -> None:
+        nonlocal injected
+        original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
+        if not injected:
+            injected = True
+            (root / "zz").mkdir()
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", apply_then_create_external_parent)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"first\n"
+    assert not (target_root / "zz" / "second.yml").exists()
+
+
+def test_s30_apply_rejects_external_nested_parent_after_operation_parent_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"first\n")
+    first_source = install_root / "zz" / "first.yml"
+    first_source.parent.mkdir(parents=True)
+    first_source.write_bytes(b"first nested\n")
+    second_source = install_root / "zz" / "yy" / "second.yml"
+    second_source.parent.mkdir(parents=True)
+    second_source.write_bytes(b"second nested\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    original_apply = managed_distribution._apply_distribution_action
+    injected = False
+
+    def apply_then_create_external_nested_parent(
+        current_plan: object,
+        root: Path,
+        action: object,
+        snapshot: object,
+        bindings: dict[str, object],
+    ) -> None:
+        nonlocal injected
+        original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
+        if not injected and getattr(action, "path", "") == "zz/first.yml":
+            injected = True
+            (root / "zz" / "yy").mkdir()
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", apply_then_create_external_nested_parent)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert (target_root / "zz" / "first.yml").read_bytes() == b"first nested\n"
+    assert (target_root / "zz" / "yy").is_dir()
+    assert not (target_root / "zz" / "yy" / "second.yml").exists()
+
+
+def test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    def fail_staging_write(fd: int, *_args: object, **_kwargs: object) -> None:
+        os.write(fd, b"partial\n")
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
+
+    with pytest.raises(DistributionApplyError, match=r"apply failed|staging"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == old
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_apply_records_partial_stage_identity_when_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_write = managed_distribution._write_fd_bytes
+    original_unlink = managed_distribution.os.unlink
+    cleanup_failed = False
+
+    def fail_stage_cleanup_once(name, *args, **kwargs):
+        nonlocal cleanup_failed
+        if not cleanup_failed and isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            cleanup_failed = True
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    def fail_staging_write(fd: int, *_args: object, **_kwargs: object) -> None:
+        os.write(fd, b"partial\n")
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup_once)
+
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=recorded.append)
+
+    assert target.read_bytes() == old
+    stage_files = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert len(recorded) == 2
+    refreshed = recorded[-1]
+    stage_stat = stage_files[0].lstat()
+    assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", original_write)
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(refreshed,),
+        ).status
+        == "complete"
+    )
+    assert target.read_bytes() == b"new\n"
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
+def test_s30_apply_create_cleans_stage_when_staging_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    def fail_staging_write(*_args: object, **_kwargs: object) -> None:
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
+
+    with pytest.raises(DistributionApplyError, match=r"apply failed|staging"):
+        apply_distribution_plan(plan)
+
+    assert not list(target_root.rglob(".spec-dock-file-*"))
+
+
+def test_s30_apply_create_records_partial_stage_identity_when_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_write = managed_distribution._write_fd_bytes
+    original_unlink = managed_distribution.os.unlink
+    cleanup_failed = False
+
+    def fail_stage_cleanup_once(name, *args, **kwargs):
+        nonlocal cleanup_failed
+        if not cleanup_failed and isinstance(name, str) and name.startswith(".spec-dock-file-"):
+            cleanup_failed = True
+            raise OSError("simulated stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    def fail_staging_write(fd: int, *_args: object, **_kwargs: object) -> None:
+        os.write(fd, b"partial\n")
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", fail_staging_write)
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_stage_cleanup_once)
+
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=recorded.append)
+
+    stage_files = list(target_root.rglob(".spec-dock-file-*"))
+    assert len(stage_files) == 1
+    assert len(recorded) == 2
+    refreshed = recorded[-1]
+    stage_stat = stage_files[0].lstat()
+    assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+
+    monkeypatch.setattr(managed_distribution, "_write_fd_bytes", original_write)
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(refreshed,),
+        ).status
+        == "complete"
+    )
+    assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"new\n"
+    assert not list(target_root.rglob(".spec-dock-file-*"))
 
 
 def test_s30_apply_prunes_historical_target_without_following_symlink(tmp_path: Path) -> None:
@@ -891,7 +1919,7 @@ def test_s55_apply_prunes_proven_obsolete_target_during_update(tmp_path: Path) -
     assert not target.exists()
 
 
-def test_s55_mode_mismatch_preserves_obsolete_target_and_blocks(tmp_path: Path) -> None:
+def test_s55_mode_mismatch_still_prunes_obsolete_target(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     old = b"legacy-managed\n"
     record = _regular_record(".codex/config.toml", old)
@@ -914,8 +1942,6 @@ def test_s55_mode_mismatch_preserves_obsolete_target_and_blocks(tmp_path: Path) 
     target.parent.mkdir(parents=True)
     target.write_bytes(old)
     target.chmod(0o755)
-    before = target.read_bytes(), stat.S_IMODE(target.stat().st_mode)
-
     plan = build_distribution_plan(
         install_root,
         manifest_path=manifest_path,
@@ -924,13 +1950,11 @@ def test_s55_mode_mismatch_preserves_obsolete_target_and_blocks(tmp_path: Path) 
     )
 
     action = next(item for item in plan.actions if item.path == ".codex/config.toml")
-    assert action.action == "preserve"
-    assert action.reason == "obsolete-identity-unknown"
-    assert action.blocked is True
-    with pytest.raises(DistributionApplyError, match="blocked"):
-        apply_distribution_plan(plan)
-
-    assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
+    assert action.action == "prune"
+    assert action.reason == "direct-obsolete-identity-match"
+    assert action.blocked is False
+    assert apply_distribution_plan(plan).status == "complete"
+    assert not target.exists()
 
 
 @pytest.mark.parametrize(
@@ -1252,6 +2276,75 @@ def test_s30_apply_materializes_canonical_shortcut_without_following_target(tmp_
     assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
 
 
+def test_s30_apply_retries_symlink_create_stage_record_and_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    original_unlink = managed_distribution.os.unlink
+    recorder_failed = False
+    cleanup_failed = False
+
+    def record_stage(record: managed_distribution.DistributionStageOwnership) -> None:
+        nonlocal recorder_failed
+        if record.file_type == "symlink" and not recorder_failed:
+            recorder_failed = True
+            raise OSError("simulated symlink stage recorder failure")
+        recorded.append(record)
+
+    def fail_symlink_cleanup_once(name, *args, **kwargs):
+        nonlocal cleanup_failed
+        if not cleanup_failed and isinstance(name, str) and name.startswith(".spec-dock-symlink-"):
+            cleanup_failed = True
+            raise OSError("simulated symlink stage cleanup failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_symlink_cleanup_once)
+
+    with pytest.raises(DistributionApplyError, match="staging cleanup"):
+        apply_distribution_plan(plan, stage_ownership_recorder=record_stage)
+
+    stage_files = list(target_root.rglob(".spec-dock-symlink-*"))
+    assert len(stage_files) == 1
+    symlink_record = next(item for item in recorded if item.file_type == "symlink")
+    stage_stat = stage_files[0].lstat()
+    assert (symlink_record.device, symlink_record.inode, symlink_record.ctime_ns) == (
+        stage_stat.st_dev,
+        stage_stat.st_ino,
+        stage_stat.st_ctime_ns,
+    )
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", original_unlink)
+    retry_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    assert (
+        apply_distribution_plan(
+            retry_plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(symlink_record,),
+        ).status
+        == "complete"
+    )
+    shortcut = target_root / "spec"
+    assert shortcut.is_symlink()
+    assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
+    assert not list(target_root.rglob(".spec-dock-symlink-*"))
+
+
 def test_s30_apply_upgrades_canonical_shortcut_with_no_replace_publish(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(
@@ -1285,6 +2378,110 @@ def test_s30_apply_upgrades_canonical_shortcut_with_no_replace_publish(tmp_path:
     assert shortcut.is_symlink()
     assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
     assert not list(target_root.glob(".spec-dock-symlink-*"))
+
+
+def test_s30_apply_retries_cleanup_of_known_stale_symlink_stage(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            historical_shortcuts=[
+                {
+                    "path": "spec",
+                    "kind": "symlink",
+                    "target": "legacy/spec-dock",
+                    "source": {"kind": "test-fixture", "ref": "issue-360-test"},
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("legacy/spec-dock")
+    stale_stage = target_root / managed_distribution._distribution_stage_name(
+        "spec",
+        managed_distribution.DistributionIdentity(kind="symlink", target="spec-dock/scripts/spec-dock"),
+    )
+    stale_stage.symlink_to("spec-dock/scripts/spec-dock")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+
+    stage_ownership = managed_distribution._distribution_stage_ownership("spec", stale_stage.name, stale_stage.lstat())
+    assert (
+        apply_distribution_plan(
+            plan,
+            allow_stale_stage_cleanup=True,
+            stage_ownership=(stage_ownership,),
+        ).status
+        == "complete"
+    )
+    assert shortcut.readlink().as_posix() == "spec-dock/scripts/spec-dock"
+    assert not list(target_root.glob(".spec-dock-symlink-*"))
+
+
+def test_s30_apply_preserves_unknown_stage_like_sibling(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    unknown = target_root / ".github" / "workflows" / ".spec-dock-file-user"
+    unknown.parent.mkdir(parents=True)
+    unknown.write_bytes(b"current\n")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    assert apply_distribution_plan(plan).status == "complete"
+    assert unknown.read_bytes() == b"current\n"
+
+
+def test_s30_apply_preserves_unrecorded_exact_stage_collision(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    initial_plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    action = next(item for item in initial_plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "create"
+    expected = next(item.identity for item in initial_plan.current_assets if item.path == action.path)
+    stage = target_root / ".github" / "workflows" / managed_distribution._distribution_stage_name(action.path, expected)
+    stage.parent.mkdir(parents=True, exist_ok=True)
+    stage.write_bytes(b"current\n")
+    before = stage.lstat()
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    assert next(item for item in plan.actions if item.path == ".github/workflows/ci.yml").action == "create"
+    assert stage.name == managed_distribution._distribution_stage_name(
+        action.path,
+        next(item.identity for item in plan.current_assets if item.path == action.path),
+    )
+    with pytest.raises(DistributionApplyError, match="managed target apply failed"):
+        apply_distribution_plan(plan, allow_stale_stage_cleanup=True)
+    with pytest.raises(DistributionApplyError, match="managed target apply failed"):
+        apply_distribution_plan(plan, allow_stale_stage_cleanup=True)
+
+    after = stage.lstat()
+    assert (after.st_dev, after.st_ino, after.st_ctime_ns) == (before.st_dev, before.st_ino, before.st_ctime_ns)
+    assert stage.read_bytes() == b"current\n"
 
 
 def test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support(
@@ -1530,3 +2727,25 @@ def test_s35_legacy_uninstall_marker_remains_admissible_without_version(tmp_path
     )
 
     assert admission.status == "uninstall-retry"
+
+
+def test_s35_retry_marker_authority_precedes_empty_workspace_fast_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    monkeypatch.setattr(
+        managed_distribution,
+        "_read_uninstall_retry_marker_for_admission",
+        lambda _target_root: True,
+    )
+
+    with pytest.raises(DistributionAdmissionError, match="uninstall-retry-present"):
+        admit_distribution_operation(
+            target_root,
+            operation="fresh",
+            package_version="1.2.3",
+            manifest_path=manifest_path,
+        )

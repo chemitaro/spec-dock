@@ -19,16 +19,27 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
+import secrets
+import shlex
 import stat
+import subprocess
 import sys
-import tempfile
-from typing import TYPE_CHECKING, Any, NamedTuple
+import threading
+from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows has no POSIX flock module.
+    fcntl = None  # type: ignore[assignment]
 
 from spec_dock import __version__
 from spec_dock.managed_distribution import (
+    DistributionAdmission,
+    DistributionApplyError,
     DistributionOperation,
     DistributionRootIdentity,
+    DistributionStageOwnership,
+    _rename_distribution_no_replace,
     admit_distribution_operation,
     apply_distribution_plan,
     build_distribution_plan,
@@ -40,15 +51,13 @@ if TYPE_CHECKING:
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
+_MANAGED_SCAFFOLD_ROOTS = tuple(Path(_SPEC_DOCK_DIRNAME) / name for name in _MANAGED_DIRS)
+_GENERATED_STATE_ROOTS = (Path("spec-dock/active"), Path("spec-dock/.agent"))
 # Keep managed skill installation aligned with the shipped Target catalog.
 _MANAGED_SKILL_NAMES = (
     "spec-dock",
     "spec-dock-grill-with-docs",
 )
-_COLLISION_AWARE_ADDITIVE_SKILL_NAMES = frozenset({
-    "spec-dock",
-    "spec-dock-grill-with-docs",
-})
 _MANAGED_OBSOLETE_EXACT_PATH_PREFIXES = (
     ".agents/skills/",
     ".agents/host-adapters/",
@@ -61,6 +70,37 @@ _UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
 _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _DISTRIBUTION_RETRY_MARKER_PAYLOAD_VERSION = 1
 _DISTRIBUTION_RETRY_MARKER_PURPOSE = "distribution-rerun"
+_DISTRIBUTION_CWD_LOCK = threading.RLock()
+
+
+@contextmanager
+def _exclusive_distribution_operation(target_root: Path) -> Iterator[DistributionRootIdentity]:
+    """Serialize installer mutations for one repository root without a lock file."""
+
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if fcntl is None or not nofollow or not directory:
+        raise RuntimeError("platform lacks required no-follow operation lock support")
+    fd = os.open(target_root, os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0))
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        locked = os.fstat(fd)
+        try:
+            visible = os.lstat(target_root)
+        except OSError as exc:
+            raise RuntimeError("distribution target root changed while acquiring operation lock") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or not stat.S_ISDIR(locked.st_mode)
+            or (visible.st_dev, visible.st_ino) != (locked.st_dev, locked.st_ino)
+        ):
+            raise RuntimeError("distribution target root changed while acquiring operation lock")
+        yield DistributionRootIdentity(device=locked.st_dev, inode=locked.st_ino)
+    finally:
+        with suppress(OSError):
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 @contextmanager
@@ -87,10 +127,10 @@ def _tool_version() -> str:
     return match.group(1) if match else __version__
 
 
-def _admit_distribution_cli(target_root: Path, *, operation: DistributionOperation) -> None:
+def _admit_distribution_cli(target_root: Path, *, operation: DistributionOperation) -> DistributionAdmission:
     """Run version/marker admission before any installer mutation."""
     with _assets_dir() as assets_dir:
-        admit_distribution_operation(
+        return admit_distribution_operation(
             target_root,
             operation=operation,
             package_version=_tool_version(),
@@ -119,10 +159,33 @@ def _require_specdock(target_root: Path) -> Path:
     return specdock_dir
 
 
-def _copy_file(src: Path, dest: Path) -> None:
-    """Copy a file while creating parent directories."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
+def _assert_root_workbench_parent_safe(specdock_dir: Path) -> None:
+    """Reject a Fresh root Workbench parent that can redirect writes."""
+    workbench_dir = specdock_dir / ".workbench"
+    try:
+        parent_info = os.lstat(workbench_dir)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise RuntimeError("managed root Workbench boundary cannot be inspected safely") from exc
+    if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_nlink < 1:
+        raise RuntimeError("managed root Workbench boundary is not a safe directory")
+
+
+def _assert_root_workbench_seed_target_safe(specdock_dir: Path) -> None:
+    """Reject symlinked or pre-existing Fresh root Workbench seed boundaries."""
+    _assert_root_workbench_parent_safe(specdock_dir)
+    workbench_dir = specdock_dir / ".workbench"
+    target = workbench_dir / "README.md"
+    try:
+        target_info = os.lstat(target)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise RuntimeError("managed root Workbench seed target cannot be inspected safely") from exc
+    if stat.S_ISLNK(target_info.st_mode) or not stat.S_ISREG(target_info.st_mode) or target_info.st_nlink != 1:
+        raise RuntimeError("managed root Workbench seed target is not a safe regular file")
+    raise RuntimeError("managed root Workbench seed target already exists; preserve-and-block")
 
 
 def _is_generated_python_cache_path(path: Path) -> bool:
@@ -133,12 +196,45 @@ def _ignore_generated_python_caches(_dir: str, names: list[str]) -> set[str]:
     return {name for name in names if name == "__pycache__" or name.endswith(".pyc")}
 
 
+def _ignore_retired_scaffold_entries(directory: str, names: list[str]) -> set[str]:
+    """Exclude retired scaffold entries before they reach a consumer tree."""
+    ignored = _ignore_generated_python_caches(directory, names)
+    path = Path(directory)
+    if path.name == "scripts":
+        ignored.update(name for name in names if name.startswith("spec-dock-close") and name.endswith(".sh"))
+    if "templates" not in path.parts:
+        return ignored
+    templates_index = len(path.parts) - 1 - path.parts[::-1].index("templates")
+    relative_parts = path.parts[templates_index + 1 :]
+    if not relative_parts:
+        ignored.update({"requirement.md", "design.md", "plan.md", "report.md"} & set(names))
+    if len(relative_parts) == 1 and relative_parts[0] in {"initiative", "epic", "issue"}:
+        ignored.update({"adrs", "artifacts", "deps.json"} & set(names))
+    ignored.update({"current", "completed"} & set(names))
+    return ignored
+
+
 class _ManagedPathIdentity(NamedTuple):
     """No-follow identity captured for one managed scaffold boundary."""
 
     device: int
     inode: int
     ctime_ns: int
+
+
+class _ManagedFileIdentity(NamedTuple):
+    """No-follow identity and content digest for one managed scaffold file."""
+
+    device: int
+    inode: int
+    ctime_ns: int
+    link_count: int
+    mode: int
+    sha256: str
+
+
+def _is_root_workbench_seed_path(path: Path) -> bool:
+    return path.name == "README.md" and path.parent.name == ".workbench" and path.parent.parent.name == "spec-dock"
 
 
 def _managed_path_identity(path: Path) -> _ManagedPathIdentity:
@@ -149,6 +245,85 @@ def _managed_path_identity(path: Path) -> _ManagedPathIdentity:
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or info.st_nlink < 1:
         raise RuntimeError(f"managed scaffold target is not a safe directory: {path}")
     return _ManagedPathIdentity(info.st_dev, info.st_ino, info.st_ctime_ns)
+
+
+def _managed_file_identity(path: Path, *, allow_hard_link: bool = False) -> _ManagedFileIdentity | None:
+    """Capture one regular file without following the final path component."""
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file cannot be inspected safely") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or (not allow_hard_link and info.st_nlink != 1):
+        raise RuntimeError("managed scaffold file is not a safe regular file")
+
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed scaffold file no-follow support is unavailable")
+    try:
+        fd = os.open(path, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0))
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file cannot be opened safely") from exc
+    try:
+        opened = os.fstat(fd)
+        if (
+            opened.st_dev != info.st_dev
+            or opened.st_ino != info.st_ino
+            or opened.st_ctime_ns != info.st_ctime_ns
+            or (not allow_hard_link and opened.st_nlink != 1)
+            or not stat.S_ISREG(opened.st_mode)
+        ):
+            raise RuntimeError("managed scaffold file identity changed")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1024 * 64)
+            if not chunk:
+                break
+            digest.update(chunk)
+        return _ManagedFileIdentity(
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_ctime_ns,
+            opened.st_nlink,
+            stat.S_IMODE(opened.st_mode),
+            digest.hexdigest(),
+        )
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file cannot be read safely") from exc
+    finally:
+        os.close(fd)
+
+
+def _root_workbench_seed_decision(specdock_dir: Path, source: Path) -> bool:
+    """Classify the Fresh root Workbench seed without following user paths."""
+    _assert_root_workbench_parent_safe(specdock_dir)
+    target = specdock_dir / ".workbench" / "README.md"
+    target_identity = _managed_file_identity(target, allow_hard_link=True)
+    if target_identity is None:
+        return True
+
+    try:
+        source_info = os.lstat(source)
+    except OSError as exc:
+        raise RuntimeError("managed root Workbench seed source cannot be inspected safely") from exc
+    if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISREG(source_info.st_mode) or source_info.st_nlink != 1:
+        raise RuntimeError("managed root Workbench seed source is not a safe regular file")
+    source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    if target_identity.sha256 != source_digest or target_identity.mode != stat.S_IMODE(source_info.st_mode):
+        raise RuntimeError("managed root Workbench seed target has unknown content; preserve-and-block")
+    return False
+
+
+def _assert_managed_file_identity(
+    path: Path,
+    expected: _ManagedFileIdentity | None,
+    *,
+    allow_hard_link: bool = False,
+) -> None:
+    """Reject a managed file that appeared or changed after preflight."""
+    if _managed_file_identity(path, allow_hard_link=allow_hard_link) != expected:
+        raise RuntimeError("managed scaffold file identity changed")
 
 
 def _assert_managed_path_identity(path: Path, expected: _ManagedPathIdentity | None) -> None:
@@ -162,53 +337,360 @@ def _assert_managed_path_identity(path: Path, expected: _ManagedPathIdentity | N
         raise RuntimeError(f"managed scaffold target identity changed: {path}")
 
 
+def _assert_managed_scaffold_tree_safe(specdock_dir: Path) -> None:
+    """Reject unsafe entries before a managed scaffold tree replacement."""
+    for name in _MANAGED_DIRS:
+        managed_dir = specdock_dir / name
+        try:
+            root_info = os.lstat(managed_dir)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise RuntimeError(f"managed scaffold target cannot be inspected safely: {managed_dir}") from exc
+        if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+            raise RuntimeError(f"managed scaffold target is not a safe directory: {managed_dir}")
+
+        def fail_incomplete_walk(exc: OSError, managed_path: Path = managed_dir) -> NoReturn:
+            raise RuntimeError(f"managed scaffold target cannot be inspected safely: {managed_path}") from exc
+
+        for current_root, dir_names, file_names in os.walk(
+            managed_dir,
+            topdown=True,
+            followlinks=False,
+            onerror=fail_incomplete_walk,
+        ):
+            current = Path(current_root)
+            for entry_name in (*dir_names, *file_names):
+                entry = current / entry_name
+                try:
+                    info = os.lstat(entry)
+                except OSError as exc:
+                    raise RuntimeError(f"managed scaffold target cannot be inspected safely: {entry}") from exc
+                if stat.S_ISLNK(info.st_mode):
+                    raise RuntimeError(f"managed scaffold target contains symlinked entry: {entry}")
+                if stat.S_ISREG(info.st_mode):
+                    if info.st_nlink != 1:
+                        raise RuntimeError(f"managed scaffold target contains hard-linked file: {entry}")
+                elif not stat.S_ISDIR(info.st_mode):
+                    raise RuntimeError(f"managed scaffold target contains special entry: {entry}")
+
+
+def _assert_managed_scaffold_file_identities(
+    expected_identities: dict[Path, _ManagedFileIdentity | None] | None,
+    *,
+    root: Path | None = None,
+) -> None:
+    """Revalidate every exact scaffold file before a recursive replacement."""
+    if expected_identities is None:
+        return
+    root_absolute = root.absolute() if root is not None else None
+    for path, expected in expected_identities.items():
+        if root_absolute is not None and not path.absolute().is_relative_to(root_absolute):
+            continue
+        _assert_managed_file_identity(
+            path,
+            expected,
+            allow_hard_link=_is_root_workbench_seed_path(path),
+        )
+
+
+def _managed_directory_flags() -> int:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if not isinstance(nofollow, int) or not isinstance(directory, int):
+        raise RuntimeError("managed scaffold no-follow support is unavailable")
+    return os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+
+
+def _assert_bound_directory_visible(parent_fd: int, name: str, directory_fd: int) -> None:
+    """Require a visible directory entry to still name one held directory."""
+    try:
+        visible = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        opened = os.fstat(directory_fd)
+    except OSError as exc:
+        raise RuntimeError("managed scaffold directory identity changed") from exc
+    if (
+        stat.S_ISLNK(visible.st_mode)
+        or not stat.S_ISDIR(visible.st_mode)
+        or not stat.S_ISDIR(opened.st_mode)
+        or (visible.st_dev, visible.st_ino) != (opened.st_dev, opened.st_ino)
+    ):
+        raise RuntimeError("managed scaffold directory identity changed")
+
+
+def _copy_managed_regular_file_at(source: Path, directory_fd: int, name: str) -> None:
+    """Copy one provider file into a held consumer directory without following links."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed scaffold no-follow support is unavailable")
+    try:
+        source_info = os.lstat(source)
+    except OSError as exc:
+        raise RuntimeError("managed scaffold source cannot be inspected safely") from exc
+    if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISREG(source_info.st_mode):
+        raise RuntimeError("managed scaffold source is not a regular file")
+
+    source_fd: int | None = None
+    target_fd: int | None = None
+    target_identity: tuple[int, int] | None = None
+    try:
+        source_fd = os.open(source, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0))
+        opened_source = os.fstat(source_fd)
+        if not stat.S_ISREG(opened_source.st_mode) or (
+            opened_source.st_dev,
+            opened_source.st_ino,
+            opened_source.st_ctime_ns,
+        ) != (source_info.st_dev, source_info.st_ino, source_info.st_ctime_ns):
+            raise RuntimeError("managed scaffold source identity changed")
+
+        mode = stat.S_IMODE(opened_source.st_mode)
+        target_fd = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+            mode,
+            dir_fd=directory_fd,
+        )
+        opened_target = os.fstat(target_fd)
+        if not stat.S_ISREG(opened_target.st_mode) or opened_target.st_nlink != 1:
+            raise RuntimeError("managed scaffold target is not a safe regular file")
+        target_identity = (opened_target.st_dev, opened_target.st_ino)
+
+        while True:
+            chunk = os.read(source_fd, 1024 * 64)
+            if not chunk:
+                break
+            view = memoryview(chunk)
+            while view:
+                written = os.write(target_fd, view)
+                if written <= 0:
+                    raise RuntimeError("managed scaffold file write made no progress")
+                view = view[written:]
+        os.fchmod(target_fd, mode)
+        os.fsync(target_fd)
+
+        visible = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISREG(visible.st_mode)
+            or visible.st_nlink != 1
+            or (visible.st_dev, visible.st_ino) != target_identity
+        ):
+            raise RuntimeError("managed scaffold target identity changed")
+    except FileExistsError as exc:
+        raise RuntimeError("managed scaffold target appeared during copy") from exc
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file could not be copied safely") from exc
+    finally:
+        if target_fd is not None:
+            with suppress(OSError):
+                os.close(target_fd)
+        if source_fd is not None:
+            with suppress(OSError):
+                os.close(source_fd)
+
+
+def _copy_managed_directory_contents(source: Path, parent_fd: int, name: str) -> None:
+    """Create and populate one consumer directory through held descriptors."""
+    try:
+        source_info = os.lstat(source)
+    except OSError as exc:
+        raise RuntimeError("managed scaffold source cannot be inspected safely") from exc
+    if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISDIR(source_info.st_mode):
+        raise RuntimeError("managed scaffold source is not a directory")
+
+    try:
+        os.mkdir(name, stat.S_IMODE(source_info.st_mode), dir_fd=parent_fd)
+    except FileExistsError as exc:
+        raise RuntimeError("managed scaffold target appeared during copy") from exc
+    except OSError as exc:
+        raise RuntimeError("managed scaffold directory could not be created safely") from exc
+
+    directory_fd: int | None = None
+    try:
+        directory_fd = os.open(name, _managed_directory_flags(), dir_fd=parent_fd)
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+        source_entries = sorted(source.iterdir(), key=lambda entry: entry.name)
+        names = [entry.name for entry in source_entries]
+        ignored = _ignore_retired_scaffold_entries(str(source), names)
+        for source_entry in source_entries:
+            entry_name = source_entry.name
+            if entry_name in ignored:
+                continue
+            _assert_bound_directory_visible(parent_fd, name, directory_fd)
+            try:
+                entry_info = os.lstat(source_entry)
+            except OSError as exc:
+                raise RuntimeError("managed scaffold source cannot be inspected safely") from exc
+            if stat.S_ISDIR(entry_info.st_mode) and not stat.S_ISLNK(entry_info.st_mode):
+                _copy_managed_directory_contents(source_entry, directory_fd, entry_name)
+            elif stat.S_ISREG(entry_info.st_mode) and not stat.S_ISLNK(entry_info.st_mode):
+                _copy_managed_regular_file_at(source_entry, directory_fd, entry_name)
+            else:
+                raise RuntimeError("managed scaffold source contains an unsafe entry")
+        os.fchmod(directory_fd, stat.S_IMODE(source_info.st_mode))
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+    finally:
+        if directory_fd is not None:
+            with suppress(OSError):
+                os.close(directory_fd)
+
+
+def _copy_managed_scaffold_tree(source: Path, destination: Path) -> None:
+    """Copy one managed scaffold root through a no-follow parent chain."""
+    parent_chain = _open_managed_parent_chain(destination)
+    try:
+        _assert_managed_parent_chain_visible(destination, parent_chain)
+        _copy_managed_directory_contents(source, parent_chain[-1], destination.name)
+        _assert_managed_parent_chain_visible(destination, parent_chain)
+    finally:
+        for opened_fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(opened_fd)
+
+
 def _sync_tree(
     src: Path,
     dest: Path,
     *,
     expected_identity: _ManagedPathIdentity | None = None,
     identity_checked: bool = False,
+    target_root: Path | None = None,
+    expected_root_identity: DistributionRootIdentity | None = None,
 ) -> None:
     """Replace `dest` directory with a full copy of `src`."""
     if expected_identity is not None or identity_checked:
         _assert_managed_path_identity(dest, expected_identity)
     if dest.exists():
-        shutil.rmtree(dest)
-    shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
+        if expected_identity is None or target_root is None:
+            raise RuntimeError("managed scaffold replacement requires a bound directory identity")
+        _remove_managed_scaffold_tree(
+            target_root,
+            dest,
+            expected_identity=expected_identity,
+            expected_root_identity=expected_root_identity,
+        )
+    _copy_managed_scaffold_tree(src, dest)
+
+
+def _chmod_managed_regular_file(path: Path, *, add: int = 0, remove: int = 0) -> None:
+    """Change one managed file mode through a held no-follow parent chain."""
+    parent_chain = _open_managed_parent_chain(path)
+    parent_fd = parent_chain[-1]
+    file_fd: int | None = None
+    try:
+        _assert_managed_parent_chain_visible(path, parent_chain)
+        try:
+            before = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RuntimeError("managed scaffold mode target is not a safe regular file")
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise RuntimeError("managed scaffold no-follow support is unavailable")
+        file_fd = os.open(
+            path.name,
+            os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(file_fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino, opened.st_ctime_ns) != (before.st_dev, before.st_ino, before.st_ctime_ns)
+        ):
+            raise RuntimeError("managed scaffold mode target identity changed")
+        os.fchmod(file_fd, (stat.S_IMODE(opened.st_mode) | add) & ~remove)
+        current = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(current.st_mode)
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
+        ):
+            raise RuntimeError("managed scaffold mode target identity changed")
+    except OSError as exc:
+        raise RuntimeError("managed scaffold mode could not be changed safely") from exc
+    finally:
+        if file_fd is not None:
+            with suppress(OSError):
+                os.close(file_fd)
+        for opened_fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(opened_fd)
 
 
 def _make_executable(path: Path) -> None:
-    """Best-effort: add executable bits to a file."""
+    """Add executable bits without following a replaced managed path."""
+    _chmod_managed_regular_file(path, add=0o111)
+
+
+def _make_readonly_directory_at(parent_fd: int, name: str) -> None:
+    directory_fd = os.open(name, _managed_directory_flags(), dir_fd=parent_fd)
     try:
-        mode = path.stat().st_mode
-        path.chmod(mode | 0o111)
-    except OSError:
-        # Best-effort only.
-        return
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+        # pathlib cannot enumerate a held directory descriptor.
+        for entry_name in sorted(os.listdir(directory_fd)):  # noqa: PTH208
+            _assert_bound_directory_visible(parent_fd, name, directory_fd)
+            info = os.stat(entry_name, dir_fd=directory_fd, follow_symlinks=False)
+            if stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode):
+                _make_readonly_directory_at(directory_fd, entry_name)
+            elif stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode):
+                if info.st_nlink != 1:
+                    raise RuntimeError("managed readonly target is hard-linked")
+                nofollow = getattr(os, "O_NOFOLLOW", None)
+                if not isinstance(nofollow, int):
+                    raise RuntimeError("managed scaffold no-follow support is unavailable")
+                file_fd = os.open(
+                    entry_name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=directory_fd,
+                )
+                try:
+                    opened = os.fstat(file_fd)
+                    if (
+                        not stat.S_ISREG(opened.st_mode)
+                        or opened.st_nlink != 1
+                        or (opened.st_dev, opened.st_ino, opened.st_ctime_ns)
+                        != (info.st_dev, info.st_ino, info.st_ctime_ns)
+                    ):
+                        raise RuntimeError("managed readonly target identity changed")
+                    os.fchmod(file_fd, stat.S_IMODE(opened.st_mode) & ~0o222)
+                    visible = os.stat(entry_name, dir_fd=directory_fd, follow_symlinks=False)
+                    if (
+                        stat.S_ISLNK(visible.st_mode)
+                        or not stat.S_ISREG(visible.st_mode)
+                        or visible.st_nlink != 1
+                        or (visible.st_dev, visible.st_ino) != (opened.st_dev, opened.st_ino)
+                    ):
+                        raise RuntimeError("managed readonly target identity changed")
+                finally:
+                    os.close(file_fd)
+            else:
+                raise RuntimeError("managed readonly tree contains an unsafe entry")
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+    except OSError as exc:
+        raise RuntimeError("managed readonly tree could not be changed safely") from exc
+    finally:
+        os.close(directory_fd)
 
 
 def _make_readonly_tree(path: Path) -> None:
-    """Best-effort: remove write bits from files under `path`.
-
-    Notes:
-    - This is best-effort only; permissions vary by OS/FS.
-    - On Windows, making files read-only can interfere with later removal on update,
-      so we skip it there.
-    """
+    """Remove write bits without following replaced managed paths."""
     if os.name == "nt":
         return
-    if not path.exists():
-        return
-
-    for p in path.rglob("*"):
-        if not p.is_file():
-            continue
+    parent_chain = _open_managed_parent_chain(path)
+    try:
+        _assert_managed_parent_chain_visible(path, parent_chain)
         try:
-            mode = p.stat().st_mode
-            p.chmod(mode & ~0o222)
-        except OSError:
-            # Best-effort only.
-            continue
+            _make_readonly_directory_at(parent_chain[-1], path.name)
+        except FileNotFoundError:
+            return
+        _assert_managed_parent_chain_visible(path, parent_chain)
+    finally:
+        for opened_fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(opened_fd)
 
 
 def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
@@ -222,7 +704,11 @@ def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
 def _write_active_pathfile(active_dir: Path, name: str, target: Path) -> None:
     """Write `active/<name>.path` as symlink fallback."""
     rel_target = os.path.relpath(target, start=active_dir)
-    (active_dir / f"{name}.path").write_text(rel_target + "\n", encoding="utf-8")
+    _write_atomic_regular_file(
+        active_dir / f"{name}.path",
+        (rel_target + "\n").encode("utf-8"),
+        mode=0o644,
+    )
 
 
 def _normalize_active_manifest_entry_id(entry: object) -> str | None:
@@ -637,14 +1123,23 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
                 if link.is_symlink() or link.is_file():
                     link.unlink(missing_ok=True)
                 elif link.is_dir():
-                    with suppress(OSError):
-                        shutil.rmtree(link)
+                    with suppress(OSError, RuntimeError):
+                        target_root = specdock_dir.parent
+                        rel_path = link.absolute().relative_to(target_root.absolute())
+                        if rel_path.parts != (_SPEC_DOCK_DIRNAME, "active", layer):
+                            raise RuntimeError("active fallback path is outside the generated boundary")
+                        _remove_bound_directory_tree(
+                            target_root,
+                            rel_path,
+                            expected_identity=_managed_path_identity(link),
+                            expected_root_identity=_distribution_root_identity(target_root),
+                        )
             if link.exists() or link.is_symlink():
                 continue
-            if pathfile.exists():
+            if pathfile.exists() or pathfile.is_symlink():
                 with suppress(OSError):
                     pathfile.unlink()
-            if pathfile.exists():
+            if pathfile.exists() or pathfile.is_symlink():
                 continue
 
         # If `.path` exists but does not resolve to a valid active entrypoint,
@@ -653,11 +1148,11 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             if link.is_symlink():
                 with suppress(OSError):
                     link.unlink()
-            if pathfile.exists():
+            if pathfile.exists() or pathfile.is_symlink():
                 with suppress(OSError):
                     pathfile.unlink()
 
-        if link.exists() or link.is_symlink() or pathfile.exists():
+        if link.exists() or link.is_symlink() or pathfile.exists() or pathfile.is_symlink():
             continue
 
         rel_target = os.path.relpath(desired_target, start=active_dir)
@@ -684,13 +1179,19 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
         issue_id=resolved_ids["issue"],
     )
     current_context_pack: str | None = None
-    if context_pack_path.exists():
+    if context_pack_path.exists() or context_pack_path.is_symlink():
         try:
-            current_context_pack = context_pack_path.read_text(encoding="utf-8")
+            context_pack_info = os.lstat(context_pack_path)
+            if stat.S_ISREG(context_pack_info.st_mode) and context_pack_info.st_nlink == 1:
+                current_context_pack = context_pack_path.read_text(encoding="utf-8")
         except OSError:
             current_context_pack = None
     if current_context_pack != desired_context_pack:
-        context_pack_path.write_text(desired_context_pack, encoding="utf-8")
+        _write_atomic_regular_file(
+            context_pack_path,
+            desired_context_pack.encode("utf-8"),
+            mode=0o644,
+        )
 
 
 def _install_repo_root_shortcut(target_root: Path) -> None:
@@ -710,107 +1211,336 @@ def _install_repo_root_shortcut(target_root: Path) -> None:
         print(f"spec-dock: (warn) failed to create repo-root shortcut symlink: {dest}: {e}", file=sys.stderr)
 
 
-def _prune_legacy_scaffold(specdock_dir: Path) -> None:
-    """Remove known legacy (v1) artifacts from generated scaffolding.
+def _retry_unpublished_atomic_regular_file(
+    temporary: Path,
+    destination: Path,
+    payload: bytes,
+    *,
+    mode: int,
+    expected_identity: tuple[int, int],
+) -> tuple[bool, bool]:
+    """Retry one failed no-replace publication while retaining temp ownership."""
+    parent = temporary.parent
+    try:
+        parent_info = os.lstat(parent)
+        if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
+            return False, False
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            return False, False
+        parent_fd = os.open(
+            parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | nofollow | getattr(os, "O_CLOEXEC", 0),
+        )
+    except OSError:
+        return False, False
+    fd: int | None = None
+    try:
+        parent_current = os.fstat(parent_fd)
+        if (
+            stat.S_ISLNK(parent_current.st_mode)
+            or not stat.S_ISDIR(parent_current.st_mode)
+            or (parent_current.st_dev, parent_current.st_ino) != (parent_info.st_dev, parent_info.st_ino)
+        ):
+            return False, False
+        temporary_info = os.stat(temporary.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(temporary_info.st_mode)
+            or not stat.S_ISREG(temporary_info.st_mode)
+            or temporary_info.st_nlink != 1
+            or (temporary_info.st_dev, temporary_info.st_ino) != expected_identity
+        ):
+            return False, False
+        try:
+            os.stat(destination.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return False, False
+        else:
+            return False, False
 
-    Why this exists:
-    - Some local clones may contain a stale `build/` directory from older versions.
-    - When building a wheel, setuptools can accidentally carry those stale files into the package.
-    - This makes `spec-dock init/update` resilient by removing legacy artifacts after copying.
+        # Open without truncation so a race replacement is only inspected by
+        # fstat; truncate the held descriptor only after its identity matches.
+        flags = os.O_WRONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(temporary.name, flags, dir_fd=parent_fd)
+        current = os.fstat(fd)
+        if (
+            stat.S_ISLNK(current.st_mode)
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or (current.st_dev, current.st_ino) != expected_identity
+        ):
+            return False, False
+        os.ftruncate(fd, 0)
+        os.fchmod(fd, mode)
+        view = memoryview(payload)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                return False, False
+            view = view[written:]
+        os.fsync(fd)
+        os.close(fd)
+        fd = None
 
-    Scope:
-    - Only touches generated scaffolding files (legacy scripts/templates/workflow/symlinks).
-    - Never deletes user-authored specs under `spec-dock/initiatives/**`.
-    """
-    scripts_dir = specdock_dir / "scripts"
-    for p in scripts_dir.glob("spec-dock-close*.sh"):
-        p.unlink(missing_ok=True)
-
-    templates_dir = specdock_dir / "templates"
-
-    preserved_readmes = {
-        Path("README.md"),
-        Path("root/.workbench/README.md"),
-        Path("initiative/.workbench/README.md"),
-        Path("epic/.workbench/README.md"),
-        Path("issue/.workbench/README.md"),
-    }
-
-    # Defensive: node templates should not generate unrecognized nested README.md files.
-    # These can reappear if a local clone has stale `build/` artifacts that get packaged.
-    for p in templates_dir.rglob("README.md"):
-        if p.relative_to(templates_dir) in preserved_readmes:
-            continue
-        p.unlink(missing_ok=True)
-
-    # Legacy node templates used per-scope `adrs/` and `artifacts/`; prune only those nested scopes.
-    for scope in ("initiative", "epic", "issue"):
-        for legacy_dir in ("adrs", "artifacts"):
-            d = templates_dir / scope / legacy_dir
-            if d.is_dir():
-                shutil.rmtree(d, ignore_errors=True)
-
-    # v1 used top-level templates/*.md; v2 uses templates/{initiative,epic,issue}/.
-    for name in ("requirement.md", "design.md", "plan.md", "report.md"):
-        (templates_dir / name).unlink(missing_ok=True)
-
-    # v1-era package contamination can leak template-scoped deps.json files.
-    for scope in ("initiative", "epic", "issue"):
-        (templates_dir / scope / "deps.json").unlink(missing_ok=True)
-
-    # v1 used nested `current/` and `completed/` directories under templates.
-    for dirname in ("current", "completed"):
-        for d in sorted(templates_dir.rglob(dirname), key=lambda x: len(str(x)), reverse=True):
-            if d.is_dir():
-                shutil.rmtree(d, ignore_errors=True)
-
-    # v1 installed a workflow that moved `current/` -> `completed/` on issue close.
-    legacy_workflow = specdock_dir.parent / ".github" / "workflows" / "spec-dock-close.yml"
-    legacy_workflow.unlink(missing_ok=True)
-
-    # v1 created root-level symlinks as shortcuts. v2 uses `spec-dock/active/`,
-    # so these are always safe to remove when they are symlinks (never delete real dirs).
-    for name in ("current-initiative", "current-epic", "current-issue"):
-        p = specdock_dir / name
-        if p.is_symlink():
-            p.unlink(missing_ok=True)
-
-    # v2 used a `.path` fallback briefly during development; prune if present.
-    for name in ("current-initiative.path", "current-epic.path", "current-issue.path"):
-        (specdock_dir / name).unlink(missing_ok=True)
+        try:
+            os.stat(destination.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return False, False
+        else:
+            return False, False
+        _rename_distribution_no_replace(parent_fd, temporary.name, parent_fd, destination.name)
+        return True, True
+    except OSError:
+        return False, False
+    finally:
+        if fd is not None:
+            with suppress(OSError):
+                os.close(fd)
+        with suppress(OSError):
+            os.close(parent_fd)
 
 
-def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None:
-    """Write one managed regular file without following a destination link."""
-    parent = path.parent
+def _publish_new_atomic_regular_file(temporary: Path, destination: Path) -> None:
+    """Move a new regular file into place without replacing a race winner."""
+    parent = temporary.parent
     try:
         parent_info = os.lstat(parent)
     except OSError as exc:
         raise RuntimeError("managed file parent cannot be inspected safely") from exc
     if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
         raise RuntimeError("managed file parent must be a real directory")
-
-    existing: os.stat_result | None
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed file parent cannot be opened safely")
     try:
-        existing = os.lstat(path)
+        parent_fd = os.open(
+            parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | nofollow | getattr(os, "O_CLOEXEC", 0),
+        )
+    except OSError as exc:
+        raise RuntimeError("managed file parent cannot be opened safely") from exc
+    try:
+        current_parent = os.fstat(parent_fd)
+        if (
+            stat.S_ISLNK(current_parent.st_mode)
+            or not stat.S_ISDIR(current_parent.st_mode)
+            or (current_parent.st_dev, current_parent.st_ino) != (parent_info.st_dev, parent_info.st_ino)
+        ):
+            raise RuntimeError("managed file parent identity changed")
+        _rename_distribution_no_replace(parent_fd, temporary.name, parent_fd, destination.name)
+    finally:
+        with suppress(OSError):
+            os.close(parent_fd)
+
+
+def _open_managed_parent_chain(path: Path) -> tuple[int, ...]:
+    """Open every parent component without following symlinks."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if not isinstance(nofollow, int) or not isinstance(directory, int):
+        raise RuntimeError("managed file parent no-follow support is unavailable")
+    flags = os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+    anchor = Path(path.anchor) if path.is_absolute() else Path()
+    components = path.parent.parts[1:] if path.is_absolute() else path.parent.parts
+    fds: list[int] = []
+    try:
+        fds.append(os.open(anchor, flags))
+        for component in components:
+            if component in ("", "."):
+                continue
+            if component == "..":
+                raise RuntimeError("managed file parent escapes the bound root")
+            next_fd = os.open(component, flags, dir_fd=fds[-1])
+            opened = os.fstat(next_fd)
+            if not stat.S_ISDIR(opened.st_mode):
+                os.close(next_fd)
+                raise RuntimeError("managed file parent must be a real directory")
+            fds.append(next_fd)
+        return tuple(fds)
+    except (OSError, RuntimeError) as exc:
+        for opened_fd in reversed(fds):
+            with suppress(OSError):
+                os.close(opened_fd)
+        if isinstance(exc, RuntimeError):
+            raise
+        raise RuntimeError("managed file parent cannot be opened safely") from exc
+
+
+def _assert_managed_parent_chain_visible(path: Path, fds: tuple[int, ...]) -> None:
+    """Reject a parent component that was rebound after descriptor opening."""
+    components = path.parent.parts[1:] if path.is_absolute() else path.parent.parts
+    components = tuple(component for component in components if component not in ("", "."))
+    if len(fds) != len(components) + 1:
+        raise RuntimeError("managed file parent identity changed")
+    for index, component in enumerate(components):
+        try:
+            visible = os.stat(component, dir_fd=fds[index], follow_symlinks=False)
+            opened = os.fstat(fds[index + 1])
+        except OSError as exc:
+            raise RuntimeError("managed file parent identity changed") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or not stat.S_ISDIR(opened.st_mode)
+            or (visible.st_dev, visible.st_ino) != (opened.st_dev, opened.st_ino)
+        ):
+            raise RuntimeError("managed file parent identity changed")
+
+
+def _managed_file_identity_at(parent_fd: int, name: str) -> _ManagedFileIdentity | None:
+    """Capture a regular file relative to one held parent descriptor."""
+    try:
+        info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
     except FileNotFoundError:
-        existing = None
+        return None
     except OSError as exc:
         raise RuntimeError("managed file cannot be inspected safely") from exc
-    if existing is not None and (
-        stat.S_ISLNK(existing.st_mode) or not stat.S_ISREG(existing.st_mode) or existing.st_nlink != 1
-    ):
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
         raise RuntimeError("managed file destination is not a safe regular file")
-
-    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=parent)
-    temporary = Path(temporary_name)
-    # `mkstemp` returns an absolute pathname even when `parent` is relative.
-    # Keep the staging reference relative while a root-bound caller holds the
-    # opened directory, otherwise a root rename would make the absolute name
-    # point at the now-empty original pathname.
-    temporary_ref = parent / temporary.name if not parent.is_absolute() else temporary
-    closed = False
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed file no-follow support is unavailable")
     try:
+        fd = os.open(name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
+    except OSError as exc:
+        raise RuntimeError("managed file cannot be opened safely") from exc
+    try:
+        opened = os.fstat(fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_dev != info.st_dev
+            or opened.st_ino != info.st_ino
+            or opened.st_ctime_ns != info.st_ctime_ns
+        ):
+            raise RuntimeError("managed file destination identity changed")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1024 * 64)
+            if not chunk:
+                break
+            digest.update(chunk)
+        return _ManagedFileIdentity(
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_ctime_ns,
+            opened.st_nlink,
+            stat.S_IMODE(opened.st_mode),
+            digest.hexdigest(),
+        )
+    finally:
+        os.close(fd)
+
+
+def _retry_unpublished_atomic_regular_file_at(
+    parent_fd: int,
+    temporary_name: str,
+    destination_name: str,
+    payload: bytes,
+    *,
+    mode: int,
+    expected_identity: tuple[int, int],
+) -> bool:
+    """Retry a failed new-file publication through its held parent."""
+    fd: int | None = None
+    try:
+        temporary_info = os.stat(temporary_name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(temporary_info.st_mode)
+            or not stat.S_ISREG(temporary_info.st_mode)
+            or temporary_info.st_nlink != 1
+            or (temporary_info.st_dev, temporary_info.st_ino) != expected_identity
+        ):
+            return False
+        try:
+            os.stat(destination_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            return False
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            return False
+        fd = os.open(
+            temporary_name,
+            os.O_WRONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino) != expected_identity
+        ):
+            return False
+        os.ftruncate(fd, 0)
+        os.fchmod(fd, mode)
+        view = memoryview(payload)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                return False
+            view = view[written:]
+        os.fsync(fd)
+        os.close(fd)
+        fd = None
+        try:
+            os.stat(destination_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            return False
+        _rename_distribution_no_replace(parent_fd, temporary_name, parent_fd, destination_name)
+        return True
+    except OSError:
+        return False
+    finally:
+        if fd is not None:
+            with suppress(OSError):
+                os.close(fd)
+
+
+def _write_atomic_regular_file(
+    path: Path,
+    payload: bytes,
+    *,
+    mode: int,
+    expected_identity: _ManagedFileIdentity | None = None,
+    identity_checked: bool = False,
+) -> None:
+    """Write one managed regular file through a held no-follow parent chain."""
+    parent_chain = _open_managed_parent_chain(path)
+    parent_fd = parent_chain[-1]
+    temporary_name: str | None = None
+    temporary_identity: tuple[int, int] | None = None
+    existing_identity: _ManagedFileIdentity | None = None
+    fd: int | None = None
+    try:
+        _assert_managed_parent_chain_visible(path, parent_chain)
+        existing_identity = _managed_file_identity_at(parent_fd, path.name)
+        if identity_checked and existing_identity != expected_identity:
+            raise RuntimeError("managed scaffold file identity changed")
+
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise RuntimeError("managed file no-follow support is unavailable")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0)
+        for _attempt in range(128):
+            candidate_name = f".{path.name}.{secrets.token_hex(12)}"
+            try:
+                fd = os.open(candidate_name, flags, mode, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            temporary_name = candidate_name
+            break
+        if fd is None or temporary_name is None:
+            raise RuntimeError("managed file staging name could not be allocated")
+        temporary_info = os.fstat(fd)
+        temporary_identity = (temporary_info.st_dev, temporary_info.st_ino)
         os.fchmod(fd, mode)
         view = memoryview(payload)
         while view:
@@ -820,34 +1550,65 @@ def _write_atomic_regular_file(path: Path, payload: bytes, *, mode: int) -> None
             view = view[written:]
         os.fsync(fd)
         os.close(fd)
-        closed = True
+        fd = None
 
-        if existing is not None:
-            current = os.lstat(path)
-            if (
-                stat.S_ISLNK(current.st_mode)
-                or not stat.S_ISREG(current.st_mode)
-                or current.st_nlink != 1
-                or current.st_dev != existing.st_dev
-                or current.st_ino != existing.st_ino
-            ):
+        _assert_managed_parent_chain_visible(path, parent_chain)
+        current_identity = _managed_file_identity_at(parent_fd, path.name)
+        if existing_identity is not None:
+            if current_identity != existing_identity:
                 raise RuntimeError("managed file destination identity changed")
-            temporary_ref.replace(path)
+            os.replace(
+                temporary_name,
+                path.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
         else:
-            # A destination that was absent during preflight must not be
-            # replaced if another actor creates it before publication.
-            os.link(temporary_ref, path, follow_symlinks=False)
-            temporary_ref.unlink()
-        temporary = None  # type: ignore[assignment]
-    except OSError as exc:
-        raise RuntimeError("managed file write failed") from exc
-    finally:
-        if not closed:
+            if current_identity is not None:
+                raise RuntimeError("managed file destination appeared")
+            _rename_distribution_no_replace(parent_fd, temporary_name, parent_fd, path.name)
+        temporary_name = None
+    except Exception as exc:
+        if fd is not None:
             with suppress(OSError):
                 os.close(fd)
-        if temporary is not None:
+            fd = None
+        if (
+            existing_identity is None
+            and temporary_name is not None
+            and temporary_identity is not None
+            and _retry_unpublished_atomic_regular_file_at(
+                parent_fd,
+                temporary_name,
+                path.name,
+                payload,
+                mode=mode,
+                expected_identity=temporary_identity,
+            )
+        ):
+            temporary_name = None
+        if isinstance(exc, OSError):
+            raise RuntimeError("managed file write failed") from exc
+        raise
+    finally:
+        if temporary_name is not None and temporary_identity is not None:
+            try:
+                current_temporary = os.stat(temporary_name, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError:
+                current_temporary = None
+            if (
+                current_temporary is not None
+                and (
+                    current_temporary.st_dev,
+                    current_temporary.st_ino,
+                )
+                == temporary_identity
+            ):
+                with suppress(OSError):
+                    os.unlink(temporary_name, dir_fd=parent_fd)
+        for opened_fd in reversed(parent_chain):
             with suppress(OSError):
-                temporary_ref.unlink()
+                os.close(opened_fd)
 
 
 def _distribution_root_identity(target_root: Path) -> DistributionRootIdentity:
@@ -883,38 +1644,42 @@ def _bound_distribution_root(
     replacement of the visible root cannot redirect those relative writes to
     the replacement repository.
     """
-    identity_path = Path(target_root).absolute()
-    bound_identity = expected or _distribution_root_identity(identity_path)
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int) or not hasattr(os, "fchdir"):
-        raise RuntimeError("root-bound distribution operations are unavailable")
-    root_flags = os.O_RDONLY | nofollow | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
-    try:
-        root_fd = os.open(identity_path, root_flags)
-    except OSError as exc:
-        raise RuntimeError("distribution target root cannot be opened safely") from exc
-    cwd_fd: int | None = None
-    try:
-        root_stat = os.fstat(root_fd)
-        if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_nlink < 1:
-            raise RuntimeError("distribution target root is not a real directory")
-        if (root_stat.st_dev, root_stat.st_ino) != (
-            bound_identity.device,
-            bound_identity.inode,
-        ):
-            raise RuntimeError("distribution target root identity changed")
-        cwd_fd = os.open(".", os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
-        os.fchdir(root_fd)
-        _assert_distribution_root_identity(identity_path, bound_identity)
-        yield Path(), identity_path, bound_identity
-    finally:
-        if cwd_fd is not None:
+    # ``cwd`` is process-global, so per-repository flock protection is not
+    # sufficient when two installer operations target different roots in the
+    # same process.  Serialize the complete absolute-path/bind/restore window.
+    with _DISTRIBUTION_CWD_LOCK:
+        identity_path = Path(target_root).absolute()
+        bound_identity = expected or _distribution_root_identity(identity_path)
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int) or not hasattr(os, "fchdir"):
+            raise RuntimeError("root-bound distribution operations are unavailable")
+        root_flags = os.O_RDONLY | nofollow | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+        try:
+            root_fd = os.open(identity_path, root_flags)
+        except OSError as exc:
+            raise RuntimeError("distribution target root cannot be opened safely") from exc
+        cwd_fd: int | None = None
+        try:
+            root_stat = os.fstat(root_fd)
+            if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_nlink < 1:
+                raise RuntimeError("distribution target root is not a real directory")
+            if (root_stat.st_dev, root_stat.st_ino) != (
+                bound_identity.device,
+                bound_identity.inode,
+            ):
+                raise RuntimeError("distribution target root identity changed")
+            cwd_fd = os.open(".", os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
+            os.fchdir(root_fd)
+            _assert_distribution_root_identity(identity_path, bound_identity)
+            yield Path(), identity_path, bound_identity
+        finally:
+            if cwd_fd is not None:
+                with suppress(OSError):
+                    os.fchdir(cwd_fd)
+                with suppress(OSError):
+                    os.close(cwd_fd)
             with suppress(OSError):
-                os.fchdir(cwd_fd)
-            with suppress(OSError):
-                os.close(cwd_fd)
-        with suppress(OSError):
-            os.close(root_fd)
+                os.close(root_fd)
 
 
 def _write_spec_dock_version(
@@ -946,12 +1711,26 @@ def _distribution_retry_marker_path(target_root: Path) -> Path:
     return target_root / _DISTRIBUTION_RETRY_MARKER_REL
 
 
+def _distribution_retry_marker_present(target_root: Path) -> bool:
+    """Detect a published retry marker without following its final path."""
+    try:
+        os.lstat(_distribution_retry_marker_path(target_root))
+    except FileNotFoundError:
+        return False
+    except OSError:
+        # An unreadable or unsafe marker must still be treated as partial state;
+        # the admission path will fail closed on the next invocation.
+        return True
+    return True
+
+
 def _write_distribution_retry_marker(
     target_root: Path,
     *,
     operation: DistributionOperation,
     last_completed_phase: str,
     expected_root_identity: DistributionRootIdentity,
+    stage_ownership: tuple[DistributionStageOwnership, ...] = (),
 ) -> None:
     """Create or atomically advance the init/update forward-retry marker."""
     with _bound_distribution_root(target_root, expected_root_identity) as (bound_root, visible_root, bound_identity):
@@ -976,6 +1755,17 @@ def _write_distribution_retry_marker(
             },
             "last_completed_phase": last_completed_phase,
             "purpose": _DISTRIBUTION_RETRY_MARKER_PURPOSE,
+            "stage_ownership": [
+                {
+                    "path": item.path,
+                    "stage_name": item.stage_name,
+                    "device": item.device,
+                    "inode": item.inode,
+                    "ctime_ns": item.ctime_ns,
+                    "file_type": item.file_type,
+                }
+                for item in stage_ownership
+            ],
         }
         marker_bytes = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
         _write_atomic_regular_file(marker, marker_bytes, mode=0o600)
@@ -990,20 +1780,41 @@ def _remove_distribution_retry_marker(
     """Remove the init/update marker only when it is a safe regular file."""
     with _bound_distribution_root(target_root, expected_root_identity) as (bound_root, visible_root, bound_identity):
         marker = _distribution_retry_marker_path(bound_root)
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise RuntimeError("distribution retry marker no-follow support is unavailable")
+        parent_flags = os.O_RDONLY | nofollow | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+        parent_fd: int | None = None
         try:
-            info = os.lstat(marker)
-        except FileNotFoundError:
-            return
+            parent_fd = os.open(marker.parent.as_posix(), parent_flags)
+            try:
+                info = os.stat(marker.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise RuntimeError("distribution retry marker is not a safe regular file")
+            _assert_distribution_root_identity(visible_root, bound_identity)
+            # Re-observe the marker through the held parent immediately before
+            # unlink so a replacement marker is never removed by pathname.
+            try:
+                current = os.stat(marker.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError as exc:
+                raise RuntimeError("distribution retry marker disappeared before removal") from exc
+            if (current.st_dev, current.st_ino, current.st_mode, current.st_nlink, current.st_ctime_ns) != (
+                info.st_dev,
+                info.st_ino,
+                info.st_mode,
+                info.st_nlink,
+                info.st_ctime_ns,
+            ):
+                raise RuntimeError("distribution retry marker identity changed")
+            os.unlink(marker.name, dir_fd=parent_fd)
         except OSError as exc:
-            raise RuntimeError("distribution retry marker cannot be inspected safely") from exc
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise RuntimeError("distribution retry marker is not a safe regular file")
-        _assert_distribution_root_identity(visible_root, bound_identity)
-        try:
-            marker.unlink()
-        except OSError as exc:
-            raise RuntimeError("distribution retry marker could not be removed") from exc
-        _assert_distribution_root_identity(visible_root, bound_identity)
+            raise RuntimeError("distribution retry marker could not be removed safely") from exc
+        finally:
+            if parent_fd is not None:
+                with suppress(OSError):
+                    os.close(parent_fd)
 
 
 def _install_spec_dock_bound(
@@ -1015,6 +1826,10 @@ def _install_spec_dock_bound(
     expected_root_identity: DistributionRootIdentity | None = None,
     root_identity_path: Path | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    expected_managed_scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] | None = None,
+    expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
+    managed_gitignore_identity_checked: bool = False,
+    seed_root_workbench: bool | None = None,
 ) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
     identity_path = root_identity_path or target_root
@@ -1026,32 +1841,43 @@ def _install_spec_dock_bound(
     guard_root()
     specdock_dir = _specdock_dir(target_root)
     fresh_specdock = not os.path.lexists(specdock_dir)
+    should_seed_root_workbench = fresh_specdock if seed_root_workbench is None else seed_root_workbench
     if specdock_dir.exists() and not force:
         raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'.")
 
     with _assets_dir() as assets_dir:
         src_spec_dock = assets_dir / "spec_dock"
         if not src_spec_dock.is_dir():
-            raise RuntimeError(f"Missing asset directory: {src_spec_dock}")
+            raise RuntimeError("Missing asset directory: spec_dock")
 
         # `.gitignore` is a required shipped asset.  Do not fall back to an
         # embedded copy: a package that omits it is incomplete and must fail
         # before creating or replacing any consumer state.
         src_gitignore = src_spec_dock / ".gitignore"
-        if not src_gitignore.is_file():
-            raise RuntimeError(f"Missing asset file: {src_gitignore}")
+        if not src_gitignore.is_file() or src_gitignore.is_symlink():
+            raise RuntimeError("Missing asset file: spec_dock/.gitignore")
 
         # Preflight all managed scaffold directories before any write.
         managed_scaffold_sync_plan: list[tuple[Path, Path]] = []
         for name in _MANAGED_DIRS:
             src = src_spec_dock / name
             if not src.exists():
-                raise RuntimeError(f"Missing asset directory: {src}")
+                raise RuntimeError(f"Missing asset directory: spec_dock/{name}")
             if not src.is_dir():
-                raise RuntimeError(f"Invalid asset directory: {src}")
+                raise RuntimeError(f"Invalid asset directory: spec_dock/{name}")
             managed_scaffold_sync_plan.append((src, specdock_dir / name))
 
+        root_workbench_readme: Path | None = None
+        if seed_root_workbench is not None:
+            _assert_root_workbench_parent_safe(specdock_dir)
+            if seed_root_workbench:
+                root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
+                if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
+                    raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
+
         guard_root()
+        _assert_managed_scaffold_tree_safe(specdock_dir)
+        _assert_managed_scaffold_file_identities(expected_managed_scaffold_file_identities)
         if expected_managed_scaffold_identities is not None:
             _assert_managed_path_identity(
                 specdock_dir,
@@ -1065,6 +1891,11 @@ def _install_spec_dock_bound(
         # never removed by this installer.
         for src, dest in managed_scaffold_sync_plan:
             guard_root()
+            _assert_managed_scaffold_tree_safe(specdock_dir)
+            _assert_managed_scaffold_file_identities(
+                expected_managed_scaffold_file_identities,
+                root=dest,
+            )
             if expected_managed_scaffold_identities is not None:
                 _assert_managed_path_identity(
                     dest,
@@ -1080,20 +1911,35 @@ def _install_spec_dock_bound(
                         else None
                     ),
                     identity_checked=expected_managed_scaffold_identities is not None,
+                    target_root=target_root,
+                    expected_root_identity=expected_root_identity,
                 )
             else:
-                shutil.copytree(src, dest, ignore=_ignore_generated_python_caches)
+                _copy_managed_scaffold_tree(src, dest)
             guard_root()
 
         guard_root()
-        _copy_file(src_gitignore, specdock_dir / ".gitignore")
+        gitignore_mode = stat.S_IMODE(src_gitignore.stat().st_mode)
+        _write_atomic_regular_file(
+            specdock_dir / ".gitignore",
+            src_gitignore.read_bytes(),
+            mode=gitignore_mode,
+            expected_identity=expected_managed_gitignore_identity,
+            identity_checked=managed_gitignore_identity_checked,
+        )
         guard_root()
 
-        if fresh_specdock:
+        if should_seed_root_workbench:
+            _assert_root_workbench_seed_target_safe(specdock_dir)
+            assert root_workbench_readme is not None
             guard_root()
-            _copy_file(
-                src_spec_dock / "templates" / "root" / ".workbench" / "README.md",
-                specdock_dir / ".workbench" / "README.md",
+            workbench_seed_target = specdock_dir / ".workbench" / "README.md"
+            workbench_seed_target.parent.mkdir(parents=True, exist_ok=True)
+            source_info = os.lstat(root_workbench_readme)
+            _write_atomic_regular_file(
+                workbench_seed_target,
+                root_workbench_readme.read_bytes(),
+                mode=stat.S_IMODE(source_info.st_mode),
             )
             guard_root()
 
@@ -1104,10 +1950,6 @@ def _install_spec_dock_bound(
         (specdock_dir / "active").mkdir(parents=True, exist_ok=True)
         guard_root()
         (specdock_dir / ".agent").mkdir(parents=True, exist_ok=True)
-        guard_root()
-
-        guard_root()
-        _prune_legacy_scaffold(specdock_dir)
         guard_root()
 
         # Ensure runtime scripts are executable (best-effort).
@@ -1150,6 +1992,10 @@ def _install_spec_dock(
     write_version: bool = True,
     expected_root_identity: DistributionRootIdentity | None = None,
     expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
+    expected_managed_scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] | None = None,
+    expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
+    managed_gitignore_identity_checked: bool = False,
+    seed_root_workbench: bool | None = None,
 ) -> None:
     """Install/update scaffold while binding all writes to the opened root."""
     with _bound_distribution_root(target_root, expected_root_identity) as (
@@ -1165,6 +2011,10 @@ def _install_spec_dock(
             expected_root_identity=bound_identity,
             root_identity_path=visible_root,
             expected_managed_scaffold_identities=expected_managed_scaffold_identities,
+            expected_managed_scaffold_file_identities=expected_managed_scaffold_file_identities,
+            expected_managed_gitignore_identity=expected_managed_gitignore_identity,
+            managed_gitignore_identity_checked=managed_gitignore_identity_checked,
+            seed_root_workbench=seed_root_workbench,
         )
 
 
@@ -1172,25 +2022,47 @@ def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
     """Validate the Fresh scaffold sources before the first target write."""
     src_spec_dock = assets_dir / "spec_dock"
     if not src_spec_dock.is_dir() or src_spec_dock.is_symlink():
-        raise RuntimeError(f"Missing asset directory: {src_spec_dock}")
+        raise RuntimeError("Missing asset directory: spec_dock")
 
     src_gitignore = src_spec_dock / ".gitignore"
     if not src_gitignore.is_file() or src_gitignore.is_symlink():
-        raise RuntimeError(f"Missing asset file: {src_gitignore}")
+        raise RuntimeError("Missing asset file: spec_dock/.gitignore")
 
     for name in _MANAGED_DIRS:
         source = src_spec_dock / name
         if not source.is_dir() or source.is_symlink():
-            raise RuntimeError(f"Invalid asset directory: {source}")
+            raise RuntimeError(f"Invalid asset directory: spec_dock/{name}")
+
+    runtime_script = src_spec_dock / "scripts" / "spec-dock"
+    try:
+        runtime_info = os.lstat(runtime_script)
+    except FileNotFoundError as exc:
+        raise RuntimeError("Missing asset file: spec_dock/scripts/spec-dock") from exc
+    except OSError as exc:
+        raise RuntimeError("Cannot inspect asset file: spec_dock/scripts/spec-dock") from exc
+    if (
+        stat.S_ISLNK(runtime_info.st_mode)
+        or not stat.S_ISREG(runtime_info.st_mode)
+        or runtime_info.st_nlink != 1
+        or (stat.S_IMODE(runtime_info.st_mode) & 0o111) == 0
+    ):
+        raise RuntimeError("Invalid asset file: spec_dock/scripts/spec-dock")
 
     root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
     if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
-        raise RuntimeError(f"Missing asset file: {root_workbench_readme}")
+        raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
 
 
 def _preflight_managed_scaffold_target_paths(
     target_root: Path,
-) -> dict[Path, _ManagedPathIdentity | None]:
+    *,
+    expected_gitignore_bytes: bytes,
+    expected_scaffold_file_paths: tuple[str, ...] = (),
+) -> tuple[
+    dict[Path, _ManagedPathIdentity | None],
+    dict[Path, _ManagedFileIdentity | None],
+    _ManagedFileIdentity | None,
+]:
     """Reject unsafe existing scaffold targets before a recognized update.
 
     The scaffold refresh replaces the four provider-managed directories and
@@ -1224,25 +2096,30 @@ def _preflight_managed_scaffold_target_paths(
 
     require_directory(specdock_dir, label="spec-dock")
     identities[specdock_dir] = _managed_path_identity(specdock_dir) if os.path.lexists(specdock_dir) else None
+    _assert_managed_scaffold_tree_safe(specdock_dir)
     for name in _MANAGED_DIRS:
         managed_dir = specdock_dir / name
         require_directory(managed_dir, label=f"spec-dock/{name}")
         identities[managed_dir] = _managed_path_identity(managed_dir) if os.path.lexists(managed_dir) else None
         if not managed_dir.exists():
             continue
-        # `_sync_tree` removes and recreates this whole directory.  Refuse any
-        # nested symlink so a managed refresh cannot silently delete a user link
-        # or traverse a replacement path during the pathname-based copy helper.
-        for current_root, dir_names, file_names in os.walk(managed_dir, topdown=True, followlinks=False):
-            current = Path(current_root)
-            unsafe_dirs = [name for name in dir_names if (current / name).is_symlink()]
-            unsafe_files = [name for name in file_names if (current / name).is_symlink()]
-            if unsafe_dirs or unsafe_files:
-                first_entry = (unsafe_dirs or unsafe_files)[0]
-                unsafe_path = (current / first_entry).relative_to(specdock_dir).as_posix()
-                raise RuntimeError(f"managed scaffold target contains symlinked entry: spec-dock/{unsafe_path}")
 
-    require_regular_file(specdock_dir / ".gitignore", label="spec-dock/.gitignore")
+    scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] = {}
+    for relative_path in expected_scaffold_file_paths:
+        path = target_root / relative_path
+        scaffold_file_identities[path] = _managed_file_identity(
+            path,
+            allow_hard_link=_is_root_workbench_seed_path(path),
+        )
+
+    gitignore_path = specdock_dir / ".gitignore"
+    require_regular_file(gitignore_path, label="spec-dock/.gitignore")
+    gitignore_identity = _managed_file_identity(gitignore_path)
+    if (
+        gitignore_identity is not None
+        and gitignore_identity.sha256 != hashlib.sha256(expected_gitignore_bytes).hexdigest()
+    ):
+        raise RuntimeError("managed scaffold target 'spec-dock/.gitignore' has unknown content; preserve-and-block")
     require_regular_file(specdock_dir / "spec-dock.version", label="spec-dock/spec-dock.version")
 
     # These directories hold persistent or generated state and are only
@@ -1253,50 +2130,356 @@ def _preflight_managed_scaffold_target_paths(
     require_regular_file(specdock_dir / "active" / "context-pack.md", label="spec-dock/active/context-pack.md")
     require_regular_file(specdock_dir / ".agent" / "active.json", label="spec-dock/.agent/active.json")
 
-    return identities
+    return identities, scaffold_file_identities, gitignore_identity
+
+
+def _shell_join(argv: list[str]) -> str:
+    """Serialize an argv vector for a copy/paste-safe retry command."""
+    if os.name == "nt":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
+
+
+def _safe_retry_target_label(target_root: Path) -> str | None:
+    """Return a caller-CWD-relative target or None when it cannot be represented."""
+    try:
+        label = os.path.relpath(target_root, Path.cwd())
+    except (OSError, ValueError):
+        return None
+    if not label:
+        label = "."
+    if "\x00" in label or any(ord(char) < 0x20 for char in label):
+        return None
+    if os.name != "nt":
+        label = Path(label).as_posix()
+    if not label or Path(label).is_absolute():
+        return None
+    return label
+
+
+def _require_retry_target_label(target_root: Path) -> str:
+    label = _safe_retry_target_label(target_root)
+    if label is None:
+        raise RuntimeError("retry target cannot be represented safely from the current working directory")
+    return label
+
+
+def _distribution_retry_command(operation: DistributionOperation, *, target_label: str = ".") -> str:
+    argv = ["spec-dock"]
+    if operation == "fresh":
+        argv.append("init")
+    elif operation == "init-force":
+        argv.extend(("init", "--force"))
+    else:
+        argv.append("update")
+    if target_label.startswith("-"):
+        argv.append("--")
+    argv.append(target_label)
+    return _shell_join(argv)
+
+
+def _safe_distribution_failure_target(exc: BaseException, phase: str) -> str:
+    """Return a repository-relative diagnostic target without leaking host paths."""
+    match = re.search(r"for '([^']+)'", str(exc))
+    if match:
+        candidate = match.group(1)
+        try:
+            relative = Path(candidate)
+            if (
+                not relative.is_absolute()
+                and "\\" not in candidate
+                and ".." not in relative.parts
+                and relative.as_posix() == candidate
+            ):
+                return candidate
+        except (OSError, ValueError):
+            pass
+    return {
+        "preflight": "distribution",
+        "distribution-apply": "distribution",
+        "managed-scaffold-refresh": "spec-dock",
+        "current-external-materialize": "distribution",
+        "obsolete-prune": "distribution",
+        "scaffold-refresh": "spec-dock",
+        "post-verify": "distribution",
+        "version-write": "spec-dock/spec-dock.version",
+        "marker-finalization": "spec-dock/.distribution-retry.json",
+    }.get(phase, "spec-dock/.distribution-retry.json")
+
+
+def _raise_distribution_partial_failure(
+    exc: BaseException,
+    *,
+    target_root: Path,
+    operation: DistributionOperation,
+    phase: str,
+    last_completed_phase: str,
+    applied_paths: tuple[str, ...] = (),
+    pending_paths: tuple[str, ...] = (),
+) -> NoReturn:
+    target = _safe_distribution_failure_target(exc, phase)
+    target_label = _safe_retry_target_label(target_root)
+    retry = (
+        _distribution_retry_command(operation, target_label=target_label) if target_label is not None else "unavailable"
+    )
+    raise RuntimeError(
+        f"distribution partial failure during {phase}; "
+        f"target={target}; last_completed_phase={last_completed_phase}; "
+        f"applied_paths={json.dumps(applied_paths, separators=(',', ':'))}; "
+        f"pending_paths={json.dumps(pending_paths, separators=(',', ':'))}; "
+        f"retry={retry}"
+    ) from None
+
+
+def _install_fresh_distribution_unlocked(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> None:
+    """Apply one validated Fresh distribution with forward-retry recovery."""
+    _require_retry_target_label(target_root)
+    phase = "preflight"
+    marker_started = False
+    last_completed_phase = "not-started"
+    root_identity = expected_root_identity or _distribution_root_identity(target_root)
+    _assert_distribution_root_identity(target_root, root_identity)
+    fresh_workspace_created = False
+    fresh_workspace_identity: _ManagedPathIdentity | None = None
+    stage_ownership: list[DistributionStageOwnership] = []
+    applied_paths: tuple[str, ...] = ()
+    pending_paths: tuple[str, ...] = ()
+    with _assets_dir() as assets_dir:
+        try:
+            _preflight_fresh_spec_dock_assets(assets_dir)
+            plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                operation="fresh",
+            )
+            blocked_actions = [action for action in plan.actions if action.blocked]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
+                raise RuntimeError(f"distribution preflight blocked: {reasons}")
+
+            _assert_distribution_root_identity(target_root, root_identity)
+            specdock_dir = _specdock_dir(target_root)
+            if not os.path.lexists(specdock_dir):
+                # Create the first workspace boundary relative to the held
+                # root directory.  A concurrent pathname replacement must
+                # not redirect this mutation to an unrelated visible root.
+                with _bound_distribution_root(target_root, root_identity) as (
+                    bound_root,
+                    _visible_root,
+                    _bound_identity,
+                ):
+                    try:
+                        _specdock_dir(bound_root).mkdir()
+                    except FileExistsError as exc:
+                        raise RuntimeError("Fresh distribution workspace appeared during preflight") from exc
+                    fresh_workspace_identity = _managed_path_identity(_specdock_dir(bound_root))
+                fresh_workspace_created = True
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="preflight-complete",
+                expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
+            )
+            marker_started = True
+            last_completed_phase = "preflight-complete"
+
+            def record_stage_ownership(record: DistributionStageOwnership) -> None:
+                stage_ownership.append(record)
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation="fresh",
+                    last_completed_phase=last_completed_phase,
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+
+            # Creating the marker's `spec-dock/` parent is itself a target-root
+            # mutation and therefore updates the root ctime.  Rebuild the
+            # read-only plan after that first mutation so apply-time snapshots
+            # remain bound to the current root identity.
+            plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                operation="fresh",
+            )
+            blocked_actions = [action for action in plan.actions if action.blocked]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
+                raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
+            pending_paths = tuple(action.path for action in plan.actions)
+
+            def apply_scaffold() -> None:
+                _assert_distribution_root_identity(target_root, root_identity)
+                _install_spec_dock(
+                    target_root,
+                    force=True,
+                    install_root_shortcut=False,
+                    write_version=False,
+                    expected_root_identity=root_identity,
+                    seed_root_workbench=_root_workbench_seed_decision(
+                        specdock_dir,
+                        assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
+                    ),
+                )
+
+            def record_progress(
+                progress_phase: str,
+                completed: tuple[str, ...],
+                pending: tuple[str, ...],
+                phase_complete: bool,
+            ) -> None:
+                nonlocal phase, last_completed_phase, applied_paths, pending_paths
+                phase = progress_phase
+                applied_paths = completed
+                pending_paths = pending
+                if not phase_complete:
+                    return
+                marker_phase = {
+                    "managed-scaffold-refresh": "managed-scaffold-refreshed",
+                    "current-external-materialize": "current-external-materialized",
+                    "obsolete-prune": "obsolete-pruned",
+                }[progress_phase]
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation="fresh",
+                    last_completed_phase=marker_phase,
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+                last_completed_phase = marker_phase
+
+            phase = "managed-scaffold-refresh"
+            _assert_distribution_root_identity(target_root, root_identity)
+            apply_distribution_plan(
+                plan,
+                allow_blocked_scaffold_paths=False,
+                stage_ownership_recorder=record_stage_ownership,
+                scaffold_applier=apply_scaffold,
+                progress_recorder=record_progress,
+            )
+
+            phase = "post-verify"
+            _assert_distribution_root_identity(target_root, root_identity)
+            post_plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                operation="fresh",
+            )
+            if post_plan.blocked:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in post_plan.actions if action.blocked)
+                raise RuntimeError(f"distribution post-verify blocked: {reasons}")
+            non_adopted = [action.path for action in post_plan.actions if action.action != "adopt"]
+            if non_adopted:
+                joined = ", ".join(non_adopted)
+                raise RuntimeError(f"distribution post-verify incomplete: {joined}")
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="post-verified",
+                expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
+            )
+            last_completed_phase = "post-verified"
+
+            phase = "version-write"
+            _write_spec_dock_version(target_root, expected_root_identity=root_identity)
+            _write_distribution_retry_marker(
+                target_root,
+                operation="fresh",
+                last_completed_phase="version-written",
+                expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
+            )
+            last_completed_phase = "version-written"
+            phase = "marker-finalization"
+            _remove_distribution_retry_marker(target_root, expected_root_identity=root_identity)
+            last_completed_phase = "marker-finalized"
+        except Exception as exc:
+            if isinstance(exc, DistributionApplyError):
+                phase = exc.phase or phase
+                applied_paths = exc.applied_paths or applied_paths
+                pending_paths = exc.pending_paths or pending_paths
+            if _distribution_retry_marker_present(target_root):
+                marker_started = True
+            if marker_started:
+                _raise_distribution_partial_failure(
+                    exc,
+                    target_root=target_root,
+                    operation="fresh",
+                    phase=phase,
+                    last_completed_phase=last_completed_phase,
+                    applied_paths=applied_paths,
+                    pending_paths=pending_paths,
+                )
+            if fresh_workspace_created and fresh_workspace_identity is not None:
+                with suppress(OSError, RuntimeError):
+                    _assert_distribution_root_identity(target_root, root_identity)
+                    _remove_empty_bound_directory(
+                        target_root,
+                        Path(_SPEC_DOCK_DIRNAME),
+                        expected_identity=fresh_workspace_identity,
+                        expected_root_identity=root_identity,
+                    )
+            raise
 
 
 def _install_fresh_distribution(target_root: Path) -> None:
-    """Apply one validated Fresh distribution, then verify its Current assets."""
-    with _assets_dir() as assets_dir:
-        _preflight_fresh_spec_dock_assets(assets_dir)
-        plan = build_distribution_plan(
-            assets_dir / "install_root",
-            manifest_path=assets_dir / "managed_distribution.json",
-            scaffold_root=assets_dir / "spec_dock",
-            target_root=target_root,
-            operation="fresh",
-        )
-        if plan.blocked:
-            reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
-            raise RuntimeError(f"distribution preflight blocked: {reasons}")
-
-        apply_distribution_plan(plan)
-        _install_spec_dock(target_root, force=False, install_root_shortcut=False)
-
-        post_plan = build_distribution_plan(
-            assets_dir / "install_root",
-            manifest_path=assets_dir / "managed_distribution.json",
-            scaffold_root=assets_dir / "spec_dock",
-            target_root=target_root,
-            operation="fresh",
-        )
-        if post_plan.blocked:
-            reasons = ", ".join(f"{action.path}: {action.reason}" for action in post_plan.actions if action.blocked)
-            raise RuntimeError(f"distribution post-verify blocked: {reasons}")
-        non_adopted = [action.path for action in post_plan.actions if action.action != "adopt"]
-        if non_adopted:
-            joined = ", ".join(non_adopted)
-            raise RuntimeError(f"distribution post-verify incomplete: {joined}")
+    with _exclusive_distribution_operation(target_root) as locked_root_identity:
+        admission = _admit_distribution_cli(target_root, operation="fresh")
+        if admission.status == "retry":
+            _install_recognized_distribution_unlocked(
+                target_root,
+                operation="fresh",
+                retry_marker=admission,
+                expected_root_identity=locked_root_identity,
+            )
+            return
+        if admission.status != "fresh":
+            raise RuntimeError("Fresh distribution target changed during operation admission")
+        _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
 
 
-def _install_recognized_distribution(target_root: Path, *, operation: DistributionOperation) -> None:
+def _install_recognized_distribution_unlocked(
+    target_root: Path,
+    *,
+    operation: DistributionOperation,
+    retry_marker: DistributionAdmission | None = None,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> None:
     """Apply a recognized distribution with same-package forward recovery."""
+    _require_retry_target_label(target_root)
     phase = "preflight"
     marker_started = False
-    root_identity = _distribution_root_identity(target_root)
+    last_completed_phase = "not-started"
+    root_identity = expected_root_identity or _distribution_root_identity(target_root)
+    _assert_distribution_root_identity(target_root, root_identity)
+    retry_recovery = _distribution_retry_marker_present(target_root)
+    applied_paths: tuple[str, ...] = ()
+    pending_paths: tuple[str, ...] = ()
+    stage_ownership: list[DistributionStageOwnership] = list(
+        retry_marker.marker.stage_ownership if retry_marker is not None and retry_marker.marker is not None else ()
+    )
     with _assets_dir() as assets_dir:
         try:
+            # Recognized updates may mutate external distribution files before
+            # the scaffold refresh. Validate the complete scaffold source
+            # catalog before publishing the retry marker or touching targets.
+            _preflight_fresh_spec_dock_assets(assets_dir)
+            src_gitignore = assets_dir / "spec_dock" / ".gitignore"
+            if not src_gitignore.is_file() or src_gitignore.is_symlink():
+                raise RuntimeError("Missing asset file: spec_dock/.gitignore")
+            expected_gitignore_bytes = src_gitignore.read_bytes()
             plan = build_distribution_plan(
                 assets_dir / "install_root",
                 manifest_path=assets_dir / "managed_distribution.json",
@@ -1304,12 +2487,23 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 target_root=target_root,
                 operation=operation,
             )
-            if plan.blocked:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in plan.actions if action.blocked)
+            blocked_actions = [
+                action
+                for action in plan.actions
+                if action.blocked and (operation == "fresh" or action.path not in plan.scaffold_paths)
+            ]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
                 raise RuntimeError(f"distribution preflight blocked: {reasons}")
 
             _assert_distribution_root_identity(target_root, root_identity)
-            absolute_scaffold_identities = _preflight_managed_scaffold_target_paths(target_root)
+            absolute_scaffold_identities, scaffold_file_identities, gitignore_identity = (
+                _preflight_managed_scaffold_target_paths(
+                    target_root,
+                    expected_gitignore_bytes=expected_gitignore_bytes,
+                    expected_scaffold_file_paths=tuple(asset.path for asset in plan.scaffold_assets),
+                )
+            )
             managed_scaffold_identities = {
                 path.relative_to(target_root): identity for path, identity in absolute_scaffold_identities.items()
             }
@@ -1318,33 +2512,110 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 operation=operation,
                 last_completed_phase="preflight-complete",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
             marker_started = True
+            last_completed_phase = "preflight-complete"
 
-            phase = "distribution-apply"
-            _assert_distribution_root_identity(target_root, root_identity)
-            apply_distribution_plan(plan)
-            _write_distribution_retry_marker(
-                target_root,
+            # Publishing the retry marker mutates the `spec-dock/` parent
+            # directory. Rebuild the complete distribution plan after that
+            # mutation so scaffold target snapshots are bound to the state
+            # that apply will actually observe.
+            plan = build_distribution_plan(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
                 operation=operation,
-                last_completed_phase="distribution-applied",
-                expected_root_identity=root_identity,
             )
+            blocked_actions = [
+                action
+                for action in plan.actions
+                if action.blocked and (operation == "fresh" or action.path not in plan.scaffold_paths)
+            ]
+            if blocked_actions:
+                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
+                raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
+            pending_paths = tuple(action.path for action in plan.actions)
 
-            phase = "scaffold-refresh"
+            def record_stage_ownership(record: DistributionStageOwnership) -> None:
+                existing = next(
+                    (
+                        item
+                        for item in stage_ownership
+                        if item.path == record.path and item.stage_name == record.stage_name
+                    ),
+                    None,
+                )
+                if existing is not None:
+                    stage_ownership.remove(existing)
+                stage_ownership.append(record)
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation=operation,
+                    last_completed_phase=last_completed_phase,
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+
+            def apply_scaffold() -> None:
+                _assert_distribution_root_identity(target_root, root_identity)
+                _install_spec_dock(
+                    target_root,
+                    force=True,
+                    install_root_shortcut=False,
+                    write_version=False,
+                    expected_root_identity=root_identity,
+                    expected_managed_scaffold_identities=managed_scaffold_identities,
+                    expected_managed_scaffold_file_identities=scaffold_file_identities,
+                    expected_managed_gitignore_identity=gitignore_identity,
+                    managed_gitignore_identity_checked=True,
+                    seed_root_workbench=(
+                        _root_workbench_seed_decision(
+                            _specdock_dir(target_root),
+                            assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
+                        )
+                        if operation == "fresh"
+                        else None
+                    ),
+                )
+
+            def record_progress(
+                progress_phase: str,
+                completed: tuple[str, ...],
+                pending: tuple[str, ...],
+                phase_complete: bool,
+            ) -> None:
+                nonlocal phase, last_completed_phase, applied_paths, pending_paths
+                phase = progress_phase
+                applied_paths = completed
+                pending_paths = pending
+                if not phase_complete:
+                    return
+                marker_phase = {
+                    "managed-scaffold-refresh": "managed-scaffold-refreshed",
+                    "current-external-materialize": "current-external-materialized",
+                    "obsolete-prune": "obsolete-pruned",
+                }[progress_phase]
+                _write_distribution_retry_marker(
+                    target_root,
+                    operation=operation,
+                    last_completed_phase=marker_phase,
+                    expected_root_identity=root_identity,
+                    stage_ownership=tuple(stage_ownership),
+                )
+                last_completed_phase = marker_phase
+
+            phase = "managed-scaffold-refresh"
             _assert_distribution_root_identity(target_root, root_identity)
-            _install_spec_dock(
-                target_root,
-                force=True,
-                write_version=False,
-                expected_root_identity=root_identity,
-                expected_managed_scaffold_identities=managed_scaffold_identities,
-            )
-            _write_distribution_retry_marker(
-                target_root,
-                operation=operation,
-                last_completed_phase="scaffold-refreshed",
-                expected_root_identity=root_identity,
+            apply_distribution_plan(
+                plan,
+                allow_blocked_scaffold_paths=operation != "fresh",
+                allow_stale_stage_cleanup=retry_recovery,
+                stage_ownership=tuple(stage_ownership),
+                stage_ownership_recorder=record_stage_ownership,
+                scaffold_applier=apply_scaffold,
+                progress_recorder=record_progress,
             )
 
             phase = "post-verify"
@@ -1365,7 +2636,9 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 operation=operation,
                 last_completed_phase="post-verified",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
+            last_completed_phase = "post-verified"
 
             phase = "version-write"
             _write_spec_dock_version(
@@ -1377,28 +2650,58 @@ def _install_recognized_distribution(target_root: Path, *, operation: Distributi
                 operation=operation,
                 last_completed_phase="version-written",
                 expected_root_identity=root_identity,
+                stage_ownership=tuple(stage_ownership),
             )
+            last_completed_phase = "version-written"
+            phase = "marker-finalization"
             _remove_distribution_retry_marker(
                 target_root,
                 expected_root_identity=root_identity,
             )
+            last_completed_phase = "marker-finalized"
         except Exception as exc:
+            if isinstance(exc, DistributionApplyError):
+                phase = exc.phase or phase
+                applied_paths = exc.applied_paths or applied_paths
+                pending_paths = exc.pending_paths or pending_paths
+            if _distribution_retry_marker_present(target_root):
+                marker_started = True
             if marker_started:
-                raise RuntimeError(
-                    f"distribution partial failure during {phase}; "
-                    "rerun the same package and operation to continue recovery"
-                ) from None
+                _raise_distribution_partial_failure(
+                    exc,
+                    target_root=target_root,
+                    operation=operation,
+                    phase=phase,
+                    last_completed_phase=last_completed_phase,
+                    applied_paths=applied_paths,
+                    pending_paths=pending_paths,
+                )
             raise exc
+
+
+def _install_recognized_distribution(
+    target_root: Path,
+    *,
+    operation: DistributionOperation,
+) -> None:
+    with _exclusive_distribution_operation(target_root) as locked_root_identity:
+        admission = _admit_distribution_cli(target_root, operation=operation)
+        if admission.status == "fresh":
+            _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
+            return
+        if admission.status not in {"recognized", "retry", "uninstall-retry"}:
+            raise RuntimeError("recognized distribution target changed during operation admission")
+        _install_recognized_distribution_unlocked(
+            target_root,
+            operation=operation,
+            retry_marker=admission if admission.status == "retry" else None,
+            expected_root_identity=locked_root_identity,
+        )
 
 
 def _managed_skill_names() -> tuple[str, ...]:
     """Return the managed bundled skill set."""
     return _MANAGED_SKILL_NAMES
-
-
-def _managed_skill_ownership_names() -> tuple[str, ...]:
-    """Return skill directory names owned by the installer for pruning decisions."""
-    return _managed_skill_names()
 
 
 def _is_within_managed_obsolete_exact_path_prefixes(path: Path) -> bool:
@@ -1453,17 +2756,6 @@ def _prune_empty_obsolete_parent_dirs(
         current = current.parent
 
 
-class _ManagedCurrentFileMapping(NamedTuple):
-    source_asset_rel: Path
-    target_rel: Path
-
-
-class _ManagedSkillInstallPlan(NamedTuple):
-    current_file_mappings: tuple[_ManagedCurrentFileMapping, ...]
-    bootstrap_only_rel_paths: tuple[Path, ...]
-    obsolete_exact_rel_paths: tuple[Path, ...]
-
-
 class _UninstallTargetIdentity(NamedTuple):
     """No-follow identity captured before an uninstall mutation."""
 
@@ -1471,6 +2763,7 @@ class _UninstallTargetIdentity(NamedTuple):
     device: int
     inode: int
     ctime_ns: int
+    nlink: int = 0
     size: int = 0
     sha256: str | None = None
     link_target: str | None = None
@@ -1623,26 +2916,242 @@ def _open_uninstall_parent_chain(
                 os.close(fd)
 
 
-def _remove_uninstall_tree_fd(directory_fd: int) -> None:
-    """Remove a spec-history directory tree through held directory fds."""
+def _assert_uninstall_directory_binding(target_root: Path, rel_path: Path, directory_fd: int) -> None:
+    """Require a held directory descriptor to remain at its repository path."""
+    try:
+        visible = os.lstat(target_root / rel_path)
+        held = os.fstat(directory_fd)
+    except OSError as exc:
+        raise RuntimeError("uninstall target path changed during safe operation") from exc
+    if (
+        stat.S_ISLNK(visible.st_mode)
+        or not stat.S_ISDIR(visible.st_mode)
+        or not stat.S_ISDIR(held.st_mode)
+        or visible.st_dev != held.st_dev
+        or visible.st_ino != held.st_ino
+    ):
+        raise RuntimeError("uninstall target path changed during safe operation")
+
+
+def _assert_uninstall_tree_entry_identity(
+    directory_fd: int,
+    name: str,
+    expected: os.stat_result,
+) -> None:
+    """Reject a recursive entry that was replaced after it was observed."""
+    try:
+        current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise RuntimeError("uninstall target changed during safe operation") from exc
+    identity_matches = (
+        current.st_dev,
+        current.st_ino,
+        current.st_mode,
+    ) == (
+        expected.st_dev,
+        expected.st_ino,
+        expected.st_mode,
+    )
+    if not stat.S_ISDIR(expected.st_mode):
+        identity_matches = identity_matches and current.st_ctime_ns == expected.st_ctime_ns
+    if not identity_matches:
+        raise RuntimeError("uninstall target changed during safe operation")
+
+
+def _remove_uninstall_tree_fd(
+    target_root: Path,
+    rel_path: Path,
+    directory_fd: int,
+    visible_fds: tuple[int, ...],
+) -> None:
+    """Remove an installer-owned tree while preserving repository binding."""
+    _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+    _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
 
     for name in os.listdir(directory_fd):
+        _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+        _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
         entry = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
         if stat.S_ISLNK(entry.st_mode):
             raise RuntimeError("refusing to remove symlink inside uninstall target")
         if stat.S_ISDIR(entry.st_mode):
+            child_rel_path = rel_path / name
             child_fd = os.open(name, _uninstall_directory_flags(), dir_fd=directory_fd)
             try:
-                _remove_uninstall_tree_fd(child_fd)
+                _remove_uninstall_tree_fd(
+                    target_root,
+                    child_rel_path,
+                    child_fd,
+                    (*visible_fds, child_fd),
+                )
+                _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+                _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+                _assert_uninstall_directory_binding(target_root, child_rel_path, child_fd)
+                _assert_uninstall_tree_entry_identity(directory_fd, name, entry)
+                os.rmdir(name, dir_fd=directory_fd)
             finally:
                 os.close(child_fd)
-            os.rmdir(name, dir_fd=directory_fd)
             continue
         if stat.S_ISREG(entry.st_mode) and entry.st_nlink != 1:
             raise RuntimeError("refusing to remove hard-linked uninstall target")
         if not stat.S_ISREG(entry.st_mode):
             raise RuntimeError("refusing to remove unsafe entry inside uninstall target")
+        _assert_uninstall_tree_entry_identity(directory_fd, name, entry)
+        _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+        _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
         os.unlink(name, dir_fd=directory_fd)
+
+
+def _remove_bound_directory_tree(
+    target_root: Path,
+    rel_path: Path,
+    *,
+    expected_identity: _ManagedPathIdentity,
+    expected_root_identity: DistributionRootIdentity | None,
+) -> None:
+    """Remove one already-authorized directory through held no-follow descriptors."""
+    with _open_uninstall_parent_chain(
+        target_root,
+        rel_path,
+        expected_root_identity=expected_root_identity,
+    ) as fds:
+        parent_fd = fds[-1]
+        try:
+            visible = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise RuntimeError("managed scaffold target changed during safe replacement") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or (visible.st_dev, visible.st_ino, visible.st_ctime_ns)
+            != (expected_identity.device, expected_identity.inode, expected_identity.ctime_ns)
+        ):
+            raise RuntimeError("managed scaffold target identity changed")
+
+        directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
+        try:
+            held = os.fstat(directory_fd)
+            if not stat.S_ISDIR(held.st_mode) or (held.st_dev, held.st_ino, held.st_ctime_ns) != (
+                expected_identity.device,
+                expected_identity.inode,
+                expected_identity.ctime_ns,
+            ):
+                raise RuntimeError("managed scaffold target identity changed")
+            visible_fds = (*fds, directory_fd)
+            _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            _remove_uninstall_tree_fd(target_root, rel_path, directory_fd, visible_fds)
+            _assert_uninstall_visible_chain(target_root, rel_path, fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            _assert_uninstall_tree_entry_identity(parent_fd, rel_path.name, visible)
+            os.rmdir(rel_path.name, dir_fd=parent_fd)
+        finally:
+            os.close(directory_fd)
+
+
+def _remove_empty_bound_directory(
+    target_root: Path,
+    rel_path: Path,
+    *,
+    expected_identity: _ManagedPathIdentity,
+    expected_root_identity: DistributionRootIdentity | None,
+) -> None:
+    """Remove an empty directory only while its captured identity remains bound."""
+    with _open_uninstall_parent_chain(
+        target_root,
+        rel_path,
+        expected_root_identity=expected_root_identity,
+    ) as fds:
+        parent_fd = fds[-1]
+        try:
+            visible = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise RuntimeError("empty directory target changed during safe cleanup") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or (visible.st_dev, visible.st_ino, visible.st_ctime_ns)
+            != (expected_identity.device, expected_identity.inode, expected_identity.ctime_ns)
+        ):
+            raise RuntimeError("empty directory target identity changed during safe cleanup")
+
+        directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
+        try:
+            held = os.fstat(directory_fd)
+            if not stat.S_ISDIR(held.st_mode) or (held.st_dev, held.st_ino, held.st_ctime_ns) != (
+                expected_identity.device,
+                expected_identity.inode,
+                expected_identity.ctime_ns,
+            ):
+                raise RuntimeError("empty directory target identity changed during safe cleanup")
+            visible_fds = (*fds, directory_fd)
+            _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            with os.scandir(directory_fd) as entries:
+                if next(entries, None) is not None:
+                    raise RuntimeError("empty directory target is no longer empty")
+            _assert_uninstall_visible_chain(target_root, rel_path, fds)
+            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            _assert_uninstall_tree_entry_identity(parent_fd, rel_path.name, visible)
+            current = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
+            if (current.st_dev, current.st_ino, current.st_ctime_ns) != (
+                expected_identity.device,
+                expected_identity.inode,
+                expected_identity.ctime_ns,
+            ):
+                raise RuntimeError("empty directory target identity changed during safe cleanup")
+            os.rmdir(rel_path.name, dir_fd=parent_fd)
+            _assert_uninstall_visible_chain(target_root, rel_path, fds)
+        finally:
+            os.close(directory_fd)
+
+
+def _remove_managed_scaffold_tree(
+    target_root: Path,
+    dest: Path,
+    *,
+    expected_identity: _ManagedPathIdentity,
+    expected_root_identity: DistributionRootIdentity | None,
+) -> None:
+    """Remove one managed scaffold root through held no-follow descriptors."""
+    try:
+        rel_path = dest.absolute().relative_to(target_root.absolute())
+    except ValueError as exc:
+        raise RuntimeError("managed scaffold target is outside the distribution root") from exc
+    if rel_path not in _MANAGED_SCAFFOLD_ROOTS:
+        raise RuntimeError("managed scaffold replacement is outside the managed roots")
+    _remove_bound_directory_tree(
+        target_root,
+        rel_path,
+        expected_identity=expected_identity,
+        expected_root_identity=expected_root_identity,
+    )
+
+
+def _read_file_descriptor(fd: int) -> bytes:
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(fd, 1024 * 64)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+
+
+def _write_file_descriptor(
+    fd: int,
+    content: bytes,
+    *,
+    before_first_write: Callable[[], None] | None = None,
+) -> None:
+    if before_first_write is not None:
+        before_first_write()
+    view = memoryview(content)
+    written = 0
+    while written < len(view):
+        count = os.write(fd, view[written:])
+        if count <= 0:
+            raise RuntimeError("uninstall marker write made no progress")
+        written += count
 
 
 def _create_uninstall_retry_marker(
@@ -1668,18 +3177,68 @@ def _create_uninstall_retry_marker(
                 dir_fd=parent_fd,
             )
         except FileExistsError:
-            info = os.stat(marker_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file") from None
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise RuntimeError("SpecDock uninstall retry marker no-follow support is unavailable") from None
+            try:
+                existing_fd = os.open(
+                    marker_rel.name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=parent_fd,
+                )
+            except OSError as exc:
+                raise RuntimeError("SpecDock uninstall retry marker cannot be opened safely") from exc
+            try:
+                before = os.fstat(existing_fd)
+                if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+                    raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+                existing_payload = _read_file_descriptor(existing_fd)
+                after = os.fstat(existing_fd)
+                if (
+                    not stat.S_ISREG(after.st_mode)
+                    or after.st_nlink != 1
+                    or (after.st_dev, after.st_ino, after.st_ctime_ns, after.st_size)
+                    != (before.st_dev, before.st_ino, before.st_ctime_ns, before.st_size)
+                    or existing_payload != payload
+                ):
+                    raise RuntimeError("SpecDock uninstall retry marker is incomplete or invalid")
+            finally:
+                with suppress(OSError):
+                    os.close(existing_fd)
             return
+        marker_identity: tuple[int, int] | None = None
+        completed = False
         try:
+            created = os.fstat(marker_fd)
+            if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
+                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+            marker_identity = (created.st_dev, created.st_ino)
             _write_file_descriptor(marker_fd, payload)
             os.fsync(marker_fd)
             written = os.fstat(marker_fd)
-            if not stat.S_ISREG(written.st_mode) or written.st_nlink != 1:
+            if (
+                not stat.S_ISREG(written.st_mode)
+                or written.st_nlink != 1
+                or (written.st_dev, written.st_ino) != marker_identity
+            ):
                 raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
+            completed = True
         finally:
-            os.close(marker_fd)
+            with suppress(OSError):
+                os.close(marker_fd)
+            if not completed and marker_identity is not None:
+                try:
+                    current = os.stat(marker_rel.name, dir_fd=parent_fd, follow_symlinks=False)
+                except OSError:
+                    pass
+                else:
+                    if (
+                        stat.S_ISREG(current.st_mode)
+                        and current.st_nlink == 1
+                        and (current.st_dev, current.st_ino) == marker_identity
+                    ):
+                        with suppress(OSError):
+                            os.unlink(marker_rel.name, dir_fd=parent_fd)
         _assert_uninstall_visible_chain(target_root, marker_rel, fds)
 
 
@@ -1742,10 +3301,11 @@ def _capture_uninstall_target_identity(target_root: Path, rel_path: Path) -> _Un
             return None
         if stat.S_ISLNK(info.st_mode):
             return _UninstallTargetIdentity(
-                "symlink",
+                "symlink" if info.st_nlink == 1 else "unsafe",
                 info.st_dev,
                 info.st_ino,
                 info.st_ctime_ns,
+                nlink=info.st_nlink,
                 link_target=os.readlink(rel_path.name, dir_fd=parent_fd),
             )
         if stat.S_ISDIR(info.st_mode):
@@ -1779,7 +3339,14 @@ def _assert_uninstall_target_identity(
 ) -> None:
     """Fail closed when a planned uninstall entry was replaced or rewritten."""
     if expected.kind == "symlink":
-        if not stat.S_ISLNK(info.st_mode) or os.readlink(name, dir_fd=parent_fd) != expected.link_target:
+        if (
+            not stat.S_ISLNK(info.st_mode)
+            or info.st_dev != expected.device
+            or info.st_ino != expected.inode
+            or info.st_ctime_ns != expected.ctime_ns
+            or info.st_nlink != expected.nlink
+            or os.readlink(name, dir_fd=parent_fd) != expected.link_target
+        ):
             raise RuntimeError("uninstall target identity changed during safe operation")
         return
     if expected.kind == "directory":
@@ -1932,10 +3499,42 @@ def _add_generated_state_uninstall_actions(
     known_rel_paths: set[Path],
 ) -> None:
     for rel_root in (Path("spec-dock/active"), Path("spec-dock/.agent")):
-        for path in _iter_existing_files_or_symlinks(target_root / rel_root):
+        root_path = target_root / rel_root
+        known_rel_paths.add(rel_root)
+        if not _path_exists_for_uninstall(root_path):
+            continue
+        root_identity, _ = _planned_uninstall_identity(target_root, rel_root)
+        if root_identity is None or root_identity.kind != "directory":
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="generated_state",
+                    status="preserved",
+                    reason="generated state root is not a safe real directory; manual review required",
+                )
+            )
+            continue
+        for path in _iter_existing_files_or_symlinks(root_path):
             rel_path = path.relative_to(target_root)
             known_rel_paths.add(rel_path)
             identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
+            if identity is not None and (
+                identity.kind == "unsafe" or (identity.kind == "symlink" and rel_root != Path("spec-dock/active"))
+            ):
+                reason = (
+                    "generated state has unsafe identity; manual review required"
+                    if identity.kind == "unsafe"
+                    else "generated state has unsafe symlink identity; manual review required"
+                )
+                actions.append(
+                    _UninstallAction(
+                        rel_path=rel_path.as_posix(),
+                        category="generated_state",
+                        status="preserved",
+                        reason=reason,
+                    )
+                )
+                continue
             actions.append(
                 _UninstallAction(
                     rel_path=rel_path.as_posix(),
@@ -1960,6 +3559,38 @@ def _add_spec_history_uninstall_action(
         return
     if specs_mode == "remove":
         identity, expected_absent = _planned_uninstall_identity(target_root, spec_history_path)
+        if identity is None and expected_absent:
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="would_remove",
+                    reason="explicit remove-specs mode; spec history already absent",
+                    expected_absent=True,
+                )
+            )
+            return
+        if identity is not None and identity.kind != "directory":
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="preserved",
+                    reason="spec history root is not a safe real directory; manual review required",
+                )
+            )
+            return
+        safety_issue = _managed_scaffold_tree_safety_issue(target_root, spec_history_path)
+        if safety_issue is not None:
+            actions.append(
+                _UninstallAction(
+                    rel_path=spec_history_path.as_posix(),
+                    category="spec_history",
+                    status="preserved",
+                    reason=f"{safety_issue}; manual review required",
+                )
+            )
+            return
         actions.append(
             _UninstallAction(
                 rel_path=spec_history_path.as_posix(),
@@ -2011,6 +3642,16 @@ def _add_shortcut_uninstall_action(actions: list[_UninstallAction], target_root:
         shortcut.is_symlink() and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"  # noqa: PTH115 - raw exact target.
     ):
         identity, expected_absent = _planned_uninstall_identity(target_root, Path("spec"))
+        if identity is not None and identity.kind == "unsafe":
+            actions.append(
+                _UninstallAction(
+                    rel_path="spec",
+                    category="shortcut",
+                    status="preserved",
+                    reason="repo-root shortcut has unsafe identity; manual review required",
+                )
+            )
+            return
         actions.append(
             _UninstallAction(
                 rel_path="spec",
@@ -2046,6 +3687,11 @@ def _add_unknown_boundary_uninstall_actions(
                 continue
             if rel_path.parts[:2] in {("spec-dock", "active"), ("spec-dock", ".agent")}:
                 continue
+            if any(
+                rel_path == managed_root or _is_path_prefix(managed_root, rel_path)
+                for managed_root in _MANAGED_SCAFFOLD_ROOTS
+            ):
+                continue
             actions.append(
                 _UninstallAction(
                     rel_path=rel_path.as_posix(),
@@ -2062,7 +3708,7 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
     for managed_dir in _MANAGED_DIRS:
         src_root = src_spec_dock / managed_dir
         if not src_root.is_dir():
-            raise RuntimeError(f"Missing asset directory: {src_root}")
+            raise RuntimeError(f"Missing asset directory: spec_dock/{managed_dir}")
         for source_path in sorted(
             (
                 path
@@ -2076,12 +3722,85 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
 
     src_gitignore = src_spec_dock / ".gitignore"
     if not src_gitignore.is_file():
-        raise RuntimeError(f"Missing asset file: {src_gitignore}")
+        raise RuntimeError("Missing asset file: spec_dock/.gitignore")
     sources.append((Path("spec-dock/.gitignore"), src_gitignore.read_bytes()))
     root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
+    if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
+        raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
     sources.append((Path("spec-dock/.workbench/README.md"), root_workbench_readme.read_bytes()))
     sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode()))
     return tuple(sources)
+
+
+def _managed_scaffold_tree_safety_issue(target_root: Path, rel_root: Path) -> str | None:
+    """Return a preflight diagnostic for unsafe recursive scaffold entries."""
+    root = target_root / rel_root
+    walk_errors: list[OSError] = []
+    for current, directories, file_names in os.walk(
+        root,
+        topdown=True,
+        followlinks=False,
+        onerror=walk_errors.append,
+    ):
+        for name in (*directories, *file_names):
+            path = Path(current) / name
+            try:
+                info = os.lstat(path)
+            except OSError:
+                return f"managed scaffold entry cannot be inspected safely: {path.relative_to(target_root)}"
+            if stat.S_ISLNK(info.st_mode):
+                return f"managed scaffold tree contains symlink: {path.relative_to(target_root)}"
+            if stat.S_ISDIR(info.st_mode):
+                continue
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                return f"managed scaffold tree contains unsafe entry: {path.relative_to(target_root)}"
+    if walk_errors:
+        return f"managed scaffold tree cannot be inspected safely: {rel_root.as_posix()}"
+    return None
+
+
+def _add_managed_scaffold_uninstall_actions(
+    actions: list[_UninstallAction],
+    target_root: Path,
+    known_rel_paths: set[Path],
+) -> None:
+    """Plan each managed scaffold tree as one safe recursive removal."""
+    for rel_root in _MANAGED_SCAFFOLD_ROOTS:
+        known_rel_paths.add(rel_root)
+        if not _path_exists_for_uninstall(target_root / rel_root):
+            continue
+        identity, expected_absent = _planned_uninstall_identity(target_root, rel_root)
+        if identity is None or identity.kind != "directory":
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="scaffold_managed",
+                    status="preserved",
+                    reason="managed scaffold root is not a safe real directory; manual review required",
+                )
+            )
+            continue
+        safety_issue = _managed_scaffold_tree_safety_issue(target_root, rel_root)
+        if safety_issue is not None:
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="scaffold_managed",
+                    status="preserved",
+                    reason=f"{safety_issue}; manual review required",
+                )
+            )
+            continue
+        actions.append(
+            _UninstallAction(
+                rel_path=rel_root.as_posix(),
+                category="scaffold_managed",
+                status="would_remove",
+                reason="SpecDock managed scaffold tree",
+                expected_identity=identity,
+                expected_absent=expected_absent,
+            )
+        )
 
 
 def _append_distribution_uninstall_actions(
@@ -2116,6 +3835,16 @@ def _append_distribution_uninstall_actions(
         )
         if distribution_action.action == "prune":
             identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
+            if identity is not None and identity.kind == "unsafe":
+                actions.append(
+                    _UninstallAction(
+                        rel_path=rel_path.as_posix(),
+                        category=category,
+                        status="preserved",
+                        reason="managed asset has unsafe identity; manual review required",
+                    )
+                )
+                continue
             if rel_path in obsolete_paths:
                 reason = (
                     "known obsolete SpecDock-managed asset"
@@ -2209,11 +3938,28 @@ def _build_uninstall_plan(
             known_rel_paths=known_rel_paths,
         )
 
+        _add_managed_scaffold_uninstall_actions(actions, target_root, known_rel_paths)
+
         for rel_path, expected in _build_scaffold_uninstall_sources(assets_dir):
+            if any(
+                rel_path == managed_root or _is_path_prefix(managed_root, rel_path)
+                for managed_root in _MANAGED_SCAFFOLD_ROOTS
+            ):
+                continue
             known_rel_paths.add(rel_path)
             if _is_delete_even_if_mismatch_uninstall_path(rel_path):
                 if _path_exists_for_uninstall(target_root / rel_path) or include_missing_removals:
                     identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
+                    if identity is not None and identity.kind == "unsafe":
+                        actions.append(
+                            _UninstallAction(
+                                rel_path=rel_path.as_posix(),
+                                category="scaffold_managed",
+                                status="preserved",
+                                reason="managed state has unsafe identity; manual review required",
+                            )
+                        )
+                        continue
                     actions.append(
                         _UninstallAction(
                             rel_path=rel_path.as_posix(),
@@ -2256,6 +4002,7 @@ def _summarize_uninstall_actions(actions: tuple[_UninstallAction, ...]) -> dict[
         "already_removed": 0,
         "preserved": 0,
         "failed": 0,
+        "pending": 0,
         "empty_dir_removed": 0,
     }
     for action in actions:
@@ -2352,14 +4099,14 @@ def _remove_uninstall_path(
                         )
                 os.unlink(rel_path.name, dir_fd=parent_fd)
             elif stat.S_ISDIR(info.st_mode):
-                if action.category != "spec_history":
+                if action.category not in {"spec_history", "scaffold_managed"}:
                     return action._replace(
                         status="failed",
                         error="unexpected uninstall directory requires manual review",
                     )
                 directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
                 try:
-                    _remove_uninstall_tree_fd(directory_fd)
+                    _remove_uninstall_tree_fd(target_root, rel_path, directory_fd, (*fds, directory_fd))
                 finally:
                     os.close(directory_fd)
                 os.rmdir(rel_path.name, dir_fd=parent_fd)
@@ -2394,6 +4141,7 @@ def _cleanup_empty_uninstall_dirs(
     actions: tuple[_UninstallAction, ...],
     *,
     expected_root_identity: DistributionRootIdentity | None = None,
+    include_workspace_root: bool = False,
 ) -> tuple[_UninstallAction, ...]:
     cleanup_actions: list[_UninstallAction] = []
     candidates: set[Path] = set()
@@ -2416,10 +4164,57 @@ def _cleanup_empty_uninstall_dirs(
             candidates.add(current)
             current = current.parent
 
+    # Fresh installs create these generated-state roots even when no state has
+    # been written yet.  Include the known roots explicitly so a successful
+    # uninstall can remove empty directories without scanning or deleting
+    # unknown user-owned paths.
+    for rel_root in _GENERATED_STATE_ROOTS:
+        root = target_root / rel_root
+        if not _path_exists_for_uninstall(root):
+            continue
+        if root.is_symlink() or not root.is_dir():
+            cleanup_actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="empty_dir",
+                    status="failed",
+                    reason="generated state root changed during cleanup",
+                    error="generated state root is no longer a real directory",
+                )
+            )
+            continue
+        walk_errors: list[OSError] = []
+
+        for current_raw, _directories, _files in os.walk(
+            root,
+            topdown=False,
+            followlinks=False,
+            onerror=walk_errors.append,
+        ):
+            current_path = Path(current_raw)
+            if not current_path.is_symlink():
+                candidates.add(current_path.relative_to(target_root))
+        if walk_errors:
+            cleanup_actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="empty_dir",
+                    status="failed",
+                    reason="generated state cleanup could not inspect the managed tree",
+                    error="generated state directory inspection failed",
+                )
+            )
+        candidates.add(rel_root)
+
+    if not include_workspace_root:
+        candidates.discard(Path("spec-dock"))
+
     for rel_path in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
         if not _is_uninstall_cleanup_boundary_path(rel_path):
             continue
         if rel_path in protected:
+            continue
+        if not _path_exists_for_uninstall(target_root / rel_path):
             continue
         try:
             with _open_uninstall_parent_chain(
@@ -2435,9 +4230,31 @@ def _cleanup_empty_uninstall_dirs(
                     continue
                 if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
                     continue
-                os.rmdir(rel_path.name, dir_fd=parent_fd)
-                _assert_uninstall_visible_chain(target_root, rel_path, fds)
+                expected_identity = _ManagedPathIdentity(info.st_dev, info.st_ino, info.st_ctime_ns)
+            _remove_empty_bound_directory(
+                target_root,
+                rel_path,
+                expected_identity=expected_identity,
+                expected_root_identity=expected_root_identity,
+            )
+        except FileNotFoundError:
+            continue
         except (OSError, RuntimeError):
+            strict_generated_cleanup = any(
+                rel_path == generated_root or _is_path_prefix(generated_root, rel_path)
+                for generated_root in _GENERATED_STATE_ROOTS
+            ) or (include_workspace_root and rel_path == Path("spec-dock"))
+            if not strict_generated_cleanup:
+                continue
+            cleanup_actions.append(
+                _UninstallAction(
+                    rel_path=rel_path.as_posix(),
+                    category="empty_dir",
+                    status="failed",
+                    reason="empty directory cleanup failed; retry required",
+                    error="managed empty directory could not be removed safely",
+                )
+            )
             continue
         cleanup_actions.append(
             _UninstallAction(
@@ -2457,24 +4274,42 @@ def _apply_uninstall_plan(
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> tuple[_UninstallAction, ...]:
     results: list[_UninstallAction] = []
+    halted = False
     for action in actions:
         if action.status == "would_remove":
-            results.append(
-                _remove_uninstall_path(
+            if halted:
+                results.append(
+                    action._replace(
+                        status="pending",
+                        reason="not attempted after an earlier uninstall safety failure",
+                        error=None,
+                    )
+                )
+                continue
+            try:
+                result = _remove_uninstall_path(
                     target_root,
                     action,
                     expected_root_identity=expected_root_identity,
                 )
-            )
+            except (OSError, RuntimeError):
+                result = action._replace(
+                    status="failed",
+                    reason="uninstall action failed; retry required",
+                    error="uninstall action failed safely",
+                )
+            results.append(result)
+            halted = result.status == "failed"
         else:
             results.append(action)
-    results.extend(
-        _cleanup_empty_uninstall_dirs(
-            target_root,
-            tuple(results),
-            expected_root_identity=expected_root_identity,
+    if not halted:
+        results.extend(
+            _cleanup_empty_uninstall_dirs(
+                target_root,
+                tuple(results),
+                expected_root_identity=expected_root_identity,
+            )
         )
-    )
     return tuple(sorted(results, key=lambda action: (action.rel_path, action.status)))
 
 
@@ -2552,7 +4387,6 @@ def _remove_uninstall_retry_marker(
         if expected_identity is not None:
             _assert_uninstall_target_identity(parent_fd, marker_rel.name, info, expected_identity)
         os.unlink(marker_rel.name, dir_fd=parent_fd)
-        _assert_uninstall_visible_chain(target_root, marker_rel, fds)
 
 
 def _finalize_uninstall_retry_marker(
@@ -2585,6 +4419,25 @@ def _finalize_uninstall_retry_marker(
     return tuple(sorted(finalized, key=lambda action: (action.rel_path, action.status)))
 
 
+def _restore_uninstall_retry_marker_action(
+    actions: tuple[_UninstallAction, ...],
+) -> tuple[_UninstallAction, ...]:
+    """Reflect a safely recreated retry marker after a postcondition failure."""
+
+    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
+    restored = [
+        action._replace(
+            status="preserved",
+            reason="SpecDock uninstall retry marker preserved after terminal cleanup failure",
+            error=None,
+        )
+        if action.rel_path == marker_path
+        else action
+        for action in actions
+    ]
+    return tuple(sorted(restored, key=lambda action: (action.rel_path, action.status)))
+
+
 def _verify_uninstall_postcondition(
     target_root: Path,
     actions: tuple[_UninstallAction, ...],
@@ -2605,6 +4458,37 @@ def _verify_uninstall_postcondition(
     _assert_distribution_root_identity(target_root, expected_root_identity)
 
 
+def _uninstall_retry_command(specs_mode: str | None, *, target_label: str = ".") -> str | None:
+    if specs_mode not in {"keep", "remove"}:
+        return None
+    mode = "keep-specs" if specs_mode == "keep" else "remove-specs"
+    argv = ["spec-dock", "uninstall", "--apply", f"--{mode}"]
+    if target_label.startswith("-"):
+        argv.append("--")
+    argv.append(target_label)
+    return _shell_join(argv)
+
+
+def _uninstall_failure_paths(
+    actions: tuple[_UninstallAction, ...],
+    explicit_paths: tuple[str, ...],
+) -> list[str]:
+    paths = set(explicit_paths)
+    paths.update(action.rel_path for action in actions if action.status in {"failed", "pending"})
+    return sorted(paths)
+
+
+def _sanitize_uninstall_action_error(error: str | None) -> str | None:
+    if error is None:
+        return None
+    return "uninstall action failed safely; inspect the relative action and retry command"
+
+
+def _sanitize_uninstall_operation_error(phase: str | None) -> str:
+    phase_name = phase or "unknown phase"
+    return f"uninstall operation failed during {phase_name}; retry required"
+
+
 def _uninstall_payload(
     target_root: Path,
     *,
@@ -2613,14 +4497,30 @@ def _uninstall_payload(
     actions: tuple[_UninstallAction, ...],
     status: str | None = None,
     errors: list[str] | None = None,
+    phase: str | None = None,
+    last_completed_phase: str | None = None,
+    diagnostic_paths: tuple[str, ...] = (),
 ) -> dict[str, Any]:
+    resolved_status = status or ("completed" if apply else "planned")
+    is_sanitized_failure = resolved_status in {"partial_failure", "blocked"}
+    failure_paths = _uninstall_failure_paths(actions, diagnostic_paths)
+    target_label = _safe_retry_target_label(target_root)
     return {
         "schema_version": 1,
-        "target": str(target_root),
+        "target": (target_label or "unavailable") if is_sanitized_failure else str(target_root),
         "mode": "apply" if apply else "dry-run",
         "apply": apply,
         "specs_mode": specs_mode,
-        "status": status or ("completed" if apply else "planned"),
+        "status": resolved_status,
+        "phase": phase or ("complete" if resolved_status == "completed" else "preflight"),
+        "last_completed_phase": last_completed_phase
+        or ("marker-finalized" if resolved_status == "completed" else "not-started"),
+        "retry_command": _uninstall_retry_command(
+            specs_mode,
+            target_label=target_label or "unavailable" if is_sanitized_failure else ".",
+        ),
+        "failed_paths": failure_paths,
+        "pending_paths": [action.rel_path for action in actions if action.status == "pending"],
         "summary": _summarize_uninstall_actions(actions),
         "actions": [
             {
@@ -2628,7 +4528,7 @@ def _uninstall_payload(
                 "category": action.category,
                 "status": action.status,
                 "reason": action.reason,
-                "error": action.error,
+                "error": _sanitize_uninstall_action_error(action.error) if is_sanitized_failure else action.error,
             }
             for action in actions
         ],
@@ -2640,7 +4540,11 @@ def _uninstall_payload(
             ),
             "reinstall or refresh with installer CLI: spec-dock init <target> or spec-dock update <target>",
         ],
-        "errors": errors or [],
+        "errors": (
+            [_sanitize_uninstall_operation_error(phase) for _ in (errors or ["uninstall operation failed"])]
+            if is_sanitized_failure
+            else errors or []
+        ),
     }
 
 
@@ -2672,23 +4576,42 @@ def _render_uninstall_text(payload: dict[str, Any]) -> str:
     lines = [
         f"spec-dock: uninstall {noun} ({payload['mode']}) -> {payload['target']}",
         f"specs_mode: {payload['specs_mode'] or 'unspecified'}",
+        f"status: {payload['status']}",
+        f"phase: {payload['phase']}",
+        f"last_completed_phase: {payload['last_completed_phase']}",
+        f"retry_command: {payload['retry_command'] or 'unavailable'}",
+        f"failed_paths: {', '.join(payload.get('failed_paths', [])) or 'none'}",
         "summary:",
     ]
     for key, value in payload["summary"].items():
         lines.append(f"  {key}: {value}")
     lines.append("actions:")
     for action in payload["actions"]:
-        lines.append(f"  [{action['status']}] {action['path']} category={action['category']} reason={action['reason']}")
+        line = f"  [{action['status']}] {action['path']} category={action['category']} reason={action['reason']}"
+        if action.get("error"):
+            line += f" error={action['error']}"
+        lines.append(line)
+    if payload.get("errors"):
+        lines.append("errors:")
+        for error in payload["errors"]:
+            lines.append(f"  - {error}")
     lines.append("guidance:")
     for item in payload["guidance"]:
         lines.append(f"  - {item}")
     return "\n".join(lines)
 
 
-def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
+def _run_uninstall_unlocked(
+    target_root: Path,
+    ns: argparse.Namespace,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> int:
     specs_mode = _uninstall_specs_mode(ns)
     apply_requested = bool(ns.apply)
     json_requested = bool(ns.json)
+    phase = "preflight"
+    last_completed_phase = "not-started"
 
     if not target_root.exists() or not target_root.is_dir():
         return _emit_uninstall_preflight_error(
@@ -2697,6 +4620,17 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             specs_mode=specs_mode,
             json_requested=json_requested,
             message=f"target path is not a directory: {target_root}",
+        )
+
+    try:
+        _require_retry_target_label(target_root)
+    except RuntimeError as exc:
+        return _emit_uninstall_preflight_error(
+            target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+            message=str(exc),
         )
 
     if apply_requested and specs_mode is None:
@@ -2709,7 +4643,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
         )
 
     try:
-        uninstall_root_identity = _distribution_root_identity(target_root)
+        uninstall_root_identity = expected_root_identity or _distribution_root_identity(target_root)
+        _assert_distribution_root_identity(target_root, uninstall_root_identity)
     except RuntimeError as e:
         return _emit_uninstall_preflight_error(
             target_root,
@@ -2743,6 +4678,7 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             json_requested=json_requested,
             message=str(e),
         )
+    last_completed_phase = "preflight-complete"
 
     try:
         # The complete plan must be validated before the first apply mutation.
@@ -2771,10 +4707,13 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 specs_mode=specs_mode,
                 actions=actions,
                 status="blocked",
+                phase="preflight",
+                last_completed_phase=last_completed_phase,
                 errors=[
                     "uninstall apply blocked before mutation: "
                     + "; ".join(f"{action.rel_path}: {action.reason}" for action in blockers)
                 ],
+                diagnostic_paths=tuple(action.rel_path for action in blockers),
             )
             if json_requested:
                 print(json.dumps(payload, sort_keys=True))
@@ -2783,16 +4722,21 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
             return 1
 
         try:
+            phase = "marker-write"
             _write_uninstall_retry_marker(
                 target_root,
                 expected_root_identity=uninstall_root_identity,
             )
+            last_completed_phase = "marker-written"
             actions = _ensure_uninstall_retry_marker_action(actions)
+            phase = "uninstall-apply"
             actions = _apply_uninstall_plan(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
+            if not any(action.status == "failed" for action in actions):
+                last_completed_phase = "uninstall-applied"
         except (OSError, RuntimeError) as e:
             payload = _uninstall_payload(
                 target_root,
@@ -2800,7 +4744,10 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
                 specs_mode=specs_mode,
                 actions=actions,
                 status="partial_failure",
+                phase=phase,
+                last_completed_phase=last_completed_phase,
                 errors=[str(e)],
+                diagnostic_paths=((_UNINSTALL_RETRY_MARKER_REL.as_posix(),) if phase == "marker-write" else ()),
             )
             if json_requested:
                 print(json.dumps(payload, sort_keys=True))
@@ -2811,24 +4758,67 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     has_failures = any(action.status == "failed" for action in actions)
     if apply_requested and not has_failures:
         try:
+            phase = "post-verify"
             _verify_uninstall_postcondition(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
+            last_completed_phase = "post-verified"
+            phase = "root-cleanup"
+            cleanup_actions = _cleanup_empty_uninstall_dirs(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+            )
+            actions = tuple(
+                sorted(
+                    (
+                        *actions,
+                        *cleanup_actions,
+                    ),
+                    key=lambda action: (action.rel_path, action.status),
+                )
+            )
+            if any(action.status == "failed" for action in cleanup_actions):
+                raise RuntimeError("uninstall empty directory cleanup failed; retry required")
+            phase = "post-verify"
+            _verify_uninstall_postcondition(
+                target_root,
+                actions,
+                expected_root_identity=uninstall_root_identity,
+            )
+            last_completed_phase = "post-verified"
+            phase = "marker-finalization"
             actions = _finalize_uninstall_retry_marker(
                 target_root,
                 actions,
                 expected_root_identity=uninstall_root_identity,
             )
+            last_completed_phase = "marker-finalized"
         except (OSError, RuntimeError) as e:
+            if phase in {"post-verify", "marker-finalization"} and not _path_exists_for_uninstall(
+                target_root / _UNINSTALL_RETRY_MARKER_REL
+            ):
+                with suppress(OSError, RuntimeError):
+                    _write_uninstall_retry_marker(
+                        target_root,
+                        expected_root_identity=uninstall_root_identity,
+                    )
+                if _path_exists_for_uninstall(target_root / _UNINSTALL_RETRY_MARKER_REL):
+                    actions = _restore_uninstall_retry_marker_action(actions)
             payload = _uninstall_payload(
                 target_root,
                 apply=True,
                 specs_mode=specs_mode,
                 actions=actions,
                 status="partial_failure",
+                phase=phase,
+                last_completed_phase=last_completed_phase,
                 errors=[str(e)],
+                diagnostic_paths=(
+                    (_UNINSTALL_RETRY_MARKER_REL.as_posix(),) if phase == "marker-finalization" else ("spec-dock",)
+                ),
             )
             if json_requested:
                 print(json.dumps(payload, sort_keys=True))
@@ -2842,6 +4832,8 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
         specs_mode=specs_mode,
         actions=actions,
         status="partial_failure" if has_failures else None,
+        phase="complete" if apply_requested and not has_failures else phase,
+        last_completed_phase="marker-finalized" if apply_requested and not has_failures else last_completed_phase,
     )
     if json_requested:
         print(json.dumps(payload, sort_keys=True))
@@ -2850,541 +4842,23 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     return 1 if has_failures else 0
 
 
-def _iter_install_root_files(assets_dir: Path) -> tuple[Path, ...]:
-    install_root = assets_dir / "install_root"
-    if not install_root.is_dir():
-        raise RuntimeError(f"Missing asset directory: {install_root}")
-    return tuple(
-        sorted(
-            (
-                candidate
-                for candidate in install_root.rglob("*")
-                if candidate.is_file() and not _is_generated_python_cache_path(candidate.relative_to(install_root))
-            ),
-            key=lambda candidate: candidate.relative_to(install_root).as_posix(),
-        )
-    )
-
-
-def _build_current_managed_file_mappings(
-    assets_dir: Path,
-) -> tuple[tuple[_ManagedCurrentFileMapping, ...], dict[Path, Path]]:
-    install_root = assets_dir / "install_root"
-    mappings: list[_ManagedCurrentFileMapping] = []
-    source_by_target: dict[Path, Path] = {}
-    for source_path in _iter_install_root_files(assets_dir):
-        target_rel = source_path.relative_to(install_root)
-        source_asset_rel = Path("install_root") / target_rel
-        existing_source = source_by_target.get(target_rel)
-        if existing_source is not None and existing_source != source_asset_rel:
-            raise RuntimeError(
-                "duplicate current managed file mapping for target "
-                f"'{target_rel.as_posix()}' from '{existing_source.as_posix()}' and "
-                f"'{source_asset_rel.as_posix()}'"
-            )
-        source_by_target[target_rel] = source_asset_rel
-        mappings.append(
-            _ManagedCurrentFileMapping(
-                source_asset_rel=source_asset_rel,
-                target_rel=target_rel,
-            )
-        )
-    return tuple(mappings), source_by_target
-
-
-def _is_collision_aware_additive_skill_path(target_rel: Path) -> bool:
-    parts = target_rel.parts
-    return len(parts) >= 4 and parts[:2] == (".agents", "skills") and parts[2] in _COLLISION_AWARE_ADDITIVE_SKILL_NAMES
-
-
-def _preflight_collision_aware_additive_skill_assets(
-    target_root: Path,
-    *,
-    assets_dir: Path,
-    mappings: tuple[_ManagedCurrentFileMapping, ...],
-) -> None:
-    for mapping in mappings:
-        if not _is_collision_aware_additive_skill_path(mapping.target_rel):
-            continue
-        target_path = target_root / mapping.target_rel
-        if not target_path.exists():
-            if target_path.is_symlink():
-                raise RuntimeError(
-                    "target path conflict for additive skill asset "
-                    f"'{mapping.target_rel.as_posix()}' (dangling symlink)"
-                )
-            continue
-        if target_path.is_symlink() or not target_path.is_file():
-            raise RuntimeError(
-                "target path conflict for additive skill asset "
-                f"'{mapping.target_rel.as_posix()}' (expected an ordinary file)"
-            )
-        source_path = assets_dir / mapping.source_asset_rel
-        if target_path.read_bytes() != source_path.read_bytes():
-            raise RuntimeError(
-                "refusing to overwrite non-identical additive skill asset "
-                f"'{mapping.target_rel.as_posix()}'; preserve or relocate the existing file first"
-            )
-
-
-def _additive_skill_directory_flags() -> int:
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    directory = getattr(os, "O_DIRECTORY", None)
-    if not isinstance(nofollow, int) or not isinstance(directory, int):
-        raise RuntimeError("platform lacks required no-follow directory support for additive skill assets")
-    return os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
-
-
-def _open_additive_skill_parent(target_root: Path, target_rel: Path, *, create_missing: bool) -> int:
-    flags = _additive_skill_directory_flags()
+def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
+    if not bool(ns.apply):
+        return _run_uninstall_unlocked(target_root, ns)
     try:
-        current_fd = os.open(target_root, flags)
-    except OSError as exc:
-        raise RuntimeError(f"cannot open additive skill target root without following symlinks: {exc}") from exc
-
-    try:
-        for component in target_rel.parts[:-1]:
-            try:
-                next_fd = os.open(component, flags, dir_fd=current_fd)
-            except FileNotFoundError:
-                if not create_missing:
-                    raise RuntimeError(
-                        f"missing additive skill parent component '{component}' for '{target_rel.as_posix()}'"
-                    ) from None
-                with suppress(FileExistsError):
-                    os.mkdir(component, dir_fd=current_fd)
-                try:
-                    next_fd = os.open(component, flags, dir_fd=current_fd)
-                except OSError as exc:
-                    raise RuntimeError(
-                        f"unsafe additive skill parent component '{component}' for '{target_rel.as_posix()}': {exc}"
-                    ) from exc
-            except OSError as exc:
-                raise RuntimeError(
-                    f"unsafe additive skill parent component '{component}' for '{target_rel.as_posix()}': {exc}"
-                ) from exc
-            os.close(current_fd)
-            current_fd = next_fd
-        return current_fd
-    except BaseException:
-        os.close(current_fd)
-        raise
-
-
-def _read_file_descriptor(fd: int) -> bytes:
-    chunks: list[bytes] = []
-    while True:
-        chunk = os.read(fd, 1024 * 64)
-        if not chunk:
-            return b"".join(chunks)
-        chunks.append(chunk)
-
-
-def _write_file_descriptor(
-    fd: int,
-    content: bytes,
-    *,
-    before_first_write: Callable[[], None] | None = None,
-) -> None:
-    if before_first_write is not None:
-        before_first_write()
-    view = memoryview(content)
-    written = 0
-    while written < len(view):
-        count = os.write(fd, view[written:])
-        if count <= 0:
-            raise RuntimeError("additive skill asset write made no progress")
-        written += count
-
-
-def _require_additive_skill_parent_still_bound(
-    *,
-    target_root: Path,
-    target_rel: Path,
-    parent_fd: int,
-) -> None:
-    try:
-        rebound_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=False)
-    except RuntimeError as exc:
-        raise RuntimeError(
-            f"additive skill parent moved outside the repository for '{target_rel.as_posix()}': {exc}"
-        ) from exc
-    try:
-        opened = os.fstat(parent_fd)
-        rebound = os.fstat(rebound_fd)
-        if (opened.st_dev, opened.st_ino) != (rebound.st_dev, rebound.st_ino):
-            raise RuntimeError(f"additive skill parent moved outside the repository for '{target_rel.as_posix()}'")
-    finally:
-        os.close(rebound_fd)
-
-
-def _verify_existing_additive_skill_asset(
-    *,
-    source_bytes: bytes,
-    target_root: Path,
-    target_rel: Path,
-) -> None:
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int):
-        raise RuntimeError("platform lacks required no-follow file support for additive skill assets")
-    parent_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=False)
-    file_fd: int | None = None
-    try:
-        try:
-            file_fd = os.open(
-                target_rel.name,
-                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
-                dir_fd=parent_fd,
-            )
-        except OSError as exc:
-            raise RuntimeError(
-                "target path conflict for additive skill asset "
-                f"'{target_rel.as_posix()}' (symlink or unreadable entry): {exc}"
-            ) from exc
-        info = os.fstat(file_fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise RuntimeError(
-                f"target path conflict for additive skill asset '{target_rel.as_posix()}' (expected an ordinary file)"
-            )
-        if _read_file_descriptor(file_fd) != source_bytes:
-            raise RuntimeError(
-                "refusing to overwrite non-identical additive skill asset "
-                f"'{target_rel.as_posix()}'; preserve or relocate the existing file first"
-            )
-        observed = os.stat(target_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-        if (observed.st_dev, observed.st_ino) != (info.st_dev, info.st_ino):
-            raise RuntimeError(f"target path changed while adopting additive skill asset '{target_rel.as_posix()}'")
-    finally:
-        if file_fd is not None:
-            os.close(file_fd)
-        os.close(parent_fd)
-
-
-def _materialize_collision_aware_additive_skill_asset(
-    *,
-    source_path: Path,
-    target_root: Path,
-    target_rel: Path,
-) -> None:
-    source_bytes = source_path.read_bytes()
-    source_mode = stat.S_IMODE(source_path.stat().st_mode)
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int):
-        raise RuntimeError("platform lacks required no-follow file support for additive skill assets")
-
-    parent_fd = _open_additive_skill_parent(target_root, target_rel, create_missing=True)
-    file_fd: int | None = None
-    try:
-        _require_additive_skill_parent_still_bound(
-            target_root=target_root,
-            target_rel=target_rel,
-            parent_fd=parent_fd,
-        )
-        try:
-            file_fd = os.open(
-                target_rel.name,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
-                source_mode,
-                dir_fd=parent_fd,
-            )
-        except FileExistsError:
-            os.close(parent_fd)
-            parent_fd = -1
-            _verify_existing_additive_skill_asset(
-                source_bytes=source_bytes,
-                target_root=target_root,
-                target_rel=target_rel,
-            )
-            return
-
-        created = os.fstat(file_fd)
-        if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
-            raise RuntimeError(f"new additive skill asset is not a safe ordinary file: '{target_rel.as_posix()}'")
-        _write_file_descriptor(
-            file_fd,
-            source_bytes,
-            before_first_write=lambda: _require_additive_skill_parent_still_bound(
-                target_root=target_root,
-                target_rel=target_rel,
-                parent_fd=parent_fd,
-            ),
-        )
-        os.fsync(file_fd)
-        _require_additive_skill_parent_still_bound(
-            target_root=target_root,
-            target_rel=target_rel,
-            parent_fd=parent_fd,
-        )
-        observed = os.stat(target_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-        if (
-            not stat.S_ISREG(observed.st_mode)
-            or observed.st_nlink != 1
-            or (observed.st_dev, observed.st_ino) != (created.st_dev, created.st_ino)
-        ):
-            raise RuntimeError(f"target path changed while creating additive skill asset '{target_rel.as_posix()}'")
-    except OSError as exc:
-        raise RuntimeError(f"cannot safely materialize additive skill asset '{target_rel.as_posix()}': {exc}") from exc
-    finally:
-        if file_fd is not None:
-            os.close(file_fd)
-        if parent_fd >= 0:
-            os.close(parent_fd)
-
-
-def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallPlan:
-    managed_skill_names = _managed_skill_names()
-    current_file_mappings, source_by_target = _build_current_managed_file_mappings(assets_dir)
-
-    for skill_name in managed_skill_names:
-        target_rel = Path(".agents") / "skills" / skill_name / "SKILL.md"
-        source_rel = source_by_target.get(target_rel)
-        if source_rel is None:
-            raise RuntimeError(f"Missing asset file: {assets_dir / 'install_root' / target_rel}")
-        src_skill = assets_dir / source_rel
-        if not src_skill.is_file():
-            raise RuntimeError(f"Missing asset file: {src_skill}")
-
-    return _ManagedSkillInstallPlan(
-        current_file_mappings=current_file_mappings,
-        bootstrap_only_rel_paths=(),
-        obsolete_exact_rel_paths=(),
-    )
-
-
-def _preflight_target_path_conflicts(
-    target_root: Path,
-    *,
-    current_target_rel_paths: tuple[Path, ...],
-    obsolete_target_rel_paths: tuple[Path, ...],
-    bootstrap_only_target_rel_paths: tuple[Path, ...] = (),
-) -> None:
-    bootstrap_only_target_rel_path_set = set(bootstrap_only_target_rel_paths)
-
-    def _assert_exact_file_path_safe(
-        target_rel: Path,
-        *,
-        path_kind: str,
-        reject_exact_symlink: bool,
-        allow_exact_file_symlink: bool = False,
-    ) -> None:
-        target_path = target_root / target_rel
-        rel_posix = target_rel.as_posix()
-
-        for parent in target_path.parents:
-            if parent == target_root:
-                break
-            if parent.is_symlink():
-                parent_rel = parent.relative_to(target_root).as_posix()
-                raise RuntimeError(
-                    "target directory/container conflict for "
-                    f"{path_kind} '{rel_posix}' (symlink container: '{parent_rel}')"
-                )
-            if parent.exists() and not parent.is_dir():
-                parent_rel = parent.relative_to(target_root).as_posix()
-                raise RuntimeError(
-                    "target directory/container conflict for "
-                    f"{path_kind} '{rel_posix}' (non-directory container: '{parent_rel}')"
-                )
-
-        if target_path.is_symlink():
-            if reject_exact_symlink:
-                if allow_exact_file_symlink and target_path.exists() and target_path.is_file():
-                    return
-                raise RuntimeError(
-                    f"target directory/container conflict for {path_kind} '{rel_posix}' (symlink at exact file path)"
-                )
-            return
-
-        if target_path.exists() and target_path.is_dir():
-            raise RuntimeError(
-                "target directory/container conflict for "
-                f"{path_kind} '{rel_posix}' (existing directory at exact file path)"
-            )
-
-    for current_rel in current_target_rel_paths:
-        _assert_exact_file_path_safe(
-            current_rel,
-            path_kind="current managed path",
-            reject_exact_symlink=True,
-            allow_exact_file_symlink=current_rel in bootstrap_only_target_rel_path_set,
-        )
-    for obsolete_rel in obsolete_target_rel_paths:
-        _assert_exact_file_path_safe(
-            obsolete_rel,
-            path_kind="obsolete managed path",
-            reject_exact_symlink=False,
-        )
-
-
-def _preflight_managed_skill_install_plan(target_root: Path | None = None) -> _ManagedSkillInstallPlan:
-    with _assets_dir() as assets_dir:
-        plan = _build_managed_skill_install_plan(assets_dir)
-        if target_root is not None:
-            current_target_rel_paths = tuple(
-                sorted(
-                    {mapping.target_rel for mapping in plan.current_file_mappings},
-                    key=lambda path: path.as_posix(),
-                )
-            )
-            obsolete_target_rel_paths = tuple(
-                sorted(
-                    set(plan.obsolete_exact_rel_paths),
-                    key=lambda path: path.as_posix(),
-                )
-            )
-            _preflight_target_path_conflicts(
+        with _exclusive_distribution_operation(target_root) as locked_root_identity:
+            return _run_uninstall_unlocked(
                 target_root,
-                current_target_rel_paths=current_target_rel_paths,
-                obsolete_target_rel_paths=obsolete_target_rel_paths,
-                bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
+                ns,
+                expected_root_identity=locked_root_identity,
             )
-            _preflight_collision_aware_additive_skill_assets(
-                target_root,
-                assets_dir=assets_dir,
-                mappings=plan.current_file_mappings,
-            )
-
-    return plan
-
-
-def _apply_managed_skill_install_plan(
-    target_root: Path,
-    *,
-    assets_dir: Path,
-    plan: _ManagedSkillInstallPlan,
-) -> None:
-    current_sync_plan: list[tuple[Path, Path, Path]] = []
-    bootstrap_only_target_rel_paths = set(plan.bootstrap_only_rel_paths)
-    current_target_rel_paths = tuple(
-        sorted(
-            {mapping.target_rel for mapping in plan.current_file_mappings},
-            key=lambda path: path.as_posix(),
-        )
-    )
-    obsolete_target_rel_paths = tuple(
-        sorted(
-            set(plan.obsolete_exact_rel_paths),
-            key=lambda path: path.as_posix(),
-        )
-    )
-
-    _preflight_target_path_conflicts(
-        target_root,
-        current_target_rel_paths=current_target_rel_paths,
-        obsolete_target_rel_paths=obsolete_target_rel_paths,
-        bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
-    )
-    _preflight_collision_aware_additive_skill_assets(
-        target_root,
-        assets_dir=assets_dir,
-        mappings=plan.current_file_mappings,
-    )
-
-    for mapping in plan.current_file_mappings:
-        source_path = assets_dir / mapping.source_asset_rel
-        if not source_path.is_file():
-            raise RuntimeError(f"Missing asset file: {source_path}")
-        target_path = target_root / mapping.target_rel
-        current_sync_plan.append((mapping.target_rel, source_path, target_path))
-
-    for target_rel, source_path, target_path in current_sync_plan:
-        if _is_collision_aware_additive_skill_path(target_rel):
-            _materialize_collision_aware_additive_skill_asset(
-                source_path=source_path,
-                target_root=target_root,
-                target_rel=target_rel,
-            )
-            continue
-        if target_rel in bootstrap_only_target_rel_paths and target_path.exists():
-            if target_path.is_file():
-                _migrate_bootstrap_only_config_if_stale(target_rel, target_path)
-                continue
-            raise RuntimeError(
-                "target directory/container conflict for current managed path "
-                f"'{target_rel.as_posix()}' (non-file entry at exact file path)"
-            )
-        _copy_file(source_path, target_path)
-
-    missing_current_targets: list[str] = []
-    for target_rel, source_path, target_path in current_sync_plan:
-        if _is_collision_aware_additive_skill_path(target_rel):
-            _verify_existing_additive_skill_asset(
-                source_bytes=source_path.read_bytes(),
-                target_root=target_root,
-                target_rel=target_rel,
-            )
-        elif not target_path.is_file():
-            missing_current_targets.append(target_rel.as_posix())
-    if missing_current_targets:
-        joined = ", ".join(sorted(missing_current_targets))
-        raise RuntimeError(f"managed current sync incomplete (missing target): {joined}")
-
-    current_target_rel_path_set = {target_rel for target_rel, _src, _dest in current_sync_plan}
-    protected_current_parent_dirs: set[Path] = set()
-    for current_target_rel in current_target_rel_path_set:
-        protected_current_parent_dirs.update(_parent_dirs_for(current_target_rel))
-    for obsolete_rel in obsolete_target_rel_paths:
-        if obsolete_rel in current_target_rel_path_set:
-            continue
-        obsolete_path = target_root / obsolete_rel
-        if not obsolete_path.exists() and not obsolete_path.is_symlink():
-            continue
-        if obsolete_path.is_symlink() or obsolete_path.is_file():
-            obsolete_path.unlink(missing_ok=True)
-            _prune_empty_obsolete_parent_dirs(
-                target_root,
-                obsolete_rel,
-                protected_rel_dirs=protected_current_parent_dirs,
-            )
-            continue
-        if obsolete_path.is_dir():
-            raise RuntimeError(
-                "target directory/container conflict for obsolete managed path "
-                f"'{obsolete_rel.as_posix()}' (existing directory at exact file path)"
-            )
-        raise RuntimeError(
-            "target directory/container conflict for obsolete managed path "
-            f"'{obsolete_rel.as_posix()}' (non-file entry at exact file path)"
-        )
-
-
-def _migrate_bootstrap_only_config_if_stale(target_rel: Path, target_path: Path) -> None:
-    if target_rel.as_posix() != ".codex/config.toml":
-        return
-    if target_path.is_symlink():
-        return
-    try:
-        target_text = target_path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return
-    migrated_text = target_text
-    replacements = (
-        (
-            "PR 作成後の checks / statuses / Codex review 監視は pr-monitor",
-            "PR 作成後の checks / statuses / Codex review 監視は "
-            "`github-pr-observation` skill の "
-            "`./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh` direct invocation",
-        ),
-    )
-    for old, new in replacements:
-        migrated_text = migrated_text.replace(old, new)
-    if migrated_text != target_text:
-        target_path.write_text(migrated_text, encoding="utf-8")
-
-
-def _install_skill(target_root: Path, *, plan: _ManagedSkillInstallPlan | None = None) -> None:
-    """Install/update managed agent skills and host-native shims.
-
-    Notes:
-    - Codex CLI discovers repository skills by scanning for `.agents/skills/`.
-    - Other agents may adopt the same convention (Agent Skills open standard).
-    """
-    with _assets_dir() as assets_dir:
-        install_plan = plan if plan is not None else _build_managed_skill_install_plan(assets_dir)
-        _apply_managed_skill_install_plan(
+    except (OSError, RuntimeError) as exc:
+        return _emit_uninstall_preflight_error(
             target_root,
-            assets_dir=assets_dir,
-            plan=install_plan,
+            apply=True,
+            specs_mode=_uninstall_specs_mode(ns),
+            json_requested=bool(ns.json),
+            message=str(exc),
         )
 
 
@@ -3433,19 +4907,30 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if ns.command == "init":
-            _admit_distribution_cli(
+            admission = _admit_distribution_cli(
                 target_root,
                 operation="init-force" if bool(ns.force) else "fresh",
             )
             if not ns.force:
-                if os.path.lexists(_specdock_dir(target_root)):
+                if admission.status == "retry":
+                    _install_recognized_distribution(target_root, operation="fresh")
+                elif admission.status == "fresh":
+                    _install_fresh_distribution(target_root)
+                elif os.path.lexists(_specdock_dir(target_root)):
                     raise RuntimeError("'spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
+                else:
+                    _install_fresh_distribution(target_root)
+            else:
+                if admission.status == "fresh":
+                    _install_fresh_distribution(target_root)
+                else:
+                    _install_recognized_distribution(target_root, operation="init-force")
+        elif ns.command == "update":
+            admission = _admit_distribution_cli(target_root, operation="update")
+            if admission.status == "fresh":
                 _install_fresh_distribution(target_root)
             else:
-                _install_recognized_distribution(target_root, operation="init-force")
-        elif ns.command == "update":
-            _admit_distribution_cli(target_root, operation="update")
-            _install_recognized_distribution(target_root, operation="update")
+                _install_recognized_distribution(target_root, operation="update")
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:

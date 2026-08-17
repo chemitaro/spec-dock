@@ -13,6 +13,7 @@ AUTHORING_ROOT = DOCS_ROOT / "authoring"
 DOGFOOD_DOCS_ROOT = REPO_ROOT / "spec-dock" / "docs"
 TEMPLATES_ROOT = DOCS_ROOT.parent / "templates"
 DOGFOOD_TEMPLATES_ROOT = DOGFOOD_DOCS_ROOT.parent / "templates"
+REPOSITORY_GUIDELINES_PATH = REPO_ROOT / "AGENTS.md"
 
 OVERVIEW_LINK_TARGETS = (
     "requirement.md",
@@ -31,6 +32,7 @@ STORAGE_CORE_REFERENCE_TARGETS = frozenset({
 })
 CURRENT_FIRST_READ_DESTINATIONS = frozenset({
     *STORAGE_CORE_REFERENCE_TARGETS,
+    "migration.md",
     "authoring/overview.md",
 })
 REFERENCE_USE_DESTINATION_PREFIX = "reference-use:"
@@ -38,6 +40,7 @@ REFERENCE_USE_DESTINATION_PREFIX = "reference-use:"
 S06_CURRENT_ASSET_PATHS = (
     "docs/README.md",
     "docs/guide.md",
+    "docs/migration.md",
     "docs/authoring/overview.md",
     "templates/README.md",
 )
@@ -104,6 +107,7 @@ S07_OWNED_ASSET_CATEGORIES = {
         "templates/README.md",
         "docs/README.md",
         "docs/guide.md",
+        "docs/migration.md",
     ),
     "base-authoring-guides": (
         "docs/authoring/issue-plan.md",
@@ -709,12 +713,12 @@ def test_s07_parity_owned_asset_manifest_is_exact_and_explicit() -> None:
     assert {category: len(paths) for category, paths in S07_OWNED_ASSET_CATEGORIES.items()} == {
         "scope-templates": 12,
         "current-artifact-templates": 6,
-        "navigation-roots": 3,
+        "navigation-roots": 4,
         "base-authoring-guides": 2,
         "current-authoring-guides": 6,
         "planning-level-guides": 4,
     }
-    assert len(S07_OWNED_ASSET_MANIFEST) == 33
+    assert len(S07_OWNED_ASSET_MANIFEST) == 34
     assert _owned_manifest_delta(S07_OWNED_ASSET_MANIFEST) == ((), (), ())
     assert S07_PARITY_EXCLUDED_SURFACES == (
         "tests/unit/infra/test_authoring_kit_assets.py",
@@ -990,6 +994,18 @@ def test_current_navigation_vocabulary_excludes_legacy_authoring_contracts(relat
     content = (DOCS_ROOT.parent / relative_path).read_text(encoding="utf-8")
 
     assert not _current_vocabulary_violations(relative_path, content)
+
+
+def test_s90_retained_repository_guidelines_match_current_distribution_surface() -> None:
+    content = REPOSITORY_GUIDELINES_PATH.read_text(encoding="utf-8")
+
+    assert "src/spec_dock/assets/install_root/" in content
+    assert ".agents/skills/spec-dock/SKILL.md" in content
+    assert ".agents/skills/spec-dock-grill-with-docs/SKILL.md" in content
+    assert ".github/workflows/ci.yml" in content
+    assert ".codex/" not in content
+    assert ".github/agents/" not in content
+    assert "host adapter" not in content.lower()
 
 
 @pytest.mark.parametrize(

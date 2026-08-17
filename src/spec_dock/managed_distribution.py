@@ -8,6 +8,7 @@ operations and fails closed when an identity changes.
 
 from __future__ import annotations
 
+from contextlib import suppress
 import ctypes
 from dataclasses import dataclass
 import errno
@@ -16,7 +17,6 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
-import secrets
 import stat
 import sys
 from typing import TYPE_CHECKING, Any, Literal, NoReturn
@@ -31,6 +31,19 @@ class DistributionManifestError(ValueError):
 
 class DistributionApplyError(RuntimeError):
     """Raised when a distribution plan cannot be applied safely."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        phase: str | None = None,
+        applied_paths: tuple[str, ...] = (),
+        pending_paths: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.phase = phase
+        self.applied_paths = applied_paths
+        self.pending_paths = pending_paths
 
 
 class DistributionAdmissionError(RuntimeError):
@@ -52,11 +65,25 @@ class DistributionIdentity:
 
 
 @dataclass(frozen=True)
+class DistributionSourceSnapshot:
+    """Stable identity of a provider regular file captured with its bytes."""
+
+    device: int
+    inode: int
+    ctime_ns: int
+    mtime_ns: int
+    size: int
+    mode: int
+
+
+@dataclass(frozen=True)
 class DistributionAsset:
     """One file in the physical Current provider catalog."""
 
     path: str
     identity: DistributionIdentity
+    source_path: str | None = None
+    source_snapshot: DistributionSourceSnapshot | None = None
 
 
 DistributionOperation = Literal["fresh", "update", "init-force", "uninstall"]
@@ -161,6 +188,13 @@ class DistributionPlan:
     target_root: Path | None = None
     operation: DistributionOperation = "fresh"
     target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...] = ()
+    scaffold_assets: tuple[DistributionAsset, ...] = ()
+
+    @property
+    def scaffold_paths(self) -> frozenset[str]:
+        """Return target paths owned by the provider scaffold portion."""
+
+        return frozenset(asset.path for asset in self.scaffold_assets)
 
     @property
     def blocked(self) -> bool:
@@ -186,6 +220,18 @@ class DistributionRootIdentity:
 
 
 @dataclass(frozen=True)
+class DistributionStageOwnership:
+    """Recorded identity of one private staging entry created by an apply."""
+
+    path: str
+    stage_name: str
+    device: int
+    inode: int
+    ctime_ns: int
+    file_type: Literal["regular", "symlink"]
+
+
+@dataclass(frozen=True)
 class DistributionRetryMarker:
     """Validated init/update retry marker without absolute paths or secrets."""
 
@@ -194,6 +240,7 @@ class DistributionRetryMarker:
     target_root: DistributionRootIdentity
     last_completed_phase: str
     purpose: Literal["distribution-rerun"]
+    stage_ownership: tuple[DistributionStageOwnership, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -434,7 +481,13 @@ def _path_overlaps(left: str, right: str) -> bool:
 def _assert_no_manifest_overlap(
     current_paths: set[str],
     manifest: DistributionManifest,
+    *,
+    protected_paths: set[str] | frozenset[str] = frozenset(),
 ) -> None:
+    for current_path in current_paths:
+        if any(_path_overlaps(current_path, protected_path) for protected_path in protected_paths):
+            _fail(f"physical Current path overlaps protected workspace surface: {current_path}")
+
     seen_historical: set[tuple[str, str, str | None, str | None]] = set()
     for item in manifest.historical_current_identities:
         signature = (item["path"], item["kind"], item.get("sha256"), item.get("target"))
@@ -442,37 +495,39 @@ def _assert_no_manifest_overlap(
             _fail(f"duplicate historical identity: {item['path']}")
         seen_historical.add(signature)
 
-    records: list[tuple[str, str, bool]] = []
+    records: list[tuple[str, str, bool, bool]] = []
     for version_index, version in enumerate(manifest.recognized_workspace_versions):
         for anchor_index, anchor in enumerate(version["anchors"]):
             records.append((
                 anchor["path"],
                 f"recognized_workspace_versions[{version_index}].anchors[{anchor_index}]",
                 False,
+                True,
             ))
     for item in manifest.historical_current_identities:
         # A historical identity is intentionally allowed to describe the same
         # target path as a newly shipped Current asset.  It is the evidence
         # used to classify an existing consumer file for upgrade/prune.
-        records.append((item["path"], "historical_current_identities", True))
+        records.append((item["path"], "historical_current_identities", True, False))
     for item in manifest.obsolete_exact_files:
-        records.append((item["path"], "obsolete_exact_files", False))
+        records.append((item["path"], "obsolete_exact_files", False, False))
     for manifest_index, item in enumerate(manifest.trusted_consumer_manifests):
-        records.append((item["path"], f"trusted_consumer_manifests[{manifest_index}]", False))
+        records.append((item["path"], f"trusted_consumer_manifests[{manifest_index}]", False, False))
         for claim_index, claim in enumerate(item["claims"]):
             records.append((
                 claim["path"],
                 f"trusted_consumer_manifests[{manifest_index}].claims[{claim_index}]",
                 True,
+                False,
             ))
     for item in manifest.historical_shortcuts:
         # The canonical shortcut is a Current identity even though it is
         # synthesized rather than shipped as a regular file.  Historical
         # shortcut records may therefore share that exact path as evidence;
         # ancestor/descendant overlap remains invalid.
-        records.append((item["path"], "historical_shortcuts", True))
+        records.append((item["path"], "historical_shortcuts", True, False))
 
-    for index, (path, section, allows_current_overlap) in enumerate(records):
+    for index, (path, section, allows_current_overlap, allows_protected_overlap) in enumerate(records):
         if allows_current_overlap:
             current_overlap = any(
                 _path_overlaps(path, current_path) and path != current_path for current_path in current_paths
@@ -481,7 +536,11 @@ def _assert_no_manifest_overlap(
             current_overlap = any(_path_overlaps(path, current_path) for current_path in current_paths)
         if current_overlap:
             _fail(f"manifest path overlaps physical Current catalog: {path}")
-        for other_path, other_section, _ in records[:index]:
+        if not allows_protected_overlap and any(
+            _path_overlaps(path, protected_path) for protected_path in protected_paths
+        ):
+            _fail(f"manifest path overlaps protected workspace surface: {path}")
+        for other_path, other_section, _, _ in records[:index]:
             if section == "historical_current_identities" and other_section == section and path == other_path:
                 # Multiple releases may legitimately have different bytes at
                 # one reusable Current path; exact duplicates were rejected
@@ -514,8 +573,9 @@ _DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
 _DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
 _DISTRIBUTION_RETRY_PHASES = frozenset({
     "preflight-complete",
-    "distribution-applied",
-    "scaffold-refreshed",
+    "managed-scaffold-refreshed",
+    "current-external-materialized",
+    "obsolete-pruned",
     "post-verified",
     "version-written",
 })
@@ -525,6 +585,24 @@ _UNINSTALL_RETRY_MARKER_PAYLOAD = {
     "purpose": "uninstall-rerun",
 }
 _VERSION_ANCHOR_PATHS = frozenset({"spec-dock/scripts/spec-dock", "spec-dock/.gitignore"})
+_SCAFFOLD_MANAGED_ROOTS = ("docs", "templates", "scripts", "system")
+_PROTECTED_WORKSPACE_ROOTS = frozenset({
+    *(f"spec-dock/{name}" for name in _SCAFFOLD_MANAGED_ROOTS),
+    "spec-dock/initiatives",
+    "spec-dock/active",
+    "spec-dock/.agent",
+    "spec-dock/.workbench",
+    "spec-dock/.gitignore",
+    "spec-dock/spec-dock.version",
+    "spec-dock/.distribution-retry.json",
+    "spec-dock/.uninstall-retry.json",
+})
+
+
+def _protected_workspace_paths(scaffold_assets: tuple[DistributionAsset, ...]) -> frozenset[str]:
+    """Return all provider-owned and user-preserve workspace boundaries."""
+
+    return _PROTECTED_WORKSPACE_ROOTS | frozenset(asset.path for asset in scaffold_assets)
 
 
 def _admission_block(reason: str, detail: str) -> NoReturn:
@@ -611,6 +689,53 @@ def _root_identity_for_admission(target_root: Path) -> DistributionRootIdentity:
     return DistributionRootIdentity(device=info.st_dev, inode=info.st_ino)
 
 
+def _is_preserved_specs_workspace(target_root: Path) -> bool:
+    """Recognize only the exact boundary left by a successful keep-specs uninstall."""
+
+    specdock_path = target_root / "spec-dock"
+    try:
+        specdock_info = os.lstat(specdock_path)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+    if stat.S_ISLNK(specdock_info.st_mode) or not stat.S_ISDIR(specdock_info.st_mode):
+        return False
+    try:
+        children = list(os.scandir(specdock_path))
+    except OSError:
+        _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+    if {entry.name for entry in children} != {"initiatives"}:
+        return False
+    initiatives = children[0]
+    try:
+        initiatives_info = initiatives.stat(follow_symlinks=False)
+    except OSError:
+        _admission_block("workspace-invalid", "preserved spec history cannot be inspected safely")
+    if initiatives.name != "initiatives" or not stat.S_ISDIR(initiatives_info.st_mode):
+        return False
+    pending = [initiatives.path]
+    while pending:
+        current = pending.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError:
+            _admission_block("workspace-invalid", "preserved spec history cannot be inspected safely")
+        for entry in entries:
+            try:
+                entry_info = entry.stat(follow_symlinks=False)
+            except OSError:
+                _admission_block("workspace-invalid", "preserved spec history cannot be inspected safely")
+            if stat.S_ISLNK(entry_info.st_mode):
+                return False
+            if stat.S_ISDIR(entry_info.st_mode):
+                pending.append(entry.path)
+                continue
+            if not stat.S_ISREG(entry_info.st_mode):
+                return False
+    return True
+
+
 def _assert_real_parent_chain(target_root: Path, relative_path: str, *, label: str) -> bool:
     current = target_root
     for component in PurePosixPath(relative_path).parts[:-1]:
@@ -646,7 +771,8 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         "last_completed_phase",
         "purpose",
     }
-    if set(raw) != expected_fields:
+    raw_fields = set(raw)
+    if raw_fields != expected_fields and raw_fields != expected_fields | {"stage_ownership"}:
         _admission_block("marker-invalid", "distribution retry marker fields are invalid")
     if raw.get("schema_version") != _DISTRIBUTION_RETRY_SCHEMA_VERSION:
         _admission_block("marker-invalid", "distribution retry marker schema is unsupported")
@@ -676,12 +802,66 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         _admission_block("marker-invalid", "distribution retry marker phase is invalid")
     if raw.get("purpose") != _DISTRIBUTION_RETRY_PURPOSE:
         _admission_block("marker-invalid", "distribution retry marker purpose is unsupported")
+    stage_ownership: list[DistributionStageOwnership] = []
+    raw_stage_ownership = raw.get("stage_ownership", [])
+    if not isinstance(raw_stage_ownership, list):
+        _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+    for item in raw_stage_ownership:
+        if not isinstance(item, dict) or set(item) != {
+            "path",
+            "stage_name",
+            "device",
+            "inode",
+            "ctime_ns",
+            "file_type",
+        }:
+            _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+        stage_path = item.get("path")
+        stage_name = item.get("stage_name")
+        file_type = item.get("file_type")
+        if (
+            not isinstance(stage_path, str)
+            or not stage_path
+            or PurePosixPath(stage_path).is_absolute()
+            or ".." in PurePosixPath(stage_path).parts
+            or PurePosixPath(stage_path).as_posix() != stage_path
+            or not isinstance(stage_name, str)
+            or not stage_name
+            or PurePosixPath(stage_name).name != stage_name
+            or not isinstance(file_type, str)
+            or file_type not in {"regular", "symlink"}
+        ):
+            _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+        stage_device = item.get("device")
+        stage_inode = item.get("inode")
+        stage_ctime_ns = item.get("ctime_ns")
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for value in (stage_device, stage_inode, stage_ctime_ns)
+        ):
+            _admission_block("marker-invalid", "distribution retry marker stage ownership is invalid")
+        assert isinstance(stage_device, int)
+        assert isinstance(stage_inode, int)
+        assert isinstance(stage_ctime_ns, int)
+        assert file_type in {"regular", "symlink"}
+        stage_file_type: Literal["regular", "symlink"] = "regular" if file_type == "regular" else "symlink"
+        stage_ownership.append(
+            DistributionStageOwnership(
+                path=stage_path,
+                stage_name=stage_name,
+                device=stage_device,
+                inode=stage_inode,
+                ctime_ns=stage_ctime_ns,
+                file_type=stage_file_type,
+            )
+        )
     return DistributionRetryMarker(
         operation=operation,
         package_version=package_version,
         target_root=DistributionRootIdentity(device=device, inode=inode),
         last_completed_phase=phase,
         purpose=_DISTRIBUTION_RETRY_PURPOSE,
+        stage_ownership=tuple(stage_ownership),
     )
 
 
@@ -829,6 +1009,20 @@ def admit_distribution_operation(
             package_version=package_version,
         )
 
+    # A successful uninstall may intentionally leave an empty workspace
+    # boundary after the retry marker is finalized.  Treat that exact empty
+    # directory as a fresh admission so the documented `init` recovery path
+    # can recreate the managed scaffold without requiring `--force`.
+    if specdock_info is not None:
+        try:
+            empty_workspace_boundary = not any(specdock_path.iterdir())
+        except OSError:
+            _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+        if empty_workspace_boundary and operation in {"fresh", "init-force"}:
+            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
+        if operation in {"fresh", "init-force"} and _is_preserved_specs_workspace(target_root):
+            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
+
     if specdock_info is None:
         if operation in {"fresh", "init-force"}:
             return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
@@ -865,9 +1059,9 @@ def _current_assets(install_root: Path) -> tuple[DistributionAsset, ...]:
             continue
         relative = _exact_relative_path(relative_candidate.as_posix(), field_name="Current path")
         try:
-            file_stat = candidate.stat()
-            digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        except OSError as exc:
+            content, source_snapshot = _source_asset_bytes(candidate)
+            digest = hashlib.sha256(content).hexdigest()
+        except (OSError, DistributionApplyError) as exc:
             raise DistributionManifestError(f"unable to read Current asset: {relative.as_posix()}") from exc
         assets.append(
             DistributionAsset(
@@ -875,8 +1069,86 @@ def _current_assets(install_root: Path) -> tuple[DistributionAsset, ...]:
                 identity=DistributionIdentity(
                     kind="regular",
                     sha256=digest,
-                    mode=stat.S_IMODE(file_stat.st_mode),
+                    mode=source_snapshot.mode,
                 ),
+                source_snapshot=source_snapshot,
+            )
+        )
+    return tuple(assets)
+
+
+def _scaffold_assets(scaffold_root: Path, *, operation: DistributionOperation) -> tuple[DistributionAsset, ...]:
+    """Build the managed scaffold portion of the shared distribution catalog."""
+
+    def is_pruned_by_scaffold_refresh(relative: Path) -> bool:
+        parts = relative.parts
+        if parts[0] == "scripts" and parts[-1].startswith("spec-dock-close") and parts[-1].endswith(".sh"):
+            return True
+        if parts[0] != "templates":
+            return False
+        if len(parts) == 2 and parts[1] in {"requirement.md", "design.md", "plan.md", "report.md"}:
+            return True
+        if len(parts) >= 2 and parts[1] in {"current", "completed"}:
+            return True
+        if (
+            len(parts) >= 3
+            and parts[1] in {"initiative", "epic", "issue"}
+            and (parts[2] == "deps.json" or parts[2] in {"adrs", "artifacts", "current", "completed"})
+        ):
+            return True
+        preserved_readmes = {
+            PurePosixPath("templates/README.md"),
+            PurePosixPath("templates/root/.workbench/README.md"),
+            PurePosixPath("templates/initiative/.workbench/README.md"),
+            PurePosixPath("templates/epic/.workbench/README.md"),
+            PurePosixPath("templates/issue/.workbench/README.md"),
+        }
+        return parts[-1] == "README.md" and relative not in preserved_readmes
+
+    if not scaffold_root.is_dir() or scaffold_root.is_symlink():
+        return ()
+    if not (scaffold_root / ".gitignore").is_file() or (scaffold_root / ".gitignore").is_symlink():
+        return ()
+    source_entries: list[tuple[str, Path]] = [(".gitignore", scaffold_root / ".gitignore")]
+    for root_name in _SCAFFOLD_MANAGED_ROOTS:
+        source_root = scaffold_root / root_name
+        if not source_root.is_dir() or source_root.is_symlink():
+            return ()
+        for candidate in sorted(source_root.rglob("*"), key=lambda item: item.relative_to(scaffold_root).as_posix()):
+            relative = candidate.relative_to(scaffold_root)
+            if "__pycache__" in relative.parts or relative.suffix in {".pyc", ".pyo"}:
+                continue
+            if is_pruned_by_scaffold_refresh(relative):
+                continue
+            if candidate.is_file() and not candidate.is_symlink():
+                source_entries.append((relative.as_posix(), candidate))
+    seed_readme = scaffold_root / "templates" / "root" / ".workbench" / "README.md"
+    if operation == "fresh" and seed_readme.is_file() and not seed_readme.is_symlink():
+        source_entries.append((".workbench/README.md", seed_readme))
+
+    assets: list[DistributionAsset] = []
+    for source_path, candidate in sorted(source_entries):
+        try:
+            content, source_snapshot = _source_asset_bytes(candidate)
+            digest = hashlib.sha256(content).hexdigest()
+        except (OSError, DistributionApplyError) as exc:
+            raise DistributionManifestError(f"unable to read scaffold asset: {source_path}") from exc
+        mode = source_snapshot.mode
+        if source_path == "scripts/spec-dock":
+            mode |= 0o111
+        if source_path.startswith("system/active-none/"):
+            mode &= ~0o222
+        target_path = f"spec-dock/{source_path}"
+        assets.append(
+            DistributionAsset(
+                path=target_path,
+                source_path=source_path,
+                identity=DistributionIdentity(
+                    kind="regular",
+                    sha256=digest,
+                    mode=mode,
+                ),
+                source_snapshot=source_snapshot,
             )
         )
     return tuple(assets)
@@ -896,14 +1168,19 @@ class _TargetObservation:
     snapshot: DistributionTargetSnapshot | None = None
 
 
-def _identity_matches(actual: DistributionIdentity, record: dict[str, Any]) -> bool:
+def _identity_matches(
+    actual: DistributionIdentity,
+    record: dict[str, Any],
+    *,
+    include_mode: bool = True,
+) -> bool:
     if actual.kind != record.get("kind"):
         return False
     if actual.kind == "regular":
         if actual.sha256 != record.get("sha256"):
             return False
         expected_mode = record.get("mode")
-        return expected_mode is None or actual.mode == expected_mode
+        return not include_mode or expected_mode is None or actual.mode == expected_mode
     return actual.target == record.get("target")
 
 
@@ -956,12 +1233,29 @@ def _target_snapshot(
     return DistributionTargetSnapshot(root=root, parents=tuple(parents), target=target)
 
 
-def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation:
-    """Inspect one target path without following a symlink component."""
+def _same_observed_node(before: os.stat_result, after: os.stat_result) -> bool:
+    return (
+        before.st_dev == after.st_dev
+        and before.st_ino == after.st_ino
+        and before.st_ctime_ns == after.st_ctime_ns
+        and stat.S_IFMT(before.st_mode) == stat.S_IFMT(after.st_mode)
+    )
 
-    current = target_root
+
+def _digest_open_file(fd: int) -> str:
+    digest = hashlib.sha256()
+    while True:
+        chunk = os.read(fd, 1024 * 1024)
+        if not chunk:
+            return digest.hexdigest()
+        digest.update(chunk)
+
+
+def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation:
+    """Inspect one target through held directory descriptors without following links."""
+
     try:
-        root_stat = os.lstat(current)
+        root_stat = os.lstat(target_root)
     except FileNotFoundError:
         return _TargetObservation(
             "missing",
@@ -985,95 +1279,164 @@ def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation
             snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
         )
 
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        parent_fd = os.open(target_root, directory_flags)
+        opened_root = os.fstat(parent_fd)
+    except OSError:
+        return _TargetObservation(
+            "root-error",
+            snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
+        )
+    if not _same_observed_node(root_stat, opened_root):
+        os.close(parent_fd)
+        return _TargetObservation(
+            "root-error",
+            snapshot=_target_snapshot(root_snapshot, [], _missing_snapshot(relative_path)),
+        )
+
     parts = PurePosixPath(relative_path).parts
     parents: list[PathIdentitySnapshot] = []
     parent_parts: list[str] = []
-    for component in parts[:-1]:
-        current = current / component
-        parent_parts.append(component)
-        parent_relative = "/".join(parent_parts)
+    missing_parent = False
+    try:
+        for component in parts[:-1]:
+            parent_parts.append(component)
+            parent_relative = "/".join(parent_parts)
+            if missing_parent:
+                parents.append(_missing_snapshot(parent_relative))
+                continue
+            try:
+                component_stat = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                parents.append(_missing_snapshot(parent_relative))
+                missing_parent = True
+                continue
+            except OSError:
+                return _TargetObservation(
+                    "parent-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            component_snapshot = _snapshot_from_stat(parent_relative, component_stat)
+            parents.append(component_snapshot)
+            if stat.S_ISLNK(component_stat.st_mode):
+                return _TargetObservation(
+                    "symlink-container",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            if not stat.S_ISDIR(component_stat.st_mode):
+                return _TargetObservation(
+                    "non-directory-container",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            try:
+                next_fd = os.open(component, directory_flags, dir_fd=parent_fd)
+                opened_component = os.fstat(next_fd)
+            except OSError:
+                return _TargetObservation(
+                    "parent-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            if not _same_observed_node(component_stat, opened_component):
+                os.close(next_fd)
+                return _TargetObservation(
+                    "parent-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+                )
+            os.close(parent_fd)
+            parent_fd = next_fd
+
+        if missing_parent:
+            return _TargetObservation(
+                "missing",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
+
+        exact_name = parts[-1]
         try:
-            component_stat = os.lstat(current)
+            exact_stat = os.stat(exact_name, dir_fd=parent_fd, follow_symlinks=False)
         except FileNotFoundError:
-            parents.append(_missing_snapshot(parent_relative))
             return _TargetObservation(
                 "missing",
                 snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
             )
         except OSError:
             return _TargetObservation(
-                "parent-error",
-                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-            )
-        component_snapshot = _snapshot_from_stat(parent_relative, component_stat)
-        parents.append(component_snapshot)
-        if stat.S_ISLNK(component_stat.st_mode):
-            return _TargetObservation(
-                "symlink-container",
-                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-            )
-        if not stat.S_ISDIR(component_stat.st_mode):
-            return _TargetObservation(
-                "non-directory-container",
-                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-            )
-
-    exact = current / parts[-1]
-    try:
-        exact_stat = os.lstat(exact)
-    except FileNotFoundError:
-        return _TargetObservation(
-            "missing",
-            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-        )
-    except OSError:
-        return _TargetObservation(
-            "target-error",
-            snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
-        )
-
-    if stat.S_ISLNK(exact_stat.st_mode):
-        try:
-            link_target = _normalized_link_target(str(exact.readlink()))
-        except OSError:
-            link_target = None
-        identity = DistributionIdentity(kind="symlink", target=link_target)
-        return _TargetObservation(
-            "symlink",
-            identity,
-            exact_stat.st_nlink,
-            _target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat, identity=identity)),
-        )
-    if stat.S_ISREG(exact_stat.st_mode):
-        try:
-            digest = hashlib.sha256(exact.read_bytes()).hexdigest()
-        except OSError:
-            return _TargetObservation(
                 "target-error",
+                snapshot=_target_snapshot(root_snapshot, parents, _missing_snapshot(relative_path)),
+            )
+
+        if stat.S_ISLNK(exact_stat.st_mode):
+            try:
+                link_target = _normalized_link_target(str(os.readlink(exact_name, dir_fd=parent_fd)))
+                after_link = os.stat(exact_name, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError:
+                link_target = None
+                after_link = exact_stat
+            if not _same_observed_node(exact_stat, after_link):
+                return _TargetObservation(
+                    "target-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
+                )
+            identity = DistributionIdentity(kind="symlink", target=link_target)
+            return _TargetObservation(
+                "symlink",
+                identity,
+                exact_stat.st_nlink,
+                _target_snapshot(
+                    root_snapshot,
+                    parents,
+                    _snapshot_from_stat(relative_path, exact_stat, identity=identity),
+                ),
+            )
+        if stat.S_ISREG(exact_stat.st_mode):
+            file_fd: int | None = None
+            try:
+                file_fd = os.open(exact_name, file_flags, dir_fd=parent_fd)
+                opened_file = os.fstat(file_fd)
+                if not _same_observed_node(exact_stat, opened_file) or not stat.S_ISREG(opened_file.st_mode):
+                    raise OSError(errno.ESTALE, "managed target identity changed")
+                digest = _digest_open_file(file_fd)
+                after_read = os.fstat(file_fd)
+                if not _same_observed_node(opened_file, after_read):
+                    raise OSError(errno.ESTALE, "managed target identity changed")
+            except OSError:
+                return _TargetObservation(
+                    "target-error",
+                    snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
+                )
+            finally:
+                if file_fd is not None:
+                    os.close(file_fd)
+            identity = DistributionIdentity(
+                kind="regular",
+                sha256=digest,
+                mode=stat.S_IMODE(opened_file.st_mode),
+            )
+            return _TargetObservation(
+                "regular",
+                identity,
+                opened_file.st_nlink,
+                _target_snapshot(
+                    root_snapshot,
+                    parents,
+                    _snapshot_from_stat(relative_path, opened_file, identity=identity),
+                ),
+            )
+        if stat.S_ISDIR(exact_stat.st_mode):
+            return _TargetObservation(
+                "directory",
+                link_count=exact_stat.st_nlink,
                 snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
             )
-        identity = DistributionIdentity(
-            kind="regular",
-            sha256=digest,
-            mode=stat.S_IMODE(exact_stat.st_mode),
-        )
         return _TargetObservation(
-            "regular",
-            identity,
-            exact_stat.st_nlink,
-            _target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat, identity=identity)),
-        )
-    if stat.S_ISDIR(exact_stat.st_mode):
-        return _TargetObservation(
-            "directory",
+            "special",
             link_count=exact_stat.st_nlink,
             snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
         )
-    return _TargetObservation(
-        "special",
-        link_count=exact_stat.st_nlink,
-        snapshot=_target_snapshot(root_snapshot, parents, _snapshot_from_stat(relative_path, exact_stat)),
-    )
+    finally:
+        os.close(parent_fd)
 
 
 def _historical_records(manifest: DistributionManifest) -> tuple[dict[str, Any], ...]:
@@ -1095,10 +1458,10 @@ def _trusted_manifest_matches(
     for trusted in manifest.trusted_consumer_manifests:
         manifest_observation = _observe_target(target_root, trusted["path"])
         manifest_identity = manifest_observation.identity
-        if manifest_identity is None or not _identity_matches(manifest_identity, trusted):
+        if manifest_identity is None or not _identity_matches(manifest_identity, trusted, include_mode=False):
             continue
         for claim in trusted["claims"]:
-            if claim["path"] == path and _identity_matches(actual, claim):
+            if claim["path"] == path and _identity_matches(actual, claim, include_mode=False):
                 return True
     return False
 
@@ -1110,7 +1473,7 @@ def _historical_provenance(
     manifest: DistributionManifest,
 ) -> str | None:
     for record in _historical_records(manifest):
-        if record["path"] == path and _identity_matches(actual, record):
+        if record["path"] == path and _identity_matches(actual, record, include_mode=False):
             return "direct"
     if _trusted_manifest_matches(target_root, path, actual, manifest):
         return "trusted-manifest"
@@ -1119,6 +1482,7 @@ def _historical_provenance(
 
 def _target_identity_specs(
     current_assets: tuple[DistributionAsset, ...],
+    scaffold_assets: tuple[DistributionAsset, ...] = (),
 ) -> dict[str, DistributionIdentity]:
     # Historical shortcut records are evidence only.  They must never create
     # a new Fresh target; the shipped canonical shortcut is the sole Current
@@ -1126,6 +1490,7 @@ def _target_identity_specs(
     return {
         **_CURRENT_SHORTCUTS,
         **{asset.path: asset.identity for asset in current_assets},
+        **{asset.path: asset.identity for asset in scaffold_assets},
     }
 
 
@@ -1179,8 +1544,22 @@ def _classify_current_target(
     if actual.kind == "symlink" and actual.target != expected.target:
         provenance = _historical_provenance(target_root, path, actual, manifest)
         if provenance is not None and operation in {"update", "init-force"}:
+            if observation.link_count is not None and observation.link_count > 1:
+                return _blocked_action(
+                    path,
+                    operation,
+                    "hard-link-mutation-unsafe",
+                    provenance="historical",
+                )
             return DistributionAction(path, operation, "upgrade", "historical", "direct-historical-identity-match")
         if provenance is not None and operation == "uninstall":
+            if observation.link_count is not None and observation.link_count > 1:
+                return _blocked_action(
+                    path,
+                    operation,
+                    "hard-link-mutation-unsafe",
+                    provenance="historical",
+                )
             return DistributionAction(path, operation, "prune", "historical", "historical-identity-match")
         if provenance is not None:
             return _blocked_action(
@@ -1217,6 +1596,43 @@ def _classify_current_target(
             "historical-identity-fresh-preserve",
             provenance="historical",
             action="preserve",
+        )
+
+    if (
+        actual.kind == "regular"
+        and actual.sha256 == expected.sha256
+        and expected.mode is not None
+        and actual.mode != expected.mode
+    ):
+        if operation in {"fresh", "uninstall"}:
+            return _blocked_action(
+                path,
+                operation,
+                "current-mode-mismatch",
+                provenance="current",
+                action="preserve",
+            )
+        if operation in {"update", "init-force"} and observation.link_count is not None and observation.link_count > 1:
+            return _blocked_action(
+                path,
+                operation,
+                "hard-link-mutation-unsafe",
+                provenance="current",
+            )
+        if operation in {"update", "init-force"}:
+            return DistributionAction(path, operation, "upgrade", "current", "current-mode-mismatch")
+
+    if (
+        actual.kind == "symlink"
+        and observation.link_count is not None
+        and observation.link_count > 1
+        and operation == "uninstall"
+    ):
+        return _blocked_action(
+            path,
+            operation,
+            "hard-link-mutation-unsafe",
+            provenance="current",
         )
 
     if (
@@ -1259,11 +1675,13 @@ def _classify_obsolete_target(
     actual = observation.identity
     if actual is None:
         return _blocked_action(path, operation, "unsafe-target-path")
-    direct = any(_identity_matches(actual, identity) for identity in item["identities"])
+    direct = any(_identity_matches(actual, identity, include_mode=False) for identity in item["identities"])
     trusted = _trusted_manifest_matches(target_root, path, actual, manifest)
     if not direct and not trusted:
         return _blocked_action(path, operation, "obsolete-identity-unknown", action="preserve")
     if actual.kind == "regular" and observation.link_count is not None and observation.link_count > 1:
+        return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="historical")
+    if actual.kind == "symlink" and observation.link_count is not None and observation.link_count > 1:
         return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="historical")
     reason = "trusted-manifest-identity-match" if trusted and not direct else "direct-obsolete-identity-match"
     return DistributionAction(path, operation, "prune", "historical", reason)
@@ -1275,8 +1693,9 @@ def _classify_target(
     current_assets: tuple[DistributionAsset, ...],
     operation: DistributionOperation,
     manifest: DistributionManifest,
+    scaffold_assets: tuple[DistributionAsset, ...] = (),
 ) -> tuple[tuple[DistributionAction, ...], tuple[tuple[str, DistributionTargetSnapshot], ...]]:
-    specs = _target_identity_specs(current_assets)
+    specs = _target_identity_specs(current_assets, scaffold_assets)
     actions: list[DistributionAction] = []
     observations: dict[str, _TargetObservation] = {}
     for path, expected in sorted(specs.items()):
@@ -1337,10 +1756,16 @@ def build_distribution_plan(
     if operation not in _OPERATIONS:
         raise DistributionManifestError(f"unsupported distribution operation: {operation!r}")
     current_assets = _current_assets(install_root)
+    scaffold_assets = (
+        _scaffold_assets(Path(scaffold_root), operation=operation)
+        if scaffold_root is not None and operation != "uninstall"
+        else ()
+    )
     manifest = _load_manifest(manifest_path)
     _assert_no_manifest_overlap(
         {asset.path for asset in current_assets} | set(_CURRENT_SHORTCUTS),
         manifest,
+        protected_paths=_protected_workspace_paths(scaffold_assets),
     )
     actions: tuple[DistributionAction, ...] = ()
     target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...] = ()
@@ -1350,6 +1775,7 @@ def build_distribution_plan(
             current_assets=current_assets,
             operation=operation,
             manifest=manifest,
+            scaffold_assets=scaffold_assets,
         )
     return DistributionPlan(
         current_assets=current_assets,
@@ -1361,6 +1787,7 @@ def build_distribution_plan(
         target_root=Path(target_root) if target_root is not None else None,
         operation=operation,
         target_snapshots=target_snapshots,
+        scaffold_assets=scaffold_assets,
     )
 
 
@@ -1543,7 +1970,18 @@ def _read_fd_bytes(fd: int) -> bytes:
         chunks.append(chunk)
 
 
-def _source_asset_bytes(source_path: Path) -> tuple[bytes, int]:
+def _source_snapshot(info: os.stat_result) -> DistributionSourceSnapshot:
+    return DistributionSourceSnapshot(
+        device=info.st_dev,
+        inode=info.st_ino,
+        ctime_ns=info.st_ctime_ns,
+        mtime_ns=info.st_mtime_ns,
+        size=info.st_size,
+        mode=stat.S_IMODE(info.st_mode),
+    )
+
+
+def _source_asset_bytes(source_path: Path) -> tuple[bytes, DistributionSourceSnapshot]:
     nofollow = getattr(os, "O_NOFOLLOW", None)
     if not isinstance(nofollow, int):
         raise DistributionApplyError("platform lacks required no-follow file support")
@@ -1557,10 +1995,17 @@ def _source_asset_bytes(source_path: Path) -> tuple[bytes, int]:
     except OSError as exc:
         raise DistributionApplyError("provider Current asset cannot be read safely") from exc
     try:
-        actual = os.fstat(fd)
-        if not stat.S_ISREG(actual.st_mode):
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
             raise DistributionApplyError("provider Current asset changed type")
-        return _read_fd_bytes(fd), stat.S_IMODE(actual.st_mode)
+        if _source_snapshot(source_stat) != _source_snapshot(opened):
+            raise DistributionApplyError("provider Current asset identity changed before read")
+        content = _read_fd_bytes(fd)
+        after_read = os.fstat(fd)
+        snapshot = _source_snapshot(after_read)
+        if snapshot != _source_snapshot(opened):
+            raise DistributionApplyError("provider Current asset identity changed during read")
+        return content, snapshot
     finally:
         os.close(fd)
 
@@ -1679,23 +2124,222 @@ def _remove_distribution_stage_if_owned(
     parent_fd: int,
     stage_name: str,
     created: os.stat_result,
+    *,
+    strict: bool = False,
 ) -> None:
     try:
         current = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
-        if (
-            current.st_dev == created.st_dev
-            and current.st_ino == created.st_ino
-            and current.st_ctime_ns == created.st_ctime_ns
-            and _file_type(current.st_mode) == _file_type(created.st_mode)
-            and current.st_nlink == created.st_nlink == 1
-        ):
-            os.unlink(stage_name, dir_fd=parent_fd)
-    except OSError:
+    except FileNotFoundError:
         return
+    except OSError as exc:
+        if strict:
+            raise DistributionApplyError("managed staging cleanup failed") from exc
+        return
+    owned = (
+        current.st_dev == created.st_dev
+        and current.st_ino == created.st_ino
+        and current.st_ctime_ns == created.st_ctime_ns
+        and _file_type(current.st_mode) == _file_type(created.st_mode)
+        and current.st_nlink == created.st_nlink == 1
+    )
+    if not owned:
+        if strict:
+            raise DistributionApplyError("managed staging identity changed")
+        return
+    try:
+        os.unlink(stage_name, dir_fd=parent_fd)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        if strict:
+            raise DistributionApplyError("managed staging cleanup failed") from exc
+
+
+def _distribution_stage_identity(parent_fd: int, stage_name: str) -> DistributionIdentity | None:
+    """Read a private stage identity without following its final path."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise DistributionApplyError("platform lacks required no-follow file support")
+    try:
+        info = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise DistributionApplyError("managed staging artifact cannot be inspected safely") from exc
+    if info.st_nlink != 1:
+        return None
+    kind = _file_type(info.st_mode)
+    if kind == "regular":
+        try:
+            fd = os.open(stage_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError("managed staging artifact cannot be opened safely") from exc
+        try:
+            opened = os.fstat(fd)
+            if (
+                opened.st_dev != info.st_dev
+                or opened.st_ino != info.st_ino
+                or opened.st_ctime_ns != info.st_ctime_ns
+                or opened.st_nlink != 1
+                or not stat.S_ISREG(opened.st_mode)
+            ):
+                raise DistributionApplyError("managed staging identity changed")
+            return DistributionIdentity(
+                kind="regular",
+                sha256=hashlib.sha256(_read_fd_bytes(fd)).hexdigest(),
+                mode=stat.S_IMODE(opened.st_mode),
+            )
+        finally:
+            os.close(fd)
+    if kind == "symlink":
+        try:
+            target = os.readlink(stage_name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError("managed staging symlink cannot be read safely") from exc
+        normalized = _normalized_link_target(target)
+        if normalized is None:
+            raise DistributionApplyError("managed staging symlink target is unsafe")
+        return DistributionIdentity(kind="symlink", target=normalized)
+    return None
+
+
+def _distribution_stage_ownership(
+    path: str,
+    stage_name: str,
+    info: os.stat_result,
+) -> DistributionStageOwnership:
+    kind = _file_type(info.st_mode)
+    if kind not in {"regular", "symlink"} or info.st_nlink != 1:
+        raise DistributionApplyError("managed staging artifact is not safe to record")
+    file_type: Literal["regular", "symlink"] = "regular" if kind == "regular" else "symlink"
+    return DistributionStageOwnership(
+        path=path,
+        stage_name=stage_name,
+        device=info.st_dev,
+        inode=info.st_ino,
+        ctime_ns=info.st_ctime_ns,
+        file_type=file_type,
+    )
+
+
+def _distribution_stage_name(path: str, identity: DistributionIdentity) -> str:
+    """Return the stable private stage name owned by one planned target."""
+    if identity.kind == "regular":
+        identity_key = f"regular:{identity.sha256}"
+        prefix = ".spec-dock-file-"
+    else:
+        identity_key = f"symlink:{identity.target}"
+        prefix = ".spec-dock-symlink-"
+    digest = hashlib.sha256(f"{path}\0{identity_key}".encode()).hexdigest()[:24]
+    return f"{prefix}{digest}"
+
+
+def _historical_stage_identities(plan: DistributionPlan, path: str) -> tuple[DistributionIdentity, ...]:
+    identities: list[DistributionIdentity] = []
+    for record in _historical_records(plan.manifest):
+        if record["path"] != path:
+            continue
+        if record["kind"] == "regular":
+            identities.append(
+                DistributionIdentity(
+                    kind="regular",
+                    sha256=record["sha256"],
+                    mode=record.get("mode"),
+                )
+            )
+        else:
+            identities.append(DistributionIdentity(kind="symlink", target=record["target"]))
+    return tuple(identities)
+
+
+def _cleanup_stale_distribution_stages(
+    plan: DistributionPlan,
+    target_root: Path,
+    action: DistributionAction,
+    snapshot: DistributionTargetSnapshot,
+    stage_ownership: tuple[DistributionStageOwnership, ...],
+) -> None:
+    """Retry cleanup of private stages recorded by an earlier failed apply."""
+    if action.action not in {"create", "adopt", "upgrade", "prune"}:
+        return
+    expected = _expected_target_identity(plan, action.path)
+    historical = _historical_stage_identities(plan, action.path)
+    if expected is None and not historical:
+        return
+    try:
+        parent_chain = _open_distribution_parent_chain(
+            target_root,
+            action.path,
+            create_missing=False,
+            expected_snapshot=snapshot,
+        )
+    except DistributionApplyError as exc:
+        if "parent is missing" in str(exc):
+            return
+        raise
+    try:
+        parent_fd = parent_chain[-1]
+        try:
+            names = os.listdir(parent_fd)  # noqa: PTH208 - descriptor-relative scan is required for no-follow safety
+        except OSError as exc:
+            raise DistributionApplyError("managed staging directory cannot be listed safely") from exc
+        known_identities = tuple(item for item in (expected, *historical) if item is not None)
+        mismatch_detected = False
+        cleaned = False
+        for owned in stage_ownership:
+            if owned.path != action.path or owned.stage_name not in names:
+                continue
+            if not any(
+                owned.stage_name == _distribution_stage_name(action.path, identity) for identity in known_identities
+            ):
+                continue
+            try:
+                current = os.stat(owned.stage_name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise DistributionApplyError("managed staging artifact cannot be inspected safely") from exc
+            if (
+                current.st_dev != owned.device
+                or current.st_ino != owned.inode
+                or current.st_ctime_ns != owned.ctime_ns
+                or _file_type(current.st_mode) != owned.file_type
+                or current.st_nlink != 1
+            ):
+                mismatch_detected = True
+                continue
+            candidate = _distribution_stage_identity(parent_fd, owned.stage_name)
+            if candidate is None:
+                mismatch_detected = True
+                continue
+            # The retry marker's exact no-follow device/inode/ctime identity
+            # proves ownership of this private stage.  Its payload may be
+            # partial after a failed write, so requiring a known package
+            # digest here would strand the same-package retry.  Content and
+            # ownership checks still apply to ordinary target mutations.
+            try:
+                os.unlink(owned.stage_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise DistributionApplyError("managed staging cleanup failed") from exc
+            cleaned = True
+        if mismatch_detected and not cleaned:
+            raise DistributionApplyError("managed staging identity changed")
+    finally:
+        _close_distribution_parent_chain(parent_chain)
 
 
 def _expected_target_identity(plan: DistributionPlan, path: str) -> DistributionIdentity | None:
-    return _target_identity_specs(plan.current_assets).get(path)
+    return _target_identity_specs(plan.current_assets, plan.scaffold_assets).get(path)
+
+
+def _asset_for_target(plan: DistributionPlan, path: str) -> DistributionAsset | None:
+    for asset in (*plan.current_assets, *plan.scaffold_assets):
+        target_path = asset.path
+        if target_path == path:
+            return asset
+    return None
 
 
 def _plan_snapshot_map(plan: DistributionPlan) -> dict[str, DistributionTargetSnapshot]:
@@ -1740,8 +2384,13 @@ def _assert_pending_snapshot_stable(
         elif actual_parent.exists:
             bound_parent = created_parent_bindings.get(expected_parent.relative_path)
             if bound_parent is None:
-                created_parent_bindings[expected_parent.relative_path] = actual_parent
-            elif not _same_structure_identity(actual_parent, bound_parent):
+                # A parent that was absent during preflight may only become
+                # acceptable after this operation creates and binds it through
+                # `_bind_created_parent_identities`.  Accepting an unbound
+                # inode here would turn a user- or concurrently-created
+                # directory into an operation-owned parent after preflight.
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+            if not _same_structure_identity(actual_parent, bound_parent):
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
     if actual.target != expected.target:
         raise DistributionApplyError(f"managed target identity changed for '{path}'")
@@ -1776,6 +2425,7 @@ def _apply_regular_action(
     source_bytes: bytes | None,
     source_mode: int | None,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
@@ -1808,7 +2458,7 @@ def _apply_regular_action(
             nofollow = getattr(os, "O_NOFOLLOW", None)
             if not isinstance(nofollow, int):
                 raise DistributionApplyError("platform lacks required no-follow file support")
-            staging_name = f".spec-dock-file-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_name = _distribution_stage_name(path, expected)
             fd = os.open(
                 staging_name,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -1820,6 +2470,8 @@ def _apply_regular_action(
             try:
                 if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
                     raise DistributionApplyError(f"managed target is unsafe for '{path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, created))
                 mutation_phase = "pre"
 
                 def check_before_write() -> None:
@@ -1843,13 +2495,30 @@ def _apply_regular_action(
                 ):
                     raise DistributionApplyError(f"managed target verification failed for '{path}'")
                 stage_identity = verified
-            finally:
-                os.close(fd)
-            try:
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
             finally:
-                _remove_distribution_stage_if_owned(parent_fd, staging_name, stage_identity)
+                with suppress(OSError):
+                    stage_identity = os.fstat(fd)
+                try:
+                    # A failed write may mutate the stage before raising.  The
+                    # creation-time stat is then stale (ctime changes), so
+                    # refresh and publish the no-follow identity before
+                    # attempting ownership-checked cleanup.  The refreshed
+                    # marker lets the next same-package retry identify a
+                    # partial stage even when cleanup fails here.
+                    if stage_ownership_recorder is not None:
+                        stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, stage_identity))
+                finally:
+                    try:
+                        os.close(fd)
+                    finally:
+                        _remove_distribution_stage_if_owned(
+                            parent_fd,
+                            staging_name,
+                            stage_identity,
+                            strict=True,
+                        )
             published_fd = os.open(target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
             try:
                 published = os.fstat(published_fd)
@@ -1874,8 +2543,6 @@ def _apply_regular_action(
         if not isinstance(nofollow, int):
             raise DistributionApplyError("platform lacks required no-follow file support")
         flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
-        if action.action == "upgrade":
-            flags = os.O_RDWR | nofollow | getattr(os, "O_CLOEXEC", 0)
         fd = os.open(target_name, flags, dir_fd=parent_fd)
         try:
             opened = os.fstat(fd)
@@ -1891,32 +2558,162 @@ def _apply_regular_action(
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
                 os.unlink(target_name, dir_fd=parent_fd)
                 return
+            if action.action != "upgrade":
+                raise DistributionApplyError(f"unsupported regular action for '{path}'")
             if source_bytes is None or source_mode is None:
                 raise DistributionApplyError(f"missing provider bytes for '{path}'")
-            mutation_phase = "pre"
+            _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
+            target_identity = snapshot.target.identity
+            if target_identity is None or target_identity.kind != "regular":
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
+            if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
+                raise DistributionApplyError(f"managed target identity changed for '{path}'")
 
-            def check_before_write() -> None:
-                nonlocal mutation_phase
+            _resolve_distribution_swap_rename()
+            staging_name = _distribution_stage_name(path, expected)
+            staging_fd = os.open(
+                staging_name,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                source_mode,
+                dir_fd=parent_fd,
+            )
+            staging_stat = os.fstat(staging_fd)
+            stage_identity = staging_stat
+            swapped = False
+            try:
+                if not stat.S_ISREG(staging_stat.st_mode) or staging_stat.st_nlink != 1:
+                    raise DistributionApplyError(f"managed target staging failed for '{path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, staging_stat))
+
+                def check_before_stage_write() -> None:
+                    _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                    current = os.fstat(staging_fd)
+                    if not stat.S_ISREG(current.st_mode) or current.st_nlink != 1:
+                        raise DistributionApplyError(f"managed target staging failed for '{path}'")
+
+                _write_fd_bytes(staging_fd, source_bytes, before_mutation=check_before_stage_write)
+                os.fchmod(staging_fd, source_mode)
+                staged = os.fstat(staging_fd)
+                if (
+                    staged.st_nlink != 1
+                    or stat.S_IMODE(staged.st_mode) != source_mode
+                    or hashlib.sha256(_read_fd_bytes(staging_fd)).hexdigest() != expected.sha256
+                ):
+                    raise DistributionApplyError(f"managed target staging verification failed for '{path}'")
+                stage_identity = staged
+
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
-                _assert_regular_fd_safe(
-                    fd,
-                    snapshot.target,
-                    path,
-                    exact=mutation_phase == "pre",
-                )
-                mutation_phase = "post"
+                _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
+                if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
+                    raise DistributionApplyError(f"managed target identity changed for '{path}'")
+                _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+                swapped = True
 
-            _write_fd_bytes(fd, source_bytes, before_mutation=check_before_write)
-            _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
-            _assert_regular_fd_safe(fd, snapshot.target, path, exact=False)
-            os.fchmod(fd, source_mode)
-            verified = os.fstat(fd)
-            if (
-                verified.st_nlink != 1
-                or stat.S_IMODE(verified.st_mode) != source_mode
-                or hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != expected.sha256
-            ):
-                raise DistributionApplyError(f"managed target verification failed for '{path}'")
+                published_fd = os.open(
+                    target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd
+                )
+                try:
+                    published = os.fstat(published_fd)
+                    if (
+                        published.st_nlink != 1
+                        or stat.S_IMODE(published.st_mode) != source_mode
+                        or hashlib.sha256(_read_fd_bytes(published_fd)).hexdigest() != expected.sha256
+                    ):
+                        raise DistributionApplyError(f"managed target verification failed for '{path}'")
+                finally:
+                    os.close(published_fd)
+            finally:
+                if not swapped:
+                    # A failed write may mutate the stage before raising.  The
+                    # creation-time stat is then stale (ctime changes), so
+                    # refresh and publish the no-follow identity before
+                    # attempting ownership-checked cleanup.
+                    with suppress(OSError):
+                        stage_identity = os.fstat(staging_fd)
+                    try:
+                        if stage_ownership_recorder is not None:
+                            stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, stage_identity))
+                    finally:
+                        try:
+                            os.close(staging_fd)
+                        finally:
+                            _remove_distribution_stage_if_owned(
+                                parent_fd,
+                                staging_name,
+                                stage_identity,
+                                strict=True,
+                            )
+                else:
+                    os.close(staging_fd)
+                    try:
+                        old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                        old_fd = os.open(
+                            staging_name,
+                            os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                            dir_fd=parent_fd,
+                        )
+                        try:
+                            old_digest = hashlib.sha256(_read_fd_bytes(old_fd)).hexdigest()
+                        finally:
+                            os.close(old_fd)
+                        if (
+                            _same_stat_structure(old_stat, snapshot.target)
+                            and old_stat.st_nlink == 1
+                            and old_digest == target_identity.sha256
+                        ):
+                            if stage_ownership_recorder is not None:
+                                # The swap rebinds the stage pathname to the
+                                # former target.  Persist that new identity
+                                # before cleanup so a failed unlink can be
+                                # recovered by the next retry.  If marker
+                                # publication itself fails, remove the old
+                                # target immediately so the stale pre-swap
+                                # marker cannot hide a managed payload.
+                                try:
+                                    stage_ownership_recorder(
+                                        _distribution_stage_ownership(path, staging_name, old_stat)
+                                    )
+                                except Exception as record_error:
+                                    # The swap has already published the new
+                                    # target, so the stage pathname now owns
+                                    # the former target inode.  A transient
+                                    # marker-write failure must not strand the
+                                    # pre-swap identity: retry the recorder
+                                    # once before falling back to cleanup.
+                                    with suppress(Exception):
+                                        stage_ownership_recorder(
+                                            _distribution_stage_ownership(path, staging_name, old_stat)
+                                        )
+                                    try:
+                                        _remove_distribution_stage_if_owned(
+                                            parent_fd,
+                                            staging_name,
+                                            old_stat,
+                                            strict=True,
+                                        )
+                                    except DistributionApplyError as cleanup_error:
+                                        try:
+                                            _remove_distribution_stage_if_owned(
+                                                parent_fd,
+                                                staging_name,
+                                                old_stat,
+                                                strict=True,
+                                            )
+                                        except DistributionApplyError as retry_cleanup_error:
+                                            raise retry_cleanup_error from record_error
+                                        raise cleanup_error from record_error
+                                    raise
+                            _remove_distribution_stage_if_owned(
+                                parent_fd,
+                                staging_name,
+                                old_stat,
+                                strict=True,
+                            )
+                        else:
+                            raise DistributionApplyError("managed staging identity changed")
+                    except FileNotFoundError:
+                        pass
         finally:
             os.close(fd)
     except FileNotFoundError as exc:
@@ -1934,6 +2731,7 @@ def _apply_symlink_action(
     snapshot: DistributionTargetSnapshot,
     expected: DistributionIdentity,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
@@ -1965,17 +2763,40 @@ def _apply_symlink_action(
             if target_exists:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_no_replace_rename()
-            staging_name = f".spec-dock-symlink-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_name = _distribution_stage_name(action.path, expected)
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            published = False
             try:
                 staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
                 if staged_target != expected_target or staging_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
+                published = True
             finally:
-                _remove_distribution_stage_if_owned(parent_fd, staging_name, staging_stat)
+                if not published:
+                    # A recorder failure or publish failure may leave the
+                    # symlink stage behind.  Refresh its no-follow identity
+                    # before retrying the marker record and use strict,
+                    # ownership-checked cleanup so a transient unlink error
+                    # remains recoverable by the next same-package retry.
+                    with suppress(OSError):
+                        staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                    try:
+                        if stage_ownership_recorder is not None:
+                            stage_ownership_recorder(
+                                _distribution_stage_ownership(action.path, staging_name, staging_stat)
+                            )
+                    finally:
+                        _remove_distribution_stage_if_owned(
+                            parent_fd,
+                            staging_name,
+                            staging_stat,
+                            strict=True,
+                        )
             created_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
             if created_target != expected_target:
                 raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
@@ -2000,7 +2821,7 @@ def _apply_symlink_action(
             if current_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_swap_rename()
-            staging_name = f".spec-dock-symlink-{os.getpid()}-{secrets.token_hex(8)}"
+            staging_name = _distribution_stage_name(action.path, expected)
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
             swapped = False
@@ -2008,6 +2829,8 @@ def _apply_symlink_action(
                 staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
                 if staged_target != expected_target:
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
+                if stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
                 latest_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
                 if not _same_stat_identity(latest_stat, snapshot.target) or latest_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
@@ -2022,7 +2845,23 @@ def _apply_symlink_action(
                     raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
             finally:
                 if not swapped:
-                    _remove_distribution_stage_if_owned(parent_fd, staging_name, staging_stat)
+                    # Match regular-file staging semantics: retry the
+                    # ownership record after a pre-swap failure, then clean
+                    # only the refreshed no-follow identity strictly.
+                    with suppress(OSError):
+                        staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                    try:
+                        if stage_ownership_recorder is not None:
+                            stage_ownership_recorder(
+                                _distribution_stage_ownership(action.path, staging_name, staging_stat)
+                            )
+                    finally:
+                        _remove_distribution_stage_if_owned(
+                            parent_fd,
+                            staging_name,
+                            staging_stat,
+                            strict=True,
+                        )
                 else:
                     try:
                         old_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
@@ -2033,7 +2872,52 @@ def _apply_symlink_action(
                             and _same_stat_structure(old_stat, snapshot.target)
                             and old_stat.st_nlink == 1
                         ):
-                            os.unlink(staging_name, dir_fd=parent_fd)
+                            if stage_ownership_recorder is not None:
+                                # After the atomic swap, the stage pathname
+                                # owns the former target.  Record that inode
+                                # before unlink so a failed cleanup remains
+                                # safely retryable.
+                                try:
+                                    stage_ownership_recorder(
+                                        _distribution_stage_ownership(action.path, staging_name, old_stat)
+                                    )
+                                except Exception as record_error:
+                                    # The swap already published the new
+                                    # target.  Retry the marker record once,
+                                    # then fall back to strict cleanup; if
+                                    # cleanup also fails, retry it once so
+                                    # either durable ownership or removal is
+                                    # established before returning partial
+                                    # failure.
+                                    with suppress(Exception):
+                                        stage_ownership_recorder(
+                                            _distribution_stage_ownership(action.path, staging_name, old_stat)
+                                        )
+                                    try:
+                                        _remove_distribution_stage_if_owned(
+                                            parent_fd,
+                                            staging_name,
+                                            old_stat,
+                                            strict=True,
+                                        )
+                                    except DistributionApplyError as cleanup_error:
+                                        try:
+                                            _remove_distribution_stage_if_owned(
+                                                parent_fd,
+                                                staging_name,
+                                                old_stat,
+                                                strict=True,
+                                            )
+                                        except DistributionApplyError as retry_cleanup_error:
+                                            raise retry_cleanup_error from record_error
+                                        raise cleanup_error from record_error
+                                    raise
+                            _remove_distribution_stage_if_owned(
+                                parent_fd,
+                                staging_name,
+                                old_stat,
+                                strict=True,
+                            )
                     except FileNotFoundError:
                         pass
             return
@@ -2052,6 +2936,7 @@ def _apply_distribution_action(
     action: DistributionAction,
     snapshot: DistributionTargetSnapshot,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
 ) -> None:
     if action.action in {"adopt", "preserve"}:
         return
@@ -2060,7 +2945,7 @@ def _apply_distribution_action(
         raise DistributionApplyError(f"managed action has no Current identity for '{action.path}'")
     if action.action == "create" and expected is not None:
         _resolve_distribution_no_replace_rename()
-    elif action.action == "upgrade" and expected is not None and expected.kind == "symlink":
+    elif action.action == "upgrade" and expected is not None:
         _resolve_distribution_swap_rename()
 
     source_bytes: bytes | None = None
@@ -2069,9 +2954,23 @@ def _apply_distribution_action(
         if expected is None or expected.kind != "regular":
             source_bytes = None
         else:
-            if plan.install_root is None:
+            asset = _asset_for_target(plan, action.path)
+            if asset is None:
+                raise DistributionApplyError(f"distribution plan has no provider source for '{action.path}'")
+            source_root = plan.scaffold_root if asset.source_path is not None else plan.install_root
+            if source_root is None:
                 raise DistributionApplyError("distribution plan has no provider source root")
-            source_bytes, source_mode = _source_asset_bytes(plan.install_root / action.path)
+            source_rel = asset.source_path or asset.path
+            source_bytes, observed_source_snapshot = _source_asset_bytes(source_root / source_rel)
+            if asset.source_snapshot is None or observed_source_snapshot != asset.source_snapshot:
+                raise DistributionApplyError(f"provider Current asset identity changed for '{action.path}'")
+            if expected.sha256 is None or hashlib.sha256(source_bytes).hexdigest() != expected.sha256:
+                raise DistributionApplyError(f"provider Current asset content changed for '{action.path}'")
+            if expected.mode is None or observed_source_snapshot.mode != expected.mode:
+                raise DistributionApplyError(f"provider Current asset mode changed for '{action.path}'")
+            # Bind the mutation to the mode captured in the read-only plan;
+            # never publish a mode observed after plan construction.
+            source_mode = expected.mode
 
     target_kind = snapshot.target.file_type
     if expected is not None and expected.kind == "symlink":
@@ -2083,6 +2982,7 @@ def _apply_distribution_action(
             snapshot=snapshot,
             expected=expected,
             created_parent_bindings=created_parent_bindings,
+            stage_ownership_recorder=stage_ownership_recorder,
         )
         return
     if expected is None and target_kind == "symlink":
@@ -2097,6 +2997,7 @@ def _apply_distribution_action(
             snapshot=snapshot,
             expected=historical_identity,
             created_parent_bindings=created_parent_bindings,
+            stage_ownership_recorder=stage_ownership_recorder,
         )
         return
     if expected is None and target_kind != "regular":
@@ -2109,22 +3010,41 @@ def _apply_distribution_action(
         source_bytes=source_bytes,
         source_mode=source_mode,
         created_parent_bindings=created_parent_bindings,
+        stage_ownership_recorder=stage_ownership_recorder,
     )
 
 
-def apply_distribution_plan(plan: DistributionPlan) -> DistributionResult:
+def apply_distribution_plan(
+    plan: DistributionPlan,
+    *,
+    allow_stale_stage_cleanup: bool = False,
+    allow_blocked_scaffold_paths: bool = False,
+    stage_ownership: tuple[DistributionStageOwnership, ...] = (),
+    stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
+    scaffold_applier: Callable[[], None] | None = None,
+    progress_recorder: Callable[[str, tuple[str, ...], tuple[str, ...], bool], None] | None = None,
+) -> DistributionResult:
     """Apply a validated plan with no-follow identity checks at every action.
 
     This S30 seam intentionally does not perform CLI admission, version-marker
-    handling, retry persistence, or recursive cleanup.  Any preflight or
-    identity mismatch raises before the corresponding action writes or removes
-    a target path.
+    handling, retry persistence, or recursive cleanup.  Stale private-stage
+    cleanup is opt-in for a validated same-package retry and only removes
+    stage entries whose no-follow identity was recorded immediately after
+    creation by that retry marker; ordinary runs leave unknown stage-like
+    siblings untouched.  Any preflight or identity mismatch raises before the
+    corresponding action writes or removes a target path.
     """
 
     target_root = plan.target_root
     if target_root is None or plan.install_root is None:
         raise DistributionApplyError("distribution plan is missing target or provider roots")
-    if plan.blocked:
+    permitted_scaffold_paths = (
+        plan.scaffold_paths if scaffold_applier is not None and allow_blocked_scaffold_paths else frozenset()
+    )
+    blocked_actions = [
+        action for action in plan.actions if action.blocked and action.path not in permitted_scaffold_paths
+    ]
+    if blocked_actions:
         raise DistributionApplyError("distribution plan is blocked")
     try:
         root_stat = os.lstat(target_root)
@@ -2135,36 +3055,146 @@ def apply_distribution_plan(plan: DistributionPlan) -> DistributionResult:
 
     snapshots = _plan_snapshot_map(plan)
     created_parent_bindings: dict[str, PathIdentitySnapshot] = {}
+    scaffold_paths = plan.scaffold_paths if scaffold_applier is not None else frozenset()
     for action in plan.actions:
         snapshot = snapshots.get(action.path)
         if snapshot is None:
             raise DistributionApplyError("distribution plan is missing a target identity snapshot")
         _assert_plan_target_snapshot(target_root, action.path, snapshot)
 
-    for index, action in enumerate(plan.actions):
-        if action.action in {"adopt", "preserve"}:
+    applied_paths: list[str] = []
+    pending_paths = [action.path for action in plan.actions]
+
+    if scaffold_applier is not None and scaffold_paths:
+        if progress_recorder is not None:
+            progress_recorder("managed-scaffold-refresh", tuple(applied_paths), tuple(pending_paths), False)
+        try:
+            scaffold_applier()
+            for action in plan.actions:
+                if action.path not in scaffold_paths:
+                    continue
+                refreshed = _observe_target(target_root, action.path)
+                if refreshed.snapshot is None:
+                    raise DistributionApplyError(f"managed scaffold post-apply path is missing for '{action.path}'")
+                expected = _expected_target_identity(plan, action.path)
+                if expected is None or refreshed.identity != expected:
+                    raise DistributionApplyError(f"managed scaffold post-apply verification failed for '{action.path}'")
+                snapshots[action.path] = refreshed.snapshot
+                applied_paths.append(action.path)
+                pending_paths.remove(action.path)
+            for action in plan.actions:
+                if action.path in scaffold_paths:
+                    continue
+                refreshed = _observe_target(target_root, action.path)
+                if refreshed.snapshot is None:
+                    raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                scaffold_owned_obsolete = (
+                    action.action == "prune"
+                    and any(action.path.startswith(f"spec-dock/{root}/") for root in _SCAFFOLD_MANAGED_ROOTS)
+                    and refreshed.state == "missing"
+                )
+                if not scaffold_owned_obsolete:
+                    _assert_pending_snapshot_stable(
+                        refreshed.snapshot,
+                        snapshots[action.path],
+                        action.path,
+                        created_parent_bindings,
+                    )
+                snapshots[action.path] = refreshed.snapshot
+        except Exception as exc:
+            if isinstance(exc, DistributionApplyError) and exc.phase is not None:
+                raise
+            raise DistributionApplyError(
+                str(exc),
+                phase="managed-scaffold-refresh",
+                applied_paths=tuple(applied_paths),
+                pending_paths=tuple(pending_paths),
+            ) from exc
+        if progress_recorder is not None:
+            progress_recorder("managed-scaffold-refresh", tuple(applied_paths), tuple(pending_paths), True)
+
+    current_paths = {asset.path for asset in plan.current_assets} | set(_CURRENT_SHORTCUTS)
+    external_actions = tuple(action for action in plan.actions if action.path not in scaffold_paths)
+    action_groups = (
+        ("current-external-materialize", tuple(action for action in external_actions if action.path in current_paths)),
+        ("obsolete-prune", tuple(action for action in external_actions if action.path not in current_paths)),
+    )
+    actions_to_apply = tuple(action for _, actions in action_groups for action in actions)
+    action_index = {id(action): index for index, action in enumerate(actions_to_apply)}
+    for phase, actions in action_groups:
+        if not actions:
+            if progress_recorder is not None:
+                progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), True)
             continue
-        snapshot = snapshots[action.path]
-        _assert_plan_target_snapshot(target_root, action.path, snapshot)
-        _apply_distribution_action(
-            plan,
-            target_root,
-            action,
-            snapshot,
-            created_parent_bindings,
-        )
-        for pending in plan.actions[index + 1 :]:
-            pending_snapshot = snapshots[pending.path]
-            pending_observation = _observe_target(target_root, pending.path)
-            if pending_observation.snapshot is None:
-                raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
-            _assert_pending_snapshot_stable(
-                pending_observation.snapshot,
-                pending_snapshot,
-                pending.path,
-                created_parent_bindings,
-            )
-            snapshots[pending.path] = pending_observation.snapshot
+        if progress_recorder is not None:
+            progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), False)
+        for action in actions:
+            index = action_index[id(action)]
+            try:
+                snapshot = snapshots[action.path]
+                _assert_plan_target_snapshot(target_root, action.path, snapshot)
+                if allow_stale_stage_cleanup:
+                    _cleanup_stale_distribution_stages(plan, target_root, action, snapshot, stage_ownership)
+                # Removing a known stale stage mutates the parent directory ctime.  The
+                # target itself must remain unchanged, but every later action needs the
+                # refreshed parent snapshot before it can be applied or adopted.
+                refreshed = _observe_target(target_root, action.path)
+                if refreshed.snapshot is None:
+                    raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                _assert_pending_snapshot_stable(refreshed.snapshot, snapshot, action.path, created_parent_bindings)
+                snapshot = refreshed.snapshot
+                snapshots[action.path] = snapshot
+                for pending in actions_to_apply[index + 1 :]:
+                    pending_snapshot = snapshots[pending.path]
+                    pending_observation = _observe_target(target_root, pending.path)
+                    if pending_observation.snapshot is None:
+                        raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
+                    _assert_pending_snapshot_stable(
+                        pending_observation.snapshot,
+                        pending_snapshot,
+                        pending.path,
+                        created_parent_bindings,
+                    )
+                    snapshots[pending.path] = pending_observation.snapshot
+                if action.action not in {"adopt", "preserve"}:
+                    if stage_ownership_recorder is None:
+                        _apply_distribution_action(plan, target_root, action, snapshot, created_parent_bindings)
+                    else:
+                        _apply_distribution_action(
+                            plan,
+                            target_root,
+                            action,
+                            snapshot,
+                            created_parent_bindings,
+                            stage_ownership_recorder,
+                        )
+                applied_paths.append(action.path)
+                pending_paths.remove(action.path)
+                if progress_recorder is not None:
+                    progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), False)
+                for pending in actions_to_apply[index + 1 :]:
+                    pending_snapshot = snapshots[pending.path]
+                    pending_observation = _observe_target(target_root, pending.path)
+                    if pending_observation.snapshot is None:
+                        raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
+                    _assert_pending_snapshot_stable(
+                        pending_observation.snapshot,
+                        pending_snapshot,
+                        pending.path,
+                        created_parent_bindings,
+                    )
+                    snapshots[pending.path] = pending_observation.snapshot
+            except Exception as exc:
+                if isinstance(exc, DistributionApplyError) and exc.phase is not None:
+                    raise
+                raise DistributionApplyError(
+                    str(exc),
+                    phase=phase,
+                    applied_paths=tuple(applied_paths),
+                    pending_paths=tuple(pending_paths),
+                ) from exc
+        if progress_recorder is not None:
+            progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), True)
 
     return DistributionResult(status="complete", actions=plan.actions)
 
@@ -2181,6 +3211,8 @@ __all__ = [
     "DistributionPlan",
     "DistributionProvenance",
     "DistributionResult",
+    "DistributionSourceSnapshot",
+    "DistributionStageOwnership",
     "DistributionTargetSnapshot",
     "PathIdentitySnapshot",
     "apply_distribution_plan",

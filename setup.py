@@ -32,6 +32,8 @@ _DISTRIBUTABLE_TEMPLATE_README_PATHS = (
 )
 _BUILD_TEMPLATE_ROOT = Path("spec_dock/assets/spec_dock/templates")
 _SOURCE_TEMPLATE_ROOT = Path("src/spec_dock/assets/spec_dock/templates")
+_BUILD_ASSET_ROOT = Path("spec_dock/assets")
+_SOURCE_ASSET_ROOT = Path("src/spec_dock/assets")
 
 _GENERATED_PYTHON_CACHE_PATTERNS = (
     "spec_dock/**/__pycache__",
@@ -41,6 +43,9 @@ _GENERATED_PYTHON_CACHE_PATTERNS = (
 )
 
 _SEEDED_STALE_OUTPUT_FIXTURE_PATHS = (
+    "spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",
+    "spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md",
+    "spec_dock/assets/spec_dock/scripts/authoring-pack/README.md",
     "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
     "spec_dock/assets/github/workflows/spec-dock-close.yml",
     "spec_dock/assets/spec_dock/templates/initiative/current/stale.md",
@@ -87,6 +92,12 @@ def _prune_stale_build_outputs(build_lib: Path) -> None:
         path
         for path in template_root.rglob("README.md")
         if path.relative_to(template_root).as_posix() not in _DISTRIBUTABLE_TEMPLATE_README_PATHS
+    )
+    build_asset_root = build_lib / _BUILD_ASSET_ROOT
+    stale_paths.update(
+        path
+        for path in build_asset_root.rglob("*")
+        if not (_SOURCE_ASSET_ROOT / path.relative_to(build_asset_root)).exists()
     )
     for stale_path in sorted(stale_paths, key=lambda path: len(path.parts), reverse=True):
         if stale_path.is_dir():

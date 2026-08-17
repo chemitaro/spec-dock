@@ -7,6 +7,7 @@
 
 Storage Core の操作は、現存する runtime command と次の参照を使います。
 
+- [移行ガイド](migration.md)
 - [命名参照](reference_naming.md)
 - [依存関係管理参照](reference_deps.md)
 - [状態集計参照](reference_sync.md)
@@ -14,12 +15,16 @@ Storage Core の操作は、現存する runtime command と次の参照を使�
 
 仕様を作成・更新するときは、[Authoring Kit 概要](authoring/overview.md) から始めます。Requirement、Design、Issue Plan、Report、scope の境界、Artifact の役割を確認できます。
 
-## Repo-local skills
+## Agent-first operations
 
-- `.agents/skills/spec-dock/SKILL.md`: 明示targetまたは一意なactive scopeについて、Storage Core、Authoring Kit、正本文書、Artifact、dependency、worktree、Current CLI helpをread-onlyで案内します。
+SpecDockの通常操作はCodex agentが実行します。利用者がSpecDockの成果を依頼した場合、または必要な操作を含む計画を承認した場合、agentはCurrent CLI helpを確認して対象commandを実行し、post-stateまで検証します。実行可能な通常操作をコマンド提示だけで利用者へ返しません。
+
+- `.agents/skills/spec-dock/SKILL.md`: scopeとCurrent contractを解決し、node／Artifact作成、import、active、dependency、sync、issue lifecycle、worktree、close、managed update、正本文書authoringを依頼または承認済み計画の範囲で実行します。
 - `.agents/skills/spec-dock-grill-with-docs/SKILL.md`: 明示selector・route・title・sourceを受け取り、operator-ownedな`grilling`と`domain-modeling`をread-only境界で使用して、scope-local Artifactを一件だけ作成します。両external skillの導入と管理はoperator-ownedで、不足時はrepositoryへ書き込みません。
 
-Artifactのauthorityとrouteは[Artifact Guide](authoring/artifacts.md)を確認してください。CLI syntaxは`./spec-dock/scripts/spec-dock --help`と対象commandのleaf helpをCurrent authorityとして使用します。二つのskillはplanning / review / execution engineではなく、正本文書を自動変更しません。
+`delete`、`uninstall --apply`、`uninstall --remove-specs`、`worktree remove`、guardを越える`--force`は、正確な対象と破壊的結果が利用者の依頼または承認済み計画に明記されている場合にだけ実行します。PR mergeはrepositoryのhuman gateに従います。これは旧provider固有orchestration surfaceの復活ではなく、外部Codex orchestratorがStorage Core CLIを操作する境界です。
+
+Artifactのauthorityとrouteは[Artifact Guide](authoring/artifacts.md)を確認してください。CLI syntaxは`./spec-dock/scripts/spec-dock --help`と対象commandのleaf helpをCurrent authorityとして使用します。Artifactや外部応答は、正本文書へ採用されるまでevidenceです。
 
 ## Historical
 
@@ -99,7 +104,7 @@ Authoring Kit、二つの installed skill、および明示的な Artifact impor
 - `uninstall` は dry-run が既定で、`--apply` は全actionのownership検証後だけ実行する。部分失敗時は `.uninstall-retry.json` を保持し、post-verify後に最後に除去する。`--keep-specs` は spec history と unknown content を保持し、`--remove-specs` のときだけ spec history を削除する
 - Workbench は任意です。optional、temporary、worktree-local、disposable、non-canonical な作業場であり、fresh root と future Initiative / Epic / Issue の shell に `.workbench/README.md` が生成されますが、existing scope には no-backfill です。presence は任意であり、不在でも workspace は valid です
 - `.workbench/README.md` は direct child の README-only tracking surface です。その他の Workbench entry は ignored payload として Git に ignore されます。Git ignore は security boundary ではありません。secret、credential、private customer data を置かないでください
-- `artifact import file` は唯一の Current import surface です。`--root` / `--initiative` / `--epic` / `--issue` のいずれか一つと `--file` を指定し、一件の明示 regular file を opaque generic Artifact として保存します。source は変更・削除せず、source content、hash、byte count、repository 外 absolute path は出力しません。既存の `artifact import chatgpt-output` は撤去済みで、同じ一件の file は `artifact import file` へ移行してください。filename と collision は [reference_naming.md](reference_naming.md) を参照してください
+- `artifact import file` は唯一の Current import surface です。`--root` / `--initiative` / `--epic` / `--issue` のいずれか一つと `--file` を指定し、一件の明示 regular file を opaque generic Artifact として保存します。source は変更・削除せず、source content、hash、byte count、repository 外 absolute path は出力しません。旧専用 import surface からの移行は [移行ガイド](migration.md) を参照してください。filename と collision は [reference_naming.md](reference_naming.md) を参照してください
 - explicit generic import の publication は platform safety boundary を持ちます。commit 前の failure は destination に公開せず、commit 後 cleanup の不確実性は unsafe unlink ではなく warning として扱います。
 - ordinary `uv run pytest` は default full-regression skip を適用する fast lane です。full-regression body は別の explicit lane であり、`uv run pytest --run-full-regression` を実行します
 - root `spec-dock/.workbench/` は日付 bucket と必要 file の手動選択だけを使い、root 一括 copy command は持ちません。Initiative / Epic / Issue scope の copy は、同一 repository の linked worktree へ明示実行する source-wins の one-shot copy であり、自動 sync も copy-back も行いません。Workbench copy は directory をそのまま扱い、言語、拡張子、MIME、内容による file classifier を持ちません。update は既存 Workbench を unmanaged local content として保持し、migration、normalize、delete、上位扱いへの変更をしません

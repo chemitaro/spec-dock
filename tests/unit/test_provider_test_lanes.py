@@ -10,18 +10,10 @@ REQUIRED_FAST_NODE_IDS = frozenset({
         "tests/unit/infra/test_init_update.py::TestInitUpdate::"
         "test_checked_in_dogfooding_mirror_docs_match_provider_assets"
     ),
-    (
-        "tests/unit/infra/test_init_update.py::TestInitUpdate::"
-        "test_checked_in_dogfooding_mirror_templates_match_provider_assets"
-    ),
     ("tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_workflow_seed_matches_repo_root_ci_workflow"),
     (
         "tests/unit/infra/test_init_update.py::TestInitUpdate::"
         "test_issue_68_provider_only_workflow_is_not_shipped_via_install_root"
-    ),
-    (
-        "tests/unit/infra/test_init_update.py::TestInitUpdate::"
-        "test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets"
     ),
 })
 

@@ -50,6 +50,8 @@ preserves user-owned and unknown paths, blocks before writing when ownership or 
 ambiguous, and records a same-root retry marker when an apply is interrupted. It is distinct from
 `init --force`; older or incompatible workspaces may still require manual normalization or rebuild.
 
+既存環境の更新手順と、旧配布面からの移行・復旧方針は [移行ガイド](spec-dock/docs/migration.md) を参照してください。
+
 ## Worktree Root Setup
 
 `./spec-dock/scripts/spec-dock worktree create` requires `SPEC_DOCK_WORKTREE_ROOT`.
@@ -80,6 +82,20 @@ After `init`, Core operations use `./spec-dock/scripts/spec-dock`. The installed
 limited to the Storage Core guide and the optional operator-owned documentation grill; planning,
 review, and execution orchestration are not shipped as repository-local workflow engines.
 
+### Agent-first operation
+
+SpecDock is intended to be operated by a Codex agent. When a user requests a SpecDock outcome or
+approves a plan that requires one, the agent runs the applicable repository-local commands and
+verifies their results. The examples below are command references, not instructions to hand routine
+execution back to the user. Removing bundled orchestration does not make the CLI human-operated.
+
+Ordinary in-scope creation, import, Artifact, active, dependency, sync, issue lifecycle, worktree
+creation, Workbench copy, close, and managed update operations do not require command-by-command
+confirmation. Destructive operations (`delete`, `uninstall --apply`, `uninstall --remove-specs`,
+`worktree remove`, and guard-bypassing `--force`) require an exact target and destructive outcome in
+the user request or approved plan. PR merge remains human-operated where repository instructions say
+so.
+
 ```bash
 # Create nodes:
 # - initiative/epic/issue default: create and link a GitHub issue.
@@ -105,9 +121,9 @@ review, and execution orchestration are not shipped as repository-local workflow
 # Copy one Initiative/Epic/Issue Workbench to an existing linked worktree (experimental, one-shot).
 ./spec-dock/scripts/spec-dock workbench copy --scope iss-00123 --to /path/to/linked-worktree
 
-# Preserve a completed ChatGPT Markdown report as byte-identical, evidence-only Artifact content.
-./spec-dock/scripts/spec-dock artifact import chatgpt-output \
-  --issue iss-00123 --file spec-dock/initiatives/.../.workbench/report.md --title "Planning report"
+# Preserve one explicit evidence file as opaque, evidence-only Artifact content.
+./spec-dock/scripts/spec-dock artifact import file \
+  --issue iss-00123 --file spec-dock/initiatives/.../.workbench/report.md
 
 # Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
 ./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
@@ -167,11 +183,10 @@ Notes:
   worktree. This is a source-wins, one-shot copy, not automatic synchronization or copy-back.
 - Workbench copy applies to the complete directory without language, extension, MIME, or content
   classification. Keep material that must survive outside Workbench in an Artifact or canonical doc.
-- `artifact import chatgpt-output` accepts one Markdown file from an approved Workbench, preserves the
-  source and its bytes, and stores it with blank Artifact identity. `chatgpt-output` is an import kind,
-  not a reserved typed Artifact token; `new artifact` and import coexist. Imported content remains
-  evidence-only until its adoption is recorded in the Evidence Adoption Ledger and accepted claims are
-  rewritten into canonical docs.
+- `artifact import file` accepts one explicit regular file, preserves the source and its bytes, and
+  stores it as an opaque generic Artifact. Imported content remains evidence-only until its adoption is
+  recorded in the Evidence Adoption Ledger and accepted claims are rewritten into canonical docs. See
+  [移行ガイド](spec-dock/docs/migration.md) for the replacement route and recovery notes.
 - `update` preserves existing Workbench directories as unmanaged local content. It does not migrate,
   normalize, delete, or promote them.
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
@@ -264,6 +279,8 @@ PR still requires a human to perform the merge.
 Codex 互換の二つの補助Skillを生成するためのスキャフォルディングツールです。
 
 実行は `uvx` を想定しており、導入後は生成されたファイル（Markdown/スクリプト/Skill）を使って運用します。
+
+SpecDockの通常操作はCodex agentが実行するagent-first運用を想定しています。利用者の依頼または承認済み計画に必要なコマンドはagentが実行・検証し、コマンド例の提示だけで利用者へ返しません。破壊的操作は対象と結果が依頼または承認済み計画に明記されている場合に限り、PRのmergeはrepositoryのhuman gateに従います。
 
 v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様ツリーを **常置**し、
 `spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
