@@ -573,6 +573,43 @@ def test_s45_fresh_rerun_through_force_converges(tmp_path: Path) -> None:
     assert _filesystem_snapshot(tmp_path) == before
 
 
+def test_s50_update_and_force_restore_missing_non_anchor_scaffold_directories(tmp_path: Path) -> None:
+    sentinels = {
+        "docs": Path("README.md"),
+        "templates": Path("initiative/requirement.md"),
+        "system": Path("active-none/issue/report.md"),
+    }
+    for operation in ("update", "init-force"):
+        target = tmp_path / operation
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+        for managed_name in sentinels:
+            shutil.rmtree(target / "spec-dock" / managed_name)
+
+        command = ["update", str(target)] if operation == "update" else ["init", str(target), "--force"]
+        assert main(command) == 0
+
+        for managed_name, sentinel in sentinels.items():
+            restored = target / "spec-dock" / managed_name / sentinel
+            source = SCAFFOLD_ROOT / managed_name / sentinel
+            assert restored.read_bytes() == source.read_bytes()
+
+
+def test_s35_update_and_force_block_missing_runtime_anchor_without_writes(tmp_path: Path, capsys) -> None:
+    for operation in ("update", "init-force"):
+        target = tmp_path / operation
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+        shutil.rmtree(target / "spec-dock" / "scripts")
+        before = _filesystem_snapshot(target)
+
+        command = ["update", str(target)] if operation == "update" else ["init", str(target), "--force"]
+        assert main(command) == 1
+
+        assert "anchor-mismatch" in capsys.readouterr().err
+        assert _filesystem_snapshot(target) == before
+
+
 def test_s45_force_init_on_empty_target_uses_fresh_distribution(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path), "--force"]) == 0
 
