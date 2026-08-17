@@ -551,15 +551,15 @@ Issue 360の対象範囲に対する最終確認を実施した。対象外の�
 
 | 観測 | 結果 | 証拠 |
 |---|---|---|
-| Fast lane | pass | 実装コミット`30671587e22d0666ed785a880e402010aaeeac09`で`uv run pytest -q` → `1022 passed, 1022 skipped` |
+| Fast lane | pass | 実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest -q` → `1023 passed, 1025 skipped` |
 | Static quality | pass | `make lint`（ruff check / format / mypy）→ pass |
-| Issue 360 focused regression | pass (Issue 360 suites) | `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` → `139 passed`。Dangling active pathfile symlink、managed-file parent rebind、marker再試行、root binding、no-follow / no-replace、Fresh / update / uninstall cut-overを確認 |
-| Archive distribution integration | pass | cleanな実装コミット`30671587e22d0666ed785a880e402010aaeeac09`で`uv run pytest --run-full-regression -q tests/integration/test_epic_00343_distribution.py` → `15 passed` |
+| Issue 360 focused regression | pass (Issue 360 suites) | 実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py tests/unit/infra/test_managed_distribution.py` → `239 passed`。scaffold recursive copy / executable / readonlyのdescriptor-bound no-follow mutation、uninstall mode mismatch preserve-and-blockを含む |
+| Archive distribution integration | pass | cleanな実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest --run-full-regression -q tests/integration/test_epic_00343_distribution.py` → `15 passed` |
 | Package build | pass | `uv build` → wheel / sdist生成 |
 | Consumer validation | pass | `./spec-dock/scripts/spec-dock validate` → `nodes=221`、`deps check iss-00360 --no-github` → `ready=true blockers=0` |
-| Full repository regression | pass (accepted nonzero / exact ledger match) | 実装コミット`30671587e22d0666ed785a880e402010aaeeac09`で`uv run pytest --run-full-regression -q` → `26 failed, 1970 passed, 48 skipped`（15分26.71秒）。ledger 26 node IDのcache無効再実行は`call_failed=26`、`non_call_failed=0`、`exact=True`、additional / missing 0件。各path・owner・follow-up・根拠は[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)に記録した |
+| Full repository regression | pass (accepted nonzero / exact ledger match) | 実装コミット`1dcb7487e6f76013f7f975cdf0e0460010f12ef3`で`uv run pytest --run-full-regression -q` → `26 failed, 1974 passed, 48 skipped`（15分24.45秒）。ledger 26 node IDのcache無効再実行は`call_failed=26`、`non_call_failed=0`、`exact=True`、additional / missing 0件。各path・owner・follow-up・根拠は[`artifacts/s95-full-regression-ledger.json`](artifacts/s95-full-regression-ledger.json)に記録した |
 | Retired test surface convergence | pass | 動的skipされていたIssue 360退役surfaceの414テストと専用helper / constantを物理削除し、`RETIRED_ISSUE360_INIT_UPDATE_PREFIXES`によるcollection-time skipを廃止した。残存fast suite、cut-over 139件、archive integration 15件、lintがpass |
-| Final ChatGPT-final-quality-gate-strict | successor remediation cycle 3 | generation 3 bounded reviewのP1を受け、obsolete test surfaceを物理削除し、failure-ledger verifierをcall phase限定かつsetup / teardown fail-closedへ修正した。最新実装SHAの全証跡を後継campaignへ固定する |
+| Final ChatGPT-final-quality-gate-strict | successor remediation cycle 4 | generation 2 bounded reviewでownership / marker / update-uninstall / retired surfaceの4 domainがfinding 0件、coverage complete。残るtests-release P1に対し、最新実装SHAのfull regression exact-set証跡を取得し、後続evidence-only candidateへ固定する |
 | S99 / H10 | pending final certificate | bounded review・slow attestation・fresh full reviewをsuccessor candidateへ再固定し、repository外certificateを発行する。origin session closureは直後candidate限定の診断であり、そのcandidateがbounded P1で停止したため認証要件へ持ち越さない。certificate後にrepositoryを変更しない |
 
 ## Residual Risks / Follow-ups
