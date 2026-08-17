@@ -59,6 +59,9 @@ EXPECTED_OBSOLETE_SKILL_PATHS = frozenset(
         "spec-dock-implementation-planner",
     )
 )
+EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS = frozenset(
+    f"spec-dock/current-{scope}{suffix}" for scope in ("initiative", "epic", "issue") for suffix in ("", ".path")
+)
 MANIFEST_FIELDS = {
     "schema_version",
     "recognized_workspace_versions",
@@ -123,8 +126,9 @@ def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
     assert plan.manifest.schema_version == 1
     assert plan.manifest.historical_current_identities == ()
     obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files}
-    assert len(obsolete_paths) == 75
+    assert len(obsolete_paths) == 81
     assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
+    assert obsolete_paths >= EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
     assert ".agents/host-adapters/meta.json" in obsolete_paths
     assert any(path.startswith(".codex/") for path in obsolete_paths)
     assert any(path.startswith(".github/agents/") for path in obsolete_paths)
@@ -142,9 +146,18 @@ def test_s20_current_catalog_is_not_duplicated_in_historical_manifest() -> None:
     assert not any(key in raw for key in {"current", "current_assets", "current_catalog"})
     assert raw["historical_current_identities"] == []
     obsolete_paths = {item["path"] for item in raw["obsolete_exact_files"]}
-    assert len(obsolete_paths) == 75
+    assert len(obsolete_paths) == 81
     assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
+    assert obsolete_paths >= EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
     assert not any(item["path"] in EXPECTED_CURRENT_PATHS for item in raw["obsolete_exact_files"])
+    unproven_entrypoints = {
+        item["path"]: item
+        for item in raw["obsolete_exact_files"]
+        if item["path"] in EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
+    }
+    assert set(unproven_entrypoints) == EXPECTED_UNPROVEN_LEGACY_ENTRYPOINT_PATHS
+    assert all(item["identities"] == [] for item in unproven_entrypoints.values())
+    assert all(item["on_unknown"] == "preserve-and-block" for item in unproven_entrypoints.values())
 
 
 def test_s55_obsolete_catalog_is_bound_to_reproducible_git_source() -> None:
