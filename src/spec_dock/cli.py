@@ -21,7 +21,6 @@ from pathlib import Path
 import re
 import secrets
 import shlex
-import shutil
 import stat
 import subprocess
 import sys
@@ -395,6 +394,160 @@ def _assert_managed_scaffold_file_identities(
         )
 
 
+def _managed_directory_flags() -> int:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if not isinstance(nofollow, int) or not isinstance(directory, int):
+        raise RuntimeError("managed scaffold no-follow support is unavailable")
+    return os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+
+
+def _assert_bound_directory_visible(parent_fd: int, name: str, directory_fd: int) -> None:
+    """Require a visible directory entry to still name one held directory."""
+    try:
+        visible = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        opened = os.fstat(directory_fd)
+    except OSError as exc:
+        raise RuntimeError("managed scaffold directory identity changed") from exc
+    if (
+        stat.S_ISLNK(visible.st_mode)
+        or not stat.S_ISDIR(visible.st_mode)
+        or not stat.S_ISDIR(opened.st_mode)
+        or (visible.st_dev, visible.st_ino) != (opened.st_dev, opened.st_ino)
+    ):
+        raise RuntimeError("managed scaffold directory identity changed")
+
+
+def _copy_managed_regular_file_at(source: Path, directory_fd: int, name: str) -> None:
+    """Copy one provider file into a held consumer directory without following links."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed scaffold no-follow support is unavailable")
+    try:
+        source_info = os.lstat(source)
+    except OSError as exc:
+        raise RuntimeError("managed scaffold source cannot be inspected safely") from exc
+    if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISREG(source_info.st_mode):
+        raise RuntimeError("managed scaffold source is not a regular file")
+
+    source_fd: int | None = None
+    target_fd: int | None = None
+    target_identity: tuple[int, int] | None = None
+    try:
+        source_fd = os.open(source, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0))
+        opened_source = os.fstat(source_fd)
+        if not stat.S_ISREG(opened_source.st_mode) or (
+            opened_source.st_dev,
+            opened_source.st_ino,
+            opened_source.st_ctime_ns,
+        ) != (source_info.st_dev, source_info.st_ino, source_info.st_ctime_ns):
+            raise RuntimeError("managed scaffold source identity changed")
+
+        mode = stat.S_IMODE(opened_source.st_mode)
+        target_fd = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+            mode,
+            dir_fd=directory_fd,
+        )
+        opened_target = os.fstat(target_fd)
+        if not stat.S_ISREG(opened_target.st_mode) or opened_target.st_nlink != 1:
+            raise RuntimeError("managed scaffold target is not a safe regular file")
+        target_identity = (opened_target.st_dev, opened_target.st_ino)
+
+        while True:
+            chunk = os.read(source_fd, 1024 * 64)
+            if not chunk:
+                break
+            view = memoryview(chunk)
+            while view:
+                written = os.write(target_fd, view)
+                if written <= 0:
+                    raise RuntimeError("managed scaffold file write made no progress")
+                view = view[written:]
+        os.fchmod(target_fd, mode)
+        os.fsync(target_fd)
+
+        visible = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISREG(visible.st_mode)
+            or visible.st_nlink != 1
+            or (visible.st_dev, visible.st_ino) != target_identity
+        ):
+            raise RuntimeError("managed scaffold target identity changed")
+    except FileExistsError as exc:
+        raise RuntimeError("managed scaffold target appeared during copy") from exc
+    except OSError as exc:
+        raise RuntimeError("managed scaffold file could not be copied safely") from exc
+    finally:
+        if target_fd is not None:
+            with suppress(OSError):
+                os.close(target_fd)
+        if source_fd is not None:
+            with suppress(OSError):
+                os.close(source_fd)
+
+
+def _copy_managed_directory_contents(source: Path, parent_fd: int, name: str) -> None:
+    """Create and populate one consumer directory through held descriptors."""
+    try:
+        source_info = os.lstat(source)
+    except OSError as exc:
+        raise RuntimeError("managed scaffold source cannot be inspected safely") from exc
+    if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISDIR(source_info.st_mode):
+        raise RuntimeError("managed scaffold source is not a directory")
+
+    try:
+        os.mkdir(name, stat.S_IMODE(source_info.st_mode), dir_fd=parent_fd)
+    except FileExistsError as exc:
+        raise RuntimeError("managed scaffold target appeared during copy") from exc
+    except OSError as exc:
+        raise RuntimeError("managed scaffold directory could not be created safely") from exc
+
+    directory_fd: int | None = None
+    try:
+        directory_fd = os.open(name, _managed_directory_flags(), dir_fd=parent_fd)
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+        source_entries = sorted(source.iterdir(), key=lambda entry: entry.name)
+        names = [entry.name for entry in source_entries]
+        ignored = _ignore_retired_scaffold_entries(str(source), names)
+        for source_entry in source_entries:
+            entry_name = source_entry.name
+            if entry_name in ignored:
+                continue
+            _assert_bound_directory_visible(parent_fd, name, directory_fd)
+            try:
+                entry_info = os.lstat(source_entry)
+            except OSError as exc:
+                raise RuntimeError("managed scaffold source cannot be inspected safely") from exc
+            if stat.S_ISDIR(entry_info.st_mode) and not stat.S_ISLNK(entry_info.st_mode):
+                _copy_managed_directory_contents(source_entry, directory_fd, entry_name)
+            elif stat.S_ISREG(entry_info.st_mode) and not stat.S_ISLNK(entry_info.st_mode):
+                _copy_managed_regular_file_at(source_entry, directory_fd, entry_name)
+            else:
+                raise RuntimeError("managed scaffold source contains an unsafe entry")
+        os.fchmod(directory_fd, stat.S_IMODE(source_info.st_mode))
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+    finally:
+        if directory_fd is not None:
+            with suppress(OSError):
+                os.close(directory_fd)
+
+
+def _copy_managed_scaffold_tree(source: Path, destination: Path) -> None:
+    """Copy one managed scaffold root through a no-follow parent chain."""
+    parent_chain = _open_managed_parent_chain(destination)
+    try:
+        _assert_managed_parent_chain_visible(destination, parent_chain)
+        _copy_managed_directory_contents(source, parent_chain[-1], destination.name)
+        _assert_managed_parent_chain_visible(destination, parent_chain)
+    finally:
+        for opened_fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(opened_fd)
+
+
 def _sync_tree(
     src: Path,
     dest: Path,
@@ -416,41 +569,128 @@ def _sync_tree(
             expected_identity=expected_identity,
             expected_root_identity=expected_root_identity,
         )
-    shutil.copytree(src, dest, ignore=_ignore_retired_scaffold_entries)
+    _copy_managed_scaffold_tree(src, dest)
+
+
+def _chmod_managed_regular_file(path: Path, *, add: int = 0, remove: int = 0) -> None:
+    """Change one managed file mode through a held no-follow parent chain."""
+    parent_chain = _open_managed_parent_chain(path)
+    parent_fd = parent_chain[-1]
+    file_fd: int | None = None
+    try:
+        _assert_managed_parent_chain_visible(path, parent_chain)
+        try:
+            before = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RuntimeError("managed scaffold mode target is not a safe regular file")
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise RuntimeError("managed scaffold no-follow support is unavailable")
+        file_fd = os.open(
+            path.name,
+            os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(file_fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino, opened.st_ctime_ns) != (before.st_dev, before.st_ino, before.st_ctime_ns)
+        ):
+            raise RuntimeError("managed scaffold mode target identity changed")
+        os.fchmod(file_fd, (stat.S_IMODE(opened.st_mode) | add) & ~remove)
+        current = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(current.st_mode)
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
+        ):
+            raise RuntimeError("managed scaffold mode target identity changed")
+    except OSError as exc:
+        raise RuntimeError("managed scaffold mode could not be changed safely") from exc
+    finally:
+        if file_fd is not None:
+            with suppress(OSError):
+                os.close(file_fd)
+        for opened_fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(opened_fd)
 
 
 def _make_executable(path: Path) -> None:
-    """Best-effort: add executable bits to a file."""
+    """Add executable bits without following a replaced managed path."""
+    _chmod_managed_regular_file(path, add=0o111)
+
+
+def _make_readonly_directory_at(parent_fd: int, name: str) -> None:
+    directory_fd = os.open(name, _managed_directory_flags(), dir_fd=parent_fd)
     try:
-        mode = path.stat().st_mode
-        path.chmod(mode | 0o111)
-    except OSError:
-        # Best-effort only.
-        return
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+        # pathlib cannot enumerate a held directory descriptor.
+        for entry_name in sorted(os.listdir(directory_fd)):  # noqa: PTH208
+            _assert_bound_directory_visible(parent_fd, name, directory_fd)
+            info = os.stat(entry_name, dir_fd=directory_fd, follow_symlinks=False)
+            if stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode):
+                _make_readonly_directory_at(directory_fd, entry_name)
+            elif stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode):
+                if info.st_nlink != 1:
+                    raise RuntimeError("managed readonly target is hard-linked")
+                nofollow = getattr(os, "O_NOFOLLOW", None)
+                if not isinstance(nofollow, int):
+                    raise RuntimeError("managed scaffold no-follow support is unavailable")
+                file_fd = os.open(
+                    entry_name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=directory_fd,
+                )
+                try:
+                    opened = os.fstat(file_fd)
+                    if (
+                        not stat.S_ISREG(opened.st_mode)
+                        or opened.st_nlink != 1
+                        or (opened.st_dev, opened.st_ino, opened.st_ctime_ns)
+                        != (info.st_dev, info.st_ino, info.st_ctime_ns)
+                    ):
+                        raise RuntimeError("managed readonly target identity changed")
+                    os.fchmod(file_fd, stat.S_IMODE(opened.st_mode) & ~0o222)
+                    visible = os.stat(entry_name, dir_fd=directory_fd, follow_symlinks=False)
+                    if (
+                        stat.S_ISLNK(visible.st_mode)
+                        or not stat.S_ISREG(visible.st_mode)
+                        or visible.st_nlink != 1
+                        or (visible.st_dev, visible.st_ino) != (opened.st_dev, opened.st_ino)
+                    ):
+                        raise RuntimeError("managed readonly target identity changed")
+                finally:
+                    os.close(file_fd)
+            else:
+                raise RuntimeError("managed readonly tree contains an unsafe entry")
+        _assert_bound_directory_visible(parent_fd, name, directory_fd)
+    except OSError as exc:
+        raise RuntimeError("managed readonly tree could not be changed safely") from exc
+    finally:
+        os.close(directory_fd)
 
 
 def _make_readonly_tree(path: Path) -> None:
-    """Best-effort: remove write bits from files under `path`.
-
-    Notes:
-    - This is best-effort only; permissions vary by OS/FS.
-    - On Windows, making files read-only can interfere with later removal on update,
-      so we skip it there.
-    """
+    """Remove write bits without following replaced managed paths."""
     if os.name == "nt":
         return
-    if not path.exists():
-        return
-
-    for p in path.rglob("*"):
-        if not p.is_file():
-            continue
+    parent_chain = _open_managed_parent_chain(path)
+    try:
+        _assert_managed_parent_chain_visible(path, parent_chain)
         try:
-            mode = p.stat().st_mode
-            p.chmod(mode & ~0o222)
-        except OSError:
-            # Best-effort only.
-            continue
+            _make_readonly_directory_at(parent_chain[-1], path.name)
+        except FileNotFoundError:
+            return
+        _assert_managed_parent_chain_visible(path, parent_chain)
+    finally:
+        for opened_fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(opened_fd)
 
 
 def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
@@ -1675,7 +1915,7 @@ def _install_spec_dock_bound(
                     expected_root_identity=expected_root_identity,
                 )
             else:
-                shutil.copytree(src, dest, ignore=_ignore_retired_scaffold_entries)
+                _copy_managed_scaffold_tree(src, dest)
             guard_root()
 
         guard_root()
