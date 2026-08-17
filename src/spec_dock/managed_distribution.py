@@ -1604,7 +1604,7 @@ def _classify_current_target(
         and expected.mode is not None
         and actual.mode != expected.mode
     ):
-        if operation == "fresh":
+        if operation in {"fresh", "uninstall"}:
             return _blocked_action(
                 path,
                 operation,

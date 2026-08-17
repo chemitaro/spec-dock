@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shlex
 import shutil
+import stat
 import threading
 import time
 
@@ -509,6 +510,58 @@ def test_s45_fresh_current_symlink_or_directory_collision_is_zero_write(tmp_path
 
         assert main(["init", str(target)]) == 1
         assert _filesystem_snapshot(target) == before
+
+
+def test_s45_scaffold_copy_rejects_file_symlink_race_without_external_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    external = tmp_path / "external.txt"
+    external.write_text("external sentinel\n", encoding="utf-8")
+    original = cli._copy_managed_regular_file_at
+    attacked = False
+
+    def inject_symlink(source: Path, directory_fd: int, name: str) -> None:
+        nonlocal attacked
+        if not attacked:
+            os.symlink(external, name, dir_fd=directory_fd)
+            attacked = True
+        original(source, directory_fd, name)
+
+    monkeypatch.setattr(cli, "_copy_managed_regular_file_at", inject_symlink)
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    assert main(["init", str(consumer)]) == 1
+    assert attacked is True
+    assert external.read_text(encoding="utf-8") == "external sentinel\n"
+
+
+def test_s45_make_executable_rejects_symlink_without_external_chmod(tmp_path: Path) -> None:
+    external = tmp_path / "external.sh"
+    external.write_text("external sentinel\n", encoding="utf-8")
+    external.chmod(0o600)
+    link = tmp_path / "managed-script"
+    link.symlink_to(external)
+
+    with pytest.raises(RuntimeError, match="safe regular file"):
+        cli._make_executable(link)
+
+    assert stat.S_IMODE(external.stat().st_mode) == 0o600
+
+
+def test_s45_make_readonly_tree_rejects_symlink_without_external_chmod(tmp_path: Path) -> None:
+    external = tmp_path / "external.md"
+    external.write_text("external sentinel\n", encoding="utf-8")
+    external.chmod(0o600)
+    managed = tmp_path / "managed"
+    managed.mkdir()
+    (managed / "placeholder.md").symlink_to(external)
+
+    with pytest.raises(RuntimeError, match="unsafe entry"):
+        cli._make_readonly_tree(managed)
+
+    assert stat.S_IMODE(external.stat().st_mode) == 0o600
 
 
 def test_s45_fresh_rerun_through_force_converges(tmp_path: Path) -> None:

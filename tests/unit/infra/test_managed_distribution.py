@@ -794,6 +794,35 @@ def test_s25_current_hard_link_is_blocked_for_uninstall(tmp_path: Path) -> None:
     assert action.blocked is True
 
 
+def test_s25_current_mode_mismatch_is_preserved_and_blocked_for_uninstall(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    source.chmod(0o755)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"current\n")
+    target.chmod(0o600)
+    before = target.read_bytes(), stat.S_IMODE(target.stat().st_mode)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "preserve"
+    assert action.provenance == "current"
+    assert action.reason == "current-mode-mismatch"
+    assert action.blocked is True
+    with pytest.raises(DistributionApplyError, match="blocked"):
+        apply_distribution_plan(plan)
+    assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
+
+
 def test_s25_current_hard_linked_shortcut_is_blocked_for_uninstall(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
