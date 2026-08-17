@@ -19,12 +19,12 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shlex
 import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 import threading
 from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 
@@ -464,7 +464,11 @@ def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
 def _write_active_pathfile(active_dir: Path, name: str, target: Path) -> None:
     """Write `active/<name>.path` as symlink fallback."""
     rel_target = os.path.relpath(target, start=active_dir)
-    (active_dir / f"{name}.path").write_text(rel_target + "\n", encoding="utf-8")
+    _write_atomic_regular_file(
+        active_dir / f"{name}.path",
+        (rel_target + "\n").encode("utf-8"),
+        mode=0o644,
+    )
 
 
 def _normalize_active_manifest_entry_id(entry: object) -> str | None:
@@ -892,10 +896,10 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
                         )
             if link.exists() or link.is_symlink():
                 continue
-            if pathfile.exists():
+            if pathfile.exists() or pathfile.is_symlink():
                 with suppress(OSError):
                     pathfile.unlink()
-            if pathfile.exists():
+            if pathfile.exists() or pathfile.is_symlink():
                 continue
 
         # If `.path` exists but does not resolve to a valid active entrypoint,
@@ -904,11 +908,11 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             if link.is_symlink():
                 with suppress(OSError):
                     link.unlink()
-            if pathfile.exists():
+            if pathfile.exists() or pathfile.is_symlink():
                 with suppress(OSError):
                     pathfile.unlink()
 
-        if link.exists() or link.is_symlink() or pathfile.exists():
+        if link.exists() or link.is_symlink() or pathfile.exists() or pathfile.is_symlink():
             continue
 
         rel_target = os.path.relpath(desired_target, start=active_dir)
@@ -935,13 +939,19 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
         issue_id=resolved_ids["issue"],
     )
     current_context_pack: str | None = None
-    if context_pack_path.exists():
+    if context_pack_path.exists() or context_pack_path.is_symlink():
         try:
-            current_context_pack = context_pack_path.read_text(encoding="utf-8")
+            context_pack_info = os.lstat(context_pack_path)
+            if stat.S_ISREG(context_pack_info.st_mode) and context_pack_info.st_nlink == 1:
+                current_context_pack = context_pack_path.read_text(encoding="utf-8")
         except OSError:
             current_context_pack = None
     if current_context_pack != desired_context_pack:
-        context_pack_path.write_text(desired_context_pack, encoding="utf-8")
+        _write_atomic_regular_file(
+            context_pack_path,
+            desired_context_pack.encode("utf-8"),
+            mode=0o644,
+        )
 
 
 def _install_repo_root_shortcut(target_root: Path) -> None:
@@ -1087,6 +1097,173 @@ def _publish_new_atomic_regular_file(temporary: Path, destination: Path) -> None
             os.close(parent_fd)
 
 
+def _open_managed_parent_chain(path: Path) -> tuple[int, ...]:
+    """Open every parent component without following symlinks."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if not isinstance(nofollow, int) or not isinstance(directory, int):
+        raise RuntimeError("managed file parent no-follow support is unavailable")
+    flags = os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+    anchor = Path(path.anchor) if path.is_absolute() else Path()
+    components = path.parent.parts[1:] if path.is_absolute() else path.parent.parts
+    fds: list[int] = []
+    try:
+        fds.append(os.open(anchor, flags))
+        for component in components:
+            if component in ("", "."):
+                continue
+            if component == "..":
+                raise RuntimeError("managed file parent escapes the bound root")
+            next_fd = os.open(component, flags, dir_fd=fds[-1])
+            opened = os.fstat(next_fd)
+            if not stat.S_ISDIR(opened.st_mode):
+                os.close(next_fd)
+                raise RuntimeError("managed file parent must be a real directory")
+            fds.append(next_fd)
+        return tuple(fds)
+    except (OSError, RuntimeError) as exc:
+        for opened_fd in reversed(fds):
+            with suppress(OSError):
+                os.close(opened_fd)
+        if isinstance(exc, RuntimeError):
+            raise
+        raise RuntimeError("managed file parent cannot be opened safely") from exc
+
+
+def _assert_managed_parent_chain_visible(path: Path, fds: tuple[int, ...]) -> None:
+    """Reject a parent component that was rebound after descriptor opening."""
+    components = path.parent.parts[1:] if path.is_absolute() else path.parent.parts
+    components = tuple(component for component in components if component not in ("", "."))
+    if len(fds) != len(components) + 1:
+        raise RuntimeError("managed file parent identity changed")
+    for index, component in enumerate(components):
+        try:
+            visible = os.stat(component, dir_fd=fds[index], follow_symlinks=False)
+            opened = os.fstat(fds[index + 1])
+        except OSError as exc:
+            raise RuntimeError("managed file parent identity changed") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or not stat.S_ISDIR(opened.st_mode)
+            or (visible.st_dev, visible.st_ino) != (opened.st_dev, opened.st_ino)
+        ):
+            raise RuntimeError("managed file parent identity changed")
+
+
+def _managed_file_identity_at(parent_fd: int, name: str) -> _ManagedFileIdentity | None:
+    """Capture a regular file relative to one held parent descriptor."""
+    try:
+        info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise RuntimeError("managed file cannot be inspected safely") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise RuntimeError("managed file destination is not a safe regular file")
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise RuntimeError("managed file no-follow support is unavailable")
+    try:
+        fd = os.open(name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
+    except OSError as exc:
+        raise RuntimeError("managed file cannot be opened safely") from exc
+    try:
+        opened = os.fstat(fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_dev != info.st_dev
+            or opened.st_ino != info.st_ino
+            or opened.st_ctime_ns != info.st_ctime_ns
+        ):
+            raise RuntimeError("managed file destination identity changed")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1024 * 64)
+            if not chunk:
+                break
+            digest.update(chunk)
+        return _ManagedFileIdentity(
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_ctime_ns,
+            opened.st_nlink,
+            stat.S_IMODE(opened.st_mode),
+            digest.hexdigest(),
+        )
+    finally:
+        os.close(fd)
+
+
+def _retry_unpublished_atomic_regular_file_at(
+    parent_fd: int,
+    temporary_name: str,
+    destination_name: str,
+    payload: bytes,
+    *,
+    mode: int,
+    expected_identity: tuple[int, int],
+) -> bool:
+    """Retry a failed new-file publication through its held parent."""
+    fd: int | None = None
+    try:
+        temporary_info = os.stat(temporary_name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(temporary_info.st_mode)
+            or not stat.S_ISREG(temporary_info.st_mode)
+            or temporary_info.st_nlink != 1
+            or (temporary_info.st_dev, temporary_info.st_ino) != expected_identity
+        ):
+            return False
+        try:
+            os.stat(destination_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            return False
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            return False
+        fd = os.open(
+            temporary_name,
+            os.O_WRONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino) != expected_identity
+        ):
+            return False
+        os.ftruncate(fd, 0)
+        os.fchmod(fd, mode)
+        view = memoryview(payload)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                return False
+            view = view[written:]
+        os.fsync(fd)
+        os.close(fd)
+        fd = None
+        try:
+            os.stat(destination_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            return False
+        _rename_distribution_no_replace(parent_fd, temporary_name, parent_fd, destination_name)
+        return True
+    except OSError:
+        return False
+    finally:
+        if fd is not None:
+            with suppress(OSError):
+                os.close(fd)
+
+
 def _write_atomic_regular_file(
     path: Path,
     payload: bytes,
@@ -1095,40 +1272,35 @@ def _write_atomic_regular_file(
     expected_identity: _ManagedFileIdentity | None = None,
     identity_checked: bool = False,
 ) -> None:
-    """Write one managed regular file without following a destination link."""
-    parent = path.parent
+    """Write one managed regular file through a held no-follow parent chain."""
+    parent_chain = _open_managed_parent_chain(path)
+    parent_fd = parent_chain[-1]
+    temporary_name: str | None = None
+    temporary_identity: tuple[int, int] | None = None
+    existing_identity: _ManagedFileIdentity | None = None
+    fd: int | None = None
     try:
-        parent_info = os.lstat(parent)
-    except OSError as exc:
-        raise RuntimeError("managed file parent cannot be inspected safely") from exc
-    if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
-        raise RuntimeError("managed file parent must be a real directory")
+        _assert_managed_parent_chain_visible(path, parent_chain)
+        existing_identity = _managed_file_identity_at(parent_fd, path.name)
+        if identity_checked and existing_identity != expected_identity:
+            raise RuntimeError("managed scaffold file identity changed")
 
-    existing: os.stat_result | None
-    try:
-        existing = os.lstat(path)
-    except FileNotFoundError:
-        existing = None
-    except OSError as exc:
-        raise RuntimeError("managed file cannot be inspected safely") from exc
-    if existing is not None and (
-        stat.S_ISLNK(existing.st_mode) or not stat.S_ISREG(existing.st_mode) or existing.st_nlink != 1
-    ):
-        raise RuntimeError("managed file destination is not a safe regular file")
-    if identity_checked:
-        _assert_managed_file_identity(path, expected_identity)
-
-    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=parent)
-    temporary = Path(temporary_name)
-    # `mkstemp` returns an absolute pathname even when `parent` is relative.
-    # Keep the staging reference relative while a root-bound caller holds the
-    # opened directory, otherwise a root rename would make the absolute name
-    # point at the now-empty original pathname.
-    temporary_ref = parent / temporary.name if not parent.is_absolute() else temporary
-    temporary_info = os.lstat(temporary_ref)
-    temporary_identity = (temporary_info.st_dev, temporary_info.st_ino)
-    closed = False
-    try:
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise RuntimeError("managed file no-follow support is unavailable")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0)
+        for _attempt in range(128):
+            candidate_name = f".{path.name}.{secrets.token_hex(12)}"
+            try:
+                fd = os.open(candidate_name, flags, mode, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            temporary_name = candidate_name
+            break
+        if fd is None or temporary_name is None:
+            raise RuntimeError("managed file staging name could not be allocated")
+        temporary_info = os.fstat(fd)
+        temporary_identity = (temporary_info.st_dev, temporary_info.st_ino)
         os.fchmod(fd, mode)
         view = memoryview(payload)
         while view:
@@ -1138,51 +1310,65 @@ def _write_atomic_regular_file(
             view = view[written:]
         os.fsync(fd)
         os.close(fd)
-        closed = True
+        fd = None
 
-        if existing is not None:
-            if identity_checked:
-                _assert_managed_file_identity(path, expected_identity)
-            current = os.lstat(path)
-            if (
-                stat.S_ISLNK(current.st_mode)
-                or not stat.S_ISREG(current.st_mode)
-                or current.st_nlink != 1
-                or current.st_dev != existing.st_dev
-                or current.st_ino != existing.st_ino
-            ):
+        _assert_managed_parent_chain_visible(path, parent_chain)
+        current_identity = _managed_file_identity_at(parent_fd, path.name)
+        if existing_identity is not None:
+            if current_identity != existing_identity:
                 raise RuntimeError("managed file destination identity changed")
-            temporary_ref.replace(path)
+            os.replace(
+                temporary_name,
+                path.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
         else:
-            # A destination that was absent during preflight must not be
-            # replaced if another actor creates it before publication.
-            _publish_new_atomic_regular_file(temporary_ref, path)
-        temporary = None  # type: ignore[assignment]
+            if current_identity is not None:
+                raise RuntimeError("managed file destination appeared")
+            _rename_distribution_no_replace(parent_fd, temporary_name, parent_fd, path.name)
+        temporary_name = None
     except Exception as exc:
-        if not closed:
+        if fd is not None:
             with suppress(OSError):
                 os.close(fd)
-            closed = True
-        if existing is None and temporary is not None:
-            published, removed = _retry_unpublished_atomic_regular_file(
-                temporary_ref,
-                path,
+            fd = None
+        if (
+            existing_identity is None
+            and temporary_name is not None
+            and temporary_identity is not None
+            and _retry_unpublished_atomic_regular_file_at(
+                parent_fd,
+                temporary_name,
+                path.name,
                 payload,
                 mode=mode,
                 expected_identity=temporary_identity,
             )
-            if published and removed:
-                temporary = None  # type: ignore[assignment]
+        ):
+            temporary_name = None
         if isinstance(exc, OSError):
             raise RuntimeError("managed file write failed") from exc
         raise
     finally:
-        if not closed:
+        if temporary_name is not None and temporary_identity is not None:
+            try:
+                current_temporary = os.stat(temporary_name, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError:
+                current_temporary = None
+            if (
+                current_temporary is not None
+                and (
+                    current_temporary.st_dev,
+                    current_temporary.st_ino,
+                )
+                == temporary_identity
+            ):
+                with suppress(OSError):
+                    os.unlink(temporary_name, dir_fd=parent_fd)
+        for opened_fd in reversed(parent_chain):
             with suppress(OSError):
-                os.close(fd)
-        if temporary is not None:
-            with suppress(OSError):
-                temporary_ref.unlink()
+                os.close(opened_fd)
 
 
 def _distribution_root_identity(target_root: Path) -> DistributionRootIdentity:
