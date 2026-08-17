@@ -1206,6 +1206,49 @@ def test_s60_atomic_regular_file_does_not_replace_racing_destination(
     assert destination.read_bytes() == b"user replacement\n"
 
 
+def test_s60_atomic_regular_file_rejects_parent_rebind_before_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parent = tmp_path / "spec-dock"
+    parent.mkdir()
+    destination = parent / ".distribution-retry.json"
+    displaced = tmp_path / "spec-dock-displaced"
+    external = tmp_path / "external"
+    external.mkdir()
+    original_open_chain = cli._open_managed_parent_chain
+
+    def rebind_after_parent_open(path: Path) -> tuple[int, ...]:
+        chain = original_open_chain(path)
+        parent.rename(displaced)
+        parent.symlink_to(external, target_is_directory=True)
+        return chain
+
+    monkeypatch.setattr(cli, "_open_managed_parent_chain", rebind_after_parent_open)
+
+    with pytest.raises(RuntimeError, match="managed file parent identity changed"):
+        cli._write_atomic_regular_file(destination, b"managed\n", mode=0o600)
+
+    assert not list(external.iterdir())
+    assert not list(displaced.iterdir())
+
+
+def test_s60_active_pathfile_does_not_follow_dangling_symlink(
+    tmp_path: Path,
+) -> None:
+    active_dir = tmp_path / "spec-dock" / "active"
+    active_dir.mkdir(parents=True)
+    external = tmp_path / "external.path"
+    pathfile = active_dir / "issue.path"
+    pathfile.symlink_to(external)
+
+    with pytest.raises(RuntimeError, match="not a safe regular file"):
+        cli._write_active_pathfile(active_dir, "issue", tmp_path / "spec-dock/system/active-none/issue")
+
+    assert pathfile.is_symlink()
+    assert not external.exists()
+
+
 def test_s60_atomic_retry_rejects_hard_link_replacement_before_truncate(
     tmp_path: Path,
     monkeypatch,
