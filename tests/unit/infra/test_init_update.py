@@ -36,9 +36,6 @@ from tests.cli_runtime.harness import (
 
 _EXPECTED_MANAGED_SKILL_NAMES = _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
 
-_ISSUE_360_RETIRED_LEGACY_SURFACE = pytest.mark.skip(
-    reason="Issue 360 retires the legacy host-adapter/planning distribution surface; cutover coverage lives in distribution tests"
-)
 
 _ISSUE_359_EXPECTED_CODEX_CONFIG = {
     "project_doc_fallback_filenames": [".codex/AGENTS.md"],
@@ -36929,101 +36926,6 @@ esac
         assert "pending" not in handoff_section.lower(), "issue-71 handoff evidence should not be pending-only"
         assert "placeholder" not in handoff_section.lower(), "issue-71 handoff evidence should not be placeholder-only"
 
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback(self) -> None:
-        repo_root = Path(__file__).resolve().parents[3]
-
-        with tempfile.TemporaryDirectory() as tmp:
-            temp_root = Path(tmp)
-            isolated_cwd = temp_root / "isolated-cwd"
-            isolated_cwd.mkdir(parents=True, exist_ok=True)
-            target_repo = temp_root / "consumer-repo"
-            target_repo.mkdir(parents=True, exist_ok=True)
-
-            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
-                repo_root=repo_root,
-                temp_root=temp_root,
-            )
-            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
-            assert spec_dock_command.is_file(), (
-                f"issue-71 expected installed spec-dock command in isolated venv: {spec_dock_command}"
-            )
-
-            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
-            assert "PYTHONPATH" not in runtime_env, "issue-71 runtime env must not rely on PYTHONPATH fallback"
-            assert "PYTHONHOME" not in runtime_env, "issue-71 runtime env must not rely on PYTHONHOME fallback"
-
-            runtime_snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
-                venv_python=venv_python,
-                repo_root=repo_root,
-                cwd=isolated_cwd,
-            )
-            self._issue_69_assert_runtime_snapshot_uses_installed_package(
-                snapshot=runtime_snapshot,
-                repo_root=repo_root,
-            )
-            assert not bool(runtime_snapshot.get("sys_path_has_repo_root")), (
-                "issue-71 isolated installed runtime unexpectedly resolved repo-root fallback in sys.path"
-            )
-
-            plan_snapshot = self._issue_70_collect_isolated_installed_plan_snapshot(
-                venv_python=venv_python,
-                cwd=isolated_cwd,
-            )
-            current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
-            assert current_sources, "issue-71 installed plan must expose current managed sources"
-            assert all(source.startswith("install_root/") for source in current_sources), (
-                "issue-71 installed plan should source current managed files from install_root only"
-            )
-            assert not any(source.startswith("codex_skills/") for source in current_sources), (
-                "issue-71 installed plan must not source current managed files from legacy codex_skills"
-            )
-
-            installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
-            managed_rel_path = ".codex/agents/spec-manager.toml"
-            expected_managed_bytes = (installed_assets_dir / "install_root" / managed_rel_path).read_bytes()
-
-            self._issue_69_run_subprocess_capture(
-                [str(spec_dock_command), "init", str(target_repo)],
-                cwd=isolated_cwd,
-                env=runtime_env,
-            )
-
-            managed_target = target_repo / managed_rel_path
-            assert managed_target.is_file(), f"issue-71 missing managed file after isolated init: {managed_target}"
-            assert managed_target.read_bytes() == expected_managed_bytes, (
-                "issue-71 isolated init did not reflect install_root managed asset bytes"
-            )
-
-            obsolete_rel_path = ".codex/agents/spec-dock-codex-adapter.toml"
-            obsolete_target = target_repo / obsolete_rel_path
-            obsolete_target.parent.mkdir(parents=True, exist_ok=True)
-            self._write_text_force(obsolete_target, "issue-71 obsolete managed payload\n")
-
-            custom_rel_path = ".github/workflows/custom-review.yml"
-            custom_target = target_repo / custom_rel_path
-            custom_target.parent.mkdir(parents=True, exist_ok=True)
-            custom_text = "name: issue-71 custom unmanaged workflow\n"
-            self._write_text_force(custom_target, custom_text)
-
-            self._write_text_force(managed_target, "issue-71 stale managed payload\n")
-            self._issue_69_run_subprocess_capture(
-                [str(spec_dock_command), "update", str(target_repo)],
-                cwd=isolated_cwd,
-                env=runtime_env,
-            )
-
-            assert managed_target.read_bytes() == expected_managed_bytes, (
-                "issue-71 isolated update did not restore managed file from install_root"
-            )
-            assert not obsolete_target.exists(), (
-                f"issue-71 isolated update should prune obsolete managed path: {obsolete_rel_path}"
-            )
-            assert custom_target.is_file(), f"issue-71 isolated update removed custom unmanaged file: {custom_rel_path}"
-            assert custom_target.read_text(encoding="utf-8") == custom_text, (
-                f"issue-71 isolated update mutated custom unmanaged file: {custom_rel_path}"
-            )
-
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -37149,44 +37051,6 @@ esac
             generated_text = generated_path.read_text(encoding="utf-8")
             assert generated_path.read_bytes() == expected_bytes, (
                 "update should copy legacy codex shim asset bytes without normalization"
-            )
-            assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
-            assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_init_copies_legacy_codex_native_shim_instructions_key_as_is(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "repo"
-            target.mkdir(parents=True, exist_ok=True)
-
-            repo_root = Path(__file__).resolve().parents[3]
-            source_assets_root = repo_root / "src" / "spec_dock" / "assets"
-
-            with tempfile.TemporaryDirectory() as tmp_assets:
-                patched_assets_root = Path(tmp_assets) / "assets"
-                shutil.copytree(source_assets_root, patched_assets_root)
-
-                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-manager.toml"
-                codex_text = codex_shim_path.read_text(encoding="utf-8")
-                assert re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, codex_text)
-                patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
-                assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, patched_text)
-                assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, patched_text)
-                codex_shim_path.write_text(patched_text, encoding="utf-8")
-                expected_bytes = codex_shim_path.read_bytes()
-
-                @contextmanager
-                def _patched_assets_dir():
-                    yield patched_assets_root
-
-                with pytest.MonkeyPatch.context() as monkeypatch:
-                    monkeypatch.setattr("spec_dock.cli._assets_dir", _patched_assets_dir)
-                    assert main(["init", str(target)]) == 0
-
-            generated_path = target / ".codex" / "agents" / "spec-manager.toml"
-            generated_text = generated_path.read_text(encoding="utf-8")
-            assert generated_path.read_bytes() == expected_bytes, (
-                "init should copy legacy codex shim asset bytes without normalization"
             )
             assert re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, generated_text)
             assert not re.search(self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN, generated_text)
@@ -37529,54 +37393,6 @@ esac
             )
             assert list(target.iterdir()) == [], "preflight failure should not write managed scaffold files"
 
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_preflight_rejects_missing_or_non_directory_later_managed_asset_before_mutation(self) -> None:
-        for mode in ("missing", "non_directory"):
-            with _case(mode=mode), tempfile.TemporaryDirectory() as tmp:
-                target = Path(tmp)
-                assert main(["init", str(target)]) == 0
-                before = self._seed_managed_contract_guard_snapshot(target)
-
-                def _mutate_assets(patched_assets_root: Path, *, mode=mode) -> None:
-                    scripts_dir = patched_assets_root / "spec_dock" / "scripts"
-                    shutil.rmtree(scripts_dir)
-                    if mode == "non_directory":
-                        scripts_dir.write_text("invalid scaffold asset directory replacement\n", encoding="utf-8")
-
-                exit_code, stderr = self._run_command_with_assets_override(
-                    "update",
-                    target,
-                    _mutate_assets,
-                )
-
-                assert exit_code == 1
-                if mode == "missing":
-                    assert "Missing asset directory" in stderr
-                else:
-                    assert "Invalid asset directory" in stderr
-                self._assert_managed_contract_guard_unchanged(target, before)
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_rejects_required_host_entry_file_drift_before_writes(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            before = self._seed_managed_contract_guard_snapshot(target)
-            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-            malformed_manifest["targets"]["codex"]["entry_file"] = ".agents/skills/spec-dock-copilot-adapter/SKILL.md"
-
-            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                target,
-                malformed_manifest,
-            )
-
-            assert exit_code == 1
-            assert (
-                "required host 'codex' must use canonical entry_file '.agents/skills/spec-dock-codex-adapter/SKILL.md'"
-                in stderr
-            )
-            self._assert_managed_contract_guard_unchanged(target, before)
-
     def test_update_rejects_missing_or_malformed_required_native_shim_owner_and_delegates_to_before_writes(
         self,
     ) -> None:
@@ -37623,68 +37439,6 @@ esac
                 assert exit_code == 1
                 assert expected_error in stderr
                 self._assert_managed_contract_guard_unchanged(target, before)
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_rejects_non_mapping_host_target_entries(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            before = self._seed_managed_contract_guard_snapshot(target)
-            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-            malformed_manifest["targets"]["codex"] = "not-a-map"
-
-            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                target,
-                malformed_manifest,
-            )
-
-            assert exit_code == 1
-            assert "invalid host adapter target contract for host 'codex'" in stderr
-            self._assert_managed_contract_guard_unchanged(target, before)
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_rejects_current_dir_obsolete_exact_file_paths(self) -> None:
-        for invalid_obsolete_path in (".", "./"):
-            with _case(invalid_obsolete_path=invalid_obsolete_path), tempfile.TemporaryDirectory() as tmp:
-                target = Path(tmp)
-                assert main(["init", str(target)]) == 0
-                before = self._seed_managed_contract_guard_snapshot(target)
-                malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
-                    invalid_obsolete_path,
-                ]
-
-                exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                    target,
-                    malformed_manifest,
-                )
-
-                assert exit_code == 1
-                assert "invalid managed_assets.obsolete_exact_file_paths item" in stderr
-                self._assert_managed_contract_guard_unchanged(target, before)
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_rejects_directory_like_obsolete_exact_file_paths(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            before = self._seed_managed_contract_guard_snapshot(target)
-            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
-                ".codex/agents/legacy",
-            ]
-
-            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
-                target,
-                malformed_manifest,
-            )
-
-            assert exit_code == 1
-            assert (
-                "invalid managed_assets.obsolete_exact_file_paths item (must be exact file path): "
-                "'.codex/agents/legacy'" in stderr
-            )
-            self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_parent_traversal_native_shim_paths(self) -> None:
         cases: tuple[tuple[str, str, str], ...] = (
@@ -37812,19 +37566,6 @@ esac
 
         assert repo_copy == bundled
 
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_workflow_issue_doc_matches_bundled_asset(self) -> None:
-        import spec_dock.cli as cli
-
-        with cli._assets_dir() as assets_dir:
-            bundled = (assets_dir / "spec_dock" / "docs" / "workflow_issue.md").read_text(encoding="utf-8")
-
-        repo_copy = (Path(__file__).resolve().parents[3] / "spec-dock" / "docs" / "workflow_issue.md").read_text(
-            encoding="utf-8"
-        )
-
-        assert repo_copy == bundled
-
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -37832,15 +37573,6 @@ esac
 
             # Second init without --force should fail.
             assert main(["init", str(target)]) != 0
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_init_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp, self._temporary_provider_cache_files():
-            target = Path(tmp)
-
-            assert main(["init", str(target)]) == 0
-
-            self._assert_no_generated_python_caches(target)
 
     def test_update_keeps_initiatives_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -37873,66 +37605,6 @@ esac
             if created_symlink:
                 assert legacy_symlink.is_symlink()
                 assert legacy_symlink.readlink() == Path("initiative/current")
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_refreshes_stale_runtime_mirror_and_preserves_user_data(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-
-            repo_root = Path(__file__).resolve().parents[3]
-            provider_runtime = (
-                repo_root
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "spec_dock"
-                / "scripts"
-                / "spec_dock_runtime"
-                / "application"
-                / "workflow.py"
-            )
-            target_runtime = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "application" / "workflow.py"
-            provider_bytes = provider_runtime.read_bytes()
-            stale_bytes = b"# stale runtime mirror fixture for iss-00246 S01\n"
-            assert stale_bytes != provider_bytes
-            target_runtime.write_bytes(stale_bytes)
-
-            user_issue_doc = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-local-99999-user"
-                / "epics"
-                / "epic-local-99999-user"
-                / "issues"
-                / "iss-local-99999-user"
-                / "requirement.md"
-            )
-            user_issue_doc.parent.mkdir(parents=True, exist_ok=True)
-            user_issue_text = "# user-authored issue data\n"
-            user_issue_doc.write_text(user_issue_text, encoding="utf-8")
-
-            unmanaged_marker = target / "user-owned-marker.txt"
-            unmanaged_marker_text = "keep unmanaged marker\n"
-            unmanaged_marker.write_text(unmanaged_marker_text, encoding="utf-8")
-
-            assert main(["update", str(target)]) == 0
-
-            assert target_runtime.read_bytes() == provider_bytes
-            assert user_issue_doc.read_text(encoding="utf-8") == user_issue_text
-            assert unmanaged_marker.read_text(encoding="utf-8") == unmanaged_marker_text
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-
-            with self._temporary_provider_cache_files():
-                assert main(["update", str(target)]) == 0
-
-            self._assert_no_generated_python_caches(target)
 
     def test_uninstall_dry_run_prints_plan_and_mutates_no_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -39032,112 +38704,6 @@ esac
             assert payload.get("blockers") == ["iss-local-00001"]
             assert "Ambiguous github.issue_number=123" not in deps_result.stderr
 
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._overlay_checked_in_dogfooding_runtime(target)
-            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(
-                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
-            )
-
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
-
-            current_meta_path = current_issue_dir / ".meta.json"
-            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
-            current_meta["github"] = {"issue_number": 123, "repo_owner": "current", "repo_name": "repo"}
-            self._write_json_force(current_meta_path, current_meta)
-
-            foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
-            foreign_meta_path = foreign_issue_dir / ".meta.json"
-            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
-            foreign_meta["github"] = {
-                "issue_number": 123,
-                "repo_owner": "other",
-                "repo_name": "repo",
-            }
-            self._write_json_force(foreign_meta_path, foreign_meta)
-
-            ambiguous_active = self._run_runtime_capture(target, ["active", "set", "123", "--force"])
-            assert ambiguous_active.returncode == 1, (
-                f"active(ambiguous) stdout:\n{ambiguous_active.stdout}\nactive(ambiguous) stderr:\n{ambiguous_active.stderr}"
-            )
-            assert "Ambiguous github.issue_number=123" in ambiguous_active.stderr
-
-            scoped_active = self._run_runtime_capture(
-                target,
-                ["active", "set", "https://github.com/other/repo/issues/123", "--force"],
-            )
-            assert scoped_active.returncode == 0, (
-                f"active(scoped) stdout:\n{scoped_active.stdout}\nactive(scoped) stderr:\n{scoped_active.stderr}"
-            )
-            assert "spec-dock: ok (active set)" in scoped_active.stdout
-
-            active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            assert active_manifest["issue"]["id"] == "iss-local-00002"
-
-            scoped_deps = self._run_runtime_capture(
-                target,
-                ["deps", "check", "https://github.com/other/repo/issues/123", "--json"],
-            )
-            assert scoped_deps.returncode in (0, 3), (
-                f"deps(scoped) stdout:\n{scoped_deps.stdout}\ndeps(scoped) stderr:\n{scoped_deps.stderr}"
-            )
-            assert '"target": "iss-local-00002"' in scoped_deps.stdout
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._overlay_checked_in_dogfooding_runtime(target)
-            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._materialize_local_issue_under_epic(
-                epic_dir, local_num=2, title="Foreign issue", github_issue_number=202
-            )
-
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
-
-            current_meta_path = current_issue_dir / ".meta.json"
-            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
-            current_meta["github"] = {"issue_number": 123}
-            self._write_json_force(current_meta_path, current_meta)
-
-            foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
-            foreign_meta_path = foreign_issue_dir / ".meta.json"
-            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
-            foreign_meta["github"] = {
-                "issue_number": 123,
-                "repo_owner": "other",
-                "repo_name": "repo",
-            }
-            self._write_json_force(foreign_meta_path, foreign_meta)
-
-            active_current = self._run_runtime_capture(
-                target,
-                ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
-            )
-            assert active_current.returncode == 0, (
-                f"active(current) stdout:\n{active_current.stdout}\nactive(current) stderr:\n{active_current.stderr}"
-            )
-            active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            assert active_manifest["issue"]["id"] == "iss-local-00001"
-
-            deps_current = self._run_runtime_capture(
-                target,
-                ["deps", "check", "https://github.com/current/repo/issues/123", "--json"],
-            )
-            assert deps_current.returncode in (0, 3), (
-                f"deps(current) stdout:\n{deps_current.stdout}\ndeps(current) stderr:\n{deps_current.stderr}"
-            )
-            assert '"target": "iss-local-00001"' in deps_current.stdout
-
     def test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -39236,47 +38802,6 @@ esac
                 "No node found for github.issue_number=123 in current repo scope (current/repo)" in deps_result.stderr
             )
             assert "Create/link the node first." in deps_result.stderr
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._overlay_checked_in_dogfooding_runtime(target)
-            self._create_minimal_local_tree(target)
-
-            sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
-            assert sync_result.returncode == 0, (
-                f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}"
-            )
-            assert "spec-dock: ok (sync)" in sync_result.stdout
-
-            deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-local-00001"])
-            assert deps_result.returncode in (0, 3), (
-                f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
-            )
-            assert (
-                "spec-dock: ok (deps check)" in deps_result.stdout
-                or "spec-dock: blocked (deps check)" in deps_result.stderr
-            ), f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}"
-
-            active_result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-local-00001", "--force"])
-            assert active_result.returncode == 0, (
-                f"active stdout:\n{active_result.stdout}\nactive stderr:\n{active_result.stderr}"
-            )
-            assert "spec-dock: ok (active set)" in active_result.stdout
-
-            validate_result = self._run_runtime_capture(target, ["validate"])
-            assert validate_result.returncode == 0, (
-                f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
-            )
-            assert "spec-dock: ok (validate)" in validate_result.stdout
-
-            doctor_result = self._run_runtime_capture(target, ["doctor"])
-            assert doctor_result.returncode == 0, (
-                f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}"
-            )
-            assert "spec-dock: ok (doctor) findings=0" in doctor_result.stdout
 
     def test_checked_in_dogfooding_runtime_subprocess_keeps_lone_unscoped_legacy_without_backfill_parity(self) -> None:
         if shutil.which("git") is None:
@@ -40085,151 +39610,6 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- issue: iss-local-00001" in context_pack_text
             assert "- initiative: (none)" not in context_pack_text
             assert "- issue: (none)" not in context_pack_text
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_keeps_context_pack_aligned_with_existing_active_entrypoints_when_persisted_manifest_is_stale(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
-
-            active_dir = target / "spec-dock" / "active"
-            self._write_json_force(
-                target / "spec-dock" / ".agent" / "active.json",
-                {
-                    "schema_version": 2,
-                    "initiative": {
-                        "id": "init-local-99999",
-                        "path": "spec-dock/initiatives/init-local-99999-missing",
-                    },
-                    "epic": {
-                        "id": "epic-local-99999",
-                        "path": "spec-dock/initiatives/init-local-99999-missing/epics/epic-local-99999-missing",
-                    },
-                    "issue": {
-                        "id": "iss-local-99999",
-                        "path": (
-                            "spec-dock/initiatives/init-local-99999-missing/epics/"
-                            "epic-local-99999-missing/issues/iss-local-99999-missing"
-                        ),
-                    },
-                },
-            )
-            (active_dir / "context-pack.md").write_text(
-                (
-                    "# Context Pack (stale)\n\n"
-                    "## Active\n"
-                    "- initiative: init-local-99999\n"
-                    "- epic: epic-local-99999\n"
-                    "- issue: iss-local-99999\n"
-                ),
-                encoding="utf-8",
-            )
-
-            assert main(["update", str(target)]) == 0
-
-            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            assert "- initiative: init-local-00001" in context_pack_text
-            assert "- epic: epic-local-00001" in context_pack_text
-            assert "- issue: iss-local-00001" in context_pack_text
-            assert "init-local-99999" not in context_pack_text
-            assert "epic-local-99999" not in context_pack_text
-            assert "iss-local-99999" not in context_pack_text
-
-            assert "init-local-00001" in self._read_active_pointer_text(target, "initiative", "requirement.md")
-            assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
-            assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "report.md")
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_skips_persisted_target_resolution_when_active_entrypoints_are_healthy(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
-
-            self._write_json_force(
-                target / "spec-dock" / ".agent" / "active.json",
-                {
-                    "schema_version": 2,
-                    "initiative": {
-                        "id": "init-local-99999",
-                        "path": "spec-dock/initiatives/init-local-99999-missing",
-                    },
-                    "epic": {
-                        "id": "epic-local-99999",
-                        "path": "spec-dock/initiatives/init-local-99999-missing/epics/epic-local-99999-missing",
-                    },
-                    "issue": {
-                        "id": "iss-local-99999",
-                        "path": (
-                            "spec-dock/initiatives/init-local-99999-missing/epics/"
-                            "epic-local-99999-missing/issues/iss-local-99999-missing"
-                        ),
-                    },
-                },
-            )
-
-            with pytest.MonkeyPatch.context() as monkeypatch:
-                monkeypatch.setattr(
-                    "spec_dock.cli._resolve_manifest_target_dir",
-                    _raise(AssertionError("healthy active entrypoint should skip persisted target resolution")),
-                )
-                assert main(["update", str(target)]) == 0
-
-            active_dir = target / "spec-dock" / "active"
-            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            assert "- initiative: init-local-00001" in context_pack_text
-            assert "- epic: epic-local-00001" in context_pack_text
-            assert "- issue: iss-local-00001" in context_pack_text
-
-    @_ISSUE_360_RETIRED_LEGACY_SURFACE
-    def test_update_regenerates_context_pack_from_existing_active_entrypoints_when_manifest_stale(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
-
-            active_dir = target / "spec-dock" / "active"
-            context_pack_path = active_dir / "context-pack.md"
-            context_pack_path.unlink(missing_ok=True)
-            assert not context_pack_path.exists()
-
-            self._write_json_force(
-                target / "spec-dock" / ".agent" / "active.json",
-                {
-                    "schema_version": 2,
-                    "initiative": {
-                        "id": "init-local-99999",
-                        "path": "spec-dock/initiatives/init-local-99999-missing",
-                    },
-                    "epic": {
-                        "id": "epic-local-99999",
-                        "path": "spec-dock/initiatives/init-local-99999-missing/epics/epic-local-99999-missing",
-                    },
-                    "issue": {
-                        "id": "iss-local-99999",
-                        "path": (
-                            "spec-dock/initiatives/init-local-99999-missing/epics/"
-                            "epic-local-99999-missing/issues/iss-local-99999-missing"
-                        ),
-                    },
-                },
-            )
-
-            assert main(["update", str(target)]) == 0
-
-            context_pack_text = context_pack_path.read_text(encoding="utf-8")
-            assert "- initiative: init-local-00001" in context_pack_text
-            assert "- epic: epic-local-00001" in context_pack_text
-            assert "- issue: iss-local-00001" in context_pack_text
-            assert "init-local-99999" not in context_pack_text
-            assert "epic-local-99999" not in context_pack_text
-            assert "iss-local-99999" not in context_pack_text
 
     def test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale(
         self,
