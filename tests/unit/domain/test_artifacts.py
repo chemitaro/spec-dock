@@ -114,11 +114,15 @@ def test_existing_generic_import_catalog_is_recognized_as_opaque_identity(tmp_pa
 @pytest.mark.parametrize(
     "filename",
     (
-        "20260810t010101z-analysis-unknown.md",
         "20260810T010101z-adr-upper-t.md",
+        "20260810t010101Z-adr-upper-z.md",
+        "20260810t010101-adr-missing-z.md",
+        "20260810t010101z_analysis-bad-separator.md",
+        "20260810t010101z-.md",
         "20260810t01010z-adr-short-time.md",
         "20261340t256199z-adr-impossible-time.md",
         "20260810t010101z-00-note-bad-slot.md",
+        "20260810t010101z-100-note-bad-slot.md",
         "001-scratch-not-in-sequential-catalog.md",
     ),
 )
@@ -127,6 +131,32 @@ def test_existing_catalog_rejects_timestamp_intent_and_sequential_controls(tmp_p
 
     assert artifacts.parse_existing_artifact_filename(filename) is None
     assert artifacts.is_malformed_artifact_candidate(tmp_path / filename) is True
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "20260811t091549z-analysis-operational-state-eventstore-readmodel-boundary.md",
+        "20260811t095606z-analysis-event-sourcing-synchronous-current-state-projection.md",
+        "20260811t113200z-analysis-existing-projection-uow-reuse.md",
+        "20260811t113201z-report-validation-result.md",
+        "20260811t113202z-review-final-gate.md",
+        "20260811t113203z-external-document.md",
+    ),
+)
+def test_existing_timestamp_markdown_with_unknown_type_like_label_is_accepted_as_untyped(
+    tmp_path: Path,
+    filename: str,
+) -> None:
+    artifacts = _artifacts_module()
+
+    parsed = artifacts.parse_existing_artifact_filename(filename)
+
+    assert parsed is not None
+    # Stored untyped Markdown retains the historical "blank" representation;
+    # this does not make its leading label part of the creation type catalog.
+    assert parsed.artifact_type == "blank"
+    assert artifacts.is_malformed_artifact_candidate(tmp_path / filename) is False
 
 
 def test_historical_tokens_are_not_misclassified_as_blank_slugs() -> None:
@@ -166,14 +196,17 @@ def test_out_of_band_non_markdown_attachment_is_distinct_from_generic_import_and
     artifacts = _artifacts_module()
     attachment = "20260810t010101z-disc-export.html"
     generic = "20260810t010102z--export.html"
-    malformed = "20260810t010103z-analysis-managed.md"
+    untyped = "20260810t010103z-analysis-managed.md"
 
     assert artifacts.parse_existing_artifact_filename(attachment) is None
     assert artifacts.is_malformed_artifact_candidate(tmp_path / attachment) is False
     generic_parsed = artifacts.parse_existing_artifact_filename(generic)
     assert generic_parsed is not None
     assert generic_parsed.artifact_id == generic
-    assert artifacts.is_malformed_artifact_candidate(tmp_path / malformed) is True
+    untyped_parsed = artifacts.parse_existing_artifact_filename(untyped)
+    assert untyped_parsed is not None
+    assert untyped_parsed.artifact_type == "blank"
+    assert artifacts.is_malformed_artifact_candidate(tmp_path / untyped) is False
 
 
 @pytest.mark.parametrize(
