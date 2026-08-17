@@ -181,6 +181,36 @@ def test_s60_distribution_operations_share_an_exclusive_root_lock(tmp_path: Path
     assert second_entered.is_set()
 
 
+def test_s60_locked_root_identity_blocks_rebind_before_fresh_admission(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    displaced = tmp_path.with_name(f"{tmp_path.name}-locked-root")
+    original_admit = cli._admit_distribution_cli
+    rebound = False
+    admission_calls = 0
+
+    def rebind_before_admission(target_root: Path, *, operation):
+        nonlocal admission_calls, rebound
+        admission_calls += 1
+        if admission_calls == 2:
+            rebound = True
+            target_root.rename(displaced)
+            target_root.mkdir()
+        return original_admit(target_root, operation=operation)
+
+    monkeypatch.setattr(cli, "_admit_distribution_cli", rebind_before_admission)
+
+    assert main(["init", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+
+    assert rebound
+    assert "distribution target root identity changed" in captured
+    assert list(tmp_path.iterdir()) == []
+    assert list(displaced.iterdir()) == []
+
+
 def test_s60_root_bound_operations_serialize_process_cwd_across_roots(tmp_path: Path) -> None:
     first_root = tmp_path / "first"
     second_root = tmp_path / "second"
@@ -537,6 +567,36 @@ def test_s50_update_preflights_all_scaffold_sources_before_distribution_write(
 
     captured = capsys.readouterr().err
     assert "Invalid asset directory: spec_dock/docs" in captured
+    assert _filesystem_snapshot(tmp_path) == before
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_s50_update_blocks_incomplete_managed_scaffold_walk_before_distribution_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
+    before = _filesystem_snapshot(tmp_path)
+    managed_docs = tmp_path / "spec-dock/docs"
+    original_walk = cli.os.walk
+
+    def fail_managed_docs_walk(top, *args, onerror=None, **kwargs):
+        if Path(top) == managed_docs:
+            assert onerror is not None
+            onerror(PermissionError("simulated incomplete managed scaffold walk"))
+        if onerror is not None:
+            kwargs["onerror"] = onerror
+        return original_walk(top, *args, **kwargs)
+
+    monkeypatch.setattr(cli.os, "walk", fail_managed_docs_walk)
+
+    assert main(["update", str(tmp_path)]) == 1
+    captured = capsys.readouterr().err
+    monkeypatch.setattr(cli.os, "walk", original_walk)
+
+    assert "managed scaffold target cannot be inspected safely" in captured
     assert _filesystem_snapshot(tmp_path) == before
     assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 

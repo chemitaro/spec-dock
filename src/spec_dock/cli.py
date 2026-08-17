@@ -75,7 +75,7 @@ _DISTRIBUTION_CWD_LOCK = threading.RLock()
 
 
 @contextmanager
-def _exclusive_distribution_operation(target_root: Path) -> Iterator[None]:
+def _exclusive_distribution_operation(target_root: Path) -> Iterator[DistributionRootIdentity]:
     """Serialize installer mutations for one repository root without a lock file."""
 
     nofollow = getattr(os, "O_NOFOLLOW", 0)
@@ -85,7 +85,19 @@ def _exclusive_distribution_operation(target_root: Path) -> Iterator[None]:
     fd = os.open(target_root, os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0))
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
+        locked = os.fstat(fd)
+        try:
+            visible = os.lstat(target_root)
+        except OSError as exc:
+            raise RuntimeError("distribution target root changed while acquiring operation lock") from exc
+        if (
+            stat.S_ISLNK(visible.st_mode)
+            or not stat.S_ISDIR(visible.st_mode)
+            or not stat.S_ISDIR(locked.st_mode)
+            or (visible.st_dev, visible.st_ino) != (locked.st_dev, locked.st_ino)
+        ):
+            raise RuntimeError("distribution target root changed while acquiring operation lock")
+        yield DistributionRootIdentity(device=locked.st_dev, inode=locked.st_ino)
     finally:
         with suppress(OSError):
             fcntl.flock(fd, fcntl.LOCK_UN)
@@ -338,7 +350,16 @@ def _assert_managed_scaffold_tree_safe(specdock_dir: Path) -> None:
             raise RuntimeError(f"managed scaffold target cannot be inspected safely: {managed_dir}") from exc
         if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
             raise RuntimeError(f"managed scaffold target is not a safe directory: {managed_dir}")
-        for current_root, dir_names, file_names in os.walk(managed_dir, topdown=True, followlinks=False):
+
+        def fail_incomplete_walk(exc: OSError, managed_path: Path = managed_dir) -> NoReturn:
+            raise RuntimeError(f"managed scaffold target cannot be inspected safely: {managed_path}") from exc
+
+        for current_root, dir_names, file_names in os.walk(
+            managed_dir,
+            topdown=True,
+            followlinks=False,
+            onerror=fail_incomplete_walk,
+        ):
             current = Path(current_root)
             for entry_name in (*dir_names, *file_names):
                 entry = current / entry_name
@@ -1784,13 +1805,18 @@ def _raise_distribution_partial_failure(
     ) from None
 
 
-def _install_fresh_distribution_unlocked(target_root: Path) -> None:
+def _install_fresh_distribution_unlocked(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> None:
     """Apply one validated Fresh distribution with forward-retry recovery."""
     _require_retry_target_label(target_root)
     phase = "preflight"
     marker_started = False
     last_completed_phase = "not-started"
-    root_identity = _distribution_root_identity(target_root)
+    root_identity = expected_root_identity or _distribution_root_identity(target_root)
+    _assert_distribution_root_identity(target_root, root_identity)
     fresh_workspace_created = False
     fresh_workspace_identity: _ManagedPathIdentity | None = None
     stage_ownership: list[DistributionStageOwnership] = []
@@ -1983,14 +2009,19 @@ def _install_fresh_distribution_unlocked(target_root: Path) -> None:
 
 
 def _install_fresh_distribution(target_root: Path) -> None:
-    with _exclusive_distribution_operation(target_root):
+    with _exclusive_distribution_operation(target_root) as locked_root_identity:
         admission = _admit_distribution_cli(target_root, operation="fresh")
         if admission.status == "retry":
-            _install_recognized_distribution_unlocked(target_root, operation="fresh", retry_marker=admission)
+            _install_recognized_distribution_unlocked(
+                target_root,
+                operation="fresh",
+                retry_marker=admission,
+                expected_root_identity=locked_root_identity,
+            )
             return
         if admission.status != "fresh":
             raise RuntimeError("Fresh distribution target changed during operation admission")
-        _install_fresh_distribution_unlocked(target_root)
+        _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
 
 
 def _install_recognized_distribution_unlocked(
@@ -1998,13 +2029,15 @@ def _install_recognized_distribution_unlocked(
     *,
     operation: DistributionOperation,
     retry_marker: DistributionAdmission | None = None,
+    expected_root_identity: DistributionRootIdentity | None = None,
 ) -> None:
     """Apply a recognized distribution with same-package forward recovery."""
     _require_retry_target_label(target_root)
     phase = "preflight"
     marker_started = False
     last_completed_phase = "not-started"
-    root_identity = _distribution_root_identity(target_root)
+    root_identity = expected_root_identity or _distribution_root_identity(target_root)
+    _assert_distribution_root_identity(target_root, root_identity)
     retry_recovery = _distribution_retry_marker_present(target_root)
     applied_paths: tuple[str, ...] = ()
     pending_paths: tuple[str, ...] = ()
@@ -2225,10 +2258,10 @@ def _install_recognized_distribution(
     *,
     operation: DistributionOperation,
 ) -> None:
-    with _exclusive_distribution_operation(target_root):
+    with _exclusive_distribution_operation(target_root) as locked_root_identity:
         admission = _admit_distribution_cli(target_root, operation=operation)
         if admission.status == "fresh":
-            _install_fresh_distribution_unlocked(target_root)
+            _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
             return
         if admission.status not in {"recognized", "retry", "uninstall-retry"}:
             raise RuntimeError("recognized distribution target changed during operation admission")
@@ -2236,6 +2269,7 @@ def _install_recognized_distribution(
             target_root,
             operation=operation,
             retry_marker=admission if admission.status == "retry" else None,
+            expected_root_identity=locked_root_identity,
         )
 
 
@@ -4141,7 +4175,12 @@ def _render_uninstall_text(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _run_uninstall_unlocked(target_root: Path, ns: argparse.Namespace) -> int:
+def _run_uninstall_unlocked(
+    target_root: Path,
+    ns: argparse.Namespace,
+    *,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> int:
     specs_mode = _uninstall_specs_mode(ns)
     apply_requested = bool(ns.apply)
     json_requested = bool(ns.json)
@@ -4178,7 +4217,8 @@ def _run_uninstall_unlocked(target_root: Path, ns: argparse.Namespace) -> int:
         )
 
     try:
-        uninstall_root_identity = _distribution_root_identity(target_root)
+        uninstall_root_identity = expected_root_identity or _distribution_root_identity(target_root)
+        _assert_distribution_root_identity(target_root, uninstall_root_identity)
     except RuntimeError as e:
         return _emit_uninstall_preflight_error(
             target_root,
@@ -4380,8 +4420,12 @@ def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     if not bool(ns.apply):
         return _run_uninstall_unlocked(target_root, ns)
     try:
-        with _exclusive_distribution_operation(target_root):
-            return _run_uninstall_unlocked(target_root, ns)
+        with _exclusive_distribution_operation(target_root) as locked_root_identity:
+            return _run_uninstall_unlocked(
+                target_root,
+                ns,
+                expected_root_identity=locked_root_identity,
+            )
     except (OSError, RuntimeError) as exc:
         return _emit_uninstall_preflight_error(
             target_root,
