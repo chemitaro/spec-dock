@@ -3,7 +3,7 @@
   "kind": "issue360_s95_full_regression_failure_ledger",
   "issue_id": "iss-00360",
   "fixed_point_sha": "a6ded0d9a838b40cdcd741fa473cd264b801f245",
-  "current_head_sha": "c7fa5b46506e6a9ceac75166d8c6f0b9b0d98d17",
+  "current_head_sha": "30671587e22d0666ed785a880e402010aaeeac09",
   "commands": {
     "current_full": "uv run pytest --run-full-regression -q",
     "fixed_point_full": "uv run pytest --run-full-regression -p no:cacheprovider -q",
@@ -22,9 +22,9 @@
   "full_run_summary": {
     "current": {
       "failed": 26,
-      "passed": 1964,
-      "skipped": 498,
-      "duration": "15m24.92s"
+      "passed": 1970,
+      "skipped": 48,
+      "duration": "15m26.71s"
     },
     "fixed_point": {
       "failed": 452,
@@ -216,5 +216,5 @@
       "disposition": "approved-no-op"
     }
   ],
-  "conclusion": "current failure paths are either fixed-point pre-existing approved-no-op failures or explicitly classified expected-retirement tests; no unclassified changed-surface failure remains"
+  "conclusion": "current call-phase failure paths exactly match the 26 fixed-point pre-existing approved-no-op failures; there are no setup, teardown, collection, infrastructure, additional, missing, expected-retirement, or unclassified changed-surface failures"
 }
