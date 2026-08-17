@@ -29,7 +29,6 @@ HISTORICAL_TIMESTAMP_TYPED_ARTIFACT_TYPES = (
     "note",
 )
 SUPPORTED_ARTIFACT_TYPES = (*CURRENT_CREATABLE_ARTIFACT_TYPES, *HISTORICAL_TIMESTAMP_TYPED_ARTIFACT_TYPES)
-UNSUPPORTED_ARTIFACT_TYPES = ("analysis",)
 
 _ARTIFACT_TIMESTAMP_INTENT_RE = re.compile(r"^[0-9]{8}[tT][0-9].*$")
 _ARTIFACT_DOC_TYPE_PATTERN = "|".join(
@@ -308,12 +307,13 @@ def parse_artifact_filename(name: str) -> ArtifactFilename | None:
     suffix = int(suffix_raw) if suffix_raw is not None else None
     slug = str(matched.group("slug"))
     parts = slug.split("-")
-    if re.fullmatch(r"[0-9]{2}", parts[0]) is not None:
+    if parts[0].isdigit():
         return None
-    for end in range(len(parts), 0, -1):
-        if "-".join(parts[:end]) in (*SUPPORTED_ARTIFACT_TYPES, *UNSUPPORTED_ARTIFACT_TYPES):
-            return None
     artifact_id = timestamp if suffix is None else f"{timestamp}-{suffix:02d}"
+    # Stored Markdown is open-world: a valid timestamp filename that does not
+    # match a known typed form is untyped evidence. Keep the historical
+    # "blank" representation for compatibility; this does not expand the
+    # closed creation type catalog.
     return ArtifactFilename(
         timestamp=timestamp,
         suffix=suffix,
@@ -369,7 +369,7 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
         return True
     lowered = stem.lower()
     parts = lowered.split("-")
-    for artifact_type in (*SUPPORTED_ARTIFACT_TYPES, *UNSUPPORTED_ARTIFACT_TYPES):
+    for artifact_type in SUPPORTED_ARTIFACT_TYPES:
         if (
             lowered == artifact_type
             or lowered.startswith(f"{artifact_type}-")

@@ -89,6 +89,8 @@
 
 - Current で新規作成する artifact doc family は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` です。type 省略は `blank` と同じです。
 - `pr-repair-batch`、`draft-requirement`、`draft-design`、`draft-plan`、`scratch`、`note` は Historical です。既存 file は validation でその type だけを理由に malformed にしませんが、新規作成 catalog には含めません。
+- この type catalog は `new artifact <type>` の creation contract です。保存済み Markdown の validation は open-world であり、既知 typed 形式に一致しない filename も、有効な timestamp / suffix と安全な non-empty kebab-case basename を持てば untyped Artifact として受理します。`analysis`、`report`、`review` などの type 風ラベルや未知ラベルだけを理由に malformed にはしません。
+- untyped Artifact は後方互換のため runtime 内部で `blank` と表現されますが、`new artifact blank` が選ぶ creation template とは別の分類です。
 - original/source file は、対象 Initiative / Epic / Issue ノード配下の `artifacts/` に作成されます。
 - Historical の ADR original は `artifacts/` または legacy `discussions/` 配下にありえます。Historical を Current 作成候補や workflow routing へ自動昇格しません。
 - この節の basename 形式は validation / allocation contract の参照です。新規作成時に手で `<ts>-...` filename を組み立てず、`new artifact <type>` が返す generated path を使います。
@@ -110,6 +112,7 @@ same-second collision 形:
 - `nn = 01..99`
   - 同一 `artifacts/` directory 内で同じ秒を共有した artifact doc family collision の safety fallback suffix です
   - runtime は同じ timestamp slot が使われている場合、短い wait / retry で次の timestamp slot を優先し、bounded wait で解消できないときだけ suffix を使います
+  - timestamp 直後の数字だけの要素は suffix として予約され、`00`、`100` 以上、その他 `01..99` 以外の値は basename としてfallbackせず rejectします
 - Current `type = adr|disc|research|interview|decision-candidate`
 - `blank` は filename token を使わず、front matter の `template: "blank"` で template identity を示します。
 - grandfathered existing `scratch` / `note` filenames may also appear in validation.
@@ -122,6 +125,10 @@ same-second collision 形:
 - `20260329t123456z-decision-candidate-token-options.md`
 - `20260329t123456z-01-research-benchmark-summary.md`
 - `20260329t123456z-02-interview-rollout-policy.md`
+- `20260329t123457z-analysis-existing-boundary.md`（untyped stored Artifact）
+- `20260329t123458z-report-validation-result.md`（untyped stored Artifact）
+
+known type の認識はuntyped fallbackより先に行います。ただしfilenameがvalidであることやtype風ラベルを含むことは、本文が採用済み、review済み、またはcanonical authorityであることを意味しません。ADR mirrorも明示的な`adr` filenameと必要なfrontmatter・eligibility条件を満たす場合だけ生成します。
 
 ### 4.3 `artifact_id` と filename stem の境界
 
