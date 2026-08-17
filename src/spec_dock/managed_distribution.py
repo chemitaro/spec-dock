@@ -65,12 +65,25 @@ class DistributionIdentity:
 
 
 @dataclass(frozen=True)
+class DistributionSourceSnapshot:
+    """Stable identity of a provider regular file captured with its bytes."""
+
+    device: int
+    inode: int
+    ctime_ns: int
+    mtime_ns: int
+    size: int
+    mode: int
+
+
+@dataclass(frozen=True)
 class DistributionAsset:
     """One file in the physical Current provider catalog."""
 
     path: str
     identity: DistributionIdentity
     source_path: str | None = None
+    source_snapshot: DistributionSourceSnapshot | None = None
 
 
 DistributionOperation = Literal["fresh", "update", "init-force", "uninstall"]
@@ -957,20 +970,6 @@ def admit_distribution_operation(
     if specdock_info is not None and stat.S_ISLNK(specdock_info.st_mode):
         _admission_block("workspace-invalid", "spec-dock is a symlink; a real directory is required")
 
-    # A successful uninstall may intentionally leave an empty workspace
-    # boundary after the retry marker is finalized.  Treat that exact empty
-    # directory as a fresh admission so the documented `init` recovery path
-    # can recreate the managed scaffold without requiring `--force`.
-    if specdock_info is not None:
-        try:
-            empty_workspace_boundary = not any(specdock_path.iterdir())
-        except OSError:
-            _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
-        if empty_workspace_boundary and operation in {"fresh", "init-force"}:
-            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
-        if operation in {"fresh", "init-force"} and _is_preserved_specs_workspace(target_root):
-            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
-
     distribution_marker_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
     uninstall_marker_present = _path_present_no_follow(target_root / _UNINSTALL_RETRY_MARKER_REL)
     if distribution_marker_present and uninstall_marker_present:
@@ -1001,6 +1000,20 @@ def admit_distribution_operation(
             status="uninstall-retry",
             package_version=package_version,
         )
+
+    # A successful uninstall may intentionally leave an empty workspace
+    # boundary after the retry marker is finalized.  Treat that exact empty
+    # directory as a fresh admission so the documented `init` recovery path
+    # can recreate the managed scaffold without requiring `--force`.
+    if specdock_info is not None:
+        try:
+            empty_workspace_boundary = not any(specdock_path.iterdir())
+        except OSError:
+            _admission_block("workspace-invalid", "managed workspace cannot be inspected safely")
+        if empty_workspace_boundary and operation in {"fresh", "init-force"}:
+            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
+        if operation in {"fresh", "init-force"} and _is_preserved_specs_workspace(target_root):
+            return DistributionAdmission(operation=operation, status="fresh", package_version=package_version)
 
     if specdock_info is None:
         if operation in {"fresh", "init-force"}:
@@ -1038,9 +1051,9 @@ def _current_assets(install_root: Path) -> tuple[DistributionAsset, ...]:
             continue
         relative = _exact_relative_path(relative_candidate.as_posix(), field_name="Current path")
         try:
-            file_stat = candidate.stat()
-            digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        except OSError as exc:
+            content, source_snapshot = _source_asset_bytes(candidate)
+            digest = hashlib.sha256(content).hexdigest()
+        except (OSError, DistributionApplyError) as exc:
             raise DistributionManifestError(f"unable to read Current asset: {relative.as_posix()}") from exc
         assets.append(
             DistributionAsset(
@@ -1048,8 +1061,9 @@ def _current_assets(install_root: Path) -> tuple[DistributionAsset, ...]:
                 identity=DistributionIdentity(
                     kind="regular",
                     sha256=digest,
-                    mode=stat.S_IMODE(file_stat.st_mode),
+                    mode=source_snapshot.mode,
                 ),
+                source_snapshot=source_snapshot,
             )
         )
     return tuple(assets)
@@ -1107,11 +1121,11 @@ def _scaffold_assets(scaffold_root: Path, *, operation: DistributionOperation) -
     assets: list[DistributionAsset] = []
     for source_path, candidate in sorted(source_entries):
         try:
-            info = candidate.stat()
-            digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        except OSError as exc:
+            content, source_snapshot = _source_asset_bytes(candidate)
+            digest = hashlib.sha256(content).hexdigest()
+        except (OSError, DistributionApplyError) as exc:
             raise DistributionManifestError(f"unable to read scaffold asset: {source_path}") from exc
-        mode = stat.S_IMODE(info.st_mode)
+        mode = source_snapshot.mode
         if source_path == "scripts/spec-dock":
             mode |= 0o111
         if source_path.startswith("system/active-none/"):
@@ -1126,6 +1140,7 @@ def _scaffold_assets(scaffold_root: Path, *, operation: DistributionOperation) -
                     sha256=digest,
                     mode=mode,
                 ),
+                source_snapshot=source_snapshot,
             )
         )
     return tuple(assets)
@@ -1947,7 +1962,18 @@ def _read_fd_bytes(fd: int) -> bytes:
         chunks.append(chunk)
 
 
-def _source_asset_bytes(source_path: Path) -> tuple[bytes, int]:
+def _source_snapshot(info: os.stat_result) -> DistributionSourceSnapshot:
+    return DistributionSourceSnapshot(
+        device=info.st_dev,
+        inode=info.st_ino,
+        ctime_ns=info.st_ctime_ns,
+        mtime_ns=info.st_mtime_ns,
+        size=info.st_size,
+        mode=stat.S_IMODE(info.st_mode),
+    )
+
+
+def _source_asset_bytes(source_path: Path) -> tuple[bytes, DistributionSourceSnapshot]:
     nofollow = getattr(os, "O_NOFOLLOW", None)
     if not isinstance(nofollow, int):
         raise DistributionApplyError("platform lacks required no-follow file support")
@@ -1961,10 +1987,17 @@ def _source_asset_bytes(source_path: Path) -> tuple[bytes, int]:
     except OSError as exc:
         raise DistributionApplyError("provider Current asset cannot be read safely") from exc
     try:
-        actual = os.fstat(fd)
-        if not stat.S_ISREG(actual.st_mode):
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
             raise DistributionApplyError("provider Current asset changed type")
-        return _read_fd_bytes(fd), stat.S_IMODE(actual.st_mode)
+        if _source_snapshot(source_stat) != _source_snapshot(opened):
+            raise DistributionApplyError("provider Current asset identity changed before read")
+        content = _read_fd_bytes(fd)
+        after_read = os.fstat(fd)
+        snapshot = _source_snapshot(after_read)
+        if snapshot != _source_snapshot(opened):
+            raise DistributionApplyError("provider Current asset identity changed during read")
+        return content, snapshot
     finally:
         os.close(fd)
 
@@ -2920,8 +2953,12 @@ def _apply_distribution_action(
             if source_root is None:
                 raise DistributionApplyError("distribution plan has no provider source root")
             source_rel = asset.source_path or asset.path
-            source_bytes, observed_source_mode = _source_asset_bytes(source_root / source_rel)
-            if expected.mode is None or observed_source_mode != expected.mode:
+            source_bytes, observed_source_snapshot = _source_asset_bytes(source_root / source_rel)
+            if asset.source_snapshot is None or observed_source_snapshot != asset.source_snapshot:
+                raise DistributionApplyError(f"provider Current asset identity changed for '{action.path}'")
+            if expected.sha256 is None or hashlib.sha256(source_bytes).hexdigest() != expected.sha256:
+                raise DistributionApplyError(f"provider Current asset content changed for '{action.path}'")
+            if expected.mode is None or observed_source_snapshot.mode != expected.mode:
                 raise DistributionApplyError(f"provider Current asset mode changed for '{action.path}'")
             # Bind the mutation to the mode captured in the read-only plan;
             # never publish a mode observed after plan construction.
@@ -3166,6 +3203,7 @@ __all__ = [
     "DistributionPlan",
     "DistributionProvenance",
     "DistributionResult",
+    "DistributionSourceSnapshot",
     "DistributionStageOwnership",
     "DistributionTargetSnapshot",
     "PathIdentitySnapshot",
