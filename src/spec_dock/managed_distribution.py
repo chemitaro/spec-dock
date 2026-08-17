@@ -708,7 +708,11 @@ def _is_preserved_specs_workspace(target_root: Path) -> bool:
     if {entry.name for entry in children} != {"initiatives"}:
         return False
     initiatives = children[0]
-    if initiatives.name != "initiatives" or initiatives.is_symlink() or not initiatives.is_dir(follow_symlinks=False):
+    try:
+        initiatives_info = initiatives.stat(follow_symlinks=False)
+    except OSError:
+        _admission_block("workspace-invalid", "preserved spec history cannot be inspected safely")
+    if initiatives.name != "initiatives" or not stat.S_ISDIR(initiatives_info.st_mode):
         return False
     pending = [initiatives.path]
     while pending:
@@ -718,12 +722,16 @@ def _is_preserved_specs_workspace(target_root: Path) -> bool:
         except OSError:
             _admission_block("workspace-invalid", "preserved spec history cannot be inspected safely")
         for entry in entries:
-            if entry.is_symlink():
+            try:
+                entry_info = entry.stat(follow_symlinks=False)
+            except OSError:
+                _admission_block("workspace-invalid", "preserved spec history cannot be inspected safely")
+            if stat.S_ISLNK(entry_info.st_mode):
                 return False
-            if entry.is_dir(follow_symlinks=False):
+            if stat.S_ISDIR(entry_info.st_mode):
                 pending.append(entry.path)
                 continue
-            if not entry.is_file(follow_symlinks=False):
+            if not stat.S_ISREG(entry_info.st_mode):
                 return False
     return True
 
