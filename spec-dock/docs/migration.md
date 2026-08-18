@@ -25,7 +25,7 @@ git status --short
 ./spec-dock/scripts/spec-dock update /path/to/project
 ```
 
-更新は固定 upstream の recognized distribution を一つの計画として検証します。所有権を証明できない変更、symlink、hard-link、root の差し替え、未知の衝突は保持して書き込みを停止します。途中で停止した場合は、同じ root・package・operation に対して同じ update command を再実行してください。`spec-dock/.distribution-retry.json` が残る場合は、別の root や別 package で上書きせず、診断された対象を先に確認します。
+更新は固定 upstream の recognized distribution を一つの計画として検証します。所有権を証明できない変更、symlink、hard-link、root の差し替え、未知の衝突は保持して書き込みを停止します。途中で停止した場合は、同じ root・package・operation に対して同じ command を再実行してください。`spec-dock/.distribution-journal.json` は root・intent・contract・plan・protocol と action ごとの exact pre/postcondition に束縛され、不一致なら追加 mutation 前に停止します。旧 `.distribution-retry.json` は同一 root/package/operation の pre-write state かつ staging lease なしの場合だけ一方向変換されます。その他の legacy marker や dual recovery state は書き換えず、診断された repository-relative reason を確認してください。new journal 作成後は古い installer へ戻さず forward recovery を行います。
 
 ## 3. 旧レイアウトや衝突がある場合
 

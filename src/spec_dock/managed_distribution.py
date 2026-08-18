@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 import ctypes
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import errno
 import hashlib
 import json
@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 import re
 import stat
 import sys
+import time
 from typing import TYPE_CHECKING, Any, Literal, NoReturn
 
 if TYPE_CHECKING:
@@ -27,6 +28,10 @@ if TYPE_CHECKING:
 
 class DistributionManifestError(ValueError):
     """Raised when the provider-private distribution manifest is unsafe."""
+
+
+class DistributionPlanError(ValueError):
+    """Raised when a read-only assessment cannot issue mutation authority."""
 
 
 class DistributionApplyError(RuntimeError):
@@ -84,6 +89,7 @@ class DistributionAsset:
     identity: DistributionIdentity
     source_path: str | None = None
     source_snapshot: DistributionSourceSnapshot | None = None
+    generated_content: bytes | None = None
 
 
 DistributionOperation = Literal["fresh", "update", "init-force", "uninstall"]
@@ -201,6 +207,76 @@ class DistributionPlan:
         """Whether any classified action requires preserve-and-block."""
 
         return any(action.blocked for action in self.actions)
+
+
+RecognizedDistributionIntent = Literal["update", "init-force"]
+
+
+@dataclass(frozen=True)
+class WorkspaceAssessment:
+    """Read-only recognized-workspace observation without mutation authority."""
+
+    intent: RecognizedDistributionIntent
+    root_identity: DistributionRootIdentity
+    contract_identity: str
+    distribution_plan: DistributionPlan
+    actions: tuple[DistributionAction, ...]
+    blockers: tuple[DistributionAction, ...]
+
+
+@dataclass(frozen=True)
+class ExecutableMutationPlan:
+    """A blocker-free recognized plan bound to one root and contract."""
+
+    intent: RecognizedDistributionIntent
+    root_identity: DistributionRootIdentity
+    contract_identity: str
+    plan_digest: str
+    distribution_plan: DistributionPlan
+    actions: tuple[DistributionAction, ...]
+
+
+JournalCheckpoint = Literal["pending", "published", "verified"]
+JournalStatus = Literal["prepared", "executing", "verifying", "completed"]
+
+
+@dataclass(frozen=True)
+class OperationJournalAction:
+    path: str
+    action: DistributionActionName
+    provenance: DistributionProvenance
+    reason: str
+    precondition: dict[str, object]
+    postcondition: dict[str, object]
+    checkpoint: JournalCheckpoint = "pending"
+
+
+@dataclass(frozen=True)
+class OperationJournal:
+    schema_version: int
+    protocol_version: int
+    operation_id: str
+    root_identity: DistributionRootIdentity
+    intent: RecognizedDistributionIntent
+    authority: str
+    package_version: str
+    contract_identity: str
+    plan_digest: str
+    created_at_ns: int
+    status: JournalStatus
+    actions: tuple[OperationJournalAction, ...]
+    staging_leases: tuple[DistributionStageOwnership, ...] = ()
+
+
+@dataclass(frozen=True)
+class DistributionProcessResult:
+    status: Literal["completed", "blocked", "recovery_required"]
+    intent: RecognizedDistributionIntent
+    actions: tuple[DistributionAction, ...]
+    plan_digest: str | None = None
+    reason: str | None = None
+    applied_paths: tuple[str, ...] = ()
+    pending_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -569,6 +645,9 @@ def _load_manifest(path: Path) -> DistributionManifest:
 _CANONICAL_VERSION_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\n$")
 _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
+_DISTRIBUTION_JOURNAL_REL = Path("spec-dock/.distribution-journal.json")
+_DISTRIBUTION_JOURNAL_SCHEMA_VERSION = 1
+_DISTRIBUTION_JOURNAL_PROTOCOL_VERSION = 1
 _DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
 _DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
 _DISTRIBUTION_RETRY_PHASES = frozenset({
@@ -595,6 +674,7 @@ _PROTECTED_WORKSPACE_ROOTS = frozenset({
     "spec-dock/.gitignore",
     "spec-dock/spec-dock.version",
     "spec-dock/.distribution-retry.json",
+    "spec-dock/.distribution-journal.json",
     "spec-dock/.uninstall-retry.json",
 })
 
@@ -979,9 +1059,19 @@ def admit_distribution_operation(
         _admission_block("workspace-invalid", "spec-dock is a symlink; a real directory is required")
 
     distribution_marker_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
+    journal_present = _path_present_no_follow(target_root / _DISTRIBUTION_JOURNAL_REL)
     uninstall_marker_present = _path_present_no_follow(target_root / _UNINSTALL_RETRY_MARKER_REL)
-    if distribution_marker_present and uninstall_marker_present:
-        _admission_block("dual-marker", "distribution and uninstall retry markers cannot coexist")
+    if sum((distribution_marker_present, journal_present, uninstall_marker_present)) > 1:
+        _admission_block("dual-marker", "distribution recovery states cannot coexist")
+
+    if journal_present:
+        if operation not in {"update", "init-force"}:
+            _admission_block("distribution-retry-present", "recover distribution before this operation")
+        return DistributionAdmission(
+            operation=operation,
+            status="retry",
+            package_version=package_version,
+        )
 
     distribution_marker = _read_distribution_retry_marker(target_root)
     uninstall_marker = _read_uninstall_retry_marker_for_admission(target_root)
@@ -1106,14 +1196,14 @@ def _scaffold_assets(scaffold_root: Path, *, operation: DistributionOperation) -
         return parts[-1] == "README.md" and relative not in preserved_readmes
 
     if not scaffold_root.is_dir() or scaffold_root.is_symlink():
-        return ()
+        raise DistributionManifestError("Missing asset directory: spec_dock")
     if not (scaffold_root / ".gitignore").is_file() or (scaffold_root / ".gitignore").is_symlink():
-        return ()
+        raise DistributionManifestError("Missing asset file: spec_dock/.gitignore")
     source_entries: list[tuple[str, Path]] = [(".gitignore", scaffold_root / ".gitignore")]
     for root_name in _SCAFFOLD_MANAGED_ROOTS:
         source_root = scaffold_root / root_name
         if not source_root.is_dir() or source_root.is_symlink():
-            return ()
+            raise DistributionManifestError(f"Invalid asset directory: spec_dock/{root_name}")
         for candidate in sorted(source_root.rglob("*"), key=lambda item: item.relative_to(scaffold_root).as_posix()):
             relative = candidate.relative_to(scaffold_root)
             if "__pycache__" in relative.parts or relative.suffix in {".pyc", ".pyo"}:
@@ -1122,7 +1212,21 @@ def _scaffold_assets(scaffold_root: Path, *, operation: DistributionOperation) -
                 continue
             if candidate.is_file() and not candidate.is_symlink():
                 source_entries.append((relative.as_posix(), candidate))
+    runtime_script = scaffold_root / "scripts" / "spec-dock"
+    try:
+        runtime_info = os.lstat(runtime_script)
+    except OSError as exc:
+        raise DistributionManifestError("Missing asset file: spec_dock/scripts/spec-dock") from exc
+    if (
+        stat.S_ISLNK(runtime_info.st_mode)
+        or not stat.S_ISREG(runtime_info.st_mode)
+        or runtime_info.st_nlink != 1
+        or stat.S_IMODE(runtime_info.st_mode) & 0o111 == 0
+    ):
+        raise DistributionManifestError("Invalid asset file: spec_dock/scripts/spec-dock")
     seed_readme = scaffold_root / "templates" / "root" / ".workbench" / "README.md"
+    if not seed_readme.is_file() or seed_readme.is_symlink():
+        raise DistributionManifestError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
     if operation == "fresh" and seed_readme.is_file() and not seed_readme.is_symlink():
         source_entries.append((".workbench/README.md", seed_readme))
 
@@ -1443,6 +1547,12 @@ def _historical_records(manifest: DistributionManifest) -> tuple[dict[str, Any],
     records: list[dict[str, Any]] = list(manifest.historical_current_identities)
     for version in manifest.recognized_workspace_versions:
         records.extend(version["anchors"])
+        version_bytes = f"{version['version']}\n".encode()
+        records.append({
+            "path": "spec-dock/spec-dock.version",
+            "kind": "regular",
+            "sha256": hashlib.sha256(version_bytes).hexdigest(),
+        })
     for item in manifest.obsolete_exact_files:
         records.extend(item["identities"])
     records.extend(manifest.historical_shortcuts)
@@ -1742,6 +1852,7 @@ def build_distribution_plan(
     scaffold_root: Path | None = None,
     target_root: Path | None = None,
     operation: DistributionOperation = "fresh",
+    generated_assets: tuple[DistributionAsset, ...] = (),
 ) -> DistributionPlan:
     """Build a read-only Current/historical distribution plan.
 
@@ -1761,6 +1872,7 @@ def build_distribution_plan(
         if scaffold_root is not None and operation != "uninstall"
         else ()
     )
+    scaffold_assets = (*scaffold_assets, *generated_assets)
     manifest = _load_manifest(manifest_path)
     _assert_no_manifest_overlap(
         {asset.path for asset in current_assets} | set(_CURRENT_SHORTCUTS),
@@ -1788,6 +1900,928 @@ def build_distribution_plan(
         operation=operation,
         target_snapshots=target_snapshots,
         scaffold_assets=scaffold_assets,
+    )
+
+
+def _distribution_identity_payload(identity: DistributionIdentity | None) -> dict[str, object] | None:
+    if identity is None:
+        return None
+    return {
+        "kind": identity.kind,
+        "sha256": identity.sha256,
+        "mode": identity.mode,
+        "target": identity.target,
+    }
+
+
+def _contract_identity(plan: DistributionPlan) -> str:
+    assets = sorted((*plan.current_assets, *plan.scaffold_assets), key=lambda asset: asset.path)
+    payload = {
+        "schema_version": plan.manifest.schema_version,
+        "assets": [
+            {
+                "path": asset.path,
+                "identity": _distribution_identity_payload(asset.identity),
+            }
+            for asset in assets
+        ],
+        "recognized_workspace_versions": plan.manifest.recognized_workspace_versions,
+        "historical_current_identities": plan.manifest.historical_current_identities,
+        "trusted_consumer_manifests": plan.manifest.trusted_consumer_manifests,
+        "obsolete_exact_files": plan.manifest.obsolete_exact_files,
+        "historical_shortcuts": plan.manifest.historical_shortcuts,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _root_identity_for_assessment(target_root: Path) -> DistributionRootIdentity:
+    try:
+        info = os.lstat(target_root)
+    except OSError as exc:
+        raise DistributionPlanError("recognized target root cannot be inspected safely") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise DistributionPlanError("recognized target root is not a real directory")
+    return DistributionRootIdentity(device=info.st_dev, inode=info.st_ino)
+
+
+def build_workspace_assessment(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    target_root: Path,
+    intent: RecognizedDistributionIntent,
+    scaffold_root: Path | None = None,
+    generated_assets: tuple[DistributionAsset, ...] = (),
+) -> WorkspaceAssessment:
+    """Assess one recognized operation without creating execution authority."""
+
+    if intent not in {"update", "init-force"}:
+        raise DistributionPlanError(f"unsupported recognized intent: {intent!r}")
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        operation=intent,
+        generated_assets=generated_assets,
+    )
+    blockers = tuple(action for action in plan.actions if action.blocked)
+    return WorkspaceAssessment(
+        intent=intent,
+        root_identity=_root_identity_for_assessment(target_root),
+        contract_identity=_contract_identity(plan),
+        distribution_plan=plan,
+        actions=plan.actions,
+        blockers=blockers,
+    )
+
+
+def _action_precondition_payload(plan: DistributionPlan, action: DistributionAction) -> dict[str, object]:
+    snapshots = dict(plan.target_snapshots)
+    snapshot = snapshots.get(action.path)
+    if snapshot is None:
+        raise DistributionPlanError(f"assessment is missing a precondition for '{action.path}'")
+    target = snapshot.target
+    return {
+        "exists": target.exists,
+        "device": target.device,
+        "inode": target.inode,
+        "ctime_ns": target.ctime_ns,
+        "file_type": target.file_type,
+        "link_count": target.link_count,
+        "identity": _distribution_identity_payload(target.identity),
+    }
+
+
+def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAction) -> dict[str, object]:
+    expected = _expected_target_identity(plan, action.path)
+    if action.action == "prune":
+        return {"exists": False, "identity": None}
+    if expected is None:
+        snapshot = dict(plan.target_snapshots).get(action.path)
+        if snapshot is None:
+            raise DistributionPlanError(f"assessment is missing a postcondition for '{action.path}'")
+        expected = snapshot.target.identity
+    return {"exists": True, "identity": _distribution_identity_payload(expected)}
+
+
+def _mutation_plan_digest(assessment: WorkspaceAssessment) -> str:
+    plan = assessment.distribution_plan
+    ordered_actions = sorted(assessment.actions, key=lambda action: (action.path, action.action, action.reason))
+    payload = {
+        "schema_version": 1,
+        "intent": assessment.intent,
+        "root_binding": {
+            "device": assessment.root_identity.device,
+            "inode": assessment.root_identity.inode,
+        },
+        "contract_identity": assessment.contract_identity,
+        "actions": [
+            {
+                "path": action.path,
+                "action": action.action,
+                "provenance": action.provenance,
+                "reason": action.reason,
+                "precondition": _action_precondition_payload(plan, action),
+                "postcondition": _action_postcondition_payload(plan, action),
+            }
+            for action in ordered_actions
+        ],
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> ExecutableMutationPlan:
+    """Issue mutation authority only for a complete blocker-free assessment."""
+
+    if assessment.blockers:
+        raise DistributionPlanError("workspace assessment contains blocker dispositions")
+    if not assessment.actions:
+        raise DistributionPlanError("workspace assessment contains no managed actions")
+    return ExecutableMutationPlan(
+        intent=assessment.intent,
+        root_identity=assessment.root_identity,
+        contract_identity=assessment.contract_identity,
+        plan_digest=_mutation_plan_digest(assessment),
+        distribution_plan=assessment.distribution_plan,
+        actions=assessment.actions,
+    )
+
+
+def _journal_payload(journal: OperationJournal) -> dict[str, object]:
+    return {
+        "schema_version": journal.schema_version,
+        "protocol_version": journal.protocol_version,
+        "operation_id": journal.operation_id,
+        "root_binding": {
+            "device": journal.root_identity.device,
+            "inode": journal.root_identity.inode,
+        },
+        "intent": journal.intent,
+        "authority": journal.authority,
+        "package_version": journal.package_version,
+        "contract_identity": journal.contract_identity,
+        "plan_digest": journal.plan_digest,
+        "created_at_ns": journal.created_at_ns,
+        "status": journal.status,
+        "actions": [
+            {
+                "path": action.path,
+                "action": action.action,
+                "provenance": action.provenance,
+                "reason": action.reason,
+                "precondition": action.precondition,
+                "postcondition": action.postcondition,
+                "checkpoint": action.checkpoint,
+            }
+            for action in journal.actions
+        ],
+        "staging_leases": [
+            {
+                "path": lease.path,
+                "stage_name": lease.stage_name,
+                "device": lease.device,
+                "inode": lease.inode,
+                "ctime_ns": lease.ctime_ns,
+                "file_type": lease.file_type,
+            }
+            for lease in journal.staging_leases
+        ],
+    }
+
+
+def _journal_bytes(journal: OperationJournal) -> bytes:
+    return (json.dumps(_journal_payload(journal), sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def _parse_operation_journal(raw: bytes) -> OperationJournal:
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DistributionApplyError("journal-protocol-incompatible") from exc
+    if not isinstance(payload, dict):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    expected_fields = {
+        "schema_version",
+        "protocol_version",
+        "operation_id",
+        "root_binding",
+        "intent",
+        "authority",
+        "package_version",
+        "contract_identity",
+        "plan_digest",
+        "created_at_ns",
+        "status",
+        "actions",
+        "staging_leases",
+    }
+    if set(payload) != expected_fields:
+        raise DistributionApplyError("journal-protocol-incompatible")
+    root = payload["root_binding"]
+    actions = payload["actions"]
+    if (
+        payload["schema_version"] != _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
+        or payload["protocol_version"] != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+        or not isinstance(root, dict)
+        or set(root) != {"device", "inode"}
+        or not all(isinstance(root[field], int) for field in ("device", "inode"))
+        or payload["intent"] not in {"update", "init-force"}
+        or not isinstance(payload["authority"], str)
+        or not isinstance(payload["package_version"], str)
+        or not isinstance(payload["operation_id"], str)
+        or not isinstance(payload["contract_identity"], str)
+        or not isinstance(payload["plan_digest"], str)
+        or not isinstance(payload["created_at_ns"], int)
+        or payload["status"] not in {"prepared", "executing", "verifying", "completed"}
+        or not isinstance(actions, list)
+    ):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    parsed_actions: list[OperationJournalAction] = []
+    for item in actions:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"path", "action", "provenance", "reason", "precondition", "postcondition", "checkpoint"}
+            or not isinstance(item["path"], str)
+            or item["action"] not in {"create", "adopt", "upgrade", "prune", "preserve", "block"}
+            or item["provenance"] not in {"missing", "current", "historical", "unknown"}
+            or not isinstance(item["reason"], str)
+            or not isinstance(item["precondition"], dict)
+            or not isinstance(item["postcondition"], dict)
+            or item["checkpoint"] not in {"pending", "published", "verified"}
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        parsed_actions.append(
+            OperationJournalAction(
+                path=item["path"],
+                action=item["action"],
+                provenance=item["provenance"],
+                reason=item["reason"],
+                precondition=item["precondition"],
+                postcondition=item["postcondition"],
+                checkpoint=item["checkpoint"],
+            )
+        )
+    raw_leases = payload["staging_leases"]
+    if not isinstance(raw_leases, list):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    leases: list[DistributionStageOwnership] = []
+    for item in raw_leases:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"path", "stage_name", "device", "inode", "ctime_ns", "file_type"}
+            or not isinstance(item["path"], str)
+            or not isinstance(item["stage_name"], str)
+            or PurePosixPath(item["stage_name"]).name != item["stage_name"]
+            or any(not isinstance(item[field], int) for field in ("device", "inode", "ctime_ns"))
+            or item["file_type"] not in {"regular", "symlink"}
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        leases.append(
+            DistributionStageOwnership(
+                path=item["path"],
+                stage_name=item["stage_name"],
+                device=item["device"],
+                inode=item["inode"],
+                ctime_ns=item["ctime_ns"],
+                file_type=item["file_type"],
+            )
+        )
+    return OperationJournal(
+        schema_version=payload["schema_version"],
+        protocol_version=payload["protocol_version"],
+        operation_id=payload["operation_id"],
+        root_identity=DistributionRootIdentity(device=root["device"], inode=root["inode"]),
+        intent=payload["intent"],
+        authority=payload["authority"],
+        package_version=payload["package_version"],
+        contract_identity=payload["contract_identity"],
+        plan_digest=payload["plan_digest"],
+        created_at_ns=payload["created_at_ns"],
+        status=payload["status"],
+        actions=tuple(parsed_actions),
+        staging_leases=tuple(leases),
+    )
+
+
+class OperationJournalStore:
+    """Descriptor-bound durable storage for one recognized operation journal."""
+
+    def __init__(self, target_root: Path) -> None:
+        self.target_root = Path(target_root)
+        self.path = self.target_root / _DISTRIBUTION_JOURNAL_REL
+
+    def _open_parent(self, expected_root: DistributionRootIdentity) -> tuple[int, int]:
+        flags = _distribution_directory_flags()
+        try:
+            root_fd = os.open(self.target_root, flags)
+        except OSError as exc:
+            raise DistributionApplyError("journal-root-mismatch") from exc
+        try:
+            opened = os.fstat(root_fd)
+            visible = os.lstat(self.target_root)
+            if (
+                stat.S_ISLNK(visible.st_mode)
+                or not stat.S_ISDIR(visible.st_mode)
+                or (opened.st_dev, opened.st_ino) != (expected_root.device, expected_root.inode)
+                or (visible.st_dev, visible.st_ino) != (expected_root.device, expected_root.inode)
+            ):
+                raise DistributionApplyError("journal-root-mismatch")
+            parent_fd = os.open("spec-dock", flags, dir_fd=root_fd)
+        except Exception:
+            os.close(root_fd)
+            raise
+        return root_fd, parent_fd
+
+    def _write(self, journal: OperationJournal, *, require_absent: bool = False) -> None:
+        content = _journal_bytes(journal)
+        root_fd, parent_fd = self._open_parent(journal.root_identity)
+        destination = _DISTRIBUTION_JOURNAL_REL.name
+        stage = f".distribution-journal-{hashlib.sha256(content).hexdigest()[:24]}.stage"
+        stage_info: os.stat_result | None = None
+        try:
+            try:
+                destination_info = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                destination_info = None
+            if require_absent and destination_info is not None:
+                raise DistributionApplyError("dual-recovery-state")
+            if destination_info is not None and (
+                not stat.S_ISREG(destination_info.st_mode) or destination_info.st_nlink != 1
+            ):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("platform lacks required no-follow file support")
+            try:
+                stage_fd = os.open(
+                    stage,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    0o600,
+                    dir_fd=parent_fd,
+                )
+            except OSError as exc:
+                raise DistributionApplyError("journal publish failed") from exc
+            try:
+                _write_fd_bytes(stage_fd, content)
+                os.fchmod(stage_fd, 0o600)
+                stage_info = os.fstat(stage_fd)
+            finally:
+                os.close(stage_fd)
+            if destination_info is None:
+                _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
+            else:
+                current = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+                if (
+                    current.st_dev,
+                    current.st_ino,
+                    current.st_ctime_ns,
+                    current.st_nlink,
+                ) != (
+                    destination_info.st_dev,
+                    destination_info.st_ino,
+                    destination_info.st_ctime_ns,
+                    destination_info.st_nlink,
+                ):
+                    raise DistributionApplyError("journal-precondition-mismatch")
+                _rename_distribution_swap(parent_fd, stage, parent_fd, destination)
+                swapped_out = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
+                if (
+                    swapped_out.st_dev,
+                    swapped_out.st_ino,
+                    swapped_out.st_nlink,
+                    _file_type(swapped_out.st_mode),
+                ) != (
+                    destination_info.st_dev,
+                    destination_info.st_ino,
+                    destination_info.st_nlink,
+                    _file_type(destination_info.st_mode),
+                ):
+                    raise DistributionApplyError("journal-precondition-mismatch")
+                _remove_distribution_stage_if_owned(parent_fd, stage, swapped_out, strict=True)
+            os.fsync(parent_fd)
+            visible = os.lstat(self.target_root)
+            if (visible.st_dev, visible.st_ino) != (
+                journal.root_identity.device,
+                journal.root_identity.inode,
+            ):
+                raise DistributionApplyError("journal-root-mismatch")
+        except Exception:
+            if stage_info is not None:
+                _remove_distribution_stage_if_owned(parent_fd, stage, stage_info)
+            raise
+        finally:
+            os.close(parent_fd)
+            os.close(root_fd)
+
+    def _read(self, expected_root: DistributionRootIdentity) -> OperationJournal:
+        root_fd, parent_fd = self._open_parent(expected_root)
+        try:
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("platform lacks required no-follow file support")
+            try:
+                info = os.stat(_DISTRIBUTION_JOURNAL_REL.name, dir_fd=parent_fd, follow_symlinks=False)
+                fd = os.open(
+                    _DISTRIBUTION_JOURNAL_REL.name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=parent_fd,
+                )
+            except FileNotFoundError as exc:
+                raise DistributionApplyError("operation journal is missing") from exc
+            except OSError as exc:
+                raise DistributionApplyError("journal-protocol-incompatible") from exc
+            try:
+                opened = os.fstat(fd)
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or info.st_nlink != 1
+                    or (opened.st_dev, opened.st_ino, opened.st_ctime_ns, opened.st_nlink)
+                    != (info.st_dev, info.st_ino, info.st_ctime_ns, info.st_nlink)
+                ):
+                    raise DistributionApplyError("journal-protocol-incompatible")
+                raw = _read_fd_bytes(fd)
+                if len(raw) > 16 * 1024 * 1024:
+                    raise DistributionApplyError("journal-protocol-incompatible")
+            finally:
+                os.close(fd)
+            return _parse_operation_journal(raw)
+        finally:
+            os.close(parent_fd)
+            os.close(root_fd)
+
+    def prepare(self, plan: ExecutableMutationPlan, *, package_version: str) -> OperationJournal:
+        created_at_ns = time.time_ns()
+        operation_id = hashlib.sha256(f"{plan.plan_digest}:{created_at_ns}".encode()).hexdigest()
+        journal = OperationJournal(
+            schema_version=_DISTRIBUTION_JOURNAL_SCHEMA_VERSION,
+            protocol_version=_DISTRIBUTION_JOURNAL_PROTOCOL_VERSION,
+            operation_id=operation_id,
+            root_identity=plan.root_identity,
+            intent=plan.intent,
+            authority="recognized-workspace-reconciliation",
+            package_version=package_version,
+            contract_identity=plan.contract_identity,
+            plan_digest=plan.plan_digest,
+            created_at_ns=created_at_ns,
+            status="prepared",
+            actions=tuple(
+                OperationJournalAction(
+                    path=action.path,
+                    action=action.action,
+                    provenance=action.provenance,
+                    reason=action.reason,
+                    precondition=_action_precondition_payload(plan.distribution_plan, action),
+                    postcondition=_action_postcondition_payload(plan.distribution_plan, action),
+                )
+                for action in sorted(plan.actions, key=lambda item: (item.path, item.action, item.reason))
+            ),
+        )
+        self._write(journal, require_absent=True)
+        return journal
+
+    def resume(self, plan: ExecutableMutationPlan, *, package_version: str) -> OperationJournal:
+        journal = self._read(plan.root_identity)
+        if journal.root_identity != plan.root_identity:
+            raise DistributionApplyError("journal-root-mismatch")
+        if journal.intent != plan.intent:
+            raise DistributionApplyError("journal-intent-mismatch")
+        if journal.authority != "recognized-workspace-reconciliation":
+            raise DistributionApplyError("journal-authority-mismatch")
+        if (
+            journal.package_version != package_version
+            or journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        if journal.contract_identity != plan.contract_identity:
+            raise DistributionApplyError("journal-contract-mismatch")
+        if journal.plan_digest != plan.plan_digest:
+            raise DistributionApplyError("journal-plan-mismatch")
+        return journal
+
+    def load_for_assessment(
+        self,
+        assessment: WorkspaceAssessment,
+        *,
+        package_version: str,
+    ) -> OperationJournal:
+        journal = self._read(assessment.root_identity)
+        if journal.root_identity != assessment.root_identity:
+            raise DistributionApplyError("journal-root-mismatch")
+        if journal.intent != assessment.intent:
+            raise DistributionApplyError("journal-intent-mismatch")
+        if journal.authority != "recognized-workspace-reconciliation":
+            raise DistributionApplyError("journal-authority-mismatch")
+        if (
+            journal.package_version != package_version
+            or journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        if journal.contract_identity != assessment.contract_identity:
+            raise DistributionApplyError("journal-contract-mismatch")
+        return journal
+
+    def write(self, journal: OperationJournal) -> OperationJournal:
+        self._write(journal)
+        return journal
+
+    def mark_executing(self, journal: OperationJournal) -> OperationJournal:
+        if journal.status not in {"prepared", "executing"}:
+            raise DistributionApplyError("journal-precondition-mismatch")
+        return self.write(replace(journal, status="executing"))
+
+    def checkpoint_published(
+        self,
+        journal: OperationJournal,
+        completed_paths: tuple[str, ...],
+    ) -> OperationJournal:
+        completed = set(completed_paths)
+        actions = tuple(
+            replace(action, checkpoint="published")
+            if action.path in completed and action.checkpoint == "pending"
+            else action
+            for action in journal.actions
+        )
+        staging_leases = tuple(lease for lease in journal.staging_leases if lease.path not in completed)
+        return self.write(
+            replace(
+                journal,
+                status="executing",
+                actions=actions,
+                staging_leases=staging_leases,
+            )
+        )
+
+    def record_staging_lease(
+        self,
+        journal: OperationJournal,
+        lease: DistributionStageOwnership,
+    ) -> OperationJournal:
+        retained = tuple(
+            item for item in journal.staging_leases if (item.path, item.stage_name) != (lease.path, lease.stage_name)
+        )
+        return self.write(replace(journal, staging_leases=(*retained, lease)))
+
+    def mark_verified(self, journal: OperationJournal) -> OperationJournal:
+        if any(action.checkpoint == "pending" for action in journal.actions):
+            raise DistributionApplyError("journal-precondition-mismatch")
+        actions = tuple(replace(action, checkpoint="verified") for action in journal.actions)
+        return self.write(replace(journal, status="verifying", actions=actions))
+
+    def mark_completed(self, journal: OperationJournal) -> OperationJournal:
+        if any(action.checkpoint != "verified" for action in journal.actions):
+            raise DistributionApplyError("journal-precondition-mismatch")
+        return self.write(replace(journal, status="completed"))
+
+    def remove_completed(self, journal: OperationJournal) -> None:
+        if journal.status != "completed":
+            raise DistributionApplyError("journal-precondition-mismatch")
+        root_fd, parent_fd = self._open_parent(journal.root_identity)
+        try:
+            name = _DISTRIBUTION_JOURNAL_REL.name
+            try:
+                info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise DistributionApplyError("journal-protocol-incompatible")
+            current = self._read(journal.root_identity)
+            if current != journal:
+                raise DistributionApplyError("journal-precondition-mismatch")
+            try:
+                os.unlink(name, dir_fd=parent_fd)
+                os.fsync(parent_fd)
+            except OSError as exc:
+                raise DistributionApplyError("journal finalization failed") from exc
+        finally:
+            os.close(parent_fd)
+            os.close(root_fd)
+
+    def remove_legacy_marker(self, marker: DistributionRetryMarker) -> None:
+        if marker.target_root != _root_identity_for_assessment(self.target_root):
+            raise DistributionApplyError("journal-root-mismatch")
+        current = _read_distribution_retry_marker(self.target_root)
+        if current != marker:
+            raise DistributionApplyError("legacy-marker-unconvertible")
+        root_fd, parent_fd = self._open_parent(marker.target_root)
+        try:
+            name = _DISTRIBUTION_RETRY_MARKER_REL.name
+            try:
+                info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise DistributionApplyError("legacy-marker-unconvertible") from exc
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise DistributionApplyError("legacy-marker-unconvertible")
+            try:
+                os.unlink(name, dir_fd=parent_fd)
+                os.fsync(parent_fd)
+            except OSError as exc:
+                raise DistributionApplyError("legacy-marker-unconvertible") from exc
+        finally:
+            os.close(parent_fd)
+            os.close(root_fd)
+
+
+def _generated_regular_asset(path: str, content: bytes, *, mode: int) -> DistributionAsset:
+    return DistributionAsset(
+        path=path,
+        identity=DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(content).hexdigest(),
+            mode=mode,
+        ),
+        generated_content=content,
+    )
+
+
+def _journal_digest(journal: OperationJournal) -> str:
+    payload = {
+        "schema_version": 1,
+        "intent": journal.intent,
+        "root_binding": {
+            "device": journal.root_identity.device,
+            "inode": journal.root_identity.inode,
+        },
+        "contract_identity": journal.contract_identity,
+        "actions": [
+            {
+                "path": action.path,
+                "action": action.action,
+                "provenance": action.provenance,
+                "reason": action.reason,
+                "precondition": action.precondition,
+                "postcondition": action.postcondition,
+            }
+            for action in journal.actions
+        ],
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _snapshot_matches_condition(snapshot: DistributionTargetSnapshot, condition: dict[str, object]) -> bool:
+    target = snapshot.target
+    if condition.get("exists") != target.exists:
+        return False
+    if "device" in condition and condition.get("device") != target.device:
+        return False
+    if "inode" in condition and condition.get("inode") != target.inode:
+        return False
+    if "ctime_ns" in condition and condition.get("ctime_ns") != target.ctime_ns:
+        return False
+    if "file_type" in condition and condition.get("file_type") != target.file_type:
+        return False
+    if "link_count" in condition and condition.get("link_count") != target.link_count:
+        return False
+    return condition.get("identity") == _distribution_identity_payload(target.identity)
+
+
+def _resume_executable_plan(
+    assessment: WorkspaceAssessment,
+    journal: OperationJournal,
+) -> ExecutableMutationPlan:
+    if _journal_digest(journal) != journal.plan_digest:
+        raise DistributionApplyError("journal-plan-mismatch")
+    snapshots = dict(assessment.distribution_plan.target_snapshots)
+    original_actions: list[DistributionAction] = []
+    pending_actions: list[DistributionAction] = []
+    for record in journal.actions:
+        snapshot = snapshots.get(record.path)
+        if snapshot is None:
+            raise DistributionApplyError("journal-precondition-mismatch")
+        expected = record.precondition if record.checkpoint == "pending" else record.postcondition
+        if not _snapshot_matches_condition(snapshot, expected):
+            raise DistributionApplyError("journal-precondition-mismatch")
+        action = DistributionAction(
+            path=record.path,
+            operation=journal.intent,
+            action=record.action,
+            provenance=record.provenance,
+            reason=record.reason,
+        )
+        original_actions.append(action)
+        if record.checkpoint == "pending":
+            pending_actions.append(action)
+    pending_plan = replace(assessment.distribution_plan, actions=tuple(pending_actions))
+    return ExecutableMutationPlan(
+        intent=journal.intent,
+        root_identity=journal.root_identity,
+        contract_identity=journal.contract_identity,
+        plan_digest=journal.plan_digest,
+        distribution_plan=pending_plan,
+        actions=tuple(original_actions),
+    )
+
+
+def _reconcile_pending_journal_actions(
+    assessment: WorkspaceAssessment,
+    journal: OperationJournal,
+) -> OperationJournal:
+    """Advance crash-ambiguous pending records only from exact observation."""
+
+    snapshots = dict(assessment.distribution_plan.target_snapshots)
+    reconciled: list[OperationJournalAction] = []
+    changed = False
+    for record in journal.actions:
+        if record.checkpoint != "pending":
+            reconciled.append(record)
+            continue
+        snapshot = snapshots.get(record.path)
+        if snapshot is None:
+            raise DistributionApplyError("journal-precondition-mismatch")
+        matches_pre = _snapshot_matches_condition(snapshot, record.precondition)
+        matches_post = _snapshot_matches_condition(snapshot, record.postcondition)
+        if matches_post and (not matches_pre or record.action in {"adopt", "preserve"}):
+            reconciled.append(replace(record, checkpoint="published"))
+            changed = True
+            continue
+        if matches_pre and not matches_post:
+            reconciled.append(record)
+            continue
+        raise DistributionApplyError("journal-precondition-mismatch")
+    if not changed:
+        return journal
+    return replace(journal, status="executing", actions=tuple(reconciled))
+
+
+def execute_recognized_distribution(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    scaffold_root: Path,
+    target_root: Path,
+    intent: RecognizedDistributionIntent,
+    package_version: str,
+    legacy_marker: DistributionRetryMarker | None = None,
+    generated_state_reconciler: Callable[[], None] | None = None,
+) -> DistributionProcessResult:
+    """Execute one recognized update/init-force through the journaled service."""
+
+    version_asset = _generated_regular_asset(
+        "spec-dock/spec-dock.version",
+        f"{package_version}\n".encode(),
+        mode=0o644,
+    )
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent=intent,
+        generated_assets=(version_asset,),
+    )
+    store = OperationJournalStore(target_root)
+    journal_present = _path_present_no_follow(store.path)
+    legacy_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
+    if not journal_present and not legacy_present and assessment.blockers:
+        reasons = ", ".join(f"{action.path}: {action.reason}" for action in assessment.blockers)
+        return DistributionProcessResult(
+            status="blocked",
+            intent=intent,
+            actions=assessment.actions,
+            reason=reasons,
+        )
+    plan_digest: str | None = None
+    journal: OperationJournal | None = None
+    try:
+        if journal_present and legacy_present:
+            raise DistributionApplyError("dual-recovery-state")
+        if legacy_present:
+            executable = build_executable_mutation_plan(assessment)
+            if (
+                legacy_marker is None
+                or legacy_marker.operation != intent
+                or legacy_marker.package_version != package_version
+                or legacy_marker.target_root != executable.root_identity
+                or legacy_marker.last_completed_phase != "preflight-complete"
+                or legacy_marker.stage_ownership
+            ):
+                raise DistributionApplyError("legacy-marker-unconvertible")
+            journal = store.prepare(executable, package_version=package_version)
+            store.remove_legacy_marker(legacy_marker)
+        elif journal_present:
+            journal = store.load_for_assessment(assessment, package_version=package_version)
+            if journal.status == "completed":
+                store.remove_completed(journal)
+                return DistributionProcessResult(
+                    status="completed",
+                    intent=intent,
+                    actions=assessment.actions,
+                    plan_digest=journal.plan_digest,
+                )
+            if journal.status == "verifying":
+                if generated_state_reconciler is not None:
+                    generated_state_reconciler()
+                if assessment.blockers or any(
+                    action.action not in {"adopt", "preserve"} for action in assessment.actions
+                ):
+                    raise DistributionApplyError("distribution postcondition failed")
+                journal = store.mark_completed(journal)
+                store.remove_completed(journal)
+                return DistributionProcessResult(
+                    status="completed",
+                    intent=intent,
+                    actions=assessment.actions,
+                    plan_digest=journal.plan_digest,
+                )
+            reconciled = _reconcile_pending_journal_actions(assessment, journal)
+            if reconciled != journal:
+                journal = store.write(reconciled)
+            executable = _resume_executable_plan(assessment, journal)
+        else:
+            executable = build_executable_mutation_plan(assessment)
+            journal = store.prepare(executable, package_version=package_version)
+        plan_digest = executable.plan_digest
+        journal = store.mark_executing(journal)
+        active_journal = journal
+        refreshed_assessment = build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent=intent,
+            generated_assets=(version_asset,),
+        )
+        refreshed_executable = _resume_executable_plan(refreshed_assessment, journal)
+
+        recorded_completed: tuple[str, ...] = ()
+
+        def record_staging_lease(lease: DistributionStageOwnership) -> None:
+            nonlocal active_journal, journal
+            active_journal = store.record_staging_lease(active_journal, lease)
+            journal = active_journal
+
+        def record_progress(
+            _phase: str,
+            completed: tuple[str, ...],
+            _pending: tuple[str, ...],
+            _phase_complete: bool,
+        ) -> None:
+            nonlocal active_journal, journal, recorded_completed
+            if completed == recorded_completed:
+                return
+            active_journal = store.checkpoint_published(active_journal, completed)
+            journal = active_journal
+            recorded_completed = completed
+
+        apply_distribution_plan(
+            refreshed_executable.distribution_plan,
+            allow_stale_stage_cleanup=bool(active_journal.staging_leases),
+            stage_ownership=active_journal.staging_leases,
+            stage_ownership_recorder=record_staging_lease,
+            progress_recorder=record_progress,
+        )
+        if generated_state_reconciler is not None:
+            generated_state_reconciler()
+        post = build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent=intent,
+            generated_assets=(version_asset,),
+        )
+        if post.blockers or any(action.action not in {"adopt", "preserve"} for action in post.actions):
+            raise DistributionApplyError("distribution postcondition failed")
+        active_journal = store.mark_verified(active_journal)
+        active_journal = store.mark_completed(active_journal)
+        store.remove_completed(active_journal)
+        journal = active_journal
+    except Exception as exc:
+        if not isinstance(exc, DistributionApplyError):
+            reason = "generated-state-reconciliation-failed"
+        else:
+            reason = str(exc)
+            if (
+                any(str(path) in reason for path in (install_root, scaffold_root, target_root))
+                or "credential=" in reason.lower()
+                or re.search(r"(?:^|[\s=])/", reason) is not None
+            ):
+                reason = "distribution-apply-failed"
+        return DistributionProcessResult(
+            status="recovery_required",
+            intent=intent,
+            actions=assessment.actions,
+            plan_digest=plan_digest,
+            reason=reason,
+            applied_paths=(
+                tuple(action.path for action in journal.actions if action.checkpoint != "pending")
+                if journal is not None
+                else ()
+            ),
+            pending_paths=(
+                tuple(action.path for action in journal.actions if action.checkpoint == "pending")
+                if journal is not None
+                else ()
+            ),
+        )
+    return DistributionProcessResult(
+        status="completed",
+        intent=intent,
+        actions=assessment.actions,
+        plan_digest=executable.plan_digest,
     )
 
 
@@ -2957,16 +3991,20 @@ def _apply_distribution_action(
             asset = _asset_for_target(plan, action.path)
             if asset is None:
                 raise DistributionApplyError(f"distribution plan has no provider source for '{action.path}'")
-            source_root = plan.scaffold_root if asset.source_path is not None else plan.install_root
-            if source_root is None:
-                raise DistributionApplyError("distribution plan has no provider source root")
-            source_rel = asset.source_path or asset.path
-            source_bytes, observed_source_snapshot = _source_asset_bytes(source_root / source_rel)
-            if asset.source_snapshot is None or observed_source_snapshot != asset.source_snapshot:
-                raise DistributionApplyError(f"provider Current asset identity changed for '{action.path}'")
+            if asset.generated_content is not None:
+                source_bytes = asset.generated_content
+                observed_source_snapshot = None
+            else:
+                source_root = plan.scaffold_root if asset.source_path is not None else plan.install_root
+                if source_root is None:
+                    raise DistributionApplyError("distribution plan has no provider source root")
+                source_rel = asset.source_path or asset.path
+                source_bytes, observed_source_snapshot = _source_asset_bytes(source_root / source_rel)
+                if asset.source_snapshot is None or observed_source_snapshot != asset.source_snapshot:
+                    raise DistributionApplyError(f"provider Current asset identity changed for '{action.path}'")
             if expected.sha256 is None or hashlib.sha256(source_bytes).hexdigest() != expected.sha256:
                 raise DistributionApplyError(f"provider Current asset content changed for '{action.path}'")
-            if expected.mode is None or observed_source_snapshot.mode != expected.mode:
+            if expected.mode is None:
                 raise DistributionApplyError(f"provider Current asset mode changed for '{action.path}'")
             # Bind the mutation to the mode captured in the read-only plan;
             # never publish a mode observed after plan construction.
@@ -3209,12 +4247,23 @@ __all__ = [
     "DistributionManifestError",
     "DistributionOperation",
     "DistributionPlan",
+    "DistributionPlanError",
+    "DistributionProcessResult",
     "DistributionProvenance",
     "DistributionResult",
     "DistributionSourceSnapshot",
     "DistributionStageOwnership",
     "DistributionTargetSnapshot",
+    "ExecutableMutationPlan",
+    "OperationJournal",
+    "OperationJournalAction",
+    "OperationJournalStore",
     "PathIdentitySnapshot",
+    "RecognizedDistributionIntent",
+    "WorkspaceAssessment",
     "apply_distribution_plan",
     "build_distribution_plan",
+    "build_executable_mutation_plan",
+    "build_workspace_assessment",
+    "execute_recognized_distribution",
 ]

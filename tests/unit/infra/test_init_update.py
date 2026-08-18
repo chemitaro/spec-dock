@@ -1,4 +1,5 @@
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
+import inspect
 import io
 import json
 import os
@@ -16,6 +17,7 @@ import zipfile
 
 import pytest
 
+import spec_dock.cli as cli
 from tests.cli_runtime.harness import (
     _EXPECTED_MANAGED_SKILL_NAMES as _HARNESS_EXPECTED_MANAGED_SKILL_NAMES,
     CliRuntimeHarness,
@@ -35,6 +37,22 @@ _REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS = tuple(
     for profile in ("lite", "standard", "strict", "critical")
     for artifact in ("design", "plan")
 )
+
+
+def test_issue_368_recognized_handler_has_single_service_route() -> None:
+    source = inspect.getsource(cli._install_recognized_distribution_unlocked)
+
+    assert "execute_recognized_distribution(" in source
+    for forbidden in (
+        "_write_distribution_retry_marker(",
+        "_remove_distribution_retry_marker(",
+        "apply_distribution_plan(",
+        "build_distribution_plan(",
+        "scaffold_applier",
+        "allow_blocked_scaffold_paths",
+        "_write_spec_dock_version(",
+    ):
+        assert forbidden not in source
 
 
 @contextmanager
@@ -1803,7 +1821,6 @@ class TestInitUpdate(CliRuntimeHarness):
 
             installed_rules = target / "spec-dock" / "docs" / "rules" / "root" / "artifacts.md"
             if install_command == "update":
-                self._write_text_force(installed_rules, "corrupted root artifact rules\n")
                 assert main(["update", str(target)]) == 0
 
             repo_root = Path(__file__).resolve().parents[3]
@@ -1836,7 +1853,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert rules_link.resolve() == installed_rules.resolve()
             assert rules_link.read_bytes() == provider_rules.read_bytes()
 
-    def test_update_preserves_legacy_artifacts_inside_existing_node_trees(self) -> None:
+    def test_update_blocks_modified_managed_content_before_pruning_legacy_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -1880,12 +1897,14 @@ class TestInitUpdate(CliRuntimeHarness):
                 self._write_text_force(artifact_path, artifact_text)
                 assert artifact_path.read_text(encoding="utf-8") == artifact_text
 
-            assert main(["update", str(target)]) == 0
+            assert main(["update", str(target)]) == 1
 
-            self._assert_canonical_rules_files_match_provider_assets(target)
-            self._assert_installed_templates_match_provider_assets(target)
-            for artifact_path in managed_legacy_artifacts:
-                assert not artifact_path.exists(), f"managed legacy artifact survived update: {artifact_path}"
+            assert (target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md").read_text(
+                encoding="utf-8"
+            ) == "corrupted managed rules\n"
+            for artifact_path, artifact_text in managed_legacy_artifacts.items():
+                assert artifact_path.is_file(), f"blocked update changed legacy artifact: {artifact_path}"
+                assert artifact_path.read_text(encoding="utf-8") == artifact_text
             for artifact_path, artifact_text in node_legacy_artifacts.items():
                 assert artifact_path.is_file(), f"node-tree artifact should be preserved: {artifact_path}"
                 assert artifact_path.read_text(encoding="utf-8") == artifact_text
