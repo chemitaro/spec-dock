@@ -63,6 +63,8 @@ Epic 365 の要件・設計・計画と Issue 分割を作成するために、I
 - 現行 `main()` は fresh target に対する `init`、`init --force`、`update` をすべて fresh provisioning へ送る。public compatibility を維持するため、D1 は recognized target の `update` / `init --force`、D2 は fresh target の3 entrypointすべてを owner とする。
 - authority non-expansion は mutation resume の exact-authority match として具体化する。lower-authority invocation は read-only inspection と diagnostic だけを許可し、journal checkpoint を進めない。
 - D3 は default/`--keep-specs` dry-run と keep-specs apply、D4 は `--remove-specs` dry-run/apply を owner とする。
+- current desired content と safe regular single-link identityを証明できるmode-only driftはjournaled repairとし、証明不能またはunsafeなmode driftだけをblockする。
+- D5はlegacy seamを削除するcleanup ownerではなくabsence gateである。production executable seam/writerの残存はD1〜D4のowner exit未達として差し戻す。
 - この refinement は Q1〜Q19 の採用判断や five fixed Issue slices を変更せず、現行 public behavior と canonical contract の曖昧さだけを解消する。
 
 ## Synthesis
@@ -252,7 +254,7 @@ CLI Adapter
 
 #### D5 `iss-00372` Distribution Hard Cutover And Parity
 
-- 旧 `_UninstallAction`、旧 plan/apply、独自 recursive mutation、二重 marker writer、private rename import、fallback seam を物理的に除去する。
+- 旧 `_UninstallAction`、旧 plan/apply、独自 recursive mutation、二重 marker writer、private rename import、fallback seam がD1〜D4で物理的に除去済みであることをabsence gateで検証する。残存するproduction seamはowner Issueへ戻す。
 - provider checkout、dogfood、wheel、sdist、fresh consumer、Linux、macOS の parity と migration/recovery docs を確認する。
 - dependency: D1〜D4。
 - 親 Initiative の T3 までに全 public operation を hard cutover し、T4 は証拠収集と completion confirmation だけにする。

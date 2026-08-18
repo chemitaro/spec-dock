@@ -103,7 +103,8 @@ exact repository commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、`src
 | 条件 | 必須結果 |
 |---|---|
 | current/historical identity を一意に証明できない | diagnostic を返し、write 0 件で停止する。 |
-| unknown、modified、wrong-mode、symlink、hardlink、unsafe parent | path ごとの reason を返し、operation 全体を block する。 |
+| current content と safe regular single-link identity を証明できる managed file の mode-only drift | desired mode への journaled repair action とし、適用前後の content/identity/mode を再検証する。 |
+| unknown、modified、ownership/content を証明できない mode drift、unsafe file type、symlink、hardlink、unsafe parent | path ごとの reason を返し、operation 全体を block する。 |
 | root または parent chain が assessment 後に変わる | mutation 直前の identity check で停止し、外部 path を変更しない。 |
 | partial failure | completed checkpoint と staging lease を journal に保持し、postcondition 成功前に journal を消さない。 |
 | root、intent、plan digest、protocol、authority が journal と不一致 | write 前に停止し、journal/staging を推測変更しない。 |
@@ -117,7 +118,7 @@ exact repository commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、`src
 1. 全公開 intent が一つの operation service を通り、operation 固有の第二 action grammar が存在しない。
 2. `cli.py` は parse、package asset location、dispatch、human/JSON render、exit mapping に限定され、ownership policy、filesystem recursion、journal transition、staging cleanup を持たない。
 3. mutation は一つの descriptor-bound filesystem kernel に集約される。
-4. `update` / `init --force` は current match、historical match、missing、obsolete proven-owned、unknown/modified、wrong mode、symlink、hardlink、parent symlink、root rebind を含む matrix を満たす。
+4. `update` / `init --force` は current match、historical match、missing、obsolete proven-owned、unknown/modified、current-content mode-only repair、unproven/unsafe mode drift block、symlink、hardlink、parent symlink、root rebind を含む matrix を満たす。
 5. fresh target に対する `init`、`init --force`、`update` は現行 command/flag/exit semantics を維持して同じ fresh intent へ正規化され、衝突なしで desired assets を作成し、不明な parent/target collision では write 0 件で停止する。
 6. deprovision は tooling/generated/owned managed assets を除去し、spec history と authority 外 unknown content を保持する。
 7. purge は `--apply --remove-specs` の explicit authority でのみ spec history を削除し、retry で authority を拡大できない。

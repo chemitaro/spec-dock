@@ -59,7 +59,7 @@ D1〜D4 は strict linear dependency とする。D5 用の test inventory、CI f
 
 ### D5 — Hard Cutover And Parity
 
-- `_UninstallAction` 系、独自 recursive mutation、旧 marker writer、private rename import、`scaffold_applier`/blocked-path fallback など残存 legacy seam を物理的に除去する。
+- `_UninstallAction` 系、独自 recursive mutation、旧 marker writer、private rename import、`scaffold_applier`/blocked-path fallback が D1〜D4 で物理削除済みであることを検証する。production executable path または writer が残る場合は D5 で削除せず、owner Issue の未完了として completion を block する。
 - dependency/import/symbol/AST test で CLI ownership boundary と single-kernel contract を固定する。
 - provider checkout、dogfood、wheel、sdist、installed/fresh consumer の inventory/byte/behavior parity を確認する。
 - focused distribution suite を Linux と macOS で実行する。

@@ -59,7 +59,7 @@ Test fixture、JSON/text golden data、platform capability inventory は 1〜3 �
 
 - exact commit の `DistributionOperation`、`DistributionAction`、`DistributionPlan`、admission、retry marker、scaffold callback、CLI orchestration を call graph にする。
 - `tests/unit/infra/test_managed_distribution.py` と `test_init_update.py` から recognized-target update/init-force の ownership/safety/output matrix と、fresh target に対する `init` / `init --force` / `update` の現行 compatibility matrix を抽出する。
-- missing/current/historical/obsolete/unknown/modified/wrong-mode/symlink/hardlink/parent/root/provider/stage case を parameterized characterization tests にする。
+- missing/current/historical/obsolete/unknown/modified/current-content mode-only repair/unproven mode drift block/symlink/hardlink/parent/root/provider/stage case を parameterized characterization tests にする。
 - no-write assertion は target tree bytes、marker、staging、backup、version、outside sentinel を含める。
 
 Targeted verification:
@@ -113,7 +113,7 @@ Exit: same-process failure と simulated crash state の双方で journal が安
 ### Step 4 — recognized target の `update` を新 service へ切り替える
 
 - CLI parse/resource location を保ち、service call と result rendering に置換する。
-- current/historical upgrade、missing create、obsolete prune、mode repair、user content preservation を新 engine で通す。
+- current/historical upgrade、missing create、obsolete prune、safe current-content mode-only repair、unproven/unsafe mode drift block、user content preservation を新 engine で通す。
 - postcondition assessment と version update を service transaction sequence に含める。
 - update 対象で `scaffold_applier` と `allow_blocked_scaffold_paths` に依存しない。
 

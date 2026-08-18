@@ -42,7 +42,7 @@ D1〜D4のunified architectureを唯一のproduction pathとして固定し、le
 dependencies: `iss-00368`, `iss-00369`, `iss-00370`, `iss-00371`
 
 1. integrated contract/route inventory
-2. legacy seam removal
+2. legacy seam absence gate
 3. structural absence tests
 4. public semantic completion matrix
 5. package surface parity
@@ -63,9 +63,9 @@ Package fixture preparationとCI configuration draftは前倒し可能だが、f
 
 Exit:remove対象とallowed migration readerがcomplete allowlistになっている。
 
-### Step 2 — Legacy seamを物理削除する
+### Step 2 — Legacy seam absenceをowner exit gateとして検証する
 
-少なくとも次を候補としてsource確認し、D1〜D4で未削除なら除去する。
+少なくとも次をdenylist候補としてsource確認する。production executable pathまたはwriterがD1〜D4で未削除なら、該当owner Issueのexit未達としてD5をblockし、D5のchange setでは除去しない。migration-only readerはStep 1のexplicit allowlistとwrite-zero evidenceを満たす場合だけ残存を許可する。
 
 - `_UninstallTargetIdentity`
 - `_UninstallAction`
@@ -80,6 +80,8 @@ Exit:remove対象とallowed migration readerがcomplete allowlistになってい
 - operation-specific fallback mutation route
 
 Namesがimplementation中に変わった場合はsemantic roleで追跡し、単なるrenameをremoval evidenceにしない。
+
+Exit: denylist候補はsourceからabsent、またはmigration-only reader allowlistに限定される。owner Issueへ戻すresidual seamが一件でもあればD5の次stepへ進まない。
 
 ### Step 3 — Structural absence testsを追加する
 
@@ -164,8 +166,8 @@ Required gates:
 
 ## rollback
 
-- structural cleanup前にbehavior testsをgreenにする。
-- cleanupでhidden repository callerが見つかった場合はcallerをsingle serviceへ移行し、legacy private APIをpublic guaranteeとして復活させない。
+- structural absence gate前にbehavior testsをgreenにする。
+- hidden repository callerまたはproduction legacy seamが見つかった場合はD5をblockし、owner Issueでsingle serviceへ移行する。legacy private APIをpublic guaranteeとして復活させない。
 - release rollbackはactive new journal protocolとのcompatibilityを確認してから行う。互換性がなければforward recovery packageを先に提供する。
 - package parity failure時はreleaseを停止し、個別artifactを手修正しない。
 - platform failure時はbest-effortへ格下げせずkernel/capability gateを修正する。
