@@ -15,7 +15,7 @@ ID: "iss-00369"
 
 ## 設計目標
 
-D1 の unified engine に `fresh` intent policy と creation postcondition を追加し、fresh `init` を end-to-end cutover する。fresh 専用差分は Distribution Contract と intent policy に限定し、別 planner、別 action、別 kernel、別 journal を作らない。
+D1 の unified engine に `fresh` intent policy と creation postcondition を追加し、fresh target の `init` / `init --force` / `update` entrypoint を end-to-end cutover する。fresh 専用差分は Distribution Contract と intent policy に限定し、別 planner、別 action、別 kernel、別 journal を作らない。
 
 ## Current / Target
 
@@ -29,6 +29,7 @@ D1 の unified engine に `fresh` intent policy と creation postcondition を�
 ### Target
 
 - `fresh` をD1の`OperationIntent`に追加する。
+- CLI admissionはfresh targetへの`init` / `init --force` / `update`をすべて`fresh`へ正規化し、requested entrypointはcurrent output/exit mappingのためだけに保持する。
 - Distribution Contractがfresh-only desired assetsとrequired directoriesを明示する。
 - Assessmentはtarget rootのunrelated contentを無視せず安全に観測するが、managed pathsとのcollisionだけをblockerにする。
 - planは全create/ensure-directory/mode/symlink actionを明示し、callbackなしでkernelへ渡す。
@@ -90,7 +91,7 @@ CLI adapterはserviceの`mutation_required` result後、apply開始前だけcurr
 
 ## data / failure
 
-- fresh journalは`intent=fresh`を固定し、update/init-force journalとしてresumeしない。
+- fresh journalはentrypointにかかわらず`intent=fresh`とexact authorityを固定する。retryはjournalのfresh intentとしてのみ進め、requested entrypointをupdate/init-force intentへ再解釈しない。
 - expected-absent preconditionはparent/root bindingとともに記録する。
 - created directories、files、symlinks、mode、versionのpostconditionをaction recordに持つ。
 - backupを作るcurrent contractが適用されるcaseでは、backup path/identityもjournal authority内に明示する。current behaviorにbackupがないcaseへ新規作成しない。
@@ -99,7 +100,7 @@ CLI adapterはserviceの`mutation_required` result後、apply開始前だけcurr
 ## 変更対象
 
 - D1 service/contract/assessment/plan/kernel/journalへのfresh overlay
-- `src/spec_dock/cli.py` fresh dispatch/prompt/backup adapter
+- `src/spec_dock/cli.py` の fresh-target `init` / `init --force` / `update` dispatch、prompt/backup adapter、output/exit mapping
 - packaged fresh desired/seed metadata
 - fresh tests in `test_managed_distribution.py` / `test_init_update.py`
 - README init/retry guidance
@@ -122,6 +123,7 @@ recognized flow、uninstall/purge、JSON schemaは変更しない。
 - directory created then later failure
 - provider source mutation
 - prompt/backup called only onmutation-required path
+- fresh target entrypoint matrix: `init` / `init --force` / `update`
 - second init without force
 - fresh journal resumed asupdate/init-force rejection
 - fresh-only seed exists after fresh init、not backfilled by update/force

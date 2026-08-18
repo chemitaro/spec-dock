@@ -58,6 +58,13 @@ Epic 365 の要件・設計・計画と Issue 分割を作成するために、I
   - Q1〜Q18 はすべて推奨 Option A を採用した。
   - Q19 で共有理解を明示承認し、canonical authoring、Issue slice 作成、必要な ADR、ChatGPT-Use Strict、生成 ZIP の byte-for-byte 採用、日本語 HTML の作成と Tailscale 配信まで承認した。
 
+### 2026-08-18 Strict review refinement
+
+- 現行 `main()` は fresh target に対する `init`、`init --force`、`update` をすべて fresh provisioning へ送る。public compatibility を維持するため、D1 は recognized target の `update` / `init --force`、D2 は fresh target の3 entrypointすべてを owner とする。
+- authority non-expansion は mutation resume の exact-authority match として具体化する。lower-authority invocation は read-only inspection と diagnostic だけを許可し、journal checkpoint を進めない。
+- D3 は default/`--keep-specs` dry-run と keep-specs apply、D4 は `--remove-specs` dry-run/apply を owner とする。
+- この refinement は Q1〜Q19 の採用判断や five fixed Issue slices を変更せず、現行 public behavior と canonical contract の曖昧さだけを解消する。
+
 ## Synthesis
 
 ### 1. 結論

@@ -50,7 +50,7 @@ exact repository commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、`src
 | E365-R02 | eligibility、workspace observation、ownership assessment、plan construction は read-only であり、blocker が一件でもあれば最初の write より前に operation 全体を停止する。safe subset の部分適用はしない。 |
 | E365-R03 | unknown、modified、user-owned content は、利用者が明示した spec history purge authority の境界内を除き、保持される。pathname や親 directory だけで ownership を推測しない。 |
 | E365-R04 | deprovision と spec history purge は同じ engine を使うが、別 intent、別 authority、別 postcondition とする。`update` や通常の deprovision が history purge を暗黙実行してはならない。 |
-| E365-R05 | mutation 開始後の durable state は Operation Journal に記録する。resume は同じ root、intent、再構成可能な同じ plan、互換 protocol、同等以下の authority に限定し、mismatch は write 前に拒否する。 |
+| E365-R05 | mutation 開始後の durable state は Operation Journal に記録する。mutation resume は同じ root、intent、再構成可能な同じ plan、互換 protocol、開始時と exact に一致する authority に限定し、mismatch は write 前に拒否する。より低い authority の invocation は read-only inspection と diagnostic だけを許可し、checkpoint を進めない。 |
 | E365-R06 | file action の precondition は exact no-follow identity で照合する。regular file の回復判断は exact pre-action SHA-256 に束縛し、catalog index、配列位置、pathname 推測を identity として使わない。 |
 | E365-R07 | root、parent chain、target、staging entry は mutation 直前にも descriptor-relative に再検証し、symlink traversal、hardlink mutation、root/parent rebind、external path mutation を拒否する。 |
 | E365-R08 | public CLI command、flag、exit behavior、利用者所有 data、安全性、および現行 `uninstall --json` schema version 1 の意味を維持する。private Python API と legacy marker schema は公開互換対象にしない。 |
@@ -66,7 +66,7 @@ exact repository commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、`src
 ### 対象
 
 - recognized workspace に対する `update` と `init --force` の reconciliation
-- fresh target に対する `init` provisioning
+- fresh target に対する `init`、`init --force`、`update` の現行 entrypoint semantics を維持した provisioning
 - current `uninstall --apply --keep-specs` 相当の managed distribution deprovision
 - current `uninstall --apply --remove-specs` 相当の explicit spec history purge
 - desired asset、historical ownership evidence、workspace observation、intent policy、preservation policy、postcondition の一貫した契約
@@ -93,7 +93,7 @@ exact repository commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、`src
 | Issue | end-to-end value |
 |---|---|
 | `iss-00368` | recognized workspace の `update` / `init --force` を統合 engine へ移す。 |
-| `iss-00369` | fresh `init` を同じ engine へ移し、別 scaffold mutation engine をなくす。 |
+| `iss-00369` | fresh target の `init` / `init --force` / `update` を fresh intent として同じ engine へ移し、別 scaffold mutation engine をなくす。 |
 | `iss-00370` | managed distribution deprovision を同じ grammar/kernel/journal へ移し、spec history を保持する。 |
 | `iss-00371` | explicit spec history purge を別 authority として同じ engine へ移す。 |
 | `iss-00372` | legacy seam を物理的に除去し、distribution surface と platform parity を確定する。 |
@@ -118,10 +118,10 @@ exact repository commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、`src
 2. `cli.py` は parse、package asset location、dispatch、human/JSON render、exit mapping に限定され、ownership policy、filesystem recursion、journal transition、staging cleanup を持たない。
 3. mutation は一つの descriptor-bound filesystem kernel に集約される。
 4. `update` / `init --force` は current match、historical match、missing、obsolete proven-owned、unknown/modified、wrong mode、symlink、hardlink、parent symlink、root rebind を含む matrix を満たす。
-5. fresh `init` は衝突なしで desired assets を作成し、不明な parent/target collision では write 0 件で停止する。
+5. fresh target に対する `init`、`init --force`、`update` は現行 command/flag/exit semantics を維持して同じ fresh intent へ正規化され、衝突なしで desired assets を作成し、不明な parent/target collision では write 0 件で停止する。
 6. deprovision は tooling/generated/owned managed assets を除去し、spec history と authority 外 unknown content を保持する。
 7. purge は `--apply --remove-specs` の explicit authority でのみ spec history を削除し、retry で authority を拡大できない。
-8. partial failure 後、same-root/same-intent/same-plan/compatible-protocol の再実行が checkpoint から収束する。mismatch は write 0 件で block される。
+8. partial failure 後、same-root/same-intent/exact-same-authority/same-plan/compatible-protocol の再実行が checkpoint から収束する。より低い authority は read-only inspection に留まり、その他の mismatch とともに mutation write 0 件で block される。
 9. legacy scaffold/uninstall mutation helper、二重 retry writer、private rename import、plan 外 mutation fallback seam が absence test で検出されない。
 10. `uninstall --json` は schema version 1 の現行 semantic contract を維持し、stdout に exactly one JSON object を出す。
 11. provider checkout、dogfood、wheel、sdist、fresh consumer の inventory/bytes/behavior parity と、Linux/macOS の focused distribution suite が確認される。

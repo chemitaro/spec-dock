@@ -36,7 +36,7 @@ Risk factors:
 
 ## 目標
 
-existing `--apply --remove-specs`をexplicit purge intent/authorityとしてcommon engineへhard cutoverし、dry-run、path guard、authority non-escalation、partial forward recovery、public JSON parityを証明する。update/deprovision/retryからsilent purgeへ到達するrouteを残さない。
+existing `--remove-specs` dry-runと`--apply --remove-specs`をexplicit purge intent/authorityとしてcommon engineへhard cutoverし、path guard、authority non-escalation、partial forward recovery、public JSON parityを証明する。update/deprovision/retryからsilent purgeへ到達するrouteを残さない。
 
 ## 順序・依存
 
@@ -138,7 +138,7 @@ make lint
 
 Required evidence:
 
-- dry-run before/after byte equality
+- `--remove-specs` dry-run before/after byte equality
 - explicit apply success and allowed-root absence
 - all non-authority invocation history deletion 0
 - outside/unknown sentinel unchanged

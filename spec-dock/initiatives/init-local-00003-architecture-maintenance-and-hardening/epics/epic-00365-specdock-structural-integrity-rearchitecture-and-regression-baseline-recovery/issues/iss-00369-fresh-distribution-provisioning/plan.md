@@ -36,7 +36,7 @@ Risk factors:
 
 ## 目標
 
-fresh `init`をD1 engineへ切り替え、collision-free provisioning、write-zero blocker、fresh journal resume、current package bytes/behaviorを検証する。Issue終了時にfresh flowの別scaffold mutation engineを残さない。
+fresh target の`init` / `init --force` / `update`をfresh intentとしてD1 engineへ切り替え、collision-free provisioning、write-zero blocker、fresh journal resume、entrypoint compatibility、current package bytes/behaviorを検証する。Issue終了時にfresh flowの別scaffold mutation engineを残さない。
 
 ## 順序・依存
 
@@ -54,7 +54,7 @@ Package inventory fixtureとnegative filesystem fixtureは2〜4に並行して�
 
 Migration:
 
-- D1のjournal protocolとcommon action grammarを前提に、fresh `init`を一回のhard cutoverでnew serviceへ移す。dual writerやruntime toggleは残さない。
+- D1のjournal protocolとcommon action grammarを前提に、fresh target の`init` / `init --force` / `update`を一回のhard cutoverでnew serviceへ移す。dual writerやruntime toggleは残さない。
 - new fresh journal作成前のconsumerはcurrent fresh admissionから通常再実行できる。new journal作成後はsame/compatible protocolによるforward recoveryだけを正規経路とする。
 - current fresh targetにlegacy retry evidenceが存在する場合は、root/intent/plan/checkpointをexactに証明できるときだけ限定変換し、情報不足ならwrite前にblockする。
 
@@ -70,7 +70,7 @@ Exit: fresh overlayを追加してもD1 resume digest/authority contractを壊�
 ### Step 2 — Current fresh contractをcharacterizeする
 
 - physical install root、scaffold resources、fresh-only seed、mode、symlink、managed skill inventoryを列挙する。
-- `test_init_update.py`のbyte-exact install、second init、unmanaged root content、workbench behaviorをfocused fixturesにする。
+- `test_init_update.py`のbyte-exact install、fresh target entrypoint matrix、second init、unmanaged root content、workbench behaviorをfocused fixturesにする。
 - prompt/backupが現行で発生するconditionとno-write conditionをsource/testから固定する。未確認behaviorを推測で追加しない。
 
 Verification:
@@ -113,9 +113,9 @@ Failure tests:
 - same-plan retry convergence
 - retry intent mismatch
 
-### Step 5 — CLI cutoverとprompt/backup boundary
+### Step 5 — Fresh entrypointのCLI cutoverとprompt/backup boundary
 
-- `main()` fresh branchをservice dispatch/result mappingへ置換する。
+- `main()`でfreshと観測された`init` / `init --force` / `update` branchを同じfresh service dispatchへ置換し、requested entrypointごとの現行result/output/exit mappingを維持する。
 - mutation-required result後だけcurrent prompt/backupを実行し、承認後にroot/plan digestを再検証する。
 - second init without forceのcurrent guidanceを維持する。
 - success/error exit/outputをgolden testで固定する。
@@ -136,13 +136,13 @@ Failure tests:
 
 ```bash
 uv run pytest tests/unit/infra/test_managed_distribution.py
-uv run pytest tests/unit/infra/test_init_update.py -k 'init or fresh or install_current_target_catalog or workbench'
+uv run pytest tests/unit/infra/test_init_update.py -k 'init or update or force or fresh or install_current_target_catalog or workbench'
 make lint
 ```
 
 Required evidence:
 
-- fresh target before/after inventory and SHA/mode/link comparison
+- fresh target entrypoint別のbefore/after inventory、SHA/mode/link、output/exit comparison
 - collision casesのwrite-zero tree snapshot
 - unrelated sentinel unchanged
 - prompt/backup call count
