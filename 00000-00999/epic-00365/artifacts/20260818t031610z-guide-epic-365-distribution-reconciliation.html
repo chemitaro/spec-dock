@@ -589,11 +589,28 @@ D4 --> D5
 
       <ol>
         <li><strong>iss-00368:</strong> recognized workspace の <code>update</code> / <code>init --force</code> と最小のcontract・journal・kernelを完成。</li>
-        <li><strong>iss-00369:</strong> fresh <code>init</code>を同じengineへ移し、別scaffold writerを削除。</li>
-        <li><strong>iss-00370:</strong> dry-run / <code>--keep-specs</code>を同じgrammar/kernel/journalへ移し、historyを保持。</li>
-        <li><strong>iss-00371:</strong> <code>--remove-specs</code>を別authorityとして移し、retryの権限昇格を拒否。</li>
-        <li><strong>iss-00372:</strong> dead/legacy seamを物理削除し、package surfacesとLinux/macOSのparityを確定。</li>
+        <li><strong>iss-00369:</strong> fresh targetの<code>init</code> / <code>init --force</code> / <code>update</code>をfresh intentとして同じengineへ移し、別scaffold writerを削除。</li>
+        <li><strong>iss-00370:</strong> default / <code>--keep-specs</code> dry-runと<code>--apply --keep-specs</code>を同じgrammar/kernel/journalへ移し、historyを保持。</li>
+        <li><strong>iss-00371:</strong> <code>--remove-specs</code> dry-run/applyを別authorityとして移し、retryの権限昇格を拒否。</li>
+        <li><strong>iss-00372:</strong> D1〜D4でlegacy seamが物理削除済みであることをowner exit gateで確認し、package surfacesとLinux/macOSのparityを確定。</li>
       </ol>
+    </section>
+
+    <section>
+      <h2>各Issueを完了と判断する要点</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Issue</th><th>利用者に届く価値</th><th>この段階のhard gate</th></tr></thead>
+          <tbody>
+            <tr><td><code>iss-00368</code></td><td>recognized workspaceを安全にupdateでき、partial failure後もexact stateから再開できる</td><td>blocker write 0、exact-SHA resume、recognized legacy route不在</td></tr>
+            <tr><td><code>iss-00369</code></td><td>fresh repositoryを既存三entrypointから同じcontractで完全provisionできる</td><td>collision write 0、unrelated content保持、fresh scaffold callback不在</td></tr>
+            <tr><td><code>iss-00370</code></td><td>dry-runで確認後、spec historyを残してmanaged distributionを外せる</td><td>history/unknown保持、JSON v1互換、deprovision legacy grammar不在</td></tr>
+            <tr><td><code>iss-00371</code></td><td>二段階の明示権限でだけspec historyを削除できる</td><td>cross-authority resume拒否、allowed root外mutation 0、purge legacy writer不在</td></tr>
+            <tr><td><code>iss-00372</code></td><td>source・package・consumer・OSの全surfaceで同じ安全契約を確認できる</td><td>legacy absence、public/package/platform parity、Epic attributable new failure 0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>D5でproduction seamが見つかった場合は、その場でcleanupせず、該当するD1〜D4 owner Issueの未完了として停止します。各vertical sliceの責任を曖昧にしないためです。</p>
     </section>
 
     <section>

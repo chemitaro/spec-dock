@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="ja" data-plantuml-status="pending" data-plantuml-contract="2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Issue 370 Managed Distribution Deprovision 説明資料</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f3f6fb;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #536273;
+      --border: #d8e0ea;
+      --accent: #175cd3;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --error: #b42318;
+      --error-bg: #fef3f2;
+      --code-bg: #101828;
+      --code-text: #f2f4f7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(100% - 24px, 960px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header, section {
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgb(16 24 40 / 8%);
+    }
+
+    header { margin-top: 0; }
+    h1, h2 { line-height: 1.4; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2.25rem); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.2rem, 4vw, 1.5rem); }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .plantuml-status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .plantuml-status.error { background: var(--error-bg); color: var(--error); }
+    .plantuml-diagram {
+      position: relative;
+      min-height: 160px;
+      margin-top: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      color: #182230;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .plantuml-diagram[data-zoom-ready="true"] { cursor: zoom-in; }
+    .plantuml-diagram[data-zoom-ready="true"]:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .diagram-zoom-hint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgb(16 24 40 / 14%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plantuml-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .muted { color: var(--muted); }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.diagram-zoom-open { overflow: hidden; }
+
+    .diagram-zoom-dialog[hidden] { display: none !important; }
+    .diagram-zoom-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgb(3 10 21 / 78%);
+    }
+
+    .diagram-zoom-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(1800px, 100%);
+      height: min(1200px, 100%);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+    }
+
+    .diagram-zoom-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin: 0;
+      padding: 6px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .diagram-zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diagram-zoom-controls button {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .diagram-zoom-controls button svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .diagram-zoom-controls button:hover,
+    .diagram-zoom-controls button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .diagram-zoom-controls button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .diagram-zoom-level {
+      min-width: 3.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    #diagram-zoom-reset {
+      width: auto;
+      min-width: 58px;
+      padding-inline: 8px;
+    }
+
+    .diagram-zoom-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #ffffff;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .diagram-zoom-canvas {
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 24px;
+    }
+
+    .diagram-zoom-canvas svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .diagram-zoom-dialog { padding: 0; }
+      .diagram-zoom-panel { border-radius: 0; }
+      .diagram-zoom-canvas { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0c111d;
+        --surface: #161b26;
+        --text: #f5f7fa;
+        --muted: #b9c2cf;
+        --border: #333b48;
+        --success-bg: #053321;
+        --error-bg: #55160c;
+      }
+    }
+    .lead { font-size: 1.05rem; }
+    .badge { display: inline-block; margin: 2px 6px 2px 0; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: .82rem; font-weight: 700; }
+    .callout { margin-top: 14px; padding: 14px 16px; border-left: 5px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--surface) 86%, var(--accent) 14%); }
+    .warning { border-left-color: var(--error); } .success { border-left-color: var(--success); }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 10px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%); }
+    ul, ol { padding-left: 1.4rem; } li + li { margin-top: 6px; }
+    .authority-note { font-size: .92rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Issue 370: Managed Distribution Deprovision</h1>
+      <p class="lead">SpecDockのtoolingとmanaged assetsを安全に外しつつ、spec historyと利用者所有contentを残す<code>uninstall --apply --keep-specs</code> flowを統合engineへ移します。</p>
+      <p><span class="badge">Issue: iss-00370 / GitHub #370</span><span class="badge">Epic 365 / D3</span><span class="badge">依存: iss-00369</span><span class="badge">Planning Level: strict</span></p>
+      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
+      <p class="authority-note">このHTMLは要件・設計・実装計画の統合説明Artifactです。canonical文書とEpic ADRが最終authorityです。</p>
+    </header>
+
+    <section>
+      <h2>最初に結論</h2>
+      <p><code>uninstall</code>は引き続きdry-runが既定です。実際のdeprovisionは<code>--apply --keep-specs</code>を明示した場合だけ始まります。owned tooling・generated state・proven-owned managed assetsを除去し、<code>spec-dock/initiatives</code>以下のspec history、modified/unknown content、repository rootのunrelated contentを保持します。</p>
+      <div class="callout success"><strong>安全な削除:</strong> current/historical evidenceで所有を証明し、root・parent・target identityを再検証できる対象だけをcommon kernelで削除します。</div>
+      <div class="callout warning"><strong>削除しない:</strong> pathnameがmanagedに見えても、所有権が不明、内容がmodified、unexpected symlink/hardlink/unknown childがある場合は追跡・削除しません。blockerが一件あればsafe subsetも適用しません。</div>
+    </section>
+
+    <section>
+      <h2>背景：なぜuninstallを作り直すのか</h2>
+      <p>現行<code>cli.py</code>は<code>_UninstallAction</code>、独自plan/apply/postverify、descriptor-relative recursive remove、<code>.uninstall-retry.json</code>、text/JSON rendererを持ちます。安全性testsは充実していますが、D1/D2 engineとはaction grammarとrecovery protocolが別です。</p>
+      <p>Issue 370は既存safetyとJSON schema version 1を維持しながら、default/keep-specs dry-runとkeep-specs applyをcommon Assessment・action grammar・kernel・journal・ProcessResultへhard cutoverします。<code>--remove-specs</code>は破壊権限が異なるためIssue 371のownerです。</p>
+    </section>
+
+    <section>
+      <h2>操作ごとの意味</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>command</th><th>このIssueでの結果</th><th>mutation</th></tr></thead>
+        <tbody>
+          <tr><td><code>spec-dock uninstall</code></td><td>keep-specs相当のplanned resultを表示</td><td>0件。journalも作らない</td></tr>
+          <tr><td><code>uninstall --keep-specs</code></td><td>明示keep-specs dry-run</td><td>0件</td></tr>
+          <tr><td><code>uninstall --apply --keep-specs</code></td><td>owned distributionをdeprovision</td><td>明示authority内だけ削除</td></tr>
+          <tr><td><code>uninstall --remove-specs</code></td><td>D4まで現行compatibility route</td><td>本Issueではcutoverしない</td></tr>
+          <tr><td><code>--apply</code>のみ、両mode指定</td><td>error</td><td>0件</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section>
+      <h2>authorityとpreservation境界</h2>
+      <script type="text/plain" class="plantuml-source" id="source-issue-370-boundary" data-target="diagram-issue-370-boundary">
+@startuml
+title deprovision が削除できる範囲
+top to bottom direction
+rectangle "deprovision authority\nremove-owned-distribution\npreserve-spec-history" as Auth
+folder "owned tooling" as Tooling
+folder "generated state" as Generated
+folder "proven-owned managed assets" as Managed
+folder "spec history\nspec-dock/initiatives" as History
+folder "unknown・modified・user-owned" as Unknown
+folder "repository外" as Outside
+Auth --> Tooling : exact ownershipなら削除
+Auth --> Generated : policyでownedなら削除
+Auth --> Managed : current/historical exactなら削除
+Auth ..> History : 必ず保持
+Auth ..> Unknown : 保持またはblock
+Auth ..> Outside : 到達禁止
+@enduml
+      </script>
+      <div id="diagram-issue-370-boundary" class="plantuml-diagram">authority境界図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-issue-370-boundary"></pre></details>
+      <p>owned childrenを削除した後のempty managed directoryだけcleanupできます。preserved descendantが残るdirectoryは削除しません。spec historyとauthority外contentはpostconditionでpre-operation identityと一致することまで確認します。</p>
+    </section>
+
+    <section>
+      <h2>dry-runとapplyの流れ</h2>
+      <script type="text/plain" class="plantuml-source" id="source-issue-370-flow" data-target="diagram-issue-370-flow">
+@startuml
+title deprovision のdry-runとapply
+actor "利用者" as User
+participant "CLI Adapter" as CLI
+participant "Operation Service" as Service
+participant "Assessment" as Assess
+database "Operation Journal" as Journal
+participant "Bounded Removal Kernel" as Kernel
+participant "Workspace" as WS
+User -> CLI : uninstall [--apply --keep-specs]
+CLI -> Service : deprovision intent
+Service -> Assess : 全pathをread-only評価
+Assess -> WS : ownershipとidentityを観測
+WS --> Assess : dispositions・blockers
+alt dry-run
+  Assess --> Service : planned diagnostic result
+  Service --> CLI : mutationなし
+else applyかつblockerなし
+  Service -> Journal : plan・authority・exact identities
+  Service -> Kernel : bounded remove actions
+  Kernel -> WS : no-followで削除
+  Kernel -> Journal : checkpoints
+  Service -> Assess : preserved surfacesを含むpostcondition
+  Service --> CLI : completedまたはrecovery_required
+else blockerあり
+  Service --> CLI : write 0 blocked
+end
+CLI --> User : textまたはJSONを一つ返す
+@enduml
+      </script>
+      <div id="diagram-issue-370-flow" class="plantuml-diagram">dry-run/apply図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-issue-370-flow"></pre></details>
+    </section>
+
+    <section>
+      <h2>JSON互換性</h2>
+      <p>内部型が変わっても、<code>uninstall --json</code>はschema version 1、stdout exactly one object、現行field semanticsを維持します。少なくとも<code>schema_version</code>、<code>target</code>、<code>mode</code>、<code>apply</code>、<code>specs_mode</code>、<code>status</code>、<code>phase</code>、<code>retry_command</code>、<code>failed_paths</code>、<code>pending_paths</code>、<code>summary</code>、<code>actions</code>、<code>guidance</code>、<code>errors</code>をcompatibility mapperで保ちます。</p>
+      <p>diagnosticはrepository-relative pathとsanitized errorに限定し、absolute path、file contents、credentialを出力しません。</p>
+    </section>
+
+    <section>
+      <h2>legacy markerと部分削除</h2>
+      <ul>
+        <li>現行<code>.uninstall-retry.json</code>はroot、original specs mode、plan digest、checkpointを証明できません。</li>
+        <li>不足情報を推測してnew journalへ自動変換せず、markerを保持してwrite前に停止します。</li>
+        <li>partial removalはexact pre-action identityとexpected absentをcheckpointし、same deprovision planだけをforward recoveryします。</li>
+        <li>deprovision journalを<code>--remove-specs</code>でresumeする要求はauthority mismatchでwrite 0です。</li>
+        <li>削除済みtreeをwhole-operation rollbackで自動復元しません。曖昧な状態はjournalを保持しmanual guidanceを返します。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>実装の進め方</h2>
+      <ol>
+        <li>現行uninstall action、dry-run/apply、preservation、partial failure、JSONをcharacterizationする。</li>
+        <li>deprovision authorityとread-only Assessmentをcommon Contractへ追加する。</li>
+        <li>exact unlink、bounded tree remove、empty-directory cleanupをdescriptor-bound kernelへ追加する。</li>
+        <li>default/keep-specs dry-runをnew ProcessResultへ切り替え、before/after byte equalityを固定する。</li>
+        <li><code>--apply --keep-specs</code>をjournaled executionへ切り替え、spec history postconditionを検証する。</li>
+        <li>legacy markerをfail closedで扱う。</li>
+        <li>deprovision対象の旧grammar・plan/apply/postverify・writer・CLI recursive helperを削除する。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>受入・検証の要点</h2>
+      <ul>
+        <li>dry-runはtree、marker、journal、stagingを変更しない。</li>
+        <li>applyはowned assetsを除去し、spec history・unknown・outside sentinelをbyte-identicalに保持する。</li>
+        <li>symlinked boundary、hardlink、parent/root replacementでexternal deletion 0。</li>
+        <li>partial failureはjournalを保持しsame-plan retryで収束、cross-authority resumeは拒否。</li>
+        <li>JSON golden、one-object、sanitization、init/update regressionがgreen。</li>
+        <li><code>test_managed_distribution.py</code>、uninstall関連<code>test_init_update.py</code>、<code>make lint</code>を通す。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>対象外と次のhandoff</h2>
+      <p><code>--remove-specs</code> purge、new command/flag/schema、history migration、generic deletion library、Windows、既存Full Regression修復は対象外です。Issue 371へ、same kernel上で別purge authorityを安全に追加できる状態を渡します。</p>
+      <p class="authority-note">図はブラウザ内の<code>@plantuml/core@1.2026.6</code>で描画し、外部rendererへsourceを送りません。初回描画にはインターネット接続が必要です。</p>
+    </section>
+  </main>
+
+  <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
+    <section class="diagram-zoom-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagram-zoom-title">
+      <h2 id="diagram-zoom-title" class="visually-hidden">図を拡大表示</h2>
+      <header class="diagram-zoom-header">
+        <div class="diagram-zoom-controls" aria-label="図の拡大率を操作する">
+          <button type="button" id="diagram-zoom-out" aria-label="図を縮小する" title="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-reset" aria-label="100%に戻す" title="100%に戻す">
+            <span id="diagram-zoom-level" class="diagram-zoom-level" aria-live="polite">100%</span>
+          </button>
+          <button type="button" id="diagram-zoom-in" aria-label="図を拡大する" title="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-close" aria-label="拡大表示を閉じる" title="閉じる">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+      </header>
+      <div id="diagram-zoom-viewport" class="diagram-zoom-viewport" tabindex="0">
+        <div id="diagram-zoom-canvas" class="diagram-zoom-canvas"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const sources = [...document.querySelectorAll(".plantuml-source")];
+      const status = document.getElementById("plantuml-status");
+
+      window.__plantumlDocumentState = {
+        expected: sources.length,
+        rendered: 0,
+        errors: [],
+        completed: false
+      };
+
+      window.__plantumlFail = message => {
+        const state = window.__plantumlDocumentState;
+        state.errors.push(String(message));
+        state.completed = true;
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図の描画に失敗しました: ${message}`;
+      };
+
+      for (const output of document.querySelectorAll("[data-source-copy]")) {
+        const source = document.getElementById(output.dataset.sourceCopy);
+        if (source) output.textContent = source.textContent.trim();
+      }
+
+      document.documentElement.dataset.plantumlStatus = "running";
+    })();
+  </script>
+
+  <script
+    src="https://unpkg.com/@plantuml/core@1.2026.6/viz-global.js"
+    onerror="window.__plantumlFail('viz-global.jsを読み込めませんでした。')"></script>
+
+  <script type="module">
+    const state = window.__plantumlDocumentState;
+    const status = document.getElementById("plantuml-status");
+    const zoomDialog = document.getElementById("diagram-zoom-dialog");
+    const zoomTitle = document.getElementById("diagram-zoom-title");
+    const zoomViewport = document.getElementById("diagram-zoom-viewport");
+    const zoomCanvas = document.getElementById("diagram-zoom-canvas");
+    const zoomLevelOutput = document.getElementById("diagram-zoom-level");
+    const zoomOutButton = document.getElementById("diagram-zoom-out");
+    const zoomInButton = document.getElementById("diagram-zoom-in");
+    const zoomResetButton = document.getElementById("diagram-zoom-reset");
+    const zoomCloseButton = document.getElementById("diagram-zoom-close");
+    let zoomLevel = 1;
+    let zoomBaseWidth = 0;
+    let zoomedSvg = null;
+    let zoomReturnFocus = null;
+
+    const diagramTitle = sourceElement => {
+      const titleLine = sourceElement.textContent.match(/^\s*title\s+(.+)$/m);
+      return titleLine?.[1]?.trim() || "図を拡大表示";
+    };
+
+    const applyDiagramZoom = () => {
+      if (!zoomedSvg || zoomBaseWidth <= 0) return;
+      zoomedSvg.style.width = `${Math.round(zoomBaseWidth * zoomLevel)}px`;
+      zoomedSvg.style.height = "auto";
+      zoomLevelOutput.value = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelOutput.textContent = zoomLevelOutput.value;
+      zoomResetButton.setAttribute("aria-label", `100%に戻す（現在${zoomLevelOutput.value}）`);
+      zoomOutButton.disabled = zoomLevel <= 0.5;
+      zoomInButton.disabled = zoomLevel >= 3;
+    };
+
+    const setDiagramZoom = nextLevel => {
+      zoomLevel = Math.min(3, Math.max(0.5, nextLevel));
+      applyDiagramZoom();
+    };
+
+    const closeDiagramZoom = () => {
+      if (zoomDialog.hidden) return;
+      zoomDialog.hidden = true;
+      document.body.classList.remove("diagram-zoom-open");
+      zoomCanvas.replaceChildren();
+      zoomedSvg = null;
+      zoomBaseWidth = 0;
+      zoomReturnFocus?.focus();
+      zoomReturnFocus = null;
+    };
+
+    const openDiagramZoom = (target, sourceElement) => {
+      const sourceSvg = target.querySelector("svg");
+      if (!sourceSvg) return;
+
+      zoomReturnFocus = target;
+      zoomedSvg = sourceSvg.cloneNode(true);
+      zoomedSvg.removeAttribute("height");
+      zoomedSvg.style.maxWidth = "none";
+      const viewBoxWidth = zoomedSvg.viewBox?.baseVal?.width || 0;
+      const declaredWidth = Number.parseFloat(zoomedSvg.getAttribute("width")) || 0;
+      zoomBaseWidth = Math.max(viewBoxWidth, declaredWidth, sourceSvg.getBoundingClientRect().width);
+      zoomLevel = 1;
+      zoomTitle.textContent = diagramTitle(sourceElement);
+      zoomCanvas.replaceChildren(zoomedSvg);
+      zoomDialog.hidden = false;
+      document.body.classList.add("diagram-zoom-open");
+      zoomViewport.scrollTo({ top: 0, left: 0 });
+      applyDiagramZoom();
+      zoomCloseButton.focus();
+    };
+
+    const prepareDiagramZoom = (target, sourceElement) => {
+      target.dataset.zoomReady = "true";
+      target.tabIndex = 0;
+      target.setAttribute("role", "button");
+      target.setAttribute("aria-label", `${diagramTitle(sourceElement)}を拡大表示する`);
+      const hint = document.createElement("span");
+      hint.className = "diagram-zoom-hint";
+      hint.textContent = "クリックして拡大";
+      hint.setAttribute("aria-hidden", "true");
+      target.append(hint);
+      target.addEventListener("click", () => openDiagramZoom(target, sourceElement));
+      target.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDiagramZoom(target, sourceElement);
+        }
+      });
+    };
+
+    const focusableZoomElements = () => [...zoomDialog.querySelectorAll(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => !element.hidden && element.getClientRects().length > 0);
+
+    zoomOutButton.addEventListener("click", () => setDiagramZoom(zoomLevel - 0.25));
+    zoomInButton.addEventListener("click", () => setDiagramZoom(zoomLevel + 0.25));
+    zoomResetButton.addEventListener("click", () => setDiagramZoom(1));
+    zoomCloseButton.addEventListener("click", closeDiagramZoom);
+    zoomDialog.addEventListener("click", event => {
+      if (event.target === zoomDialog) closeDiagramZoom();
+    });
+    document.addEventListener("keydown", event => {
+      if (zoomDialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDiagramZoom();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableZoomElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    try {
+      const { renderToString } = await import(
+        "https://unpkg.com/@plantuml/core@1.2026.6/plantuml.js"
+      );
+
+      const renderDiagram = lines => new Promise((resolve, reject) => {
+        renderToString(
+          lines,
+          svg => resolve(svg),
+          message => reject(new Error(message))
+        );
+      });
+
+      const normalizeDiagnosticText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+      const inspectRenderedSvg = svgMarkup => {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const root = parsed.documentElement;
+        if (!root || root.localName.toLowerCase() === "parsererror" || parsed.querySelector("parsererror")) {
+          throw new Error("PlantUMLが不正なSVGを返しました。");
+        }
+        if (root.localName.toLowerCase() !== "svg") {
+          throw new Error("PlantUMLの描画結果がSVGではありません。");
+        }
+
+        const fullText = normalizeDiagnosticText(root.textContent);
+        const diagramType = root.getAttribute("data-diagram-type")?.toLowerCase() ?? "";
+        const hasKnownErrorText = /Syntax Error\?|An error has occurred/i.test(fullText);
+        const hasDiagnosticStructure = /PlantUML version\b/i.test(fullText)
+          && /\[From [^\]]*\(line \d+\)\s*\]/i.test(fullText)
+          && /@startuml/i.test(fullText);
+
+        if (diagramType === "error" || hasKnownErrorText || hasDiagnosticStructure) {
+          const diagnosticLines = [...root.querySelectorAll("text")]
+            .filter(element => {
+              const presentation = [
+                element.getAttribute("fill"),
+                element.getAttribute("style"),
+                element.getAttribute("text-decoration")
+              ].filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, "");
+              return /(?:fill:)?(?:#ff0000|#f00|red|rgb\(255,0,0\))/.test(presentation)
+                || presentation.includes("wavy");
+            })
+            .map(element => normalizeDiagnosticText(element.textContent))
+            .filter(Boolean);
+          const reason = [...new Set(diagnosticLines)].join(" / ").slice(0, 500)
+            || (hasKnownErrorText
+              ? fullText.match(/Syntax Error\?|An error has occurred/i)?.[0]
+              : "PlantUMLの診断画面が返されました。");
+          throw new Error(`PlantUMLの診断SVGが検出されました: ${reason}`);
+        }
+
+        return root;
+      };
+
+      for (const sourceElement of document.querySelectorAll(".plantuml-source")) {
+        const target = document.getElementById(sourceElement.dataset.target);
+        if (!target) {
+          state.errors.push(`${sourceElement.id}: 描画先がありません。`);
+          continue;
+        }
+
+        try {
+          const lines = sourceElement.textContent.trim().split(/\r?\n/);
+          const svgMarkup = await renderDiagram(lines);
+          const svg = inspectRenderedSvg(svgMarkup);
+          target.replaceChildren(document.importNode(svg, true));
+          prepareDiagramZoom(target, sourceElement);
+          target.dataset.plantumlStatus = "success";
+          state.rendered += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          state.errors.push(`${sourceElement.id}: ${message}`);
+          target.dataset.plantumlStatus = "error";
+          target.textContent = `この図の描画に失敗しました: ${message}`;
+        }
+      }
+
+      state.completed = true;
+      if (state.rendered === state.expected && state.errors.length === 0) {
+        document.documentElement.dataset.plantumlStatus = "success";
+        status.textContent = `図を${state.rendered}件すべて描画できました。`;
+      } else {
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図を${state.rendered}件描画し、${state.errors.length}件のエラーが発生しました。`;
+      }
+    } catch (error) {
+      window.__plantumlFail(error instanceof Error ? error.message : String(error));
+    }
+  </script>
+</body>
+</html>
