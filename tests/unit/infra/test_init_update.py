@@ -8040,7 +8040,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
             assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "requirement.md")
 
-    def test_update_rejects_workbench_symlink_from_persisted_manifest_and_active_entrypoint(self) -> None:
+    def test_update_blocks_workbench_symlink_from_persisted_manifest_and_active_entrypoint(self) -> None:
         import spec_dock.cli as cli
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -8109,21 +8109,16 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 )
                 is None
             )
-            assert main(["update", str(target)]) == 0
+            original_target = issue_link.readlink()
+            original_context_pack = (active_dir / "context-pack.md").read_bytes()
 
-            placeholder = specdock_dir / "system" / "active-none" / "issue"
-            resolved = cli._resolve_existing_active_entrypoint(
-                specdock_dir,
-                active_dir=active_dir,
-                layer="issue",
-            )
-            assert resolved == (placeholder.resolve(), None)
-            assert self._read_active_pointer_text(target, "issue", "README.md") == (
-                placeholder / "README.md"
-            ).read_text(encoding="utf-8")
-            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            assert "- issue: (none)" in context_pack_text
-            assert "iss-local-00999" not in context_pack_text
+            assert main(["update", str(target)]) == 1
+
+            assert issue_link.is_symlink()
+            assert issue_link.readlink() == original_target
+            assert (real_issue / "requirement.md").read_text(encoding="utf-8") == "scratch requirement\n"
+            assert (active_dir / "context-pack.md").read_bytes() == original_context_pack
+            assert not (specdock_dir / ".distribution-journal.json").exists()
 
     def test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -8887,3 +8882,64 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert self._read_active_pointer_text(target, "initiative", "README.md") == placeholder.read_text(
                 encoding="utf-8"
             )
+
+    @pytest.mark.parametrize("command", [["update"], ["init", "--force"]])
+    def test_recognized_reconciliation_preserves_external_active_symlink(self, command: list[str]) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            external = Path(tmp) / "external-issue"
+            target.mkdir()
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            external.mkdir()
+            sentinel = external / "sentinel.txt"
+            sentinel.write_text("user-owned\n", encoding="utf-8")
+
+            specdock_dir = target / "spec-dock"
+            pointer = specdock_dir / "active" / "issue"
+            pointer.unlink(missing_ok=True)
+            pointer.symlink_to(external, target_is_directory=True)
+            original_target = pointer.readlink()
+            original_version = (specdock_dir / "spec-dock.version").read_bytes()
+
+            assert main([*command, str(target)]) == 1
+
+            assert pointer.is_symlink()
+            assert pointer.readlink() == original_target
+            assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+            assert (specdock_dir / "spec-dock.version").read_bytes() == original_version
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
+    def test_update_blocks_active_pointer_rebind_after_generated_asset_capture(self, monkeypatch) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            external = Path(tmp) / "external-issue"
+            target.mkdir()
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            external.mkdir()
+            sentinel = external / "sentinel.txt"
+            sentinel.write_text("user-owned\n", encoding="utf-8")
+
+            specdock_dir = target / "spec-dock"
+            pointer = specdock_dir / "active" / "issue"
+            original_assets = cli._active_fallback_distribution_assets
+
+            def capture_then_rebind(current_specdock_dir: Path):
+                assets = original_assets(current_specdock_dir)
+                pointer.unlink()
+                pointer.symlink_to(external, target_is_directory=True)
+                return assets
+
+            monkeypatch.setattr(cli, "_active_fallback_distribution_assets", capture_then_rebind)
+
+            assert main(["update", str(target)]) == 1
+
+            assert pointer.is_symlink()
+            assert pointer.resolve() == external.resolve()
+            assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+            assert not (specdock_dir / ".distribution-journal.json").exists()

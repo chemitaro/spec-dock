@@ -1056,7 +1056,12 @@ def _render_default_context_pack() -> str:
     return _render_context_pack(initiative_id=None, epic_id=None, issue_id=None)
 
 
-def _generated_regular_distribution_asset(path: str, content: bytes) -> DistributionAsset:
+def _generated_regular_distribution_asset(
+    path: str,
+    content: bytes,
+    *,
+    refreshable_existing_identities: tuple[DistributionIdentity, ...] | None = None,
+) -> DistributionAsset:
     return DistributionAsset(
         path=path,
         identity=DistributionIdentity(
@@ -1065,18 +1070,95 @@ def _generated_regular_distribution_asset(path: str, content: bytes) -> Distribu
             mode=0o644,
         ),
         generated_content=content,
+        refreshable_existing_identities=refreshable_existing_identities,
     )
 
 
-def _generated_symlink_distribution_asset(path: str, target: str) -> DistributionAsset:
+def _generated_symlink_distribution_asset(
+    path: str,
+    target: str,
+    *,
+    refreshable_existing_identities: tuple[DistributionIdentity, ...] | None = None,
+) -> DistributionAsset:
     return DistributionAsset(
         path=path,
         identity=DistributionIdentity(kind="symlink", target=target),
+        refreshable_existing_identities=refreshable_existing_identities,
     )
 
 
 def _active_symlink_creation_supported() -> bool:
     return hasattr(os, "symlink") and os.symlink in os.supports_dir_fd
+
+
+def _active_fallback_existing_state_is_refreshable(
+    specdock_dir: Path,
+    *,
+    active_dir: Path,
+    layer: str,
+    existing: tuple[Path, str | None] | None,
+) -> bool:
+    """Return whether an existing fallback pointer has managed-state evidence."""
+
+    def points_within_managed_active_targets(pointer: Path, raw_target: str) -> bool:
+        candidate = Path(raw_target)
+        if not candidate.is_absolute():
+            candidate = pointer.parent / candidate
+        try:
+            relative = candidate.resolve().relative_to(specdock_dir.parent.resolve())
+        except (OSError, ValueError):
+            return False
+        parts = relative.parts
+        return parts[:2] == ("spec-dock", "initiatives") or parts[:3] == (
+            "spec-dock",
+            "system",
+            "active-none",
+        )
+
+    link = active_dir / layer
+    pathfile = active_dir / f"{layer}.path"
+    if link.is_symlink():
+        try:
+            return points_within_managed_active_targets(link, link.readlink().as_posix())
+        except OSError:
+            return False
+    if link.exists():
+        return existing is not None and link.is_file()
+    if pathfile.is_file() and not pathfile.is_symlink():
+        try:
+            return points_within_managed_active_targets(pathfile, pathfile.read_text(encoding="utf-8").strip())
+        except OSError:
+            return False
+    return not pathfile.exists() and not pathfile.is_symlink()
+
+
+def _active_fallback_refresh_identities(path: Path, *, allowed: bool) -> tuple[DistributionIdentity, ...]:
+    """Bind generated refresh authority to the exact observed pointer identity."""
+
+    if not allowed or (not path.exists() and not path.is_symlink()):
+        return ()
+    if path.is_symlink():
+        try:
+            return (DistributionIdentity(kind="symlink", target=path.readlink().as_posix()),)
+        except OSError:
+            return ()
+    if not path.is_file():
+        return ()
+    try:
+        before = path.stat(follow_symlinks=False)
+        content = path.read_bytes()
+        after = path.stat(follow_symlinks=False)
+    except OSError:
+        return ()
+    if before != after or after.st_nlink != 1:
+        return ()
+    return (
+        DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(content).hexdigest(),
+            mode=stat.S_IMODE(after.st_mode),
+        ),
+    )
 
 
 def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[DistributionAsset, ...]:
@@ -1098,6 +1180,12 @@ def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[Distributi
             )
         except RuntimeError:
             existing = None
+        allow_existing_refresh = _active_fallback_existing_state_is_refreshable(
+            specdock_dir,
+            active_dir=active_dir,
+            layer=layer,
+            existing=existing,
+        )
         if existing is not None and existing[1] is not None:
             desired_target, desired_id = existing
         else:
@@ -1131,6 +1219,10 @@ def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[Distributi
                 _generated_symlink_distribution_asset(
                     f"spec-dock/active/{layer}",
                     current_link_target,
+                    refreshable_existing_identities=_active_fallback_refresh_identities(
+                        link,
+                        allowed=allow_existing_refresh,
+                    ),
                 )
             )
             continue
@@ -1149,6 +1241,10 @@ def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[Distributi
                         _generated_regular_distribution_asset(
                             f"spec-dock/active/{layer}.path",
                             content,
+                            refreshable_existing_identities=_active_fallback_refresh_identities(
+                                pathfile,
+                                allowed=allow_existing_refresh,
+                            ),
                         )
                     )
                     continue
@@ -1158,6 +1254,10 @@ def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[Distributi
                 _generated_regular_distribution_asset(
                     f"spec-dock/active/{layer}.path",
                     (os.path.relpath(desired_target, start=active_dir) + "\n").encode("utf-8"),
+                    refreshable_existing_identities=_active_fallback_refresh_identities(
+                        pathfile,
+                        allowed=allow_existing_refresh,
+                    ),
                 )
             )
             continue
@@ -1166,6 +1266,10 @@ def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[Distributi
             _generated_symlink_distribution_asset(
                 f"spec-dock/active/{layer}",
                 os.path.relpath(desired_target, start=active_dir),
+                refreshable_existing_identities=_active_fallback_refresh_identities(
+                    link,
+                    allowed=allow_existing_refresh,
+                ),
             )
         )
 

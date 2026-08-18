@@ -90,6 +90,7 @@ class DistributionAsset:
     source_path: str | None = None
     source_snapshot: DistributionSourceSnapshot | None = None
     generated_content: bytes | None = None
+    refreshable_existing_identities: tuple[DistributionIdentity, ...] | None = None
 
 
 DistributionOperation = Literal["fresh", "update", "init-force", "uninstall"]
@@ -1649,6 +1650,7 @@ def _classify_current_target(
     operation: DistributionOperation,
     manifest: DistributionManifest,
     generated_path: bool = False,
+    refreshable_existing_identities: tuple[DistributionIdentity, ...] | None = None,
     observation: _TargetObservation | None = None,
 ) -> DistributionAction:
     if observation is None:
@@ -1676,9 +1678,12 @@ def _classify_current_target(
     actual = observation.identity
     if actual is None:
         return _blocked_action(path, operation, "unsafe-target-path")
+    generated_refresh_allowed = generated_path and (
+        refreshable_existing_identities is None or actual in refreshable_existing_identities
+    )
     if actual.kind != expected.kind:
         if (
-            generated_path
+            generated_refresh_allowed
             and operation in {"update", "init-force"}
             and {actual.kind, expected.kind} <= {"regular", "symlink"}
         ):
@@ -1687,7 +1692,7 @@ def _classify_current_target(
             return DistributionAction(path, operation, "upgrade", "current", "generated-state-refresh")
         return _blocked_action(path, operation, "exact-path-symlink" if actual.kind == "symlink" else "exact-path-type")
     if actual.kind == "symlink" and actual.target != expected.target:
-        if generated_path and operation in {"update", "init-force"}:
+        if generated_refresh_allowed and operation in {"update", "init-force"}:
             if observation.link_count is not None and observation.link_count > 1:
                 return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="current")
             return DistributionAction(path, operation, "upgrade", "current", "generated-state-refresh")
@@ -1720,7 +1725,7 @@ def _classify_current_target(
             )
         return _blocked_action(path, operation, "unknown-current-collision", action="preserve")
     if actual.kind == "regular" and actual.sha256 != expected.sha256:
-        if generated_path and operation in {"update", "init-force"}:
+        if generated_refresh_allowed and operation in {"update", "init-force"}:
             if observation.link_count is not None and observation.link_count > 1:
                 return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="current")
             return DistributionAction(path, operation, "upgrade", "current", "generated-state-refresh")
@@ -1849,7 +1854,7 @@ def _classify_target(
     scaffold_assets: tuple[DistributionAsset, ...] = (),
 ) -> tuple[tuple[DistributionAction, ...], tuple[tuple[str, DistributionTargetSnapshot], ...]]:
     specs = _target_identity_specs(current_assets, scaffold_assets)
-    generated_paths = frozenset(asset.path for asset in scaffold_assets if asset.source_path is None)
+    generated_assets = {asset.path: asset for asset in scaffold_assets if asset.source_path is None}
     actions: list[DistributionAction] = []
     observations: dict[str, _TargetObservation] = {}
     for path, expected in sorted(specs.items()):
@@ -1862,7 +1867,10 @@ def _classify_target(
                 expected=expected,
                 operation=operation,
                 manifest=manifest,
-                generated_path=path in generated_paths,
+                generated_path=path in generated_assets,
+                refreshable_existing_identities=(
+                    generated_assets[path].refreshable_existing_identities if path in generated_assets else None
+                ),
                 observation=observation,
             )
         )
