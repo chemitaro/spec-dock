@@ -15,6 +15,8 @@ from spec_dock.managed_distribution import (
     DistributionAction,
     DistributionAdmissionError,
     DistributionApplyError,
+    DistributionAsset,
+    DistributionIdentity,
     DistributionManifestError,
     DistributionPlan,
     DistributionPlanError,
@@ -323,6 +325,28 @@ def test_i368_executable_plan_digest_is_stable_for_equivalent_assessment(tmp_pat
     assert first.root_identity == second.root_identity
 
 
+def test_i368_generated_asset_path_must_be_canonical_and_repository_relative(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    content = b"outside\n"
+    generated = DistributionAsset(
+        path="../outside.txt",
+        identity=DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(content).hexdigest(),
+            mode=0o644,
+        ),
+        generated_content=content,
+    )
+
+    with pytest.raises(DistributionPlanError, match="repository-relative"):
+        build_distribution_plan(
+            install_root,
+            manifest_path=manifest_path,
+            generated_assets=(generated,),
+        )
+
+
 def test_i368_journal_prepare_records_bound_actions_before_target_mutation(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -451,6 +475,96 @@ def test_i368_journal_resume_rejects_binding_mismatch_without_rewrite(
     assert store.path.read_bytes() == before
 
 
+def test_i368_journal_resume_rejects_recomputed_digest_for_changed_action(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    changed = list(journal.actions)
+    changed[0] = managed_distribution.replace(changed[0], action="prune")
+    tampered = managed_distribution.replace(journal, actions=tuple(changed))
+    tampered = managed_distribution.replace(
+        tampered,
+        plan_digest=managed_distribution._journal_digest(tampered),
+    )
+    store.write(tampered)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-plan-mismatch"
+
+
+def test_i368_journal_resume_rejects_existing_parent_rebind(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    parent = target_root / ".github" / "workflows"
+    parent.mkdir(parents=True)
+    (target_root / "spec-dock").mkdir()
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    OperationJournalStore(target_root).prepare(
+        build_executable_mutation_plan(assessment),
+        package_version="1.2.3",
+    )
+    parent.rename(target_root / ".github" / "workflows-old")
+    parent.mkdir()
+    sentinel = parent / "sentinel.txt"
+    sentinel.write_text("replacement\n", encoding="utf-8")
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-precondition-mismatch"
+    assert sentinel.read_text(encoding="utf-8") == "replacement\n"
+    assert not (parent / "ci.yml").exists()
+
+
 def test_i368_recognized_service_executes_and_finalizes_journal(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -471,6 +585,45 @@ def test_i368_recognized_service_executes_and_finalizes_journal(tmp_path: Path) 
     assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"desired\n"
     assert (target_root / "spec-dock" / ".gitignore").read_text(encoding="utf-8") == ".agent/\n"
     assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i368_recognized_noop_does_not_prepare_a_journal(tmp_path: Path, monkeypatch) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+    assert first.status == "completed", first.reason
+    prepared = False
+    original_prepare = OperationJournalStore.prepare
+
+    def record_prepare(*args, **kwargs):
+        nonlocal prepared
+        prepared = True
+        return original_prepare(*args, **kwargs)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", record_prepare)
+
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert not prepared
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
@@ -503,15 +656,35 @@ def test_i368_recognized_service_upgrades_a_recognized_workspace_version(tmp_pat
     assert (specdock_dir / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
 
 
-def test_i368_generated_state_failure_retains_journal_and_resumes(tmp_path: Path) -> None:
+def test_i368_generated_state_asset_failure_retains_journal_and_resumes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())
     scaffold_root = _minimal_scaffold_root(tmp_path)
     target_root = tmp_path / "consumer"
     (target_root / "spec-dock").mkdir(parents=True)
 
-    def fail_generated_state() -> None:
-        raise OSError("injected generated-state failure")
+    content = b"generated context\n"
+    generated_asset = DistributionAsset(
+        path="spec-dock/active/context-pack.md",
+        identity=DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(content).hexdigest(),
+            mode=0o644,
+        ),
+        generated_content=content,
+    )
+    original_apply = managed_distribution._apply_distribution_action
+
+    def fail_generated_action(*args, **kwargs):
+        action = kwargs["action"]
+        if action.path == generated_asset.path:
+            raise DistributionApplyError("injected generated-state failure")
+        return original_apply(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", fail_generated_action)
 
     first = execute_recognized_distribution(
         install_root,
@@ -520,11 +693,15 @@ def test_i368_generated_state_failure_retains_journal_and_resumes(tmp_path: Path
         target_root=target_root,
         intent="update",
         package_version="1.2.3",
-        generated_state_reconciler=fail_generated_state,
+        generated_assets=(generated_asset,),
     )
     journal_path = target_root / "spec-dock" / ".distribution-journal.json"
     assert first.status == "recovery_required"
     assert journal_path.is_file()
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert generated_asset.path in {action["path"] for action in journal["actions"]}
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", original_apply)
 
     second = execute_recognized_distribution(
         install_root,
@@ -533,11 +710,12 @@ def test_i368_generated_state_failure_retains_journal_and_resumes(tmp_path: Path
         target_root=target_root,
         intent="update",
         package_version="1.2.3",
-        generated_state_reconciler=lambda: None,
+        generated_assets=(generated_asset,),
     )
 
     assert second.status == "completed", second.reason
     assert not journal_path.exists()
+    assert (target_root / generated_asset.path).read_bytes() == content
 
 
 @pytest.mark.parametrize(

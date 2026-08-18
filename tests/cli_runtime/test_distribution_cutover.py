@@ -1228,6 +1228,7 @@ def test_i368_journal_removal_failure_is_forward_recoverable(
     operation: str,
 ) -> None:
     assert main(["init", str(tmp_path)]) == 0
+    (tmp_path / "spec-dock/docs/README.md").unlink()
     original_remove = managed_distribution.OperationJournalStore.remove_completed
 
     def fail_journal_removal(*_args, **_kwargs):
@@ -1283,6 +1284,7 @@ def test_s60_distribution_retry_command_runs_for_special_explicit_target(
     monkeypatch.chdir(parent)
     assert main(["init", str(target)]) == 0
     capsys.readouterr()
+    (target / "spec-dock/docs/README.md").unlink()
 
     original_apply = managed_distribution.apply_distribution_plan
 
@@ -1432,6 +1434,7 @@ def test_s60_root_rebind_during_marker_publication(
     capsys,
 ) -> None:
     assert main(["init", str(tmp_path)]) == 0
+    (tmp_path / "spec-dock/docs/README.md").unlink()
     displaced = tmp_path.with_name(f"{tmp_path.name}-marker-displaced")
     original_rename = managed_distribution._rename_distribution_no_replace
     switched = False
@@ -1513,6 +1516,7 @@ def test_s60_distribution_apply_fault_keeps_marker_and_old_version(
     capsys,
 ) -> None:
     assert main(["init", str(tmp_path)]) == 0
+    (tmp_path / "spec-dock/docs/README.md").unlink()
     version = tmp_path / "spec-dock/spec-dock.version"
     before_version = version.read_bytes()
     journal = tmp_path / "spec-dock/.distribution-journal.json"
@@ -1807,12 +1811,15 @@ def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnos
     assert main(["init", str(tmp_path)]) == 0
     version = tmp_path / "spec-dock/spec-dock.version"
     before_version = version.read_bytes()
-    original = cli._ensure_active_fallback_entrypoints
+    (tmp_path / "spec-dock/active/context-pack.md").unlink()
+    original = managed_distribution._apply_distribution_action
 
-    def fail_after_generated_state(*args, **kwargs):
-        raise RuntimeError("credential=secret /private/outside/source.txt")
+    def fail_after_generated_state(plan, target_root, action, *args, **kwargs):
+        if action.path == "spec-dock/active/context-pack.md":
+            raise RuntimeError("credential=secret /private/outside/source.txt")
+        return original(plan, target_root, action, *args, **kwargs)
 
-    monkeypatch.setattr(cli, "_ensure_active_fallback_entrypoints", fail_after_generated_state)
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", fail_after_generated_state)
 
     assert main(["update", str(tmp_path)]) == 1
 
@@ -1826,7 +1833,7 @@ def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnos
     assert payload["status"] == "executing"
     assert version.read_bytes() == before_version
 
-    monkeypatch.setattr(cli, "_ensure_active_fallback_entrypoints", original)
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", original)
     assert main(["update", str(tmp_path)]) == 0
     assert not journal.exists()
 
@@ -2014,6 +2021,7 @@ def test_s70_uninstall_cleanup_rechecks_empty_directory_identity_before_rmdir(
 
 def test_s60_post_verify_failure_keeps_marker_until_forward_retry(tmp_path: Path, monkeypatch, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
+    (tmp_path / "spec-dock/docs/README.md").unlink()
     version = tmp_path / "spec-dock/spec-dock.version"
     before_version = version.read_bytes()
     original = managed_distribution.OperationJournalStore.mark_verified
