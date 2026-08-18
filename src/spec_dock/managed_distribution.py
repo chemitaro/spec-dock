@@ -2642,14 +2642,94 @@ class OperationJournalStore:
             current = self._read(journal.root_identity)
             if current != journal:
                 raise DistributionApplyError("journal-precondition-mismatch")
-            try:
-                os.unlink(name, dir_fd=parent_fd)
-                os.fsync(parent_fd)
-            except OSError as exc:
-                raise DistributionApplyError(failure_reason) from exc
+            self._quarantine_and_remove(
+                parent_fd,
+                name,
+                info,
+                identity_error="journal-precondition-mismatch",
+                failure_reason=failure_reason,
+            )
         finally:
             os.close(parent_fd)
             os.close(root_fd)
+
+    def _quarantine_and_remove(
+        self,
+        parent_fd: int,
+        name: str,
+        expected: os.stat_result,
+        *,
+        identity_error: str,
+        failure_reason: str,
+    ) -> None:
+        """Move a bound regular file aside before deleting its exact identity."""
+
+        token = hashlib.sha256(f"{expected.st_dev}:{expected.st_ino}:{expected.st_ctime_ns}".encode()).hexdigest()[:24]
+        quarantine = f".{name}.{token}.remove"
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise DistributionApplyError("platform lacks required no-follow file support")
+        try:
+            held_fd = os.open(
+                name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise DistributionApplyError(identity_error) from exc
+        try:
+            try:
+                held_before = os.fstat(held_fd)
+                if (
+                    held_before.st_dev,
+                    held_before.st_ino,
+                    held_before.st_ctime_ns,
+                    held_before.st_mode,
+                    held_before.st_nlink,
+                ) != (
+                    expected.st_dev,
+                    expected.st_ino,
+                    expected.st_ctime_ns,
+                    expected.st_mode,
+                    expected.st_nlink,
+                ):
+                    raise DistributionApplyError(identity_error)
+                _rename_distribution_no_replace(parent_fd, name, parent_fd, quarantine)
+            except OSError as exc:
+                raise DistributionApplyError(failure_reason) from exc
+            try:
+                moved = os.stat(quarantine, dir_fd=parent_fd, follow_symlinks=False)
+                held_after = os.fstat(held_fd)
+            except OSError as exc:
+                raise DistributionApplyError(failure_reason) from exc
+            moved_identity = (
+                moved.st_dev,
+                moved.st_ino,
+                moved.st_ctime_ns,
+                moved.st_mode,
+                moved.st_nlink,
+            )
+            held_identity = (
+                held_after.st_dev,
+                held_after.st_ino,
+                held_after.st_ctime_ns,
+                held_after.st_mode,
+                held_after.st_nlink,
+            )
+            if moved_identity != held_identity:
+                try:
+                    _rename_distribution_no_replace(parent_fd, quarantine, parent_fd, name)
+                    os.fsync(parent_fd)
+                except OSError as exc:
+                    raise DistributionApplyError(failure_reason) from exc
+                raise DistributionApplyError(identity_error)
+            try:
+                _remove_distribution_stage_if_owned(parent_fd, quarantine, moved, strict=True)
+                os.fsync(parent_fd)
+            except DistributionApplyError as exc:
+                raise DistributionApplyError(failure_reason) from exc
+        finally:
+            os.close(held_fd)
 
     def remove_legacy_marker(self, marker: DistributionRetryMarker) -> None:
         if marker.target_root != _root_identity_for_assessment(self.target_root):
@@ -2666,11 +2746,13 @@ class OperationJournalStore:
                 raise DistributionApplyError("legacy-marker-unconvertible") from exc
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 raise DistributionApplyError("legacy-marker-unconvertible")
-            try:
-                os.unlink(name, dir_fd=parent_fd)
-                os.fsync(parent_fd)
-            except OSError as exc:
-                raise DistributionApplyError("legacy-marker-unconvertible") from exc
+            self._quarantine_and_remove(
+                parent_fd,
+                name,
+                info,
+                identity_error="legacy-marker-unconvertible",
+                failure_reason="legacy-marker-unconvertible",
+            )
         finally:
             os.close(parent_fd)
             os.close(root_fd)
