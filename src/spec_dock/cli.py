@@ -39,10 +39,12 @@ from spec_dock.managed_distribution import (
     DistributionOperation,
     DistributionRootIdentity,
     DistributionStageOwnership,
+    RecognizedDistributionIntent,
     _rename_distribution_no_replace,
     admit_distribution_operation,
     apply_distribution_plan,
     build_distribution_plan,
+    execute_recognized_distribution,
 )
 
 if TYPE_CHECKING:
@@ -2450,7 +2452,7 @@ def _install_fresh_distribution(target_root: Path) -> None:
         _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
 
 
-def _install_recognized_distribution_unlocked(
+def _install_legacy_distribution_unlocked(
     target_root: Path,
     *,
     operation: DistributionOperation,
@@ -2677,6 +2679,53 @@ def _install_recognized_distribution_unlocked(
                     pending_paths=pending_paths,
                 )
             raise exc
+
+
+def _install_recognized_distribution_unlocked(
+    target_root: Path,
+    *,
+    operation: DistributionOperation,
+    retry_marker: DistributionAdmission | None = None,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> None:
+    """Execute recognized intents through the unified journaled service."""
+
+    if operation == "fresh":
+        _install_legacy_distribution_unlocked(
+            target_root,
+            operation=operation,
+            retry_marker=retry_marker,
+            expected_root_identity=expected_root_identity,
+        )
+        return
+    if operation not in {"update", "init-force"}:
+        raise RuntimeError(f"unsupported recognized distribution operation: {operation}")
+    recognized_operation: RecognizedDistributionIntent = "update" if operation == "update" else "init-force"
+    if expected_root_identity is not None:
+        _assert_distribution_root_identity(target_root, expected_root_identity)
+    with _assets_dir() as assets_dir:
+        result = execute_recognized_distribution(
+            assets_dir / "install_root",
+            manifest_path=assets_dir / "managed_distribution.json",
+            scaffold_root=assets_dir / "spec_dock",
+            target_root=target_root,
+            intent=recognized_operation,
+            package_version=_tool_version(),
+            legacy_marker=retry_marker.marker if retry_marker is not None else None,
+            generated_state_reconciler=lambda: _ensure_active_fallback_entrypoints(_specdock_dir(target_root)),
+        )
+    if result.status == "blocked":
+        raise RuntimeError(f"distribution preflight blocked: {result.reason}")
+    if result.status == "recovery_required":
+        target_label = _require_retry_target_label(target_root)
+        retry = _distribution_retry_command(operation, target_label=target_label)
+        raise RuntimeError(
+            "distribution partial failure during reconciliation; "
+            "target=spec-dock/.distribution-journal.json; "
+            f"applied_paths={json.dumps(result.applied_paths, separators=(',', ':'))}; "
+            f"pending_paths={json.dumps(result.pending_paths, separators=(',', ':'))}; "
+            f"retry={retry}; reason={result.reason}"
+        )
 
 
 def _install_recognized_distribution(
