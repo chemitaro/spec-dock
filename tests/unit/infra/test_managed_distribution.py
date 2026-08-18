@@ -70,6 +70,13 @@ MANIFEST_FIELDS = {
     "obsolete_exact_files",
     "historical_shortcuts",
 }
+EXPECTED_HISTORICAL_CURRENT_IDENTITY = {
+    "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+    "kind": "regular",
+    "sha256": "7182c1156bcf3635ffd3113cdcfb1d507c819b6aba6982673c0b10166f5da40c",
+    "mode": 0o644,
+    "source": {"kind": "git-provider-source", "ref": HISTORICAL_COMMIT},
+}
 
 
 def _manifest_with(**overrides: object) -> dict[str, object]:
@@ -124,7 +131,7 @@ def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
     assert {asset.path for asset in plan.current_assets} == EXPECTED_CURRENT_PATHS
     assert plan.actions == ()
     assert plan.manifest.schema_version == 1
-    assert plan.manifest.historical_current_identities == ()
+    assert plan.manifest.historical_current_identities == (EXPECTED_HISTORICAL_CURRENT_IDENTITY,)
     obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files}
     assert len(obsolete_paths) == 81
     assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
@@ -139,12 +146,20 @@ def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
         assert asset.identity.mode == stat.S_IMODE(source.stat().st_mode)
 
 
-def test_s20_current_catalog_is_not_duplicated_in_historical_manifest() -> None:
+def test_s20_current_catalog_bytes_are_not_duplicated_in_historical_manifest() -> None:
     raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
     assert set(raw) == MANIFEST_FIELDS
     assert not any(key in raw for key in {"current", "current_assets", "current_catalog"})
-    assert raw["historical_current_identities"] == []
+    assert raw["historical_current_identities"] == [EXPECTED_HISTORICAL_CURRENT_IDENTITY]
+    current_identities = {
+        path.relative_to(INSTALL_ROOT).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in INSTALL_ROOT.rglob("*")
+        if path.is_file()
+    }
+    assert all(
+        identity["sha256"] != current_identities[identity["path"]] for identity in raw["historical_current_identities"]
+    )
     obsolete_paths = {item["path"] for item in raw["obsolete_exact_files"]}
     assert len(obsolete_paths) == 81
     assert obsolete_paths >= EXPECTED_OBSOLETE_SKILL_PATHS
@@ -160,9 +175,10 @@ def test_s20_current_catalog_is_not_duplicated_in_historical_manifest() -> None:
     assert all(item["on_unknown"] == "preserve-and-block" for item in unproven_entrypoints.values())
 
 
-def test_s55_obsolete_catalog_is_bound_to_reproducible_git_source() -> None:
+def test_s55_historical_catalog_is_bound_to_reproducible_git_source() -> None:
     raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    records = [identity for item in raw["obsolete_exact_files"] for identity in item["identities"]]
+    records = list(raw["historical_current_identities"])
+    records.extend(identity for item in raw["obsolete_exact_files"] for identity in item["identities"])
 
     assert records
     assert {identity["source"]["ref"] for identity in records} == {HISTORICAL_COMMIT}
