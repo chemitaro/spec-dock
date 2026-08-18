@@ -1803,6 +1803,42 @@ def test_s60_fresh_root_workspace_creation_stays_on_held_root(
     assert (displaced / "spec-dock").is_dir()
 
 
+def test_i368_recognized_update_stays_on_held_root_after_visible_rebind(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    assert main(["init", str(tmp_path)]) == 0
+    (tmp_path / "spec-dock/active/context-pack.md").unlink()
+    expected_root = cli._distribution_root_identity(tmp_path)
+    original_bound_root = cli._bound_distribution_root
+    displaced = tmp_path.with_name(f"{tmp_path.name}-recognized-displaced")
+    switched = False
+
+    @contextmanager
+    def rebind_after_open(target_root: Path, expected=None):
+        nonlocal switched
+        with original_bound_root(target_root, expected) as bound:
+            if not switched:
+                switched = True
+                tmp_path.rename(displaced)
+                tmp_path.mkdir()
+                (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
+            yield bound
+
+    monkeypatch.setattr(cli, "_bound_distribution_root", rebind_after_open)
+
+    with pytest.raises(RuntimeError, match="journal-root-mismatch"):
+        cli._install_recognized_distribution_unlocked(
+            tmp_path,
+            operation="update",
+            expected_root_identity=expected_root,
+        )
+
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not (tmp_path / "spec-dock").exists()
+    assert not (displaced / "spec-dock/active/context-pack.md").exists()
+
+
 def test_s60_scaffold_failure_keeps_marker_and_old_version_and_sanitizes_diagnostic(
     tmp_path: Path,
     monkeypatch,
