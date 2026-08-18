@@ -2133,10 +2133,50 @@ def _mutation_plan_digest(assessment: WorkspaceAssessment) -> str:
 def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> ExecutableMutationPlan:
     """Issue mutation authority only for a complete blocker-free assessment."""
 
+    plan = assessment.distribution_plan
+    if plan.operation != assessment.intent:
+        raise DistributionPlanError("workspace assessment intent does not match its distribution plan")
+    if assessment.contract_identity != _contract_identity(plan):
+        raise DistributionPlanError("workspace assessment contract identity does not match its distribution plan")
+    if assessment.actions != plan.actions:
+        raise DistributionPlanError("workspace assessment actions do not match its distribution plan")
+    expected_blockers = tuple(action for action in plan.actions if action.blocked)
+    if assessment.blockers != expected_blockers:
+        raise DistributionPlanError("workspace assessment blockers do not match its distribution plan")
     if assessment.blockers:
         raise DistributionPlanError("workspace assessment contains blocker dispositions")
     if not assessment.actions:
         raise DistributionPlanError("workspace assessment contains no managed actions")
+    actions_by_path = {action.path: action for action in assessment.actions}
+    snapshots = dict(plan.target_snapshots)
+    if len(actions_by_path) != len(assessment.actions) or len(snapshots) != len(plan.target_snapshots):
+        raise DistributionPlanError("workspace assessment contains duplicate managed paths")
+    if not set(actions_by_path).issubset(snapshots):
+        raise DistributionPlanError("workspace assessment is missing snapshots for managed actions")
+    current_specs = _target_identity_specs(plan.current_assets, plan.scaffold_assets)
+    obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files} - set(current_specs)
+    for action in assessment.actions:
+        try:
+            _exact_relative_path(action.path, field_name="workspace assessment action path")
+        except DistributionManifestError as exc:
+            raise DistributionPlanError("workspace assessment contains an unsafe managed path") from exc
+        if action.operation != assessment.intent:
+            raise DistributionPlanError("workspace assessment action intent mismatch")
+        if action.action == "prune":
+            if action.path not in obsolete_paths:
+                raise DistributionPlanError("workspace assessment prune is outside obsolete authority")
+        elif action.path not in current_specs:
+            raise DistributionPlanError("workspace assessment action is outside current authority")
+        snapshot = snapshots[action.path]
+        if (
+            not snapshot.root.exists
+            or snapshot.root.file_type != "directory"
+            or (snapshot.root.device, snapshot.root.inode)
+            != (assessment.root_identity.device, assessment.root_identity.inode)
+        ):
+            raise DistributionPlanError("workspace assessment root snapshot does not match its root binding")
+        _action_precondition_payload(plan, action)
+        _action_postcondition_payload(plan, action)
     return ExecutableMutationPlan(
         intent=assessment.intent,
         root_identity=assessment.root_identity,
@@ -2306,8 +2346,9 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
 class OperationJournalStore:
     """Descriptor-bound durable storage for one recognized operation journal."""
 
-    def __init__(self, target_root: Path) -> None:
+    def __init__(self, target_root: Path, *, identity_path: Path | None = None) -> None:
         self.target_root = Path(target_root)
+        self.identity_path = Path(identity_path) if identity_path is not None else self.target_root
         self.path = self.target_root / _DISTRIBUTION_JOURNAL_REL
 
     def _open_parent(self, expected_root: DistributionRootIdentity) -> tuple[int, int]:
@@ -2318,7 +2359,7 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-root-mismatch") from exc
         try:
             opened = os.fstat(root_fd)
-            visible = os.lstat(self.target_root)
+            visible = os.lstat(self.identity_path)
             if (
                 stat.S_ISLNK(visible.st_mode)
                 or not stat.S_ISDIR(visible.st_mode)
@@ -2399,7 +2440,7 @@ class OperationJournalStore:
                     raise DistributionApplyError("journal-precondition-mismatch")
                 _remove_distribution_stage_if_owned(parent_fd, stage, swapped_out, strict=True)
             os.fsync(parent_fd)
-            visible = os.lstat(self.target_root)
+            visible = os.lstat(self.identity_path)
             if (visible.st_dev, visible.st_ino) != (
                 journal.root_identity.device,
                 journal.root_identity.inode,
@@ -2575,6 +2616,20 @@ class OperationJournalStore:
     def remove_completed(self, journal: OperationJournal) -> None:
         if journal.status != "completed":
             raise DistributionApplyError("journal-precondition-mismatch")
+        self._remove_exact(journal, failure_reason="journal finalization failed")
+
+    def discard_prepared(self, journal: OperationJournal) -> None:
+        """Roll back a journal that has not acquired leases or mutation progress."""
+
+        if (
+            journal.status != "prepared"
+            or journal.staging_leases
+            or any(action.checkpoint != "pending" for action in journal.actions)
+        ):
+            raise DistributionApplyError("journal-precondition-mismatch")
+        self._remove_exact(journal, failure_reason="journal rollback failed")
+
+    def _remove_exact(self, journal: OperationJournal, *, failure_reason: str) -> None:
         root_fd, parent_fd = self._open_parent(journal.root_identity)
         try:
             name = _DISTRIBUTION_JOURNAL_REL.name
@@ -2591,7 +2646,7 @@ class OperationJournalStore:
                 os.unlink(name, dir_fd=parent_fd)
                 os.fsync(parent_fd)
             except OSError as exc:
-                raise DistributionApplyError("journal finalization failed") from exc
+                raise DistributionApplyError(failure_reason) from exc
         finally:
             os.close(parent_fd)
             os.close(root_fd)
@@ -2815,6 +2870,7 @@ def execute_recognized_distribution(
     package_version: str,
     legacy_marker: DistributionRetryMarker | None = None,
     generated_assets: tuple[DistributionAsset, ...] = (),
+    root_identity_path: Path | None = None,
 ) -> DistributionProcessResult:
     """Execute one recognized update/init-force through the journaled service."""
 
@@ -2831,7 +2887,7 @@ def execute_recognized_distribution(
         intent=intent,
         generated_assets=(version_asset, *generated_assets),
     )
-    store = OperationJournalStore(target_root)
+    store = OperationJournalStore(target_root, identity_path=root_identity_path)
     journal_present = _path_present_no_follow(store.path)
     legacy_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
     if not journal_present and not legacy_present and assessment.blockers:
@@ -2860,6 +2916,7 @@ def execute_recognized_distribution(
             raise DistributionApplyError("dual-recovery-state")
         if legacy_present:
             executable = build_executable_mutation_plan(assessment)
+            plan_digest = executable.plan_digest
             if (
                 legacy_marker is None
                 or legacy_marker.operation != intent
@@ -2870,10 +2927,20 @@ def execute_recognized_distribution(
             ):
                 raise DistributionApplyError("legacy-marker-unconvertible")
             journal = store.prepare(executable, package_version=package_version)
-            store.remove_legacy_marker(legacy_marker)
+            try:
+                store.remove_legacy_marker(legacy_marker)
+            except Exception:
+                prepared = journal
+                try:
+                    store.discard_prepared(prepared)
+                except Exception as rollback_error:
+                    raise DistributionApplyError("dual-recovery-state") from rollback_error
+                journal = None
+                raise
         elif journal_present:
             journal = store.load_for_assessment(assessment, package_version=package_version)
             if journal.status == "completed":
+                executable = _resume_executable_plan(assessment, journal)
                 store.remove_completed(journal)
                 return DistributionProcessResult(
                     status="completed",
@@ -2882,6 +2949,7 @@ def execute_recognized_distribution(
                     plan_digest=journal.plan_digest,
                 )
             if journal.status == "verifying":
+                executable = _resume_executable_plan(assessment, journal)
                 if assessment.blockers or any(
                     action.action not in {"adopt", "preserve"} for action in assessment.actions
                 ):
@@ -2960,8 +3028,13 @@ def execute_recognized_distribution(
             reason = "generated-state-reconciliation-failed"
         else:
             reason = str(exc)
+            sensitive_paths = tuple(
+                str(path)
+                for path in (install_root, scaffold_root, target_root)
+                if path.is_absolute()
+            )
             if (
-                any(str(path) in reason for path in (install_root, scaffold_root, target_root))
+                any(path in reason for path in sensitive_paths)
                 or "credential=" in reason.lower()
                 or re.search(r"(?:^|[\s=])/", reason) is not None
             ):

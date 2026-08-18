@@ -297,6 +297,45 @@ def test_i368_blocked_assessment_cannot_issue_executable_authority(tmp_path: Pat
         build_executable_mutation_plan(assessment)
 
 
+def test_i368_forged_assessment_cannot_prune_outside_manifest_authority(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    sentinel = target_root / "user-owned.txt"
+    sentinel.parent.mkdir()
+    sentinel.write_text("keep\n", encoding="utf-8")
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        intent="update",
+    )
+    forged_action = DistributionAction(
+        path="user-owned.txt",
+        operation="update",
+        action="prune",
+        provenance="historical",
+        reason="obsolete-exact",
+    )
+    original_snapshot = assessment.distribution_plan.target_snapshots[0][1]
+    forged_plan = managed_distribution.replace(
+        assessment.distribution_plan,
+        actions=(forged_action,),
+        target_snapshots=((forged_action.path, original_snapshot),),
+    )
+    forged_assessment = managed_distribution.replace(
+        assessment,
+        distribution_plan=forged_plan,
+        actions=(forged_action,),
+        blockers=(),
+    )
+
+    with pytest.raises(DistributionPlanError, match="outside obsolete authority"):
+        build_executable_mutation_plan(forged_assessment)
+
+    assert sentinel.read_text(encoding="utf-8") == "keep\n"
+
+
 def test_i368_executable_plan_digest_is_stable_for_equivalent_assessment(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -771,6 +810,124 @@ def test_i368_legacy_marker_conversion_is_limited_to_prewrite_state(
     else:
         assert marker_path.read_bytes() == before
         assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i368_legacy_marker_removal_failure_rolls_back_prepared_journal(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker = DistributionRetryMarker(
+        operation="update",
+        package_version="1.2.3",
+        target_root=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+        last_completed_phase="preflight-complete",
+        purpose="distribution-rerun",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": marker.operation,
+            "package_version": marker.package_version,
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": marker.last_completed_phase,
+            "purpose": marker.purpose,
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    before = marker_path.read_bytes()
+    original_remove = OperationJournalStore.remove_legacy_marker
+
+    def fail_marker_removal(*_args, **_kwargs) -> None:
+        raise DistributionApplyError("legacy-marker-unconvertible")
+
+    monkeypatch.setattr(OperationJournalStore, "remove_legacy_marker", fail_marker_removal)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        legacy_marker=marker,
+    )
+
+    assert first.status == "recovery_required"
+    assert first.reason == "legacy-marker-unconvertible"
+    assert marker_path.read_bytes() == before
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+
+    monkeypatch.setattr(OperationJournalStore, "remove_legacy_marker", original_remove)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        legacy_marker=marker,
+    )
+
+    assert second.status == "completed", second.reason
+    assert not marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+@pytest.mark.parametrize("terminal_status", ["verifying", "completed"])
+def test_i368_terminal_journal_rejects_tampered_digest_before_finalization(
+    tmp_path: Path,
+    monkeypatch,
+    terminal_status: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / terminal_status
+    (target_root / "spec-dock").mkdir(parents=True)
+    method_name = "mark_completed" if terminal_status == "verifying" else "remove_completed"
+    original = getattr(OperationJournalStore, method_name)
+
+    def fail_terminal_transition(*_args, **_kwargs):
+        raise DistributionApplyError("injected terminal transition failure")
+
+    monkeypatch.setattr(OperationJournalStore, method_name, fail_terminal_transition)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert first.status == "recovery_required"
+    payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert payload["status"] == terminal_status
+    payload["plan_digest"] = "0" * 64
+    journal_path.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+    before = journal_path.read_bytes()
+
+    monkeypatch.setattr(OperationJournalStore, method_name, original)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-plan-mismatch"
+    assert journal_path.read_bytes() == before
 
 
 def test_i368_same_plan_partial_failure_resumes_from_journal_checkpoint(tmp_path: Path, monkeypatch) -> None:

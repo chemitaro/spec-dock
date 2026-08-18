@@ -2934,20 +2934,27 @@ def _install_recognized_distribution_unlocked(
     if operation not in {"update", "init-force"}:
         raise RuntimeError(f"unsupported recognized distribution operation: {operation}")
     recognized_operation: RecognizedDistributionIntent = "update" if operation == "update" else "init-force"
-    if expected_root_identity is not None:
-        _assert_distribution_root_identity(target_root, expected_root_identity)
-    generated_assets = _active_fallback_distribution_assets(_specdock_dir(target_root))
-    with _assets_dir() as assets_dir:
-        result = execute_recognized_distribution(
-            assets_dir / "install_root",
-            manifest_path=assets_dir / "managed_distribution.json",
-            scaffold_root=assets_dir / "spec_dock",
-            target_root=target_root,
-            intent=recognized_operation,
-            package_version=_tool_version(),
-            legacy_marker=retry_marker.marker if retry_marker is not None else None,
-            generated_assets=generated_assets,
-        )
+    with _assets_dir() as packaged_assets_dir:
+        assets_dir = packaged_assets_dir.resolve()
+        with _bound_distribution_root(target_root, expected_root_identity) as (
+            bound_root,
+            visible_root,
+            bound_identity,
+        ):
+            generated_assets = _active_fallback_distribution_assets(_specdock_dir(bound_root))
+            result = execute_recognized_distribution(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=bound_root,
+                intent=recognized_operation,
+                package_version=_tool_version(),
+                legacy_marker=retry_marker.marker if retry_marker is not None else None,
+                generated_assets=generated_assets,
+                root_identity_path=visible_root,
+            )
+            if result.status != "recovery_required":
+                _assert_distribution_root_identity(visible_root, bound_identity)
     if result.status == "blocked":
         raise RuntimeError(f"distribution preflight blocked: {result.reason}")
     if result.status == "recovery_required":
