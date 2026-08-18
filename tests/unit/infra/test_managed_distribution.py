@@ -1032,6 +1032,94 @@ def test_i368_legacy_marker_removal_preserves_concurrent_replacement(
     assert marker_path.read_bytes() == replacement
 
 
+def test_i368_journal_cleanup_failure_restores_canonical_recovery_authority(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    prepared = store.prepare(executable, package_version="1.2.3")
+    completed = managed_distribution.replace(
+        prepared,
+        status="completed",
+        actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
+    )
+    store.write(completed)
+    before = store.path.read_bytes()
+    original_remove = managed_distribution._remove_distribution_stage_if_owned
+
+    def fail_quarantine_cleanup(parent_fd, stage_name, created, *, strict=False):
+        if stage_name.endswith(".remove"):
+            raise DistributionApplyError("simulated quarantine cleanup failure")
+        return original_remove(parent_fd, stage_name, created, strict=strict)
+
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_stage_if_owned", fail_quarantine_cleanup)
+
+    with pytest.raises(DistributionApplyError, match="journal finalization failed"):
+        store.remove_completed(completed)
+
+    assert store.path.read_bytes() == before
+    assert not list(store.path.parent.glob(f".{store.path.name}.*.remove"))
+
+
+def test_i368_legacy_marker_quarantine_fsync_failure_restores_marker(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker = DistributionRetryMarker(
+        operation="update",
+        package_version="1.2.3",
+        target_root=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+        last_completed_phase="preflight-complete",
+        purpose="distribution-rerun",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": marker.operation,
+            "package_version": marker.package_version,
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": marker.last_completed_phase,
+            "purpose": marker.purpose,
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    before = marker_path.read_bytes()
+    original_fsync = managed_distribution.os.fsync
+    failed = False
+
+    def fail_quarantine_fsync_once(fd: int) -> None:
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise OSError("simulated quarantine fsync failure")
+        original_fsync(fd)
+
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_quarantine_fsync_once)
+
+    with pytest.raises(DistributionApplyError, match="legacy-marker-unconvertible"):
+        OperationJournalStore(target_root).remove_legacy_marker(marker)
+
+    assert marker_path.read_bytes() == before
+    assert not list(marker_path.parent.glob(f".{marker_path.name}.*.remove"))
+
+
 def test_i368_same_plan_partial_failure_resumes_from_journal_checkpoint(tmp_path: Path, monkeypatch) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     second_source = install_root / ".agents" / "skills" / "example" / "SKILL.md"
