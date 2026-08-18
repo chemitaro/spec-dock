@@ -27,6 +27,14 @@ Epic 365 の要件・設計・計画と Issue 分割を作成するために、I
   - 既存 node path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/`
   - 計画上の採用タイトル: `SpecDock Distribution Reconciliation and Recovery Architecture`
   - node ID と既存 path は維持する。`.meta.json` は CLI 管理対象であり、rename/update command が存在しないため手編集しない。
+  - child Issue nodes:
+    - `iss-00368` / GitHub `#368` / `recognized-workspace-reconciliation`
+    - `iss-00369` / GitHub `#369` / `fresh-distribution-provisioning`
+    - `iss-00370` / GitHub `#370` / `managed-distribution-deprovision`
+    - `iss-00371` / GitHub `#371` / `explicit-spec-history-purge`
+    - `iss-00372` / GitHub `#372` / `distribution-hard-cutover-and-parity`
+  - accepted ADR destination: `artifacts/20260818t031610z-adr-unified-distribution-reconciliation-and-forward-recovery.md`
+  - authoritative HTML destination: `artifacts/20260818t031610z-guide-epic-365-distribution-reconciliation.html`
 - repository snapshot:
   - 調査開始時の local/GitHub `main` 一致 SHA: `081fde0d333520173255ad710aa66d727b475ec2`
   - authoring branch: `codex/epic-365-distribution-reconciliation-planning`
@@ -211,31 +219,31 @@ CLI Adapter
 
 ### 8. Issue slices と依存方向
 
-#### D1 Recognized Workspace Reconciliation
+#### D1 `iss-00368` Recognized Workspace Reconciliation
 
 - `update` と `init --force` を新 engine へ移す最初の完全な vertical slice。
 - Distribution Contract、Workspace Assessment、共通 action grammar、Descriptor-bound Filesystem Kernel、Operation Journal、typed diagnostics を、この利用者 flow を完了できる最小範囲で成立させる。
 - 対象 flow の legacy path は同じ Issue 内で削除する。
 
-#### D2 Fresh Distribution Provisioning
+#### D2 `iss-00369` Fresh Distribution Provisioning
 
 - fresh `init` を D1 の engine へ移す。
 - fresh-only collision / creation / postcondition を追加し、別 scaffold mutation engine を残さない。
 - dependency: D1。
 
-#### D3 Managed Distribution Deprovision
+#### D3 `iss-00370` Managed Distribution Deprovision
 
 - current `uninstall --keep-specs` 相当を共通 grammar/kernel/journal へ移す。
 - spec history と unknown content の preservation を end-to-end で証明する。
 - dependency: D2。
 
-#### D4 Explicit Spec History Purge
+#### D4 `iss-00371` Explicit Spec History Purge
 
 - current `uninstall --remove-specs` 相当を別 intent / 別 authority として同じ engine へ移す。
 - retry で deprovision から purge へ昇格できないことを証明する。
 - dependency: D3。
 
-#### D5 Hard Cutover and Distribution Parity
+#### D5 `iss-00372` Distribution Hard Cutover And Parity
 
 - 旧 `_UninstallAction`、旧 plan/apply、独自 recursive mutation、二重 marker writer、private rename import、fallback seam を物理的に除去する。
 - provider checkout、dogfood、wheel、sdist、fresh consumer、Linux、macOS の parity と migration/recovery docs を確認する。
@@ -285,39 +293,39 @@ epic-00365-distribution-reconciliation-planning-pack/
 │   ├── design.md
 │   └── plan.md
 ├── issues/
-│   ├── 01-recognized-workspace-reconciliation/
+│   ├── iss-00368-recognized-workspace-reconciliation/
 │   │   ├── requirement.md
 │   │   ├── design.md
 │   │   └── plan.md
-│   ├── 02-fresh-distribution-provisioning/
+│   ├── iss-00369-fresh-distribution-provisioning/
 │   │   ├── requirement.md
 │   │   ├── design.md
 │   │   └── plan.md
-│   ├── 03-managed-distribution-deprovision/
+│   ├── iss-00370-managed-distribution-deprovision/
 │   │   ├── requirement.md
 │   │   ├── design.md
 │   │   └── plan.md
-│   ├── 04-explicit-spec-history-purge/
+│   ├── iss-00371-explicit-spec-history-purge/
 │   │   ├── requirement.md
 │   │   ├── design.md
 │   │   └── plan.md
-│   └── 05-hard-cutover-and-distribution-parity/
+│   └── iss-00372-distribution-hard-cutover-and-parity/
 │       ├── requirement.md
 │       ├── design.md
 │       └── plan.md
 ├── adr/
-│   └── <必要な durable architecture decision のみ>.md
+│   └── 20260818t031610z-adr-unified-distribution-reconciliation-and-forward-recovery.md
 └── explanation/
-    └── epic-00365-distribution-reconciliation.html
+    └── 20260818t031610z-guide-epic-365-distribution-reconciliation.html
 ```
 
-`MANIFEST.md` は、採用タイトル、5 Issue の ASCII single-space title、slug、依存順、各 source file と destination role、ADR の要否と acceptance owner、HTML の authoritative destination を明記する。Issue title は SpecDock `new issue` の validation を通る ASCII alphanumeric + single spaces とする。Markdown本文は日本語とし、code identifier、command、path、schema field は原文を維持する。
+`MANIFEST.md` は、採用タイトル、上記5 Issueのactual ID / GitHub number / title / slug / dependency、各source fileとexact destination、ADR acceptance、HTML authoritative destinationを明記する。Issue nodeはすでにSpecDock CLIで作成済みであり、ChatGPTは別ID、別title、別slug、追加Issueを生成しない。Markdown本文は日本語とし、code identifier、command、path、schema fieldは原文を維持する。
 
-Epic / Issue canonical Markdown は現在の対応 template と Authoring Kit の責務分離を守る。front matter は actual Epic ID `epic-00365`、GitHub Issue `365`、parent `init-local-00003` を使う。Issue docs は作成前には ID / GitHub number が未確定であるため、本文を後から書き換えずに採用できるよう、front matter に未確定 ID や架空番号を埋め込まない構成にするか、SpecDock 作成済み scaffold の front matter を維持したまま本文全体を差し替えられる明示的 payload boundary を `MANIFEST.md` で定義する。最終採用時に ChatGPT 生成 bytes を編集する必要が生じる設計は不可とする。
+Epic / Issue canonical Markdown は現在の対応 template と Authoring Kit の責務分離を守る。Epic front matter はactual Epic ID `epic-00365`、GitHub Issue `365`、parent `init-local-00003` を使う。Issue front matter は作成済みscaffoldに記録されたactual Issue ID `iss-00368`〜`iss-00372`、GitHub `#368`〜`#372`、parent `epic-00365` / `init-local-00003`、actual titleを使う。placeholder、架空番号、後処理tokenを残さず、そのままdestination file全体と差し替えられるcomplete fileを生成する。
 
 ただし利用者は「ChatGPT が作成した file をそのまま採用し、既存 template file を編集ではなく差し替える」ことを要求している。したがって最優先の成果物形式は、Issue ID に依存しない完全な destination file を生成し、作成後 scaffold の metadata 値を壊さず byte-for-byte replace できる方式である。exact adoption が不可能な format conflict を発見した場合は、ZIP生成前に回答内で blocker と安全な解決案を示し、推測で placeholder を残さない。
 
-ADR は cross-Issue で durable に参照すべき architecture / contract / migration decision があり、Epic `design.md` だけでは ownership が曖昧になる場合に限り作成する。作成する場合は Current ADR template に従い、明示的な利用者承認済み判断だけを `accepted` とし、`accepted_by: "iwasawayuuta"`、`accepted_at: "2026-08-18"`、`mirror_eligible: true` を使う。単なる設計説明や重複内容を ADR にしない。
+ADR は `20260818t031610z-adr-unified-distribution-reconciliation-and-forward-recovery.md` の1件だけを完成させる。Current ADR templateに従い、Q4〜Q7、Q10〜Q12、Q16〜Q18で利用者承認済みの単一operation model、pre-write fail-closed、journaled forward recovery、deprovision/purge authority separation、vertical hard cutoverを記録する。`ID: "20260818t031610z-adr"`、`タイトル: "Unified Distribution Reconciliation And Forward Recovery"`、`状態: "accepted"`、`authority: "accepted"`、`accepted_authority: "accepted ADR"`、`accepted_at: "2026-08-18"`、`accepted_by: "iwasawayuuta"`、`mirror_eligible: true` を使う。追加ADRや重複した設計説明は作らない。
 
 日本語 HTML は `japanese-explanatory-html` の `explanatory-document.html` contract v2 を基礎にし、`@plantuml/core@1.2026.6` の pinned browser rendering、editable inline PlantUML source、shared accessible zoom modal、diagnostic SVG rejection を保持する。資料単体で背景、用語、責務、正常 flow、failure/recovery、Issue rollout、検証、非対象を理解できるようにする。図の題名・表示語・関係名は日本語にし、実 code identifier は原文を維持する。PlantUML Server、Kroki、remote include、pre-rendered image を使わない。
 
@@ -381,18 +389,16 @@ ADR は cross-Issue で durable に参照すべき architecture / contract / mig
 
 ### 書き込みと採用の手順
 
-1. この Artifact を validate、commit、push し、Strict consult が GitHub connector で読める exact branch tip にする。
-2. ChatGPT-Use Strict で ZIP を生成する。
-3. archive member、path、file type、size、secret risk を検査する。
-4. `MANIFEST.md` の Issue title/slug/dependency を照合する。
-5. SpecDock CLI で 5 Issue node を作成する。metadata、GitHub linkage、active/generated state は手編集しない。
-6. ZIP内の canonical Markdownを、対応 node の scaffold file へ編集せず差し替える。
-7. source/destination SHA-256 equality を記録する。
-8. ADR がある場合は Current `new artifact adr` surface と acceptance fields の整合を確認し、正規 epic artifact path へ採用する。
-9. HTMLを Epic direct-child `artifacts/` の authoritative file として採用する。
-10. SpecDock validation、document role、dependency projection、Git diff、byte equality を確認する。
-11. HTML browser validationを通し、authoritative fileをTailscaleへpublishする。
-12. 最終状態をcommit/pushし、作成したIssue ID、path、validation、URL、unpublish commandを報告する。
+1. SpecDock CLIで5 Issue node、dependency、ADR scaffoldを作成し、公式HTML template v2をauthoritative destinationへ配置する。
+2. このArtifactをactual ID/pathへ更新し、scaffold一式をvalidate、commit、pushしてStrictがGitHub connectorで読めるexact branch tipにする。
+3. ChatGPT-Use Strictでactual ID入りZIPを生成する。
+4. archive member、path、file type、size、secret riskを検査する。
+5. `MANIFEST.md` のIssue ID/title/slug/dependencyとexact destinationを照合する。
+6. ZIP内のcanonical Markdown、ADR、HTMLを、対応する既存scaffold/destinationへ編集せず差し替える。
+7. source/destination SHA-256 equalityを記録する。
+8. SpecDock validation、document role、dependency projection、Git diff、byte equalityを確認する。
+9. HTML browser validationを通し、authoritative fileをTailscaleへpublishする。
+10. 最終状態をcommit/pushし、Issue ID、path、validation、URL、unpublish commandを報告する。
 
 ### 完了時に残してはならない曖昧さ
 
