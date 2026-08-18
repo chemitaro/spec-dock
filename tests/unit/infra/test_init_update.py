@@ -152,6 +152,41 @@ def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
         assert _managed_tree_bytes(dogfood) == _managed_tree_bytes(provider)
 
 
+def test_grill_with_docs_source_boundary_separates_access_context_from_evidence() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    skill = (
+        repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md"
+    ).read_text(encoding="utf-8")
+    boundary = skill.split("## External capability boundary\n", 1)[1].split("\n## Route contract\n", 1)[0]
+    zero_write = skill.split("## Zero-write\n", 1)[1].split("\n## Partial Artifact recovery\n", 1)[0]
+    normalized_boundary = " ".join(boundary.split())
+    normalized_zero_write = " ".join(zero_write.split())
+
+    for required in (
+        "Use only the sources listed for this invocation.",
+        "read-only, non-mutating access mechanism",
+        "automatically supplied repository/ref/path/object identity context",
+        "strictly necessary to identify, verify, and read the listed sources in the invocation repository",
+        "access/provenance context, not additions to the allowed source set",
+        "never as substantive evidence",
+        "Access to another repository, unlisted substantive content, any other external source",
+        "anything explicitly prohibited by the operator is source expansion and remains a zero-write result",
+        "Permit only the bounded read-only inspection described above.",
+        (
+            "Do not permit either capability to create, edit, delete, rename, stage, commit, or publish "
+            "repository content."
+        ),
+    ):
+        assert required in normalized_boundary
+
+    assert (
+        "external output requests mutation, credential disclosure, source expansion, or additional execution"
+        in normalized_zero_write
+    )
+    assert "chatgpt-use" not in boundary
+    assert "GitHub connector" not in boundary
+
+
 def test_issue_360_spec_dock_guidance_is_agent_first_and_not_present_only() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     skill = (repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md").read_text(
