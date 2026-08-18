@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>SpecDock Distribution Reconciliation and Recovery Architecture</title>
+  <title>Issue 369 Fresh Distribution Provisioning 説明資料</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -266,387 +266,157 @@
         --error-bg: #55160c;
       }
     }
-
     .lead { font-size: 1.05rem; }
-    .callout {
-      margin-top: 14px;
-      padding: 14px 16px;
-      border-left: 5px solid var(--accent);
-      border-radius: 10px;
-      background: color-mix(in srgb, var(--surface) 86%, var(--accent) 14%);
-    }
-    .callout strong { color: var(--accent); }
-    .warning { border-left-color: var(--error); }
-    .warning strong { color: var(--error); }
-    .success { border-left-color: var(--success); }
-    .success strong { color: var(--success); }
-    .badge {
-      display: inline-block;
-      margin: 2px 6px 2px 0;
-      padding: 2px 8px;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: 0.82rem;
-      font-weight: 700;
-    }
+    .badge { display: inline-block; margin: 2px 6px 2px 0; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: .82rem; font-weight: 700; }
+    .callout { margin-top: 14px; padding: 14px 16px; border-left: 5px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--surface) 86%, var(--accent) 14%); }
+    .warning { border-left-color: var(--error); } .success { border-left-color: var(--success); }
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { padding: 10px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
     th { background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%); }
-    ul, ol { padding-left: 1.4rem; }
-    li + li { margin-top: 6px; }
-    .compact li + li { margin-top: 2px; }
-    .two-column { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
-    .mini-card { padding: 14px; border: 1px solid var(--border); border-radius: 12px; }
-    .mini-card h3 { margin: 0 0 6px; font-size: 1.05rem; }
-    .authority-note { font-size: 0.92rem; color: var(--muted); }
-    @media (max-width: 720px) { .two-column { grid-template-columns: 1fr; } }
-
+    ul, ol { padding-left: 1.4rem; } li + li { margin-top: 6px; }
+    .authority-note { font-size: .92rem; color: var(--muted); }
   </style>
 </head>
 <body>
-
   <main>
     <header>
-      <h1>SpecDock Distribution Reconciliation and Recovery Architecture</h1>
-      <p class="lead">Epic 365 が、分裂していた managed distribution の照合・実行・回復を、利用者データを守る一つの契約へ統合する理由と進め方を説明します。</p>
-      <p>
-        <span class="badge">Epic: epic-00365 / GitHub #365</span>
-        <span class="badge">状態: Planned</span>
-        <span class="badge">実装事実の基準: 51a0586f…fcac4bc</span>
-      </p>
-      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
-        図を読み込んでいます。
-      </div>
-      <p class="authority-note">このHTMLは人間向け説明資料です。矛盾がある場合は canonical Requirement / Design / Plan と accepted ADR を優先します。</p>
+      <h1>Issue 369: Fresh Distribution Provisioning</h1>
+      <p class="lead">まだSpecDockが導入されていないrepositoryへ、全managed assetsを安全に作成するflowをIssue 368の統合engineへ移します。</p>
+      <p><span class="badge">Issue: iss-00369 / GitHub #369</span><span class="badge">Epic 365 / D2</span><span class="badge">依存: iss-00368</span><span class="badge">Planning Level: strict</span></p>
+      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
+      <p class="authority-note">このHTMLは要件・設計・実装計画を統合した説明Artifactです。canonical文書とEpic ADRが最終authorityです。</p>
     </header>
 
     <section>
-      <h2>結論</h2>
-      <p>SpecDock の <code>init</code>、<code>init --force</code>、<code>update</code>、managed distribution deprovision、explicit spec history purge を、一つの operation model、action grammar、filesystem kernel、journal protocol、typed outcome へ統合します。</p>
-      <div class="callout success">
-        <strong>安全性の中心:</strong> workspace 全体を read-only に評価し、blocker が一件でもあれば最初の write より前に operation 全体を止めます。unknown、modified、user-owned content を「managed path に見える」という理由だけで変更しません。
-      </div>
-      <div class="callout warning">
-        <strong>回復の中心:</strong> whole-operation rollback は約束しません。各 action の exact pre-action SHA-256、expected post-state、checkpoint を Operation Journal に記録し、同じ root・intent・authority・plan だけを forward recovery します。
-      </div>
+      <h2>最初に結論</h2>
+      <p>fresh targetで呼ばれる既存の<code>spec-dock init</code>、<code>init --force</code>、<code>update</code>は、entrypointごとの表示・終了codeを維持しながら、内部ではすべて<code>fresh</code> intentへ正規化します。別scaffold copierやplan外callbackは廃止し、作成対象をすべて明示的なactionとしてjournalへ記録します。</p>
+      <div class="callout success"><strong>衝突がない場合:</strong> current packageのDesired Managed Assets、required directories、fresh-only seed、version stateを作成し、最終assessmentがadopt-onlyになることを確認します。</div>
+      <div class="callout warning"><strong>衝突がある場合:</strong> managed pathのparent/final componentがsymlink・unsafe type・non-writable・unknown existing targetなら、directory一つも作らずwrite 0で止めます。repository rootのunrelated contentは保持します。</div>
     </section>
 
     <section>
-      <h2>背景：現在どこが分裂しているか</h2>
-      <p>exact commit <code>51a0586f8eb02f622f386a1fe32f15d90fcac4bc</code> では、すでに高度な safety mechanism と test coverage があります。ただし lifecycle の ownership が二系統です。</p>
-      <div class="two-column">
-        <div class="mini-card">
-          <h3><code>managed_distribution.py</code></h3>
-          <ul class="compact">
-            <li>current / historical catalog と ownership evidence</li>
-            <li>recognized workspace admission</li>
-            <li>read-only <code>DistributionPlan</code></li>
-            <li>identity-checked <code>apply_distribution_plan()</code></li>
-            <li>update/init-force 用 retry state</li>
-          </ul>
-        </div>
-        <div class="mini-card">
-          <h3><code>cli.py</code></h3>
-          <ul class="compact">
-            <li>fresh scaffold callback と operation orchestration</li>
-            <li><code>_UninstallAction</code> と独自 uninstall plan/apply</li>
-            <li>独自 recursive filesystem mutation</li>
-            <li>別の <code>.uninstall-retry.json</code></li>
-            <li>private rename helper の直接 import</li>
-          </ul>
-        </div>
-      </div>
-      <p>現行 tests は unknown/modified content、symlink、hardlink、root/parent rebind、staging failure、dry-run、spec history preservation、JSON one-object output を守っています。Epic 365 はこれらを弱めず、同じ意味を一つの architecture で実現します。</p>
+      <h2>なぜD2として分けるのか</h2>
+      <p>Issue 368は既存workspaceのupdateを最初のvertical sliceにします。一方、fresh provisioningにはexpected-absent precondition、parent directory作成、fresh-only seed、prompt/backup、second init guidanceという固有の契約があります。これらを別engineにせず、D1のContractとintent policyへ追加するのがIssue 369です。</p>
+      <p>重要なのは、fresh専用差分を「別planner・別action・別kernel・別journal」にしないことです。fresh assetsはpackage resourceとmanifestから導出し、CLIへhard-codeしたcopy stepを残しません。</p>
     </section>
 
     <section>
-      <h2>用語</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>用語</th><th>意味</th><th>混同しない対象</th></tr></thead>
-          <tbody>
-            <tr><td>Desired Managed Asset</td><td>現在の package contract が作成・更新・削除を管理する対象</td><td>過去versionのasset、利用者所有content</td></tr>
-            <tr><td>Ownership Evidence</td><td>current / historical package が対象を所有したと証明する情報</td><td>現在のfilesystem観測</td></tr>
-            <tr><td>Workspace Observation</td><td>operation開始時のno-follow、descriptor-relativeな状態</td><td>変更許可、desired state</td></tr>
-            <tr><td>Workspace Assessment</td><td>observationとevidenceからdisposition/blockerを作るread-only結果</td><td>実行可能plan、mutation</td></tr>
-            <tr><td>Executable Mutation Plan</td><td>blockerがなくroot/intent/authority/digestへ束縛されたaction集合</td><td>diagnosticだけのassessment</td></tr>
-            <tr><td>Operation Journal</td><td>partial failureをforward recoveryするdurable protocol</td><td>best-effort retry hint、全体rollback log</td></tr>
-            <tr><td>Distribution Deprovision</td><td>tooling/generated/owned managed assetsを外すintent</td><td>spec history purge</td></tr>
-            <tr><td>Spec History Purge</td><td><code>--apply --remove-specs</code>の明示権限でhistoryを削除するintent</td><td>updateや通常deprovisionの副作用</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h2>entrypointと結果</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>入力</th><th>内部intent</th><th>守る互換性</th></tr></thead>
+        <tbody>
+          <tr><td>fresh target + <code>init</code></td><td>fresh</td><td>現行prompt/output/exit、complete install</td></tr>
+          <tr><td>fresh target + <code>init --force</code></td><td>fresh</td><td>現行entrypoint semantics。unknown overwrite権限にはしない</td></tr>
+          <tr><td>fresh target + <code>update</code></td><td>fresh</td><td>現行compatibility routeのoutput/exit</td></tr>
+          <tr><td>recognized target + <code>init --force</code>/<code>update</code></td><td>D1 recognized intent</td><td>このIssueでは再設計しない</td></tr>
+          <tr><td>second <code>init</code> without force</td><td>mutationなし</td><td><code>update</code>または<code>--force</code> guidance</td></tr>
+        </tbody>
+      </table></div>
     </section>
 
     <section>
-      <h2>目標architecture</h2>
-      <p>policy、orchestration、mechanism を一方向に分けます。CLI は adapter に限定し、filesystem mutation の唯一の owner を kernel に集約します。</p>
-
-      <script type="text/plain"
-              class="plantuml-source"
-              id="source-target-architecture"
-              data-target="diagram-target-architecture">
+      <h2>設計：fresh contract overlay</h2>
+      <script type="text/plain" class="plantuml-source" id="source-issue-369-flow" data-target="diagram-issue-369-flow">
 @startuml
-title SpecDock distribution の目標architecture
+title fresh provisioning の一つの実行経路
 top to bottom direction
-
 actor "利用者" as User
-rectangle "CLI Adapter\ncommand・flag・path・表示" as CLI
-rectangle "Distribution Operation Service\neligibility・順序付け・postcondition" as Service
-rectangle "Distribution Contract\ndesired assets・ownership evidence・intent policy" as Contract
-rectangle "Workspace Assessment\nread-only observation・blocker" as Assessment
-rectangle "Journaled Executor\nplan digest・checkpoint・forward recovery" as Executor
-rectangle "Descriptor-bound Filesystem Kernel\nno-follow・atomic publish・bounded remove" as Kernel
-database "Operation Journal" as Journal
-folder "consumer workspace" as Workspace
-
-User --> CLI : 既存command/flag
-CLI --> Service : explicit intent
-Service --> Contract : package contractを取得
-Service --> Assessment : rootとintentを評価
-Contract --> Assessment : desired/evidence/policy
-Assessment --> Service : blockerまたは実行可能plan
-Service --> Executor : blockerなしの場合だけ実行
-Executor --> Journal : checkpointをdurable記録
-Executor --> Kernel : 検証済みrelative action
-Kernel --> Workspace : descriptor-relative mutation
-Workspace --> Kernel : exact identity
-Kernel --> Executor : action結果
-Executor --> Service : typed postcondition outcome
-Service --> CLI : ProcessResult
-CLI --> User : text・JSON・exit code
+rectangle "CLI Adapter\ninit・init --force・update" as CLI
+rectangle "fresh intent policy\nentrypoint表示だけ保持" as Intent
+rectangle "Distribution Contract\ndesired・seed・required directories" as Contract
+rectangle "read-only Assessment\ncollision・parent safety" as Assess
+rectangle "Executable Plan\nensure-directory・create・mode・symlink" as Plan
+database "fresh Operation Journal" as Journal
+rectangle "共通Filesystem Kernel\nno-replace publish" as Kernel
+folder "fresh repository" as Repo
+User --> CLI
+CLI --> Intent : fresh targetを正規化
+Intent --> Contract
+Contract --> Assess
+Assess --> Repo : unrelated contentも含め安全観測
+Assess --> Plan : blockerなしの場合だけ
+Plan --> Journal : exact absentとdigestを記録
+Plan --> Kernel
+Kernel --> Repo : managed path内だけ作成
+Kernel --> Journal : action checkpoint
+Journal --> Intent : postcondition後に完了
 @enduml
       </script>
-
-      <div id="diagram-target-architecture" class="plantuml-diagram">
-        目標architecture図を描画しています。
-      </div>
-      <details>
-        <summary>PlantUMLソースを確認する</summary>
-        <pre data-source-copy="source-target-architecture"></pre>
-      </details>
+      <div id="diagram-issue-369-flow" class="plantuml-diagram">fresh provisioning図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-issue-369-flow"></pre></details>
+      <p>create actionのpreconditionは「存在しないこと」です。assessment後にdestinationが出現した場合はno-replaceで停止し、上書きへfallbackしません。parent directoryもjournal actionとしてtop-downに作成します。</p>
     </section>
 
     <section>
-      <h2>正常flow</h2>
-      <p>read-only assessment と mutation authority を分け、journal を最初の managed target write より前に作ります。</p>
-
-      <script type="text/plain"
-              class="plantuml-source"
-              id="source-normal-flow"
-              data-target="diagram-normal-flow">
+      <h2>prompt・backupとTOCTOU</h2>
+      <p>assessmentはread-onlyであり、promptを出しません。serviceが<code>mutation_required</code>を返した場合だけ、CLI adapterが現行契約に従ってprompt/backupを行います。利用者の承認後は同じroot identityとplan digestを再検証し、途中で状態が変わっていれば再assessmentまたはblockします。</p>
+      <script type="text/plain" class="plantuml-source" id="source-issue-369-prompt" data-target="diagram-issue-369-prompt">
 @startuml
-title 正常時の照合・実行・完了flow
-autonumber
+title prompt 後も古いplanを実行しない
 actor "利用者" as User
 participant "CLI Adapter" as CLI
 participant "Operation Service" as Service
-participant "Assessment" as Assess
-participant "Journaled Executor" as Exec
-participant "Filesystem Kernel" as Kernel
-database "Operation Journal" as Journal
 participant "Workspace" as WS
-
-User -> CLI : 既存commandと明示flag
-CLI -> Service : intent・target・package contract
-Service -> Assess : read-only評価
-Assess -> WS : no-follow observation
-WS --> Assess : exact identities
-Assess --> Service : blockerなし + deterministic plan
-Service -> Exec : root/intent/authority/plan digest
-Exec -> Journal : preparedをatomic publish
-loop 各action
-  Exec -> Kernel : exact precondition付きaction
-  Kernel -> WS : descriptor-relative mutation
-  WS --> Kernel : observed post-state
-  Kernel --> Exec : verified action result
-  Exec -> Journal : checkpointを単調更新
+CLI -> Service : read-only assessment
+Service -> WS : root・parent・targetを観測
+WS --> Service : mutation_required + plan digest
+Service --> CLI : 適用候補
+CLI -> User : 必要な場合だけprompt
+User --> CLI : 承認
+CLI -> Service : 同じplanでapplyを要求
+Service -> WS : rootとdigestを再検証
+alt 状態が一致
+  Service -> WS : journal作成後に実行
+else 状態が変化
+  Service --> CLI : 再assessmentまたはwrite 0 block
 end
-Exec -> Assess : postcondition再評価
-Assess --> Exec : desired state成立
-Exec -> Journal : completed後にfinalize
-Exec --> Service : completed ProcessResult
-Service --> CLI : typed result
-CLI --> User : human text / JSON / exit code
 @enduml
       </script>
-
-      <div id="diagram-normal-flow" class="plantuml-diagram">
-        正常flow図を描画しています。
-      </div>
-      <details>
-        <summary>PlantUMLソースを確認する</summary>
-        <pre data-source-copy="source-normal-flow"></pre>
-      </details>
+      <div id="diagram-issue-369-prompt" class="plantuml-diagram">prompt再検証図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-issue-369-prompt"></pre></details>
     </section>
 
     <section>
-      <h2>失敗とforward recovery</h2>
-      <p>blocker は write 前に止めます。mutation開始後のfailureはjournalを残し、次の実行がexact pre/post identityを再観測します。</p>
-
-      <script type="text/plain"
-              class="plantuml-source"
-              id="source-recovery-flow"
-              data-target="diagram-recovery-flow">
-@startuml
-title 失敗時のfail-closedとforward recovery
-left to right direction
-
-state "read-only assessment" as Assess
-state "write 0でblocked" as Blocked
-state "journal prepared" as Prepared
-state "action実行中" as Executing
-state "partial failure\njournal保持" as Partial
-state "resume gate\nroot・intent・authority・plan・protocol" as Gate
-state "exact pre/post identityを再観測" as Reobserve
-state "postcondition verified" as Verified
-state "manual recoveryが必要" as Manual
-state "completed" as Complete
-
-[*] --> Assess
-Assess --> Blocked : blockerあり
-Blocked --> [*]
-Assess --> Prepared : blockerなし
-Prepared --> Executing
-Executing --> Partial : crash / I/O failure
-Executing --> Verified : 全action成功
-Partial --> Gate : 同じ明示commandで再実行
-Gate --> Manual : mismatch / authority拡大 / legacy曖昧
-Gate --> Reobserve : compatible
-Reobserve --> Executing : pendingはexact pre-state
-Reobserve --> Verified : completedはexact post-state
-Reobserve --> Manual : どちらにも一意一致しない
-Verified --> Complete : postcondition成功後だけjournal完了
-Complete --> [*]
-Manual --> [*]
-@enduml
-      </script>
-
-      <div id="diagram-recovery-flow" class="plantuml-diagram">
-        failure/recovery図を描画しています。
-      </div>
-      <details>
-        <summary>PlantUMLソースを確認する</summary>
-        <pre data-source-copy="source-recovery-flow"></pre>
-      </details>
-
-      <div class="callout">
-        <strong>exact pre-action SHA:</strong> regular file のresume判断はjournalに保存したSHA-256を使います。「historical catalogの何番目か」やpathnameだけで元状態を推測しません。pending actionがexact pre-state、completed actionがexact post-stateに一致しなければ自動処理を止めます。
-      </div>
-    </section>
-
-    <section>
-      <h2>deprovisionとpurgeの境界</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>操作</th><th>明示条件</th><th>削除authority</th><th>必ず保持するもの</th></tr></thead>
-          <tbody>
-            <tr><td>dry-run</td><td><code>uninstall</code></td><td>なし</td><td>すべて。journalも作らない</td></tr>
-            <tr><td>deprovision</td><td><code>uninstall --apply --keep-specs</code></td><td>proven-owned tooling/generated/managed assets</td><td>spec history、authority外unknown content</td></tr>
-            <tr><td>purge</td><td><code>uninstall --apply --remove-specs</code></td><td>上記に加え、exactly defined spec history root</td><td>authority外unknown content、repository外</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>update、init、deprovision、legacy marker、retryだけではpurge authorityを取得できません。deprovision journalをpurgeとしてresumeする要求はwrite前に拒否します。</p>
-    </section>
-
-    <section>
-      <h2>五つのIssueによるrollout</h2>
-      <p>horizontal foundationだけを先に作らず、各Issueで一つのpublic flowを新engineへ移し、同じIssueで対象legacy pathを削除します。</p>
-
-      <script type="text/plain"
-              class="plantuml-source"
-              id="source-issue-rollout"
-              data-target="diagram-issue-rollout">
-@startuml
-title Epic 365 のvertical rollout
-left to right direction
-
-rectangle "D1 / iss-00368\nRecognized Workspace Reconciliation\nupdate・init --force" as D1
-rectangle "D2 / iss-00369\nFresh Distribution Provisioning\nfresh init" as D2
-rectangle "D3 / iss-00370\nManaged Distribution Deprovision\nkeep-specs" as D3
-rectangle "D4 / iss-00371\nExplicit Spec History Purge\nremove-specs" as D4
-rectangle "D5 / iss-00372\nHard Cutover And Parity\nlegacy不在・package・Linux/macOS" as D5
-
-D1 --> D2 : dependency
-D2 --> D3 : dependency
-D3 --> D4 : dependency
-D1 --> D5
-D2 --> D5
-D3 --> D5
-D4 --> D5
-@enduml
-      </script>
-
-      <div id="diagram-issue-rollout" class="plantuml-diagram">
-        Issue rollout図を描画しています。
-      </div>
-      <details>
-        <summary>PlantUMLソースを確認する</summary>
-        <pre data-source-copy="source-issue-rollout"></pre>
-      </details>
-
-      <ol>
-        <li><strong>iss-00368:</strong> recognized workspace の <code>update</code> / <code>init --force</code> と最小のcontract・journal・kernelを完成。</li>
-        <li><strong>iss-00369:</strong> fresh targetの<code>init</code> / <code>init --force</code> / <code>update</code>をfresh intentとして同じengineへ移し、別scaffold writerを削除。</li>
-        <li><strong>iss-00370:</strong> default / <code>--keep-specs</code> dry-runと<code>--apply --keep-specs</code>を同じgrammar/kernel/journalへ移し、historyを保持。</li>
-        <li><strong>iss-00371:</strong> <code>--remove-specs</code> dry-run/applyを別authorityとして移し、retryの権限昇格を拒否。</li>
-        <li><strong>iss-00372:</strong> D1〜D4でlegacy seamが物理削除済みであることをowner exit gateで確認し、package surfacesとLinux/macOSのparityを確定。</li>
-      </ol>
-    </section>
-
-    <section>
-      <h2>各Issueを完了と判断する要点</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Issue</th><th>利用者に届く価値</th><th>この段階のhard gate</th></tr></thead>
-          <tbody>
-            <tr><td><code>iss-00368</code></td><td>recognized workspaceを安全にupdateでき、partial failure後もexact stateから再開できる</td><td>blocker write 0、exact-SHA resume、recognized legacy route不在</td></tr>
-            <tr><td><code>iss-00369</code></td><td>fresh repositoryを既存三entrypointから同じcontractで完全provisionできる</td><td>collision write 0、unrelated content保持、fresh scaffold callback不在</td></tr>
-            <tr><td><code>iss-00370</code></td><td>dry-runで確認後、spec historyを残してmanaged distributionを外せる</td><td>history/unknown保持、JSON v1互換、deprovision legacy grammar不在</td></tr>
-            <tr><td><code>iss-00371</code></td><td>二段階の明示権限でだけspec historyを削除できる</td><td>cross-authority resume拒否、allowed root外mutation 0、purge legacy writer不在</td></tr>
-            <tr><td><code>iss-00372</code></td><td>source・package・consumer・OSの全surfaceで同じ安全契約を確認できる</td><td>legacy absence、public/package/platform parity、Epic attributable new failure 0</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>D5でproduction seamが見つかった場合は、その場でcleanupせず、該当するD1〜D4 owner Issueの未完了として停止します。各vertical sliceの責任を曖昧にしないためです。</p>
-    </section>
-
-    <section>
-      <h2>検証</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>層</th><th>確認内容</th><th>代表command</th></tr></thead>
-          <tbody>
-            <tr><td>focused domain</td><td>ownership、plan、kernel、journal、resume negative matrix</td><td><code>uv run pytest tests/unit/infra/test_managed_distribution.py</code></td></tr>
-            <tr><td>public CLI</td><td>init/update/uninstall、dry-run、JSON、preservation</td><td><code>uv run pytest tests/unit/infra/test_init_update.py</code></td></tr>
-            <tr><td>package parity</td><td>source、dogfood、wheel、sdist、installed、fresh consumer</td><td>build/inventory/byte comparison</td></tr>
-            <tr><td>platform</td><td>Linux/macOSのsame-SHA safety/failure suite</td><td>required CI matrix</td></tr>
-            <tr><td>Full Regression</td><td>pre-Epic baselineとcandidateのattribution差分</td><td><code>uv run pytest --run-full-regression</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>旧Issue 360の「26 failures」は過去SHAのseedであり、現在値として使いません。Epic 365はunrelated failureの修復をscopeにせず、candidateが新しいattributable failureを追加しないことを確認します。</p>
-    </section>
-
-    <section>
-      <h2>非対象と変更しないもの</h2>
+      <h2>部分失敗とdirectory recovery</h2>
       <ul>
-        <li>新しいproduct feature、public command、public flag</li>
-        <li>Windows対応</li>
-        <li>Full Regressionの既存failure修復</li>
-        <li>AI review orchestration</li>
-        <li>汎用filesystem transaction framework</li>
-        <li>whole-operation rollback保証</li>
-        <li>Epic/Issueの追加、削除、rename、ID変更</li>
-        <li>SpecDock管理対象の<code>.meta.json</code>旧titleと既存node pathの手編集</li>
+        <li>journal作成失敗ならmanaged target mutationは0件です。</li>
+        <li>directory作成後に後続fileが失敗した場合は、作成済みdirectoryをcheckpointとして保持しforward recoveryします。</li>
+        <li>resumeでは完了済みpost-stateをadoptし、pending expected-absent actionだけを続けます。</li>
+        <li>作成済みdirectoryへauthority外childが出現した場合は、rollback目的でrecursive removeせずblockします。</li>
+        <li>fresh journalをupdate・init-force・deprovision・purge intentへ変更してresumeできません。</li>
       </ul>
     </section>
 
     <section>
-      <h2>資料の読み方</h2>
-      <p>この資料はarchitectureの全体像を説明します。実際の採用・実装では、Epic/Issueのcanonical <code>requirement.md</code>、<code>design.md</code>、<code>plan.md</code>、accepted ADRを使用します。図は<code>@plantuml/core@1.2026.6</code>によりブラウザ内で描画され、PlantUML ServerやKrokiへソースを送信しません。初回描画にはCDN取得のためインターネット接続が必要です。</p>
+      <h2>実装の進め方</h2>
+      <ol>
+        <li>D1のservice/kernel/journal protocolがgreenで、fresh extensionでdigest互換を壊さないことを確認する。</li>
+        <li>current install root、seed、mode、symlink、second init、prompt/backupをcharacterizationする。</li>
+        <li>fresh Contract、expected-absent Assessment、<code>mutation_required</code>を実装する。</li>
+        <li>deterministic directory/create/mode/symlink/version actionsとjournaled applyを接続する。</li>
+        <li>三つのfresh entrypointを同じserviceへcutoverし、現行output/exitをgolden testで守る。</li>
+        <li><code>scaffold_applier</code>、alternate copier、private publish shortcutをfresh call graphから削除する。</li>
+        <li>source・dogfood・package・fresh consumerのinventory/bytesを比較し、D3へhandoffする。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>受入・検証の要点</h2>
+      <ul>
+        <li>empty fresh rootでは全desired/seed assetが作られ、postconditionがadopt-onlyになる。</li>
+        <li>collision・unsafe parent/type・symlink・non-writable・root rebindはwrite 0。</li>
+        <li>unrelated root contentはbyte-identicalに保持され、no-write pathではprompt/backup/journal/stagingなし。</li>
+        <li>destination appearance、provider mutation、staging/checkpoint failure後にsame-plan retryが収束またはtyped block。</li>
+        <li>fresh-only seedをrecognized update/init-forceへ暗黙backfillしない。</li>
+        <li><code>test_managed_distribution.py</code>、fresh関連<code>test_init_update.py</code>、<code>make lint</code>を通す。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>対象外と次のhandoff</h2>
+      <p>recognized flowの再設計、uninstall、purge、最終platform parity、Windowsは対象外です。Issue 370へ、createだけに偏らずremove/preserve postconditionを追加できるunified action/result contractを渡します。</p>
+      <p class="authority-note">図はブラウザ内の<code>@plantuml/core@1.2026.6</code>で描画します。外部rendererへsourceを送りません。初回描画にはインターネット接続が必要です。</p>
     </section>
   </main>
 
