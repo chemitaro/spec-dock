@@ -8379,18 +8379,12 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             assert list(active_dir.iterdir()) == []
 
-            original_symlink_to = cli.Path.symlink_to
-
-            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
-                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
-                    raise OSError("simulated active symlink failure")
-                original_symlink_to(self, target, *args, **kwargs)
-
-            cli.Path.symlink_to = _fail_active_symlink
+            original_symlink_support = cli._active_symlink_creation_supported
+            cli._active_symlink_creation_supported = lambda: False
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.Path.symlink_to = original_symlink_to
+                cli._active_symlink_creation_supported = original_symlink_support
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
             for layer in ("initiative", "epic", "issue"):
@@ -8434,18 +8428,12 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            original_symlink_to = cli.Path.symlink_to
-
-            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
-                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
-                    raise OSError("simulated active symlink failure")
-                original_symlink_to(self, target, *args, **kwargs)
-
-            cli.Path.symlink_to = _fail_active_symlink
+            original_symlink_support = cli._active_symlink_creation_supported
+            cli._active_symlink_creation_supported = lambda: False
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.Path.symlink_to = original_symlink_to
+                cli._active_symlink_creation_supported = original_symlink_support
 
             expected_paths = {
                 "initiative": initiative_dir,
@@ -8510,18 +8498,12 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            original_symlink_to = cli.Path.symlink_to
-
-            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
-                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
-                    raise OSError("simulated active symlink failure")
-                original_symlink_to(self, target, *args, **kwargs)
-
-            cli.Path.symlink_to = _fail_active_symlink
+            original_symlink_support = cli._active_symlink_creation_supported
+            cli._active_symlink_creation_supported = lambda: False
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.Path.symlink_to = original_symlink_to
+                cli._active_symlink_creation_supported = original_symlink_support
 
             expected_paths = {
                 "initiative": initiative_dir,
@@ -8581,18 +8563,12 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 },
             )
 
-            original_symlink_to = cli.Path.symlink_to
-
-            def _fail_active_symlink(self: Path, target: str | Path, *args, **kwargs) -> None:
-                if self.parent.resolve() == active_dir.resolve() and self.name in {"initiative", "epic", "issue"}:
-                    raise OSError("simulated active symlink failure")
-                original_symlink_to(self, target, *args, **kwargs)
-
-            cli.Path.symlink_to = _fail_active_symlink
+            original_symlink_support = cli._active_symlink_creation_supported
+            cli._active_symlink_creation_supported = lambda: False
             try:
                 assert main(["update", str(target)]) == 0
             finally:
-                cli.Path.symlink_to = original_symlink_to
+                cli._active_symlink_creation_supported = original_symlink_support
 
             placeholder_root = target / "spec-dock" / "system" / "active-none"
             for layer in ("initiative", "epic", "issue"):
@@ -8830,7 +8806,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- issue: iss-local-00001" in context_pack_text
             assert "iss-local-99999" not in context_pack_text
 
-    def test_update_repairs_same_layer_invalid_directory_conflict_using_real_pathfile_target(self) -> None:
+    def test_update_blocks_same_layer_invalid_directory_conflict_without_recursive_removal(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -8883,22 +8859,12 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 encoding="utf-8",
             )
 
-            assert main(["update", str(target)]) == 0
+            assert main(["update", str(target)]) == 1
 
-            if issue_link.exists():
-                assert issue_link.is_symlink()
-                assert issue_link.resolve() == issue_dir.resolve()
-            else:
-                assert issue_pathfile.is_file()
-                rel_target = issue_pathfile.read_text(encoding="utf-8").strip()
-                assert (active_dir / rel_target).resolve() == issue_dir.resolve()
-            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
-                encoding="utf-8"
-            )
-
-            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            assert "- issue: iss-local-00001" in context_pack_text
-            assert "iss-local-99999" not in context_pack_text
+            assert issue_link.is_dir()
+            assert (issue_link / "report.md").read_text(encoding="utf-8") == "stale invalid directory conflict\n"
+            assert issue_pathfile.is_file()
+            assert not (specdock_dir / ".distribution-journal.json").exists()
 
     def test_update_repairs_dangling_active_symlink_entrypoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1297,6 +1297,29 @@ def _normalized_link_target(value: str) -> str | None:
         return None
 
 
+def _generated_link_target_is_within_root(path: str, target: str) -> bool:
+    if not target or "\\" in target or target.startswith("/") or _DRIVE_RE.match(target):
+        return False
+    parts: list[str] = list(PurePosixPath(path).parent.parts)
+    for component in PurePosixPath(target).parts:
+        if component in {"", "."}:
+            continue
+        if component == "..":
+            if not parts:
+                return False
+            parts.pop()
+            continue
+        parts.append(component)
+    return bool(parts)
+
+
+def _normalized_link_target_for_path(path: str, target: str) -> str | None:
+    normalized = _normalized_link_target(target)
+    if normalized is not None:
+        return normalized
+    return target if _generated_link_target_is_within_root(path, target) else None
+
+
 def _file_type(mode: int) -> str:
     if stat.S_ISREG(mode):
         return "regular"
@@ -1473,7 +1496,10 @@ def _observe_target(target_root: Path, relative_path: str) -> _TargetObservation
 
         if stat.S_ISLNK(exact_stat.st_mode):
             try:
-                link_target = _normalized_link_target(str(os.readlink(exact_name, dir_fd=parent_fd)))
+                link_target = _normalized_link_target_for_path(
+                    relative_path,
+                    str(os.readlink(exact_name, dir_fd=parent_fd)),
+                )
                 after_link = os.stat(exact_name, dir_fd=parent_fd, follow_symlinks=False)
             except OSError:
                 link_target = None
@@ -1622,6 +1648,7 @@ def _classify_current_target(
     expected: DistributionIdentity,
     operation: DistributionOperation,
     manifest: DistributionManifest,
+    generated_path: bool = False,
     observation: _TargetObservation | None = None,
 ) -> DistributionAction:
     if observation is None:
@@ -1650,8 +1677,20 @@ def _classify_current_target(
     if actual is None:
         return _blocked_action(path, operation, "unsafe-target-path")
     if actual.kind != expected.kind:
+        if (
+            generated_path
+            and operation in {"update", "init-force"}
+            and {actual.kind, expected.kind} <= {"regular", "symlink"}
+        ):
+            if observation.link_count is not None and observation.link_count > 1:
+                return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="current")
+            return DistributionAction(path, operation, "upgrade", "current", "generated-state-refresh")
         return _blocked_action(path, operation, "exact-path-symlink" if actual.kind == "symlink" else "exact-path-type")
     if actual.kind == "symlink" and actual.target != expected.target:
+        if generated_path and operation in {"update", "init-force"}:
+            if observation.link_count is not None and observation.link_count > 1:
+                return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="current")
+            return DistributionAction(path, operation, "upgrade", "current", "generated-state-refresh")
         provenance = _historical_provenance(target_root, path, actual, manifest)
         if provenance is not None and operation in {"update", "init-force"}:
             if observation.link_count is not None and observation.link_count > 1:
@@ -1681,6 +1720,10 @@ def _classify_current_target(
             )
         return _blocked_action(path, operation, "unknown-current-collision", action="preserve")
     if actual.kind == "regular" and actual.sha256 != expected.sha256:
+        if generated_path and operation in {"update", "init-force"}:
+            if observation.link_count is not None and observation.link_count > 1:
+                return _blocked_action(path, operation, "hard-link-mutation-unsafe", provenance="current")
+            return DistributionAction(path, operation, "upgrade", "current", "generated-state-refresh")
         provenance = _historical_provenance(target_root, path, actual, manifest)
         if provenance is None:
             return _blocked_action(path, operation, "unknown-current-collision", action="preserve")
@@ -1806,6 +1849,7 @@ def _classify_target(
     scaffold_assets: tuple[DistributionAsset, ...] = (),
 ) -> tuple[tuple[DistributionAction, ...], tuple[tuple[str, DistributionTargetSnapshot], ...]]:
     specs = _target_identity_specs(current_assets, scaffold_assets)
+    generated_paths = frozenset(asset.path for asset in scaffold_assets if asset.source_path is None)
     actions: list[DistributionAction] = []
     observations: dict[str, _TargetObservation] = {}
     for path, expected in sorted(specs.items()):
@@ -1818,6 +1862,7 @@ def _classify_target(
                 expected=expected,
                 operation=operation,
                 manifest=manifest,
+                generated_path=path in generated_paths,
                 observation=observation,
             )
         )
@@ -1872,7 +1917,33 @@ def build_distribution_plan(
         if scaffold_root is not None and operation != "uninstall"
         else ()
     )
-    scaffold_assets = (*scaffold_assets, *generated_assets)
+    normalized_generated_assets: list[DistributionAsset] = []
+    occupied_paths = {asset.path for asset in (*current_assets, *scaffold_assets)} | set(_CURRENT_SHORTCUTS)
+    for asset in generated_assets:
+        try:
+            normalized_path = _exact_relative_path(asset.path, field_name="generated asset path").as_posix()
+        except DistributionManifestError as exc:
+            raise DistributionPlanError("generated asset path is not repository-relative") from exc
+        if normalized_path != asset.path or normalized_path in occupied_paths:
+            raise DistributionPlanError("generated asset path is duplicated or not canonical")
+        if asset.source_path is not None or asset.source_snapshot is not None:
+            raise DistributionPlanError("generated asset cannot reference a provider source path")
+        if asset.identity.kind == "regular":
+            if (
+                asset.generated_content is None
+                or asset.identity.sha256 != hashlib.sha256(asset.generated_content).hexdigest()
+            ):
+                raise DistributionPlanError("generated regular asset identity does not match its content")
+        elif asset.identity.kind == "symlink":
+            if asset.generated_content is not None or not _generated_link_target_is_within_root(
+                normalized_path, asset.identity.target or ""
+            ):
+                raise DistributionPlanError("generated symlink asset has an invalid target")
+        else:
+            raise DistributionPlanError("generated asset kind is unsupported")
+        occupied_paths.add(normalized_path)
+        normalized_generated_assets.append(asset)
+    scaffold_assets = (*scaffold_assets, *normalized_generated_assets)
     manifest = _load_manifest(manifest_path)
     _assert_no_manifest_overlap(
         {asset.path for asset in current_assets} | set(_CURRENT_SHORTCUTS),
@@ -1984,6 +2055,8 @@ def _action_precondition_payload(plan: DistributionPlan, action: DistributionAct
         raise DistributionPlanError(f"assessment is missing a precondition for '{action.path}'")
     target = snapshot.target
     return {
+        "root": _path_snapshot_condition(snapshot.root),
+        "parents": [_path_snapshot_condition(parent) for parent in snapshot.parents if parent.exists],
         "exists": target.exists,
         "device": target.device,
         "inode": target.inode,
@@ -1995,15 +2068,31 @@ def _action_precondition_payload(plan: DistributionPlan, action: DistributionAct
 
 
 def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAction) -> dict[str, object]:
+    snapshot = dict(plan.target_snapshots).get(action.path)
+    if snapshot is None:
+        raise DistributionPlanError(f"assessment is missing a postcondition for '{action.path}'")
+    boundary = {
+        "root": _path_snapshot_condition(snapshot.root),
+        "parents": [_path_snapshot_condition(parent) for parent in snapshot.parents if parent.exists],
+    }
     expected = _expected_target_identity(plan, action.path)
     if action.action == "prune":
-        return {"exists": False, "identity": None}
+        return {**boundary, "exists": False, "identity": None}
     if expected is None:
-        snapshot = dict(plan.target_snapshots).get(action.path)
-        if snapshot is None:
-            raise DistributionPlanError(f"assessment is missing a postcondition for '{action.path}'")
         expected = snapshot.target.identity
-    return {"exists": True, "identity": _distribution_identity_payload(expected)}
+    return {**boundary, "exists": True, "identity": _distribution_identity_payload(expected)}
+
+
+def _path_snapshot_condition(snapshot: PathIdentitySnapshot) -> dict[str, object]:
+    return {
+        "relative_path": snapshot.relative_path,
+        "exists": snapshot.exists,
+        "device": snapshot.device,
+        "inode": snapshot.inode,
+        "ctime_ns": snapshot.ctime_ns,
+        "file_type": snapshot.file_type,
+        "link_count": snapshot.link_count,
+    }
 
 
 def _mutation_plan_digest(assessment: WorkspaceAssessment) -> str:
@@ -2562,6 +2651,22 @@ def _journal_digest(journal: OperationJournal) -> str:
 
 
 def _snapshot_matches_condition(snapshot: DistributionTargetSnapshot, condition: dict[str, object]) -> bool:
+    root_condition = condition.get("root")
+    if not isinstance(root_condition, dict) or not _path_snapshot_matches_condition(snapshot.root, root_condition):
+        return False
+    parent_conditions = condition.get("parents")
+    if not isinstance(parent_conditions, list):
+        return False
+    actual_parents = {parent.relative_path: parent for parent in snapshot.parents}
+    for parent_condition in parent_conditions:
+        if not isinstance(parent_condition, dict):
+            return False
+        relative_path = parent_condition.get("relative_path")
+        if not isinstance(relative_path, str):
+            return False
+        actual_parent = actual_parents.get(relative_path)
+        if actual_parent is None or not _path_snapshot_matches_condition(actual_parent, parent_condition):
+            return False
     target = snapshot.target
     if condition.get("exists") != target.exists:
         return False
@@ -2578,12 +2683,58 @@ def _snapshot_matches_condition(snapshot: DistributionTargetSnapshot, condition:
     return condition.get("identity") == _distribution_identity_payload(target.identity)
 
 
+def _path_snapshot_matches_condition(snapshot: PathIdentitySnapshot, condition: dict[str, object]) -> bool:
+    return all(
+        condition.get(field) == getattr(snapshot, field)
+        for field in ("relative_path", "exists", "device", "inode", "file_type")
+    )
+
+
+def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: OperationJournal) -> None:
+    plan = assessment.distribution_plan
+    current_actions = {action.path: action for action in assessment.actions}
+    records = {record.path: record for record in journal.actions}
+    completed_missing_obsolete = {
+        record.path
+        for record in journal.actions
+        if record.action == "prune" and record.checkpoint != "pending" and record.path not in current_actions
+    }
+    if len(records) != len(journal.actions) or set(records) - completed_missing_obsolete != set(current_actions):
+        raise DistributionApplyError("journal-plan-mismatch")
+    current_specs = _target_identity_specs(plan.current_assets, plan.scaffold_assets)
+    obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files} - set(current_specs)
+    for record in journal.actions:
+        if record.action == "prune":
+            if record.path not in obsolete_paths or record.postcondition.get("exists") is not False:
+                raise DistributionApplyError("journal-plan-mismatch")
+        else:
+            expected_identity = current_specs.get(record.path)
+            if expected_identity is None or record.action not in {"create", "adopt", "upgrade", "preserve"}:
+                raise DistributionApplyError("journal-plan-mismatch")
+            if record.postcondition.get("exists") is not True or record.postcondition.get(
+                "identity"
+            ) != _distribution_identity_payload(expected_identity):
+                raise DistributionApplyError("journal-plan-mismatch")
+        if record.checkpoint == "pending":
+            current = current_actions[record.path]
+            if (record.action, record.provenance, record.reason) != (
+                current.action,
+                current.provenance,
+                current.reason,
+            ):
+                raise DistributionApplyError("journal-plan-mismatch")
+            snapshot = dict(plan.target_snapshots).get(record.path)
+            if snapshot is None or not _snapshot_matches_condition(snapshot, record.precondition):
+                raise DistributionApplyError("journal-plan-mismatch")
+
+
 def _resume_executable_plan(
     assessment: WorkspaceAssessment,
     journal: OperationJournal,
 ) -> ExecutableMutationPlan:
     if _journal_digest(journal) != journal.plan_digest:
         raise DistributionApplyError("journal-plan-mismatch")
+    _assert_journal_action_contract(assessment, journal)
     snapshots = dict(assessment.distribution_plan.target_snapshots)
     original_actions: list[DistributionAction] = []
     pending_actions: list[DistributionAction] = []
@@ -2655,7 +2806,7 @@ def execute_recognized_distribution(
     intent: RecognizedDistributionIntent,
     package_version: str,
     legacy_marker: DistributionRetryMarker | None = None,
-    generated_state_reconciler: Callable[[], None] | None = None,
+    generated_assets: tuple[DistributionAsset, ...] = (),
 ) -> DistributionProcessResult:
     """Execute one recognized update/init-force through the journaled service."""
 
@@ -2670,7 +2821,7 @@ def execute_recognized_distribution(
         scaffold_root=scaffold_root,
         target_root=target_root,
         intent=intent,
-        generated_assets=(version_asset,),
+        generated_assets=(version_asset, *generated_assets),
     )
     store = OperationJournalStore(target_root)
     journal_present = _path_present_no_follow(store.path)
@@ -2682,6 +2833,17 @@ def execute_recognized_distribution(
             intent=intent,
             actions=assessment.actions,
             reason=reasons,
+        )
+    if (
+        not journal_present
+        and not legacy_present
+        and all(action.action in {"adopt", "preserve"} for action in assessment.actions)
+    ):
+        return DistributionProcessResult(
+            status="completed",
+            intent=intent,
+            actions=assessment.actions,
+            plan_digest=_mutation_plan_digest(assessment),
         )
     plan_digest: str | None = None
     journal: OperationJournal | None = None
@@ -2712,8 +2874,6 @@ def execute_recognized_distribution(
                     plan_digest=journal.plan_digest,
                 )
             if journal.status == "verifying":
-                if generated_state_reconciler is not None:
-                    generated_state_reconciler()
                 if assessment.blockers or any(
                     action.action not in {"adopt", "preserve"} for action in assessment.actions
                 ):
@@ -2742,7 +2902,7 @@ def execute_recognized_distribution(
             scaffold_root=scaffold_root,
             target_root=target_root,
             intent=intent,
-            generated_assets=(version_asset,),
+            generated_assets=(version_asset, *generated_assets),
         )
         refreshed_executable = _resume_executable_plan(refreshed_assessment, journal)
 
@@ -2773,15 +2933,13 @@ def execute_recognized_distribution(
             stage_ownership_recorder=record_staging_lease,
             progress_recorder=record_progress,
         )
-        if generated_state_reconciler is not None:
-            generated_state_reconciler()
         post = build_workspace_assessment(
             install_root,
             manifest_path=manifest_path,
             scaffold_root=scaffold_root,
             target_root=target_root,
             intent=intent,
-            generated_assets=(version_asset,),
+            generated_assets=(version_asset, *generated_assets),
         )
         if post.blockers or any(action.action not in {"adopt", "preserve"} for action in post.actions):
             raise DistributionApplyError("distribution postcondition failed")
@@ -3189,7 +3347,7 @@ def _remove_distribution_stage_if_owned(
             raise DistributionApplyError("managed staging cleanup failed") from exc
 
 
-def _distribution_stage_identity(parent_fd: int, stage_name: str) -> DistributionIdentity | None:
+def _distribution_stage_identity(parent_fd: int, stage_name: str, path: str) -> DistributionIdentity | None:
     """Read a private stage identity without following its final path."""
     nofollow = getattr(os, "O_NOFOLLOW", None)
     if not isinstance(nofollow, int):
@@ -3230,7 +3388,7 @@ def _distribution_stage_identity(parent_fd: int, stage_name: str) -> Distributio
             target = os.readlink(stage_name, dir_fd=parent_fd)
         except OSError as exc:
             raise DistributionApplyError("managed staging symlink cannot be read safely") from exc
-        normalized = _normalized_link_target(target)
+        normalized = _normalized_link_target_for_path(path, target)
         if normalized is None:
             raise DistributionApplyError("managed staging symlink target is unsafe")
         return DistributionIdentity(kind="symlink", target=normalized)
@@ -3342,7 +3500,7 @@ def _cleanup_stale_distribution_stages(
             ):
                 mismatch_detected = True
                 continue
-            candidate = _distribution_stage_identity(parent_fd, owned.stage_name)
+            candidate = _distribution_stage_identity(parent_fd, owned.stage_name, owned.path)
             if candidate is None:
                 mismatch_detected = True
                 continue
@@ -3785,13 +3943,26 @@ def _apply_symlink_action(
         parent_fd = parent_chain[-1]
         target_name = PurePosixPath(action.path).name
         try:
-            current_target = os.readlink(target_name, dir_fd=parent_fd)
+            current_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
             target_exists = True
         except FileNotFoundError:
+            current_stat = None
             current_target = None
             target_exists = False
         except OSError as exc:
             raise DistributionApplyError(f"managed target is unsafe for '{action.path}'") from exc
+        else:
+            assert current_stat is not None
+            if stat.S_ISLNK(current_stat.st_mode):
+                try:
+                    current_target = _normalized_link_target_for_path(
+                        action.path,
+                        os.readlink(target_name, dir_fd=parent_fd),
+                    )
+                except OSError as exc:
+                    raise DistributionApplyError(f"managed target is unsafe for '{action.path}'") from exc
+            else:
+                current_target = None
 
         if action.action == "create":
             if target_exists:
@@ -3802,7 +3973,9 @@ def _apply_symlink_action(
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
             published = False
             try:
-                staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
+                staged_target = _normalized_link_target_for_path(
+                    action.path, os.readlink(staging_name, dir_fd=parent_fd)
+                )
                 if staged_target != expected_target or staging_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
                 if stage_ownership_recorder is not None:
@@ -3831,7 +4004,7 @@ def _apply_symlink_action(
                             staging_stat,
                             strict=True,
                         )
-            created_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
+            created_target = _normalized_link_target_for_path(action.path, os.readlink(target_name, dir_fd=parent_fd))
             if created_target != expected_target:
                 raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
             return
@@ -3844,7 +4017,7 @@ def _apply_symlink_action(
             if not _same_stat_identity(latest_stat, snapshot.target) or latest_stat.st_nlink != 1:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
-            latest_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
+            latest_target = _normalized_link_target_for_path(action.path, os.readlink(target_name, dir_fd=parent_fd))
             if latest_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             os.unlink(target_name, dir_fd=parent_fd)
@@ -3852,7 +4025,7 @@ def _apply_symlink_action(
         if action.action == "upgrade":
             if not target_exists or snapshot.target.identity is None:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
-            if current_target != snapshot.target.identity.target:
+            if snapshot.target.identity.kind == "symlink" and current_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_swap_rename()
             staging_name = _distribution_stage_name(action.path, expected)
@@ -3860,7 +4033,9 @@ def _apply_symlink_action(
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
             swapped = False
             try:
-                staged_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
+                staged_target = _normalized_link_target_for_path(
+                    action.path, os.readlink(staging_name, dir_fd=parent_fd)
+                )
                 if staged_target != expected_target:
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
                 if stage_ownership_recorder is not None:
@@ -3868,13 +4043,18 @@ def _apply_symlink_action(
                 latest_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
                 if not _same_stat_identity(latest_stat, snapshot.target) or latest_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
-                latest_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
-                if latest_target != snapshot.target.identity.target:
-                    raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                if snapshot.target.identity.kind == "symlink":
+                    latest_target = _normalized_link_target_for_path(
+                        action.path, os.readlink(target_name, dir_fd=parent_fd)
+                    )
+                    if latest_target != snapshot.target.identity.target:
+                        raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
                 _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
                 swapped = True
-                published_target = _normalized_link_target(os.readlink(target_name, dir_fd=parent_fd))
+                published_target = _normalized_link_target_for_path(
+                    action.path, os.readlink(target_name, dir_fd=parent_fd)
+                )
                 if published_target != expected_target:
                     raise DistributionApplyError(f"managed target verification failed for '{action.path}'")
             finally:
@@ -3898,8 +4078,12 @@ def _apply_symlink_action(
                         )
                 else:
                     try:
-                        old_target = _normalized_link_target(os.readlink(staging_name, dir_fd=parent_fd))
                         old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                        old_target = (
+                            _normalized_link_target_for_path(action.path, os.readlink(staging_name, dir_fd=parent_fd))
+                            if stat.S_ISLNK(old_stat.st_mode)
+                            else None
+                        )
                         if (
                             snapshot.target.identity is not None
                             and old_target == snapshot.target.identity.target
@@ -4170,7 +4354,6 @@ def apply_distribution_plan(
             index = action_index[id(action)]
             try:
                 snapshot = snapshots[action.path]
-                _assert_plan_target_snapshot(target_root, action.path, snapshot)
                 if allow_stale_stage_cleanup:
                     _cleanup_stale_distribution_stages(plan, target_root, action, snapshot, stage_ownership)
                 # Removing a known stale stage mutates the parent directory ctime.  The

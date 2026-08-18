@@ -36,6 +36,8 @@ from spec_dock import __version__
 from spec_dock.managed_distribution import (
     DistributionAdmission,
     DistributionApplyError,
+    DistributionAsset,
+    DistributionIdentity,
     DistributionOperation,
     DistributionRootIdentity,
     DistributionStageOwnership,
@@ -1052,6 +1054,133 @@ def _render_context_pack(*, initiative_id: str | None, epic_id: str | None, issu
 
 def _render_default_context_pack() -> str:
     return _render_context_pack(initiative_id=None, epic_id=None, issue_id=None)
+
+
+def _generated_regular_distribution_asset(path: str, content: bytes) -> DistributionAsset:
+    return DistributionAsset(
+        path=path,
+        identity=DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(content).hexdigest(),
+            mode=0o644,
+        ),
+        generated_content=content,
+    )
+
+
+def _generated_symlink_distribution_asset(path: str, target: str) -> DistributionAsset:
+    return DistributionAsset(
+        path=path,
+        identity=DistributionIdentity(kind="symlink", target=target),
+    )
+
+
+def _active_symlink_creation_supported() -> bool:
+    return hasattr(os, "symlink") and os.symlink in os.supports_dir_fd
+
+
+def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[DistributionAsset, ...]:
+    """Describe active fallback state without mutating the recognized workspace."""
+
+    active_dir = specdock_dir / "active"
+    persisted = _load_persisted_active_entries(specdock_dir)
+    assets: list[DistributionAsset] = []
+    resolved_ids: dict[str, str | None] = {"initiative": None, "epic": None, "issue": None}
+    for layer in ("initiative", "epic", "issue"):
+        link = active_dir / layer
+        pathfile = active_dir / f"{layer}.path"
+        persisted_id, persisted_path = persisted[layer]
+        try:
+            existing = _resolve_existing_active_entrypoint(
+                specdock_dir,
+                active_dir=active_dir,
+                layer=layer,
+            )
+        except RuntimeError:
+            existing = None
+        if existing is not None and existing[1] is not None:
+            desired_target, desired_id = existing
+        else:
+            resolved_target = _resolve_manifest_target_dir(
+                specdock_dir,
+                layer,
+                expected_id=persisted_id,
+                persisted_path=persisted_path,
+            )
+            if resolved_target is None:
+                resolved_target = _resolve_persisted_path_dir(
+                    specdock_dir,
+                    layer=layer,
+                    expected_id=persisted_id,
+                    persisted_path=persisted_path,
+                )
+            desired_id = persisted_id if resolved_target is not None else None
+            desired_target = resolved_target or specdock_dir / "system" / "active-none" / layer
+        resolved_ids[layer] = desired_id
+        desired_resolved = desired_target.resolve()
+
+        current_link_target: str | None = None
+        if link.is_symlink():
+            with suppress(OSError, UnicodeDecodeError):
+                raw_target = link.readlink()
+                candidate = raw_target if raw_target.is_absolute() else link.parent / raw_target
+                if candidate.resolve() == desired_resolved:
+                    current_link_target = raw_target.as_posix()
+        if current_link_target is not None:
+            assets.append(
+                _generated_symlink_distribution_asset(
+                    f"spec-dock/active/{layer}",
+                    current_link_target,
+                )
+            )
+            continue
+
+        if (
+            existing is not None
+            and not link.exists()
+            and not link.is_symlink()
+            and pathfile.is_file()
+            and not pathfile.is_symlink()
+        ):
+            with suppress(OSError):
+                content = pathfile.read_bytes()
+                if (active_dir / content.decode("utf-8").strip()).resolve() == desired_resolved:
+                    assets.append(
+                        _generated_regular_distribution_asset(
+                            f"spec-dock/active/{layer}.path",
+                            content,
+                        )
+                    )
+                    continue
+
+        if not _active_symlink_creation_supported():
+            assets.append(
+                _generated_regular_distribution_asset(
+                    f"spec-dock/active/{layer}.path",
+                    (os.path.relpath(desired_target, start=active_dir) + "\n").encode("utf-8"),
+                )
+            )
+            continue
+
+        assets.append(
+            _generated_symlink_distribution_asset(
+                f"spec-dock/active/{layer}",
+                os.path.relpath(desired_target, start=active_dir),
+            )
+        )
+
+    context_pack = _render_context_pack(
+        initiative_id=resolved_ids["initiative"],
+        epic_id=resolved_ids["epic"],
+        issue_id=resolved_ids["issue"],
+    ).encode("utf-8")
+    assets.append(
+        _generated_regular_distribution_asset(
+            "spec-dock/active/context-pack.md",
+            context_pack,
+        )
+    )
+    return tuple(assets)
 
 
 def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
@@ -2703,6 +2832,7 @@ def _install_recognized_distribution_unlocked(
     recognized_operation: RecognizedDistributionIntent = "update" if operation == "update" else "init-force"
     if expected_root_identity is not None:
         _assert_distribution_root_identity(target_root, expected_root_identity)
+    generated_assets = _active_fallback_distribution_assets(_specdock_dir(target_root))
     with _assets_dir() as assets_dir:
         result = execute_recognized_distribution(
             assets_dir / "install_root",
@@ -2712,7 +2842,7 @@ def _install_recognized_distribution_unlocked(
             intent=recognized_operation,
             package_version=_tool_version(),
             legacy_marker=retry_marker.marker if retry_marker is not None else None,
-            generated_state_reconciler=lambda: _ensure_active_fallback_entrypoints(_specdock_dir(target_root)),
+            generated_assets=generated_assets,
         )
     if result.status == "blocked":
         raise RuntimeError(f"distribution preflight blocked: {result.reason}")
