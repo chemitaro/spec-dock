@@ -3029,9 +3029,7 @@ def execute_recognized_distribution(
         else:
             reason = str(exc)
             sensitive_paths = tuple(
-                str(path)
-                for path in (install_root, scaffold_root, target_root)
-                if path.is_absolute()
+                str(path) for path in (install_root, scaffold_root, target_root) if path.is_absolute()
             )
             if (
                 any(path in reason for path in sensitive_paths)
