@@ -3,7 +3,7 @@
 ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
-状態: "draft"
+状態: "planned"
 最終更新: "2026-08-18"
 依存: ["requirement.md"]
 親: ["epic-00365", "init-local-00003"]
@@ -14,25 +14,202 @@ ID: "iss-00368"
 詳細: [Design Guide](../../../../../../docs/authoring/design.md)
 
 ## 設計目標
-Requirement を満たす構造と責務を記述する。
+
+`update` / `init --force` を最初の complete vertical slice として、以下を実際の public flow まで接続する。
+
+```text
+CLI Adapter
+  -> recognize/update intent
+  -> Distribution Operation Service
+      -> Contract + read-only Assessment
+      -> ExecutableMutationPlan
+      -> OperationJournal
+      -> Descriptor-bound Kernel
+      -> postcondition + ProcessResult
+```
+
+D1 で導入する abstraction は後続 Issue が拡張できるが、未使用の generic framework にしない。recognized flow で必要な action、identity、journal transition だけを実装し、同じ Issue 内で旧 recognized-flow seam を削除する。
 
 ## Current / Target
-変更前の状態と実現する状態を記述する。
+
+### Current
+
+- `admit_distribution_operation()` が package version、workspace version/anchors、retry marker を read-only に検証する。
+- `build_distribution_plan()` が current/historical/unknown provenance と create/adopt/upgrade/prune/preserve/block を作る。
+- `apply_distribution_plan()` が no-follow target/parent/root checks、staging、atomic publish、cleanup、progress callback を持つ。
+- `cli.py` が root lock、marker phases、scaffold callback、post-plan、version write、marker finalization を orchestration する。
+- `allow_blocked_scaffold_paths` と `scaffold_applier` により、plan action とは別の mutation authority が存在する。
+
+### Target
+
+- recognized flow の orchestration を `DistributionOperationService.execute()` 相当へ移す。
+- `WorkspaceAssessment` と `ExecutableMutationPlan` を別 type にし、blocker 有り assessment から plan を構築できない API にする。
+- plan の全 mutation を common action grammar と kernel operation に展開する。scaffold refresh を callback で外注しない。
+- journal が operation phase と action checkpoint を所有し、CLI は marker phase を書かない。
+- `ProcessResult` から current text/exit semantics を生成する。
 
 ## 責務・Interface
-責務境界、interface、親契約との関係を記述する。
+
+### Recognized intent
+
+```text
+RecognizedIntent = update | init-force
+```
+
+`init-force` は overwrite authority ではなく、recognized workspace で installer init semantics を選ぶ intent とする。unknown/modified asset の ownership blocker を解除しない。
+
+### Assessment input
+
+- target root descriptor binding
+- recognized workspace version/anchor evidence
+- package Distribution Contract
+- current/historical ownership evidence
+- current journal または convertible legacy marker
+- explicit intent
+
+### Assessment output
+
+各 target disposition は次を持つ。
+
+```text
+relative_path
+observed_identity
+ownership_provenance: missing | current | historical | unknown
+action: create | adopt | replace | remove | preserve | block
+reason_code
+blocking
+```
+
+obsolete target は historical evidence と exact current observation が一致する場合だけ remove authority を得る。mode drift の扱いは current contract/test を維持し、content ownership と mutation safety を別に評価する。
+
+### Plan construction
+
+`ExecutableMutationPlan.from_assessment()` 相当は次を検証する。
+
+- blockers が空
+- root/intent/authority/contract identity が固定済み
+- action path が contract boundary 内
+- precondition/postcondition identity が complete
+- deterministic order と canonical `plan_digest`
+
+plan digest は absolute path、timestamp、process-specific inode 値だけに依存させず、resume に必要な root binding と relative contract/action identity を明示的に含める。
+
+### Journal lifecycle
+
+```text
+absent
+  -> prepared       # plan digest と actions を durable publish、target mutation 0
+  -> executing      # action checkpoint が単調進行
+  -> verifying      # all actions checkpointed、postcondition assessment
+  -> completed      # postcondition success
+  -> removed        # staging cleanup と finalization success
+```
+
+crash/exception では `prepared` 以降の journal を保持する。`completed` 前に削除しない。
+
+Action checkpoint:
+
+- `pending`: current state は exact pre-action identity であること
+- `published`: expected post-action identity を確認済み
+- `verified`: operation-level postcondition に含めて再評価済み
+
+checkpoint write failure 時は current target を再観測し、pre/post のどちらか一方に exact match する場合だけ state を再構成する。両方/どちらにも一致しない場合は block する。
+
+### Legacy `.distribution-retry.json`
+
+one-way conversion または compatibility resume の必須条件:
+
+- regular file、expected schema/purpose
+- marker root identity と current root binding が一致
+- marker operation が current invocation と一致
+- executing package version が marker/package/workspace compatibility policy を満たす
+- `.uninstall-retry.json` と同時存在しない
+- recorded stage ownership が exact no-follow identity に一致
+- current Contract と observation から same remaining plan を一意に再構成できる
+
+一つでも証明できなければ marker を書き換えず `legacy-marker-unconvertible` とする。
+
+### Filesystem Kernel subset
+
+D1 で使用する operation:
+
+- validate/open root and parent chain
+- create managed directories
+- stage/write/fsync/publish regular file
+- create/replace exact symlink
+- exact unlink proven-owned obsolete file
+- apply mode
+- cleanup journal-owned staging
+- atomic journal publish/remove
+
+recursive removal は D3/D4 で必要になるまで public kernel contract に入れない。ただし obsolete empty directory cleanup は owned children と emptiness を descriptor-relative に証明した範囲で許可する。
 
 ## data / failure
-データ、失敗、回復時の扱いを記述する。
+
+### Exact precondition
+
+regular target:
+
+```text
+file_type + device + inode + link_count + size + mode + sha256
+```
+
+provider source:
+
+```text
+source device/inode/ctime/mtime/size/mode + bytes sha256
+```
+
+recovery では action record の exact SHA を参照する。historical list の index から bytes/identity を選ばない。
+
+### Retry mismatch reason
+
+stable internal reason を少なくとも次に分ける。
+
+- `journal-root-mismatch`
+- `journal-intent-mismatch`
+- `journal-authority-mismatch`
+- `journal-plan-mismatch`
+- `journal-protocol-incompatible`
+- `journal-precondition-mismatch`
+- `legacy-marker-unconvertible`
+- `dual-recovery-state`
+
+public text は sanitization してよいが、tests と result は reason distinction を失わない。
 
 ## 変更対象
-変更する要素と変更しない要素を記述する。
+
+- `src/spec_dock/managed_distribution.py` の type/service/journal/kernel boundary
+- recognized flow に必要なら package 内の focused module 抽出
+- `src/spec_dock/cli.py` の update/init-force dispatch と output mapping
+- current distribution manifest の protocol compatibility metadata
+- `tests/unit/infra/test_managed_distribution.py`
+- `tests/unit/infra/test_init_update.py`
+- README recovery guidance
+
+fresh-only flow、uninstall/purge behavior、package/platform final parity は変更しない。
 
 ## 移行・互換性・rollback
-移行、互換性、戻し方を記述する。
+
+- existing recognized workspace version/anchor/historical evidence contract を入力 adapter から再利用する。
+- new journal 作成前の failure は mutation 0 で current command retry 可能とする。
+- new journal 作成後は new/compatible package の forward recovery を使う。old package への code rollback が safe と証明されない場合は実行しない。
+- cutover commit では update/init-force の old orchestration route を削除する。fresh compatibility path は D2 まで残せるが、recognized intent から到達不能にする。
+- legacy marker conversion fixture は exact current marker bytes を使い、field を推測追加した fixtureだけで成功を証明しない。
 
 ## testability
-設計を検証できる観測点と方法を記述する。
+
+- pure assessment tests: current/historical/missing/obsolete/unknown/wrong mode/symlink/hardlink
+- plan-construction negative test: blocker 有り、unsafe path、incomplete identity、nondeterministic digest
+- journal lifecycle tests: prepared/executing/verifying/completed、checkpoint failure、atomic publish failure
+- resume tests: same-plan convergence、root/intent/plan/protocol/SHA mismatch
+- kernel negative tests: parent/root rebind、target appearance、provider mutation、staging collision、unknown stage sibling
+- CLI tests: update/init-force success/error、unmanaged preservation、no prompt/backup on no-write path、current output/exit
+- absence tests: recognized flow から `scaffold_applier`、legacy phase writer、plan outside mutation への dependency がない
 
 ## risk
-実装前に扱うリスクを記述する。
+
+- D1 が horizontal rewrite に膨張する risk: recognized flow の acceptance に必要な interface だけを作り、fresh/deprovision/purge action は後続 Issue に残す。
+- digest canonicalization の誤り: stable serialization fixture と order permutation negative test を作る。
+- marker conversion が authority を推測する risk: exact required fields と failure reason を code/test/docs で同時固定する。
+- current behavior drift: existing tests を先に characterization し、新実装の都合で unknown preservation expectation を弱めない。
