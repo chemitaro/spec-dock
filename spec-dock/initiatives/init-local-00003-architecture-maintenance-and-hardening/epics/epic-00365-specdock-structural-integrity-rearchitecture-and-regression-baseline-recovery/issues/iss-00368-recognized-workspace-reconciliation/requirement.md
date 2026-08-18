@@ -27,8 +27,8 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 | ID | 要件 |
 |---|---|
 | I368-R01 | `update` と `init --force` は同じ recognized-workspace intent policy と operation service を使う。public command/flag は変更しない。 |
-| I368-R02 | current exact match は adopt、missing desired asset は create、proven historical match は upgrade、release catalog から外れた proven-owned asset は prune として評価できる。 |
-| I368-R03 | unknown current collision、modified content、unproven obsolete target、unsafe file type、symlink、hardlink、parent symlink、root/parent rebind が一件でもあれば write 0 件で operation 全体を block する。 |
+| I368-R02 | current exact match は adopt、missing desired asset は create、proven historical match は upgrade、release catalog から外れた proven-owned asset は prune として評価できる。current content と safe regular single-link identity を証明できる mode-only drift は desired mode への journaled repair とする。 |
+| I368-R03 | unknown current collision、modified content、ownership/content を証明できない mode drift、unproven obsolete target、unsafe file type、symlink、hardlink、parent symlink、root/parent rebind が一件でもあれば write 0 件で operation 全体を block する。 |
 | I368-R04 | user-owned initiatives、workbench payload、authority 外 unknown sibling を保持する。managed root 内という理由だけで ownership を推測しない。 |
 | I368-R05 | assessment と plan construction は marker、backup、staging、version file、managed target を変更しない。 |
 | I368-R06 | apply 開始前に root/intent/contract/plan digest に束縛した Operation Journal を作り、各 action の exact precondition と expected postcondition を記録する。 |
@@ -74,7 +74,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 ## 受け入れ条件
 
 1. recognized target の `update` と `init --force` が新 operation service を end-to-end 使用する。
-2. SC-UPDATE-01〜04 相当の current/historical/missing/unknown/unsafe matrix が focused tests と CLI tests で成功する。
+2. SC-UPDATE-01〜04 相当の current/historical/missing/unknown/unsafe matrixに加え、current-content mode-only repair と unproven/unsafe mode drift block が focused tests と CLI tests で成功する。
 3. blocker が一件でもある plan は journal、staging、backup、version file、managed asset を一切変更しない。
 4. same-root/same-plan partial failure fixture が journal checkpoint から再実行して desired postcondition に収束する。
 5. root、intent、authority、plan digest、protocol、exact pre-action SHA mismatch fixture が write 0 件で停止する。
