@@ -21,10 +21,10 @@ five fixed Issue slices を順に統合し、SpecDock の全 managed distributio
 
 | 順序 | Issue | dependency | 完成時の handoff |
 |---|---|---|---|
-| D1 | `iss-00368` Recognized Workspace Reconciliation | なし | `update` / `init --force` が新 engine、journal、typed result を end-to-end 使用し、対象 legacy path が削除される。 |
-| D2 | `iss-00369` Fresh Distribution Provisioning | `iss-00368` | fresh `init` が D1 engine を使用し、別 scaffold mutation seam が fresh flow から削除される。 |
-| D3 | `iss-00370` Managed Distribution Deprovision | `iss-00369` | `uninstall --apply --keep-specs` と dry-run/JSON が共通 grammar/kernel/journal を使用し、spec history を保持する。 |
-| D4 | `iss-00371` Explicit Spec History Purge | `iss-00370` | `uninstall --apply --remove-specs` が別 authority として共通 engine を使用し、retry authority escalation を拒否する。 |
+| D1 | `iss-00368` Recognized Workspace Reconciliation | なし | recognized target の `update` / `init --force` が新 engine、journal、typed result を end-to-end 使用し、対象 legacy path が削除される。 |
+| D2 | `iss-00369` Fresh Distribution Provisioning | `iss-00368` | fresh target の `init` / `init --force` / `update` が fresh intent として D1 engine を使用し、別 scaffold mutation seam が fresh flow から削除される。 |
+| D3 | `iss-00370` Managed Distribution Deprovision | `iss-00369` | default/`--keep-specs` dry-run と `uninstall --apply --keep-specs` が共通 grammar/kernel/journal を使用し、spec history を保持する。 |
+| D4 | `iss-00371` Explicit Spec History Purge | `iss-00370` | `uninstall --remove-specs` dry-run/apply が別 authority として共通 engine を使用し、retry authority escalation を拒否する。 |
 | D5 | `iss-00372` Distribution Hard Cutover And Parity | D1〜D4 | legacy seam absence、public/package/platform parity、migration/recovery docs を確定する。 |
 
 D1〜D4 は strict linear dependency とする。D5 用の test inventory、CI feasibility、parity fixture preparation は読み取り専用または既存 behavior を変えない範囲で並行調査できるが、D5 の cutover assertion は D1〜D4 完了前に確定しない。
@@ -41,19 +41,19 @@ D1〜D4 は strict linear dependency とする。D5 用の test inventory、CI f
 ### D2 — Fresh Distribution Provisioning
 
 - fresh-only desired assets、collision、directory creation、prompt/backup condition、postcondition を D1 contract へ追加する。
-- fresh `init` を新 service へ切り替える。
+- fresh target に対する `init`、`init --force`、`update` の現行 entrypoint semantics を characterization し、すべてを `fresh` intent の新 service へ切り替える。
 - fresh flow の別 scaffold mutation engine と特殊な publish shortcut を削除する。
 
 ### D3 — Managed Distribution Deprovision
 
-- current dry-run、`--apply --keep-specs`、text/JSON semantics を characterization する。
+- current default/`--keep-specs` dry-run、`--apply --keep-specs`、text/JSON semantics を characterization する。`--remove-specs` dry-run/apply は D4 の owner とする。
 - tooling/generated/owned asset removal と spec history/unknown preservation を共通 action grammar へ追加する。
 - current uninstall plan/apply/postverify を service/kernel/journal に移し、deprovision 対象 legacy helper を削除する。
 - information-poor `.uninstall-retry.json` は推測変換せず、exactly safe な migration path または typed manual recovery を提供する。
 
 ### D4 — Explicit Spec History Purge
 
-- existing `--apply --remove-specs` を explicit purge authority として model/journal/plan digest に束縛する。
+- existing `--remove-specs` dry-run と `--apply --remove-specs` を explicit purge intent/authority として model/journal/plan digest に束縛する。
 - dry-run summary、path guard、pre-write blocker、postcondition、retry authority non-escalation を完成させる。
 - purge flow の legacy branch を削除し、update/deprovision から purge へ到達する path がないことを test で固定する。
 

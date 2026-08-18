@@ -181,7 +181,7 @@ public text は sanitization してよいが、tests と result は reason disti
 
 - `src/spec_dock/managed_distribution.py` の type/service/journal/kernel boundary
 - recognized flow に必要なら package 内の focused module 抽出
-- `src/spec_dock/cli.py` の update/init-force dispatch と output mapping
+- `src/spec_dock/cli.py` の recognized-target update/init-force dispatch と output mapping
 - current distribution manifest の protocol compatibility metadata
 - `tests/unit/infra/test_managed_distribution.py`
 - `tests/unit/infra/test_init_update.py`
@@ -194,7 +194,7 @@ fresh-only flow、uninstall/purge behavior、package/platform final parity は�
 - existing recognized workspace version/anchor/historical evidence contract を入力 adapter から再利用する。
 - new journal 作成前の failure は mutation 0 で current command retry 可能とする。
 - new journal 作成後は new/compatible package の forward recovery を使う。old package への code rollback が safe と証明されない場合は実行しない。
-- cutover commit では update/init-force の old orchestration route を削除する。fresh compatibility path は D2 まで残せるが、recognized intent から到達不能にする。
+- cutover commit では recognized-target update/init-force の old orchestration route を削除する。fresh target の `init` / `init --force` / `update` compatibility path は D2 の ownerとして残し、recognized service から到達不能にする。
 - legacy marker conversion fixture は exact current marker bytes を使い、field を推測追加した fixtureだけで成功を証明しない。
 
 ## testability
@@ -204,7 +204,7 @@ fresh-only flow、uninstall/purge behavior、package/platform final parity は�
 - journal lifecycle tests: prepared/executing/verifying/completed、checkpoint failure、atomic publish failure
 - resume tests: same-plan convergence、root/intent/plan/protocol/SHA mismatch
 - kernel negative tests: parent/root rebind、target appearance、provider mutation、staging collision、unknown stage sibling
-- CLI tests: update/init-force success/error、unmanaged preservation、no prompt/backup on no-write path、current output/exit
+- CLI tests: recognized update/init-force success/error、unmanaged preservation、no prompt/backup on no-write path、current output/exit、および fresh entrypoint matrix が D1 で変化しないこと
 - absence tests: recognized flow から `scaffold_applier`、legacy phase writer、plan outside mutation への dependency がない
 
 ## risk

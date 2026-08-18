@@ -42,7 +42,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 ### 対象
 
 - recognized current/historical workspace admission
-- `update` と `init --force`
+- recognized target の `update` と `init --force`
 - desired/current/historical/obsolete ownership assessment
 - common action grammar の最小 end-to-end subset
 - Operation Journal protocol の初期 version
@@ -53,7 +53,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 
 ### 対象外
 
-- fresh `init` の cutover（`iss-00369`）
+- fresh target の `init` / `init --force` / `update` cutover（`iss-00369`）
 - deprovision（`iss-00370`）
 - history purge（`iss-00371`）
 - all-surface/platform parity の最終確定（`iss-00372`）
@@ -63,7 +63,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 
 ## 失敗・境界条件
 
-- target が managed/recognized workspace と証明できない場合、fresh init へ推測 fallback せず operation-specific diagnostic を返す。
+- D1 の recognized service は、recognized workspace と証明できない target を fresh へ推測 fallback せず operation-specific diagnostic を返す。public CLI が観測した fresh target に対する既存 `init` / `init --force` / `update` compatibility route は D2 の owner とし、この Issue では挙動を変更しない。
 - assessment 後に provider asset bytes/mode、root、parent、target が変わった場合は apply を停止する。
 - journal create/publish に失敗した場合、managed target mutation は 0 件である。
 - action publish と checkpoint の間で crash した場合、resume は exact pre/post identity から状態を一意判定する。曖昧なら block する。
@@ -73,7 +73,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 
 ## 受け入れ条件
 
-1. `update` と `init --force` が新 operation service を end-to-end 使用する。
+1. recognized target の `update` と `init --force` が新 operation service を end-to-end 使用する。
 2. SC-UPDATE-01〜04 相当の current/historical/missing/unknown/unsafe matrix が focused tests と CLI tests で成功する。
 3. blocker が一件でもある plan は journal、staging、backup、version file、managed asset を一切変更しない。
 4. same-root/same-plan partial failure fixture が journal checkpoint から再実行して desired postcondition に収束する。
@@ -82,7 +82,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 7. provider change、target appearance、parent/root replacement、hardlink/symlink の current negative tests が維持される。
 8. `update` / `init --force` 対象の legacy scaffold callback、marker transition、plan 外 mutation route が削除され、同じ flow を二経路で実行できない。
 9. `tests/unit/infra/test_managed_distribution.py` と `tests/unit/infra/test_init_update.py` の affected tests が成功する。
-10. fresh、uninstall、purge の public behavior はこの Issue で変更しない。
+10. fresh target の `init` / `init --force` / `update`、uninstall、purge の public behavior はこの Issue で変更せず、fresh entrypoint matrix の characterization test を D2 へ引き渡す。
 
 ## 制約・前提
 

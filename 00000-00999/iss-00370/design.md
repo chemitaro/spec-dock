@@ -15,7 +15,7 @@ ID: "iss-00370"
 
 ## 設計目標
 
-D1/D2のunified engineへ`deprovision` intentを追加し、dry-run、owned removal、preservation、journaled apply、postcondition、public JSON mappingをend-to-end接続する。current CLI-owned `_UninstallAction` grammarとrecursive mutationをcommon domain/kernelへ移す。
+D1/D2のunified engineへ`deprovision` intentを追加し、default/`--keep-specs` dry-run、owned removal、preservation、journaled apply、postcondition、public JSON mappingをend-to-end接続する。current CLI-owned `_UninstallAction` grammarとrecursive mutationをcommon domain/kernelへ移す。
 
 ## Current / Target
 
@@ -32,7 +32,7 @@ D1/D2のunified engineへ`deprovision` intentを追加し、dry-run、owned remo
 - `deprovision`をcommon `OperationIntent`とauthority policyへ追加する。
 - current uninstall classificationをcommon disposition/actionへmappingする。
 - recursive removeをDescriptor-bound Filesystem Kernelのbounded operationにする。
-- dry-runはassessment/planから`ProcessResult(planned)`を返す。
+- default/`--keep-specs` dry-runはdeprovision assessment/planから`ProcessResult(planned)`を返す。`--remove-specs` dry-runはD4までcurrent compatibility pathに留める。
 - applyはcommon Operation Journalを使い、spec history rootをpreserve postconditionに含める。
 - current JSONはCLI compatibility mapperで維持する。
 
@@ -115,13 +115,13 @@ exact conversionに必要な追加evidenceがcurrent treeから一意に得ら�
 ## 変更対象
 
 - common contract/assessment/action/journal/kernelへのdeprovision extension
-- `cli.py` uninstall dry-run/apply dispatchとJSON/text mapper
+- `cli.py` default/`--keep-specs` dry-runとkeep-specs apply dispatch、JSON/text mapper
 - current uninstall legacy helperのdeprovision route
 - `test_init_update.py` uninstall scenarios
 - `test_managed_distribution.py` common remove/journal/kernel tests
 - README uninstall/recovery guidance
 
-`--remove-specs` executionはD4まで切り替えない。
+`--remove-specs` dry-run/applyはD4まで切り替えない。
 
 ## 移行・互換性・rollback
 
@@ -133,7 +133,7 @@ exact conversionに必要な追加evidenceがcurrent treeから一意に得ら�
 
 ## testability
 
-- dry-run no-write snapshot
+- default/`--keep-specs` dry-run no-write snapshot
 - keep-specs successful removal
 - modified/unknown file preserve/block
 - initiatives/spec history byte identity

@@ -36,7 +36,7 @@ Risk factors:
 
 ## 目標
 
-`uninstall` dry-runと`--apply --keep-specs`をcommon engineへhard cutoverし、owned distribution removalとspec history/unknown preservationをend-to-end証明する。current JSON semanticsを維持し、deprovision対象legacy grammar/writerを削除する。
+default/`--keep-specs` dry-runと`--apply --keep-specs`をcommon engineへhard cutoverし、owned distribution removalとspec history/unknown preservationをend-to-end証明する。`--remove-specs` dry-run/applyはD4のownerとする。current JSON semanticsを維持し、deprovision対象legacy grammar/writerを削除する。
 
 ## 順序・依存
 
@@ -54,7 +54,7 @@ D4 purge fixtureはauthority comparison用にread-only準備できるが、purge
 
 Migration:
 
-- dry-runと`--apply --keep-specs`を同じIssue内でnew serviceへhard cutoverし、deprovision対象のold action/plan/apply/postverify/writerを同時に削除する。
+- default/`--keep-specs` dry-runと`--apply --keep-specs`を同じIssue内でnew serviceへhard cutoverし、deprovision対象のold action/plan/apply/postverify/writerを同時に削除する。
 - current `.uninstall-retry.json`はoriginal root、intent、plan digest、checkpoint、specs modeを証明できないため、defaultではnew deprovision journalへ変換しない。exact追加証拠がある限定case以外はmarkerを保持してwrite前にblockする。
 - D4まで残るremove-specs compatibility routeはnew deprovision journalから到達不能にし、purge authorityを推測移行しない。
 
@@ -63,7 +63,7 @@ Migration:
 ### Step 1 — Current contractを固定する
 
 - `_UninstallAction` category/status/reason、plan/apply/postverify、retry marker、payload fieldsをcall graph/schema fixtureにする。
-- dry-run、keep-specs、modified/unknown preservation、bounded cleanup、symlink/hardlink、partial failureのexisting testsをinventory化する。
+- default/`--keep-specs` dry-run、keep-specs apply、modified/unknown preservation、bounded cleanup、symlink/hardlink、partial failureのexisting testsをinventory化する。`--remove-specs` fixturesはD4 handoffとして区別する。
 - JSONはexactly one object、schema version、keys、action fields、status/phase/guidance/error sanitizationをgolden fixtureにする。
 
 ```bash
@@ -102,9 +102,9 @@ Failure tests:
 - unknown child appearance
 - checkpoint failure
 
-### Step 4 — Dry-runをnew ProcessResultへ切り替える
+### Step 4 — Default/`--keep-specs` dry-runをnew ProcessResultへ切り替える
 
-- `uninstall` no `--apply`をnew assessment/resultへdispatchする。
+- `uninstall` no `--apply`のうちdefault/`--keep-specs`をnew deprovision assessment/resultへdispatchする。`--remove-specs`はD4までlegacy compatibility routeを維持する。
 - current text/JSON mapperでplanned resultを出す。
 - tree/marker/journal/staging before-after equalityをassertする。
 - blocker diagnosticsとapplyabilityを区別する。
@@ -142,7 +142,7 @@ make lint
 
 Required evidence:
 
-- dry-run tree byte equality
+- default/`--keep-specs` dry-run tree byte equality
 - successful removal inventory
 - spec history/unknown/outside sentinel byte equality
 - blocker write-zero
@@ -163,7 +163,7 @@ Required evidence:
 ## exit / handoff
 
 - I370-R01〜R10とacceptance 1〜10がevidenceに結び付く。
-- dry-run、keep-specs、JSON、partial recoveryがcommon engineを使用。
+- default/`--keep-specs` dry-run、keep-specs apply、JSON、partial recoveryがcommon engineを使用。
 - spec history/unknown preservationがpostcondition testで証明。
 - deprovision対象legacy grammar/recursive mutation/writerが削除。
 - D4へ、same engine上でseparate purge authority/action/postconditionを追加できる状態を渡す。
