@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "final_quality_gate_campaign_plan",
+  "task_id": "ISS-00368",
+  "target_branch": "iss-00368-recognized-workspace-reconciliation",
+  "fixed_point": "7588d54114a2b8be7661353952f65741169320bd",
+  "fast_profile_id": "specdock-fast-v1",
+  "slow_profile_id": "specdock-slow-v1",
+  "domain_ids": [
+    "ownership-path-identity",
+    "marker-retry-recovery",
+    "update-uninstall-reinit",
+    "retired-surface-package-parity",
+    "tests-release-evidence"
+  ],
+  "evidence_only_paths": [],
+  "supplementary_files": [
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/plan.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/plan.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/report.md"
+  ],
+  "model": "gpt-5.6-sol",
+  "timeout": "120m",
+  "budget_profile": "strict-v1"
+}
