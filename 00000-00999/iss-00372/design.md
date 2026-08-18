@@ -117,7 +117,7 @@ Full Regression comparisonはpre-Epic exact baseline SHAとcandidate SHAに別�
 
 ## 変更対象
 
-- source structural cleanup
+- source structural absence verificationとowner Issueへのfail-closed handback
 - AST/import/dependency/runtime route tests
 - package inventory/byte parity tests
 - `.github/workflows/provider-ci.yml`等のfocused macOS evidence path
@@ -129,7 +129,7 @@ D1〜D4 public semantics、node metadata、unrelated regression codeは変更し
 ## 移行・互換性・rollback
 
 - residual legacy readersはexplicit allowlistとremoval conditionを持つ。writer/authority routeは残さない。
-- structural cleanupはbehavior tests green後に行い、dead seam removalでunexpectedconsumerが見つかった場合はprivate APIのpublic guaranteeを新設せずrepository内callersを移行する。
+- structural absence verificationはbehavior tests green後に行う。production executable seam/writerまたはhidden repository callerが見つかった場合はowner Issueのexit未達としてblockし、D5内でcleanupやprivate APIのpublic guarantee新設を行わない。
 - release rollback前にactive new-journal consumerのcompatible forward recoveryを確認する。
 - package parity failure時はreleaseを止め、surface-specificmanual patchではなくcanonical provider source/projectionを修正する。
 

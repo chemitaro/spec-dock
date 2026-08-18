@@ -80,7 +80,7 @@ reason_code
 blocking
 ```
 
-obsolete target は historical evidence と exact current observation が一致する場合だけ remove authority を得る。mode drift の扱いは current contract/test を維持し、content ownership と mutation safety を別に評価する。
+obsolete target は historical evidence と exact current observation が一致する場合だけ remove authority を得る。mode drift は content が current desired bytes と一致し、target が safe regular single-link identity と証明できる場合だけ desired mode への repair action とする。content ownership、type、link count、parent safetyを証明できない mode drift は blocker とし、mode repair authorityを発行しない。
 
 ### Plan construction
 
@@ -199,7 +199,7 @@ fresh-only flow、uninstall/purge behavior、package/platform final parity は�
 
 ## testability
 
-- pure assessment tests: current/historical/missing/obsolete/unknown/wrong mode/symlink/hardlink
+- pure assessment tests: current/historical/missing/obsolete/unknown/current-content mode-only repair/unproven mode drift block/symlink/hardlink
 - plan-construction negative test: blocker 有り、unsafe path、incomplete identity、nondeterministic digest
 - journal lifecycle tests: prepared/executing/verifying/completed、checkpoint failure、atomic publish failure
 - resume tests: same-plan convergence、root/intent/plan/protocol/SHA mismatch

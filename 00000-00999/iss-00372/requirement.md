@@ -14,7 +14,7 @@ ID: "iss-00372"
 
 ## 目的
 
-D1〜D4で移行した全public distribution flowについて、legacy execution seamを物理的に除去し、provider checkout、dogfooding workspace、wheel、sdist、fresh consumer、Linux、macOSで同じcontractが成立することを確定する。利用者に見えるcommand/flag/data/JSON semanticsとdata-preservation safetyを維持したまま、single ownership boundaryを完成させる。
+D1〜D4で移行した全public distribution flowについて、legacy execution seamが各owner Issueで物理的に除去済みであることを検証し、provider checkout、dogfooding workspace、wheel、sdist、fresh consumer、Linux、macOSで同じcontractが成立することを確定する。利用者に見えるcommand/flag/data/JSON semanticsとdata-preservation safetyを維持したまま、single ownership boundaryのabsence evidenceを完成させる。
 
 ## 背景
 
@@ -82,5 +82,6 @@ vertical cutover後もdead code、private import、compatibility callback、lega
 
 - dependencies `iss-00368`〜`iss-00371`が完了済みである。
 - D5でbehavior gapが見つかった場合はowner IssueのRequirement/Designへ戻し、D5で黙ってnew semanticsを決めない。
+- production executable pathまたはwriterを持つlegacy seamが見つかった場合はowner Issueのexit未達としてD5をblockし、D5 scopeでcleanupを代行しない。migration-only readerはexplicit allowlistとwrite-zero testで判定する。
 - platform evidenceはcommand、runner、OS、Python/package version、candidate SHAを記録する。
 - Full Regression未解決unrelated failureはsibling Epic handoff evidenceに分類するが、本Issueでnodeを作らない。
