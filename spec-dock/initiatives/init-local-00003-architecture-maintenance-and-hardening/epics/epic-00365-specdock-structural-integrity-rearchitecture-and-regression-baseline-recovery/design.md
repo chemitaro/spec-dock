@@ -61,7 +61,7 @@ CLI Adapter
 
 責務:
 
-- public surface を `OperationIntent` と explicit authority に正規化する。
+- public surface を workspace observation に基づく `OperationIntent` と explicit authority に正規化する。fresh target の既存 `init`、`init --force`、`update` entrypoint はいずれも `fresh` intent とし、recognized target の `update` / `init-force` と混同しない。
 - package resources と executing package version を service に渡す。
 - `ProcessResult` を現行 text、JSON schema version 1、exit code へ写像する。
 
@@ -166,7 +166,7 @@ status
 
 **exact pre-action SHA rule:** recovery は「historical identities の何番目」や catalog index を参照してはいけない。未完了 action は現状が journal の exact pre-action identity と一致するときだけ再実行できる。完了 action は expected post-action identity と一致するときだけ完了扱いを維持する。どちらにも一致しない状態は ambiguous として block する。
 
-checkpoint は単調に進む。partial failure では journal と証明済み staging lease を保持し、same root / same intent / same authority / same plan / compatible protocol の package が re-observe して収束させる。postcondition 成功後だけ journal を完了・除去する。
+checkpoint は単調に進む。partial failure では journal と証明済み staging lease を保持し、same root / same intent / exact same authority / same plan / compatible protocol の package が re-observe して収束させる。lower-authority invocation は read-only inspection と diagnostic だけを行い、checkpoint を進めない。postcondition 成功後だけ journal を完了・除去する。
 
 ### 7. Descriptor-bound Filesystem Kernel
 

@@ -36,7 +36,7 @@ Risk factors:
 
 ## 目標
 
-`update` と `init --force` を新 unified reconciliation engine へ hard cutover し、blocker write-zero、exact-SHA journal resume、current public behavior を focused tests で証明する。Issue 終了時に recognized flow の旧 scaffold callback/marker orchestration/plan外 mutation routeを残さない。
+recognized target の `update` と `init --force` を新 unified reconciliation engine へ hard cutover し、blocker write-zero、exact-SHA journal resume、current public behavior を focused tests で証明する。fresh target の同名 entrypoint は D2 の owner として現行挙動を保持する。Issue 終了時に recognized flow の旧 scaffold callback/marker orchestration/plan外 mutation routeを残さない。
 
 ## 順序・依存
 
@@ -58,7 +58,7 @@ Test fixture、JSON/text golden data、platform capability inventory は 1〜3 �
 ### Step 1 — Current behavior と public contract を固定する
 
 - exact commit の `DistributionOperation`、`DistributionAction`、`DistributionPlan`、admission、retry marker、scaffold callback、CLI orchestration を call graph にする。
-- `tests/unit/infra/test_managed_distribution.py` と `test_init_update.py` から update/init-force の ownership/safety/output matrix を抽出する。
+- `tests/unit/infra/test_managed_distribution.py` と `test_init_update.py` から recognized-target update/init-force の ownership/safety/output matrix と、fresh target に対する `init` / `init --force` / `update` の現行 compatibility matrix を抽出する。
 - missing/current/historical/obsolete/unknown/modified/wrong-mode/symlink/hardlink/parent/root/provider/stage case を parameterized characterization tests にする。
 - no-write assertion は target tree bytes、marker、staging、backup、version、outside sentinel を含める。
 
@@ -110,7 +110,7 @@ Negative tests:
 
 Exit: same-process failure と simulated crash state の双方で journal が安全に残る。
 
-### Step 4 — `update` を新 service へ切り替える
+### Step 4 — recognized target の `update` を新 service へ切り替える
 
 - CLI parse/resource location を保ち、service call と result rendering に置換する。
 - current/historical upgrade、missing create、obsolete prune、mode repair、user content preservation を新 engine で通す。
@@ -126,7 +126,7 @@ uv run pytest tests/unit/infra/test_init_update.py -k 'update'
 
 Exit: update の successful/blocked/partial-recovery paths が new ProcessResult から出力される。
 
-### Step 5 — `init --force` を同じ recognized flow へ切り替える
+### Step 5 — recognized target の `init --force` を同じ flow へ切り替える
 
 - force を unknown overwrite authority として扱わない。
 - update と共通 assessment/action/kernel/journal を使用し、intent policy の必要差分だけを contract に置く。

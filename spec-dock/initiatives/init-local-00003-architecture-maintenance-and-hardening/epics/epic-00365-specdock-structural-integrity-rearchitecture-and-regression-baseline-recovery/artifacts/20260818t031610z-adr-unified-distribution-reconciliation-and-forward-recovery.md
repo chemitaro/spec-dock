@@ -49,7 +49,7 @@ unknown、modified、user-owned content は、explicit spec history purge author
 
 partial failure の正規 recovery は Operation Journal による forward recovery とし、whole-operation atomic rollback は保証しない。
 
-journal は root binding、intent、authority、package/contract/protocol identity、plan digest、ordered action、checkpoint、staging lease を持つ。resume は same root、same intent、same or lower authority、same reconstructable plan、compatible protocol に限定する。
+journal は root binding、intent、authority、package/contract/protocol identity、plan digest、ordered action、checkpoint、staging lease を持つ。mutation resume は same root、same intent、exact same authority、same reconstructable plan、compatible protocol に限定する。lower-authority invocation は journal の read-only inspection と diagnostic だけを許可し、action 実行や checkpoint 更新を行わない。
 
 regular-file recovery は exact pre-action SHA-256 と expected post-action SHA-256 を使う。historical catalog の index、配列位置、pathname 推測を pre-state identity として使わない。未完了 action が exact pre-state、完了 action が exact post-state に一致しない場合は ambiguous として write 前に停止する。
 
@@ -70,10 +70,10 @@ managed distribution deprovision と spec history purge は同じ engine を使�
 
 D1〜D4 は public flow ごとの vertical slice とし、新 engine への切替と対象 legacy path の削除を同じ Issue で完了する。長期 dual mode、runtime toggle、二重 writer は採用しない。
 
-- D1: recognized `update` / `init --force`
-- D2: fresh `init`
-- D3: managed deprovision
-- D4: explicit history purge
+- D1: recognized target の `update` / `init --force`
+- D2: fresh target の `init` / `init --force` / `update`
+- D3: default/`--keep-specs` dry-run と managed deprovision apply
+- D4: `--remove-specs` dry-run/apply による explicit history purge
 - D5: remaining legacy seam absence と distribution/platform parity の確定
 
 ## Options

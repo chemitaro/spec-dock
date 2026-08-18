@@ -14,7 +14,7 @@ ID: "iss-00370"
 
 ## 目的
 
-current `spec-dock uninstall --apply --keep-specs` 相当の managed distribution deprovision を unified reconciliation engineへ移す。利用者はdry-runでcomplete ownership-safe planを確認し、明示apply後にtooling、generated state、proven-owned managed assetsを除去できる一方、spec historyとauthority外unknown contentを保持できる。
+current `spec-dock uninstall --apply --keep-specs` 相当の managed distribution deprovision を unified reconciliation engineへ移す。利用者はdefault/`--keep-specs` dry-runでcomplete ownership-safe deprovision planを確認し、明示apply後にtooling、generated state、proven-owned managed assetsを除去できる一方、spec historyとauthority外unknown contentを保持できる。
 
 ## 背景
 
@@ -25,7 +25,7 @@ exact commitではuninstallが`cli.py`内の`_UninstallAction`、独自plan/appl
 | ID | 要件 |
 |---|---|
 | I370-R01 | `uninstall`はdry-runを既定とし、`--apply`にはexactly one specs modeを要求する。deprovision mutationは`--apply --keep-specs`でのみ開始する。 |
-| I370-R02 | dry-runはread-only assessment/plan-derived resultを返し、journal、retry marker、staging、target mutationを作らない。 |
+| I370-R02 | defaultまたは`--keep-specs` dry-runはread-only deprovision assessment/plan-derived resultを返し、journal、retry marker、staging、target mutationを作らない。`--remove-specs` dry-runはD4のpurge ownerとする。 |
 | I370-R03 | deprovisionはowned tooling、generated state、current/historical proven managed assets、owned empty directoriesを除去し、spec historyとauthority外unknown contentを保持する。 |
 | I370-R04 | all actionsのownership/mutation safetyをwrite前に評価し、blockerが一件でもあればpartial safe subsetを適用しない。 |
 | I370-R05 | modified managed file、unknown file、unsafe mode/type、symlink/hardlink、parent/root rebindはpreserveまたはblockされ、repository外を変更しない。 |
@@ -39,7 +39,7 @@ exact commitではuninstallが`cli.py`内の`_UninstallAction`、独自plan/appl
 
 ### 対象
 
-- uninstall dry-runと`--apply --keep-specs`
+- default/`--keep-specs` uninstall dry-runと`--apply --keep-specs`
 - deprovision intent/authority/postcondition
 - owned removal/preserve/block action
 - bounded descriptor-relative recursive remove
@@ -49,7 +49,7 @@ exact commitではuninstallが`cli.py`内の`_UninstallAction`、独自plan/appl
 
 ### 対象外
 
-- `--remove-specs` purge execution（`iss-00371`）
+- `--remove-specs` purge dry-run/apply（`iss-00371`）
 - new uninstall command/flag/schema
 - spec history content migration
 - generic recursive deletion library
@@ -59,7 +59,7 @@ exact commitではuninstallが`cli.py`内の`_UninstallAction`、独自plan/appl
 ## 失敗・境界条件
 
 - `--apply` without specs mode、both modes、unmanaged targetはmutation前にerror。
-- dry-runとJSON renderingはtargetを変更しない。
+- default/`--keep-specs` dry-runとJSON renderingはtargetを変更しない。`--remove-specs` dry-runの同じ保証はD4で固定する。
 - ownershipを証明できないmanaged-looking pathはpathnameだけで削除しない。
 - preserved file/rootを含むparent directoryはremoveしない。
 - recursive remove中にsymlink、hardlink、identity change、unknown childを観測した場合は外部をfollowせず停止する。
@@ -68,7 +68,7 @@ exact commitではuninstallが`cli.py`内の`_UninstallAction`、独自plan/appl
 
 ## 受け入れ条件
 
-1. dry-runがplanned resultを返し、before/after treeがbyte-identicalである。
+1. default/`--keep-specs` dry-runがdeprovision planned resultを返し、before/after treeがbyte-identicalである。`--remove-specs` dry-runはD4までcurrent compatibility pathを維持する。
 2. `--apply --keep-specs`がowned tooling/generated/managed assetsを除去する。
 3. initiatives/spec history、modified/unknown content、repository root sentinelが保持される。
 4. blocker有りplanがwrite 0件で停止する。
