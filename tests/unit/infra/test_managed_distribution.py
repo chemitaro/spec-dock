@@ -930,6 +930,108 @@ def test_i368_terminal_journal_rejects_tampered_digest_before_finalization(
     assert journal_path.read_bytes() == before
 
 
+def test_i368_journal_finalization_preserves_concurrent_replacement(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    prepared = store.prepare(executable, package_version="1.2.3")
+    completed = managed_distribution.replace(
+        prepared,
+        status="completed",
+        actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
+    )
+    store.write(completed)
+    original_rename = managed_distribution._rename_distribution_no_replace
+    replacement = b"user-owned replacement\n"
+    replaced = False
+
+    def replace_before_quarantine(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal replaced
+        if not replaced and source_name == store.path.name and destination_name.endswith(".remove"):
+            replaced = True
+            store.path.unlink()
+            store.path.write_bytes(replacement)
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_before_quarantine)
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        store.remove_completed(completed)
+
+    assert store.path.read_bytes() == replacement
+
+
+def test_i368_legacy_marker_removal_preserves_concurrent_replacement(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker = DistributionRetryMarker(
+        operation="update",
+        package_version="1.2.3",
+        target_root=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+        last_completed_phase="preflight-complete",
+        purpose="distribution-rerun",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": marker.operation,
+            "package_version": marker.package_version,
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": marker.last_completed_phase,
+            "purpose": marker.purpose,
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    store = OperationJournalStore(target_root)
+    original_rename = managed_distribution._rename_distribution_no_replace
+    replacement = b"user-owned replacement\n"
+    replaced = False
+
+    def replace_before_quarantine(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal replaced
+        if not replaced and source_name == marker_path.name and destination_name.endswith(".remove"):
+            replaced = True
+            marker_path.unlink()
+            marker_path.write_bytes(replacement)
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_before_quarantine)
+
+    with pytest.raises(DistributionApplyError, match="legacy-marker-unconvertible"):
+        store.remove_legacy_marker(marker)
+
+    assert marker_path.read_bytes() == replacement
+
+
 def test_i368_same_plan_partial_failure_resumes_from_journal_checkpoint(tmp_path: Path, monkeypatch) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     second_source = install_root / ".agents" / "skills" / "example" / "SKILL.md"
