@@ -3,7 +3,7 @@
 ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
-最終更新: "2026-08-18"
+最終更新: "2026-08-19"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -21,14 +21,17 @@ ID: "iss-00368"
 - recognized flow から旧 scaffold callback、CLI-owned marker transition、plan 外の version write を除去し、fresh-only compatibility route は `iss-00369` の対象として到達不能のまま残した。
 - README と shipped/dogfooding docs の recovery guidance を new journal contract に更新した。
 - Strict bounded review で検出した journal action 改変、generated path traversal、parent rebind、plan 外 active mutation、no-op journal 作成を根因単位で修正し、回帰テストを追加した。
+- Strict remediation で active fallback の generated refresh authority を事前観測した exact pointer identity に束縛し、外部・workbench symlink と asset capture 後の pointer rebind を operation 全体の write 前 blocker にした。
 
 ## Verification
 
+実装検証対象 SHA: `c71d904f48c5881a65eac68157aa5523394fc8c1`
+
 - [x] `make lint` — ruff check / format check / mypy が成功
 - [x] `uv run pytest tests/unit/infra/test_managed_distribution.py` — 117 passed
-- [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py -k 'update or force or distribution or issue_368'` — 124 passed
+- [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py -k 'update or force or distribution or issue_368'` — 127 passed
 - [x] `uv run pytest --run-full-regression tests/cli_runtime/test_distribution_cutover.py` — Issue 368 対応後は 143 passed、1 failed。残る failure は Issue 359 retained-skill SHA golden と current provider bytes の既存不一致で、本 Issue の変更対象外
-- [x] `uv run pytest` — 1053 passed、1044 policy-skipped
+- [x] `uv run pytest` — 1053 passed、1047 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
 - [ ] ChatGPT Final Quality Gate Strict — bounded review remediation 後の exact candidate SHA で再実施中
