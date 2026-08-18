@@ -22,16 +22,18 @@ ID: "iss-00368"
 - README と shipped/dogfooding docs の recovery guidance を new journal contract に更新した。
 - Strict bounded review で検出した journal action 改変、generated path traversal、parent rebind、plan 外 active mutation、no-op journal 作成を根因単位で修正し、回帰テストを追加した。
 - Strict remediation で active fallback の generated refresh authority を事前観測した exact pointer identity に束縛し、外部・workbench symlink と asset capture 後の pointer rebind を operation 全体の write 前 blocker にした。
+- Strict successor remediation で assessment と canonical plan の authority 一致を発行前に検証し、legacy marker 変換失敗時の prepared journal rollback、terminal journal の digest/action contract 再検証、recognized flow 全体の descriptor-bound root と visible identity 検証を追加した。
+- retained-skill SHA failure は fixed point と remediation SHA の expected/actual 値がそれぞれ同一であることを `artifacts/retained-skill-baseline-comparison.json` に記録し、Issue 368 による回帰ではないことを再現可能にした。
 
 ## Verification
 
-実装検証対象 SHA: `c71d904f48c5881a65eac68157aa5523394fc8c1`
+Strict successor remediation 実装 SHA: `e417662b0cedf2200440729ed786cc33425cecdb`
 
 - [x] `make lint` — ruff check / format check / mypy が成功
 - [x] `uv run pytest tests/unit/infra/test_managed_distribution.py` — 117 passed
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py -k 'update or force or distribution or issue_368'` — 127 passed
-- [x] `uv run pytest --run-full-regression tests/cli_runtime/test_distribution_cutover.py` — Issue 368 対応後は 143 passed、1 failed。残る failure は Issue 359 retained-skill SHA golden と current provider bytes の既存不一致で、本 Issue の変更対象外
-- [x] `uv run pytest` — 1053 passed、1047 policy-skipped
+- [x] `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` — 144 passed、1 failed。残る failure は fixed point と remediation SHA で expected/actual SHA が不変な Issue 359 retained-skill golden の既存不一致
+- [x] `uv run pytest -q` — 1057 passed、1048 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
 - [ ] ChatGPT Final Quality Gate Strict — bounded review remediation 後の exact candidate SHA で再実施中
