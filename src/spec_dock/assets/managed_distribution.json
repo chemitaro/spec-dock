@@ -25,7 +25,18 @@
       ]
     }
   ],
-  "historical_current_identities": [],
+  "historical_current_identities": [
+    {
+      "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+      "kind": "regular",
+      "sha256": "7182c1156bcf3635ffd3113cdcfb1d507c819b6aba6982673c0b10166f5da40c",
+      "mode": 420,
+      "source": {
+        "kind": "git-provider-source",
+        "ref": "948d0cf0dedb84ca34e51a4adc0995820aa011f6"
+      }
+    }
+  ],
   "trusted_consumer_manifests": [],
   "obsolete_exact_files": [
     {
