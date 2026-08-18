@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00372",
+  "title": "Distribution Hard Cutover And Parity",
+  "slug": "distribution-hard-cutover-and-parity",
+  "created_at": "2026-08-18T12:14:08+09:00",
+  "updated_at": "2026-08-18T12:15:27+09:00",
+  "parent_id": "epic-00365",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00365",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 372,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00368",
+    "iss-00369",
+    "iss-00370",
+    "iss-00371"
+  ]
+}
