@@ -32,7 +32,7 @@ CURRENT_INSTALL_ROOT_FILES = frozenset({
 })
 CURRENT_SKILL_SHA256 = {
     ".agents/skills/spec-dock/SKILL.md": "7d722020bc4666dd523ddb48d454d5af40367b1d712299e3d5c7dbc88319ae71",
-    ".agents/skills/spec-dock-grill-with-docs/SKILL.md": "7182c1156bcf3635ffd3113cdcfb1d507c819b6aba6982673c0b10166f5da40c",
+    ".agents/skills/spec-dock-grill-with-docs/SKILL.md": "83a63630c54be938158dc6a8eca89fa71dfe48c8f6025c7223322c55b4124db8",
 }
 
 REMOVED_INSTALL_ROOT_PREFIXES = (
