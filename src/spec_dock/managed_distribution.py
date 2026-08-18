@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import secrets
 import stat
 import sys
 import time
@@ -2664,7 +2665,10 @@ class OperationJournalStore:
     ) -> None:
         """Move a bound regular file aside before deleting its exact identity."""
 
-        token = hashlib.sha256(f"{expected.st_dev}:{expected.st_ino}:{expected.st_ctime_ns}".encode()).hexdigest()[:24]
+        identity_token = hashlib.sha256(
+            f"{expected.st_dev}:{expected.st_ino}:{expected.st_ctime_ns}".encode()
+        ).hexdigest()[:16]
+        token = f"{identity_token}-{secrets.token_hex(16)}"
         quarantine = f".{name}.{token}.remove"
         nofollow = getattr(os, "O_NOFOLLOW", None)
         if not isinstance(nofollow, int):
@@ -2717,19 +2721,73 @@ class OperationJournalStore:
                 held_after.st_nlink,
             )
             if moved_identity != held_identity:
-                try:
-                    _rename_distribution_no_replace(parent_fd, quarantine, parent_fd, name)
-                    os.fsync(parent_fd)
-                except OSError as exc:
-                    raise DistributionApplyError(failure_reason) from exc
+                self._restore_quarantined_entry(
+                    parent_fd,
+                    name,
+                    quarantine,
+                    held_fd,
+                    identity_error=identity_error,
+                    failure_reason=failure_reason,
+                    require_held_identity=False,
+                )
                 raise DistributionApplyError(identity_error)
             try:
-                _remove_distribution_stage_if_owned(parent_fd, quarantine, moved, strict=True)
+                # Persist the name transition before the destructive step.  A
+                # later cleanup failure can then restore the still-linked exact
+                # inode instead of losing the canonical recovery authority.
                 os.fsync(parent_fd)
-            except DistributionApplyError as exc:
+                _remove_distribution_stage_if_owned(parent_fd, quarantine, moved, strict=True)
+            except (DistributionApplyError, OSError) as exc:
+                self._restore_quarantined_entry(
+                    parent_fd,
+                    name,
+                    quarantine,
+                    held_fd,
+                    identity_error=identity_error,
+                    failure_reason=failure_reason,
+                    require_held_identity=True,
+                )
                 raise DistributionApplyError(failure_reason) from exc
         finally:
             os.close(held_fd)
+
+    @staticmethod
+    def _restore_quarantined_entry(
+        parent_fd: int,
+        name: str,
+        quarantine: str,
+        held_fd: int,
+        *,
+        identity_error: str,
+        failure_reason: str,
+        require_held_identity: bool,
+    ) -> None:
+        """Restore the held recovery entry after a post-rename failure."""
+
+        try:
+            quarantined = os.stat(quarantine, dir_fd=parent_fd, follow_symlinks=False)
+            held = os.fstat(held_fd)
+        except OSError as exc:
+            raise DistributionApplyError(failure_reason) from exc
+        if require_held_identity and (
+            quarantined.st_dev,
+            quarantined.st_ino,
+            quarantined.st_ctime_ns,
+            quarantined.st_mode,
+            quarantined.st_nlink,
+        ) != (
+            held.st_dev,
+            held.st_ino,
+            held.st_ctime_ns,
+            held.st_mode,
+            held.st_nlink,
+        ):
+            raise DistributionApplyError(identity_error)
+        try:
+            _rename_distribution_no_replace(parent_fd, quarantine, parent_fd, name)
+            os.fsync(parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError(failure_reason) from exc
 
     def remove_legacy_marker(self, marker: DistributionRetryMarker) -> None:
         if marker.target_root != _root_identity_for_assessment(self.target_root):
