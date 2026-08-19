@@ -4069,6 +4069,8 @@ def _add_managed_scaffold_uninstall_actions(
     actions: list[_UninstallAction],
     target_root: Path,
     known_rel_paths: set[Path],
+    *,
+    assets_dir: Path,
 ) -> None:
     """Plan each managed scaffold tree as one safe recursive removal."""
     for rel_root in _MANAGED_SCAFFOLD_ROOTS:
@@ -4096,6 +4098,44 @@ def _add_managed_scaffold_uninstall_actions(
                     reason=f"{safety_issue}; manual review required",
                 )
             )
+            continue
+        source_root = assets_dir / "spec_dock" / rel_root.relative_to("spec-dock")
+        managed_entries = {
+            rel_root / source_path.relative_to(source_root)
+            for source_path in source_root.rglob("*")
+            if not _is_generated_python_cache_path(source_path.relative_to(assets_dir / "spec_dock"))
+        }
+        unknown_entries: list[Path] = []
+        for current, directory_names, file_names in os.walk(
+            target_root / rel_root,
+            topdown=True,
+            followlinks=False,
+        ):
+            current_path = Path(current)
+            for name in (*directory_names, *file_names):
+                candidate = current_path / name
+                candidate_rel = candidate.relative_to(target_root)
+                if candidate_rel not in managed_entries:
+                    unknown_entries.append(candidate_rel)
+        if unknown_entries:
+            actions.append(
+                _UninstallAction(
+                    rel_path=rel_root.as_posix(),
+                    category="scaffold_managed",
+                    status="preserved",
+                    reason="managed scaffold tree contains unknown entries; move them aside and retry",
+                )
+            )
+            for unknown_entry in sorted(set(unknown_entries), key=lambda path: path.as_posix()):
+                known_rel_paths.add(unknown_entry)
+                actions.append(
+                    _UninstallAction(
+                        rel_path=unknown_entry.as_posix(),
+                        category="unmanaged",
+                        status="preserved",
+                        reason="unknown entry inside managed scaffold tree",
+                    )
+                )
             continue
         actions.append(
             _UninstallAction(
@@ -4244,7 +4284,12 @@ def _build_uninstall_plan(
             known_rel_paths=known_rel_paths,
         )
 
-        _add_managed_scaffold_uninstall_actions(actions, target_root, known_rel_paths)
+        _add_managed_scaffold_uninstall_actions(
+            actions,
+            target_root,
+            known_rel_paths,
+            assets_dir=assets_dir,
+        )
 
         for rel_path, expected in _build_scaffold_uninstall_sources(assets_dir):
             if any(

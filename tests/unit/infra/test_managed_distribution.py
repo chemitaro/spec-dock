@@ -2076,6 +2076,52 @@ def test_s25_update_upgrades_direct_historical_identity(tmp_path: Path) -> None:
     assert target.read_bytes() == old
 
 
+def test_i368_regular_upgrade_restores_replacement_raced_at_atomic_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"new\n")
+    old = b"old\n"
+    replacement = b"user-owned replacement\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    original_swap = managed_distribution._rename_distribution_swap
+    raced = False
+
+    def race_before_first_swap(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal raced
+        if destination_name == "ci.yml" and not raced:
+            raced = True
+            target.unlink()
+            target.write_bytes(replacement)
+        original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", race_before_first_swap)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == replacement
+    assert not list(target.parent.glob(".spec-dock-file-*"))
+
+
 def test_s25_fresh_historical_identity_is_preserved_and_blocked(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"new\n")
     old = b"old\n"
@@ -3397,6 +3443,61 @@ def test_s55_apply_prunes_proven_obsolete_target_during_update(tmp_path: Path) -
     assert not target.exists()
 
 
+def test_i368_prune_preserves_replacement_raced_at_final_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old = b"legacy-managed\n"
+    replacement = b"user-owned replacement\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": ".codex/config.toml",
+                    "surface": "legacy-codex-surface",
+                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".codex" / "config.toml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    original_rename = managed_distribution._rename_distribution_no_replace
+    raced = False
+
+    def race_before_quarantine(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal raced
+        if source_name == "config.toml" and destination_name.endswith(".remove") and not raced:
+            raced = True
+            target.unlink()
+            target.write_bytes(replacement)
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", race_before_quarantine)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert target.read_bytes() == replacement
+    assert not list(target.parent.glob(".*.remove"))
+
+
 def test_s55_mode_mismatch_still_prunes_obsolete_target(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     old = b"legacy-managed\n"
@@ -4006,6 +4107,60 @@ def test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support(
 
     assert shortcut.is_symlink()
     assert shortcut.readlink().as_posix() == "legacy/spec-dock"
+    assert not list(target_root.glob(".spec-dock-symlink-*"))
+
+
+def test_i368_symlink_upgrade_restores_replacement_raced_at_atomic_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            historical_shortcuts=[
+                {
+                    "path": "spec",
+                    "kind": "symlink",
+                    "target": "legacy/spec-dock",
+                    "source": {"kind": "test-fixture", "ref": "issue-360-test"},
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("legacy/spec-dock")
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    original_swap = managed_distribution._rename_distribution_swap
+    raced = False
+
+    def race_before_first_swap(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal raced
+        if destination_name == "spec" and not raced:
+            raced = True
+            shortcut.unlink()
+            shortcut.symlink_to("user/owned")
+        original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", race_before_first_swap)
+
+    with pytest.raises(DistributionApplyError, match="identity"):
+        apply_distribution_plan(plan)
+
+    assert shortcut.is_symlink()
+    assert shortcut.readlink().as_posix() == "user/owned"
     assert not list(target_root.glob(".spec-dock-symlink-*"))
 
 
