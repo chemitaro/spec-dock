@@ -3,7 +3,7 @@
   "kind": "issue368_full_regression_failure_ledger",
   "issue_id": "iss-00368",
   "fixed_point_sha": "7588d54114a2b8be7661353952f65741169320bd",
-  "current_head_sha": "4d6304c7c983a45f495e3efc439e5c3b17ce5cad",
+  "current_head_sha": "2715c0bfbbe4b7ac5583cb2af37117810bb05ae3",
   "commands": {
     "current_full": "uv run pytest --run-full-regression -q",
     "fixed_point_full": "uv run pytest --run-full-regression"
@@ -17,11 +17,11 @@
     "duration": "15m59s"
   },
   "current_head_verification": {
-    "working_tree_sha": "4d6304c7c983a45f495e3efc439e5c3b17ce5cad",
+    "working_tree_sha": "2715c0bfbbe4b7ac5583cb2af37117810bb05ae3",
     "failed": 27,
-    "passed": 2058,
+    "passed": 2059,
     "skipped": 48,
-    "duration": "16m59s"
+    "duration": "17m18s"
   },
   "subset_comparison": {
     "current_failure_paths": 27,
@@ -313,12 +313,12 @@
         "aggregate_signature_sha256": "6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8"
       },
       "current": {
-        "sha": "4d6304c7c983a45f495e3efc439e5c3b17ce5cad",
+        "sha": "2715c0bfbbe4b7ac5583cb2af37117810bb05ae3",
         "failed": 27,
-        "passed": 270,
+        "passed": 271,
         "skipped": 2,
-        "duration": "3m30s",
-        "junit_sha256": "30b2db156316a1757a1c1aa6c1b9a4864f6639e28ad913085647eae06b7147b4",
+        "duration": "3m26s",
+        "junit_sha256": "9f1db89d47cbfb73d5a70b7d171f02ba2614f9a21fd949785158c8c092b6d711",
         "aggregate_signature_sha256": "6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8"
       }
     },
