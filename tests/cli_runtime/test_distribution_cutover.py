@@ -2209,7 +2209,7 @@ def test_s65_uninstall_dry_run_surfaces_known_obsolete_identity(tmp_path: Path, 
     assert obsolete.exists()
 
 
-def test_s70_uninstall_apply_blocks_unproven_legacy_scaffold_entry(
+def test_s70_uninstall_apply_removes_unproven_legacy_scaffold_entry_with_managed_root(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -2218,19 +2218,18 @@ def test_s70_uninstall_apply_blocks_unproven_legacy_scaffold_entry(
     legacy = tmp_path / "spec-dock/scripts/spec-dock-chatgpt"
     legacy.write_text("legacy managed scaffold\n", encoding="utf-8")
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "blocked"
-    assert payload["phase"] == "preflight"
+    assert payload["status"] == "completed"
     actions = {action["path"]: action for action in payload["actions"]}
-    assert actions["spec-dock/scripts/spec-dock-chatgpt"]["category"] == "unmanaged"
-    assert actions["spec-dock/scripts/spec-dock-chatgpt"]["status"] == "preserved"
-    assert legacy.read_text(encoding="utf-8") == "legacy managed scaffold\n"
+    assert actions["spec-dock/scripts"]["category"] == "scaffold_managed"
+    assert actions["spec-dock/scripts"]["status"] == "removed"
+    assert not legacy.exists()
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
-def test_s70_uninstall_apply_blocks_modified_managed_scaffold_file(
+def test_s70_uninstall_apply_removes_modified_managed_scaffold_with_managed_root(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -2238,18 +2237,14 @@ def test_s70_uninstall_apply_blocks_modified_managed_scaffold_file(
     capsys.readouterr()
     managed = tmp_path / "spec-dock/docs/README.md"
     managed.write_text("locally modified managed scaffold\n", encoding="utf-8")
-    before = _filesystem_snapshot(tmp_path)
-
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "blocked"
-    assert payload["phase"] == "preflight"
-    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs/README.md")
+    assert payload["status"] == "completed"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs")
     assert action["category"] == "scaffold_managed"
-    assert action["status"] == "preserved"
-    assert "content mismatch" in action["reason"]
-    assert _filesystem_snapshot(tmp_path) == before
+    assert action["status"] == "removed"
+    assert not managed.exists()
 
 
 def test_s70_keep_specs_uninstall_allows_reinit_without_losing_history(
@@ -2337,29 +2332,22 @@ def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marke
     assert external.read_text(encoding="utf-8") == "user-owned\n"
 
 
-def test_s70_uninstall_apply_blocks_unknown_scaffold_entry_before_recursive_remove(
+def test_s70_uninstall_apply_removes_unknown_scaffold_entry_with_managed_root(
     tmp_path: Path,
-    monkeypatch,
     capsys,
 ) -> None:
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
-    moved = tmp_path.with_name(f"{tmp_path.name}-moved-scaffold")
     sentinel = tmp_path / "spec-dock/docs/rebind-sentinel.md"
-    sentinel.write_text("preserve outside repository\n", encoding="utf-8")
+    sentinel.write_text("managed root payload\n", encoding="utf-8")
 
-    def move_before_recursive_remove(*_args, **_kwargs):
-        pytest.fail("recursive removal must not start after an unknown-entry blocker")
-
-    monkeypatch.setattr(cli, "_remove_uninstall_tree_fd", move_before_recursive_remove)
-
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "blocked"
-    assert payload["phase"] == "preflight"
-    assert not moved.exists()
-    assert sentinel.read_text(encoding="utf-8") == "preserve outside repository\n"
+    assert payload["status"] == "completed"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs")
+    assert action["status"] == "removed"
+    assert not sentinel.exists()
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
