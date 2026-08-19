@@ -41,15 +41,16 @@ ID: "iss-00368"
 - Strict g13 remediation では、uninstall の managed scaffold root 一括再帰削除を廃止し、各 shipped file を current content digest と no-follow identity に束縛した個別 action へ変更した。unknown または modified file は全 mutation 前の blocker とし、E365-R03 の preserve-and-block 契約を S70 と installer 回帰テストで固定した。
 - Strict g13 final remediation では、legacy marker の admission 時 no-follow identity と bytes digest を journal publish 直前に再検証し、同一 root lock 内で schema-2 forward-only guard へ原子的に置換してから journal authority を発行する。compatible newer conversion の journal publish failure は guard から再開でき、admission 後の同内容 marker 差し替えは mutation 前に拒否する。
 - terminal journal の regular/symlink postcondition に file type と link count 1 を保持し、`completed` retry でも current assessment が blocker-free かつ adopt/preserve のみであることを再確認してから journal を削除する。completed publish 後に managed target が hardlink 化された場合は journal を保持して recovery-required にする。
+- Strict g14 bounded remediation では、journal action の target precondition を `device` / `inode` / `ctime_ns` を含む canonical 10-field schema として検証する。field を単独で欠落させた journal、および3項目を除いて同内容・同modeの別inodeへ差し替えた journal は、digestを再計算されても mutation 前に拒否する。
 - full-regression の pre-slow 診断は、実装 anchor 上の JUnit failure node ID と正規化 signature 27件を ledger と実行時照合してから exit 0 を返す verifier で実施した。controller の authoritative slow profile が実行する `pytest --run-full-regression -q` 自体にも同一 ledger guard を組み込み、全既知 node を収集した suite で node ID、signature、setup/teardown error が不一致なら非許可の exit 3 とする。検証中に発見した本文長 `37` と時刻文字列の部分一致による既存 privacy test の誤検知も、曖昧な短数値 sentinel を除去して安定化した。
-- 実装 anchor は `b8c5a64260cd640d5bda720c60e0e067739dc3de`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `b8c5a64260cd640d5bda720c60e0e067739dc3de` の既存失敗集合と authoritative pytest guard／診断 verifier の signature 検証へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。controller slow profile と二重検証の区別は `artifacts/final-quality-gate-check-profile.json` に保存した。
+- 実装 anchor は `001350ff90d8725cf69ddea54930bfa0524657bb`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `001350ff90d8725cf69ddea54930bfa0524657bb` の既存失敗集合と authoritative pytest guard／診断 verifier の signature 検証へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。controller slow profile と二重検証の区別は `artifacts/final-quality-gate-check-profile.json` に保存した。
 
 ## Verification
 
 exact candidate の SHA と合否の正本は、当該 report 自身を含む `review_head_sha` に対して生成される Strict controller の candidate manifest / check attestation / certificate とする。report 内へ自己参照的な候補 SHA を固定せず、以下の手動確認は controller 実行前の診断証拠として区別する。
 
 - [x] `make lint` — successor 候補 commit 前の診断で ruff check / format check / mypy が成功
-- [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 151 passed
+- [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 155 passed
 - [x] `uv run pytest --run-full-regression -q tests/unit/infra/test_init_update.py -k 'unknown_file_inside_managed_scaffold_root or scaffold_managed_roots_remove_recursively or preserves_unknown_files_under_managed_roots'` — 3 passed、129 deselected
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py` — 131 passed
 - [x] `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` — 144 passed、1 failed。残る failure は fixed point と remediation SHA で expected/actual SHA が不変な Issue 359 retained-skill golden の既存不一致
@@ -62,11 +63,12 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] `uv run python .../artifacts/verify-full-regression.py` at `bd2141708ed3a332bfb98ccbd2eabcf008e8ca66` — underlying pytest は 27 failed、2063 passed、48 skipped、17m14s。authoritative pytest guard と外側 verifier の双方が既知27件の node ID と正規化 failure signature の完全一致を確認
 - [x] `uv run python .../artifacts/verify-full-regression.py` at `967b7253ac78ee925bead668951fc1065191ec7c` — underlying pytest は 27 failed、2064 passed、48 skipped、17m21s。authoritative pytest guard と外側 verifier の双方が既知27件の node ID と正規化 failure signature の完全一致を確認
 - [x] `uv run python .../artifacts/verify-full-regression.py` at `b8c5a64260cd640d5bda720c60e0e067739dc3de` — underlying pytest は 27 failed、2067 passed、48 skipped、17m21s。authoritative pytest guard と外側 verifier の双方が既知27件の node ID と正規化 failure signature の完全一致を確認
+- [x] `uv run python .../artifacts/verify-full-regression.py` at `001350ff90d8725cf69ddea54930bfa0524657bb` — underlying pytest は 27 failed、2071 passed、48 skipped、17m19s。authoritative pytest guard と外側 verifier の双方が既知27件の node ID と正規化 failure signature の完全一致を確認
 - [x] `uv run pytest --run-full-regression -q tests/unit/infra/test_init_update.py` — uninstall の exact-content file action と preserve-and-block を含む 133 passed
 - [x] fixed point と candidate で `test_tc_346_s03_003_actual_cross_filesystem_source` の時刻 `08:37` 誤検知を再現し、privacy oracle 修正後の focused full-regression は 1 passed
 - [x] failure ledger に列挙した9ファイルを `--run-full-regression --junitxml=<run.xml>` で固定点と実装 anchor の双方で再実行 — 各27 failed、正規化した27件の failure signature と aggregate SHA-256 `6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8` が一致
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
-- [x] `uv run pytest -q` — 1087 passed、1055 policy-skipped
+- [x] `uv run pytest -q` — 1091 passed、1055 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
 - Strict の最終合否は repository 外の append-only campaign ledger と certificate にのみ記録し、合否記録のために認証後の candidate を変更しない。
