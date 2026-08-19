@@ -2432,6 +2432,190 @@ def test_i368_checkpoint_write_failure_recovers_from_exact_postcondition(tmp_pat
     assert not journal_path.exists()
 
 
+def test_i368_retry_cleans_exact_stage_created_after_write_ahead_reservation(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    parent = target_root / ".github" / "workflows"
+    parent.mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset("spec-dock/spec-dock.version", b"1.2.3\n", mode=0o644),
+        ),
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    expected = next(
+        item.identity for item in executable.distribution_plan.current_assets if item.path == ".github/workflows/ci.yml"
+    )
+    stage_name = managed_distribution._new_distribution_stage_name(".github/workflows/ci.yml", expected)
+    journal = store.record_staging_lease(
+        journal,
+        managed_distribution._reserved_distribution_stage_ownership(".github/workflows/ci.yml", stage_name, "regular"),
+    )
+    stage = parent / stage_name
+    stage.write_bytes(b"desired\n")
+    stage.chmod(0o644)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert (parent / "ci.yml").read_bytes() == b"desired\n"
+    assert not stage.exists()
+
+
+def test_i368_retry_rebinds_displaced_predecessor_after_abrupt_swap(tmp_path: Path) -> None:
+    old = b"old\n"
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset("spec-dock/spec-dock.version", b"1.2.3\n", mode=0o644),
+        ),
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    expected = next(
+        item.identity for item in executable.distribution_plan.current_assets if item.path == ".github/workflows/ci.yml"
+    )
+    stage_name = managed_distribution._new_distribution_stage_name(".github/workflows/ci.yml", expected)
+    stage = target.parent / stage_name
+    stage.write_bytes(b"desired\n")
+    stage.chmod(0o644)
+    journal = store.record_staging_lease(
+        journal,
+        managed_distribution._distribution_stage_ownership(".github/workflows/ci.yml", stage_name, stage.lstat()),
+    )
+    parent_fd = os.open(target.parent, os.O_RDONLY)
+    try:
+        managed_distribution._rename_distribution_swap(parent_fd, stage_name, parent_fd, target.name)
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert target.read_bytes() == b"desired\n"
+    assert not stage.exists()
+
+
+def test_i368_retry_removes_reserved_quarantine_after_abrupt_prune(tmp_path: Path) -> None:
+    old = b"obsolete\n"
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": ".codex/config.toml",
+                    "surface": "legacy-codex-surface",
+                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".codex" / "config.toml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset("spec-dock/spec-dock.version", b"1.2.3\n", mode=0o644),
+        ),
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    obsolete_identity = dict(executable.distribution_plan.target_snapshots)[".codex/config.toml"].target.identity
+    assert obsolete_identity is not None
+    quarantine_name = managed_distribution._new_distribution_stage_name(".codex/config.toml", obsolete_identity)
+    journal = store.record_staging_lease(
+        journal,
+        managed_distribution._reserved_distribution_stage_ownership(".codex/config.toml", quarantine_name, "regular"),
+    )
+    parent_fd = os.open(target.parent, os.O_RDONLY)
+    try:
+        managed_distribution._rename_distribution_no_replace(parent_fd, target.name, parent_fd, quarantine_name)
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert not target.exists()
+    assert not (target.parent / quarantine_name).exists()
+
+
+def test_i368_forward_guard_rejects_reordered_self_rehashed_journal(tmp_path: Path) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    assert len(journal.actions) > 1
+    reordered = managed_distribution.replace(journal, actions=tuple(reversed(journal.actions)))
+    reordered = managed_distribution.replace(
+        reordered,
+        plan_digest=managed_distribution._journal_digest(reordered),
+    )
+    store.write(reordered, predecessor=journal)
+
+    with pytest.raises(DistributionApplyError, match="journal-plan-mismatch"):
+        store.resume(executable, package_version="1.2.3")
+
+
 @pytest.mark.parametrize(
     "record",
     [
@@ -3542,7 +3726,8 @@ def test_s30_apply_rebinds_stage_ownership_after_swap_for_retry(
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
     assert target.read_bytes() == b"new\n"
-    assert len(recorded) == 2
+    assert len(recorded) == 3
+    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
     rebound = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
@@ -3596,7 +3781,7 @@ def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
     def fail_post_swap_record(record: managed_distribution.DistributionStageOwnership) -> None:
         nonlocal record_calls
         record_calls += 1
-        if record_calls == 2:
+        if record_calls == 3:
             raise RuntimeError("simulated post-swap marker write failure")
         recorded.append(record)
 
@@ -3613,7 +3798,8 @@ def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
 
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 2
+    assert len(recorded) == 3
+    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
     rebound = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
@@ -3663,7 +3849,7 @@ def test_s30_apply_cleans_rebound_stage_when_marker_update_fails(
     recorded: list[managed_distribution.DistributionStageOwnership] = []
 
     def fail_marker_update(record: managed_distribution.DistributionStageOwnership) -> None:
-        if recorded:
+        if len(recorded) >= 2:
             raise RuntimeError("simulated retry marker write failure")
         recorded.append(record)
 
@@ -3997,7 +4183,8 @@ def test_s30_apply_records_partial_stage_identity_when_cleanup_fails(
     assert target.read_bytes() == old
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 2
+    assert len(recorded) == 3
+    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
     refreshed = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
@@ -4090,7 +4277,8 @@ def test_s30_apply_create_records_partial_stage_identity_when_cleanup_fails(
 
     stage_files = list(target_root.rglob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 2
+    assert len(recorded) == 3
+    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
     refreshed = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
@@ -4232,7 +4420,7 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
         destination_name: str,
     ) -> None:
         nonlocal raced
-        if source_name == "config.toml" and destination_name.endswith(".remove") and not raced:
+        if source_name == "config.toml" and destination_name.startswith(".spec-dock-file-") and not raced:
             raced = True
             target.unlink()
             target.write_bytes(replacement)
@@ -4629,7 +4817,7 @@ def test_s30_apply_retries_symlink_create_stage_record_and_cleanup(
 
     def record_stage(record: managed_distribution.DistributionStageOwnership) -> None:
         nonlocal recorder_failed
-        if record.file_type == "symlink" and not recorder_failed:
+        if record.file_type == "symlink" and record.device != 0 and not recorder_failed:
             recorder_failed = True
             raise OSError("simulated symlink stage recorder failure")
         recorded.append(record)
@@ -4648,7 +4836,7 @@ def test_s30_apply_retries_symlink_create_stage_record_and_cleanup(
 
     stage_files = list(target_root.rglob(".spec-dock-symlink-*"))
     assert len(stage_files) == 1
-    symlink_record = next(item for item in recorded if item.file_type == "symlink")
+    symlink_record = next(item for item in recorded if item.file_type == "symlink" and item.device != 0)
     stage_stat = stage_files[0].lstat()
     assert (symlink_record.device, symlink_record.inode, symlink_record.ctime_ns) == (
         stage_stat.st_dev,

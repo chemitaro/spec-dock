@@ -107,6 +107,10 @@ absent
 
 crash/exception では `prepared` 以降の journal を保持する。`completed` 前に削除しない。
 
+schema-2 forward guard は journal より先に `operation_id`、`contract_identity`、canonical `plan_digest` を durable publish する。journal はこの独立アンカーと一致する場合だけ作成・再開でき、journal 内部の action 順序や immutable metadata と digest をまとめて差し替えても authority を再構成できない。
+
+stage作成、atomic exchange、prune quarantine、missing parent作成は、可視namespace mutationより先に予約名またはmissing intentをjournalへ記録する。作成後またはexchange後はexact inodeへleaseを昇格してからcleanupし、強制終了後は予約名、canonical postcondition、displaced predecessor、空のcreated parentが単一の既知遷移に一致する場合だけforward recoveryする。未知entryまたは複数状態に一致する場合は保持してblockする。
+
 Action checkpoint:
 
 - `pending`: current state は exact pre-action identity であること
