@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 import ctypes
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 import errno
 import hashlib
 import json
@@ -321,6 +321,8 @@ class DistributionRetryMarker:
     last_completed_phase: str
     purpose: Literal["distribution-rerun", "recognized-journal-forward-only"]
     stage_ownership: tuple[DistributionStageOwnership, ...] = ()
+    source_snapshot: PathIdentitySnapshot | None = field(default=None, compare=False, repr=False)
+    source_sha256: str | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -718,8 +720,13 @@ def _parse_package_version(value: str, *, source: str) -> tuple[int, int, int]:
     return _parse_canonical_version(value + "\n", source=source)
 
 
-def _read_no_follow_regular(path: Path, *, label: str, allow_missing: bool = False) -> bytes | None:
-    """Read one link-count-one regular file without following a symlink."""
+def _read_no_follow_regular_evidence(
+    path: Path,
+    *,
+    label: str,
+    allow_missing: bool = False,
+) -> tuple[bytes, os.stat_result] | None:
+    """Read one link-count-one regular file and retain its held identity."""
 
     nofollow = getattr(os, "O_NOFOLLOW", None)
     if not isinstance(nofollow, int):
@@ -738,10 +745,10 @@ def _read_no_follow_regular(path: Path, *, label: str, allow_missing: bool = Fal
     except OSError:
         _admission_block("invalid-file", f"{label} cannot be opened without following links")
     try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
             _admission_block("invalid-file", f"{label} must be a regular file")
-        if info.st_nlink != 1:
+        if before.st_nlink != 1:
             _admission_block("hard-link", f"{label} must have link count 1")
         chunks: list[bytes] = []
         while True:
@@ -749,11 +756,34 @@ def _read_no_follow_regular(path: Path, *, label: str, allow_missing: bool = Fal
             if not chunk:
                 break
             chunks.append(chunk)
-        return b"".join(chunks)
+        content = b"".join(chunks)
+        after = os.fstat(fd)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_ctime_ns,
+            before.st_mode,
+            before.st_nlink,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_ctime_ns,
+            after.st_mode,
+            after.st_nlink,
+        ):
+            _admission_block("invalid-file", f"{label} changed while it was read")
+        return content, after
     except OSError:
         _admission_block("read-error", f"{label} cannot be read safely")
     finally:
         os.close(fd)
+
+
+def _read_no_follow_regular(path: Path, *, label: str, allow_missing: bool = False) -> bytes | None:
+    """Read one link-count-one regular file without following a symlink."""
+
+    evidence = _read_no_follow_regular_evidence(path, label=label, allow_missing=allow_missing)
+    return evidence[0] if evidence is not None else None
 
 
 def _path_present_no_follow(path: Path) -> bool:
@@ -842,8 +872,9 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
     path = target_root / _DISTRIBUTION_RETRY_MARKER_REL
     if not _path_present_no_follow(path):
         return None
-    raw_bytes = _read_no_follow_regular(path, label="distribution retry marker")
-    assert raw_bytes is not None
+    evidence = _read_no_follow_regular_evidence(path, label="distribution retry marker")
+    assert evidence is not None
+    raw_bytes, source_info = evidence
     try:
         raw = json.loads(raw_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
@@ -953,6 +984,8 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         last_completed_phase=phase,
         purpose=(_DISTRIBUTION_JOURNAL_GUARD_PURPOSE if supported_guard else _DISTRIBUTION_RETRY_PURPOSE),
         stage_ownership=tuple(stage_ownership),
+        source_snapshot=_snapshot_from_stat(_DISTRIBUTION_RETRY_MARKER_REL.as_posix(), source_info),
+        source_sha256=hashlib.sha256(raw_bytes).hexdigest(),
     )
 
 
@@ -2120,7 +2153,14 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
         return {**boundary, "exists": False, "identity": None}
     if expected is None:
         expected = snapshot.target.identity
-    return {**boundary, "exists": True, "identity": _distribution_identity_payload(expected)}
+    expected_type = expected.kind if expected is not None else snapshot.target.file_type
+    return {
+        **boundary,
+        "exists": True,
+        "file_type": expected_type,
+        "link_count": 1,
+        "identity": _distribution_identity_payload(expected),
+    }
 
 
 def _path_snapshot_condition(snapshot: PathIdentitySnapshot) -> dict[str, object]:
@@ -2762,6 +2802,7 @@ class OperationJournalStore:
         plan: ExecutableMutationPlan,
         *,
         package_version: str,
+        replace_marker: DistributionRetryMarker | None = None,
     ) -> DistributionRetryMarker:
         """Publish an old-installer-visible guard before the new journal exists."""
 
@@ -2796,16 +2837,80 @@ class OperationJournalStore:
         destination = _DISTRIBUTION_RETRY_MARKER_REL.name
         stage = f".distribution-retry-{secrets.token_hex(16)}.stage"
         stage_info: os.stat_result | None = None
+        held_fd: int | None = None
         try:
             try:
-                os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+                destination_info = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
             except FileNotFoundError:
-                pass
-            else:
+                destination_info = None
+            if replace_marker is None and destination_info is not None:
                 raise DistributionApplyError("dual-recovery-state")
+            if replace_marker is not None:
+                expected = replace_marker.source_snapshot
+                expected_sha256 = replace_marker.source_sha256
+                if expected is None or expected_sha256 is None or destination_info is None:
+                    current = _read_distribution_retry_marker(self.target_root)
+                    if current != replace_marker or current is None:
+                        raise DistributionApplyError("legacy-marker-unconvertible")
+                    expected = current.source_snapshot
+                    expected_sha256 = current.source_sha256
+                assert expected is not None
+                assert expected_sha256 is not None
+                if (
+                    not expected.exists
+                    or expected.file_type != "regular"
+                    or expected.link_count != 1
+                    or destination_info is None
+                    or (
+                        destination_info.st_dev,
+                        destination_info.st_ino,
+                        destination_info.st_ctime_ns,
+                        _file_type(destination_info.st_mode),
+                        destination_info.st_nlink,
+                    )
+                    != (
+                        expected.device,
+                        expected.inode,
+                        expected.ctime_ns,
+                        expected.file_type,
+                        expected.link_count,
+                    )
+                ):
+                    raise DistributionApplyError("legacy-marker-unconvertible")
             nofollow = getattr(os, "O_NOFOLLOW", None)
             if not isinstance(nofollow, int):
                 raise DistributionApplyError("platform lacks required no-follow file support")
+            if replace_marker is not None:
+                try:
+                    held_fd = os.open(
+                        destination,
+                        os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                        dir_fd=parent_fd,
+                    )
+                except OSError as exc:
+                    raise DistributionApplyError("legacy-marker-unconvertible") from exc
+                held_before = os.fstat(held_fd)
+                chunks: list[bytes] = []
+                while True:
+                    chunk = os.read(held_fd, 1024 * 1024)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                held_after = os.fstat(held_fd)
+                if (
+                    held_before.st_dev,
+                    held_before.st_ino,
+                    held_before.st_ctime_ns,
+                    held_before.st_mode,
+                    held_before.st_nlink,
+                ) != (
+                    held_after.st_dev,
+                    held_after.st_ino,
+                    held_after.st_ctime_ns,
+                    held_after.st_mode,
+                    held_after.st_nlink,
+                ) or hashlib.sha256(b"".join(chunks)).hexdigest() != expected_sha256:
+                    raise DistributionApplyError("legacy-marker-unconvertible")
             fd = os.open(
                 stage,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -2818,14 +2923,50 @@ class OperationJournalStore:
                 stage_info = os.fstat(fd)
             finally:
                 os.close(fd)
-            _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
+            if replace_marker is None:
+                _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
+            else:
+                assert destination_info is not None
+                assert held_fd is not None
+                _rename_distribution_swap(parent_fd, stage, parent_fd, destination)
+                swapped_out = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
+                held_after = os.fstat(held_fd)
+                if (
+                    swapped_out.st_dev,
+                    swapped_out.st_ino,
+                    swapped_out.st_ctime_ns,
+                    swapped_out.st_mode,
+                    swapped_out.st_nlink,
+                ) != (
+                    held_after.st_dev,
+                    held_after.st_ino,
+                    held_after.st_ctime_ns,
+                    held_after.st_mode,
+                    held_after.st_nlink,
+                ):
+                    raise DistributionApplyError("legacy-marker-unconvertible")
+                os.fsync(parent_fd)
+                self._quarantine_and_remove(
+                    parent_fd,
+                    stage,
+                    swapped_out,
+                    identity_error="legacy-marker-unconvertible",
+                    failure_reason="legacy-marker-unconvertible",
+                )
             os.fsync(parent_fd)
-            return marker
+            visible = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+            return replace(
+                marker,
+                source_snapshot=_snapshot_from_stat(_DISTRIBUTION_RETRY_MARKER_REL.as_posix(), visible),
+                source_sha256=hashlib.sha256(content).hexdigest(),
+            )
         except Exception:
             if stage_info is not None:
                 _remove_distribution_stage_if_owned(parent_fd, stage, stage_info)
             raise
         finally:
+            if held_fd is not None:
+                os.close(held_fd)
             os.close(parent_fd)
             os.close(root_fd)
 
@@ -3340,9 +3481,12 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             expected_identity = current_specs.get(record.path)
             if expected_identity is None or record.action not in {"create", "adopt", "upgrade", "preserve"}:
                 raise DistributionApplyError("journal-plan-mismatch")
-            if record.postcondition.get("exists") is not True or record.postcondition.get(
-                "identity"
-            ) != _distribution_identity_payload(expected_identity):
+            if (
+                record.postcondition.get("exists") is not True
+                or record.postcondition.get("file_type") != expected_identity.kind
+                or record.postcondition.get("link_count") != 1
+                or record.postcondition.get("identity") != _distribution_identity_payload(expected_identity)
+            ):
                 raise DistributionApplyError("journal-plan-mismatch")
         snapshot = dict(plan.target_snapshots).get(record.path)
         if snapshot is None and record.path in completed_missing_obsolete:
@@ -3563,6 +3707,11 @@ def execute_recognized_distribution(
                     or guard_marker.stage_ownership
                 ):
                     raise DistributionApplyError("legacy-marker-unconvertible")
+                guard_marker = store.prepare_legacy_guard(
+                    executable,
+                    package_version=package_version,
+                    replace_marker=guard_marker,
+                )
                 journal = store.prepare(executable, package_version=package_version)
             else:
                 assert journal_seed is not None
@@ -3573,6 +3722,10 @@ def execute_recognized_distribution(
             assert journal is not None
             if journal.status == "completed":
                 executable = _resume_executable_plan(assessment, journal)
+                if assessment.blockers or any(
+                    action.action not in {"adopt", "preserve"} for action in assessment.actions
+                ):
+                    raise DistributionApplyError("distribution postcondition failed")
                 store.remove_completed(journal)
                 if guard_marker is not None:
                     store.remove_legacy_marker(guard_marker)

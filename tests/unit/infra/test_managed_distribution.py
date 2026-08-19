@@ -1437,7 +1437,6 @@ def test_i368_legacy_guard_removal_failure_retains_completed_targets_for_retry(
         }),
         encoding="utf-8",
     )
-    before = marker_path.read_bytes()
     original_remove = OperationJournalStore.remove_legacy_marker
 
     def fail_marker_removal(*_args, **_kwargs) -> None:
@@ -1456,7 +1455,9 @@ def test_i368_legacy_guard_removal_failure_retains_completed_targets_for_retry(
 
     assert first.status == "recovery_required"
     assert first.reason == "legacy-marker-unconvertible"
-    assert marker_path.read_bytes() == before
+    guard = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert guard["schema_version"] == 2
+    assert guard["purpose"] == "recognized-journal-forward-only"
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
     assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"desired\n"
 
@@ -1468,7 +1469,111 @@ def test_i368_legacy_guard_removal_failure_retains_completed_targets_for_retry(
         target_root=target_root,
         intent="update",
         package_version="1.2.3",
-        legacy_marker=marker,
+    )
+
+    assert second.status == "completed", second.reason
+    assert not marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i368_legacy_conversion_rejects_marker_replaced_after_admission(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    admitted = managed_distribution._read_distribution_retry_marker(target_root)
+    assert admitted is not None
+    replacement = marker_path.read_bytes()
+    marker_path.unlink()
+    marker_path.write_bytes(replacement)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.3.0",
+        legacy_marker=admitted,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "legacy-marker-unconvertible"
+    assert marker_path.read_bytes() == replacement
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i368_legacy_conversion_failure_leaves_forward_only_guard_for_newer_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    admitted = managed_distribution._read_distribution_retry_marker(target_root)
+    assert admitted is not None
+    original_prepare = OperationJournalStore.prepare
+
+    def fail_journal_publish(*_args, **_kwargs):
+        raise DistributionApplyError("injected journal publish failure")
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", fail_journal_publish)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.3.0",
+        legacy_marker=admitted,
+    )
+
+    assert first.status == "recovery_required"
+    guard = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert guard["schema_version"] == 2
+    assert guard["purpose"] == "recognized-journal-forward-only"
+    assert guard["package_version"] == "1.3.0"
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", original_prepare)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.3.0",
     )
 
     assert second.status == "completed", second.reason
@@ -1523,6 +1628,50 @@ def test_i368_terminal_journal_rejects_tampered_digest_before_finalization(
     assert second.status == "recovery_required"
     assert second.reason == "journal-plan-mismatch"
     assert journal_path.read_bytes() == before
+
+
+def test_i368_completed_journal_retains_recovery_authority_after_target_gains_hardlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_remove = OperationJournalStore.remove_completed
+
+    def interrupt_after_completed(*_args, **_kwargs):
+        raise DistributionApplyError("injected completed-journal interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "remove_completed", interrupt_after_completed)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert first.status == "recovery_required"
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["status"] == "completed"
+    managed_target = target_root / ".github" / "workflows" / "ci.yml"
+    (target_root / "managed-target-alias").hardlink_to(managed_target)
+
+    monkeypatch.setattr(OperationJournalStore, "remove_completed", original_remove)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-precondition-mismatch", "distribution postcondition failed"}
+    assert journal_path.exists()
 
 
 def test_i368_terminal_journal_finalizes_after_completed_prune_disappears_from_assessment(

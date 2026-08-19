@@ -162,14 +162,16 @@ Notes:
   unknown, modified, symlinked, hard-linked, or root-rebound targets. No pathname-based recursive
   cleanup is used for unknown paths.
 - An interrupted recognized update or `init --force` may leave
-  `spec-dock/.distribution-journal.json`. Rerun the same package and operation against the same
-  repository root to resume from exact action pre/postconditions. Root, intent, contract, plan,
-  protocol, or exact target-state mismatches stop before further mutation; inspect the reported
-  repository-relative reason instead of rolling back to older installer code.
+  `spec-dock/.distribution-journal.json`. Rerun the same operation against the same repository root
+  with the same package or a compatible newer package to resume from exact action pre/postconditions.
+  Root, intent, authority, contract, plan, protocol, or exact target-state mismatches, downgrades, and
+  incompatible packages stop before further mutation; inspect the reported repository-relative reason
+  instead of rolling back to older installer code.
 - A legacy `spec-dock/.distribution-retry.json` is converted one way only when it is the exact
-  same-root, same-package, same-operation pre-write state with no staging lease. Malformed, later-phase,
-  cross-root, different-operation, unknown-stage, or dual recovery state is preserved and rejected for
-  manual diagnosis.
+  same-root, same-operation pre-write state with no staging lease and the executing package is the same
+  or a compatible newer version. Malformed, later-phase, cross-root, different-operation, downgrade,
+  incompatible-package, unknown-stage, or dual recovery state is preserved and rejected for manual
+  diagnosis.
 - `uninstall` is dry-run by default. `--apply` requires a complete ownership-safe plan; partial
   failures retain `.uninstall-retry.json` until post-verification succeeds, and `--remove-specs` is
   required before spec history is deleted. `--keep-specs` preserves initiatives and unknown content.
