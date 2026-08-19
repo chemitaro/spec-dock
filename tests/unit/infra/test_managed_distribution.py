@@ -614,7 +614,7 @@ def test_i368_journal_resume_rejects_existing_parent_rebind(tmp_path: Path) -> N
     assert not (parent / "ci.yml").exists()
 
 
-def test_i368_journal_resume_accepts_parent_authorized_before_creation(tmp_path: Path) -> None:
+def test_i368_journal_resume_rejects_unbound_parent_authorized_before_creation(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
     scaffold_root = _minimal_scaffold_root(tmp_path)
@@ -652,9 +652,10 @@ def test_i368_journal_resume_accepts_parent_authorized_before_creation(tmp_path:
         package_version="1.2.3",
     )
 
-    assert result.status == "completed", result.reason
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-precondition-mismatch"
     assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
-    assert (appeared / "ci.yml").read_bytes() == b"current\n"
+    assert not (appeared / "ci.yml").exists()
 
 
 def test_i368_parent_creation_crash_resumes_from_durable_parent_intent(
@@ -687,7 +688,10 @@ def test_i368_parent_creation_crash_resumes_from_durable_parent_intent(
 
     journal_path = target_root / "spec-dock" / ".distribution-journal.json"
     payload = json.loads(journal_path.read_text(encoding="utf-8"))
-    assert any(not binding["exists"] for binding in payload["created_parent_bindings"])
+    assert payload["created_parent_bindings"]
+    bindings = {binding["relative_path"]: binding for binding in payload["created_parent_bindings"]}
+    assert bindings[".github"]["exists"] is True
+    assert bindings[".github/workflows"]["exists"] is True
     assert (target_root / ".github" / "workflows").is_dir()
 
     monkeypatch.setattr(managed_distribution, "_bind_created_parent_identities", original_bind)
@@ -3654,6 +3658,7 @@ def test_s30_apply_blocks_root_rebind_after_preflight_before_parent_creation(
         create_missing: bool = False,
         expected_snapshot: DistributionTargetSnapshot | None = None,
         created_parent_bindings: dict[str, PathIdentitySnapshot] | None = None,
+        created_parent_recorder: object = None,
     ) -> tuple[int, ...]:
         nonlocal switched
         if not switched:
@@ -3667,6 +3672,7 @@ def test_s30_apply_blocks_root_rebind_after_preflight_before_parent_creation(
             create_missing=create_missing,
             expected_snapshot=expected_snapshot,
             created_parent_bindings=created_parent_bindings,
+            created_parent_recorder=created_parent_recorder,  # type: ignore[arg-type]
         )
 
     monkeypatch.setattr(managed_distribution, "_open_distribution_parent_chain", switch_root_before_open)
