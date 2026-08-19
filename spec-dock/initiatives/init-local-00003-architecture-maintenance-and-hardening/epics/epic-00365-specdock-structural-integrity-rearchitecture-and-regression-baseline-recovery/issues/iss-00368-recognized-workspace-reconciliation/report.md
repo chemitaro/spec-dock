@@ -38,8 +38,8 @@ ID: "iss-00368"
 - Strict g11 remediation では、full-regression の既知27件について固定点と実装 anchor の JUnit failure message を採取し、checkout / temporary path と pytest diagnostic suffix を正規化した assertion/error signature を node ID ごとに比較した。27件すべての SHA-256 が一致し、比較契約・run metadata・per-node signature を failure ledger 内へ保存した。
 - Strict g11 bounded remediation では、installer の既存 regular file 更新を pathname `os.replace` から held target/staging descriptor に束縛した atomic swap へ変更した。identity 確認後に destination が差し替えられても swap 後検証または事前照合で拒否し、ユーザー置換 entry を保持する。
 - Strict g11 candidate 2 remediation では、completed prune が再 assessment から消えた場合も descriptor-bound 再観測で exact postcondition を検証して terminal journal を完結できるようにした。全 journal action の pre/postcondition は完全な親チェーンを保持し、digest を再計算した親省略も拒否する。
-- full-regression slow gate は静的な非ゼロ許容を廃止し、exact candidate 上の JUnit failure node ID と正規化 signature 27件を ledger と実行時照合してから exit 0 を返す verifier へ置き換えた。検証中に発見した本文長 `37` と時刻文字列の部分一致による既存 privacy test の誤検知も、曖昧な短数値 sentinel を除去して安定化した。
-- 実装 anchor は `700a39fa71ee8aab283648c79e5101930d8db3fa`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `700a39fa71ee8aab283648c79e5101930d8db3fa` の既存失敗集合と実行時 signature 検証へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。slow profile の完全な command/verifier 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
+- full-regression の pre-slow 診断は、実装 anchor 上の JUnit failure node ID と正規化 signature 27件を ledger と実行時照合してから exit 0 を返す verifier で実施した。controller の authoritative slow profile は registry 定義の `pytest --run-full-regression -q` と failure ledger 照合を維持する。検証中に発見した本文長 `37` と時刻文字列の部分一致による既存 privacy test の誤検知も、曖昧な短数値 sentinel を除去して安定化した。
+- 実装 anchor は `700a39fa71ee8aab283648c79e5101930d8db3fa`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `700a39fa71ee8aab283648c79e5101930d8db3fa` の既存失敗集合と診断時 signature 検証へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。controller slow profile と pre-slow 診断の区別は `artifacts/final-quality-gate-check-profile.json` に保存した。
 
 ## Verification
 
