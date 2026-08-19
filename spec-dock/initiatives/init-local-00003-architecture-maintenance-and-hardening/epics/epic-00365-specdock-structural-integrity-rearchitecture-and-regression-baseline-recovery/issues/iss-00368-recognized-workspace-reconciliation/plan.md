@@ -93,9 +93,11 @@ Exit: assessment test は filesystem write を観測せず、plan digest fixture
 ### Step 3 — Journal と kernel の recognized subset を実装する
 
 - operation journal の schema/protocol version、root/intent/authority/contract/plan binding を実装する。
+- schema-2 forward guard に operation/contract/canonical plan の独立アンカーを先行publishし、journalのself-rehashed改変を拒否する。
 - regular/symlink/directory/staging identity を用途別 type に分ける。
 - exact pre-action SHA と expected post-action identity を action record に入れる。
 - descriptor-bound create/replace/remove/mode/staging/journal operation を kernel に集約する。
+- stage、exchange、prune quarantine、missing parentのnamespace transitionをwrite-ahead reservationとexact successor leaseで再開可能にする。
 - checkpoint は atomic publish 後の re-observation を通して単調更新する。
 
 Negative tests:
