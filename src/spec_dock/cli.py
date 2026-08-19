@@ -2693,7 +2693,7 @@ def _install_fresh_distribution(target_root: Path) -> None:
     with _exclusive_distribution_operation(target_root) as locked_root_identity:
         admission = _admit_distribution_cli(target_root, operation="fresh")
         if admission.status == "retry":
-            _install_recognized_distribution_unlocked(
+            _install_fresh_compatibility_distribution_unlocked(
                 target_root,
                 operation="fresh",
                 retry_marker=admission,
@@ -2705,14 +2705,16 @@ def _install_fresh_distribution(target_root: Path) -> None:
         _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
 
 
-def _install_legacy_distribution_unlocked(
+def _install_fresh_compatibility_distribution_unlocked(
     target_root: Path,
     *,
     operation: DistributionOperation,
     retry_marker: DistributionAdmission | None = None,
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> None:
-    """Apply a recognized distribution with same-package forward recovery."""
+    """Apply the D2-owned fresh compatibility flow with forward recovery."""
+    if operation != "fresh":
+        raise RuntimeError("fresh compatibility flow requires the fresh operation")
     _require_retry_target_label(target_root)
     phase = "preflight"
     marker_started = False
@@ -2943,15 +2945,6 @@ def _install_recognized_distribution_unlocked(
     version_identity: DistributionIdentity | None = None,
 ) -> None:
     """Execute recognized intents through the unified journaled service."""
-
-    if operation == "fresh":
-        _install_legacy_distribution_unlocked(
-            target_root,
-            operation=operation,
-            retry_marker=retry_marker,
-            expected_root_identity=expected_root_identity,
-        )
-        return
     if operation not in {"update", "init-force"}:
         raise RuntimeError(f"unsupported recognized distribution operation: {operation}")
     recognized_operation: RecognizedDistributionIntent = "update" if operation == "update" else "init-force"
