@@ -43,8 +43,15 @@
       "python",
       "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py"
     ],
-    "observed_implementation_sha": "a28b57f25c82cde96411965ace491f44540cab48",
+    "observed_implementation_sha": "bd2141708ed3a332bfb98ccbd2eabcf008e8ca66",
     "result": "pass",
-    "purpose": "diagnostic verification of the normalized failure signatures recorded by the ledger; the controller slow attestation remains authoritative"
+    "purpose": "independent diagnostic verification of the normalized failure signatures recorded by the ledger; the authoritative pytest command also enforces the same ledger through tests/conftest.py"
+  },
+  "authoritative_failure_guard": {
+    "path": "tests/conftest.py",
+    "activation": "--run-full-regression with all approved ledger node IDs collected",
+    "accepted_match_exit_code": 1,
+    "mismatch_exit_code": 3,
+    "verified_implementation_sha": "bd2141708ed3a332bfb98ccbd2eabcf008e8ca66"
   }
 }
