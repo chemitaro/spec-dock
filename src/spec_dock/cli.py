@@ -2940,6 +2940,7 @@ def _install_recognized_distribution_unlocked(
     operation: DistributionOperation,
     retry_marker: DistributionAdmission | None = None,
     expected_root_identity: DistributionRootIdentity | None = None,
+    version_identity: DistributionIdentity | None = None,
 ) -> None:
     """Execute recognized intents through the unified journaled service."""
 
@@ -2971,6 +2972,7 @@ def _install_recognized_distribution_unlocked(
                 package_version=_tool_version(),
                 legacy_marker=retry_marker.marker if retry_marker is not None else None,
                 generated_assets=generated_assets,
+                version_refreshable_existing_identities=(version_identity,) if version_identity is not None else (),
                 root_identity_path=visible_root,
             )
             if result.status != "recovery_required":
@@ -3006,6 +3008,7 @@ def _install_recognized_distribution(
             operation=operation,
             retry_marker=admission if admission.status == "retry" else None,
             expected_root_identity=locked_root_identity,
+            version_identity=admission.version_identity,
         )
 
 

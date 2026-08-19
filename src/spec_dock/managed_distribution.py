@@ -259,6 +259,7 @@ class OperationJournal:
     protocol_version: int
     operation_id: str
     root_identity: DistributionRootIdentity
+    workspace_identity: PathIdentitySnapshot
     intent: RecognizedDistributionIntent
     authority: str
     package_version: str
@@ -268,6 +269,7 @@ class OperationJournal:
     status: JournalStatus
     actions: tuple[OperationJournalAction, ...]
     staging_leases: tuple[DistributionStageOwnership, ...] = ()
+    created_parent_bindings: tuple[PathIdentitySnapshot, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -330,6 +332,7 @@ class DistributionAdmission:
     package_version: str
     target_version: str | None = None
     marker: DistributionRetryMarker | None = None
+    version_identity: DistributionIdentity | None = None
 
     def diagnostic(self) -> dict[str, object]:
         """Return stable, repository-relative admission evidence."""
@@ -996,7 +999,7 @@ def _validate_workspace_version(
     *,
     manifest: DistributionManifest,
     package_version: str,
-) -> tuple[str, tuple[int, int, int]]:
+) -> tuple[str, tuple[int, int, int], DistributionIdentity]:
     version_path = target_root / "spec-dock" / "spec-dock.version"
     raw_bytes = _read_no_follow_regular(version_path, label="spec-dock/spec-dock.version", allow_missing=True)
     if raw_bytes is None:
@@ -1006,6 +1009,17 @@ def _validate_workspace_version(
     except UnicodeDecodeError:
         _admission_block("invalid-version", "spec-dock/spec-dock.version must be ASCII")
     target_tuple = _parse_canonical_version(version_text, source="spec-dock/spec-dock.version")
+    try:
+        version_info = os.lstat(version_path)
+    except OSError:
+        _admission_block("invalid-file", "spec-dock/spec-dock.version changed during admission")
+    if not stat.S_ISREG(version_info.st_mode) or version_info.st_nlink != 1:
+        _admission_block("invalid-file", "spec-dock/spec-dock.version changed during admission")
+    version_identity = DistributionIdentity(
+        kind="regular",
+        sha256=hashlib.sha256(raw_bytes).hexdigest(),
+        mode=stat.S_IMODE(version_info.st_mode),
+    )
     entry = _recognized_version_entry(manifest, version_text[:-1])
     anchors = entry["anchors"]
     for path_text in _VERSION_ANCHOR_PATHS:
@@ -1017,7 +1031,7 @@ def _validate_workspace_version(
         _admission_block(
             "downgrade-blocked", f"target version {version_text[:-1]} is newer than package {package_version}"
         )
-    return version_text[:-1], target_tuple
+    return version_text[:-1], target_tuple, version_identity
 
 
 def admit_distribution_operation(
@@ -1063,16 +1077,26 @@ def admit_distribution_operation(
     distribution_marker_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
     journal_present = _path_present_no_follow(target_root / _DISTRIBUTION_JOURNAL_REL)
     uninstall_marker_present = _path_present_no_follow(target_root / _UNINSTALL_RETRY_MARKER_REL)
-    if sum((distribution_marker_present, journal_present, uninstall_marker_present)) > 1:
+    if uninstall_marker_present and (distribution_marker_present or journal_present):
         _admission_block("dual-marker", "distribution recovery states cannot coexist")
 
     if journal_present:
         if operation not in {"update", "init-force"}:
             _admission_block("distribution-retry-present", "recover distribution before this operation")
+        distribution_marker = _read_distribution_retry_marker(target_root)
+        if distribution_marker is not None and (
+            distribution_marker.operation != operation
+            or distribution_marker.target_root != root_identity
+            or distribution_marker.last_completed_phase != "preflight-complete"
+            or distribution_marker.stage_ownership
+            or not _journal_package_is_compatible(distribution_marker.package_version, package_version)
+        ):
+            _admission_block("dual-marker", "distribution recovery states cannot coexist")
         return DistributionAdmission(
             operation=operation,
             status="retry",
             package_version=package_version,
+            marker=distribution_marker,
         )
 
     distribution_marker = _read_distribution_retry_marker(target_root)
@@ -1126,7 +1150,7 @@ def admit_distribution_operation(
         _admission_block("workspace-missing", "target is not a managed SpecDock repo")
     if operation == "fresh":
         return DistributionAdmission(operation=operation, status="existing", package_version=package_version)
-    target_version, _target_tuple = _validate_workspace_version(
+    target_version, _target_tuple, version_identity = _validate_workspace_version(
         target_root,
         manifest=manifest,
         package_version=package_version,
@@ -1136,6 +1160,7 @@ def admit_distribution_operation(
         status="recognized",
         package_version=package_version,
         target_version=target_version,
+        version_identity=version_identity,
     )
 
 
@@ -1798,7 +1823,7 @@ def _classify_current_target(
         actual.kind == "regular"
         and observation.link_count is not None
         and observation.link_count > 1
-        and operation == "uninstall"
+        and operation in {"update", "init-force", "uninstall"}
     ):
         return _blocked_action(
             path,
@@ -2215,8 +2240,26 @@ def _staging_leases_digest(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _created_parent_bindings_payload(journal: OperationJournal) -> list[dict[str, object]]:
+    return [_path_snapshot_condition(binding) for binding in journal.created_parent_bindings]
+
+
+def _created_parent_bindings_digest(
+    *,
+    operation_id: str,
+    bindings: list[dict[str, object]],
+) -> str:
+    encoded = json.dumps(
+        {"operation_id": operation_id, "created_parent_bindings": bindings},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _journal_payload(journal: OperationJournal) -> dict[str, object]:
     leases = _staging_leases_payload(journal)
+    created_parent_bindings = _created_parent_bindings_payload(journal)
     return {
         "schema_version": journal.schema_version,
         "protocol_version": journal.protocol_version,
@@ -2225,6 +2268,7 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
             "device": journal.root_identity.device,
             "inode": journal.root_identity.inode,
         },
+        "workspace_binding": _path_snapshot_condition(journal.workspace_identity),
         "intent": journal.intent,
         "authority": journal.authority,
         "package_version": journal.package_version,
@@ -2249,6 +2293,11 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
             operation_id=journal.operation_id,
             leases=leases,
         ),
+        "created_parent_bindings": created_parent_bindings,
+        "created_parent_bindings_digest": _created_parent_bindings_digest(
+            operation_id=journal.operation_id,
+            bindings=created_parent_bindings,
+        ),
     }
 
 
@@ -2268,6 +2317,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         "protocol_version",
         "operation_id",
         "root_binding",
+        "workspace_binding",
         "intent",
         "authority",
         "package_version",
@@ -2278,10 +2328,13 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         "actions",
         "staging_leases",
         "staging_leases_digest",
+        "created_parent_bindings",
+        "created_parent_bindings_digest",
     }
     if set(payload) != expected_fields:
         raise DistributionApplyError("journal-protocol-incompatible")
     root = payload["root_binding"]
+    workspace = payload["workspace_binding"]
     actions = payload["actions"]
     if (
         payload["schema_version"] != _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
@@ -2289,6 +2342,15 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         or not isinstance(root, dict)
         or set(root) != {"device", "inode"}
         or not all(isinstance(root[field], int) for field in ("device", "inode"))
+        or not isinstance(workspace, dict)
+        or set(workspace) != {"relative_path", "exists", "device", "inode", "ctime_ns", "file_type", "link_count"}
+        or workspace.get("relative_path") != "spec-dock"
+        or workspace.get("exists") is not True
+        or workspace.get("file_type") != "directory"
+        or any(
+            isinstance(workspace.get(field), bool) or not isinstance(workspace.get(field), int)
+            for field in ("device", "inode", "ctime_ns", "link_count")
+        )
         or payload["intent"] not in {"update", "init-force"}
         or not isinstance(payload["authority"], str)
         or not isinstance(payload["package_version"], str)
@@ -2358,11 +2420,62 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
                 file_type=item["file_type"],
             )
         )
+    raw_bindings = payload["created_parent_bindings"]
+    if (
+        not isinstance(raw_bindings, list)
+        or not isinstance(payload["created_parent_bindings_digest"], str)
+        or payload["created_parent_bindings_digest"]
+        != _created_parent_bindings_digest(
+            operation_id=payload["operation_id"],
+            bindings=raw_bindings,
+        )
+    ):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    created_parent_bindings: list[PathIdentitySnapshot] = []
+    for item in raw_bindings:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"relative_path", "exists", "device", "inode", "ctime_ns", "file_type", "link_count"}
+            or not isinstance(item["relative_path"], str)
+            or item["exists"] is not True
+            or any(not isinstance(item[field], int) for field in ("device", "inode", "ctime_ns", "link_count"))
+            or item["file_type"] != "directory"
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        created_parent_bindings.append(
+            PathIdentitySnapshot(
+                relative_path=item["relative_path"],
+                exists=True,
+                device=item["device"],
+                inode=item["inode"],
+                ctime_ns=item["ctime_ns"],
+                file_type="directory",
+                link_count=item["link_count"],
+            )
+        )
+    if len({item.relative_path for item in created_parent_bindings}) != len(created_parent_bindings):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    checkpoints = {action.checkpoint for action in parsed_actions}
+    if (
+        (payload["status"] == "prepared" and (checkpoints - {"pending"} or leases))
+        or (payload["status"] == "executing" and "verified" in checkpoints)
+        or (payload["status"] in {"verifying", "completed"} and (checkpoints != {"verified"} or leases))
+    ):
+        raise DistributionApplyError("journal-protocol-incompatible")
     return OperationJournal(
         schema_version=payload["schema_version"],
         protocol_version=payload["protocol_version"],
         operation_id=payload["operation_id"],
         root_identity=DistributionRootIdentity(device=root["device"], inode=root["inode"]),
+        workspace_identity=PathIdentitySnapshot(
+            relative_path="spec-dock",
+            exists=True,
+            device=workspace["device"],
+            inode=workspace["inode"],
+            ctime_ns=workspace["ctime_ns"],
+            file_type="directory",
+            link_count=workspace["link_count"],
+        ),
         intent=payload["intent"],
         authority=payload["authority"],
         package_version=payload["package_version"],
@@ -2372,6 +2485,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         status=payload["status"],
         actions=tuple(parsed_actions),
         staging_leases=tuple(leases),
+        created_parent_bindings=tuple(created_parent_bindings),
     )
 
 
@@ -2394,7 +2508,15 @@ class OperationJournalStore:
         self.identity_path = Path(identity_path) if identity_path is not None else self.target_root
         self.path = self.target_root / _DISTRIBUTION_JOURNAL_REL
 
-    def _open_parent(self, expected_root: DistributionRootIdentity) -> tuple[int, int]:
+    @staticmethod
+    def _workspace_condition(journal: OperationJournal) -> dict[str, object]:
+        return _path_snapshot_condition(journal.workspace_identity)
+
+    def _open_parent(
+        self,
+        expected_root: DistributionRootIdentity,
+        expected_workspace: dict[str, object] | None = None,
+    ) -> tuple[int, int]:
         flags = _distribution_directory_flags()
         try:
             root_fd = os.open(self.target_root, flags)
@@ -2411,6 +2533,18 @@ class OperationJournalStore:
             ):
                 raise DistributionApplyError("journal-root-mismatch")
             parent_fd = os.open("spec-dock", flags, dir_fd=root_fd)
+            if expected_workspace is not None:
+                parent = os.fstat(parent_fd)
+                if (
+                    expected_workspace.get("exists") is not True
+                    or expected_workspace.get("file_type") != "directory"
+                    or (parent.st_dev, parent.st_ino)
+                    != (
+                        expected_workspace.get("device"),
+                        expected_workspace.get("inode"),
+                    )
+                ):
+                    raise DistributionApplyError("journal-parent-mismatch")
         except Exception:
             os.close(root_fd)
             raise
@@ -2418,7 +2552,10 @@ class OperationJournalStore:
 
     def _write(self, journal: OperationJournal, *, require_absent: bool = False) -> None:
         content = _journal_bytes(journal)
-        root_fd, parent_fd = self._open_parent(journal.root_identity)
+        root_fd, parent_fd = self._open_parent(
+            journal.root_identity,
+            self._workspace_condition(journal),
+        )
         destination = _DISTRIBUTION_JOURNAL_REL.name
         stage = f".distribution-journal-{hashlib.sha256(content).hexdigest()[:24]}.stage"
         stage_info: os.stat_result | None = None
@@ -2528,7 +2665,22 @@ class OperationJournalStore:
                     raise DistributionApplyError("journal-protocol-incompatible")
             finally:
                 os.close(fd)
-            return _parse_operation_journal(raw)
+            journal = _parse_operation_journal(raw)
+            if journal.root_identity != expected_root:
+                raise DistributionApplyError("journal-root-mismatch")
+            parent = os.fstat(parent_fd)
+            expected_workspace = self._workspace_condition(journal)
+            if (
+                expected_workspace.get("exists") is not True
+                or expected_workspace.get("file_type") != "directory"
+                or (parent.st_dev, parent.st_ino)
+                != (
+                    expected_workspace.get("device"),
+                    expected_workspace.get("inode"),
+                )
+            ):
+                raise DistributionApplyError("journal-parent-mismatch")
+            return journal
         finally:
             os.close(parent_fd)
             os.close(root_fd)
@@ -2536,11 +2688,18 @@ class OperationJournalStore:
     def prepare(self, plan: ExecutableMutationPlan, *, package_version: str) -> OperationJournal:
         created_at_ns = time.time_ns()
         operation_id = hashlib.sha256(f"{plan.plan_digest}:{created_at_ns}".encode()).hexdigest()
+        try:
+            workspace_info = os.lstat(self.target_root / "spec-dock")
+        except OSError as exc:
+            raise DistributionApplyError("journal-parent-mismatch") from exc
+        if stat.S_ISLNK(workspace_info.st_mode) or not stat.S_ISDIR(workspace_info.st_mode):
+            raise DistributionApplyError("journal-parent-mismatch")
         journal = OperationJournal(
             schema_version=_DISTRIBUTION_JOURNAL_SCHEMA_VERSION,
             protocol_version=_DISTRIBUTION_JOURNAL_PROTOCOL_VERSION,
             operation_id=operation_id,
             root_identity=plan.root_identity,
+            workspace_identity=_snapshot_from_stat("spec-dock", workspace_info),
             intent=plan.intent,
             authority="recognized-workspace-reconciliation",
             package_version=package_version,
@@ -2562,6 +2721,78 @@ class OperationJournalStore:
         )
         self._write(journal, require_absent=True)
         return journal
+
+    def prepare_legacy_guard(
+        self,
+        plan: ExecutableMutationPlan,
+        *,
+        package_version: str,
+    ) -> DistributionRetryMarker:
+        """Publish an old-installer-visible guard before the new journal exists."""
+
+        marker = DistributionRetryMarker(
+            operation=plan.intent,
+            package_version=package_version,
+            target_root=plan.root_identity,
+            last_completed_phase="preflight-complete",
+            purpose=_DISTRIBUTION_RETRY_PURPOSE,
+        )
+        payload: dict[str, object] = {
+            "schema_version": _DISTRIBUTION_RETRY_SCHEMA_VERSION,
+            "operation": marker.operation,
+            "package_version": marker.package_version,
+            "target_root": {
+                "device": marker.target_root.device,
+                "inode": marker.target_root.inode,
+            },
+            "last_completed_phase": marker.last_completed_phase,
+            "purpose": marker.purpose,
+            "stage_ownership": [],
+        }
+        content = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        try:
+            workspace_info = os.lstat(self.target_root / "spec-dock")
+        except OSError as exc:
+            raise DistributionApplyError("journal-parent-mismatch") from exc
+        if stat.S_ISLNK(workspace_info.st_mode) or not stat.S_ISDIR(workspace_info.st_mode):
+            raise DistributionApplyError("journal-parent-mismatch")
+        workspace_condition = _path_snapshot_condition(_snapshot_from_stat("spec-dock", workspace_info))
+        root_fd, parent_fd = self._open_parent(plan.root_identity, workspace_condition)
+        destination = _DISTRIBUTION_RETRY_MARKER_REL.name
+        stage = f".distribution-retry-{secrets.token_hex(16)}.stage"
+        stage_info: os.stat_result | None = None
+        try:
+            try:
+                os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise DistributionApplyError("dual-recovery-state")
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("platform lacks required no-follow file support")
+            fd = os.open(
+                stage,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                0o600,
+                dir_fd=parent_fd,
+            )
+            try:
+                _write_fd_bytes(fd, content)
+                os.fchmod(fd, 0o600)
+                stage_info = os.fstat(fd)
+            finally:
+                os.close(fd)
+            _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
+            os.fsync(parent_fd)
+            return marker
+        except Exception:
+            if stage_info is not None:
+                _remove_distribution_stage_if_owned(parent_fd, stage, stage_info)
+            raise
+        finally:
+            os.close(parent_fd)
+            os.close(root_fd)
 
     def resume(self, plan: ExecutableMutationPlan, *, package_version: str) -> OperationJournal:
         journal = self._read(plan.root_identity)
@@ -2619,6 +2850,26 @@ class OperationJournalStore:
         completed_paths: tuple[str, ...],
     ) -> OperationJournal:
         completed = set(completed_paths)
+        for lease in journal.staging_leases:
+            if lease.path not in completed:
+                continue
+            try:
+                parent_chain = _open_distribution_parent_chain(
+                    self.target_root,
+                    lease.path,
+                    create_missing=False,
+                )
+            except DistributionApplyError as exc:
+                raise DistributionApplyError("managed staging cleanup failed") from exc
+            try:
+                try:
+                    os.stat(lease.stage_name, dir_fd=parent_chain[-1], follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                else:
+                    raise DistributionApplyError("managed staging cleanup failed")
+            finally:
+                _close_distribution_parent_chain(parent_chain)
         actions = tuple(
             replace(action, checkpoint="published")
             if action.path in completed and action.checkpoint == "pending"
@@ -2645,19 +2896,37 @@ class OperationJournalStore:
         )
         return self.write(replace(journal, staging_leases=(*retained, lease)))
 
+    def record_created_parent_bindings(
+        self,
+        journal: OperationJournal,
+        bindings: tuple[PathIdentitySnapshot, ...],
+    ) -> OperationJournal:
+        existing = {binding.relative_path: binding for binding in journal.created_parent_bindings}
+        for binding in bindings:
+            current = existing.get(binding.relative_path)
+            if current is not None and not _same_structure_identity(current, binding):
+                raise DistributionApplyError("journal-precondition-mismatch")
+            existing[binding.relative_path] = binding
+        ordered = tuple(existing[path] for path in sorted(existing))
+        return self.write(replace(journal, created_parent_bindings=ordered))
+
     def mark_verified(self, journal: OperationJournal) -> OperationJournal:
-        if any(action.checkpoint == "pending" for action in journal.actions):
+        if journal.staging_leases or any(action.checkpoint == "pending" for action in journal.actions):
             raise DistributionApplyError("journal-precondition-mismatch")
         actions = tuple(replace(action, checkpoint="verified") for action in journal.actions)
         return self.write(replace(journal, status="verifying", actions=actions))
 
     def mark_completed(self, journal: OperationJournal) -> OperationJournal:
-        if any(action.checkpoint != "verified" for action in journal.actions):
+        if journal.staging_leases or any(action.checkpoint != "verified" for action in journal.actions):
             raise DistributionApplyError("journal-precondition-mismatch")
         return self.write(replace(journal, status="completed"))
 
     def remove_completed(self, journal: OperationJournal) -> None:
-        if journal.status != "completed":
+        if (
+            journal.status != "completed"
+            or journal.staging_leases
+            or any(action.checkpoint != "verified" for action in journal.actions)
+        ):
             raise DistributionApplyError("journal-precondition-mismatch")
         self._remove_exact(journal, failure_reason="journal finalization failed")
 
@@ -2858,7 +3127,13 @@ class OperationJournalStore:
             os.close(root_fd)
 
 
-def _generated_regular_asset(path: str, content: bytes, *, mode: int) -> DistributionAsset:
+def _generated_regular_asset(
+    path: str,
+    content: bytes,
+    *,
+    mode: int,
+    refreshable_existing_identities: tuple[DistributionIdentity, ...] | None = None,
+) -> DistributionAsset:
     return DistributionAsset(
         path=path,
         identity=DistributionIdentity(
@@ -2867,6 +3142,7 @@ def _generated_regular_asset(path: str, content: bytes, *, mode: int) -> Distrib
             mode=mode,
         ),
         generated_content=content,
+        refreshable_existing_identities=refreshable_existing_identities,
     )
 
 
@@ -2895,7 +3171,11 @@ def _journal_digest(journal: OperationJournal) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _snapshot_matches_condition(snapshot: DistributionTargetSnapshot, condition: dict[str, object]) -> bool:
+def _snapshot_matches_condition(
+    snapshot: DistributionTargetSnapshot,
+    condition: dict[str, object],
+    created_parent_bindings: tuple[PathIdentitySnapshot, ...] = (),
+) -> bool:
     root_condition = condition.get("root")
     if not isinstance(root_condition, dict) or not _path_snapshot_matches_condition(snapshot.root, root_condition):
         return False
@@ -2903,6 +3183,7 @@ def _snapshot_matches_condition(snapshot: DistributionTargetSnapshot, condition:
     if not isinstance(parent_conditions, list):
         return False
     actual_parents = {parent.relative_path: parent for parent in snapshot.parents}
+    bound_parents = {parent.relative_path: parent for parent in created_parent_bindings}
     for parent_condition in parent_conditions:
         if not isinstance(parent_condition, dict):
             return False
@@ -2911,7 +3192,14 @@ def _snapshot_matches_condition(snapshot: DistributionTargetSnapshot, condition:
             return False
         actual_parent = actual_parents.get(relative_path)
         if actual_parent is None or not _path_snapshot_matches_condition(actual_parent, parent_condition):
-            return False
+            bound_parent = bound_parents.get(relative_path)
+            if (
+                parent_condition.get("exists") is not False
+                or actual_parent is None
+                or bound_parent is None
+                or not _same_structure_identity(actual_parent, bound_parent)
+            ):
+                return False
     target = snapshot.target
     if condition.get("exists") != target.exists:
         return False
@@ -2949,6 +3237,28 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
     lease_keys = {(lease.path, lease.stage_name) for lease in journal.staging_leases}
     if len(lease_keys) != len(journal.staging_leases):
         raise DistributionApplyError("journal-plan-mismatch")
+    allowed_created_parents: set[str] = set()
+    for record in journal.actions:
+        parents = record.precondition.get("parents")
+        if not isinstance(parents, list):
+            raise DistributionApplyError("journal-plan-mismatch")
+        allowed_created_parents.update(
+            parent["relative_path"]
+            for parent in parents
+            if isinstance(parent, dict)
+            and parent.get("exists") is False
+            and isinstance(parent.get("relative_path"), str)
+        )
+    if any(binding.relative_path not in allowed_created_parents for binding in journal.created_parent_bindings):
+        raise DistributionApplyError("journal-plan-mismatch")
+    actual_parents = {
+        parent.relative_path: parent for snapshot in dict(plan.target_snapshots).values() for parent in snapshot.parents
+    }
+    if any(
+        (actual := actual_parents.get(binding.relative_path)) is None or not _same_structure_identity(actual, binding)
+        for binding in journal.created_parent_bindings
+    ):
+        raise DistributionApplyError("journal-precondition-mismatch")
     for lease in journal.staging_leases:
         if lease.path not in records:
             raise DistributionApplyError("journal-plan-mismatch")
@@ -2956,7 +3266,9 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
         known_identities = tuple(
             identity for identity in (expected, *_historical_stage_identities(plan, lease.path)) if identity is not None
         )
-        if not any(lease.stage_name == _distribution_stage_name(lease.path, identity) for identity in known_identities):
+        if not any(
+            _matches_distribution_stage_name(lease.stage_name, lease.path, identity) for identity in known_identities
+        ):
             raise DistributionApplyError("journal-plan-mismatch")
     current_specs = _target_identity_specs(plan.current_assets, plan.scaffold_assets)
     obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files} - set(current_specs)
@@ -2981,7 +3293,11 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             ):
                 raise DistributionApplyError("journal-plan-mismatch")
             snapshot = dict(plan.target_snapshots).get(record.path)
-            if snapshot is None or not _snapshot_matches_condition(snapshot, record.precondition):
+            if snapshot is None or not _snapshot_matches_condition(
+                snapshot,
+                record.precondition,
+                journal.created_parent_bindings,
+            ):
                 raise DistributionApplyError("journal-plan-mismatch")
 
 
@@ -3000,7 +3316,7 @@ def _resume_executable_plan(
         if snapshot is None:
             raise DistributionApplyError("journal-precondition-mismatch")
         expected = record.precondition if record.checkpoint == "pending" else record.postcondition
-        if not _snapshot_matches_condition(snapshot, expected):
+        if not _snapshot_matches_condition(snapshot, expected, journal.created_parent_bindings):
             raise DistributionApplyError("journal-precondition-mismatch")
         action = DistributionAction(
             path=record.path,
@@ -3039,8 +3355,8 @@ def _reconcile_pending_journal_actions(
         snapshot = snapshots.get(record.path)
         if snapshot is None:
             raise DistributionApplyError("journal-precondition-mismatch")
-        matches_pre = _snapshot_matches_condition(snapshot, record.precondition)
-        matches_post = _snapshot_matches_condition(snapshot, record.postcondition)
+        matches_pre = _snapshot_matches_condition(snapshot, record.precondition, journal.created_parent_bindings)
+        matches_post = _snapshot_matches_condition(snapshot, record.postcondition, journal.created_parent_bindings)
         if matches_post and (not matches_pre or record.action in {"adopt", "preserve"}):
             reconciled.append(replace(record, checkpoint="published"))
             changed = True
@@ -3054,6 +3370,25 @@ def _reconcile_pending_journal_actions(
     return replace(journal, status="executing", actions=tuple(reconciled))
 
 
+def _journal_version_precondition_identity(journal: OperationJournal) -> DistributionIdentity | None:
+    for action in journal.actions:
+        if action.path != "spec-dock/spec-dock.version":
+            continue
+        identity = action.precondition.get("identity")
+        if (
+            isinstance(identity, dict)
+            and identity.get("kind") == "regular"
+            and isinstance(identity.get("sha256"), str)
+            and (identity.get("mode") is None or isinstance(identity.get("mode"), int))
+        ):
+            return DistributionIdentity(
+                kind="regular",
+                sha256=identity["sha256"],
+                mode=identity.get("mode"),
+            )
+    return None
+
+
 def execute_recognized_distribution(
     install_root: Path,
     *,
@@ -3064,14 +3399,35 @@ def execute_recognized_distribution(
     package_version: str,
     legacy_marker: DistributionRetryMarker | None = None,
     generated_assets: tuple[DistributionAsset, ...] = (),
+    version_refreshable_existing_identities: tuple[DistributionIdentity, ...] | None = None,
     root_identity_path: Path | None = None,
 ) -> DistributionProcessResult:
     """Execute one recognized update/init-force through the journaled service."""
 
+    store = OperationJournalStore(target_root, identity_path=root_identity_path)
+    journal_present = _path_present_no_follow(store.path)
+    journal_seed: OperationJournal | None = None
+    operation_package_version = package_version
+    version_refresh_identities = version_refreshable_existing_identities
+    if journal_present:
+        try:
+            journal_seed = store._read(_root_identity_for_assessment(target_root))
+            operation_package_version = journal_seed.package_version
+            journal_version_identity = _journal_version_precondition_identity(journal_seed)
+            if journal_version_identity is not None:
+                version_refresh_identities = (journal_version_identity,)
+        except DistributionApplyError as exc:
+            return DistributionProcessResult(
+                status="recovery_required",
+                intent=intent,
+                actions=(),
+                reason=str(exc),
+            )
     version_asset = _generated_regular_asset(
         "spec-dock/spec-dock.version",
-        f"{package_version}\n".encode(),
+        f"{operation_package_version}\n".encode(),
         mode=0o644,
+        refreshable_existing_identities=version_refresh_identities,
     )
     assessment = build_workspace_assessment(
         install_root,
@@ -3081,8 +3437,6 @@ def execute_recognized_distribution(
         intent=intent,
         generated_assets=(version_asset, *generated_assets),
     )
-    store = OperationJournalStore(target_root, identity_path=root_identity_path)
-    journal_present = _path_present_no_follow(store.path)
     legacy_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
     if not journal_present and not legacy_present and assessment.blockers:
         reasons = ", ".join(f"{action.path}: {action.reason}" for action in assessment.blockers)
@@ -3105,37 +3459,62 @@ def execute_recognized_distribution(
         )
     plan_digest: str | None = None
     journal: OperationJournal | None = None
+    guard_marker = legacy_marker
     try:
-        if journal_present and legacy_present:
+        if legacy_present and guard_marker is None:
+            guard_marker = _read_distribution_retry_marker(target_root)
+        if (
+            journal_present
+            and legacy_present
+            and (
+                journal_seed is None
+                or guard_marker is None
+                or guard_marker.operation != journal_seed.intent
+                or guard_marker.package_version != journal_seed.package_version
+                or guard_marker.target_root != journal_seed.root_identity
+                or guard_marker.last_completed_phase != "preflight-complete"
+                or guard_marker.stage_ownership
+            )
+        ):
             raise DistributionApplyError("dual-recovery-state")
         if legacy_present:
-            executable = build_executable_mutation_plan(assessment)
-            plan_digest = executable.plan_digest
-            if (
-                legacy_marker is None
-                or legacy_marker.operation != intent
-                or legacy_marker.package_version != package_version
-                or legacy_marker.target_root != executable.root_identity
-                or legacy_marker.last_completed_phase != "preflight-complete"
-                or legacy_marker.stage_ownership
-            ):
-                raise DistributionApplyError("legacy-marker-unconvertible")
-            journal = store.prepare(executable, package_version=package_version)
-            try:
-                store.remove_legacy_marker(legacy_marker)
-            except Exception:
-                prepared = journal
-                try:
-                    store.discard_prepared(prepared)
-                except Exception as rollback_error:
-                    raise DistributionApplyError("dual-recovery-state") from rollback_error
-                journal = None
-                raise
+            if not journal_present:
+                executable = build_executable_mutation_plan(assessment)
+                plan_digest = executable.plan_digest
+                if (
+                    guard_marker is None
+                    or guard_marker.operation != intent
+                    or guard_marker.package_version != package_version
+                    or guard_marker.target_root != executable.root_identity
+                    or guard_marker.last_completed_phase != "preflight-complete"
+                    or guard_marker.stage_ownership
+                ):
+                    raise DistributionApplyError("legacy-marker-unconvertible")
+                journal = store.prepare(executable, package_version=package_version)
+            else:
+                assert journal_seed is not None
+                journal = store.load_for_assessment(assessment, package_version=package_version)
         elif journal_present:
             journal = store.load_for_assessment(assessment, package_version=package_version)
+        if journal_present:
+            assert journal is not None
             if journal.status == "completed":
                 executable = _resume_executable_plan(assessment, journal)
                 store.remove_completed(journal)
+                if guard_marker is not None:
+                    store.remove_legacy_marker(guard_marker)
+                if journal.package_version != package_version:
+                    return execute_recognized_distribution(
+                        install_root,
+                        manifest_path=manifest_path,
+                        scaffold_root=scaffold_root,
+                        target_root=target_root,
+                        intent=intent,
+                        package_version=package_version,
+                        generated_assets=generated_assets,
+                        version_refreshable_existing_identities=(version_asset.identity,),
+                        root_identity_path=root_identity_path,
+                    )
                 return DistributionProcessResult(
                     status="completed",
                     intent=intent,
@@ -3150,6 +3529,20 @@ def execute_recognized_distribution(
                     raise DistributionApplyError("distribution postcondition failed")
                 journal = store.mark_completed(journal)
                 store.remove_completed(journal)
+                if guard_marker is not None:
+                    store.remove_legacy_marker(guard_marker)
+                if journal.package_version != package_version:
+                    return execute_recognized_distribution(
+                        install_root,
+                        manifest_path=manifest_path,
+                        scaffold_root=scaffold_root,
+                        target_root=target_root,
+                        intent=intent,
+                        package_version=package_version,
+                        generated_assets=generated_assets,
+                        version_refreshable_existing_identities=(version_asset.identity,),
+                        root_identity_path=root_identity_path,
+                    )
                 return DistributionProcessResult(
                     status="completed",
                     intent=intent,
@@ -3159,9 +3552,13 @@ def execute_recognized_distribution(
             reconciled = _reconcile_pending_journal_actions(assessment, journal)
             if reconciled != journal:
                 journal = store.write(reconciled)
+            published_paths = tuple(action.path for action in journal.actions if action.checkpoint == "published")
+            if any(lease.path in published_paths for lease in journal.staging_leases):
+                journal = store.checkpoint_published(journal, published_paths)
             executable = _resume_executable_plan(assessment, journal)
-        else:
+        elif journal is None:
             executable = build_executable_mutation_plan(assessment)
+            guard_marker = store.prepare_legacy_guard(executable, package_version=package_version)
             journal = store.prepare(executable, package_version=package_version)
         plan_digest = executable.plan_digest
         journal = store.mark_executing(journal)
@@ -3183,6 +3580,11 @@ def execute_recognized_distribution(
             active_journal = store.record_staging_lease(active_journal, lease)
             journal = active_journal
 
+        def record_created_parents(bindings: tuple[PathIdentitySnapshot, ...]) -> None:
+            nonlocal active_journal, journal
+            active_journal = store.record_created_parent_bindings(active_journal, bindings)
+            journal = active_journal
+
         def record_progress(
             _phase: str,
             completed: tuple[str, ...],
@@ -3201,6 +3603,8 @@ def execute_recognized_distribution(
             allow_stale_stage_cleanup=bool(active_journal.staging_leases),
             stage_ownership=active_journal.staging_leases,
             stage_ownership_recorder=record_staging_lease,
+            created_parent_bindings=active_journal.created_parent_bindings,
+            created_parent_recorder=record_created_parents,
             progress_recorder=record_progress,
         )
         post = build_workspace_assessment(
@@ -3216,6 +3620,8 @@ def execute_recognized_distribution(
         active_journal = store.mark_verified(active_journal)
         active_journal = store.mark_completed(active_journal)
         store.remove_completed(active_journal)
+        if guard_marker is not None:
+            store.remove_legacy_marker(guard_marker)
         journal = active_journal
     except Exception as exc:
         if not isinstance(exc, DistributionApplyError):
@@ -3247,6 +3653,18 @@ def execute_recognized_distribution(
                 if journal is not None
                 else ()
             ),
+        )
+    if operation_package_version != package_version:
+        return execute_recognized_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent=intent,
+            package_version=package_version,
+            generated_assets=generated_assets,
+            version_refreshable_existing_identities=(version_asset.identity,),
+            root_identity_path=root_identity_path,
         )
     return DistributionProcessResult(
         status="completed",
@@ -3316,6 +3734,7 @@ def _open_distribution_parent_chain(
                             f"managed target parent appeared during apply for '{target_rel}'"
                         ) from None
                 else:
+                    os.fsync(fds[-1])
                     created_missing = True
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
             except OSError as exc:
@@ -3613,6 +4032,7 @@ def _remove_distribution_stage_if_owned(
         return
     try:
         os.unlink(stage_name, dir_fd=parent_fd)
+        os.fsync(parent_fd)
     except FileNotFoundError:
         return
     except OSError as exc:
@@ -3688,7 +4108,7 @@ def _distribution_stage_ownership(
 
 
 def _distribution_stage_name(path: str, identity: DistributionIdentity) -> str:
-    """Return the stable private stage name owned by one planned target."""
+    """Return the stable prefix for private stages owned by one planned target."""
     if identity.kind == "regular":
         identity_key = f"regular:{identity.sha256}"
         prefix = ".spec-dock-file-"
@@ -3697,6 +4117,17 @@ def _distribution_stage_name(path: str, identity: DistributionIdentity) -> str:
         prefix = ".spec-dock-symlink-"
     digest = hashlib.sha256(f"{path}\0{identity_key}".encode()).hexdigest()[:24]
     return f"{prefix}{digest}"
+
+
+def _new_distribution_stage_name(path: str, identity: DistributionIdentity) -> str:
+    """Return an attempt-unique stage name so an unleased crash cannot reserve the next attempt."""
+
+    return f"{_distribution_stage_name(path, identity)}-{secrets.token_hex(16)}"
+
+
+def _matches_distribution_stage_name(name: str, path: str, identity: DistributionIdentity) -> bool:
+    prefix = _distribution_stage_name(path, identity)
+    return name == prefix or name.startswith(f"{prefix}-")
 
 
 def _historical_stage_identities(plan: DistributionPlan, path: str) -> tuple[DistributionIdentity, ...]:
@@ -3755,7 +4186,8 @@ def _cleanup_stale_distribution_stages(
             if owned.path != action.path or owned.stage_name not in names:
                 continue
             if not any(
-                owned.stage_name == _distribution_stage_name(action.path, identity) for identity in known_identities
+                _matches_distribution_stage_name(owned.stage_name, action.path, identity)
+                for identity in known_identities
             ):
                 continue
             try:
@@ -3784,6 +4216,7 @@ def _cleanup_stale_distribution_stages(
             # ownership checks still apply to ordinary target mutations.
             try:
                 os.unlink(owned.stage_name, dir_fd=parent_fd)
+                os.fsync(parent_fd)
             except FileNotFoundError:
                 continue
             except OSError as exc:
@@ -3866,7 +4299,9 @@ def _bind_created_parent_identities(
     snapshot: DistributionTargetSnapshot,
     parent_chain: tuple[int, ...],
     created_parent_bindings: dict[str, PathIdentitySnapshot],
+    created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None = None,
 ) -> None:
+    changed = False
     for index, expected_parent in enumerate(snapshot.parents, start=1):
         if expected_parent.exists or index >= len(parent_chain):
             continue
@@ -3877,8 +4312,11 @@ def _bind_created_parent_identities(
         bound_parent = created_parent_bindings.get(expected_parent.relative_path)
         if bound_parent is None:
             created_parent_bindings[expected_parent.relative_path] = current
+            changed = True
         elif not _same_structure_identity(current, bound_parent):
             raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
+    if changed and created_parent_recorder is not None:
+        created_parent_recorder(tuple(created_parent_bindings[path] for path in sorted(created_parent_bindings)))
 
 
 def _apply_regular_action(
@@ -3891,6 +4329,7 @@ def _apply_regular_action(
     source_mode: int | None,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
+    created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
@@ -3904,7 +4343,13 @@ def _apply_regular_action(
     try:
         _assert_distribution_chain_bound(parent_chain, snapshot, path)
         _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
-        _bind_created_parent_identities(path, snapshot, parent_chain, created_parent_bindings)
+        _bind_created_parent_identities(
+            path,
+            snapshot,
+            parent_chain,
+            created_parent_bindings,
+            created_parent_recorder,
+        )
         parent_fd = parent_chain[-1]
         target_name = PurePosixPath(path).name
         try:
@@ -3923,7 +4368,7 @@ def _apply_regular_action(
             nofollow = getattr(os, "O_NOFOLLOW", None)
             if not isinstance(nofollow, int):
                 raise DistributionApplyError("platform lacks required no-follow file support")
-            staging_name = _distribution_stage_name(path, expected)
+            staging_name = _new_distribution_stage_name(path, expected)
             fd = os.open(
                 staging_name,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -3962,6 +4407,7 @@ def _apply_regular_action(
                 stage_identity = verified
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
+                os.fsync(parent_fd)
             finally:
                 with suppress(OSError):
                     stage_identity = os.fstat(fd)
@@ -4022,6 +4468,7 @@ def _apply_regular_action(
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
                 os.unlink(target_name, dir_fd=parent_fd)
+                os.fsync(parent_fd)
                 return
             if action.action != "upgrade":
                 raise DistributionApplyError(f"unsupported regular action for '{path}'")
@@ -4035,7 +4482,7 @@ def _apply_regular_action(
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
 
             _resolve_distribution_swap_rename()
-            staging_name = _distribution_stage_name(path, expected)
+            staging_name = _new_distribution_stage_name(path, expected)
             staging_fd = os.open(
                 staging_name,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -4073,6 +4520,7 @@ def _apply_regular_action(
                 if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
                     raise DistributionApplyError(f"managed target identity changed for '{path}'")
                 _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+                os.fsync(parent_fd)
                 swapped = True
 
                 published_fd = os.open(
@@ -4197,6 +4645,7 @@ def _apply_symlink_action(
     expected: DistributionIdentity,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
+    created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
@@ -4212,7 +4661,13 @@ def _apply_symlink_action(
     try:
         _assert_distribution_chain_bound(parent_chain, snapshot, action.path)
         _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
-        _bind_created_parent_identities(action.path, snapshot, parent_chain, created_parent_bindings)
+        _bind_created_parent_identities(
+            action.path,
+            snapshot,
+            parent_chain,
+            created_parent_bindings,
+            created_parent_recorder,
+        )
         parent_fd = parent_chain[-1]
         target_name = PurePosixPath(action.path).name
         try:
@@ -4241,7 +4696,7 @@ def _apply_symlink_action(
             if target_exists:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_no_replace_rename()
-            staging_name = _distribution_stage_name(action.path, expected)
+            staging_name = _new_distribution_stage_name(action.path, expected)
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
             published = False
@@ -4255,6 +4710,7 @@ def _apply_symlink_action(
                     stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
+                os.fsync(parent_fd)
                 published = True
             finally:
                 if not published:
@@ -4294,6 +4750,7 @@ def _apply_symlink_action(
             if latest_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             os.unlink(target_name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
             return
         if action.action == "upgrade":
             if not target_exists or snapshot.target.identity is None:
@@ -4301,7 +4758,7 @@ def _apply_symlink_action(
             if snapshot.target.identity.kind == "symlink" and current_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_swap_rename()
-            staging_name = _distribution_stage_name(action.path, expected)
+            staging_name = _new_distribution_stage_name(action.path, expected)
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
             swapped = False
@@ -4324,6 +4781,7 @@ def _apply_symlink_action(
                         raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
                 _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+                os.fsync(parent_fd)
                 swapped = True
                 published_target = _normalized_link_target_for_path(
                     action.path, os.readlink(target_name, dir_fd=parent_fd)
@@ -4428,6 +4886,7 @@ def _apply_distribution_action(
     snapshot: DistributionTargetSnapshot,
     created_parent_bindings: dict[str, PathIdentitySnapshot],
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
+    created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None = None,
 ) -> None:
     if action.action in {"adopt", "preserve"}:
         return
@@ -4478,6 +4937,7 @@ def _apply_distribution_action(
             expected=expected,
             created_parent_bindings=created_parent_bindings,
             stage_ownership_recorder=stage_ownership_recorder,
+            created_parent_recorder=created_parent_recorder,
         )
         return
     if expected is None and target_kind == "symlink":
@@ -4493,6 +4953,7 @@ def _apply_distribution_action(
             expected=historical_identity,
             created_parent_bindings=created_parent_bindings,
             stage_ownership_recorder=stage_ownership_recorder,
+            created_parent_recorder=created_parent_recorder,
         )
         return
     if expected is None and target_kind != "regular":
@@ -4506,6 +4967,7 @@ def _apply_distribution_action(
         source_mode=source_mode,
         created_parent_bindings=created_parent_bindings,
         stage_ownership_recorder=stage_ownership_recorder,
+        created_parent_recorder=created_parent_recorder,
     )
 
 
@@ -4516,6 +4978,8 @@ def apply_distribution_plan(
     allow_blocked_scaffold_paths: bool = False,
     stage_ownership: tuple[DistributionStageOwnership, ...] = (),
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
+    created_parent_bindings: tuple[PathIdentitySnapshot, ...] = (),
+    created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None = None,
     scaffold_applier: Callable[[], None] | None = None,
     progress_recorder: Callable[[str, tuple[str, ...], tuple[str, ...], bool], None] | None = None,
 ) -> DistributionResult:
@@ -4549,7 +5013,7 @@ def apply_distribution_plan(
         raise DistributionApplyError("managed target root is not a real directory")
 
     snapshots = _plan_snapshot_map(plan)
-    created_parent_bindings: dict[str, PathIdentitySnapshot] = {}
+    created_parent_bindings_by_path = {binding.relative_path: binding for binding in created_parent_bindings}
     scaffold_paths = plan.scaffold_paths if scaffold_applier is not None else frozenset()
     for action in plan.actions:
         snapshot = snapshots.get(action.path)
@@ -4593,7 +5057,7 @@ def apply_distribution_plan(
                         refreshed.snapshot,
                         snapshots[action.path],
                         action.path,
-                        created_parent_bindings,
+                        created_parent_bindings_by_path,
                     )
                 snapshots[action.path] = refreshed.snapshot
         except Exception as exc:
@@ -4635,7 +5099,12 @@ def apply_distribution_plan(
                 refreshed = _observe_target(target_root, action.path)
                 if refreshed.snapshot is None:
                     raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
-                _assert_pending_snapshot_stable(refreshed.snapshot, snapshot, action.path, created_parent_bindings)
+                _assert_pending_snapshot_stable(
+                    refreshed.snapshot,
+                    snapshot,
+                    action.path,
+                    created_parent_bindings_by_path,
+                )
                 snapshot = refreshed.snapshot
                 snapshots[action.path] = snapshot
                 for pending in actions_to_apply[index + 1 :]:
@@ -4647,20 +5116,36 @@ def apply_distribution_plan(
                         pending_observation.snapshot,
                         pending_snapshot,
                         pending.path,
-                        created_parent_bindings,
+                        created_parent_bindings_by_path,
                     )
                     snapshots[pending.path] = pending_observation.snapshot
                 if action.action not in {"adopt", "preserve"}:
-                    if stage_ownership_recorder is None:
-                        _apply_distribution_action(plan, target_root, action, snapshot, created_parent_bindings)
+                    if stage_ownership_recorder is None and created_parent_recorder is None:
+                        _apply_distribution_action(
+                            plan,
+                            target_root,
+                            action,
+                            snapshot,
+                            created_parent_bindings_by_path,
+                        )
+                    elif stage_ownership_recorder is None:
+                        _apply_distribution_action(
+                            plan,
+                            target_root,
+                            action,
+                            snapshot,
+                            created_parent_bindings_by_path,
+                            created_parent_recorder=created_parent_recorder,
+                        )
                     else:
                         _apply_distribution_action(
                             plan,
                             target_root,
                             action,
                             snapshot,
-                            created_parent_bindings,
+                            created_parent_bindings_by_path,
                             stage_ownership_recorder,
+                            created_parent_recorder,
                         )
                 applied_paths.append(action.path)
                 pending_paths.remove(action.path)
@@ -4675,7 +5160,7 @@ def apply_distribution_plan(
                         pending_observation.snapshot,
                         pending_snapshot,
                         pending.path,
-                        created_parent_bindings,
+                        created_parent_bindings_by_path,
                     )
                     snapshots[pending.path] = pending_observation.snapshot
             except Exception as exc:
