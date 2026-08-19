@@ -3,7 +3,7 @@
   "kind": "issue368_full_regression_failure_ledger",
   "issue_id": "iss-00368",
   "fixed_point_sha": "7588d54114a2b8be7661353952f65741169320bd",
-  "current_head_sha": "4f4fbfb591f6d70a77e1b67730b4e2b17b9e3726",
+  "current_head_sha": "ac4c33171b6dad2dae9400072f806d94bcc615bf",
   "commands": {
     "current_full": "uv run pytest --run-full-regression -q",
     "fixed_point_full": "uv run pytest --run-full-regression"
