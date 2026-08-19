@@ -617,6 +617,57 @@ def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_parent_ch
     assert result.reason == "journal-plan-mismatch"
 
 
+def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_post_parent_chain(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    changed = list(journal.actions)
+    parents = changed[0].postcondition["parents"]
+    assert isinstance(parents, list) and parents
+    changed[0] = managed_distribution.replace(
+        changed[0],
+        postcondition={**changed[0].postcondition, "parents": parents[1:]},
+    )
+    tampered = managed_distribution.replace(journal, actions=tuple(changed))
+    tampered = managed_distribution.replace(
+        tampered,
+        plan_digest=managed_distribution._journal_digest(tampered),
+    )
+    store.write(tampered)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-plan-mismatch"
+
+
 def test_i368_journal_resume_rejects_existing_parent_rebind(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -1428,6 +1479,64 @@ def test_i368_terminal_journal_rejects_tampered_digest_before_finalization(
     assert second.status == "recovery_required"
     assert second.reason == "journal-plan-mismatch"
     assert journal_path.read_bytes() == before
+
+
+def test_i368_terminal_journal_finalizes_after_completed_prune_disappears_from_assessment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    old = b"legacy-managed\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": ".codex/config.toml",
+                    "surface": "legacy-codex-surface",
+                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target = target_root / ".codex" / "config.toml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    (target_root / "spec-dock").mkdir()
+    original_remove = OperationJournalStore.remove_completed
+
+    def fail_finalization(*_args, **_kwargs):
+        raise DistributionApplyError("injected terminal finalization failure")
+
+    monkeypatch.setattr(OperationJournalStore, "remove_completed", fail_finalization)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert first.status == "recovery_required"
+    assert not target.exists()
+    assert journal_path.is_file()
+
+    monkeypatch.setattr(OperationJournalStore, "remove_completed", original_remove)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert not journal_path.exists()
 
 
 def test_i368_journal_finalization_preserves_concurrent_replacement(

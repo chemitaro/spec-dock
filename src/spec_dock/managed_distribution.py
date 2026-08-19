@@ -2113,7 +2113,7 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
         raise DistributionPlanError(f"assessment is missing a postcondition for '{action.path}'")
     boundary = {
         "root": _path_snapshot_condition(snapshot.root),
-        "parents": [_path_snapshot_condition(parent) for parent in snapshot.parents if parent.exists],
+        "parents": [_path_snapshot_condition(parent) for parent in snapshot.parents],
     }
     expected = _expected_target_identity(plan, action.path)
     if action.action == "prune":
@@ -3279,6 +3279,8 @@ def _condition_has_complete_parent_chain(
 
 def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: OperationJournal) -> None:
     plan = assessment.distribution_plan
+    if plan.target_root is None:
+        raise DistributionApplyError("journal-plan-mismatch")
     current_actions = {action.path: action for action in assessment.actions}
     records = {record.path: record for record in journal.actions}
     completed_missing_obsolete = {
@@ -3342,6 +3344,15 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
                 "identity"
             ) != _distribution_identity_payload(expected_identity):
                 raise DistributionApplyError("journal-plan-mismatch")
+        snapshot = dict(plan.target_snapshots).get(record.path)
+        if snapshot is None and record.path in completed_missing_obsolete:
+            snapshot = _observe_target(plan.target_root, record.path).snapshot
+        if (
+            snapshot is None
+            or not _condition_has_complete_parent_chain(snapshot, record.precondition)
+            or not _condition_has_complete_parent_chain(snapshot, record.postcondition)
+        ):
+            raise DistributionApplyError("journal-plan-mismatch")
         if record.checkpoint == "pending":
             current = current_actions[record.path]
             if (record.action, record.provenance, record.reason) != (
@@ -3350,15 +3361,10 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
                 current.reason,
             ):
                 raise DistributionApplyError("journal-plan-mismatch")
-            snapshot = dict(plan.target_snapshots).get(record.path)
-            if (
-                snapshot is None
-                or not _condition_has_complete_parent_chain(snapshot, record.precondition)
-                or not _snapshot_matches_condition(
-                    snapshot,
-                    record.precondition,
-                    journal.created_parent_bindings,
-                )
+            if not _snapshot_matches_condition(
+                snapshot,
+                record.precondition,
+                journal.created_parent_bindings,
             ):
                 raise DistributionApplyError("journal-plan-mismatch")
 
@@ -3370,11 +3376,16 @@ def _resume_executable_plan(
     if _journal_digest(journal) != journal.plan_digest:
         raise DistributionApplyError("journal-plan-mismatch")
     _assert_journal_action_contract(assessment, journal)
-    snapshots = dict(assessment.distribution_plan.target_snapshots)
+    plan = assessment.distribution_plan
+    if plan.target_root is None:
+        raise DistributionApplyError("journal-plan-mismatch")
+    snapshots = dict(plan.target_snapshots)
     original_actions: list[DistributionAction] = []
     pending_actions: list[DistributionAction] = []
     for record in journal.actions:
         snapshot = snapshots.get(record.path)
+        if snapshot is None and record.action == "prune" and record.checkpoint != "pending":
+            snapshot = _observe_target(plan.target_root, record.path).snapshot
         if snapshot is None:
             raise DistributionApplyError("journal-precondition-mismatch")
         expected = record.precondition if record.checkpoint == "pending" else record.postcondition
