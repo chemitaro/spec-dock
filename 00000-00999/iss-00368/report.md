@@ -35,6 +35,7 @@ ID: "iss-00368"
 - Strict g10 remediation では、prune と regular/symlink upgrade の最終 pathname mutation を held identity の再検証と nonce quarantine／atomic rollback へ統一し、競合差し替えを削除せず canonical path へ復元して fail closed にした。`uninstall --apply --keep-specs` は managed scaffold root 内の未知ファイル・ディレクトリを preflight blocker として列挙し、最初の mutation 前にツリー全体を保持する。
 - Strict g10 bounded remediation では、durable な親作成意図と exact inode binding を分離した。mkdir 直後に exact binding を journal へ記録し、再開時に出現済み親を受理するのは `exists=true` の binding と inode が一致する場合だけとした。inventory にない旧 scaffold entry も未知ユーザー entry と同じく preflight で保持する。
 - Strict g10 candidate 2 remediation では、pending journal action の precondition が assessment の完全な親チェーンを順序どおり保持することを要求した。親要素を削除して digest を再計算した journal も plan mismatch として mutation 前に拒否する。
+- Strict g11 remediation では、full-regression の既知27件について固定点と実装 anchor の JUnit failure message を採取し、checkout / temporary path と pytest diagnostic suffix を正規化した assertion/error signature を node ID ごとに比較した。27件すべての SHA-256 が一致し、比較契約・run metadata・per-node signature を failure ledger 内へ保存した。
 - 実装 anchor は `4d6304c7c983a45f495e3efc439e5c3b17ce5cad`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `4d6304c7c983a45f495e3efc439e5c3b17ce5cad` の既存失敗集合へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。slow profile の完全な command/ledger 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
 
 ## Verification
@@ -49,6 +50,7 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] `uv run pytest --run-full-regression -q` at `72c1e4c724c115f0d6d6831eb6c2cff8bc239700` — 27 failed、2053 passed、48 skipped、17m10s。27件は fixed point ledger の node ID 集合と一致
 - [x] `uv run pytest --run-full-regression -q` at `f07c6440d827b2cea5ccdae7fe268e76706d1c39` — 27 failed、2057 passed、48 skipped、17m02s。27件は fixed point ledger の node ID 集合と一致
 - [x] `uv run pytest --run-full-regression -q` at `4d6304c7c983a45f495e3efc439e5c3b17ce5cad` — 27 failed、2058 passed、48 skipped、16m59s。27件は fixed point ledger の node ID 集合と一致
+- [x] failure ledger に列挙した9ファイルを `--run-full-regression --junitxml=<run.xml>` で固定点と実装 anchor の双方で再実行 — 各27 failed、正規化した27件の failure signature と aggregate SHA-256 `6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8` が一致
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
 - [x] `uv run pytest -q` — 1079 passed、1053 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
