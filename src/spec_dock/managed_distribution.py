@@ -319,7 +319,7 @@ class DistributionRetryMarker:
     package_version: str
     target_root: DistributionRootIdentity
     last_completed_phase: str
-    purpose: Literal["distribution-rerun"]
+    purpose: Literal["distribution-rerun", "recognized-journal-forward-only"]
     stage_ownership: tuple[DistributionStageOwnership, ...] = ()
 
 
@@ -655,6 +655,8 @@ _DISTRIBUTION_JOURNAL_SCHEMA_VERSION = 1
 _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION = 1
 _DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
 _DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
+_DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION = 2
+_DISTRIBUTION_JOURNAL_GUARD_PURPOSE: Literal["recognized-journal-forward-only"] = "recognized-journal-forward-only"
 _DISTRIBUTION_RETRY_PHASES = frozenset({
     "preflight-complete",
     "managed-scaffold-refreshed",
@@ -859,7 +861,13 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
     raw_fields = set(raw)
     if raw_fields != expected_fields and raw_fields != expected_fields | {"stage_ownership"}:
         _admission_block("marker-invalid", "distribution retry marker fields are invalid")
-    if raw.get("schema_version") != _DISTRIBUTION_RETRY_SCHEMA_VERSION:
+    schema_version = raw.get("schema_version")
+    purpose = raw.get("purpose")
+    supported_guard = (
+        schema_version == _DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION and purpose == _DISTRIBUTION_JOURNAL_GUARD_PURPOSE
+    )
+    supported_legacy = schema_version == _DISTRIBUTION_RETRY_SCHEMA_VERSION and purpose == _DISTRIBUTION_RETRY_PURPOSE
+    if not supported_guard and not supported_legacy:
         _admission_block("marker-invalid", "distribution retry marker schema is unsupported")
     operation = raw.get("operation")
     if operation not in {"fresh", "update", "init-force"}:
@@ -885,8 +893,6 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
     phase = raw.get("last_completed_phase")
     if not isinstance(phase, str) or phase not in _DISTRIBUTION_RETRY_PHASES:
         _admission_block("marker-invalid", "distribution retry marker phase is invalid")
-    if raw.get("purpose") != _DISTRIBUTION_RETRY_PURPOSE:
-        _admission_block("marker-invalid", "distribution retry marker purpose is unsupported")
     stage_ownership: list[DistributionStageOwnership] = []
     raw_stage_ownership = raw.get("stage_ownership", [])
     if not isinstance(raw_stage_ownership, list):
@@ -945,7 +951,7 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         package_version=package_version,
         target_root=DistributionRootIdentity(device=device, inode=inode),
         last_completed_phase=phase,
-        purpose=_DISTRIBUTION_RETRY_PURPOSE,
+        purpose=(_DISTRIBUTION_JOURNAL_GUARD_PURPOSE if supported_guard else _DISTRIBUTION_RETRY_PURPOSE),
         stage_ownership=tuple(stage_ownership),
     )
 
@@ -2437,19 +2443,28 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
             not isinstance(item, dict)
             or set(item) != {"relative_path", "exists", "device", "inode", "ctime_ns", "file_type", "link_count"}
             or not isinstance(item["relative_path"], str)
-            or item["exists"] is not True
-            or any(not isinstance(item[field], int) for field in ("device", "inode", "ctime_ns", "link_count"))
-            or item["file_type"] != "directory"
+            or not isinstance(item["exists"], bool)
+            or (
+                item["exists"] is True
+                and (
+                    any(not isinstance(item[field], int) for field in ("device", "inode", "ctime_ns", "link_count"))
+                    or item["file_type"] != "directory"
+                )
+            )
+            or (
+                item["exists"] is False
+                and any(item[field] is not None for field in ("device", "inode", "ctime_ns", "file_type", "link_count"))
+            )
         ):
             raise DistributionApplyError("journal-protocol-incompatible")
         created_parent_bindings.append(
             PathIdentitySnapshot(
                 relative_path=item["relative_path"],
-                exists=True,
+                exists=item["exists"],
                 device=item["device"],
                 inode=item["inode"],
                 ctime_ns=item["ctime_ns"],
-                file_type="directory",
+                file_type=item["file_type"],
                 link_count=item["link_count"],
             )
         )
@@ -2459,7 +2474,12 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     if (
         (payload["status"] == "prepared" and (checkpoints - {"pending"} or leases))
         or (payload["status"] == "executing" and "verified" in checkpoints)
-        or (payload["status"] in {"verifying", "completed"} and (checkpoints != {"verified"} or leases))
+        or (
+            payload["status"] in {"verifying", "completed"}
+            and (
+                checkpoints != {"verified"} or leases or any(not binding.exists for binding in created_parent_bindings)
+            )
+        )
     ):
         raise DistributionApplyError("journal-protocol-incompatible")
     return OperationJournal(
@@ -2557,7 +2577,7 @@ class OperationJournalStore:
             self._workspace_condition(journal),
         )
         destination = _DISTRIBUTION_JOURNAL_REL.name
-        stage = f".distribution-journal-{hashlib.sha256(content).hexdigest()[:24]}.stage"
+        stage = f".distribution-journal-{secrets.token_hex(16)}.stage"
         stage_info: os.stat_result | None = None
         try:
             try:
@@ -2618,7 +2638,13 @@ class OperationJournalStore:
                     _file_type(destination_info.st_mode),
                 ):
                     raise DistributionApplyError("journal-precondition-mismatch")
-                _remove_distribution_stage_if_owned(parent_fd, stage, swapped_out, strict=True)
+                self._quarantine_and_remove(
+                    parent_fd,
+                    stage,
+                    swapped_out,
+                    identity_error="journal-precondition-mismatch",
+                    failure_reason="managed staging cleanup failed",
+                )
             os.fsync(parent_fd)
             visible = os.lstat(self.identity_path)
             if (visible.st_dev, visible.st_ino) != (
@@ -2718,6 +2744,15 @@ class OperationJournalStore:
                 )
                 for action in sorted(plan.actions, key=lambda item: (item.path, item.action, item.reason))
             ),
+            created_parent_bindings=tuple(
+                _missing_snapshot(path)
+                for path in sorted({
+                    parent.relative_path
+                    for action in plan.actions
+                    for parent in dict(plan.distribution_plan.target_snapshots)[action.path].parents
+                    if not parent.exists
+                })
+            ),
         )
         self._write(journal, require_absent=True)
         return journal
@@ -2735,10 +2770,10 @@ class OperationJournalStore:
             package_version=package_version,
             target_root=plan.root_identity,
             last_completed_phase="preflight-complete",
-            purpose=_DISTRIBUTION_RETRY_PURPOSE,
+            purpose=_DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
         )
         payload: dict[str, object] = {
-            "schema_version": _DISTRIBUTION_RETRY_SCHEMA_VERSION,
+            "schema_version": _DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION,
             "operation": marker.operation,
             "package_version": marker.package_version,
             "target_root": {
@@ -2904,14 +2939,18 @@ class OperationJournalStore:
         existing = {binding.relative_path: binding for binding in journal.created_parent_bindings}
         for binding in bindings:
             current = existing.get(binding.relative_path)
-            if current is not None and not _same_structure_identity(current, binding):
+            if current is not None and current.exists and not _same_structure_identity(current, binding):
                 raise DistributionApplyError("journal-precondition-mismatch")
             existing[binding.relative_path] = binding
         ordered = tuple(existing[path] for path in sorted(existing))
         return self.write(replace(journal, created_parent_bindings=ordered))
 
     def mark_verified(self, journal: OperationJournal) -> OperationJournal:
-        if journal.staging_leases or any(action.checkpoint == "pending" for action in journal.actions):
+        if (
+            journal.staging_leases
+            or any(action.checkpoint == "pending" for action in journal.actions)
+            or any(not binding.exists for binding in journal.created_parent_bindings)
+        ):
             raise DistributionApplyError("journal-precondition-mismatch")
         actions = tuple(replace(action, checkpoint="verified") for action in journal.actions)
         return self.write(replace(journal, status="verifying", actions=actions))
@@ -3197,7 +3236,8 @@ def _snapshot_matches_condition(
                 parent_condition.get("exists") is not False
                 or actual_parent is None
                 or bound_parent is None
-                or not _same_structure_identity(actual_parent, bound_parent)
+                or actual_parent.file_type != "directory"
+                or (bound_parent.exists and not _same_structure_identity(actual_parent, bound_parent))
             ):
                 return False
     target = snapshot.target
@@ -3255,7 +3295,11 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
         parent.relative_path: parent for snapshot in dict(plan.target_snapshots).values() for parent in snapshot.parents
     }
     if any(
-        (actual := actual_parents.get(binding.relative_path)) is None or not _same_structure_identity(actual, binding)
+        binding.exists
+        and (
+            (actual := actual_parents.get(binding.relative_path)) is None
+            or not _same_structure_identity(actual, binding)
+        )
         for binding in journal.created_parent_bindings
     ):
         raise DistributionApplyError("journal-precondition-mismatch")
@@ -3688,6 +3732,7 @@ def _open_distribution_parent_chain(
     *,
     create_missing: bool = False,
     expected_snapshot: DistributionTargetSnapshot | None = None,
+    created_parent_bindings: dict[str, PathIdentitySnapshot] | None = None,
 ) -> tuple[int, ...]:
     flags = _distribution_directory_flags()
     fds: list[int] = []
@@ -3713,8 +3758,10 @@ def _open_distribution_parent_chain(
             try:
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
                 if expected_parent is not None and not expected_parent.exists:
-                    os.close(next_fd)
-                    raise DistributionApplyError(f"managed target parent appeared during apply for '{target_rel}'")
+                    authorized = created_parent_bindings is not None and component_relative in created_parent_bindings
+                    if not authorized:
+                        os.close(next_fd)
+                        raise DistributionApplyError(f"managed target parent appeared during apply for '{target_rel}'")
             except FileNotFoundError:
                 if not create_missing:
                     raise DistributionApplyError(f"managed target parent is missing for '{target_rel}'") from None
@@ -4288,7 +4335,9 @@ def _assert_pending_snapshot_stable(
                 # inode here would turn a user- or concurrently-created
                 # directory into an operation-owned parent after preflight.
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
-            if not _same_structure_identity(actual_parent, bound_parent):
+            if actual_parent.file_type != "directory" or (
+                bound_parent.exists and not _same_structure_identity(actual_parent, bound_parent)
+            ):
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
     if actual.target != expected.target:
         raise DistributionApplyError(f"managed target identity changed for '{path}'")
@@ -4303,14 +4352,14 @@ def _bind_created_parent_identities(
 ) -> None:
     changed = False
     for index, expected_parent in enumerate(snapshot.parents, start=1):
-        if expected_parent.exists or index >= len(parent_chain):
+        bound_parent = created_parent_bindings.get(expected_parent.relative_path)
+        if index >= len(parent_chain) or (expected_parent.exists and (bound_parent is None or bound_parent.exists)):
             continue
         current = _snapshot_from_stat(
             expected_parent.relative_path,
             os.fstat(parent_chain[index]),
         )
-        bound_parent = created_parent_bindings.get(expected_parent.relative_path)
-        if bound_parent is None:
+        if bound_parent is None or not bound_parent.exists:
             created_parent_bindings[expected_parent.relative_path] = current
             changed = True
         elif not _same_structure_identity(current, bound_parent):
@@ -4339,6 +4388,7 @@ def _apply_regular_action(
         path,
         create_missing=action.action == "create",
         expected_snapshot=snapshot,
+        created_parent_bindings=created_parent_bindings,
     )
     try:
         _assert_distribution_chain_bound(parent_chain, snapshot, path)
@@ -4657,6 +4707,7 @@ def _apply_symlink_action(
         action.path,
         create_missing=action.action == "create",
         expected_snapshot=snapshot,
+        created_parent_bindings=created_parent_bindings,
     )
     try:
         _assert_distribution_chain_bound(parent_chain, snapshot, action.path)
