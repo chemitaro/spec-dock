@@ -50,6 +50,16 @@ EXPECTED_CURRENT_PATHS = frozenset({
     ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
     ".github/workflows/ci.yml",
 })
+
+
+def test_issue_368_generated_link_target_enforces_repository_root_boundary() -> None:
+    checker = managed_distribution._generated_link_target_is_within_root
+
+    assert checker("spec-dock/active/issue", "../../outside") is True
+    assert checker("spec-dock/active/issue", "../../../outside") is False
+    assert checker("spec-dock/active/issue", "../../..") is False
+
+
 EXPECTED_OBSOLETE_SKILL_PATHS = frozenset(
     f".agents/skills/{name}/SKILL.md"
     for name in (
