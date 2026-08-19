@@ -1149,7 +1149,23 @@ def _active_fallback_refresh_identities(path: Path, *, allowed: bool) -> tuple[D
         after = path.stat(follow_symlinks=False)
     except OSError:
         return ()
-    if before != after or after.st_nlink != 1:
+    if (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_nlink,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_nlink,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ) or after.st_nlink != 1:
         return ()
     return (
         DistributionIdentity(
@@ -1277,10 +1293,15 @@ def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[Distributi
         epic_id=resolved_ids["epic"],
         issue_id=resolved_ids["issue"],
     ).encode("utf-8")
+    context_pack_path = active_dir / "context-pack.md"
     assets.append(
         _generated_regular_distribution_asset(
             "spec-dock/active/context-pack.md",
             context_pack,
+            refreshable_existing_identities=_active_fallback_refresh_identities(
+                context_pack_path,
+                allowed=context_pack_path.is_file() and not context_pack_path.is_symlink(),
+            ),
         )
     )
     return tuple(assets)
