@@ -166,6 +166,17 @@ def _minimal_scaffold_root(tmp_path: Path) -> Path:
     return scaffold_root
 
 
+def _prepare_guarded_journal(
+    store: OperationJournalStore,
+    executable,
+    *,
+    package_version: str = "1.2.3",
+):
+    marker = store.prepare_legacy_guard(executable, package_version=package_version)
+    store.bind_forward_guard(marker)
+    return store.prepare(executable, package_version=package_version)
+
+
 def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
     plan = build_distribution_plan(INSTALL_ROOT, manifest_path=MANIFEST_PATH)
 
@@ -545,7 +556,7 @@ def test_i368_journal_resume_rejects_recomputed_digest_for_changed_action(tmp_pa
         ),
     )
     store = OperationJournalStore(target_root)
-    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    journal = _prepare_guarded_journal(store, build_executable_mutation_plan(assessment))
     changed = list(journal.actions)
     changed[0] = managed_distribution.replace(changed[0], action="prune")
     tampered = managed_distribution.replace(journal, actions=tuple(changed))
@@ -589,7 +600,7 @@ def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_parent_ch
         ),
     )
     store = OperationJournalStore(target_root)
-    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    journal = _prepare_guarded_journal(store, build_executable_mutation_plan(assessment))
     changed = list(journal.actions)
     parents = changed[0].precondition["parents"]
     assert isinstance(parents, list) and parents
@@ -649,7 +660,7 @@ def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_target_id
         ),
     )
     store = OperationJournalStore(target_root)
-    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    journal = _prepare_guarded_journal(store, build_executable_mutation_plan(assessment))
     original: Path | None = None
     if len(missing_fields) > 1:
         original = target.with_name("ci-original.yml")
@@ -708,7 +719,7 @@ def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_post_pare
         ),
     )
     store = OperationJournalStore(target_root)
-    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    journal = _prepare_guarded_journal(store, build_executable_mutation_plan(assessment))
     changed = list(journal.actions)
     parents = changed[0].postcondition["parents"]
     assert isinstance(parents, list) and parents
@@ -758,10 +769,7 @@ def test_i368_journal_resume_rejects_existing_parent_rebind(tmp_path: Path) -> N
             ),
         ),
     )
-    OperationJournalStore(target_root).prepare(
-        build_executable_mutation_plan(assessment),
-        package_version="1.2.3",
-    )
+    _prepare_guarded_journal(OperationJournalStore(target_root), build_executable_mutation_plan(assessment))
     parent.rename(target_root / ".github" / "workflows-old")
     parent.mkdir()
     sentinel = parent / "sentinel.txt"
@@ -802,10 +810,7 @@ def test_i368_journal_resume_rejects_unbound_parent_authorized_before_creation(t
             ),
         ),
     )
-    OperationJournalStore(target_root).prepare(
-        build_executable_mutation_plan(assessment),
-        package_version="1.2.3",
-    )
+    _prepare_guarded_journal(OperationJournalStore(target_root), build_executable_mutation_plan(assessment))
     appeared = target_root / ".github" / "workflows"
     appeared.mkdir(parents=True)
     sentinel = appeared / "sentinel.txt"
@@ -958,7 +963,74 @@ def test_i368_journal_guard_is_rejected_by_the_legacy_marker_contract(tmp_path: 
     assert managed_distribution._read_distribution_retry_marker(target_root) == marker
 
 
-def test_i368_journal_swap_cleanup_preserves_a_concurrent_stage_replacement(
+@pytest.mark.parametrize("guard_state", ("absent", "schema-1", "replaced"))
+def test_i368_journal_resume_requires_exact_schema_2_forward_guard(
+    tmp_path: Path,
+    guard_state: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    _prepare_guarded_journal(store, build_executable_mutation_plan(assessment))
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    admitted_guard = managed_distribution._read_distribution_retry_marker(target_root)
+    assert admitted_guard is not None
+    journal_before = store.path.read_bytes()
+    marker_bytes = marker_path.read_bytes()
+    if guard_state == "absent":
+        marker_path.unlink()
+    elif guard_state == "schema-1":
+        root_info = target_root.stat()
+        marker_path.write_text(
+            json.dumps({
+                "schema_version": 1,
+                "operation": "update",
+                "package_version": "1.2.3",
+                "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+                "last_completed_phase": "preflight-complete",
+                "purpose": "distribution-rerun",
+                "stage_ownership": [],
+            }),
+            encoding="utf-8",
+        )
+    else:
+        marker_path.unlink()
+        marker_path.write_bytes(marker_bytes)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        legacy_marker=admitted_guard,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert store.path.read_bytes() == journal_before
+    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+
+
+def test_i368_journal_publish_restores_predecessor_after_stage_replacement(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -976,11 +1048,12 @@ def test_i368_journal_swap_cleanup_preserves_a_concurrent_stage_replacement(
     )
     store = OperationJournalStore(target_root)
     prepared = store.prepare(executable, package_version="1.2.3")
-    original_rename = managed_distribution._rename_distribution_no_replace
+    before = store.path.read_bytes()
+    original_swap = managed_distribution._rename_distribution_swap
     replacement = b"concurrent replacement\n"
     replaced_stage: Path | None = None
 
-    def replace_before_quarantine(
+    def replace_before_swap(
         source_parent_fd: int,
         source_name: str,
         destination_parent_fd: int,
@@ -991,15 +1064,147 @@ def test_i368_journal_swap_cleanup_preserves_a_concurrent_stage_replacement(
             replaced_stage = target_root / "spec-dock" / source_name
             replaced_stage.unlink()
             replaced_stage.write_bytes(replacement)
-        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
-    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_before_quarantine)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", replace_before_swap)
 
     with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
         store.mark_executing(prepared)
 
     assert replaced_stage is not None
+    assert store.path.read_bytes() == before
     assert replaced_stage.read_bytes() == replacement
+
+
+def test_i368_journal_publish_restores_raced_canonical_predecessor(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    prepared = store.prepare(executable, package_version="1.2.3")
+    original_swap = managed_distribution._rename_distribution_swap
+    replacement = b"raced canonical journal\n"
+    replaced = False
+
+    def replace_canonical_before_swap(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal replaced
+        if not replaced and destination_name == store.path.name:
+            replaced = True
+            store.path.unlink()
+            store.path.write_bytes(replacement)
+        original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", replace_canonical_before_swap)
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        store.mark_executing(prepared)
+
+    assert replaced is True
+    assert store.path.read_bytes() == replacement
+
+
+def test_i368_journal_transition_rejects_same_bytes_predecessor_replacement(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    prepared = store.prepare(executable, package_version="1.2.3")
+    same_bytes = store.path.read_bytes()
+    store.path.unlink()
+    store.path.write_bytes(same_bytes)
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        store.mark_executing(prepared)
+
+    assert store.path.read_bytes() == same_bytes
+
+
+def test_i368_forward_guard_publish_restores_raced_legacy_marker(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    admitted = managed_distribution._read_distribution_retry_marker(target_root)
+    assert admitted is not None
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    original_swap = managed_distribution._rename_distribution_swap
+    replacement = marker_path.read_bytes()
+    replaced = False
+
+    def replace_marker_before_swap(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal replaced
+        if not replaced and destination_name == marker_path.name:
+            replaced = True
+            marker_path.unlink()
+            marker_path.write_bytes(replacement)
+        original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", replace_marker_before_swap)
+
+    with pytest.raises(DistributionApplyError, match="legacy-marker-unconvertible"):
+        OperationJournalStore(target_root).prepare_legacy_guard(
+            executable,
+            package_version="1.3.0",
+            replace_marker=admitted,
+        )
+
+    assert replaced is True
+    assert marker_path.read_bytes() == replacement
 
 
 def test_i368_journal_resume_allows_newer_package_for_same_plan(tmp_path: Path) -> None:
@@ -1710,6 +1915,61 @@ def test_i368_legacy_conversion_failure_leaves_forward_only_guard_for_newer_retr
 
     assert second.status == "completed", second.reason
     assert not marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i368_journal_publish_revalidates_exact_forward_guard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    admitted = managed_distribution._read_distribution_retry_marker(target_root)
+    assert admitted is not None
+    original_prepare = OperationJournalStore.prepare
+    replaced = False
+
+    def replace_guard_before_journal_publish(self, plan, *, package_version):
+        nonlocal replaced
+        guard_bytes = marker_path.read_bytes()
+        marker_path.unlink()
+        marker_path.write_bytes(guard_bytes)
+        replaced = True
+        return original_prepare(self, plan, package_version=package_version)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", replace_guard_before_journal_publish)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.3.0",
+        legacy_marker=admitted,
+    )
+
+    assert replaced is True
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert json.loads(marker_path.read_text(encoding="utf-8"))["schema_version"] == 2
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
