@@ -3264,6 +3264,19 @@ def _path_snapshot_matches_condition(snapshot: PathIdentitySnapshot, condition: 
     )
 
 
+def _condition_has_complete_parent_chain(
+    snapshot: DistributionTargetSnapshot,
+    condition: dict[str, object],
+) -> bool:
+    parent_conditions = condition.get("parents")
+    if not isinstance(parent_conditions, list):
+        return False
+    relative_paths = tuple(
+        parent.get("relative_path") if isinstance(parent, dict) else None for parent in parent_conditions
+    )
+    return relative_paths == tuple(parent.relative_path for parent in snapshot.parents)
+
+
 def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: OperationJournal) -> None:
     plan = assessment.distribution_plan
     current_actions = {action.path: action for action in assessment.actions}
@@ -3338,10 +3351,14 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             ):
                 raise DistributionApplyError("journal-plan-mismatch")
             snapshot = dict(plan.target_snapshots).get(record.path)
-            if snapshot is None or not _snapshot_matches_condition(
-                snapshot,
-                record.precondition,
-                journal.created_parent_bindings,
+            if (
+                snapshot is None
+                or not _condition_has_complete_parent_chain(snapshot, record.precondition)
+                or not _snapshot_matches_condition(
+                    snapshot,
+                    record.precondition,
+                    journal.created_parent_bindings,
+                )
             ):
                 raise DistributionApplyError("journal-plan-mismatch")
 
