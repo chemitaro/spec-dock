@@ -32,7 +32,7 @@ ID: "iss-00368"
 - Strict g8 bounded review を受け、fresh retry は D2 所有の `_install_fresh_compatibility_distribution_unlocked()` へ直接接続し、recognized handler から legacy/fresh compatibility call edge を物理的に除去した。fresh fault-injection contract は専用入口を通して維持する。
 - Strict g9 semantic review の4件を受け、journal publish の stage 名を nonce 化し、swap 後の旧 journal cleanup を held-fd quarantine 経路へ統一した。missing parent の作成権限は journal に未作成 binding として mkdir より前に永続化し、作成後の exact inode binding へ昇格するため、mkdir 直後と journal rename 直前の crash から同一 plan を再開できる。
 - journal 前置 guard は schema 2 / `recognized-journal-forward-only` とし、schema 1 のみを認識する旧 installer が new journal workspace を mutation 前に拒否する一方、現行 installer は journal 作成前 crash と journal 併存状態を forward recovery できる。
-- 実装 anchor は `6f9630f2f35021806dc3d4054f755098907ad8e8`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測 SHA `4f4fbfb591f6d70a77e1b67730b4e2b17b9e3726` の既存失敗集合を保持し、exact candidate の再実行結果は Strict check attestation で検証する。slow profile の完全な command/ledger 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
+- 実装 anchor は `6f9630f2f35021806dc3d4054f755098907ad8e8`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `72c1e4c724c115f0d6d6831eb6c2cff8bc239700` の既存失敗集合へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。slow profile の完全な command/ledger 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
 
 ## Verification
 
@@ -42,7 +42,7 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 140 passed
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py` — 131 passed
 - [x] `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` — 144 passed、1 failed。残る failure は fixed point と remediation SHA で expected/actual SHA が不変な Issue 359 retained-skill golden の既存不一致
-- [x] `uv run pytest --run-full-regression -q` at `4f4fbfb591f6d70a77e1b67730b4e2b17b9e3726` — 27 failed、2048 passed、48 skipped。27件は fixed point ledger の node ID 集合と一致
+- [x] `uv run pytest --run-full-regression -q` at `72c1e4c724c115f0d6d6831eb6c2cff8bc239700` — 27 failed、2053 passed、48 skipped、17m10s。27件は fixed point ledger の node ID 集合と一致
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
 - [x] `uv run pytest -q` — 1076 passed、1052 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
