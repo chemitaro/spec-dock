@@ -617,6 +617,74 @@ def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_parent_ch
     assert result.reason == "journal-plan-mismatch"
 
 
+@pytest.mark.parametrize(
+    "missing_fields",
+    (("device",), ("inode",), ("ctime_ns",), ("device", "inode", "ctime_ns")),
+)
+def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_target_identity(
+    tmp_path: Path,
+    missing_fields: tuple[str, ...],
+) -> None:
+    content = b"current\n"
+    install_root = _minimal_install_root(tmp_path, content)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(content)
+    (target_root / "spec-dock").mkdir()
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    original: Path | None = None
+    if len(missing_fields) > 1:
+        original = target.with_name("ci-original.yml")
+        target.rename(original)
+        target.write_bytes(content)
+        target.chmod(stat.S_IMODE(original.stat().st_mode))
+    changed = list(journal.actions)
+    action_index = next(index for index, action in enumerate(changed) if action.path == ".github/workflows/ci.yml")
+    precondition = dict(changed[action_index].precondition)
+    for missing_field in missing_fields:
+        del precondition[missing_field]
+    changed[action_index] = managed_distribution.replace(changed[action_index], precondition=precondition)
+    tampered = managed_distribution.replace(journal, actions=tuple(changed))
+    tampered = managed_distribution.replace(
+        tampered,
+        plan_digest=managed_distribution._journal_digest(tampered),
+    )
+    store.write(tampered)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-plan-mismatch"
+    assert target.read_bytes() == content
+    if original is not None:
+        assert original.read_bytes() == content
+
+
 def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_post_parent_chain(
     tmp_path: Path,
 ) -> None:
