@@ -1363,6 +1363,50 @@ def test_i368_legacy_marker_conversion_is_limited_to_prewrite_state(
         assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
+def test_i368_newer_package_converts_prewrite_legacy_marker_and_refreshes_version(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker = DistributionRetryMarker(
+        operation="update",
+        package_version="1.2.3",
+        target_root=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+        last_completed_phase="preflight-complete",
+        purpose="distribution-rerun",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": marker.operation,
+            "package_version": marker.package_version,
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": marker.last_completed_phase,
+            "purpose": marker.purpose,
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.3.0",
+        legacy_marker=marker,
+    )
+
+    assert result.status == "completed", result.reason
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.3.0\n"
+    assert not marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
 def test_i368_legacy_guard_removal_failure_retains_completed_targets_for_retry(
     tmp_path: Path,
     monkeypatch,
@@ -4505,6 +4549,35 @@ def test_s35_cross_root_retry_replay_and_dual_marker_are_blocked(tmp_path: Path)
             package_version="1.2.4",
             manifest_path=manifest_path,
         )
+
+
+def test_s35_admission_allows_newer_package_for_prewrite_legacy_marker(tmp_path: Path) -> None:
+    manifest_path = _s35_version_manifest(tmp_path)
+    target_root = tmp_path / "consumer"
+    marker = target_root / "spec-dock" / ".distribution-retry.json"
+    root_info = target_root.stat()
+    marker.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+        }),
+        encoding="utf-8",
+    )
+
+    admission = admit_distribution_operation(
+        target_root,
+        operation="update",
+        package_version="1.2.4",
+        manifest_path=manifest_path,
+    )
+
+    assert admission.status == "retry"
+    assert admission.marker is not None
+    assert admission.marker.package_version == "1.2.3"
 
 
 def test_s35_legacy_uninstall_marker_remains_admissible_without_version(tmp_path: Path) -> None:
