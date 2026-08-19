@@ -568,6 +568,55 @@ def test_i368_journal_resume_rejects_recomputed_digest_for_changed_action(tmp_pa
     assert result.reason == "journal-plan-mismatch"
 
 
+def test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_parent_chain(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.prepare(build_executable_mutation_plan(assessment), package_version="1.2.3")
+    changed = list(journal.actions)
+    parents = changed[0].precondition["parents"]
+    assert isinstance(parents, list) and parents
+    changed[0] = managed_distribution.replace(
+        changed[0],
+        precondition={**changed[0].precondition, "parents": parents[1:]},
+    )
+    tampered = managed_distribution.replace(journal, actions=tuple(changed))
+    tampered = managed_distribution.replace(
+        tampered,
+        plan_digest=managed_distribution._journal_digest(tampered),
+    )
+    store.write(tampered)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-plan-mismatch"
+
+
 def test_i368_journal_resume_rejects_existing_parent_rebind(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
