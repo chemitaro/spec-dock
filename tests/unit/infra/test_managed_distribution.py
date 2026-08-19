@@ -3726,8 +3726,7 @@ def test_s30_apply_rebinds_stage_ownership_after_swap_for_retry(
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
     assert target.read_bytes() == b"new\n"
-    assert len(recorded) == 3
-    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
+    assert len(recorded) == 2
     rebound = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
@@ -3781,7 +3780,7 @@ def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
     def fail_post_swap_record(record: managed_distribution.DistributionStageOwnership) -> None:
         nonlocal record_calls
         record_calls += 1
-        if record_calls == 3:
+        if record_calls == 2:
             raise RuntimeError("simulated post-swap marker write failure")
         recorded.append(record)
 
@@ -3798,8 +3797,7 @@ def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
 
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 3
-    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
+    assert len(recorded) == 2
     rebound = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
@@ -3849,7 +3847,7 @@ def test_s30_apply_cleans_rebound_stage_when_marker_update_fails(
     recorded: list[managed_distribution.DistributionStageOwnership] = []
 
     def fail_marker_update(record: managed_distribution.DistributionStageOwnership) -> None:
-        if len(recorded) >= 2:
+        if recorded:
             raise RuntimeError("simulated retry marker write failure")
         recorded.append(record)
 
@@ -4183,8 +4181,7 @@ def test_s30_apply_records_partial_stage_identity_when_cleanup_fails(
     assert target.read_bytes() == old
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 3
-    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
+    assert len(recorded) == 2
     refreshed = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
@@ -4277,8 +4274,7 @@ def test_s30_apply_create_records_partial_stage_identity_when_cleanup_fails(
 
     stage_files = list(target_root.rglob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 3
-    assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
+    assert len(recorded) == 2
     refreshed = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (

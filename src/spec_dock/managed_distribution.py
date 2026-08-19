@@ -4356,6 +4356,7 @@ def execute_recognized_distribution(
             stage_ownership_recorder=record_staging_lease,
             created_parent_bindings=active_journal.created_parent_bindings,
             created_parent_recorder=record_created_parents,
+            write_ahead_stage_reservations=True,
             progress_recorder=record_progress,
         )
         post = build_workspace_assessment(
@@ -5377,6 +5378,7 @@ def _apply_regular_action(
     created_parent_bindings: dict[str, PathIdentitySnapshot],
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
     created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None,
+    write_ahead_stage_reservations: bool,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
@@ -5418,7 +5420,7 @@ def _apply_regular_action(
             if not isinstance(nofollow, int):
                 raise DistributionApplyError("platform lacks required no-follow file support")
             staging_name = _new_distribution_stage_name(path, expected)
-            if stage_ownership_recorder is not None:
+            if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(path, staging_name, "regular"))
             fd = os.open(
                 staging_name,
@@ -5526,7 +5528,7 @@ def _apply_regular_action(
                     identity_message=f"managed target identity changed for '{path}'",
                     transition_path=path,
                     transition_name=_new_distribution_stage_name(path, target_identity),
-                    transition_recorder=stage_ownership_recorder,
+                    transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
                 )
                 return
             if action.action != "upgrade":
@@ -5542,7 +5544,7 @@ def _apply_regular_action(
 
             _resolve_distribution_swap_rename()
             staging_name = _new_distribution_stage_name(path, expected)
-            if stage_ownership_recorder is not None:
+            if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(path, staging_name, "regular"))
             staging_fd = os.open(
                 staging_name,
@@ -5714,6 +5716,7 @@ def _apply_symlink_action(
     created_parent_bindings: dict[str, PathIdentitySnapshot],
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None,
     created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None,
+    write_ahead_stage_reservations: bool,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
@@ -5767,7 +5770,7 @@ def _apply_symlink_action(
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_no_replace_rename()
             staging_name = _new_distribution_stage_name(action.path, expected)
-            if stage_ownership_recorder is not None:
+            if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(action.path, staging_name, "symlink"))
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -5828,7 +5831,7 @@ def _apply_symlink_action(
                 identity_message=f"managed target identity changed for '{action.path}'",
                 transition_path=action.path,
                 transition_name=_new_distribution_stage_name(action.path, snapshot.target.identity),
-                transition_recorder=stage_ownership_recorder,
+                transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
             )
             return
         if action.action == "upgrade":
@@ -5838,7 +5841,7 @@ def _apply_symlink_action(
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
             _resolve_distribution_swap_rename()
             staging_name = _new_distribution_stage_name(action.path, expected)
-            if stage_ownership_recorder is not None:
+            if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(action.path, staging_name, "symlink"))
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -5991,6 +5994,7 @@ def _apply_distribution_action(
     created_parent_bindings: dict[str, PathIdentitySnapshot],
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None = None,
+    write_ahead_stage_reservations: bool = False,
 ) -> None:
     if action.action in {"adopt", "preserve"}:
         return
@@ -6042,6 +6046,7 @@ def _apply_distribution_action(
             created_parent_bindings=created_parent_bindings,
             stage_ownership_recorder=stage_ownership_recorder,
             created_parent_recorder=created_parent_recorder,
+            write_ahead_stage_reservations=write_ahead_stage_reservations,
         )
         return
     if expected is None and target_kind == "symlink":
@@ -6058,6 +6063,7 @@ def _apply_distribution_action(
             created_parent_bindings=created_parent_bindings,
             stage_ownership_recorder=stage_ownership_recorder,
             created_parent_recorder=created_parent_recorder,
+            write_ahead_stage_reservations=write_ahead_stage_reservations,
         )
         return
     if expected is None and target_kind != "regular":
@@ -6072,6 +6078,7 @@ def _apply_distribution_action(
         created_parent_bindings=created_parent_bindings,
         stage_ownership_recorder=stage_ownership_recorder,
         created_parent_recorder=created_parent_recorder,
+        write_ahead_stage_reservations=write_ahead_stage_reservations,
     )
 
 
@@ -6084,6 +6091,7 @@ def apply_distribution_plan(
     stage_ownership_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     created_parent_bindings: tuple[PathIdentitySnapshot, ...] = (),
     created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None = None,
+    write_ahead_stage_reservations: bool = False,
     scaffold_applier: Callable[[], None] | None = None,
     progress_recorder: Callable[[str, tuple[str, ...], tuple[str, ...], bool], None] | None = None,
 ) -> DistributionResult:
@@ -6250,6 +6258,7 @@ def apply_distribution_plan(
                             created_parent_bindings_by_path,
                             stage_ownership_recorder,
                             created_parent_recorder,
+                            write_ahead_stage_reservations,
                         )
                 applied_paths.append(action.path)
                 pending_paths.remove(action.path)
