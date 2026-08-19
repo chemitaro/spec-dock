@@ -3236,8 +3236,9 @@ def _snapshot_matches_condition(
                 parent_condition.get("exists") is not False
                 or actual_parent is None
                 or bound_parent is None
+                or not bound_parent.exists
                 or actual_parent.file_type != "directory"
-                or (bound_parent.exists and not _same_structure_identity(actual_parent, bound_parent))
+                or not _same_structure_identity(actual_parent, bound_parent)
             ):
                 return False
     target = snapshot.target
@@ -3733,6 +3734,7 @@ def _open_distribution_parent_chain(
     create_missing: bool = False,
     expected_snapshot: DistributionTargetSnapshot | None = None,
     created_parent_bindings: dict[str, PathIdentitySnapshot] | None = None,
+    created_parent_recorder: Callable[[tuple[PathIdentitySnapshot, ...]], None] | None = None,
 ) -> tuple[int, ...]:
     flags = _distribution_directory_flags()
     fds: list[int] = []
@@ -3748,6 +3750,7 @@ def _open_distribution_parent_chain(
             )
         parts = PurePosixPath(target_rel).parts
         for component_index, component in enumerate(parts[:-1]):
+            created_component = False
             component_relative = "/".join(parts[: component_index + 1])
             expected_parent = None
             if expected_snapshot is not None:
@@ -3758,8 +3761,14 @@ def _open_distribution_parent_chain(
             try:
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
                 if expected_parent is not None and not expected_parent.exists:
-                    authorized = created_parent_bindings is not None and component_relative in created_parent_bindings
-                    if not authorized:
+                    bound_parent = (
+                        created_parent_bindings.get(component_relative) if created_parent_bindings is not None else None
+                    )
+                    if (
+                        bound_parent is None
+                        or not bound_parent.exists
+                        or not _same_stat_structure(os.fstat(next_fd), bound_parent)
+                    ):
                         os.close(next_fd)
                         raise DistributionApplyError(f"managed target parent appeared during apply for '{target_rel}'")
             except FileNotFoundError:
@@ -3783,11 +3792,21 @@ def _open_distribution_parent_chain(
                 else:
                     os.fsync(fds[-1])
                     created_missing = True
+                    created_component = True
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
             except OSError as exc:
                 raise DistributionApplyError(f"managed target parent is unsafe for '{target_rel}'") from exc
             fds.append(next_fd)
             _assert_visible_distribution_chain_bound(target_root, target_rel, tuple(fds))
+            if created_component and created_parent_bindings is not None:
+                created_parent_bindings[component_relative] = _snapshot_from_stat(
+                    component_relative,
+                    os.fstat(next_fd),
+                )
+                if created_parent_recorder is not None:
+                    created_parent_recorder(
+                        tuple(created_parent_bindings[path] for path in sorted(created_parent_bindings))
+                    )
             if expected_snapshot is not None:
                 _assert_distribution_chain_bound(
                     tuple(fds),
@@ -4470,16 +4489,14 @@ def _assert_pending_snapshot_stable(
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
         elif actual_parent.exists:
             bound_parent = created_parent_bindings.get(expected_parent.relative_path)
-            if bound_parent is None:
+            if bound_parent is None or not bound_parent.exists:
                 # A parent that was absent during preflight may only become
                 # acceptable after this operation creates and binds it through
                 # `_bind_created_parent_identities`.  Accepting an unbound
                 # inode here would turn a user- or concurrently-created
                 # directory into an operation-owned parent after preflight.
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
-            if actual_parent.file_type != "directory" or (
-                bound_parent.exists and not _same_structure_identity(actual_parent, bound_parent)
-            ):
+            if actual_parent.file_type != "directory" or not _same_structure_identity(actual_parent, bound_parent):
                 raise DistributionApplyError(f"managed target identity changed for '{path}'")
     if actual.target != expected.target:
         raise DistributionApplyError(f"managed target identity changed for '{path}'")
@@ -4531,6 +4548,7 @@ def _apply_regular_action(
         create_missing=action.action == "create",
         expected_snapshot=snapshot,
         created_parent_bindings=created_parent_bindings,
+        created_parent_recorder=created_parent_recorder,
     )
     try:
         _assert_distribution_chain_bound(parent_chain, snapshot, path)
@@ -4862,6 +4880,7 @@ def _apply_symlink_action(
         create_missing=action.action == "create",
         expected_snapshot=snapshot,
         created_parent_bindings=created_parent_bindings,
+        created_parent_recorder=created_parent_recorder,
     )
     try:
         _assert_distribution_chain_bound(parent_chain, snapshot, action.path)
