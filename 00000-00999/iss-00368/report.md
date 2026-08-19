@@ -34,19 +34,21 @@ ID: "iss-00368"
 - journal 前置 guard は schema 2 / `recognized-journal-forward-only` とし、schema 1 のみを認識する旧 installer が new journal workspace を mutation 前に拒否する一方、現行 installer は journal 作成前 crash と journal 併存状態を forward recovery できる。
 - Strict g10 remediation では、prune と regular/symlink upgrade の最終 pathname mutation を held identity の再検証と nonce quarantine／atomic rollback へ統一し、競合差し替えを削除せず canonical path へ復元して fail closed にした。`uninstall --apply --keep-specs` は managed scaffold root 内の未知ファイル・ディレクトリを preflight blocker として列挙し、最初の mutation 前にツリー全体を保持する。
 - Strict g10 bounded remediation では、durable な親作成意図と exact inode binding を分離した。mkdir 直後に exact binding を journal へ記録し、再開時に出現済み親を受理するのは `exists=true` の binding と inode が一致する場合だけとした。inventory にない旧 scaffold entry も未知ユーザー entry と同じく preflight で保持する。
-- 実装 anchor は `f07c6440d827b2cea5ccdae7fe268e76706d1c39`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `f07c6440d827b2cea5ccdae7fe268e76706d1c39` の既存失敗集合へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。slow profile の完全な command/ledger 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
+- Strict g10 candidate 2 remediation では、pending journal action の precondition が assessment の完全な親チェーンを順序どおり保持することを要求した。親要素を削除して digest を再計算した journal も plan mismatch として mutation 前に拒否する。
+- 実装 anchor は `4d6304c7c983a45f495e3efc439e5c3b17ce5cad`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `4d6304c7c983a45f495e3efc439e5c3b17ce5cad` の既存失敗集合へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。slow profile の完全な command/ledger 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
 
 ## Verification
 
 exact candidate の SHA と合否の正本は、当該 report 自身を含む `review_head_sha` に対して生成される Strict controller の candidate manifest / check attestation / certificate とする。report 内へ自己参照的な候補 SHA を固定せず、以下の手動確認は controller 実行前の診断証拠として区別する。
 
 - [x] `make lint` — successor 候補 commit 前の診断で ruff check / format check / mypy が成功
-- [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 143 passed
+- [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 144 passed
 - [x] `uv run pytest --run-full-regression -q tests/unit/infra/test_init_update.py -k 'unknown_file_inside_managed_scaffold_root or scaffold_managed_roots_remove_recursively or preserves_unknown_files_under_managed_roots'` — 3 passed、129 deselected
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py` — 131 passed
 - [x] `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` — 144 passed、1 failed。残る failure は fixed point と remediation SHA で expected/actual SHA が不変な Issue 359 retained-skill golden の既存不一致
 - [x] `uv run pytest --run-full-regression -q` at `72c1e4c724c115f0d6d6831eb6c2cff8bc239700` — 27 failed、2053 passed、48 skipped、17m10s。27件は fixed point ledger の node ID 集合と一致
 - [x] `uv run pytest --run-full-regression -q` at `f07c6440d827b2cea5ccdae7fe268e76706d1c39` — 27 failed、2057 passed、48 skipped、17m02s。27件は fixed point ledger の node ID 集合と一致
+- [x] `uv run pytest --run-full-regression -q` at `4d6304c7c983a45f495e3efc439e5c3b17ce5cad` — 27 failed、2058 passed、48 skipped、16m59s。27件は fixed point ledger の node ID 集合と一致
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
 - [x] `uv run pytest -q` — 1079 passed、1053 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
