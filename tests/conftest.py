@@ -1,3 +1,9 @@
+import hashlib
+import json
+from pathlib import Path
+import re
+import sys
+
 import pytest
 
 HEAVY_NODE_PREFIXES = (
@@ -23,6 +29,47 @@ REQUIRED_FAST_NODE_IDS = frozenset({
 
 
 POLICY_SKIP_REASON = "full_regression test is disabled by default; use --run-full-regression to run it"
+FULL_REGRESSION_LEDGER = (
+    Path(__file__).parents[1] / "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
+    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
+    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
+)
+
+_full_regression_guard_active = False
+_full_regression_expected: dict[str, str] = {}
+_full_regression_failures: dict[str, str] = {}
+_full_regression_errors: list[str] = []
+
+
+def _normalize_failure_message(message: str, repository: Path) -> str:
+    message = message.split(" +  where ", 1)[0]
+    message = message.replace(str(repository), "<repo>")
+    message = re.sub(
+        r"/(?:private/)?var/folders/[^/]+/[^/]+/T/tmp[^/`'\"\\ ]*",
+        "<tmp>",
+        message,
+    )
+    message = re.sub(r"/(?:private/)?var/folders/[^'\" ,]+", "<tmp-runtime-path>", message)
+    message = message.replace("<repo>/.venv/bin/python3", "<python>")
+    message = message.replace("<repo>/.venv/bin/python", "<python>")
+    return " ".join(message.split())
+
+
+def _approved_full_regression_signatures() -> dict[str, str]:
+    ledger = json.loads(FULL_REGRESSION_LEDGER.read_text(encoding="utf-8"))
+    failure_paths = ledger.get("failure_paths", [])
+    expected = {
+        entry["nodeid"]: entry["fixed_point_signature_sha256"]
+        for entry in failure_paths
+        if entry.get("current_status") == "failed"
+        and entry.get("fixed_point_status") == "failed"
+        and entry.get("disposition") == "approved-no-op"
+        and entry.get("failure_signature_match") is True
+        and entry.get("current_signature_sha256") == entry.get("fixed_point_signature_sha256")
+    }
+    if len(expected) != len(failure_paths) or not expected:
+        raise pytest.UsageError("full-regression ledger contains incomplete failure signatures")
+    return expected
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -43,6 +90,8 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
+    global _full_regression_guard_active, _full_regression_expected
+
     run_full_regression = config.getoption("--run-full-regression")
 
     for item in items:
@@ -83,3 +132,43 @@ def pytest_collection_modifyitems(
             )
         if is_full_regression and not run_full_regression:
             item.add_marker(pytest.mark.skip(reason=POLICY_SKIP_REASON))
+
+    if run_full_regression and not config.option.collectonly and FULL_REGRESSION_LEDGER.is_file():
+        expected = _approved_full_regression_signatures()
+        collected_nodeids = {item.nodeid for item in items}
+        if set(expected).issubset(collected_nodeids):
+            _full_regression_guard_active = True
+            _full_regression_expected = expected
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    if not _full_regression_guard_active or not report.failed:
+        return
+    if report.when != "call":
+        _full_regression_errors.append(report.nodeid)
+        return
+    reprcrash = getattr(report.longrepr, "reprcrash", None)
+    message = reprcrash.message if reprcrash is not None else str(report.longrepr)
+    normalized = _normalize_failure_message(message, Path.cwd().resolve())
+    _full_regression_failures[report.nodeid] = hashlib.sha256(normalized.encode()).hexdigest()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    if not _full_regression_guard_active:
+        return
+    expected = _full_regression_expected
+    actual = _full_regression_failures
+    if not _full_regression_errors and actual == expected:
+        print(f"verified {len(actual)} approved failure signatures against the full-regression ledger")
+        return
+    details = {
+        "unexpected_errors": sorted(_full_regression_errors),
+        "missing_failures": sorted(set(expected) - set(actual)),
+        "unexpected_failures": sorted(set(actual) - set(expected)),
+        "signature_mismatches": sorted(
+            nodeid for nodeid in set(actual) & set(expected) if actual[nodeid] != expected[nodeid]
+        ),
+    }
+    print(f"full-regression ledger mismatch: {json.dumps(details, sort_keys=True)}", file=sys.stderr)
+    session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
