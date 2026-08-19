@@ -414,7 +414,6 @@ def _s03_privacy_forbidden_values(source: Path, body: bytes) -> tuple[str, ...]:
         source.parent.name.lower(),
         body_text,
         digest,
-        str(len(body)),
         derived,
         "sha256",
         "byte_count",
