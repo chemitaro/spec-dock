@@ -5219,7 +5219,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             if not ns.force:
                 if admission.status == "retry":
-                    _install_recognized_distribution(target_root, operation="fresh")
+                    _install_fresh_distribution(target_root)
                 elif admission.status == "fresh":
                     _install_fresh_distribution(target_root)
                 elif os.path.lexists(_specdock_dir(target_root)):
