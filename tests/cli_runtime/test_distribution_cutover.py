@@ -2230,7 +2230,7 @@ def test_s70_uninstall_apply_blocks_unproven_legacy_scaffold_entry(
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
-def test_s70_uninstall_apply_removes_modified_managed_scaffold_tree(
+def test_s70_uninstall_apply_blocks_modified_managed_scaffold_file(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -2238,13 +2238,18 @@ def test_s70_uninstall_apply_removes_modified_managed_scaffold_tree(
     capsys.readouterr()
     managed = tmp_path / "spec-dock/docs/README.md"
     managed.write_text("locally modified managed scaffold\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "completed"
-    assert not managed.exists()
-    assert not (tmp_path / "spec-dock/docs").exists()
+    assert payload["status"] == "blocked"
+    assert payload["phase"] == "preflight"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs/README.md")
+    assert action["category"] == "scaffold_managed"
+    assert action["status"] == "preserved"
+    assert "content mismatch" in action["reason"]
+    assert _filesystem_snapshot(tmp_path) == before
 
 
 def test_s70_keep_specs_uninstall_allows_reinit_without_losing_history(
