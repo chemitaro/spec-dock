@@ -21,7 +21,7 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 - `spec-dock uninstall [path]` / `./spec-dock/scripts/spec-dock uninstall [path]` は repo-local managed artifacts の removal です。GitHub Issue / remote state は変更せず、Python package / global CLI / environment / `uvx` cache の uninstall も行いません
 - runtime uninstall は installer uninstall の wrapper で、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock uninstall <target>` として実行します。repo-local runtime が削除済みの場合の retry / reinstall / refresh は installer CLI の `spec-dock uninstall <target>` / `spec-dock init <target>` / `spec-dock update <target>` を使います
 - dependency metadata の canonical storage は `.meta.json` top-level `depends_on` であり、追加/削除/確認は `./spec-dock/scripts/spec-dock deps add/remove/check` の command-first mutation を使います（詳細: `reference_deps.md`）
-- legacy `meta.json`（旧名）、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で推測修復せず preserve-and-block します。partial apply は `.distribution-journal.json` の root・intent・contract・plan・protocol・exact pre/postcondition 束縛から forward recovery し、不一致や dual recovery state は追加 mutation 前に拒否します
+- legacy `meta.json`（旧名）、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で推測修復せず preserve-and-block します。partial apply は `.distribution-journal.json` の root・intent・authority・contract・plan・protocol・exact pre/postcondition 束縛から同一または compatible newer package で forward recovery し、不一致、downgrade、incompatible package、dual recovery state は追加 mutation 前に拒否します
 - `uninstall` は dry-run が既定です。`--apply` は全計画の検証後にだけ mutation を開始し、部分失敗時は legacy `.uninstall-retry.json` を保持します。`--keep-specs` では spec history を削除せず、削除には `--remove-specs` が必要です
 
 代表的な解決材料（`gh` 側）:
