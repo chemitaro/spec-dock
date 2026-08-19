@@ -3,7 +3,7 @@
 ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
-最終更新: "2026-08-19"
+最終更新: "2026-08-20"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -47,7 +47,10 @@ ID: "iss-00368"
 - journal 再開時は schema-2 forward-only guard の exact identity / digest を admission と全 publish 境界で再検証し、guard 欠落、schema-1 downgrade、同内容差し替え、journal publish 直前の置換を `dual-recovery-state` または recovery-required として mutation 前に拒否する。
 - `uninstall --apply --keep-specs` は Epic 365 の固定点契約どおり、管理対象ルート `spec-dock/{docs,templates,scripts,system}` をルート単位で再帰削除する。管理ルート内の legacy / modified / unknown entry はルートとともに削除し、Strict g13 で導入された個別ファイル preserve-and-block 退行を解消した。
 - full-regression の pre-slow 診断は、実装 anchor 上の JUnit failure node ID と正規化 signature 27件を ledger と実行時照合してから exit 0 を返す verifier で実施した。controller の authoritative slow profile が実行する `pytest --run-full-regression -q` 自体にも同一 ledger guard を組み込み、全既知 node を収集した suite で node ID、signature、setup/teardown error が不一致なら非許可の exit 3 とする。検証中に発見した本文長 `37` と時刻文字列の部分一致による既存 privacy test の誤検知も、曖昧な短数値 sentinel を除去して安定化した。
-- 実装 anchor は `1d62f3221a5a55add1c592076de2688c2f0b4a89`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `1d62f3221a5a55add1c592076de2688c2f0b4a89` の既存失敗集合と authoritative pytest guard／診断 verifier の signature 検証へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。controller slow profile と二重検証の区別は `artifacts/final-quality-gate-check-profile.json` に保存した。
+- `chatgpt-final-quality-gate-strict-new` の exact-SHA review で検出した recovery entry の authority 再取得を修正した。journal transition は forward guard の held descriptor、identity、bytes digest を publish 前後で検証し、journal / guard の successor evidence は公開に用いた stage descriptor から構築して canonical name が同じ inode を指すことを返却直前に確認する。
+- journal / guard finalization は caller が保持する source snapshot と digest を deletion authority とし、quarantine rename 前に held descriptor の identity と bytes を照合する。同内容・異内容の並行置換はいずれも削除せず fail closed とし、journal publish 後に guard が置換された場合は current operation が公開した exact journal inode だけを rollback する。
+- authoritative full-regression ledger guard は `--run-full-regression` 指定時に常時有効化し、ledger の欠落・不正、および削除・rename・focused selection による expected node 欠落を mismatch として exit 3 にする。expected node が collection に揃わないことを guard 無効化の条件にはしない。
+- `1d62f3221a5a55add1c592076de2688c2f0b4a89` は旧 campaign の実装 anchor であり、その後の Strict remediation で実装とテストを変更したため最終 candidate anchor ではない。最終 exact candidate の SHA と同一 SHA 上の review/test 合否は Strict check attestation を正本とする。
 
 ## Verification
 
@@ -75,6 +78,10 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] failure ledger に列挙した9ファイルを `--run-full-regression --junitxml=<run.xml>` で固定点と実装 anchor の双方で再実行 — 各27 failed、正規化した27件の failure signature と aggregate SHA-256 `6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8` が一致
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
 - [x] `uv run pytest -q` — 1099 passed、1053 policy-skipped
+- [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — recovery authority の publish / successor / finalization race を含む 172 passed
+- [x] `uv run pytest tests/unit/test_provider_test_lanes.py -q` — missing ledger / missing node / incomplete selection を含む 12 passed
+- [x] `make lint` — ruff check / format check / mypy が成功
+- [x] `uv run pytest -q` — 1111 passed、1053 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
 - Strict の最終合否は repository 外の append-only campaign ledger と certificate にのみ記録し、合否記録のために認証後の candidate を変更しない。
