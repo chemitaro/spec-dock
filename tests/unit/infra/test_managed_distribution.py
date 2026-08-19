@@ -614,7 +614,7 @@ def test_i368_journal_resume_rejects_existing_parent_rebind(tmp_path: Path) -> N
     assert not (parent / "ci.yml").exists()
 
 
-def test_i368_journal_resume_rejects_parent_that_appeared_after_prepare(tmp_path: Path) -> None:
+def test_i368_journal_resume_accepts_parent_authorized_before_creation(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
     scaffold_root = _minimal_scaffold_root(tmp_path)
@@ -652,10 +652,182 @@ def test_i368_journal_resume_rejects_parent_that_appeared_after_prepare(tmp_path
         package_version="1.2.3",
     )
 
-    assert result.status == "recovery_required"
-    assert result.reason == "journal-precondition-mismatch"
+    assert result.status == "completed", result.reason
     assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
-    assert not (appeared / "ci.yml").exists()
+    assert (appeared / "ci.yml").read_bytes() == b"current\n"
+
+
+def test_i368_parent_creation_crash_resumes_from_durable_parent_intent(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_bind = managed_distribution._bind_created_parent_identities
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    def crash_before_parent_binding(*_args, **_kwargs) -> None:
+        raise SimulatedProcessCrash
+
+    monkeypatch.setattr(managed_distribution, "_bind_created_parent_identities", crash_before_parent_binding)
+    with pytest.raises(SimulatedProcessCrash):
+        execute_recognized_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent="update",
+            package_version="1.2.3",
+        )
+
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert any(not binding["exists"] for binding in payload["created_parent_bindings"])
+    assert (target_root / ".github" / "workflows").is_dir()
+
+    monkeypatch.setattr(managed_distribution, "_bind_created_parent_identities", original_bind)
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "completed", retry.reason
+    assert not journal_path.exists()
+
+
+def test_i368_journal_publish_retry_uses_a_fresh_stage_after_crash(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_rename = managed_distribution._rename_distribution_swap
+    crashed_stage: str | None = None
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    def crash_before_journal_swap(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal crashed_stage
+        crashed_stage = source_name
+        raise SimulatedProcessCrash
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", crash_before_journal_swap)
+    with pytest.raises(SimulatedProcessCrash):
+        execute_recognized_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent="update",
+            package_version="1.2.3",
+        )
+
+    assert crashed_stage is not None
+    assert (target_root / "spec-dock" / crashed_stage).is_file()
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", original_rename)
+
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "completed", retry.reason
+    assert (target_root / "spec-dock" / crashed_stage).is_file()
+
+
+def test_i368_journal_guard_is_rejected_by_the_legacy_marker_contract(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        intent="update",
+    )
+    marker = OperationJournalStore(target_root).prepare_legacy_guard(
+        build_executable_mutation_plan(assessment),
+        package_version="1.2.3",
+    )
+    payload = json.loads((target_root / "spec-dock" / ".distribution-retry.json").read_text(encoding="utf-8"))
+
+    assert marker.purpose == "recognized-journal-forward-only"
+    assert (payload["schema_version"], payload["purpose"]) == (
+        managed_distribution._DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION,
+        managed_distribution._DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
+    )
+    assert (payload["schema_version"], payload["purpose"]) != (
+        managed_distribution._DISTRIBUTION_RETRY_SCHEMA_VERSION,
+        managed_distribution._DISTRIBUTION_RETRY_PURPOSE,
+    )
+    assert managed_distribution._read_distribution_retry_marker(target_root) == marker
+
+
+def test_i368_journal_swap_cleanup_preserves_a_concurrent_stage_replacement(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    prepared = store.prepare(executable, package_version="1.2.3")
+    original_rename = managed_distribution._rename_distribution_no_replace
+    replacement = b"concurrent replacement\n"
+    replaced_stage: Path | None = None
+
+    def replace_before_quarantine(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal replaced_stage
+        if replaced_stage is None and source_name.startswith(".distribution-journal-"):
+            replaced_stage = target_root / "spec-dock" / source_name
+            replaced_stage.unlink()
+            replaced_stage.write_bytes(replacement)
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_before_quarantine)
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        store.mark_executing(prepared)
+
+    assert replaced_stage is not None
+    assert replaced_stage.read_bytes() == replacement
 
 
 def test_i368_journal_resume_allows_newer_package_for_same_plan(tmp_path: Path) -> None:
@@ -1227,6 +1399,7 @@ def test_i368_journal_finalization_preserves_concurrent_replacement(
         prepared,
         status="completed",
         actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
+        created_parent_bindings=(),
     )
     store.write(completed)
     original_rename = managed_distribution._rename_distribution_no_replace
@@ -1329,6 +1502,7 @@ def test_i368_journal_cleanup_failure_restores_canonical_recovery_authority(
         prepared,
         status="completed",
         actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
+        created_parent_bindings=(),
     )
     store.write(completed)
     before = store.path.read_bytes()
@@ -3378,6 +3552,7 @@ def test_s30_apply_blocks_root_rebind_after_preflight_before_parent_creation(
         *,
         create_missing: bool = False,
         expected_snapshot: DistributionTargetSnapshot | None = None,
+        created_parent_bindings: dict[str, PathIdentitySnapshot] | None = None,
     ) -> tuple[int, ...]:
         nonlocal switched
         if not switched:
@@ -3390,6 +3565,7 @@ def test_s30_apply_blocks_root_rebind_after_preflight_before_parent_creation(
             relative_path,
             create_missing=create_missing,
             expected_snapshot=expected_snapshot,
+            created_parent_bindings=created_parent_bindings,
         )
 
     monkeypatch.setattr(managed_distribution, "_open_distribution_parent_chain", switch_root_before_open)
