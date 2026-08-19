@@ -2638,6 +2638,84 @@ class OperationJournalStore:
         if current is None or not self._same_marker_evidence(current, marker):
             raise DistributionApplyError("dual-recovery-state")
 
+    @staticmethod
+    def _assert_bound_regular_entry(
+        parent_fd: int,
+        name: str,
+        held_fd: int,
+        expected_snapshot: PathIdentitySnapshot,
+        expected_sha256: str,
+        *,
+        identity_error: str,
+    ) -> os.stat_result:
+        try:
+            visible_before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            held_before = os.fstat(held_fd)
+            raw = _read_fd_bytes(held_fd)
+            held_after = os.fstat(held_fd)
+            visible_after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise DistributionApplyError(identity_error) from exc
+        if (
+            not stat.S_ISREG(held_before.st_mode)
+            or held_before.st_nlink != 1
+            or not _same_stat_identity(held_before, expected_snapshot)
+            or _stat_identity_tuple(visible_before) != _stat_identity_tuple(held_before)
+            or _stat_identity_tuple(held_after) != _stat_identity_tuple(held_before)
+            or _stat_identity_tuple(visible_after) != _stat_identity_tuple(held_before)
+            or hashlib.sha256(raw).hexdigest() != expected_sha256
+        ):
+            raise DistributionApplyError(identity_error)
+        return held_after
+
+    def _open_bound_forward_guard(self, parent_fd: int) -> int | None:
+        marker = self._forward_guard
+        if marker is None:
+            return None
+        expected_snapshot = marker.source_snapshot
+        expected_sha256 = marker.source_sha256
+        if expected_snapshot is None or expected_sha256 is None:
+            raise DistributionApplyError("dual-recovery-state")
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise DistributionApplyError("platform lacks required no-follow file support")
+        try:
+            guard_fd = os.open(
+                _DISTRIBUTION_RETRY_MARKER_REL.name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise DistributionApplyError("dual-recovery-state") from exc
+        try:
+            self._assert_bound_regular_entry(
+                parent_fd,
+                _DISTRIBUTION_RETRY_MARKER_REL.name,
+                guard_fd,
+                expected_snapshot,
+                expected_sha256,
+                identity_error="dual-recovery-state",
+            )
+        except Exception:
+            os.close(guard_fd)
+            raise
+        return guard_fd
+
+    def _assert_bound_forward_guard(self, parent_fd: int, guard_fd: int | None) -> None:
+        if guard_fd is None:
+            return
+        assert self._forward_guard is not None
+        assert self._forward_guard.source_snapshot is not None
+        assert self._forward_guard.source_sha256 is not None
+        self._assert_bound_regular_entry(
+            parent_fd,
+            _DISTRIBUTION_RETRY_MARKER_REL.name,
+            guard_fd,
+            self._forward_guard.source_snapshot,
+            self._forward_guard.source_sha256,
+            identity_error="dual-recovery-state",
+        )
+
     def bind_forward_guard(self, marker: DistributionRetryMarker) -> None:
         self._assert_current_forward_guard(marker)
         self._forward_guard = marker
@@ -2648,9 +2726,7 @@ class OperationJournalStore:
         *,
         predecessor: OperationJournal | None = None,
         require_absent: bool = False,
-    ) -> None:
-        if self._forward_guard is not None:
-            self._assert_current_forward_guard(self._forward_guard)
+    ) -> OperationJournal:
         content = _journal_bytes(journal)
         predecessor_content = _journal_bytes(predecessor) if predecessor is not None else None
         root_fd, parent_fd = self._open_parent(
@@ -2662,7 +2738,11 @@ class OperationJournalStore:
         stage_info: os.stat_result | None = None
         stage_fd: int | None = None
         destination_fd: int | None = None
+        guard_fd: int | None = None
+        published_new = False
+        swapped_out: os.stat_result | None = None
         try:
+            guard_fd = self._open_bound_forward_guard(parent_fd)
             try:
                 destination_info = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
             except FileNotFoundError:
@@ -2717,8 +2797,10 @@ class OperationJournalStore:
                 stage_fd, content
             ):
                 raise DistributionApplyError("journal-precondition-mismatch")
+            self._assert_bound_forward_guard(parent_fd, guard_fd)
             if destination_info is None:
                 _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
+                published_new = True
                 published = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
                 if _stat_identity_tuple(published) != _stat_identity_tuple(
                     os.fstat(stage_fd)
@@ -2735,6 +2817,7 @@ class OperationJournalStore:
                     expected_target=destination_info,
                     identity_message="journal-precondition-mismatch",
                 )
+                published_new = True
                 if not _held_fd_has_exact_bytes(stage_fd, content):
                     try:
                         _rename_distribution_swap(parent_fd, stage, parent_fd, destination)
@@ -2742,24 +2825,66 @@ class OperationJournalStore:
                     except OSError as exc:
                         raise DistributionApplyError("journal-precondition-mismatch") from exc
                     raise DistributionApplyError("journal-precondition-mismatch")
-                _remove_distribution_stage_if_owned(
-                    parent_fd,
-                    stage,
-                    swapped_out,
-                    strict=True,
-                )
             os.fsync(parent_fd)
+            self._assert_bound_forward_guard(parent_fd, guard_fd)
+            published_info = os.fstat(stage_fd)
+            successor_snapshot = _snapshot_from_stat(
+                _DISTRIBUTION_JOURNAL_REL.as_posix(),
+                published_info,
+            )
+            self._assert_bound_regular_entry(
+                parent_fd,
+                destination,
+                stage_fd,
+                successor_snapshot,
+                hashlib.sha256(content).hexdigest(),
+                identity_error="journal-precondition-mismatch",
+            )
             visible = os.lstat(self.identity_path)
             if (visible.st_dev, visible.st_ino) != (
                 journal.root_identity.device,
                 journal.root_identity.inode,
             ):
                 raise DistributionApplyError("journal-root-mismatch")
+            if swapped_out is not None:
+                _remove_distribution_stage_if_owned(
+                    parent_fd,
+                    stage,
+                    swapped_out,
+                    strict=True,
+                )
+            return replace(
+                journal,
+                source_snapshot=successor_snapshot,
+                source_sha256=hashlib.sha256(content).hexdigest(),
+            )
         except Exception:
+            if published_new and stage_fd is not None and stage_info is not None:
+                try:
+                    if swapped_out is None:
+                        _remove_distribution_target_if_bound(
+                            parent_fd,
+                            destination,
+                            os.fstat(stage_fd),
+                            held_fd=stage_fd,
+                            identity_message="journal-precondition-mismatch",
+                        )
+                    elif destination_fd is not None:
+                        visible_destination = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+                        visible_stage = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
+                        if _stat_identity_tuple(visible_destination) == _stat_identity_tuple(
+                            os.fstat(stage_fd)
+                        ) and _stat_identity_tuple(visible_stage) == _stat_identity_tuple(os.fstat(destination_fd)):
+                            _rename_distribution_swap(parent_fd, stage, parent_fd, destination)
+                            os.fsync(parent_fd)
+                except (DistributionApplyError, OSError):
+                    pass
             if stage_info is not None:
                 _remove_distribution_stage_if_owned(parent_fd, stage, stage_info)
             raise
         finally:
+            if guard_fd is not None:
+                os.close(guard_fd)
             if destination_fd is not None:
                 os.close(destination_fd)
             if stage_fd is not None:
@@ -2868,8 +2993,7 @@ class OperationJournalStore:
                 })
             ),
         )
-        self._write(journal, require_absent=True)
-        return self._read(journal.root_identity)
+        return self._write(journal, require_absent=True)
 
     def prepare_legacy_guard(
         self,
@@ -3048,10 +3172,22 @@ class OperationJournalStore:
                     strict=True,
                 )
             os.fsync(parent_fd)
-            visible = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+            published_info = os.fstat(stage_fd)
+            successor_snapshot = _snapshot_from_stat(
+                _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+                published_info,
+            )
+            self._assert_bound_regular_entry(
+                parent_fd,
+                destination,
+                stage_fd,
+                successor_snapshot,
+                hashlib.sha256(content).hexdigest(),
+                identity_error="legacy-marker-unconvertible",
+            )
             return replace(
                 marker,
-                source_snapshot=_snapshot_from_stat(_DISTRIBUTION_RETRY_MARKER_REL.as_posix(), visible),
+                source_snapshot=successor_snapshot,
                 source_sha256=hashlib.sha256(content).hexdigest(),
             )
         except Exception:
@@ -3115,8 +3251,7 @@ class OperationJournalStore:
     ) -> OperationJournal:
         if predecessor is None:
             predecessor = self._read(journal.root_identity)
-        self._write(journal, predecessor=predecessor)
-        return self._read(journal.root_identity)
+        return self._write(journal, predecessor=predecessor)
 
     def mark_executing(self, journal: OperationJournal) -> OperationJournal:
         if journal.status not in {"prepared", "executing"}:
@@ -3226,10 +3361,10 @@ class OperationJournalStore:
         self._remove_exact(journal, failure_reason="journal rollback failed")
 
     def _remove_exact(self, journal: OperationJournal, *, failure_reason: str) -> None:
-        if self._forward_guard is not None:
-            self._assert_current_forward_guard(self._forward_guard)
         root_fd, parent_fd = self._open_parent(journal.root_identity)
+        guard_fd: int | None = None
         try:
+            guard_fd = self._open_bound_forward_guard(parent_fd)
             name = _DISTRIBUTION_JOURNAL_REL.name
             try:
                 info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
@@ -3237,17 +3372,23 @@ class OperationJournalStore:
                 return
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 raise DistributionApplyError("journal-protocol-incompatible")
-            current = self._read(journal.root_identity)
-            if current != journal:
+            expected_snapshot = journal.source_snapshot
+            expected_sha256 = journal.source_sha256
+            if expected_snapshot is None or expected_sha256 is None or not _same_stat_identity(info, expected_snapshot):
                 raise DistributionApplyError("journal-precondition-mismatch")
             self._quarantine_and_remove(
                 parent_fd,
                 name,
                 info,
+                expected_snapshot=expected_snapshot,
+                expected_sha256=expected_sha256,
+                pre_delete_check=lambda: self._assert_bound_forward_guard(parent_fd, guard_fd),
                 identity_error="journal-precondition-mismatch",
                 failure_reason=failure_reason,
             )
         finally:
+            if guard_fd is not None:
+                os.close(guard_fd)
             os.close(parent_fd)
             os.close(root_fd)
 
@@ -3257,6 +3398,9 @@ class OperationJournalStore:
         name: str,
         expected: os.stat_result,
         *,
+        expected_snapshot: PathIdentitySnapshot,
+        expected_sha256: str,
+        pre_delete_check: Callable[[], None] | None = None,
         identity_error: str,
         failure_reason: str,
     ) -> None:
@@ -3293,7 +3437,12 @@ class OperationJournalStore:
                     expected.st_ctime_ns,
                     expected.st_mode,
                     expected.st_nlink,
-                ):
+                ) or not _same_stat_identity(held_before, expected_snapshot):
+                    raise DistributionApplyError(identity_error)
+                raw = _read_fd_bytes(held_fd)
+                if hashlib.sha256(raw).hexdigest() != expected_sha256 or _stat_identity_tuple(
+                    os.fstat(held_fd)
+                ) != _stat_identity_tuple(held_before):
                     raise DistributionApplyError(identity_error)
                 _rename_distribution_no_replace(parent_fd, name, parent_fd, quarantine)
             except OSError as exc:
@@ -3333,6 +3482,8 @@ class OperationJournalStore:
                 # later cleanup failure can then restore the still-linked exact
                 # inode instead of losing the canonical recovery authority.
                 os.fsync(parent_fd)
+                if pre_delete_check is not None:
+                    pre_delete_check()
                 _remove_distribution_stage_if_owned(parent_fd, quarantine, moved, strict=True)
             except (DistributionApplyError, OSError) as exc:
                 self._restore_quarantined_entry(
@@ -3404,10 +3555,16 @@ class OperationJournalStore:
                 raise DistributionApplyError("legacy-marker-unconvertible") from exc
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 raise DistributionApplyError("legacy-marker-unconvertible")
+            expected_snapshot = marker.source_snapshot
+            expected_sha256 = marker.source_sha256
+            if expected_snapshot is None or expected_sha256 is None or not _same_stat_identity(info, expected_snapshot):
+                raise DistributionApplyError("legacy-marker-unconvertible")
             self._quarantine_and_remove(
                 parent_fd,
                 name,
                 info,
+                expected_snapshot=expected_snapshot,
+                expected_sha256=expected_sha256,
                 identity_error="legacy-marker-unconvertible",
                 failure_reason="legacy-marker-unconvertible",
             )

@@ -2148,7 +2148,7 @@ def test_i368_journal_finalization_preserves_concurrent_replacement(
         actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
         created_parent_bindings=(),
     )
-    store.write(completed)
+    completed = store.write(completed)
     original_rename = managed_distribution._rename_distribution_no_replace
     replacement = b"user-owned replacement\n"
     replaced = False
@@ -2201,6 +2201,8 @@ def test_i368_legacy_marker_removal_preserves_concurrent_replacement(
         }),
         encoding="utf-8",
     )
+    admitted = managed_distribution._read_distribution_retry_marker(target_root)
+    assert admitted is not None
     store = OperationJournalStore(target_root)
     original_rename = managed_distribution._rename_distribution_no_replace
     replacement = b"user-owned replacement\n"
@@ -2222,7 +2224,7 @@ def test_i368_legacy_marker_removal_preserves_concurrent_replacement(
     monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_before_quarantine)
 
     with pytest.raises(DistributionApplyError, match="legacy-marker-unconvertible"):
-        store.remove_legacy_marker(marker)
+        store.remove_legacy_marker(admitted)
 
     assert marker_path.read_bytes() == replacement
 
@@ -2251,7 +2253,7 @@ def test_i368_journal_cleanup_failure_restores_canonical_recovery_authority(
         actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
         created_parent_bindings=(),
     )
-    store.write(completed)
+    completed = store.write(completed)
     before = store.path.read_bytes()
     original_remove = managed_distribution._remove_distribution_stage_if_owned
 
@@ -5160,3 +5162,241 @@ def test_s35_retry_marker_authority_precedes_empty_workspace_fast_path(
             package_version="1.2.3",
             manifest_path=manifest_path,
         )
+
+
+def _i368_minimal_executable(tmp_path: Path):
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    return target_root, executable
+
+
+def test_i368_journal_create_revalidates_guard_at_publish_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    guard_path = target_root / "spec-dock" / ".distribution-retry.json"
+    replacement = guard_path.read_bytes()
+    original_rename = managed_distribution._rename_distribution_no_replace
+    replaced = False
+
+    def replace_guard_after_precheck(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal replaced
+        if not replaced and destination_name == store.path.name:
+            guard_path.unlink()
+            guard_path.write_bytes(replacement)
+            replaced = True
+        return original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_guard_after_precheck)
+
+    with pytest.raises(DistributionApplyError, match="dual-recovery-state"):
+        store.prepare(executable, package_version="1.2.3")
+
+    assert replaced is True
+    assert guard_path.read_bytes() == replacement
+    assert not store.path.exists()
+
+
+def test_i368_journal_swap_revalidates_guard_at_publish_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    prepared = _prepare_guarded_journal(store, executable)
+    before = store.path.read_bytes()
+    guard_path = target_root / "spec-dock" / ".distribution-retry.json"
+    replacement = guard_path.read_bytes()
+    original_swap = managed_distribution._rename_distribution_swap
+    replaced = False
+
+    def replace_guard_after_precheck(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal replaced
+        if not replaced and destination_name == store.path.name:
+            guard_path.unlink()
+            guard_path.write_bytes(replacement)
+            replaced = True
+        return original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", replace_guard_after_precheck)
+
+    with pytest.raises(DistributionApplyError, match="dual-recovery-state"):
+        store.mark_executing(prepared)
+
+    assert replaced is True
+    assert guard_path.read_bytes() == replacement
+    assert store.path.read_bytes() == before
+
+
+def test_i368_journal_finalization_restores_journal_when_guard_races(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    prepared = _prepare_guarded_journal(store, executable)
+    completed = store.write(
+        managed_distribution.replace(
+            prepared,
+            status="completed",
+            actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
+            created_parent_bindings=(),
+        ),
+        predecessor=prepared,
+    )
+    journal_bytes = store.path.read_bytes()
+    guard_path = target_root / "spec-dock" / ".distribution-retry.json"
+    replacement = guard_path.read_bytes()
+    original_rename = managed_distribution._rename_distribution_no_replace
+    replaced = False
+
+    def replace_guard_after_journal_quarantine(
+        source_parent_fd,
+        source_name,
+        destination_parent_fd,
+        destination_name,
+    ):
+        nonlocal replaced
+        result = original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not replaced and source_name == store.path.name and destination_name.endswith(".remove"):
+            guard_path.unlink()
+            guard_path.write_bytes(replacement)
+            replaced = True
+        return result
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        replace_guard_after_journal_quarantine,
+    )
+
+    with pytest.raises(DistributionApplyError, match="journal finalization failed"):
+        store.remove_completed(completed)
+
+    assert replaced is True
+    assert guard_path.read_bytes() == replacement
+    assert store.path.read_bytes() == journal_bytes
+
+
+@pytest.mark.parametrize("entry", ["journal", "guard"])
+def test_i368_published_successor_rejects_same_byte_replacement_before_return(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    original_assert = OperationJournalStore._assert_bound_regular_entry
+    replaced = False
+    expected_name = store.path.name if entry == "journal" else ".distribution-retry.json"
+    expected_path = target_root / "spec-dock" / expected_name
+
+    def replace_before_acceptance(
+        self,
+        parent_fd,
+        name,
+        held_fd,
+        expected_snapshot,
+        expected_sha256,
+        *,
+        identity_error,
+    ):
+        nonlocal replaced
+        if not replaced and name == expected_name:
+            content = managed_distribution._read_fd_bytes(held_fd)
+            expected_path.unlink()
+            expected_path.write_bytes(content)
+            replaced = True
+        return original_assert(
+            parent_fd,
+            name,
+            held_fd,
+            expected_snapshot,
+            expected_sha256,
+            identity_error=identity_error,
+        )
+
+    monkeypatch.setattr(OperationJournalStore, "_assert_bound_regular_entry", replace_before_acceptance)
+
+    with pytest.raises(
+        DistributionApplyError,
+        match=r"journal-precondition-mismatch|legacy-marker-unconvertible",
+    ):
+        if entry == "journal":
+            store.prepare(executable, package_version="1.2.3")
+        else:
+            store.prepare_legacy_guard(executable, package_version="1.2.3")
+
+    assert replaced is True
+    assert expected_path.exists()
+
+
+@pytest.mark.parametrize("entry", ["journal", "guard"])
+@pytest.mark.parametrize("same_bytes", [True, False])
+def test_i368_finalization_rejects_replacement_before_authority_reacquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    same_bytes: bool,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    if entry == "journal":
+        journal = store.prepare(executable, package_version="1.2.3")
+        journal = store.write(
+            managed_distribution.replace(
+                journal,
+                status="completed",
+                actions=tuple(
+                    managed_distribution.replace(action, checkpoint="verified") for action in journal.actions
+                ),
+                created_parent_bindings=(),
+            ),
+            predecessor=journal,
+        )
+        target = store.path
+    else:
+        journal = None
+        target = target_root / "spec-dock" / ".distribution-retry.json"
+    original_open_parent = OperationJournalStore._open_parent
+    replacement = target.read_bytes() if same_bytes else b"concurrent replacement\n"
+    replaced = False
+
+    def replace_before_stat(self, expected_root, expected_workspace=None):
+        nonlocal replaced
+        result = original_open_parent(self, expected_root, expected_workspace)
+        if not replaced:
+            target.unlink()
+            target.write_bytes(replacement)
+            replaced = True
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "_open_parent", replace_before_stat)
+
+    with pytest.raises(
+        DistributionApplyError,
+        match=r"journal-precondition-mismatch|legacy-marker-unconvertible",
+    ):
+        if entry == "journal":
+            assert journal is not None
+            store.remove_completed(journal)
+        else:
+            store.remove_legacy_marker(guard)
+
+    assert replaced is True
+    assert target.read_bytes() == replacement

@@ -39,6 +39,8 @@ _full_regression_guard_active = False
 _full_regression_expected: dict[str, str] = {}
 _full_regression_failures: dict[str, str] = {}
 _full_regression_errors: list[str] = []
+_full_regression_missing_nodes: set[str] = set()
+_full_regression_ledger_errors: list[str] = []
 
 
 def _normalize_failure_message(message: str, repository: Path) -> str:
@@ -90,7 +92,7 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    global _full_regression_guard_active, _full_regression_expected
+    global _full_regression_guard_active, _full_regression_expected, _full_regression_missing_nodes
 
     run_full_regression = config.getoption("--run-full-regression")
 
@@ -133,12 +135,16 @@ def pytest_collection_modifyitems(
         if is_full_regression and not run_full_regression:
             item.add_marker(pytest.mark.skip(reason=POLICY_SKIP_REASON))
 
-    if run_full_regression and not config.option.collectonly and FULL_REGRESSION_LEDGER.is_file():
-        expected = _approved_full_regression_signatures()
+    if run_full_regression and not config.option.collectonly:
+        _full_regression_guard_active = True
+        try:
+            expected = _approved_full_regression_signatures()
+        except (OSError, ValueError, KeyError, TypeError, pytest.UsageError) as exc:
+            _full_regression_ledger_errors.append(f"{type(exc).__name__}: {exc}")
+            expected = {}
+        _full_regression_expected = expected
         collected_nodeids = {item.nodeid for item in items}
-        if set(expected).issubset(collected_nodeids):
-            _full_regression_guard_active = True
-            _full_regression_expected = expected
+        _full_regression_missing_nodes = set(expected) - collected_nodeids
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
@@ -159,11 +165,18 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         return
     expected = _full_regression_expected
     actual = _full_regression_failures
-    if not _full_regression_errors and actual == expected:
+    if (
+        not _full_regression_errors
+        and not _full_regression_ledger_errors
+        and not _full_regression_missing_nodes
+        and actual == expected
+    ):
         print(f"verified {len(actual)} approved failure signatures against the full-regression ledger")
         return
     details = {
         "unexpected_errors": sorted(_full_regression_errors),
+        "ledger_errors": sorted(_full_regression_ledger_errors),
+        "missing_expected_nodes": sorted(_full_regression_missing_nodes),
         "missing_failures": sorted(set(expected) - set(actual)),
         "unexpected_failures": sorted(set(actual) - set(expected)),
         "signature_mismatches": sorted(
