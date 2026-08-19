@@ -30,7 +30,7 @@ ID: "iss-00368"
 - staging lease は operation ID に束縛した digest と action/known-stage contract の両方を検証し、journal へ追加された未証明 lease から cleanup authority を得ない。active fallback の refresh authority は有効な `.meta.json` entry または layer 固有の exact `active-none` target に限定した。
 - Strict g6 の再審査で検出した `active/context-pack.md` の symlink collision は、事前観測した単一リンク regular identity だけを generated refresh の対象にすることで write 前 blocker にした。regular file の安定性判定から read に伴う atime 変化を除外し、正当な stale context pack の更新は維持した。
 - Strict g8 bounded review を受け、fresh retry は D2 所有の `_install_fresh_compatibility_distribution_unlocked()` へ直接接続し、recognized handler から legacy/fresh compatibility call edge を物理的に除去した。fresh fault-injection contract は専用入口を通して維持する。
-- 実装 anchor `f6179d1fb368613ca89f35b826635aeee0affebe` より後の差分は campaign plan の `evidence_only_paths` に列挙したファイルだけに限定する。full regression ledger は実測 SHA `4f4fbfb591f6d70a77e1b67730b4e2b17b9e3726` に束縛し、後続の実装変更は分岐統合と境界テストだけに限定した。slow profile の完全な command/ledger 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
+- 実装 anchor `f6179d1fb368613ca89f35b826635aeee0affebe` より後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測 SHA `4f4fbfb591f6d70a77e1b67730b4e2b17b9e3726` に束縛し、後続の実装変更は分岐統合と境界テストだけに限定した。slow profile の完全な command/ledger 定義は `artifacts/final-quality-gate-check-profile.json` に保存した。
 
 ## Verification
 
