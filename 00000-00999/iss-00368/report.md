@@ -50,6 +50,10 @@ ID: "iss-00368"
 - `chatgpt-final-quality-gate-strict-new` の exact-SHA review で検出した recovery entry の authority 再取得を修正した。journal transition は forward guard の held descriptor、identity、bytes digest を publish 前後で検証し、journal / guard の successor evidence は公開に用いた stage descriptor から構築して canonical name が同じ inode を指すことを返却直前に確認する。
 - journal / guard finalization は caller が保持する source snapshot と digest を deletion authority とし、quarantine rename 前に held descriptor の identity と bytes を照合する。同内容・異内容の並行置換はいずれも削除せず fail closed とし、journal publish 後に guard が置換された場合は current operation が公開した exact journal inode だけを rollback する。
 - authoritative full-regression ledger guard は `--run-full-regression` 指定時に常時有効化し、ledger の欠落・不正、および削除・rename・focused selection による expected node 欠落を mismatch として exit 3 にする。expected node が collection に揃わないことを guard 無効化の条件にはしない。
+- Strict successor review で検出した symlink exchange race は、交換前の exact snapshot とlink target、交換後の安定した両pathname、rollback前後の両identityとlink targetを照合するCASへ変更した。最初の交換内で置換されたentryはexact pairを再交換してcanonicalへ復元し、二重raceでidentityが曖昧なstageを再取得してcleanup authorityへ昇格しない。
+- schema-2 forward guard はjournal作成前に `operation_id`、`contract_identity`、canonical `plan_digest` を永続化する。再開時はguardとjournalの独立アンカーを照合するため、action順序やimmutable metadataを変更してjournal内部のdigestを再計算してもmutation前に拒否する。
+- managed stage名とprune quarantine名は作成・rename前にzero-identityの予約leaseとしてjournalへ記録し、作成後のexact inode leaseへ昇格する。swap直後に停止してdesired inodeがcanonicalへ移り旧precondition inodeがstageへ移った状態、およびprune rename直後の予約quarantineは、journalへ遷移後identityをwrite-ahead記録してからcleanupする。元はmissingの親directoryは、全descendant actionがpendingかつ出現したreal directoryが空の場合だけexact inode bindingへ昇格し、非空・symlink・計画外出現は拒否する。
+- 強制終了時に残るfilesystem状態を直接構築する回帰として、予約stage作成直後、regular swap直後、prune quarantine直後、self-rehashed action reorderを追加し、同一plan retryの収束とplan改変のmutation前拒否を固定した。
 - `1d62f3221a5a55add1c592076de2688c2f0b4a89` は旧 campaign の実装 anchor であり、その後の Strict remediation で実装とテストを変更したため最終 candidate anchor ではない。最終 exact candidate の SHA と同一 SHA 上の review/test 合否は Strict check attestation を正本とする。
 
 ## Verification
@@ -78,10 +82,10 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] failure ledger に列挙した9ファイルを `--run-full-regression --junitxml=<run.xml>` で固定点と実装 anchor の双方で再実行 — 各27 failed、正規化した27件の failure signature と aggregate SHA-256 `6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8` が一致
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
 - [x] `uv run pytest -q` — 1099 passed、1053 policy-skipped
-- [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — recovery authority の publish / successor / finalization race を含む 172 passed
+- [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — write-ahead reservation、abrupt swap/prune recovery、plan anchor、symlink CAS race を含む 176 passed
 - [x] `uv run pytest tests/unit/test_provider_test_lanes.py -q` — missing ledger / missing node / incomplete selection を含む 12 passed
 - [x] `make lint` — ruff check / format check / mypy が成功
-- [x] `uv run pytest -q` — 1111 passed、1053 policy-skipped
+- [x] `uv run pytest -q` — 1115 passed、1053 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
 - Strict の最終合否は repository 外の append-only campaign ledger と certificate にのみ記録し、合否記録のために認証後の candidate を変更しない。
