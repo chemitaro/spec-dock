@@ -5218,9 +5218,7 @@ def main(argv: list[str] | None = None) -> int:
                 operation="init-force" if bool(ns.force) else "fresh",
             )
             if not ns.force:
-                if admission.status == "retry":
-                    _install_fresh_distribution(target_root)
-                elif admission.status == "fresh":
+                if admission.status in {"retry", "fresh"}:
                     _install_fresh_distribution(target_root)
                 elif os.path.lexists(_specdock_dir(target_root)):
                     raise RuntimeError("'spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
