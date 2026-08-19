@@ -3,7 +3,7 @@
   "kind": "issue368_full_regression_failure_ledger",
   "issue_id": "iss-00368",
   "fixed_point_sha": "7588d54114a2b8be7661353952f65741169320bd",
-  "current_head_sha": "bd2141708ed3a332bfb98ccbd2eabcf008e8ca66",
+  "current_head_sha": "967b7253ac78ee925bead668951fc1065191ec7c",
   "commands": {
     "current_full": "uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py",
     "fixed_point_full": "uv run pytest --run-full-regression"
@@ -17,11 +17,11 @@
     "duration": "15m59s"
   },
   "current_head_verification": {
-    "working_tree_sha": "bd2141708ed3a332bfb98ccbd2eabcf008e8ca66",
+    "working_tree_sha": "967b7253ac78ee925bead668951fc1065191ec7c",
     "failed": 27,
-    "passed": 2063,
+    "passed": 2064,
     "skipped": 48,
-    "duration": "17m14s",
+    "duration": "17m21s",
     "runtime_signature_verification": {
       "verified_failure_signatures": 27,
       "unexpected_failures": 0,
