@@ -44,6 +44,7 @@ def test_issue_368_recognized_handler_has_single_service_route() -> None:
 
     assert "execute_recognized_distribution(" in source
     for forbidden in (
+        "_install_fresh_compatibility_distribution_unlocked(",
         "_write_distribution_retry_marker(",
         "_remove_distribution_retry_marker(",
         "apply_distribution_plan(",
@@ -53,6 +54,15 @@ def test_issue_368_recognized_handler_has_single_service_route() -> None:
         "_write_spec_dock_version(",
     ):
         assert forbidden not in source
+
+
+def test_issue_368_fresh_retry_is_owned_outside_recognized_handler() -> None:
+    fresh_source = inspect.getsource(cli._install_fresh_distribution)
+    compatibility_source = inspect.getsource(cli._install_fresh_compatibility_distribution_unlocked)
+
+    assert "_install_fresh_compatibility_distribution_unlocked(" in fresh_source
+    assert 'if operation != "fresh":' in compatibility_source
+    assert "fresh compatibility flow requires the fresh operation" in compatibility_source
 
 
 @contextmanager
