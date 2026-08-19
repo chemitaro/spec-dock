@@ -3418,6 +3418,34 @@ def _condition_has_complete_parent_chain(
     return relative_paths == tuple(parent.relative_path for parent in snapshot.parents)
 
 
+def _condition_has_complete_target_identity(condition: dict[str, object]) -> bool:
+    required_fields = {
+        "root",
+        "parents",
+        "exists",
+        "device",
+        "inode",
+        "ctime_ns",
+        "file_type",
+        "link_count",
+        "identity",
+    }
+    if set(condition) != required_fields or not isinstance(condition["exists"], bool):
+        return False
+    if condition["exists"] is False:
+        return all(
+            condition[field] is None for field in ("device", "inode", "ctime_ns", "file_type", "link_count", "identity")
+        )
+    return (
+        all(
+            isinstance(condition[field], int) and not isinstance(condition[field], bool)
+            for field in ("device", "inode", "ctime_ns", "link_count")
+        )
+        and isinstance(condition["file_type"], str)
+        and isinstance(condition["identity"], dict)
+    )
+
+
 def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: OperationJournal) -> None:
     plan = assessment.distribution_plan
     if plan.target_root is None:
@@ -3436,6 +3464,8 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
         raise DistributionApplyError("journal-plan-mismatch")
     allowed_created_parents: set[str] = set()
     for record in journal.actions:
+        if not _condition_has_complete_target_identity(record.precondition):
+            raise DistributionApplyError("journal-plan-mismatch")
         parents = record.precondition.get("parents")
         if not isinstance(parents, list):
             raise DistributionApplyError("journal-plan-mismatch")
