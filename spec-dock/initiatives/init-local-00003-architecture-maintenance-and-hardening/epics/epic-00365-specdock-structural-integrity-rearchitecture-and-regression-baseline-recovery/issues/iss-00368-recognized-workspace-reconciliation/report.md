@@ -28,6 +28,7 @@ ID: "iss-00368"
 - quarantine rename は削除前に directory fsync し、削除または事前 fsync が失敗した場合は held identity を canonical journal / marker path へ no-replace restore する。失敗を返した後も次回 retry が同じ recovery authority を再読できる。
 - Strict g6 remediation で missing parent も journal precondition に保持し、resume 前に出現した parent collision を write 前に拒否するようにした。journal package compatibility は exact protocol / contract / plan を維持した forward-only version とし、downgrade は拒否する。
 - staging lease は operation ID に束縛した digest と action/known-stage contract の両方を検証し、journal へ追加された未証明 lease から cleanup authority を得ない。active fallback の refresh authority は有効な `.meta.json` entry または layer 固有の exact `active-none` target に限定した。
+- Strict g6 の再審査で検出した `active/context-pack.md` の symlink collision は、事前観測した単一リンク regular identity だけを generated refresh の対象にすることで write 前 blocker にした。regular file の安定性判定から read に伴う atime 変化を除外し、正当な stale context pack の更新は維持した。
 
 ## Verification
 
@@ -35,9 +36,9 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 
 - [x] `make lint` — successor 候補 commit 前の診断で ruff check / format check / mypy が成功
 - [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 129 passed
-- [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py -k 'update or force or distribution or issue_368'` — 128 passed
+- [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py -k 'update or force or distribution or issue_368'` — 130 passed
 - [x] `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` — 144 passed、1 failed。残る failure は fixed point と remediation SHA で expected/actual SHA が不変な Issue 359 retained-skill golden の既存不一致
-- [x] `uv run pytest -q` — 1065 passed、1049 policy-skipped
+- [x] `uv run pytest -q` — 1065 passed、1051 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
 - Strict の最終合否は repository 外の append-only campaign ledger と certificate にのみ記録し、合否記録のために認証後の candidate を変更しない。

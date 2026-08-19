@@ -8349,6 +8349,33 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- issue: (none)" not in context_pack_text
             assert "- `spec-dock/active/issue/README.md`" not in context_pack_text
 
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    def test_recognized_reconciliation_blocks_context_pack_symlink_before_writes(
+        self,
+        command: tuple[str, ...],
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            context_pack_path = specdock_dir / "active" / "context-pack.md"
+            user_content = target / "user-context-pack.md"
+            user_content.write_text("user-owned context\n", encoding="utf-8")
+            context_pack_path.unlink()
+            context_pack_path.symlink_to(os.path.relpath(user_content, start=context_pack_path.parent))
+            before = self._relative_file_snapshot(target)
+
+            exit_code = main([*command, str(target)])
+
+            assert exit_code == 1
+            assert self._relative_file_snapshot(target) == before
+            assert context_pack_path.is_symlink()
+            assert user_content.read_text(encoding="utf-8") == "user-owned context\n"
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 
