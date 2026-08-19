@@ -17,7 +17,7 @@ ID: "iss-00368"
 - recognized target の `update` と `init --force` を `execute_recognized_distribution()` の単一路線へ切り替えた。
 - read-only `WorkspaceAssessment` と blocker-free `ExecutableMutationPlan` を分離し、root / intent / contract / canonical plan digest に束縛した `.distribution-journal.json` を導入した。
 - managed regular file / symlink / obsolete prune / generated version / active fallback を既存 descriptor-bound kernel で適用し、action checkpoint、staging lease、exact pre/postcondition から partial failure を forward recovery できるようにした。
-- legacy `.distribution-retry.json` は、同一 root/package/operation の `preflight-complete` かつ staging lease なしの場合だけ one-way conversion し、それ以外と dual recovery state は mutation 前に拒否する。
+- legacy `.distribution-retry.json` は、同一 root/operation の `preflight-complete` かつ staging lease なしで、実行 package が同一または compatible newer の場合だけ one-way conversion し、それ以外と dual recovery state は mutation 前に拒否する。
 - recognized flow から旧 scaffold callback、CLI-owned marker transition、plan 外の version write を除去し、fresh-only compatibility route は `iss-00369` の対象として到達不能のまま残した。
 - README と shipped/dogfooding docs の recovery guidance を new journal contract に更新した。
 - Strict bounded review で検出した journal action 改変、generated path traversal、parent rebind、plan 外 active mutation、no-op journal 作成を根因単位で修正し、回帰テストを追加した。
@@ -39,6 +39,8 @@ ID: "iss-00368"
 - Strict g11 bounded remediation では、installer の既存 regular file 更新を pathname `os.replace` から held target/staging descriptor に束縛した atomic swap へ変更した。identity 確認後に destination が差し替えられても swap 後検証または事前照合で拒否し、ユーザー置換 entry を保持する。
 - Strict g11 candidate 2 remediation では、completed prune が再 assessment から消えた場合も descriptor-bound 再観測で exact postcondition を検証して terminal journal を完結できるようにした。全 journal action の pre/postcondition は完全な親チェーンを保持し、digest を再計算した親省略も拒否する。
 - Strict g13 remediation では、uninstall の managed scaffold root 一括再帰削除を廃止し、各 shipped file を current content digest と no-follow identity に束縛した個別 action へ変更した。unknown または modified file は全 mutation 前の blocker とし、E365-R03 の preserve-and-block 契約を S70 と installer 回帰テストで固定した。
+- Strict g13 final remediation では、legacy marker の admission 時 no-follow identity と bytes digest を journal publish 直前に再検証し、同一 root lock 内で schema-2 forward-only guard へ原子的に置換してから journal authority を発行する。compatible newer conversion の journal publish failure は guard から再開でき、admission 後の同内容 marker 差し替えは mutation 前に拒否する。
+- terminal journal の regular/symlink postcondition に file type と link count 1 を保持し、`completed` retry でも current assessment が blocker-free かつ adopt/preserve のみであることを再確認してから journal を削除する。completed publish 後に managed target が hardlink 化された場合は journal を保持して recovery-required にする。
 - full-regression の pre-slow 診断は、実装 anchor 上の JUnit failure node ID と正規化 signature 27件を ledger と実行時照合してから exit 0 を返す verifier で実施した。controller の authoritative slow profile が実行する `pytest --run-full-regression -q` 自体にも同一 ledger guard を組み込み、全既知 node を収集した suite で node ID、signature、setup/teardown error が不一致なら非許可の exit 3 とする。検証中に発見した本文長 `37` と時刻文字列の部分一致による既存 privacy test の誤検知も、曖昧な短数値 sentinel を除去して安定化した。
 - 実装 anchor は `967b7253ac78ee925bead668951fc1065191ec7c`。この後の差分は campaign plan と semantic review plan で一致する5件の `evidence_only_paths` に限定する。full regression ledger は実測候補 `967b7253ac78ee925bead668951fc1065191ec7c` の既存失敗集合と authoritative pytest guard／診断 verifier の signature 検証へ再束縛し、後続の exact candidate 再実行結果は Strict check attestation で検証する。controller slow profile と二重検証の区別は `artifacts/final-quality-gate-check-profile.json` に保存した。
 
@@ -47,7 +49,7 @@ ID: "iss-00368"
 exact candidate の SHA と合否の正本は、当該 report 自身を含む `review_head_sha` に対して生成される Strict controller の candidate manifest / check attestation / certificate とする。report 内へ自己参照的な候補 SHA を固定せず、以下の手動確認は controller 実行前の診断証拠として区別する。
 
 - [x] `make lint` — successor 候補 commit 前の診断で ruff check / format check / mypy が成功
-- [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 144 passed
+- [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 151 passed
 - [x] `uv run pytest --run-full-regression -q tests/unit/infra/test_init_update.py -k 'unknown_file_inside_managed_scaffold_root or scaffold_managed_roots_remove_recursively or preserves_unknown_files_under_managed_roots'` — 3 passed、129 deselected
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py` — 131 passed
 - [x] `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py` — 144 passed、1 failed。残る failure は fixed point と remediation SHA で expected/actual SHA が不変な Issue 359 retained-skill golden の既存不一致
@@ -63,7 +65,7 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] fixed point と candidate で `test_tc_346_s03_003_actual_cross_filesystem_source` の時刻 `08:37` 誤検知を再現し、privacy oracle 修正後の focused full-regression は 1 passed
 - [x] failure ledger に列挙した9ファイルを `--run-full-regression --junitxml=<run.xml>` で固定点と実装 anchor の双方で再実行 — 各27 failed、正規化した27件の failure signature と aggregate SHA-256 `6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8` が一致
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
-- [x] `uv run pytest -q` — 1082 passed、1054 policy-skipped
+- [x] `uv run pytest -q` — 1087 passed、1055 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
 - Strict の最終合否は repository 外の append-only campaign ledger と certificate にのみ記録し、合否記録のために認証後の candidate を変更しない。
