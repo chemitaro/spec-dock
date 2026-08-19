@@ -1455,7 +1455,8 @@ def test_s60_root_rebind_during_marker_publication(
     assert "journal-root-mismatch" in captured
     assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
     assert not (tmp_path / "spec-dock").exists()
-    assert (displaced / "spec-dock/.distribution-journal.json").exists()
+    assert not (displaced / "spec-dock/.distribution-journal.json").exists()
+    assert (displaced / "spec-dock/.distribution-retry.json").exists()
 
 
 def test_s60_root_rebind_during_scaffold_mutation(
