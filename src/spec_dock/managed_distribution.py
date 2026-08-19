@@ -2890,6 +2890,21 @@ class OperationJournalStore:
                 except OSError as exc:
                     raise DistributionApplyError("legacy-marker-unconvertible") from exc
                 held_before = os.fstat(held_fd)
+                assert destination_info is not None
+                if (
+                    held_before.st_dev,
+                    held_before.st_ino,
+                    held_before.st_ctime_ns,
+                    held_before.st_mode,
+                    held_before.st_nlink,
+                ) != (
+                    destination_info.st_dev,
+                    destination_info.st_ino,
+                    destination_info.st_ctime_ns,
+                    destination_info.st_mode,
+                    destination_info.st_nlink,
+                ):
+                    raise DistributionApplyError("legacy-marker-unconvertible")
                 chunks: list[bytes] = []
                 while True:
                     chunk = os.read(held_fd, 1024 * 1024)
