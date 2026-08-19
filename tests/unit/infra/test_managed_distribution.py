@@ -1586,6 +1586,70 @@ def test_i368_legacy_conversion_rejects_marker_replaced_after_admission(tmp_path
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
+def test_i368_legacy_conversion_rejects_marker_replaced_between_stat_and_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    admitted = managed_distribution._read_distribution_retry_marker(target_root)
+    assert admitted is not None
+    replacement = marker_path.read_bytes()
+    original_path = marker_path.with_name(".distribution-retry-original.json")
+    original_open = managed_distribution.os.open
+    replaced = False
+
+    def replace_marker_before_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        if not replaced and path == marker_path.name and dir_fd is not None:
+            marker_path.rename(original_path)
+            marker_path.write_bytes(replacement)
+            replaced = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(managed_distribution.os, "open", replace_marker_before_open)
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.3.0",
+        legacy_marker=admitted,
+    )
+
+    assert replaced is True
+    assert result.status == "recovery_required"
+    assert result.reason == "legacy-marker-unconvertible"
+    assert marker_path.read_bytes() == replacement
+    assert original_path.read_bytes() == replacement
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+
+
 def test_i368_legacy_conversion_failure_leaves_forward_only_guard_for_newer_retry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
