@@ -6706,7 +6706,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert "unmanaged" in action["reason"]
             assert self._relative_file_snapshot(target) == before
 
-    def test_uninstall_dry_run_scaffold_managed_roots_remove_recursively(self) -> None:
+    def test_uninstall_dry_run_preserves_modified_managed_scaffold_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -6716,13 +6716,33 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             actions = self._uninstall_json_actions(target)
 
-            for rel in ("spec-dock/docs", "spec-dock/scripts", "spec-dock/system", "spec-dock/templates"):
-                with _case(rel=rel):
-                    action = actions[rel]
-                    assert action["category"] == "scaffold_managed"
-                    assert action["status"] == "would_remove"
-                    assert "managed scaffold tree" in action["reason"]
-            assert "spec-dock/docs/guide.md" not in actions
+            assert actions["spec-dock/docs/guide.md"]["category"] == "scaffold_managed"
+            assert actions["spec-dock/docs/guide.md"]["status"] == "preserved"
+            assert "content mismatch" in actions["spec-dock/docs/guide.md"]["reason"]
+            assert actions["spec-dock/docs/README.md"]["status"] == "would_remove"
+            assert self._relative_file_snapshot(target) == before
+
+    def test_uninstall_apply_keep_specs_blocks_modified_managed_scaffold_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            edited_doc = target / "spec-dock" / "docs" / "guide.md"
+            edited_doc.write_text("product docs edit\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=1,
+            )
+
+            assert payload["status"] == "blocked"
+            assert payload["phase"] == "preflight"
+            actions = self._actions_by_path(payload)
+            assert actions["spec-dock/docs/guide.md"]["category"] == "scaffold_managed"
+            assert actions["spec-dock/docs/guide.md"]["status"] == "preserved"
+            assert "content mismatch" in actions["spec-dock/docs/guide.md"]["reason"]
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_apply_keep_specs_blocks_unknown_file_inside_managed_scaffold_root(self) -> None:
@@ -6743,7 +6763,6 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert payload["status"] == "blocked"
             assert payload["phase"] == "preflight"
             actions = self._actions_by_path(payload)
-            assert actions["spec-dock/docs"]["status"] == "preserved"
             assert actions["spec-dock/docs/local-notes.md"]["category"] == "unmanaged"
             assert actions["spec-dock/docs/local-notes.md"]["status"] == "preserved"
             assert self._relative_file_snapshot(target) == before
