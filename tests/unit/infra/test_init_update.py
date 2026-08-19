@@ -8461,7 +8461,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- issue: iss-local-00001" in context_pack_text
             assert "- issue: (none)" not in context_pack_text
 
-    def test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails(self) -> None:
+    def test_update_blocks_unknown_active_path_files_even_with_valid_persisted_targets(self) -> None:
         import spec_dock.cli as cli
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -8496,35 +8496,18 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             original_symlink_support = cli._active_symlink_creation_supported
             cli._active_symlink_creation_supported = lambda: False
             try:
-                assert main(["update", str(target)]) == 0
+                assert main(["update", str(target)]) == 1
             finally:
                 cli._active_symlink_creation_supported = original_symlink_support
 
-            expected_paths = {
-                "initiative": initiative_dir,
-                "epic": epic_dir,
-                "issue": issue_dir,
-            }
-            for layer, expected in expected_paths.items():
+            for layer in ("initiative", "epic", "issue"):
                 with _case(layer=layer):
                     pathfile = active_dir / f"{layer}.path"
                     assert pathfile.is_file()
-                    rel_target = pathfile.read_text(encoding="utf-8").strip()
-                    assert rel_target != stale_rel
-                    resolved = (active_dir / rel_target).resolve()
-                    assert resolved == expected.resolve()
+                    assert pathfile.read_text(encoding="utf-8") == stale_rel + "\n"
+            assert not (target / "spec-dock" / ".distribution-journal.json").exists()
 
-            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
-                initiative_dir / "requirement.md"
-            ).read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
-                epic_dir / "requirement.md"
-            ).read_text(encoding="utf-8")
-            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
-                encoding="utf-8"
-            )
-
-    def test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails(
+    def test_update_blocks_unknown_active_path_files_when_persisted_manifest_is_broken(
         self,
     ) -> None:
         import spec_dock.cli as cli
@@ -8561,22 +8544,16 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             original_symlink_support = cli._active_symlink_creation_supported
             cli._active_symlink_creation_supported = lambda: False
             try:
-                assert main(["update", str(target)]) == 0
+                assert main(["update", str(target)]) == 1
             finally:
                 cli._active_symlink_creation_supported = original_symlink_support
 
-            placeholder_root = target / "spec-dock" / "system" / "active-none"
             for layer in ("initiative", "epic", "issue"):
                 with _case(layer=layer):
                     pathfile = active_dir / f"{layer}.path"
                     assert pathfile.is_file()
-                    rel_target = pathfile.read_text(encoding="utf-8").strip()
-                    assert rel_target != stale_rel
-                    resolved = (active_dir / rel_target).resolve()
-                    assert resolved == (placeholder_root / layer).resolve()
-                    assert self._read_active_pointer_text(target, layer, "README.md") == (
-                        placeholder_root / layer / "README.md"
-                    ).read_text(encoding="utf-8")
+                    assert pathfile.read_text(encoding="utf-8") == stale_rel + "\n"
+            assert not (target / "spec-dock" / ".distribution-journal.json").exists()
 
     def test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -8734,7 +8711,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "epic-local-99999" not in context_pack_text
             assert "iss-local-99999" not in context_pack_text
 
-    def test_update_repairs_same_layer_non_symlink_file_conflict_using_real_pathfile_target(self) -> None:
+    def test_update_blocks_same_layer_non_symlink_file_conflict_even_with_real_pathfile_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -8784,22 +8761,11 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 encoding="utf-8",
             )
 
-            assert main(["update", str(target)]) == 0
+            assert main(["update", str(target)]) == 1
 
-            if issue_link.exists():
-                assert issue_link.is_symlink()
-                assert issue_link.resolve() == issue_dir.resolve()
-            else:
-                assert issue_pathfile.is_file()
-                rel_target = issue_pathfile.read_text(encoding="utf-8").strip()
-                assert (active_dir / rel_target).resolve() == issue_dir.resolve()
-            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
-                encoding="utf-8"
-            )
-
-            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
-            assert "- issue: iss-local-00001" in context_pack_text
-            assert "iss-local-99999" not in context_pack_text
+            assert issue_link.read_text(encoding="utf-8") == "stale non-symlink conflict\n"
+            assert issue_pathfile.is_file()
+            assert not (specdock_dir / ".distribution-journal.json").exists()
 
     def test_update_blocks_same_layer_invalid_directory_conflict_without_recursive_removal(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -8861,7 +8827,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert issue_pathfile.is_file()
             assert not (specdock_dir / ".distribution-journal.json").exists()
 
-    def test_update_repairs_dangling_active_symlink_entrypoint(self) -> None:
+    def test_update_blocks_unknown_dangling_active_symlink_entrypoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
@@ -8876,12 +8842,37 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert pointer.is_symlink()
             assert not pointer.exists()
 
-            assert main(["update", str(target)]) == 0
+            original_target = pointer.readlink()
 
-            placeholder = target / "spec-dock" / "system" / "active-none" / "initiative" / "README.md"
-            assert self._read_active_pointer_text(target, "initiative", "README.md") == placeholder.read_text(
-                encoding="utf-8"
-            )
+            assert main(["update", str(target)]) == 1
+
+            assert pointer.is_symlink()
+            assert pointer.readlink() == original_target
+            assert not (target / "spec-dock" / ".distribution-journal.json").exists()
+
+    def test_update_blocks_unknown_active_symlink_inside_initiatives_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            unknown = specdock_dir / "initiatives" / "user-owned-directory"
+            unknown.mkdir(parents=True)
+            sentinel = unknown / "sentinel.txt"
+            sentinel.write_text("user-owned\n", encoding="utf-8")
+            pointer = specdock_dir / "active" / "initiative"
+            pointer.unlink(missing_ok=True)
+            pointer.symlink_to(unknown, target_is_directory=True)
+            original_target = pointer.readlink()
+
+            assert main(["update", str(target)]) == 1
+
+            assert pointer.is_symlink()
+            assert pointer.readlink() == original_target
+            assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+            assert not (specdock_dir / ".distribution-journal.json").exists()
 
     @pytest.mark.parametrize("command", [["update"], ["init", "--force"]])
     def test_recognized_reconciliation_preserves_external_active_symlink(self, command: list[str]) -> None:

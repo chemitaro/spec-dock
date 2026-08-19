@@ -604,6 +604,142 @@ def test_i368_journal_resume_rejects_existing_parent_rebind(tmp_path: Path) -> N
     assert not (parent / "ci.yml").exists()
 
 
+def test_i368_journal_resume_rejects_parent_that_appeared_after_prepare(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    OperationJournalStore(target_root).prepare(
+        build_executable_mutation_plan(assessment),
+        package_version="1.2.3",
+    )
+    appeared = target_root / ".github" / "workflows"
+    appeared.mkdir(parents=True)
+    sentinel = appeared / "sentinel.txt"
+    sentinel.write_text("user-owned\n", encoding="utf-8")
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-precondition-mismatch"
+    assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+    assert not (appeared / "ci.yml").exists()
+
+
+def test_i368_journal_resume_allows_newer_package_for_same_plan(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    prepared = store.prepare(executable, package_version="1.2.3")
+
+    resumed = store.resume(executable, package_version="1.3.0")
+
+    assert resumed == prepared
+
+
+def test_i368_journal_resume_rejects_older_package(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    store.prepare(executable, package_version="1.2.3")
+
+    with pytest.raises(DistributionApplyError, match="journal-protocol-incompatible"):
+        store.resume(executable, package_version="1.2.2")
+
+
+def test_i368_journal_rejects_unbound_staging_lease_without_deleting_stage(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    parent = target_root / ".github" / "workflows"
+    parent.mkdir(parents=True)
+    (target_root / "spec-dock").mkdir()
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    store.prepare(executable, package_version="1.2.3")
+    action = next(item for item in executable.actions if item.path == ".github/workflows/ci.yml")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    stage_name = managed_distribution._distribution_stage_name(action.path, expected)
+    stage = parent / stage_name
+    stage.write_bytes(b"desired\n")
+    stage_info = stage.stat(follow_symlinks=False)
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    payload["staging_leases"].append({
+        "path": action.path,
+        "stage_name": stage_name,
+        "device": stage_info.st_dev,
+        "inode": stage_info.st_ino,
+        "ctime_ns": stage_info.st_ctime_ns,
+        "file_type": "regular",
+    })
+    store.path.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-protocol-incompatible"
+    assert stage.read_bytes() == b"desired\n"
+
+
 def test_i368_recognized_service_executes_and_finalizes_journal(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())

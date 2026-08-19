@@ -1100,33 +1100,32 @@ def _active_fallback_existing_state_is_refreshable(
 ) -> bool:
     """Return whether an existing fallback pointer has managed-state evidence."""
 
-    def points_within_managed_active_targets(pointer: Path, raw_target: str) -> bool:
+    allowed_targets = {(specdock_dir / "system" / "active-none" / layer).resolve()}
+    if existing is not None:
+        allowed_targets.add(existing[0].resolve())
+
+    def points_to_validated_active_target(pointer: Path, raw_target: str) -> bool:
         candidate = Path(raw_target)
         if not candidate.is_absolute():
             candidate = pointer.parent / candidate
         try:
-            relative = candidate.resolve().relative_to(specdock_dir.parent.resolve())
-        except (OSError, ValueError):
+            resolved = candidate.resolve()
+        except OSError:
             return False
-        parts = relative.parts
-        return parts[:2] == ("spec-dock", "initiatives") or parts[:3] == (
-            "spec-dock",
-            "system",
-            "active-none",
-        )
+        return resolved in allowed_targets
 
     link = active_dir / layer
     pathfile = active_dir / f"{layer}.path"
     if link.is_symlink():
         try:
-            return points_within_managed_active_targets(link, link.readlink().as_posix())
+            return points_to_validated_active_target(link, link.readlink().as_posix())
         except OSError:
             return False
     if link.exists():
-        return existing is not None and link.is_file()
+        return False
     if pathfile.is_file() and not pathfile.is_symlink():
         try:
-            return points_within_managed_active_targets(pathfile, pathfile.read_text(encoding="utf-8").strip())
+            return points_to_validated_active_target(pathfile, pathfile.read_text(encoding="utf-8").strip())
         except OSError:
             return False
     return not pathfile.exists() and not pathfile.is_symlink()

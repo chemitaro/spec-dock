@@ -2065,7 +2065,7 @@ def _action_precondition_payload(plan: DistributionPlan, action: DistributionAct
     target = snapshot.target
     return {
         "root": _path_snapshot_condition(snapshot.root),
-        "parents": [_path_snapshot_condition(parent) for parent in snapshot.parents if parent.exists],
+        "parents": [_path_snapshot_condition(parent) for parent in snapshot.parents],
         "exists": target.exists,
         "device": target.device,
         "inode": target.inode,
@@ -2188,7 +2188,35 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
     )
 
 
+def _staging_leases_payload(journal: OperationJournal) -> list[dict[str, object]]:
+    return [
+        {
+            "path": lease.path,
+            "stage_name": lease.stage_name,
+            "device": lease.device,
+            "inode": lease.inode,
+            "ctime_ns": lease.ctime_ns,
+            "file_type": lease.file_type,
+        }
+        for lease in journal.staging_leases
+    ]
+
+
+def _staging_leases_digest(
+    *,
+    operation_id: str,
+    leases: list[dict[str, object]],
+) -> str:
+    payload = {
+        "operation_id": operation_id,
+        "staging_leases": leases,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _journal_payload(journal: OperationJournal) -> dict[str, object]:
+    leases = _staging_leases_payload(journal)
     return {
         "schema_version": journal.schema_version,
         "protocol_version": journal.protocol_version,
@@ -2216,17 +2244,11 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
             }
             for action in journal.actions
         ],
-        "staging_leases": [
-            {
-                "path": lease.path,
-                "stage_name": lease.stage_name,
-                "device": lease.device,
-                "inode": lease.inode,
-                "ctime_ns": lease.ctime_ns,
-                "file_type": lease.file_type,
-            }
-            for lease in journal.staging_leases
-        ],
+        "staging_leases": leases,
+        "staging_leases_digest": _staging_leases_digest(
+            operation_id=journal.operation_id,
+            leases=leases,
+        ),
     }
 
 
@@ -2255,6 +2277,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         "status",
         "actions",
         "staging_leases",
+        "staging_leases_digest",
     }
     if set(payload) != expected_fields:
         raise DistributionApplyError("journal-protocol-incompatible")
@@ -2303,7 +2326,15 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
             )
         )
     raw_leases = payload["staging_leases"]
-    if not isinstance(raw_leases, list):
+    if (
+        not isinstance(raw_leases, list)
+        or not isinstance(payload["staging_leases_digest"], str)
+        or payload["staging_leases_digest"]
+        != _staging_leases_digest(
+            operation_id=payload["operation_id"],
+            leases=raw_leases,
+        )
+    ):
         raise DistributionApplyError("journal-protocol-incompatible")
     leases: list[DistributionStageOwnership] = []
     for item in raw_leases:
@@ -2342,6 +2373,17 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         actions=tuple(parsed_actions),
         staging_leases=tuple(leases),
     )
+
+
+def _journal_package_is_compatible(journal_version: str, executing_version: str) -> bool:
+    """Allow the same journal protocol to move forward, never backward."""
+
+    try:
+        journal_tuple = _parse_package_version(journal_version, source="journal package version")
+        executing_tuple = _parse_package_version(executing_version, source="executing package version")
+    except DistributionAdmissionError:
+        return False
+    return executing_tuple >= journal_tuple
 
 
 class OperationJournalStore:
@@ -2529,9 +2571,9 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-intent-mismatch")
         if journal.authority != "recognized-workspace-reconciliation":
             raise DistributionApplyError("journal-authority-mismatch")
-        if (
-            journal.package_version != package_version
-            or journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+        if journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION or not _journal_package_is_compatible(
+            journal.package_version,
+            package_version,
         ):
             raise DistributionApplyError("journal-protocol-incompatible")
         if journal.contract_identity != plan.contract_identity:
@@ -2553,9 +2595,9 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-intent-mismatch")
         if journal.authority != "recognized-workspace-reconciliation":
             raise DistributionApplyError("journal-authority-mismatch")
-        if (
-            journal.package_version != package_version
-            or journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+        if journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION or not _journal_package_is_compatible(
+            journal.package_version,
+            package_version,
         ):
             raise DistributionApplyError("journal-protocol-incompatible")
         if journal.contract_identity != assessment.contract_identity:
@@ -2904,6 +2946,18 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
     }
     if len(records) != len(journal.actions) or set(records) - completed_missing_obsolete != set(current_actions):
         raise DistributionApplyError("journal-plan-mismatch")
+    lease_keys = {(lease.path, lease.stage_name) for lease in journal.staging_leases}
+    if len(lease_keys) != len(journal.staging_leases):
+        raise DistributionApplyError("journal-plan-mismatch")
+    for lease in journal.staging_leases:
+        if lease.path not in records:
+            raise DistributionApplyError("journal-plan-mismatch")
+        expected = _expected_target_identity(plan, lease.path)
+        known_identities = tuple(
+            identity for identity in (expected, *_historical_stage_identities(plan, lease.path)) if identity is not None
+        )
+        if not any(lease.stage_name == _distribution_stage_name(lease.path, identity) for identity in known_identities):
+            raise DistributionApplyError("journal-plan-mismatch")
     current_specs = _target_identity_specs(plan.current_assets, plan.scaffold_assets)
     obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files} - set(current_specs)
     for record in journal.actions:
