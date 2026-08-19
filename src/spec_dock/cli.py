@@ -42,7 +42,9 @@ from spec_dock.managed_distribution import (
     DistributionRootIdentity,
     DistributionStageOwnership,
     RecognizedDistributionIntent,
+    _remove_distribution_target_if_bound,
     _rename_distribution_no_replace,
+    _swap_regular_distribution_target_if_bound,
     admit_distribution_operation,
     apply_distribution_plan,
     build_distribution_plan,
@@ -1774,6 +1776,8 @@ def _write_atomic_regular_file(
     temporary_identity: tuple[int, int] | None = None
     existing_identity: _ManagedFileIdentity | None = None
     fd: int | None = None
+    target_fd: int | None = None
+    staging_fd: int | None = None
     try:
         _assert_managed_parent_chain_visible(path, parent_chain)
         existing_identity = _managed_file_identity_at(parent_fd, path.name)
@@ -1812,11 +1816,40 @@ def _write_atomic_regular_file(
         if existing_identity is not None:
             if current_identity != existing_identity:
                 raise RuntimeError("managed file destination identity changed")
-            os.replace(
+            target_fd = os.open(
+                path.name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+            staging_fd = os.open(
+                temporary_name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+            target_info = os.fstat(target_fd)
+            if (
+                not stat.S_ISREG(target_info.st_mode)
+                or target_info.st_nlink != existing_identity.link_count
+                or target_info.st_dev != existing_identity.device
+                or target_info.st_ino != existing_identity.inode
+                or target_info.st_ctime_ns != existing_identity.ctime_ns
+            ):
+                raise RuntimeError("managed file destination identity changed")
+            moved_target = _swap_regular_distribution_target_if_bound(
+                parent_fd,
                 temporary_name,
                 path.name,
-                src_dir_fd=parent_fd,
-                dst_dir_fd=parent_fd,
+                target_fd=target_fd,
+                staging_fd=staging_fd,
+                expected_target=target_info,
+                identity_message="managed file destination identity changed",
+            )
+            _remove_distribution_target_if_bound(
+                parent_fd,
+                temporary_name,
+                moved_target,
+                held_fd=target_fd,
+                identity_message="managed file destination identity changed",
             )
         else:
             if current_identity is not None:
@@ -1846,6 +1879,12 @@ def _write_atomic_regular_file(
             raise RuntimeError("managed file write failed") from exc
         raise
     finally:
+        if staging_fd is not None:
+            with suppress(OSError):
+                os.close(staging_fd)
+        if target_fd is not None:
+            with suppress(OSError):
+                os.close(target_fd)
         if temporary_name is not None and temporary_identity is not None:
             try:
                 current_temporary = os.stat(temporary_name, dir_fd=parent_fd, follow_symlinks=False)

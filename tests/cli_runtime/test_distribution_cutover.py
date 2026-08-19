@@ -1321,6 +1321,28 @@ def test_s60_atomic_regular_file_does_not_replace_racing_destination(
     assert destination.read_bytes() == b"user replacement\n"
 
 
+def test_s60_atomic_regular_file_does_not_replace_racing_existing_destination(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / ".distribution-retry.json"
+    destination.write_bytes(b"managed old value\n")
+    original_swap = cli._swap_regular_distribution_target_if_bound
+
+    def race_swap(*args, **kwargs):
+        destination.unlink()
+        destination.write_bytes(b"user replacement\n")
+        return original_swap(*args, **kwargs)
+
+    monkeypatch.setattr(cli, "_swap_regular_distribution_target_if_bound", race_swap)
+
+    with pytest.raises(RuntimeError, match="managed file destination identity changed"):
+        cli._write_atomic_regular_file(destination, b"managed new value\n", mode=0o600)
+
+    assert destination.read_bytes() == b"user replacement\n"
+    assert not list(tmp_path.glob("..distribution-retry.json.*"))
+
+
 def test_s60_atomic_regular_file_rejects_parent_rebind_before_staging(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
