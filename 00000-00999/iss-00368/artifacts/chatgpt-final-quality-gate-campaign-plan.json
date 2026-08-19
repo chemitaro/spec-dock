@@ -5,7 +5,7 @@
   "target_branch": "iss-00368-recognized-workspace-reconciliation",
   "fixed_point": "7588d54114a2b8be7661353952f65741169320bd",
   "fast_profile_id": "specdock-fast-v1",
-  "slow_profile_id": "specdock-slow-v1",
+  "slow_profile_id": "specdock-issue368-slow-v1",
   "domain_ids": [
     "ownership-path-identity",
     "marker-retry-recovery",
