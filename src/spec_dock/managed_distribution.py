@@ -1112,7 +1112,7 @@ def admit_distribution_operation(
             _admission_block("distribution-retry-present", "recover distribution before uninstall")
         if distribution_marker.operation != operation:
             _admission_block("marker-operation-mismatch", "retry marker belongs to another operation")
-        if distribution_marker.package_version != package_version:
+        if not _journal_package_is_compatible(distribution_marker.package_version, package_version):
             _admission_block("marker-package-mismatch", "retry marker belongs to another package version")
         if distribution_marker.target_root != root_identity:
             _admission_block("cross-root-replay", "retry marker belongs to another repository root")
@@ -3557,7 +3557,7 @@ def execute_recognized_distribution(
                 if (
                     guard_marker is None
                     or guard_marker.operation != intent
-                    or guard_marker.package_version != package_version
+                    or not _journal_package_is_compatible(guard_marker.package_version, package_version)
                     or guard_marker.target_root != executable.root_identity
                     or guard_marker.last_completed_phase != "preflight-complete"
                     or guard_marker.stage_ownership
