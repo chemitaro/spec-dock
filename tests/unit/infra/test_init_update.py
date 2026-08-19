@@ -6725,6 +6725,29 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert "spec-dock/docs/guide.md" not in actions
             assert self._relative_file_snapshot(target) == before
 
+    def test_uninstall_apply_keep_specs_blocks_unknown_file_inside_managed_scaffold_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            unknown = target / "spec-dock" / "docs" / "local-notes.md"
+            unknown.write_text("user-owned notes\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=1,
+            )
+
+            assert payload["status"] == "blocked"
+            assert payload["phase"] == "preflight"
+            actions = self._actions_by_path(payload)
+            assert actions["spec-dock/docs"]["status"] == "preserved"
+            assert actions["spec-dock/docs/local-notes.md"]["category"] == "unmanaged"
+            assert actions["spec-dock/docs/local-notes.md"]["status"] == "preserved"
+            assert self._relative_file_snapshot(target) == before
+
     def test_uninstall_blocks_unrecognized_specdock_version(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

@@ -4051,6 +4051,148 @@ def _rename_distribution_swap(
     raise OSError(error_number, os.strerror(error_number), destination_name)
 
 
+def _stat_identity_tuple(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (info.st_dev, info.st_ino, info.st_ctime_ns, info.st_mode, info.st_nlink)
+
+
+def _stat_structure_tuple(info: os.stat_result) -> tuple[int, int, str, int]:
+    return (info.st_dev, info.st_ino, _file_type(info.st_mode), info.st_nlink)
+
+
+def _restore_distribution_quarantine(
+    parent_fd: int,
+    quarantine_name: str,
+    target_name: str,
+    *,
+    failure_message: str,
+) -> None:
+    try:
+        _rename_distribution_no_replace(parent_fd, quarantine_name, parent_fd, target_name)
+        os.fsync(parent_fd)
+    except OSError as exc:
+        raise DistributionApplyError(failure_message) from exc
+
+
+def _remove_distribution_target_if_bound(
+    parent_fd: int,
+    target_name: str,
+    expected: os.stat_result,
+    *,
+    held_fd: int | None = None,
+    identity_message: str,
+) -> None:
+    """Delete only the inode bound before the pathname mutation.
+
+    A nonce quarantine turns a concurrent replacement into a reversible move:
+    the moved entry is compared with the held descriptor (or the exact
+    no-follow symlink identity) before any unlink is attempted.
+    """
+
+    expected_identity = _stat_identity_tuple(expected)
+    if held_fd is not None and _stat_identity_tuple(os.fstat(held_fd)) != expected_identity:
+        raise DistributionApplyError(identity_message)
+    quarantine_name = f".{target_name}.{secrets.token_hex(16)}.remove"
+    try:
+        _rename_distribution_no_replace(parent_fd, target_name, parent_fd, quarantine_name)
+    except OSError as exc:
+        raise DistributionApplyError(identity_message) from exc
+    try:
+        moved = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+        bound_identity = _stat_identity_tuple(os.fstat(held_fd)) if held_fd is not None else expected_identity
+        if _stat_identity_tuple(moved) != bound_identity:
+            _restore_distribution_quarantine(
+                parent_fd,
+                quarantine_name,
+                target_name,
+                failure_message=identity_message,
+            )
+            raise DistributionApplyError(identity_message)
+        os.fsync(parent_fd)
+        try:
+            _remove_distribution_stage_if_owned(parent_fd, quarantine_name, moved, strict=True)
+        except DistributionApplyError as exc:
+            _restore_distribution_quarantine(
+                parent_fd,
+                quarantine_name,
+                target_name,
+                failure_message=identity_message,
+            )
+            raise DistributionApplyError(identity_message) from exc
+    except Exception:
+        raise
+
+
+def _swap_regular_distribution_target_if_bound(
+    parent_fd: int,
+    staging_name: str,
+    target_name: str,
+    *,
+    target_fd: int,
+    staging_fd: int,
+    expected_target: os.stat_result,
+    identity_message: str,
+) -> os.stat_result:
+    """Exchange two held regular files and roll back a raced pathname."""
+
+    if _stat_identity_tuple(os.fstat(target_fd)) != _stat_identity_tuple(expected_target):
+        raise DistributionApplyError(identity_message)
+    visible_target = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+    visible_stage = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+    if _stat_identity_tuple(visible_target) != _stat_identity_tuple(expected_target) or _stat_identity_tuple(
+        visible_stage
+    ) != _stat_identity_tuple(os.fstat(staging_fd)):
+        raise DistributionApplyError(identity_message)
+    _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+    os.fsync(parent_fd)
+    moved_target = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+    published = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+    if _stat_identity_tuple(moved_target) != _stat_identity_tuple(os.fstat(target_fd)) or _stat_identity_tuple(
+        published
+    ) != _stat_identity_tuple(os.fstat(staging_fd)):
+        try:
+            _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+            os.fsync(parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError(identity_message) from exc
+        raise DistributionApplyError(identity_message)
+    return moved_target
+
+
+def _swap_symlink_distribution_target_if_bound(
+    parent_fd: int,
+    staging_name: str,
+    target_name: str,
+    *,
+    expected_target: PathIdentitySnapshot,
+    staging_stat: os.stat_result,
+    identity_message: str,
+) -> os.stat_result:
+    """Exchange symlinks and restore both names when a pathname raced."""
+
+    visible_target = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+    visible_stage = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+    if not _same_stat_identity(visible_target, expected_target) or _stat_identity_tuple(
+        visible_stage
+    ) != _stat_identity_tuple(staging_stat):
+        raise DistributionApplyError(identity_message)
+    _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+    os.fsync(parent_fd)
+    moved_target = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+    published = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+    if (
+        not _same_stat_structure(moved_target, expected_target)
+        or moved_target.st_nlink != expected_target.link_count
+        or _stat_structure_tuple(published) != _stat_structure_tuple(staging_stat)
+    ):
+        try:
+            _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
+            os.fsync(parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError(identity_message) from exc
+        raise DistributionApplyError(identity_message)
+    return moved_target
+
+
 def _remove_distribution_stage_if_owned(
     parent_fd: int,
     stage_name: str,
@@ -4517,8 +4659,13 @@ def _apply_regular_action(
                     raise DistributionApplyError(f"managed target identity changed for '{path}'")
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
-                os.unlink(target_name, dir_fd=parent_fd)
-                os.fsync(parent_fd)
+                _remove_distribution_target_if_bound(
+                    parent_fd,
+                    target_name,
+                    opened,
+                    held_fd=fd,
+                    identity_message=f"managed target identity changed for '{path}'",
+                )
                 return
             if action.action != "upgrade":
                 raise DistributionApplyError(f"unsupported regular action for '{path}'")
@@ -4569,8 +4716,15 @@ def _apply_regular_action(
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
                 if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
                     raise DistributionApplyError(f"managed target identity changed for '{path}'")
-                _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
-                os.fsync(parent_fd)
+                _swap_regular_distribution_target_if_bound(
+                    parent_fd,
+                    staging_name,
+                    target_name,
+                    target_fd=fd,
+                    staging_fd=staging_fd,
+                    expected_target=opened,
+                    identity_message=f"managed target identity changed for '{path}'",
+                )
                 swapped = True
 
                 published_fd = os.open(
@@ -4800,8 +4954,12 @@ def _apply_symlink_action(
             latest_target = _normalized_link_target_for_path(action.path, os.readlink(target_name, dir_fd=parent_fd))
             if latest_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
-            os.unlink(target_name, dir_fd=parent_fd)
-            os.fsync(parent_fd)
+            _remove_distribution_target_if_bound(
+                parent_fd,
+                target_name,
+                latest_stat,
+                identity_message=f"managed target identity changed for '{action.path}'",
+            )
             return
         if action.action == "upgrade":
             if not target_exists or snapshot.target.identity is None:
@@ -4831,8 +4989,14 @@ def _apply_symlink_action(
                     if latest_target != snapshot.target.identity.target:
                         raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
-                _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
-                os.fsync(parent_fd)
+                _swap_symlink_distribution_target_if_bound(
+                    parent_fd,
+                    staging_name,
+                    target_name,
+                    expected_target=snapshot.target,
+                    staging_stat=staging_stat,
+                    identity_message=f"managed target identity changed for '{action.path}'",
+                )
                 swapped = True
                 published_target = _normalized_link_target_for_path(
                     action.path, os.readlink(target_name, dir_fd=parent_fd)
