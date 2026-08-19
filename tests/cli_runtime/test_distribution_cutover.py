@@ -2187,7 +2187,7 @@ def test_s65_uninstall_dry_run_surfaces_known_obsolete_identity(tmp_path: Path, 
     assert obsolete.exists()
 
 
-def test_s70_uninstall_apply_removes_legacy_managed_scaffold_tree(
+def test_s70_uninstall_apply_blocks_unproven_legacy_scaffold_entry(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -2196,12 +2196,16 @@ def test_s70_uninstall_apply_removes_legacy_managed_scaffold_tree(
     legacy = tmp_path / "spec-dock/scripts/spec-dock-chatgpt"
     legacy.write_text("legacy managed scaffold\n", encoding="utf-8")
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "completed"
-    assert not legacy.exists()
-    assert not (tmp_path / "spec-dock/scripts").exists()
+    assert payload["status"] == "blocked"
+    assert payload["phase"] == "preflight"
+    actions = {action["path"]: action for action in payload["actions"]}
+    assert actions["spec-dock/scripts/spec-dock-chatgpt"]["category"] == "unmanaged"
+    assert actions["spec-dock/scripts/spec-dock-chatgpt"]["status"] == "preserved"
+    assert legacy.read_text(encoding="utf-8") == "legacy managed scaffold\n"
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
 def test_s70_uninstall_apply_removes_modified_managed_scaffold_tree(
@@ -2306,7 +2310,7 @@ def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marke
     assert external.read_text(encoding="utf-8") == "user-owned\n"
 
 
-def test_s70_uninstall_apply_blocks_managed_scaffold_rebind_before_external_delete(
+def test_s70_uninstall_apply_blocks_unknown_scaffold_entry_before_recursive_remove(
     tmp_path: Path,
     monkeypatch,
     capsys,
@@ -2316,22 +2320,20 @@ def test_s70_uninstall_apply_blocks_managed_scaffold_rebind_before_external_dele
     moved = tmp_path.with_name(f"{tmp_path.name}-moved-scaffold")
     sentinel = tmp_path / "spec-dock/docs/rebind-sentinel.md"
     sentinel.write_text("preserve outside repository\n", encoding="utf-8")
-    original_remove_tree = cli._remove_uninstall_tree_fd
 
-    def move_before_recursive_remove(target_root, rel_path, directory_fd, visible_fds):
-        if rel_path == Path("spec-dock/docs"):
-            (target_root / rel_path).rename(moved)
-        return original_remove_tree(target_root, rel_path, directory_fd, visible_fds)
+    def move_before_recursive_remove(*_args, **_kwargs):
+        pytest.fail("recursive removal must not start after an unknown-entry blocker")
 
     monkeypatch.setattr(cli, "_remove_uninstall_tree_fd", move_before_recursive_remove)
 
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "partial_failure"
-    assert moved.is_dir()
-    assert (moved / "rebind-sentinel.md").read_text(encoding="utf-8") == "preserve outside repository\n"
-    assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
+    assert payload["status"] == "blocked"
+    assert payload["phase"] == "preflight"
+    assert not moved.exists()
+    assert sentinel.read_text(encoding="utf-8") == "preserve outside repository\n"
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
 def test_s60_retry_marker_phase_allowlist_rejects_unknown_phase_without_writes(tmp_path: Path, capsys) -> None:
