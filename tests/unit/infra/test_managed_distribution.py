@@ -689,6 +689,100 @@ def test_i368_journal_resume_rejects_older_package(tmp_path: Path) -> None:
         store.resume(executable, package_version="1.2.2")
 
 
+def test_i368_newer_package_finishes_original_journal_then_refreshes_version(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_mark_completed = OperationJournalStore.mark_completed
+
+    def interrupt_before_completed(*_args, **_kwargs):
+        raise DistributionApplyError("injected terminal interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", interrupt_before_completed)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["package_version"] == "1.2.3"
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", original_mark_completed)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.3.0",
+    )
+
+    assert second.status == "completed", second.reason
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.3.0\n"
+    assert not journal_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-retry.json").exists()
+
+
+def test_i368_journal_rejects_rebound_workspace_parent(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.prepare(executable, package_version="1.2.3")
+    journal_bytes = store.path.read_bytes()
+    workspace.rename(target_root / "spec-dock-displaced")
+    workspace.mkdir()
+    store.path.write_bytes(journal_bytes)
+
+    with pytest.raises(DistributionApplyError, match="journal-parent-mismatch"):
+        store.write(journal)
+
+    assert store.path.read_bytes() == journal_bytes
+
+
+def test_i368_completed_journal_rejects_pending_actions(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    store.prepare(executable, package_version="1.2.3")
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    payload["status"] = "completed"
+
+    with pytest.raises(DistributionApplyError, match="journal-protocol-incompatible"):
+        managed_distribution._parse_operation_journal(
+            (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        )
+
+
 def test_i368_journal_rejects_unbound_staging_lease_without_deleting_stage(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -760,6 +854,41 @@ def test_i368_recognized_service_executes_and_finalizes_journal(tmp_path: Path) 
     assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"desired\n"
     assert (target_root / "spec-dock" / ".gitignore").read_text(encoding="utf-8") == ".agent/\n"
     assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i368_legacy_guard_remains_visible_for_the_entire_journal_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_apply = managed_distribution._apply_distribution_action
+    observed = False
+
+    def assert_recovery_authorities(*args, **kwargs):
+        nonlocal observed
+        observed = True
+        assert (target_root / "spec-dock" / ".distribution-retry.json").is_file()
+        assert (target_root / "spec-dock" / ".distribution-journal.json").is_file()
+        return original_apply(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", assert_recovery_authorities)
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert observed
+    assert not (target_root / "spec-dock" / ".distribution-retry.json").exists()
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
@@ -948,7 +1077,7 @@ def test_i368_legacy_marker_conversion_is_limited_to_prewrite_state(
         assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
-def test_i368_legacy_marker_removal_failure_rolls_back_prepared_journal(
+def test_i368_legacy_guard_removal_failure_retains_completed_targets_for_retry(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -999,7 +1128,7 @@ def test_i368_legacy_marker_removal_failure_rolls_back_prepared_journal(
     assert first.reason == "legacy-marker-unconvertible"
     assert marker_path.read_bytes() == before
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
-    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+    assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"desired\n"
 
     monkeypatch.setattr(OperationJournalStore, "remove_legacy_marker", original_remove)
     second = execute_recognized_distribution(
@@ -1350,6 +1479,11 @@ def test_i368_checkpoint_write_failure_recovers_from_exact_postcondition(tmp_pat
     journal_path = target_root / "spec-dock" / ".distribution-journal.json"
     assert first.status == "recovery_required"
     assert journal_path.is_file()
+    failed_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert {item["relative_path"] for item in failed_payload["created_parent_bindings"]} >= {
+        ".github",
+        ".github/workflows",
+    }
 
     monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
     second = execute_recognized_distribution(
@@ -1926,7 +2060,11 @@ def test_s25_historical_hard_link_is_blocked_for_mutation(tmp_path: Path) -> Non
     assert action.blocked is True
 
 
-def test_s25_current_hard_link_is_blocked_for_uninstall(tmp_path: Path) -> None:
+@pytest.mark.parametrize("operation", ["update", "init-force", "uninstall"])
+def test_s25_current_hard_link_is_blocked_for_mutation(
+    tmp_path: Path,
+    operation: managed_distribution.DistributionOperation,
+) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"current\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())
     target_root = tmp_path / "consumer"
@@ -1940,7 +2078,7 @@ def test_s25_current_hard_link_is_blocked_for_uninstall(tmp_path: Path) -> None:
         install_root,
         manifest_path=manifest_path,
         target_root=target_root,
-        operation="uninstall",
+        operation=operation,
     )
 
     action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
@@ -3600,7 +3738,7 @@ def test_s30_apply_preserves_unknown_stage_like_sibling(tmp_path: Path) -> None:
     assert unknown.read_bytes() == b"current\n"
 
 
-def test_s30_apply_preserves_unrecorded_exact_stage_collision(tmp_path: Path) -> None:
+def test_s30_apply_ignores_and_preserves_unrecorded_legacy_stage_collision(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"current\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())
     target_root = tmp_path / "consumer"
@@ -3630,14 +3768,12 @@ def test_s30_apply_preserves_unrecorded_exact_stage_collision(tmp_path: Path) ->
         action.path,
         next(item.identity for item in plan.current_assets if item.path == action.path),
     )
-    with pytest.raises(DistributionApplyError, match="managed target apply failed"):
-        apply_distribution_plan(plan, allow_stale_stage_cleanup=True)
-    with pytest.raises(DistributionApplyError, match="managed target apply failed"):
-        apply_distribution_plan(plan, allow_stale_stage_cleanup=True)
+    assert apply_distribution_plan(plan, allow_stale_stage_cleanup=True).status == "complete"
 
     after = stage.lstat()
     assert (after.st_dev, after.st_ino, after.st_ctime_ns) == (before.st_dev, before.st_ino, before.st_ctime_ns)
     assert stage.read_bytes() == b"current\n"
+    assert (target_root / action.path).read_bytes() == b"current\n"
 
 
 def test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support(
