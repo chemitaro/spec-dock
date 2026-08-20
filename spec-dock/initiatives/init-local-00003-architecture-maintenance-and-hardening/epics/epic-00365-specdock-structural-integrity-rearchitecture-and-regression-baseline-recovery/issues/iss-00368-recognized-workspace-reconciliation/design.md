@@ -4,7 +4,7 @@ ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
 状態: "planned"
-最終更新: "2026-08-18"
+最終更新: "2026-08-21"
 依存: ["requirement.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -57,6 +57,14 @@ RecognizedIntent = update | init-force
 ```
 
 `init-force` は overwrite authority ではなく、recognized workspace で installer init semantics を選ぶ intent とする。unknown/modified asset の ownership blocker を解除しない。
+
+### Concurrency authority boundary
+
+recognized operation は target root の no-follow identity に束縛した root operation lock を acquire してから assessment、journal、apply、post-verify、terminal cleanup を実行する。同じ lock contract に協調する `update` / `init --force` / uninstall writer は operation 全体で直列化する。
+
+lock は advisory であり、arbitrary same-UID process に対する kernel namespace capability ではない。このため kernel subset は各 mutation 直前に held descriptor、exact lease、content/link identity、created-parent closed set を再検証し、そこで観測した replacement、rebind、unknown child を preserve-and-block する。一方、非協調 process が最後の検証後かつ単一 `unlinkat` / pathname rename syscall 前だけ private recovery name を差し替える挙動は contract 外とする。Darwin/POSIX の公開 API には expected inode または held file descriptor を条件に pathname を削除する primitive がなく、最後の exact witness を残さず有限完了する protocol と arbitrary same-UID mutation exclusion は同時に提供しない。
+
+この境界は unknown/modified managed target の authority を拡張しない。canonical target、stage、quarantine、created parent に対する既存の再検証と fail-closed recovery は維持し、lock 非協調 writer を自動受理または cleanup authority へ昇格しない。
 
 ### Assessment input
 
@@ -216,6 +224,7 @@ fresh-only flow、uninstall/purge behavior、package/platform final parity は�
 - journal lifecycle tests: prepared/executing/verifying/completed、checkpoint failure、atomic publish failure
 - resume tests: same-plan convergence、root/intent/plan/protocol/SHA mismatch
 - kernel negative tests: parent/root rebind、target appearance、provider mutation、staging collision、unknown stage sibling
+- concurrency tests: root operation lock に協調する concurrent invocation の直列化、mutation-boundary replacement / unknown-child interposition の preserve-and-block
 - CLI tests: recognized update/init-force success/error、unmanaged preservation、no prompt/backup on no-write path、current output/exit、および fresh entrypoint matrix が D1 で変化しないこと
 - absence tests: recognized flow から `scaffold_applier`、legacy phase writer、plan outside mutation への dependency がない
 
@@ -225,3 +234,4 @@ fresh-only flow、uninstall/purge behavior、package/platform final parity は�
 - digest canonicalization の誤り: stable serialization fixture と order permutation negative test を作る。
 - marker conversion が authority を推測する risk: exact required fields と failure reason を code/test/docs で同時固定する。
 - current behavior drift: existing tests を先に characterization し、新実装の都合で unknown preservation expectation を弱めない。
+- advisory lock 外の arbitrary same-UID mutationをkernel CASとして誤って約束するrisk: public Darwin/POSIX surfaceのpathname delete制約を明記し、保証対象をroot operation lock協調writerとmutation境界で観測可能な変更に固定する。
