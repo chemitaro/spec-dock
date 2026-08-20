@@ -3,7 +3,7 @@
 ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
-最終更新: "2026-08-20"
+最終更新: "2026-08-21"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -25,6 +25,10 @@ ID: "iss-00368"
 - Strict successor remediation で assessment と canonical plan の authority 一致を発行前に検証し、legacy marker 変換失敗時の prepared journal rollback、terminal journal の digest/action contract 再検証、recognized flow 全体の descriptor-bound root と visible identity 検証を追加した。
 - retained-skill SHA failure は fixed point と Strict candidate の expected/actual 値がそれぞれ同一であることを `artifacts/retained-skill-baseline-comparison.json` に記録し、Issue 368 による回帰ではないことを再現可能にした。
 - marker / journal の cleanup は、root operation lock 内で推測不能な nonce を持つ private quarantine 名へ no-replace rename し、移動後の held-fd identity が一致した場合だけ削除する。並行置換を検出した場合は置換 entry を元の予約パスへ復元して fail-closed にする。
+- concurrency authority は root operation lock に協調する SpecDock writer と各 mutation 境界で観測可能な外部変更に固定した。advisory lock を無視する同一 UID process が最後の検証と単一 pathname syscall の間だけ private recovery name を差し替える挙動は保証対象外とし、Darwin/POSIX に存在しない delete-by-inode を暗黙の契約にしない。既存の exact lease、held descriptor、content/link identity、created-parent closed-set 再検証は維持する。
+- failed-stage と predecessor cleanup は GC lease を `(action path, private name)` 単位で併存させ、predecessor exact、destination reserved/exact、retained-only transition を journal に write-ahead 記録する。最後の retained witness も fresh nonce へ可逆 rename してから identity、link topology、canonical successor、created-parent inventory を再証明し、検証境界での replacement と unknown child は削除せず復元または保持する。
+- digestless schema-2 prepared journal は guard が保持する exact inherited lease と plan/action tuple が一致する場合だけ initial digest を先行 anchor して再開する。旧 roleless backup state は prior implementation が作った derived private names、device/inode/type/link topology、contentまたはsymlink target、action preconditionを再証明し、既知のlink-count transitionでstaleになったctimeだけを限定互換としてexplicit roleへ昇格する。
+- pending create/adoptを含む recovery は action 実行前に全 GC role を解決し、unknown siblingやunleased private nameがある状態では target write 0 で停止する。regular/symlink のreservation、rename、exact promotion、first unlink、retained transition各停止点から同一plan retryが収束するcrash matrixを追加した。
 - quarantine rename は削除前に directory fsync し、削除または事前 fsync が失敗した場合は held identity を canonical journal / marker path へ no-replace restore する。失敗を返した後も次回 retry が同じ recovery authority を再読できる。
 - Strict g6 remediation で missing parent も journal precondition に保持し、resume 前に出現した parent collision を write 前に拒否するようにした。journal package compatibility は exact protocol / contract / plan を維持した forward-only version とし、downgrade は拒否する。
 - staging lease は operation ID に束縛した digest と action/known-stage contract の両方を検証し、journal へ追加された未証明 lease から cleanup authority を得ない。active fallback の refresh authority は有効な `.meta.json` entry または layer 固有の exact `active-none` target に限定した。
@@ -96,6 +100,11 @@ exact candidate の SHA と合否の正本は、当該 report 自身を request 
 - [x] `uv run pytest -q` — 1115 passed、1053 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
+- [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — multi-name GC、digestless/roleless compatibility、final retained witness interpositionを含む279 passed
+- [x] 新規P1 focused selection — 15 passed、264 deselected
+- [x] `uv run pytest --run-full-regression -q tests/cli_runtime/test_distribution_cutover.py::test_s60_distribution_operations_share_an_exclusive_root_lock` — test本体1 passed。focused selectionに対する既知ledger node欠落advisoryによりprocess exit 3
+- [x] `make lint` — ruff check / format check / mypy 172 source files が成功
+- [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - Strict の最終合否は Git-ignored Workbench の wrapper-owned state / result と exact-SHA test manifest / logs に記録し、合否記録のために認証後の candidate を変更しない。
 
 ## Residual Risks / Follow-ups

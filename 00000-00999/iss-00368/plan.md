@@ -4,7 +4,7 @@ ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
 状態: "planned"
-最終更新: "2026-08-18"
+最終更新: "2026-08-21"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -101,6 +101,7 @@ Exit: assessment test は filesystem write を観測せず、plan digest fixture
 - stage、exchange、prune quarantine、missing parentのnamespace transitionをwrite-ahead reservationとexact successor leaseで再開可能にする。
 - recognized pre-service read set を descriptor-bound private snapshot へ限定し、unsafe preserved boundary と capture 後の rebind を write-zero で拒否する。
 - recovered created-parent binding の内容を action checkpoint / exact lease の closed set で再証明し、journal内digestだけで ownership authority を得られないようにする。
+- recognized mutation と terminal cleanup を root operation lock 内に保ち、協調する SpecDock writer を直列化する。各 mutation 境界の exact identity / content / link topology / created-parent inventory 再検証は維持し、advisory lock を無視する同一 UID process の最終 pathname syscall 間差し替えは kernel CAS の保証対象に含めない。
 - checkpoint は atomic publish 後の re-observation を通して単調更新する。
 
 Negative tests:
@@ -112,6 +113,8 @@ Negative tests:
 - hardlink/symlink swap
 - staging write/publish/cleanup failure
 - checkpoint write failure後の pre/post ambiguous state
+- root operation lock に協調する concurrent invocation の直列化
+- final cleanup を含む mutation-boundary replacement / unknown-child interposition の preserve-and-block
 
 Exit: same-process failure と simulated crash state の双方で journal が安全に残る。
 
@@ -222,10 +225,11 @@ conversion前のlegacy markerは失敗時に書き換えない。conversion成�
 
 ## exit / handoff
 
-- I368-R01〜R10とacceptance 1〜10がtest/evidenceに結び付く。
+- I368-R01〜R11とacceptance 1〜11がtest/evidenceに結び付く。
 - update/init-forceのlegacy execution routeが削除済み。
 - current safety testsを弱めず、新negative/resume testsが成功。
 - current public command/flag/text/exit behaviorが維持。
 - new journal protocol、exact-SHA rule、legacy conversion conditionがdocsと一致。
+- concurrency contract が root operation lock 協調 writer と mutation-boundary observation に固定され、非協調 same-UID writer を delete-by-inode 相当として誤って保証しない。
 - D2へ、fresh intentを追加できるstable Contract/Assessment/Kernel/Journal/Result seamを引き渡す。
 - residual riskはfresh-only scaffold semantics、deprovision/purge action、final Linux/macOS/package parityであり、D2〜D5へ明示的に渡す。
