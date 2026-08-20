@@ -1173,7 +1173,6 @@ def admit_distribution_operation(
             or distribution_marker.operation != operation
             or distribution_marker.target_root != root_identity
             or distribution_marker.last_completed_phase != "preflight-complete"
-            or distribution_marker.stage_ownership
             or not _journal_package_is_compatible(distribution_marker.package_version, package_version)
         ):
             _admission_block("dual-marker", "distribution recovery states cannot coexist")
@@ -3081,6 +3080,7 @@ class OperationJournalStore:
                     if not parent.exists
                 })
             ),
+            staging_leases=guard.stage_ownership,
         )
         return self._write(journal, require_absent=True)
 
@@ -3090,6 +3090,7 @@ class OperationJournalStore:
         *,
         package_version: str,
         replace_marker: DistributionRetryMarker | None = None,
+        stage_ownership: tuple[DistributionStageOwnership, ...] = (),
     ) -> DistributionRetryMarker:
         """Publish an old-installer-visible guard before the new journal exists."""
 
@@ -3106,6 +3107,7 @@ class OperationJournalStore:
             operation_id=operation_id,
             contract_identity=plan.contract_identity,
             plan_digest=plan.plan_digest,
+            stage_ownership=stage_ownership,
         )
         payload: dict[str, object] = {
             "schema_version": _DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION,
@@ -3117,7 +3119,17 @@ class OperationJournalStore:
             },
             "last_completed_phase": marker.last_completed_phase,
             "purpose": marker.purpose,
-            "stage_ownership": [],
+            "stage_ownership": [
+                {
+                    "path": lease.path,
+                    "stage_name": lease.stage_name,
+                    "device": lease.device,
+                    "inode": lease.inode,
+                    "ctime_ns": lease.ctime_ns,
+                    "file_type": lease.file_type,
+                }
+                for lease in stage_ownership
+            ],
             "operation_id": marker.operation_id,
             "contract_identity": marker.contract_identity,
             "plan_digest": marker.plan_digest,
@@ -3405,6 +3417,12 @@ class OperationJournalStore:
                             continue
                         raise DistributionApplyError("managed staging cleanup failed") from exc
                     target_identity = _distribution_stage_identity(parent_chain[-1], target_name, lease.path)
+                    if (
+                        record.action == "adopt"
+                        and target_info.st_nlink == 1
+                        and record.postcondition.get("identity") == _distribution_identity_payload(target_identity)
+                    ):
+                        continue
                     if (
                         target_info.st_dev != lease.device
                         or target_info.st_ino != lease.inode
@@ -4211,7 +4229,7 @@ def _validated_legacy_stage_leases(
         if (
             key in seen
             or action is None
-            or action.action not in {"create", "upgrade", "prune"}
+            or action.action not in {"create", "adopt", "upgrade", "prune"}
             or snapshot is None
             or expected is None
             or not any(
@@ -4296,7 +4314,6 @@ def execute_recognized_distribution(
                 or guard_marker.package_version != journal_seed.package_version
                 or guard_marker.target_root != journal_seed.root_identity
                 or guard_marker.last_completed_phase != "preflight-complete"
-                or guard_marker.stage_ownership
             ):
                 raise DistributionApplyError("dual-recovery-state")
             if guard_marker is not None:
@@ -4368,7 +4385,6 @@ def execute_recognized_distribution(
                 or guard_marker.package_version != journal_seed.package_version
                 or guard_marker.target_root != journal_seed.root_identity
                 or guard_marker.last_completed_phase != "preflight-complete"
-                or guard_marker.stage_ownership
             )
         ):
             raise DistributionApplyError("dual-recovery-state")
@@ -4386,12 +4402,12 @@ def execute_recognized_distribution(
                     raise DistributionApplyError("legacy-marker-unconvertible")
                 if guard_marker.purpose == _DISTRIBUTION_JOURNAL_GUARD_PURPOSE:
                     if (
-                        guard_marker.stage_ownership
-                        or guard_marker.operation_id is None
+                        guard_marker.operation_id is None
                         or guard_marker.contract_identity != executable.contract_identity
                         or guard_marker.plan_digest != executable.plan_digest
                     ):
                         raise DistributionApplyError("forward-guard-plan-mismatch")
+                    _validated_legacy_stage_leases(executable, guard_marker, target_root)
                     store.bind_forward_guard(guard_marker)
                     journal = store.prepare(executable, package_version=guard_marker.package_version)
                 else:
@@ -4400,14 +4416,10 @@ def execute_recognized_distribution(
                         executable,
                         package_version=package_version,
                         replace_marker=guard_marker,
+                        stage_ownership=legacy_stage_leases,
                     )
                     store.bind_forward_guard(guard_marker)
                     journal = store.prepare(executable, package_version=package_version)
-                    if legacy_stage_leases:
-                        journal = store.write(
-                            replace(journal, staging_leases=legacy_stage_leases),
-                            predecessor=journal,
-                        )
             else:
                 assert journal_seed is not None
                 journal = store.load_for_assessment(
@@ -5768,6 +5780,7 @@ def _apply_regular_action(
                     identity_message=f"managed target identity changed for '{path}'",
                 )
                 swapped = True
+                staged_successor = os.fstat(staging_fd)
 
                 published_fd = os.open(
                     target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd
@@ -5775,7 +5788,8 @@ def _apply_regular_action(
                 try:
                     published = os.fstat(published_fd)
                     if (
-                        published.st_nlink != 1
+                        _stat_identity_tuple(published) != _stat_identity_tuple(staged_successor)
+                        or published.st_nlink != 1
                         or stat.S_IMODE(published.st_mode) != source_mode
                         or hashlib.sha256(_read_fd_bytes(published_fd)).hexdigest() != expected.sha256
                     ):
@@ -5812,7 +5826,7 @@ def _apply_regular_action(
                                 strict=True,
                             )
                 else:
-                    published_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+                    published_successor = staged_successor
                     os.close(staging_fd)
                     try:
                         old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -5878,6 +5892,9 @@ def _apply_regular_action(
                                             raise retry_cleanup_error from record_error
                                         raise cleanup_error from record_error
                                     raise
+                            current_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+                            if _stat_identity_tuple(current_successor) != _stat_identity_tuple(published_successor):
+                                raise DistributionApplyError(f"managed target identity changed for '{path}'")
                             _remove_distribution_stage_if_owned(
                                 parent_fd,
                                 staging_name,
@@ -6107,7 +6124,17 @@ def _apply_symlink_action(
                             strict=True,
                         )
                 else:
-                    published_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+                    current_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+                    current_target = _normalized_link_target_for_path(
+                        action.path,
+                        os.readlink(target_name, dir_fd=parent_fd),
+                    )
+                    if (
+                        _stat_structure_tuple(current_successor) != _stat_structure_tuple(staging_stat)
+                        or current_target != expected_target
+                    ):
+                        raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                    published_successor = current_successor
                     try:
                         old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
                         old_target = (
@@ -6168,6 +6195,11 @@ def _apply_symlink_action(
                                             raise retry_cleanup_error from record_error
                                         raise cleanup_error from record_error
                                     raise
+                            current_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+                            if _stat_identity_tuple(current_successor) != _stat_identity_tuple(published_successor):
+                                raise DistributionApplyError(
+                                    f"managed target identity changed for '{action.path}'"
+                                )
                             _remove_distribution_stage_if_owned(
                                 parent_fd,
                                 staging_name,
