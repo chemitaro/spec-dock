@@ -46,12 +46,19 @@ _full_regression_ledger_errors: list[str] = []
 def _normalize_failure_message(message: str, repository: Path) -> str:
     message = message.split(" +  where ", 1)[0]
     message = message.replace(str(repository), "<repo>")
+    message = re.sub(r"/tmp/tmp[^/`'\"\\ ]*", "<tmp>", message)
     message = re.sub(
         r"/(?:private/)?var/folders/[^/]+/[^/]+/T/tmp[^/`'\"\\ ]*",
         "<tmp>",
         message,
     )
     message = re.sub(r"/(?:private/)?var/folders/[^'\" ,]+", "<tmp-runtime-path>", message)
+    message = re.sub(
+        r"(\n\s*Right contains one more item:[^\n]*)\n(?:\s*\n)?\s*Full diff:.*\Z",
+        r"\1\n  Use -v to get more diff",
+        message,
+        flags=re.DOTALL,
+    )
     message = message.replace("<repo>/.venv/bin/python3", "<python>")
     message = message.replace("<repo>/.venv/bin/python", "<python>")
     return " ".join(message.split())

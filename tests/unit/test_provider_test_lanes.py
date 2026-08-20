@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from tests.conftest import _normalize_failure_message
+
 REQUIRED_FAST_NODE_IDS = frozenset({
     "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_legacy_flag_reports_parser_error",
     "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_by_id_succeeds_through_runtime_subprocess",
@@ -19,6 +21,38 @@ REQUIRED_FAST_NODE_IDS = frozenset({
 })
 
 POLICY_SKIP_HINT = "--run-full-regression"
+
+
+def test_full_regression_signature_normalization_is_platform_independent() -> None:
+    repository = Path("/repo")
+    macos_runtime_error = (
+        "RuntimeError: retry `/private/var/folders/aa/bb/T/tmpabc/spec-dock/scripts/spec-dock update`."
+    )
+    linux_runtime_error = "RuntimeError: retry `/tmp/tmpxyz/spec-dock/scripts/spec-dock update`."
+    compact_assertion = (
+        "AssertionError: assert [] == [('/repo', 10000)]\n"
+        "  \n"
+        "  Right contains one more item: ('/repo', 10000)\n"
+        "  Use -v to get more diff"
+    )
+    expanded_assertion = (
+        "AssertionError: assert [] == [('/repo', 10000)]\n"
+        "  \n"
+        "  Right contains one more item: ('/repo', 10000)\n"
+        "  \n"
+        "  Full diff:\n"
+        "  + []\n"
+        "  - [('/repo', 10000)]"
+    )
+
+    assert _normalize_failure_message(macos_runtime_error, repository) == _normalize_failure_message(
+        linux_runtime_error,
+        repository,
+    )
+    assert _normalize_failure_message(compact_assertion, repository) == _normalize_failure_message(
+        expanded_assertion,
+        repository,
+    )
 
 
 def _repo_root() -> Path:
