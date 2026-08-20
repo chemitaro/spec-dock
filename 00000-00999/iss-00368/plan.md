@@ -99,6 +99,8 @@ Exit: assessment test は filesystem write を観測せず、plan digest fixture
 - exact pre-action SHA と expected post-action identity を action record に入れる。
 - descriptor-bound create/replace/remove/mode/staging/journal operation を kernel に集約する。
 - stage、exchange、prune quarantine、missing parentのnamespace transitionをwrite-ahead reservationとexact successor leaseで再開可能にする。
+- recognized pre-service read set を descriptor-bound private snapshot へ限定し、unsafe preserved boundary と capture 後の rebind を write-zero で拒否する。
+- recovered created-parent binding の内容を action checkpoint / exact lease の closed set で再証明し、journal内digestだけで ownership authority を得られないようにする。
 - checkpoint は atomic publish 後の re-observation を通して単調更新する。
 
 Negative tests:

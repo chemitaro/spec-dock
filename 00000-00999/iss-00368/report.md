@@ -46,7 +46,7 @@ ID: "iss-00368"
 - Strict g15 remediation では、journal の読取時 identity と bytes digest を非直列化 evidence として保持し、全 journal transition の publish 直前に predecessor の exact identity / bytes を再検証する。stage file も held descriptor に束縛し、stage・canonical journal・forward guard が同内容へ差し替えられても atomic rollback 後に fail closed とする。
 - journal 再開時は schema-2 forward-only guard の exact identity / digest を admission と全 publish 境界で再検証し、guard 欠落、schema-1 downgrade、同内容差し替え、journal publish 直前の置換を `dual-recovery-state` または recovery-required として mutation 前に拒否する。
 - `uninstall --apply --keep-specs` は Epic 365 の固定点契約どおり、管理対象ルート `spec-dock/{docs,templates,scripts,system}` をルート単位で再帰削除する。管理ルート内の legacy / modified / unknown entry はルートとともに削除し、Strict g13 で導入された個別ファイル preserve-and-block 退行を解消した。
-- full-regression の pre-slow 診断は、実装 anchor 上の JUnit failure node ID と正規化 signature 27件を ledger と実行時照合してから exit 0 を返す verifier で実施した。controller の authoritative slow profile が実行する `pytest --run-full-regression -q` 自体にも同一 ledger guard を組み込み、全既知 node を収集した suite で node ID、signature、setup/teardown error が不一致なら非許可の exit 3 とする。検証中に発見した本文長 `37` と時刻文字列の部分一致による既存 privacy test の誤検知も、曖昧な短数値 sentinel を除去して安定化した。
+- full-regression の pre-slow 診断は、実装 anchor 上の JUnit failure node ID と正規化 signature 27件を ledger と実行時照合してから exit 0 を返す verifier で実施した。exact candidate の slow lane が実行する `pytest --run-full-regression -q` 自体にも同一 ledger guard を組み込み、全既知 node を収集した suite で node ID、signature、setup/teardown error が不一致なら非許可の exit 3 とする。検証中に発見した本文長 `37` と時刻文字列の部分一致による既存 privacy test の誤検知も、曖昧な短数値 sentinel を除去して安定化した。
 - `chatgpt-final-quality-gate-strict-new` の exact-SHA review で検出した recovery entry の authority 再取得を修正した。journal transition は forward guard の held descriptor、identity、bytes digest を publish 前後で検証し、journal / guard の successor evidence は公開に用いた stage descriptor から構築して canonical name が同じ inode を指すことを返却直前に確認する。
 - journal / guard finalization は caller が保持する source snapshot と digest を deletion authority とし、quarantine rename 前に held descriptor の identity と bytes を照合する。同内容・異内容の並行置換はいずれも削除せず fail closed とし、journal publish 後に guard が置換された場合は current operation が公開した exact journal inode だけを rollback する。
 - authoritative full-regression ledger guard は `--run-full-regression` 指定時に常時有効化し、ledger の欠落・不正、および削除・rename・focused selection による expected node 欠落を mismatch として exit 3 にする。expected node が collection に揃わないことを guard 無効化の条件にはしない。
@@ -58,11 +58,14 @@ ID: "iss-00368"
 - Strict successor の guard-only remediationで、journal不在のschema-2 forward guardはlegacy markerとして再発行せず、既存operation/contract/planと再構成planのexact一致時だけ同じguardからjournalを発行する。terminal cleanupはguard削除の成功後までcompleted journalを保持し、guard削除後のcompleted journal-only状態は対象を再適用せずcleanupのみ完了する。
 - `chatgpt-final-quality-gate-strict-new` の次回 remediation では、exact legacy stage leaseをlegacy marker置換と同時にschema-2 guardへ保存し、初回journalがそのleaseを継承するようにした。これによりguard publish直後の停止でもcleanup authorityを保持する。旧版のpost-swap状態はdesired canonicalがexact postconditionを満たす`adopt`に限ってdisplaced predecessor leaseをcleanupし、それ以外は変換しない。
 - regular/symlink exchange後のsuccessor leaseは、公開前から保持したstage inodeとの同一性をcanonicalで確認して構築する。displaced predecessor削除直前にもcanonicalを同じexact leaseへ再照合し、successor記録後のsame-content/different-inode置換ではpredecessorを保持してfail closedとする。
-- `1d62f3221a5a55add1c592076de2688c2f0b4a89` は旧 campaign の実装 anchor であり、その後の Strict remediation で実装とテストを変更したため最終 candidate anchor ではない。最終 exact candidate の SHA と同一 SHA 上の review/test 合否は Strict check attestation を正本とする。
+- exact successor lease は recovery 中も displaced predecessor lease へ置換せず cleanup 完了まで保持する。regular/symlink の即時 cleanup と resumed checkpoint は同じ helper 内で canonical successor のdevice/inode/ctime/type/link count/content identityとstage predecessorのexact preconditionを再検証し、mismatchではunlinkとcheckpoint更新を行わない。
+- recognized pre-service の active fallback 読取は bound root から no-follow capture した private snapshot に限定する。`.agent` / `.work` / `active` / `initiatives` のsymlink boundary、multi-link retained file、capture後rebindはoperation service開始前にwrite-zeroで拒否する。
+- recovery 時の `created_parent_bindings` はhintとして再検証し、originally-missing parent内をaction checkpoint、exact canonical identity、current stage leaseで説明できるclosed setに限定する。self-rehashed bindingがunknown user siblingをoperation-ownedへ昇格させる経路を拒否する。
+- `1d62f3221a5a55add1c592076de2688c2f0b4a89` は旧 campaign の実装 anchor であり、その後の Strict remediation で実装とテストを変更したため最終 candidate anchor ではない。最終 exact candidate の SHA と同一 SHA 上の review/test 合否は、`chatgpt-final-quality-gate-strict-new` が所有する Workbench の state / result / test manifest を正本とする。旧 campaign の ledger、certificate、回数上限は移植しない。
 
 ## Verification
 
-exact candidate の SHA と合否の正本は、当該 report 自身を含む `review_head_sha` に対して生成される Strict controller の candidate manifest / check attestation / certificate とする。report 内へ自己参照的な候補 SHA を固定せず、以下の手動確認は controller 実行前の診断証拠として区別する。
+exact candidate の SHA と合否の正本は、当該 report 自身を request context に含めた `chatgpt-final-quality-gate-strict-new` の wrapper-owned `quality-gate-state.json` / `quality-gate-result.json` と、同一 SHA の全 required command を保存する `test-results/manifest.json` および deterministic logs とする。これらは Git-ignored Workbench に保持し、report 内へ自己参照的な候補 SHA を固定しない。以下の手動確認は exact candidate 実行前の診断証拠として区別する。
 
 - [x] `make lint` — successor 候補 commit 前の診断で ruff check / format check / mypy が成功
 - [x] `uv run pytest -q tests/unit/infra/test_managed_distribution.py` — 156 passed
@@ -93,7 +96,7 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] `uv run pytest -q` — 1115 passed、1053 policy-skipped
 - [x] `./spec-dock/scripts/spec-dock validate` — `nodes=227`
 - [x] `git diff --check` — 成功
-- Strict の最終合否は repository 外の append-only campaign ledger と certificate にのみ記録し、合否記録のために認証後の candidate を変更しない。
+- Strict の最終合否は Git-ignored Workbench の wrapper-owned state / result と exact-SHA test manifest / logs に記録し、合否記録のために認証後の candidate を変更しない。
 
 ## Residual Risks / Follow-ups
 

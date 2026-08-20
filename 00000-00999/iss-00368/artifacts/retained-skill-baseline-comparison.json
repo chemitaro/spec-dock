@@ -3,7 +3,7 @@
   "kind": "issue368_retained_skill_baseline_comparison",
   "recorded_at": "2026-08-18T18:02:31Z",
   "fixed_point_sha": "7588d54114a2b8be7661353952f65741169320bd",
-  "candidate_selector": "review_head_sha from the Strict candidate manifest that includes this artifact",
+  "candidate_selector": "reviewed_sha from the wrapper-owned chatgpt-final-quality-gate-strict-new result whose request includes this artifact",
   "test": "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source",
   "path": "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md",
   "expected_sha256": {
