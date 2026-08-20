@@ -321,6 +321,8 @@ class DistributionStageOwnership:
         "gc-reserved",
         "gc-exact",
     ] = "stage"
+    gc_predecessor_name: str | None = None
+    gc_ordinal: int | None = None
 
 
 @dataclass(frozen=True)
@@ -2385,6 +2387,14 @@ def _staging_leases_payload(journal: OperationJournal) -> list[dict[str, object]
             "ctime_ns": lease.ctime_ns,
             "file_type": lease.file_type,
             **({"role": lease.role} if lease.role != "stage" else {}),
+            **(
+                {
+                    "gc_predecessor_name": lease.gc_predecessor_name,
+                    "gc_ordinal": lease.gc_ordinal,
+                }
+                if lease.gc_predecessor_name is not None
+                else {}
+            ),
         }
         for lease in journal.staging_leases
     ]
@@ -2564,9 +2574,17 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     leases: list[DistributionStageOwnership] = []
     for item in raw_leases:
         lease_fields = {"path", "stage_name", "device", "inode", "ctime_ns", "file_type"}
+        transition_fields = {"gc_predecessor_name", "gc_ordinal"}
+        item_fields = frozenset(item) if isinstance(item, dict) else frozenset()
+        has_transition = item_fields == frozenset(lease_fields | {"role"} | transition_fields)
         if (
             not isinstance(item, dict)
-            or frozenset(item) not in {frozenset(lease_fields), frozenset(lease_fields | {"role"})}
+            or item_fields
+            not in {
+                frozenset(lease_fields),
+                frozenset(lease_fields | {"role"}),
+                frozenset(lease_fields | {"role"} | transition_fields),
+            }
             or not isinstance(item["path"], str)
             or not isinstance(item["stage_name"], str)
             or PurePosixPath(item["stage_name"]).name != item["stage_name"]
@@ -2587,6 +2605,18 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
                 "gc-reserved",
                 "gc-exact",
             }
+            or (
+                has_transition
+                and (
+                    item.get("role") not in {"gc-reserved", "gc-exact", "backup-only"}
+                    or not isinstance(item["gc_predecessor_name"], str)
+                    or PurePosixPath(item["gc_predecessor_name"]).name != item["gc_predecessor_name"]
+                    or item["gc_predecessor_name"] == item["stage_name"]
+                    or not isinstance(item["gc_ordinal"], int)
+                    or isinstance(item["gc_ordinal"], bool)
+                    or item["gc_ordinal"] not in {1, 2, 3}
+                )
+            )
         ):
             raise DistributionApplyError("journal-protocol-incompatible")
         leases.append(
@@ -2601,6 +2631,8 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
                     "role",
                     "predecessor-quarantine" if item["stage_name"].endswith(".remove") else "stage",
                 ),
+                gc_predecessor_name=(item["gc_predecessor_name"] if has_transition else None),
+                gc_ordinal=(item["gc_ordinal"] if has_transition else None),
             )
         )
     raw_bindings = payload["created_parent_bindings"]
@@ -3576,6 +3608,7 @@ class OperationJournalStore:
 
     def resume(self, plan: ExecutableMutationPlan, *, package_version: str) -> OperationJournal:
         journal = self._read(plan.root_identity)
+        _assert_gc_transition_graph(journal)
         current_guard = _read_distribution_retry_marker(self.target_root)
         if current_guard is None or current_guard.purpose != _DISTRIBUTION_JOURNAL_GUARD_PURPOSE:
             raise DistributionApplyError("dual-recovery-state")
@@ -3620,6 +3653,7 @@ class OperationJournalStore:
         require_guard: bool = True,
     ) -> OperationJournal:
         journal = self._read(assessment.root_identity)
+        _assert_gc_transition_graph(journal)
         if require_guard:
             current_guard = _read_distribution_retry_marker(self.target_root)
             if current_guard is None or current_guard.purpose != _DISTRIBUTION_JOURNAL_GUARD_PURPOSE:
@@ -4413,33 +4447,60 @@ class OperationJournalStore:
     def _resume_gc_cleanup(self, journal: OperationJournal) -> OperationJournal:
         """Finish journal-owned private-name GC before any target action resumes."""
 
+        _assert_gc_transition_graph(journal)
         active = journal
         records = {record.path: record for record in active.actions}
-        gc_leases = tuple(
-            sorted(
-                (lease for lease in active.staging_leases if lease.role in {"gc-reserved", "gc-exact"}),
-                key=lambda lease: (lease.path, 0 if lease.role == "gc-exact" else 1, lease.stage_name),
+        gc_leases = _ordered_gc_transition_leases(active)
+        for stale_gc_lease in gc_leases:
+            current_gc = tuple(
+                lease
+                for lease in active.staging_leases
+                if lease.path == stale_gc_lease.path
+                and lease.stage_name == stale_gc_lease.stage_name
+                and lease.role in {"gc-reserved", "gc-exact"}
             )
-        )
-        for gc_lease in gc_leases:
+            if not current_gc:
+                continue
+            if len(current_gc) != 1:
+                raise DistributionApplyError("managed staging cleanup failed")
+            gc_lease = current_gc[0]
             record = records.get(gc_lease.path)
             if record is None:
                 raise DistributionApplyError("managed staging cleanup failed")
-            original_name = gc_lease.stage_name.rsplit(".", 2)[0]
+            original_name = gc_lease.gc_predecessor_name or gc_lease.stage_name.rsplit(".", 2)[0]
             sources = tuple(
                 lease
                 for lease in active.staging_leases
-                if lease.path == gc_lease.path
-                and lease.stage_name == original_name
-                and lease.role not in {"gc-reserved", "gc-exact"}
+                if lease.path == gc_lease.path and lease.stage_name == original_name
             )
             source_candidates = tuple(lease for lease in sources if lease.role == "stage") or sources
+            if not source_candidates and gc_lease.role == "gc-exact" and gc_lease.gc_predecessor_name is not None:
+                source_candidates = (gc_lease,)
+            backup_sources = _explicit_gc_backup_sources(active, gc_lease)
+            if len(backup_sources) > 1:
+                raise DistributionApplyError("managed staging cleanup failed")
+            backup_source = backup_sources[0] if backup_sources else None
+            if (
+                not source_candidates
+                and gc_lease.gc_ordinal == 2
+                and gc_lease.gc_predecessor_name is not None
+                and backup_source is not None
+            ):
+                source_candidates = (backup_source,)
             if len(source_candidates) != 1:
                 raise DistributionApplyError("managed staging cleanup failed")
             source = source_candidates[0]
-            backup_source = next(
-                (lease for lease in sources if lease.role in {"backup-reserved", "backup-dual"}),
-                None,
+            parallel_predecessor_name = (
+                backup_source.stage_name
+                if backup_source is not None
+                else next(
+                    (
+                        _distribution_quarantine_backup_name(lease.stage_name)
+                        for lease in active.staging_leases
+                        if lease.path == gc_lease.path and lease.role == "predecessor-quarantine"
+                    ),
+                    None,
+                )
             )
             successor_gc = next(
                 (
@@ -4448,9 +4509,28 @@ class OperationJournalStore:
                     if lease.path == gc_lease.path
                     and lease.stage_name != gc_lease.stage_name
                     and lease.role in {"gc-reserved", "gc-exact"}
+                    and lease.gc_predecessor_name == gc_lease.stage_name
+                    and lease.gc_ordinal is not None
+                    and gc_lease.gc_ordinal is not None
+                    and lease.gc_ordinal == gc_lease.gc_ordinal + 1
                 ),
                 None,
             )
+            parallel_gc = next(
+                (
+                    lease
+                    for lease in active.staging_leases
+                    if lease.path == gc_lease.path
+                    and lease.stage_name != gc_lease.stage_name
+                    and lease.role in {"gc-reserved", "gc-exact", "backup-only"}
+                    and gc_lease.gc_ordinal == 2
+                    and lease.gc_ordinal == 3
+                    and parallel_predecessor_name is not None
+                    and lease.gc_predecessor_name == parallel_predecessor_name
+                ),
+                None,
+            )
+            transition_continues = successor_gc is not None or parallel_gc is not None
             parent_chain = _open_distribution_parent_chain(
                 self.target_root,
                 gc_lease.path,
@@ -4484,20 +4564,80 @@ class OperationJournalStore:
                 successor_info = (
                     _stat_optional_no_follow(parent_fd, successor_gc.stage_name) if successor_gc is not None else None
                 )
+                parallel_info = (
+                    _stat_optional_no_follow(parent_fd, parallel_gc.stage_name) if parallel_gc is not None else None
+                )
+                backup_info = (
+                    _stat_optional_no_follow(parent_fd, backup_source.stage_name) if backup_source is not None else None
+                )
 
                 def record_gc(updated: DistributionStageOwnership) -> None:
                     nonlocal active
                     active = self.record_staging_lease(active, updated)
 
-                if quarantined is None and successor_info is not None:
+                if quarantined is None and (successor_info is not None or parallel_info is not None):
+                    continuation_info = successor_info or parallel_info
+                    assert continuation_info is not None
                     if (
-                        successor_info.st_dev != gc_lease.device
-                        or successor_info.st_ino != gc_lease.inode
-                        or _file_type(successor_info.st_mode) != gc_lease.file_type
-                        or successor_info.st_nlink not in {1, 2}
+                        continuation_info.st_dev != gc_lease.device
+                        or continuation_info.st_ino != gc_lease.inode
+                        or _file_type(continuation_info.st_mode) != gc_lease.file_type
+                        or continuation_info.st_nlink not in {1, 2}
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
+                    if (
+                        parallel_gc is not None
+                        and parallel_info is not None
+                        and parallel_gc.role == "gc-exact"
+                        and parallel_gc.gc_ordinal == 3
+                        and parallel_info.st_nlink == 1
+                    ):
+                        record_gc(
+                            _distribution_stage_ownership(
+                                gc_lease.path,
+                                parallel_gc.stage_name,
+                                parallel_info,
+                                role="backup-only",
+                                gc_predecessor_name=parallel_gc.gc_predecessor_name,
+                                gc_ordinal=parallel_gc.gc_ordinal,
+                            )
+                        )
                 elif quarantined is None and original is not None:
+                    if gc_lease.gc_ordinal == 3 and gc_lease.gc_predecessor_name is not None:
+                        if (
+                            original.st_dev != source.device
+                            or original.st_ino != source.inode
+                            or _file_type(original.st_mode) != source.file_type
+                            or original.st_nlink not in {1, 2}
+                        ):
+                            raise DistributionApplyError("managed staging cleanup failed")
+                        validate_gc_authority()
+                        _rename_distribution_no_replace(
+                            parent_fd,
+                            original_name,
+                            parent_fd,
+                            gc_lease.stage_name,
+                        )
+                        os.fsync(parent_fd)
+                        promoted = os.stat(gc_lease.stage_name, dir_fd=parent_fd, follow_symlinks=False)
+                        if (
+                            promoted.st_dev != source.device
+                            or promoted.st_ino != source.inode
+                            or _file_type(promoted.st_mode) != source.file_type
+                            or promoted.st_nlink not in {1, 2}
+                        ):
+                            raise DistributionApplyError("managed staging cleanup failed")
+                        record_gc(
+                            _distribution_stage_ownership(
+                                gc_lease.path,
+                                gc_lease.stage_name,
+                                promoted,
+                                role="gc-exact",
+                                gc_predecessor_name=gc_lease.gc_predecessor_name,
+                                gc_ordinal=gc_lease.gc_ordinal,
+                            )
+                        )
+                        return self._resume_gc_cleanup(active)
                     if (
                         original.st_dev != source.device
                         or original.st_ino != source.inode
@@ -4515,6 +4655,8 @@ class OperationJournalStore:
                         gc_path=gc_lease.path,
                         gc_recorder=record_gc,
                         gc_name=gc_lease.stage_name,
+                        gc_ordinal=gc_lease.gc_ordinal or 1,
+                        gc_predecessor_name=original_name,
                     )
                     quarantined = None
                 elif quarantined is not None:
@@ -4535,6 +4677,8 @@ class OperationJournalStore:
                                 ctime_ns=quarantined.st_ctime_ns,
                                 file_type=("regular" if stat.S_ISREG(quarantined.st_mode) else "symlink"),
                                 role="gc-exact",
+                                gc_predecessor_name=gc_lease.gc_predecessor_name,
+                                gc_ordinal=gc_lease.gc_ordinal,
                             )
                         )
                         gc_lease = next(
@@ -4546,34 +4690,83 @@ class OperationJournalStore:
                         )
                     exact_backup_authority = (
                         backup_source is not None
-                        and original is not None
-                        and original.st_dev == quarantined.st_dev == gc_lease.device
-                        and original.st_ino == quarantined.st_ino == gc_lease.inode
-                        and _file_type(original.st_mode) == _file_type(quarantined.st_mode) == gc_lease.file_type
-                        and original.st_nlink == quarantined.st_nlink == 2
+                        and backup_info is not None
+                        and backup_info.st_dev == quarantined.st_dev == gc_lease.device
+                        and backup_info.st_ino == quarantined.st_ino == gc_lease.inode
+                        and _file_type(backup_info.st_mode) == _file_type(quarantined.st_mode) == gc_lease.file_type
+                        and backup_info.st_nlink == quarantined.st_nlink == 2
                         and (
                             backup_source.role == "backup-reserved"
                             or (
-                                original.st_dev == backup_source.device
-                                and original.st_ino == backup_source.inode
-                                and original.st_ctime_ns == backup_source.ctime_ns
-                                and _file_type(original.st_mode) == backup_source.file_type
+                                gc_lease.gc_ordinal == 2
+                                and gc_lease.gc_predecessor_name is not None
+                                and (
+                                    parallel_gc is None
+                                    or (
+                                        parallel_gc.gc_ordinal == 3
+                                        and parallel_gc.gc_predecessor_name == backup_source.stage_name
+                                    )
+                                )
+                            )
+                            or (
+                                backup_info.st_dev == backup_source.device
+                                and backup_info.st_ino == backup_source.inode
+                                and backup_info.st_ctime_ns == backup_source.ctime_ns
+                                and _file_type(backup_info.st_mode) == backup_source.file_type
                             )
                         )
                     )
+                    exact_peer_authority = (
+                        parallel_gc is not None
+                        and parallel_info is not None
+                        and original is None
+                        and parallel_info.st_dev == quarantined.st_dev == gc_lease.device
+                        and parallel_info.st_ino == quarantined.st_ino == gc_lease.inode
+                        and _file_type(parallel_info.st_mode) == _file_type(quarantined.st_mode) == gc_lease.file_type
+                        and quarantined.st_nlink == 2
+                    )
+                    exact_terminal_authority = (
+                        gc_lease.gc_ordinal == 3
+                        and gc_lease.gc_predecessor_name is not None
+                        and original is None
+                        and quarantined.st_nlink == 1
+                        and backup_source is not None
+                        and backup_source.role == "backup-dual"
+                        and backup_source.device == quarantined.st_dev == gc_lease.device
+                        and backup_source.inode == quarantined.st_ino == gc_lease.inode
+                        and backup_source.file_type == _file_type(quarantined.st_mode) == gc_lease.file_type
+                        and not any(
+                            lease.path == gc_lease.path
+                            and lease.role in {"gc-reserved", "gc-exact"}
+                            and lease.gc_ordinal is not None
+                            and lease.gc_ordinal < 3
+                            for lease in active.staging_leases
+                        )
+                    )
+                    transition_continues = transition_continues or exact_peer_authority
                     if (
                         quarantined.st_dev != gc_lease.device
                         or quarantined.st_ino != gc_lease.inode
-                        or (quarantined.st_ctime_ns != gc_lease.ctime_ns and not exact_backup_authority)
+                        or (
+                            quarantined.st_ctime_ns != gc_lease.ctime_ns
+                            and not exact_backup_authority
+                            and not exact_peer_authority
+                            and not exact_terminal_authority
+                        )
                         or _file_type(quarantined.st_mode) != gc_lease.file_type
                         or quarantined.st_nlink not in {1, 2}
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
-                    if quarantined.st_nlink == 2 and (
-                        original is None
-                        or original.st_dev != quarantined.st_dev
-                        or original.st_ino != quarantined.st_ino
-                        or original.st_nlink != 2
+                    if (
+                        quarantined.st_nlink == 2
+                        and not exact_peer_authority
+                        and not exact_backup_authority
+                        and (
+                            original is None
+                            or original.st_dev != quarantined.st_dev
+                            or original.st_ino != quarantined.st_ino
+                            or original.st_nlink != 2
+                        )
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
                     validate_gc_authority()
@@ -4582,16 +4775,59 @@ class OperationJournalStore:
                         raise DistributionApplyError("managed staging cleanup failed")
                     os.unlink(gc_lease.stage_name, dir_fd=parent_fd)
                     os.fsync(parent_fd)
-                    if original is not None and successor_gc is not None:
-                        retained_source = os.stat(original_name, dir_fd=parent_fd, follow_symlinks=False)
+                    retained_peer_name = (
+                        parallel_gc.stage_name if exact_peer_authority and parallel_gc is not None else None
+                    )
+                    retained_backup_name = (
+                        backup_source.stage_name
+                        if exact_backup_authority
+                        and backup_source is not None
+                        and successor_gc is None
+                        and parallel_gc is None
+                        else None
+                    )
+                    if (
+                        (original is not None and successor_gc is not None)
+                        or retained_peer_name is not None
+                        or retained_backup_name is not None
+                    ):
+                        retained_source_name = retained_peer_name or retained_backup_name or original_name
+                        retained_source = os.stat(retained_source_name, dir_fd=parent_fd, follow_symlinks=False)
+                        if original is not None and successor_gc is not None:
+                            record_gc(
+                                replace(
+                                    successor_gc,
+                                    gc_predecessor_name=original_name,
+                                    gc_ordinal=3,
+                                )
+                            )
                         record_gc(
                             _distribution_stage_ownership(
                                 gc_lease.path,
-                                original_name,
+                                retained_source_name,
                                 retained_source,
                                 role="backup-only",
+                                gc_predecessor_name=(
+                                    (
+                                        parallel_gc.gc_predecessor_name
+                                        if retained_peer_name is not None and parallel_gc is not None
+                                        else gc_lease.stage_name
+                                    )
+                                    if retained_peer_name is not None or retained_backup_name is not None
+                                    else None
+                                ),
+                                gc_ordinal=(
+                                    (
+                                        parallel_gc.gc_ordinal
+                                        if retained_peer_name is not None and parallel_gc is not None
+                                        else 3
+                                    )
+                                    if retained_peer_name is not None or retained_backup_name is not None
+                                    else None
+                                ),
                             )
                         )
+                        transition_continues = True
                     validate_gc_authority()
                     if original is not None and successor_gc is None:
                         retained_source = os.stat(original_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -4612,7 +4848,7 @@ class OperationJournalStore:
                 and lease.role == "predecessor-quarantine"
                 and _distribution_quarantine_backup_name(lease.stage_name) == original_name
             }
-            if successor_gc is None and source.role == "backup-only" and len(completed_quarantines) != 1:
+            if not transition_continues and source.role == "backup-only" and len(completed_quarantines) != 1:
                 raise DistributionApplyError("managed staging cleanup failed")
             retained = tuple(
                 lease
@@ -4621,7 +4857,7 @@ class OperationJournalStore:
                     lease.path == gc_lease.path
                     and (
                         (
-                            successor_gc is None
+                            not transition_continues
                             and lease.role
                             in {
                                 "gc-reserved",
@@ -4633,13 +4869,13 @@ class OperationJournalStore:
                             }
                         )
                         or (
-                            successor_gc is not None
+                            transition_continues
                             and lease.stage_name == gc_lease.stage_name
                             and lease.role in {"gc-reserved", "gc-exact"}
                         )
                         or lease.stage_name == gc_lease.stage_name
-                        or (successor_gc is None and lease.stage_name == original_name)
-                        or (successor_gc is None and lease.stage_name in completed_quarantines)
+                        or (not transition_continues and lease.stage_name == original_name)
+                        or (not transition_continues and lease.stage_name in completed_quarantines)
                     )
                 )
             )
@@ -4763,8 +4999,20 @@ class OperationJournalStore:
                 for item in journal.staging_leases
                 if not (
                     item.path == lease.path
-                    and item.role in backup_roles
-                    and (lease.role in {"backup-only", "backup-reserved", "backup-dual"} or item.role == lease.role)
+                    and (
+                        (
+                            item.role in backup_roles
+                            and (
+                                lease.role in {"backup-only", "backup-reserved", "backup-dual"}
+                                or item.role == lease.role
+                            )
+                        )
+                        or (
+                            lease.role == "backup-only"
+                            and item.role in gc_roles
+                            and item.stage_name == lease.stage_name
+                        )
+                    )
                 )
             )
         elif lease.role in gc_roles:
@@ -5191,6 +5439,272 @@ def _condition_has_complete_target_identity(condition: dict[str, object]) -> boo
     )
 
 
+def _explicit_gc_backup_sources(
+    journal: OperationJournal,
+    gc_lease: DistributionStageOwnership,
+) -> tuple[DistributionStageOwnership, ...]:
+    predecessor_name = gc_lease.gc_predecessor_name
+    if predecessor_name is None:
+        return ()
+    return tuple(
+        lease
+        for lease in journal.staging_leases
+        if lease.path == gc_lease.path
+        and lease.role in {"backup-reserved", "backup-dual"}
+        and (
+            lease.stage_name == predecessor_name
+            or lease.stage_name == _distribution_quarantine_backup_name(predecessor_name)
+            or (predecessor_name.startswith(f"{lease.stage_name}.") and predecessor_name.endswith(".gc"))
+        )
+    )
+
+
+def _ordered_gc_transition_leases(journal: OperationJournal) -> tuple[DistributionStageOwnership, ...]:
+    return tuple(
+        sorted(
+            (lease for lease in journal.staging_leases if lease.role in {"gc-reserved", "gc-exact"}),
+            key=lambda lease: (
+                lease.path,
+                lease.gc_ordinal if lease.gc_ordinal is not None else 0,
+                0 if lease.role == "gc-exact" else 1,
+                lease.stage_name,
+            ),
+        )
+    )
+
+
+def _gc_transition_companion_is_explicit(
+    journal: OperationJournal,
+    left: DistributionStageOwnership,
+    right: DistributionStageOwnership,
+) -> bool:
+    if left.path != right.path or left.stage_name == right.stage_name:
+        return False
+    if (
+        left.gc_ordinal is not None
+        and right.gc_ordinal is not None
+        and left.role in {"gc-reserved", "gc-exact", "backup-only"}
+        and right.role in {"gc-reserved", "gc-exact", "backup-only"}
+    ):
+        if right.gc_predecessor_name == left.stage_name and right.gc_ordinal == left.gc_ordinal + 1:
+            return True
+        if left.gc_predecessor_name == right.stage_name and left.gc_ordinal == right.gc_ordinal + 1:
+            return True
+        ordinal_two, ordinal_three = (left, right) if left.gc_ordinal == 2 else (right, left)
+        if ordinal_two.gc_ordinal == 2 and ordinal_three.gc_ordinal == 3:
+            return any(
+                backup.path == left.path
+                and backup.stage_name == ordinal_three.gc_predecessor_name
+                and backup.role in {"backup-reserved", "backup-dual", "backup-only-reserved", "backup-only"}
+                and backup.device == ordinal_two.device
+                and backup.inode == ordinal_two.inode
+                and backup.file_type == ordinal_two.file_type
+                for backup in journal.staging_leases
+            )
+    gc_lease, backup = (left, right) if left.gc_ordinal is not None else (right, left)
+    if (
+        gc_lease.gc_ordinal in {1, 3}
+        and gc_lease.gc_predecessor_name == backup.stage_name
+        and backup.role in {"backup-reserved", "backup-dual", "backup-only-reserved", "backup-only"}
+    ):
+        return True
+    if gc_lease.gc_ordinal != 2 or backup.role not in {
+        "backup-reserved",
+        "backup-dual",
+        "backup-only-reserved",
+        "backup-only",
+    }:
+        return False
+    if (
+        gc_lease.gc_predecessor_name is not None
+        and gc_lease.gc_predecessor_name.startswith(f"{backup.stage_name}.")
+        and gc_lease.gc_predecessor_name.endswith(".gc")
+        and gc_lease.device == backup.device
+        and gc_lease.inode == backup.inode
+        and gc_lease.file_type == backup.file_type
+    ):
+        return True
+    return any(
+        predecessor.path == gc_lease.path
+        and predecessor.stage_name == gc_lease.gc_predecessor_name
+        and predecessor.role in {"gc-reserved", "gc-exact"}
+        and predecessor.gc_ordinal == 1
+        and predecessor.gc_predecessor_name == backup.stage_name
+        and predecessor.device == gc_lease.device == backup.device
+        and predecessor.inode == gc_lease.inode == backup.inode
+        and predecessor.file_type == gc_lease.file_type == backup.file_type
+        for predecessor in journal.staging_leases
+    )
+
+
+def _assert_gc_transition_graph(journal: OperationJournal) -> None:
+    """Reject malformed GC authority graphs before inspecting or mutating names."""
+
+    if any(
+        len(_explicit_gc_backup_sources(journal, lease)) > 1
+        for lease in journal.staging_leases
+        if lease.role in {"gc-reserved", "gc-exact"}
+    ):
+        raise DistributionApplyError("journal-plan-mismatch")
+    leases_by_name: dict[str, list[DistributionStageOwnership]] = {}
+    for lease in journal.staging_leases:
+        leases_by_name.setdefault(lease.stage_name, []).append(lease)
+
+    transition_ordinals: set[tuple[str, int]] = set()
+    outgoing_edges: dict[tuple[str, str], list[int]] = {}
+    for lease in journal.staging_leases:
+        has_predecessor = lease.gc_predecessor_name is not None
+        if has_predecessor != (lease.gc_ordinal is not None):
+            raise DistributionApplyError("journal-plan-mismatch")
+        if not has_predecessor:
+            continue
+        predecessor_name = lease.gc_predecessor_name
+        ordinal = lease.gc_ordinal
+        assert predecessor_name is not None
+        assert ordinal is not None
+        if (
+            lease.role not in {"gc-reserved", "gc-exact", "backup-only"}
+            or lease.stage_name == PurePosixPath(lease.path).name
+            or PurePosixPath(predecessor_name).name != predecessor_name
+            or predecessor_name == lease.stage_name
+            or predecessor_name == PurePosixPath(lease.path).name
+            or ordinal not in {1, 2, 3}
+            or (lease.path, ordinal) in transition_ordinals
+        ):
+            raise DistributionApplyError("journal-plan-mismatch")
+        transition_ordinals.add((lease.path, ordinal))
+        outgoing_edges.setdefault((lease.path, predecessor_name), []).append(ordinal)
+
+        named_predecessors = leases_by_name.get(predecessor_name, [])
+        if any(candidate.path != lease.path for candidate in named_predecessors):
+            raise DistributionApplyError("journal-plan-mismatch")
+        same_path_predecessors = tuple(candidate for candidate in named_predecessors if candidate.path == lease.path)
+        if len(same_path_predecessors) > 1:
+            raise DistributionApplyError("journal-plan-mismatch")
+        if same_path_predecessors:
+            predecessor = same_path_predecessors[0]
+            if (
+                lease.device > 0
+                and predecessor.device > 0
+                and (
+                    lease.device != predecessor.device
+                    or lease.inode != predecessor.inode
+                    or lease.file_type != predecessor.file_type
+                )
+            ):
+                raise DistributionApplyError("journal-plan-mismatch")
+            if predecessor.gc_ordinal is not None:
+                if predecessor.role not in {"gc-reserved", "gc-exact"} or ordinal != predecessor.gc_ordinal + 1:
+                    raise DistributionApplyError("journal-plan-mismatch")
+            elif ordinal == 1:
+                if predecessor.role not in {
+                    "stage",
+                    "predecessor-quarantine",
+                    "backup-reserved",
+                    "backup-dual",
+                    "backup-only-reserved",
+                    "backup-only",
+                }:
+                    raise DistributionApplyError("journal-plan-mismatch")
+            elif ordinal == 3:
+                if predecessor.role not in {
+                    "backup-reserved",
+                    "backup-dual",
+                    "backup-only-reserved",
+                    "backup-only",
+                }:
+                    raise DistributionApplyError("journal-plan-mismatch")
+            else:
+                raise DistributionApplyError("journal-plan-mismatch")
+            continue
+
+        backup_predecessors = tuple(
+            candidate
+            for candidate in journal.staging_leases
+            if candidate.path == lease.path
+            and candidate.role in {"backup-reserved", "backup-dual"}
+            and (
+                candidate.stage_name == _distribution_quarantine_backup_name(predecessor_name)
+                or (
+                    predecessor_name.startswith(f"{candidate.stage_name}.")
+                    and predecessor_name.endswith(".gc")
+                    and lease.device > 0
+                    and candidate.device == lease.device
+                    and candidate.inode == lease.inode
+                    and candidate.file_type == lease.file_type
+                )
+            )
+        )
+        derived_missing_backup = any(
+            candidate.path == lease.path
+            and candidate.role == "predecessor-quarantine"
+            and _distribution_quarantine_backup_name(candidate.stage_name) == predecessor_name
+            for candidate in journal.staging_leases
+        )
+        if not ((ordinal == 2 and len(backup_predecessors) == 1) or (ordinal in {1, 3} and derived_missing_backup)):
+            raise DistributionApplyError("journal-plan-mismatch")
+    for (path, predecessor_name), ordinals in outgoing_edges.items():
+        if len(ordinals) == 1:
+            continue
+        graph_predecessor = next(
+            (lease for lease in journal.staging_leases if lease.path == path and lease.stage_name == predecessor_name),
+            None,
+        )
+        derived_missing_backup = any(
+            lease.path == path
+            and lease.role == "predecessor-quarantine"
+            and _distribution_quarantine_backup_name(lease.stage_name) == predecessor_name
+            for lease in journal.staging_leases
+        )
+        if sorted(ordinals) != [1, 3] or not (
+            (graph_predecessor is not None and graph_predecessor.role in {"backup-reserved", "backup-dual"})
+            or derived_missing_backup
+        ):
+            raise DistributionApplyError("journal-plan-mismatch")
+    for path in {lease.path for lease in journal.staging_leases}:
+        ordinal_two = next(
+            (
+                lease
+                for lease in journal.staging_leases
+                if lease.path == path and lease.gc_ordinal == 2 and lease.role in {"gc-reserved", "gc-exact"}
+            ),
+            None,
+        )
+        ordinal_three = next(
+            (
+                lease
+                for lease in journal.staging_leases
+                if lease.path == path
+                and lease.gc_ordinal == 3
+                and lease.role in {"gc-reserved", "gc-exact", "backup-only"}
+            ),
+            None,
+        )
+        if ordinal_two is None or ordinal_three is None or ordinal_three.gc_predecessor_name is None:
+            continue
+        retained_predecessor = next(
+            (
+                lease
+                for lease in journal.staging_leases
+                if lease.path == path
+                and lease.stage_name == ordinal_three.gc_predecessor_name
+                and lease.role in {"backup-reserved", "backup-dual", "backup-only-reserved", "backup-only"}
+            ),
+            None,
+        )
+        if (
+            retained_predecessor is not None
+            and ordinal_two.device > 0
+            and retained_predecessor.device > 0
+            and (
+                ordinal_two.device != retained_predecessor.device
+                or ordinal_two.inode != retained_predecessor.inode
+                or ordinal_two.file_type != retained_predecessor.file_type
+            )
+        ):
+            raise DistributionApplyError("journal-plan-mismatch")
+
+
 def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: OperationJournal) -> None:
     plan = assessment.distribution_plan
     if plan.target_root is None:
@@ -5207,6 +5721,7 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
     lease_keys = {(lease.path, lease.stage_name) for lease in journal.staging_leases}
     if len(lease_keys) != len(journal.staging_leases):
         raise DistributionApplyError("journal-plan-mismatch")
+    _assert_gc_transition_graph(journal)
     allowed_created_parents: set[str] = set()
     for record in journal.actions:
         if not _condition_has_complete_target_identity(record.precondition):
@@ -5554,39 +6069,65 @@ def _assert_created_parent_binding_fd_closed_set(
                     reserved_info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
                 except OSError as exc:
                     raise DistributionApplyError("journal-precondition-mismatch") from exc
-                expected_links = 2 if lease.role == "backup-reserved" else 1
-                companion_role = (
-                    "predecessor-quarantine"
-                    if lease.role == "backup-reserved"
-                    else ("backup-dual" if lease.role == "backup-only-reserved" else None)
-                )
-                companion = next(
-                    (
-                        item
-                        for item in journal.staging_leases
-                        if item.path == lease.path and item.role == companion_role and item.device > 0
-                    ),
-                    None,
-                )
-                if lease.role == "backup-reserved" and companion is None:
+                companion: DistributionStageOwnership | None = None
+                allowed_links = {1}
+                requires_companion = False
+                if lease.role == "gc-reserved":
                     companion = next(
                         (
                             item
                             for item in journal.staging_leases
-                            if item.path == lease.path and item.role == "gc-exact" and item.device > 0
+                            if item.path == lease.path
+                            and item.stage_name == lease.gc_predecessor_name
+                            and item.device > 0
+                            and (
+                                (lease.gc_ordinal == 1 and item.role in {"stage", "backup-dual", "backup-only"})
+                                or (lease.gc_ordinal == 2 and item.role == "gc-exact" and item.gc_ordinal == 1)
+                                or (
+                                    lease.gc_ordinal == 3
+                                    and item.role in {"backup-reserved", "backup-dual", "backup-only"}
+                                )
+                            )
                         ),
                         None,
                     )
+                    requires_companion = True
+                    allowed_links = (
+                        {2}
+                        if lease.gc_ordinal in {2, 3}
+                        or (companion is not None and companion.role in {"backup-dual", "backup-only"})
+                        else {1}
+                    )
+                elif lease.role in {"backup-reserved", "backup-only-reserved"}:
+                    companion = next(
+                        (
+                            item
+                            for item in journal.staging_leases
+                            if item.path == lease.path
+                            and item.device > 0
+                            and (
+                                (
+                                    item.role == "predecessor-quarantine"
+                                    and _distribution_quarantine_backup_name(item.stage_name) == lease.stage_name
+                                )
+                                or (
+                                    lease.role == "backup-reserved"
+                                    and item.role == "gc-exact"
+                                    and item.gc_predecessor_name == lease.stage_name
+                                )
+                            )
+                        ),
+                        None,
+                    )
+                    requires_companion = True
+                    allowed_links = {1, 2} if lease.role == "backup-only-reserved" else {2}
                 if (
                     _file_type(reserved_info.st_mode) == lease.file_type
-                    and reserved_info.st_nlink == expected_links
+                    and reserved_info.st_nlink in allowed_links
+                    and not (requires_companion and companion is None)
                     and (
-                        companion_role is None
-                        or (
-                            companion is not None
-                            and reserved_info.st_dev == companion.device
-                            and reserved_info.st_ino == companion.inode
-                        )
+                        companion is None
+                        or (reserved_info.st_dev == companion.device and reserved_info.st_ino == companion.inode)
                     )
                 ):
                     matched_stage = True
@@ -5616,8 +6157,8 @@ def _assert_created_parent_binding_fd_closed_set(
                     for item in journal.staging_leases
                     if item.path == lease.path
                     and item.stage_name != lease.stage_name
-                    and item.role == "gc-exact"
                     and item.device > 0
+                    and _gc_transition_companion_is_explicit(journal, lease, item)
                 ),
                 None,
             )
@@ -5628,6 +6169,7 @@ def _assert_created_parent_binding_fd_closed_set(
                         or candidate.role != "gc-exact"
                         or candidate.device != lease.device
                         or candidate.inode != lease.inode
+                        or not _gc_transition_companion_is_explicit(journal, lease, candidate)
                     ):
                         continue
                     try:
@@ -5651,15 +6193,109 @@ def _assert_created_parent_binding_fd_closed_set(
                 if matched_stage:
                     break
             if (
+                lease.role == "backup-dual"
+                and exact_info.st_dev == lease.device
+                and exact_info.st_ino == lease.inode
+                and _file_type(exact_info.st_mode) == lease.file_type
+                and exact_info.st_nlink == 1
+                and any(
+                    candidate.path == lease.path
+                    and candidate.role in {"gc-reserved", "gc-exact"}
+                    and candidate.gc_ordinal == 3
+                    and candidate.gc_predecessor_name == lease.stage_name
+                    for candidate in journal.staging_leases
+                )
+                and all(
+                    candidate.role == "gc-exact"
+                    and candidate.device == lease.device
+                    and candidate.inode == lease.inode
+                    and candidate.file_type == lease.file_type
+                    and _stat_optional_no_follow(parent_fd, candidate.stage_name) is None
+                    for candidate in journal.staging_leases
+                    if candidate.path == lease.path
+                    and candidate.role in {"gc-reserved", "gc-exact"}
+                    and candidate.gc_ordinal in {1, 2}
+                )
+            ):
+                matched_stage = True
+                break
+            if (
                 lease.role == "gc-exact"
                 and exact_info.st_dev == lease.device
                 and exact_info.st_ino == lease.inode
                 and exact_info.st_ctime_ns == lease.ctime_ns
                 and _file_type(exact_info.st_mode) == lease.file_type
-                and exact_info.st_nlink in {1, 2}
+                and exact_info.st_nlink == 1
             ):
                 matched_stage = True
                 break
+            if (
+                lease.role == "gc-exact"
+                and lease.gc_ordinal == 3
+                and exact_info.st_dev == lease.device
+                and exact_info.st_ino == lease.inode
+                and _file_type(exact_info.st_mode) == lease.file_type
+                and exact_info.st_nlink == 1
+            ):
+                completed_predecessor = next(
+                    (
+                        candidate
+                        for candidate in journal.staging_leases
+                        if candidate.path == lease.path
+                        and candidate.role == "gc-exact"
+                        and candidate.gc_ordinal == 2
+                        and candidate.device == lease.device
+                        and candidate.inode == lease.inode
+                        and candidate.file_type == lease.file_type
+                    ),
+                    None,
+                )
+                if (
+                    completed_predecessor is not None
+                    and _stat_optional_no_follow(parent_fd, completed_predecessor.stage_name) is None
+                ):
+                    matched_stage = True
+                    break
+            if lease.role == "gc-exact" and lease.gc_ordinal == 2 and exact_info.st_nlink == 2:
+                graph_successor = next(
+                    (
+                        candidate
+                        for candidate in journal.staging_leases
+                        if candidate.path == lease.path
+                        and candidate.role == "gc-reserved"
+                        and candidate.gc_ordinal == 3
+                        and any(
+                            backup.path == lease.path
+                            and backup.stage_name == candidate.gc_predecessor_name
+                            and backup.role in {"backup-reserved", "backup-dual"}
+                            and backup.device == lease.device
+                            and backup.inode == lease.inode
+                            and backup.file_type == lease.file_type
+                            for backup in journal.staging_leases
+                        )
+                    ),
+                    None,
+                )
+                if graph_successor is not None:
+                    try:
+                        graph_info = os.stat(
+                            graph_successor.stage_name,
+                            dir_fd=parent_fd,
+                            follow_symlinks=False,
+                        )
+                    except FileNotFoundError:
+                        graph_info = None
+                    except OSError as exc:
+                        raise DistributionApplyError("journal-precondition-mismatch") from exc
+                    if (
+                        graph_info is not None
+                        and graph_info.st_dev == exact_info.st_dev == lease.device
+                        and graph_info.st_ino == exact_info.st_ino == lease.inode
+                        and _file_type(graph_info.st_mode) == _file_type(exact_info.st_mode) == lease.file_type
+                        and graph_info.st_nlink == 2
+                    ):
+                        matched_stage = True
+                        break
             if lease.role == "gc-exact" and exact_info.st_nlink == 2:
                 for candidate in journal.staging_leases:
                     if (
@@ -5667,6 +6303,7 @@ def _assert_created_parent_binding_fd_closed_set(
                         or candidate.stage_name == lease.stage_name
                         or candidate.device != lease.device
                         or candidate.inode != lease.inode
+                        or not _gc_transition_companion_is_explicit(journal, lease, candidate)
                     ):
                         continue
                     try:
@@ -5885,6 +6522,7 @@ def execute_recognized_distribution(
     if journal_present:
         try:
             journal_seed = store._read(_root_identity_for_assessment(target_root))
+            _assert_gc_transition_graph(journal_seed)
             if guard_marker is None:
                 try:
                     guard_marker = _read_distribution_retry_marker(target_root)
@@ -7100,6 +7738,8 @@ def _remove_distribution_stage_if_owned(
     gc_path: str | None = None,
     gc_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     gc_name: str | None = None,
+    gc_ordinal: int = 1,
+    gc_predecessor_name: str | None = None,
 ) -> str | None:
     try:
         current = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -7313,6 +7953,8 @@ def _remove_distribution_stage_if_owned(
                         quarantine_name,
                         "regular" if stat.S_ISREG(current.st_mode) else "symlink",
                         role="gc-reserved",
+                        gc_predecessor_name=gc_predecessor_name or stage_name,
+                        gc_ordinal=gc_ordinal,
                     )
                 )
             if mutation_validator is not None:
@@ -7348,6 +7990,8 @@ def _remove_distribution_stage_if_owned(
                         quarantine_name,
                         moved,
                         role="gc-exact",
+                        gc_predecessor_name=gc_predecessor_name or stage_name,
+                        gc_ordinal=gc_ordinal,
                     )
                 )
                 try:
@@ -7406,13 +8050,15 @@ def _remove_distribution_stage_if_owned(
                 )
                 gc_recorder(
                     DistributionStageOwnership(
-                        gc_path,
-                        quarantine_name,
-                        verified.st_dev,
-                        verified.st_ino,
-                        verified.st_ctime_ns,
-                        "regular" if stat.S_ISREG(verified.st_mode) else "symlink",
-                        "gc-exact",
+                        path=gc_path,
+                        stage_name=quarantine_name,
+                        device=verified.st_dev,
+                        inode=verified.st_ino,
+                        ctime_ns=verified.st_ctime_ns,
+                        file_type="regular" if stat.S_ISREG(verified.st_mode) else "symlink",
+                        role="gc-exact",
+                        gc_predecessor_name=gc_predecessor_name or stage_name,
+                        gc_ordinal=gc_ordinal,
                     )
                 )
             delete_name = f"{stage_name}.{secrets.token_hex(16)}.gc"
@@ -7424,6 +8070,8 @@ def _remove_distribution_stage_if_owned(
                         delete_name,
                         "regular" if stat.S_ISREG(moved.st_mode) else "symlink",
                         role="gc-reserved",
+                        gc_predecessor_name=quarantine_name,
+                        gc_ordinal=2,
                     )
                 )
             _rename_distribution_no_replace(parent_fd, quarantine_name, parent_fd, delete_name)
@@ -7456,6 +8104,8 @@ def _remove_distribution_stage_if_owned(
                         ctime_ns=deleting.st_ctime_ns,
                         file_type="regular" if stat.S_ISREG(deleting.st_mode) else "symlink",
                         role="gc-exact",
+                        gc_predecessor_name=quarantine_name,
+                        gc_ordinal=2,
                     )
                 )
             try:
@@ -7472,6 +8122,8 @@ def _remove_distribution_stage_if_owned(
                         retained_gc_name,
                         "regular" if stat.S_ISREG(retained.st_mode) else "symlink",
                         role="gc-reserved",
+                        gc_predecessor_name=retained_name,
+                        gc_ordinal=3,
                     )
                 )
             _rename_distribution_no_replace(
@@ -7512,6 +8164,8 @@ def _remove_distribution_stage_if_owned(
                         ctime_ns=retained_gc.st_ctime_ns,
                         file_type="regular" if stat.S_ISREG(retained_gc.st_mode) else "symlink",
                         role="gc-exact",
+                        gc_predecessor_name=retained_name,
+                        gc_ordinal=3,
                     )
                 )
             if mutation_validator is not None:
@@ -7538,6 +8192,8 @@ def _remove_distribution_stage_if_owned(
                         retained_gc_name,
                         retained,
                         role="backup-only",
+                        gc_predecessor_name=retained_name,
+                        gc_ordinal=3,
                     )
                 )
             if mutation_validator is not None and gc_recorder is not None:
@@ -7678,6 +8334,8 @@ def _distribution_stage_ownership(
         "gc-reserved",
         "gc-exact",
     ] = "stage",
+    gc_predecessor_name: str | None = None,
+    gc_ordinal: int | None = None,
 ) -> DistributionStageOwnership:
     kind = _file_type(info.st_mode)
     expected_links = 2 if role == "backup-dual" else 1
@@ -7692,6 +8350,8 @@ def _distribution_stage_ownership(
         ctime_ns=info.st_ctime_ns,
         file_type=file_type,
         role=role,
+        gc_predecessor_name=gc_predecessor_name,
+        gc_ordinal=gc_ordinal,
     )
 
 
@@ -7710,6 +8370,8 @@ def _reserved_distribution_stage_ownership(
         "gc-reserved",
         "gc-exact",
     ] = "stage",
+    gc_predecessor_name: str | None = None,
+    gc_ordinal: int | None = None,
 ) -> DistributionStageOwnership:
     """Persist a private stage name before its namespace entry is created."""
 
@@ -7721,6 +8383,8 @@ def _reserved_distribution_stage_ownership(
         ctime_ns=0,
         file_type=file_type,
         role=role,
+        gc_predecessor_name=gc_predecessor_name,
+        gc_ordinal=gc_ordinal,
     )
 
 
