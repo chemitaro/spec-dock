@@ -109,6 +109,8 @@ crash/exception では `prepared` 以降の journal を保持する。`completed
 
 schema-2 forward guard は journal より先に `operation_id`、`contract_identity`、canonical `plan_digest` を durable publish する。journal はこの独立アンカーと一致する場合だけ作成・再開でき、journal 内部の action 順序や immutable metadata と digest をまとめて差し替えても authority を再構成できない。
 
+journal不在のschema-2 forward guardはschema-1 conversionと区別し、既存bytes/identityを保持したままoperation/contract/planがexact一致するpre-journal状態だけを再開する。recovery metadata自身の作成で変わるdirectory ctimeはplan digestから除外するが、journal actionのexact preconditionとdevice/inode/type/linkは維持する。terminal cleanupはguardを削除するまでcompleted journalを残し、guard削除後のcompleted journal-onlyは対象mutationを再実行せずcleanupだけを許可する。旧実装が残した曖昧なguard-onlyは保持し `forward-guard-plan-mismatch` で停止する。
+
 stage作成、atomic exchange、prune quarantine、missing parent作成は、可視namespace mutationより先に予約名またはmissing intentをjournalへ記録する。regular stageは可変write中は予約leaseを維持し、bytes/mode確定後にだけexact successor inodeへ昇格する。exchange後はcanonical successor leaseをdisplaced predecessor cleanupより先にdurable化する。強制終了後は予約名、exact canonical successor、displaced predecessor、空のcreated parentが単一の既知遷移に一致する場合だけforward recoveryする。same-contentでもcanonical inodeがleaseと異なる場合、またはexchange後にcanonicalが未知entryへ置換された場合はrollback/cleanupせず両entryを保持してblockする。
 
 Action checkpoint:

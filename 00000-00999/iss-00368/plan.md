@@ -94,6 +94,7 @@ Exit: assessment test は filesystem write を観測せず、plan digest fixture
 
 - operation journal の schema/protocol version、root/intent/authority/contract/plan binding を実装する。
 - schema-2 forward guard に operation/contract/canonical plan の独立アンカーを先行publishし、journalのself-rehashed改変を拒否する。
+- journal不在のschema-2 guardはlegacy conversionと分岐し、existing operation/contract/planと再構成planがexact一致するpre-journal状態だけを再開する。terminal cleanupはguard削除完了までcompleted journalを保持し、completed journal-onlyは再適用せずcleanupのみ行う。
 - regular/symlink/directory/staging identity を用途別 type に分ける。
 - exact pre-action SHA と expected post-action identity を action record に入れる。
 - descriptor-bound create/replace/remove/mode/staging/journal operation を kernel に集約する。
