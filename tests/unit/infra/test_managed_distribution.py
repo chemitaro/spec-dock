@@ -4055,6 +4055,60 @@ def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
     assert not list(target.parent.glob(".spec-dock-file-*"))
 
 
+def test_i368_post_swap_same_content_replacement_preserves_displaced_predecessor(
+    tmp_path: Path,
+) -> None:
+    desired = b"new\n"
+    old = b"old\n"
+    install_root = _minimal_install_root(tmp_path, content=desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="update",
+    )
+    recorded: list[managed_distribution.DistributionStageOwnership] = []
+    replaced = False
+
+    def replace_canonical_after_successor_record(lease: managed_distribution.DistributionStageOwnership) -> None:
+        nonlocal replaced
+        recorded.append(lease)
+        if replaced or lease.inode == 0 or target.read_bytes() != desired:
+            return
+        canonical = target.lstat()
+        if (canonical.st_dev, canonical.st_ino) != (lease.device, lease.inode):
+            return
+        replacement = target.with_name("ci.concurrent")
+        replacement.write_bytes(desired)
+        replacement.chmod(stat.S_IMODE(canonical.st_mode))
+        os.replace(replacement, target)
+        replaced = True
+
+    with pytest.raises(DistributionApplyError, match="managed target identity changed"):
+        apply_distribution_plan(
+            plan,
+            stage_ownership_recorder=replace_canonical_after_successor_record,
+            write_ahead_stage_reservations=True,
+        )
+
+    assert replaced is True
+    assert target.read_bytes() == desired
+    stages = list(target.parent.glob(".spec-dock-file-*"))
+    assert len(stages) == 1
+    assert stages[0].read_bytes() == old
+    successor = recorded[-1]
+    canonical = target.lstat()
+    assert (canonical.st_dev, canonical.st_ino) != (successor.device, successor.inode)
+
+
 def test_s30_apply_cleans_rebound_stage_when_marker_update_fails(
     tmp_path: Path,
 ) -> None:
@@ -5816,7 +5870,10 @@ def test_i368_finalization_rejects_replacement_before_authority_reacquisition(
     assert target.read_bytes() == replacement
 
 
-def test_i368_legacy_marker_with_exact_partial_stage_converts_and_resumes(tmp_path: Path) -> None:
+def test_i368_legacy_marker_with_exact_partial_stage_converts_and_resumes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     old = b"old\n"
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(
@@ -5875,6 +5932,106 @@ def test_i368_legacy_marker_with_exact_partial_stage_converts_and_resumes(tmp_pa
     )
     marker = managed_distribution._read_distribution_retry_marker(target_root)
     assert marker is not None
+    original_prepare = OperationJournalStore.prepare
+    interrupted = False
+
+    def interrupt_before_initial_journal(self, plan, *, package_version):
+        nonlocal interrupted
+        interrupted = True
+        raise DistributionApplyError("injected pre-journal interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", interrupt_before_initial_journal)
+
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        legacy_marker=marker,
+    )
+
+    assert first.status == "recovery_required"
+    assert interrupted is True
+    converted = managed_distribution._read_distribution_retry_marker(target_root)
+    assert converted is not None
+    assert converted.purpose == "recognized-journal-forward-only"
+    assert converted.stage_ownership == marker.stage_ownership
+    monkeypatch.setattr(OperationJournalStore, "prepare", original_prepare)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        legacy_marker=converted,
+    )
+
+    assert result.status == "completed", result.reason
+    assert target.read_bytes() == b"desired\n"
+    assert not stage.exists()
+
+
+def test_i368_legacy_post_swap_stage_converts_as_adopt_cleanup(tmp_path: Path) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(desired)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset("spec-dock/spec-dock.version", b"1.2.3\n", mode=0o644),
+        ),
+    )
+    executable = build_executable_mutation_plan(assessment)
+    action = next(item for item in executable.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "adopt"
+    expected = next(
+        item.identity for item in executable.distribution_plan.current_assets if item.path == action.path
+    )
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    stage = target.parent / stage_name
+    stage.write_bytes(old)
+    stage_stat = stage.lstat()
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "update",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [{
+                "path": action.path,
+                "stage_name": stage_name,
+                "device": stage_stat.st_dev,
+                "inode": stage_stat.st_ino,
+                "ctime_ns": stage_stat.st_ctime_ns,
+                "file_type": "regular",
+            }],
+        }),
+        encoding="utf-8",
+    )
+    marker = managed_distribution._read_distribution_retry_marker(target_root)
+    assert marker is not None
 
     result = execute_recognized_distribution(
         install_root,
@@ -5887,7 +6044,7 @@ def test_i368_legacy_marker_with_exact_partial_stage_converts_and_resumes(tmp_pa
     )
 
     assert result.status == "completed", result.reason
-    assert target.read_bytes() == b"desired\n"
+    assert target.read_bytes() == desired
     assert not stage.exists()
 
 
