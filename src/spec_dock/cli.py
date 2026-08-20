@@ -24,6 +24,7 @@ import shlex
 import stat
 import subprocess
 import sys
+import tempfile
 import threading
 from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 
@@ -1091,6 +1092,482 @@ def _generated_symlink_distribution_asset(
 
 def _active_symlink_creation_supported() -> bool:
     return hasattr(os, "symlink") and os.symlink in os.supports_dir_fd
+
+
+class _PreservedReadBinding(NamedTuple):
+    """No-follow identity captured for one preserved-state read boundary."""
+
+    device: int
+    inode: int
+    mode: int
+    link_count: int
+    size: int
+    mtime_ns: int
+    ctime_ns: int
+    link_target: str | None = None
+
+
+def _preserved_read_binding(info: os.stat_result, *, link_target: str | None = None) -> _PreservedReadBinding:
+    return _PreservedReadBinding(
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        info.st_nlink,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+        link_target,
+    )
+
+
+def _open_preserved_parent_at(root_fd: int, relative_path: Path) -> tuple[int, ...]:
+    """Open one repository-relative parent chain without following links."""
+
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise RuntimeError("preserved state path escapes the bound repository")
+    opened: list[int] = [os.dup(root_fd)]
+    try:
+        for component in relative_path.parent.parts:
+            if component in ("", "."):
+                continue
+            child_fd = os.open(component, _managed_directory_flags(), dir_fd=opened[-1])
+            child = os.fstat(child_fd)
+            visible = os.stat(component, dir_fd=opened[-1], follow_symlinks=False)
+            if (
+                stat.S_ISLNK(visible.st_mode)
+                or not stat.S_ISDIR(visible.st_mode)
+                or not stat.S_ISDIR(child.st_mode)
+                or (visible.st_dev, visible.st_ino) != (child.st_dev, child.st_ino)
+            ):
+                os.close(child_fd)
+                raise RuntimeError("preserved state directory identity changed")
+            opened.append(child_fd)
+        return tuple(opened)
+    except (OSError, RuntimeError) as exc:
+        for fd in reversed(opened):
+            with suppress(OSError):
+                os.close(fd)
+        if isinstance(exc, RuntimeError):
+            raise
+        raise RuntimeError("preserved state directory cannot be opened safely") from exc
+
+
+def _stat_preserved_path_at(root_fd: int, relative_path: Path) -> tuple[os.stat_result | None, str | None]:
+    """Stat one preserved path through a no-follow repository-relative parent chain."""
+
+    parent_chain = _open_preserved_parent_at(root_fd, relative_path)
+    try:
+        try:
+            info = os.stat(relative_path.name, dir_fd=parent_chain[-1], follow_symlinks=False)
+        except FileNotFoundError:
+            return None, None
+        link_target = os.readlink(relative_path.name, dir_fd=parent_chain[-1]) if stat.S_ISLNK(info.st_mode) else None
+        return info, link_target
+    except OSError as exc:
+        raise RuntimeError("preserved state path cannot be inspected safely") from exc
+    finally:
+        for fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(fd)
+
+
+def _read_preserved_regular_at(
+    root_fd: int,
+    relative_path: Path,
+    bindings: dict[Path, _PreservedReadBinding | None],
+    *,
+    binding_path: Path | None = None,
+) -> tuple[bytes, int, _PreservedReadBinding] | None:
+    """Read one single-link regular file from a held parent descriptor."""
+
+    binding_key = binding_path or relative_path
+    parent_chain = _open_preserved_parent_at(root_fd, relative_path)
+    file_fd: int | None = None
+    try:
+        parent_fd = parent_chain[-1]
+        try:
+            visible = os.stat(relative_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            bindings[binding_key] = None
+            return None
+        if stat.S_ISLNK(visible.st_mode) or not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1:
+            raise RuntimeError(f"preserved state file is not a safe regular file: {relative_path.as_posix()}")
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise RuntimeError("preserved state no-follow support is unavailable")
+        file_fd = os.open(
+            relative_path.name,
+            os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(file_fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino, opened.st_ctime_ns)
+            != (visible.st_dev, visible.st_ino, visible.st_ctime_ns)
+        ):
+            raise RuntimeError("preserved state file identity changed")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(file_fd, 1024 * 64)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(file_fd)
+        current = os.stat(relative_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        expected = _preserved_read_binding(opened)
+        if _preserved_read_binding(after) != expected or _preserved_read_binding(current) != expected:
+            raise RuntimeError("preserved state file identity changed")
+        bindings[binding_key] = expected
+        return b"".join(chunks), stat.S_IMODE(opened.st_mode), expected
+    except OSError as exc:
+        raise RuntimeError("preserved state file cannot be read safely") from exc
+    finally:
+        if file_fd is not None:
+            with suppress(OSError):
+                os.close(file_fd)
+        for fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(fd)
+
+
+def _capture_preserved_directory_at(
+    root_fd: int,
+    relative_path: Path,
+    bindings: dict[Path, _PreservedReadBinding | None],
+    *,
+    required: bool,
+    binding_path: Path | None = None,
+) -> int | None:
+    """Open and bind one directory that is part of the preserved read set."""
+
+    binding_key = binding_path or relative_path
+    parent_chain = _open_preserved_parent_at(root_fd, relative_path)
+    try:
+        parent_fd = parent_chain[-1]
+        try:
+            visible = os.stat(relative_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            bindings[binding_key] = None
+            if required:
+                raise RuntimeError(f"missing preserved state directory: {relative_path.as_posix()}") from None
+            return None
+        if stat.S_ISLNK(visible.st_mode) or not stat.S_ISDIR(visible.st_mode):
+            raise RuntimeError(f"preserved state boundary is not a safe directory: {relative_path.as_posix()}")
+        directory_fd = os.open(relative_path.name, _managed_directory_flags(), dir_fd=parent_fd)
+        opened = os.fstat(directory_fd)
+        if not stat.S_ISDIR(opened.st_mode) or (opened.st_dev, opened.st_ino, opened.st_ctime_ns) != (
+            visible.st_dev,
+            visible.st_ino,
+            visible.st_ctime_ns,
+        ):
+            os.close(directory_fd)
+            raise RuntimeError("preserved state directory identity changed")
+        bindings[binding_key] = _preserved_read_binding(opened)
+        return directory_fd
+    except OSError as exc:
+        raise RuntimeError("preserved state directory cannot be opened safely") from exc
+    finally:
+        for fd in reversed(parent_chain):
+            with suppress(OSError):
+                os.close(fd)
+
+
+def _snapshot_active_manifest(content: bytes, *, visible_root: Path) -> bytes:
+    """Map absolute in-repository manifest paths into the private snapshot root."""
+
+    try:
+        loaded: Any = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return content
+    if not isinstance(loaded, dict):
+        return content
+    changed = False
+    for layer in ("initiative", "epic", "issue"):
+        entry = loaded.get(layer)
+        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+            continue
+        raw_path = Path(entry["path"])
+        if not raw_path.is_absolute():
+            continue
+        try:
+            relative = raw_path.relative_to(visible_root)
+        except ValueError:
+            entry["path"] = "__preserved-state-outside-repository__"
+        else:
+            entry["path"] = relative.as_posix()
+        changed = True
+    if not changed:
+        return content
+    return (json.dumps(loaded, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def _preserved_active_target_is_within_specdock(raw_target: str) -> bool:
+    """Validate an active target lexically without resolving filesystem entries."""
+
+    if (
+        not raw_target
+        or "\\" in raw_target
+        or Path(raw_target).is_absolute()
+        or any(ord(character) < 0x20 for character in raw_target)
+    ):
+        return False
+    parts = ["spec-dock", "active"]
+    for component in Path(raw_target).parts:
+        if component in ("", "."):
+            continue
+        if component == "..":
+            if not parts:
+                return False
+            parts.pop()
+            continue
+        parts.append(component)
+    return bool(parts) and parts[0] == "spec-dock"
+
+
+def _snapshot_initiative_metadata(
+    source_fd: int,
+    destination: Path,
+    relative_root: Path,
+    bindings: dict[Path, _PreservedReadBinding | None],
+) -> None:
+    """Copy only metadata that the active-state resolver reads from initiatives."""
+
+    for name in sorted(os.listdir(source_fd)):
+        if name == ".workbench":
+            continue
+        info = os.stat(name, dir_fd=source_fd, follow_symlinks=False)
+        relative_path = relative_root / name
+        if stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode):
+            child_fd = os.open(name, _managed_directory_flags(), dir_fd=source_fd)
+            try:
+                opened = os.fstat(child_fd)
+                if (opened.st_dev, opened.st_ino, opened.st_ctime_ns) != (
+                    info.st_dev,
+                    info.st_ino,
+                    info.st_ctime_ns,
+                ):
+                    raise RuntimeError("preserved initiative directory identity changed")
+                bindings[relative_path] = _preserved_read_binding(opened)
+                child_destination = destination / name
+                child_destination.mkdir()
+                _snapshot_initiative_metadata(child_fd, child_destination, relative_path, bindings)
+            finally:
+                os.close(child_fd)
+            continue
+        if name != ".meta.json":
+            continue
+        captured = _read_preserved_regular_at(
+            source_fd,
+            Path(name),
+            bindings,
+            binding_path=relative_path,
+        )
+        if captured is None:
+            raise RuntimeError("preserved initiative metadata disappeared")
+        content, mode, _binding = captured
+        target = destination / name
+        target.write_bytes(content)
+        target.chmod(mode)
+
+
+def _revalidate_preserved_read_bindings(
+    root_fd: int,
+    bindings: dict[Path, _PreservedReadBinding | None],
+) -> None:
+    """Reject any preserved input that appeared, vanished, or rebound before service entry."""
+
+    for relative_path, expected in bindings.items():
+        current, link_target = _stat_preserved_path_at(root_fd, relative_path)
+        if expected is None:
+            if current is not None:
+                raise RuntimeError("preserved state path appeared after capture")
+            continue
+        if current is None or _preserved_read_binding(current, link_target=link_target) != expected:
+            raise RuntimeError("preserved state path identity changed after capture")
+
+
+@contextmanager
+def _recognized_preserved_state_snapshot(
+    bound_root: Path,
+    *,
+    visible_root: Path,
+) -> Iterator[tuple[Path, Callable[[], None]]]:
+    """Yield a descriptor-captured snapshot for recognized pre-service reads."""
+
+    # `_bound_distribution_root` has already fchdir-bound this lexical path to
+    # the opened repository.  Do not reopen `visible_root`: it may be rebound
+    # by an attacker while the held repository remains the mutation authority.
+    root_fd = os.open(bound_root, _managed_directory_flags())
+    bindings: dict[Path, _PreservedReadBinding | None] = {}
+    try:
+        specdock_fd = _capture_preserved_directory_at(root_fd, Path("spec-dock"), bindings, required=True)
+        assert specdock_fd is not None
+        try:
+            with tempfile.TemporaryDirectory(prefix="spec-dock-preserved-") as tmp:
+                snapshot_root = Path(tmp) / "repo"
+                snapshot_specdock = snapshot_root / "spec-dock"
+                snapshot_specdock.mkdir(parents=True)
+                snapshot_root = snapshot_root.resolve()
+                snapshot_specdock = snapshot_root / "spec-dock"
+
+                for relative_path in (
+                    Path("system"),
+                    Path("system/active-none"),
+                    Path("system/active-none/initiative"),
+                    Path("system/active-none/epic"),
+                    Path("system/active-none/issue"),
+                ):
+                    binding_path = Path("spec-dock") / relative_path
+                    directory_fd = _capture_preserved_directory_at(
+                        specdock_fd,
+                        relative_path,
+                        bindings,
+                        required=True,
+                        binding_path=binding_path,
+                    )
+                    assert directory_fd is not None
+                    os.close(directory_fd)
+                    (snapshot_root / binding_path).mkdir(exist_ok=True)
+
+                initiatives_rel = Path("spec-dock/initiatives")
+                initiatives_fd = _capture_preserved_directory_at(
+                    specdock_fd,
+                    Path("initiatives"),
+                    bindings,
+                    required=False,
+                    binding_path=initiatives_rel,
+                )
+                snapshot_initiatives = snapshot_root / initiatives_rel
+                snapshot_initiatives.mkdir()
+                if initiatives_fd is not None:
+                    try:
+                        _snapshot_initiative_metadata(
+                            initiatives_fd,
+                            snapshot_initiatives,
+                            initiatives_rel,
+                            bindings,
+                        )
+                    finally:
+                        os.close(initiatives_fd)
+
+                for directory_name, file_names in (
+                    (".agent", ("active.json",)),
+                    (".work", ("active.json", "current.json")),
+                ):
+                    directory_rel = Path("spec-dock") / directory_name
+                    directory_fd = _capture_preserved_directory_at(
+                        specdock_fd,
+                        Path(directory_name),
+                        bindings,
+                        required=False,
+                        binding_path=directory_rel,
+                    )
+                    snapshot_directory = snapshot_root / directory_rel
+                    snapshot_directory.mkdir()
+                    if directory_fd is None:
+                        continue
+                    try:
+                        for file_name in file_names:
+                            file_rel = directory_rel / file_name
+                            captured = _read_preserved_regular_at(
+                                directory_fd,
+                                Path(file_name),
+                                bindings,
+                                binding_path=file_rel,
+                            )
+                            if captured is None:
+                                continue
+                            content, mode, _binding = captured
+                            target = snapshot_root / file_rel
+                            target.write_bytes(_snapshot_active_manifest(content, visible_root=visible_root))
+                            target.chmod(mode)
+                    finally:
+                        os.close(directory_fd)
+
+                active_rel = Path("spec-dock/active")
+                active_fd = _capture_preserved_directory_at(
+                    specdock_fd,
+                    Path("active"),
+                    bindings,
+                    required=False,
+                    binding_path=active_rel,
+                )
+                snapshot_active = snapshot_root / active_rel
+                snapshot_active.mkdir()
+                active_names = (
+                    "initiative",
+                    "epic",
+                    "issue",
+                    "initiative.path",
+                    "epic.path",
+                    "issue.path",
+                    "context-pack.md",
+                )
+                if active_fd is not None:
+                    try:
+                        active_entries = set(os.listdir(active_fd))  # noqa: PTH208
+                        for name in active_names:
+                            path_rel = active_rel / name
+                            info = (
+                                os.stat(name, dir_fd=active_fd, follow_symlinks=False)
+                                if name in active_entries
+                                else None
+                            )
+                            if info is None:
+                                bindings[path_rel] = None
+                                continue
+                            if stat.S_ISLNK(info.st_mode):
+                                link_target = os.readlink(name, dir_fd=active_fd)
+                                if not _preserved_active_target_is_within_specdock(link_target):
+                                    raise RuntimeError(
+                                        "preserved active entrypoint has a symlink target outside spec-dock"
+                                    )
+                                current = os.stat(name, dir_fd=active_fd, follow_symlinks=False)
+                                if (
+                                    not stat.S_ISLNK(current.st_mode)
+                                    or (current.st_dev, current.st_ino, current.st_ctime_ns)
+                                    != (info.st_dev, info.st_ino, info.st_ctime_ns)
+                                    or os.readlink(name, dir_fd=active_fd) != link_target
+                                ):
+                                    raise RuntimeError("preserved active entrypoint identity changed")
+                                bindings[path_rel] = _preserved_read_binding(current, link_target=link_target)
+                                (snapshot_active / name).symlink_to(link_target)
+                                continue
+                            if stat.S_ISDIR(info.st_mode):
+                                bindings[path_rel] = _preserved_read_binding(info)
+                                (snapshot_active / name).mkdir()
+                                continue
+                            if name in {"initiative", "epic", "issue"}:
+                                raise RuntimeError("preserved active entrypoint is not a safe link or directory")
+                            captured = _read_preserved_regular_at(
+                                active_fd,
+                                Path(name),
+                                bindings,
+                                binding_path=path_rel,
+                            )
+                            if captured is None:
+                                raise RuntimeError("preserved active state disappeared")
+                            content, mode, _binding = captured
+                            if name.endswith(".path"):
+                                try:
+                                    pathfile_target = content.decode("utf-8").strip()
+                                except UnicodeDecodeError as exc:
+                                    raise RuntimeError("preserved active pathfile is not valid UTF-8") from exc
+                                if not _preserved_active_target_is_within_specdock(pathfile_target):
+                                    raise RuntimeError("preserved active pathfile target escapes spec-dock")
+                            target = snapshot_active / name
+                            target.write_bytes(content)
+                            target.chmod(mode)
+                    finally:
+                        os.close(active_fd)
+
+                yield snapshot_specdock, lambda: _revalidate_preserved_read_bindings(root_fd, bindings)
+        finally:
+            os.close(specdock_fd)
+    finally:
+        os.close(root_fd)
 
 
 def _active_fallback_existing_state_is_refreshable(
@@ -2994,19 +3471,24 @@ def _install_recognized_distribution_unlocked(
             visible_root,
             bound_identity,
         ):
-            generated_assets = _active_fallback_distribution_assets(_specdock_dir(bound_root))
-            result = execute_recognized_distribution(
-                assets_dir / "install_root",
-                manifest_path=assets_dir / "managed_distribution.json",
-                scaffold_root=assets_dir / "spec_dock",
-                target_root=bound_root,
-                intent=recognized_operation,
-                package_version=_tool_version(),
-                legacy_marker=retry_marker.marker if retry_marker is not None else None,
-                generated_assets=generated_assets,
-                version_refreshable_existing_identities=(version_identity,) if version_identity is not None else (),
-                root_identity_path=visible_root,
-            )
+            with _recognized_preserved_state_snapshot(bound_root, visible_root=visible_root) as (
+                snapshot_specdock,
+                revalidate_preserved,
+            ):
+                generated_assets = _active_fallback_distribution_assets(snapshot_specdock)
+                revalidate_preserved()
+                result = execute_recognized_distribution(
+                    assets_dir / "install_root",
+                    manifest_path=assets_dir / "managed_distribution.json",
+                    scaffold_root=assets_dir / "spec_dock",
+                    target_root=bound_root,
+                    intent=recognized_operation,
+                    package_version=_tool_version(),
+                    legacy_marker=retry_marker.marker if retry_marker is not None else None,
+                    generated_assets=generated_assets,
+                    version_refreshable_existing_identities=(version_identity,) if version_identity is not None else (),
+                    root_identity_path=visible_root,
+                )
             if result.status != "recovery_required":
                 _assert_distribution_root_identity(visible_root, bound_identity)
     if result.status == "blocked":

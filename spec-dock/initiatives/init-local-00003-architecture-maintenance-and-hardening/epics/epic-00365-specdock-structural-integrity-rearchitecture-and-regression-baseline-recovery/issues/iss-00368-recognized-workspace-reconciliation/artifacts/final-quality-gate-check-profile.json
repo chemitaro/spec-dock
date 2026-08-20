@@ -5,7 +5,7 @@
     "id": "specdock-issue368-slow-v1",
     "version": "1.0.0",
     "lane": "slow",
-    "reuse": "exact-candidate-controller-only",
+    "reuse": "exact-candidate-workbench-only",
     "checks": [
       {
         "id": "full-regression",
@@ -36,6 +36,17 @@
       }
     ]
   },
+  "evidence_contract": {
+    "gate": "chatgpt-final-quality-gate-strict-new",
+    "review_authority": [
+      "quality-gate-state.json",
+      "quality-gate-result.json"
+    ],
+    "test_authority": "test-results/manifest.json",
+    "log_directory": "test-results/",
+    "binding": "every required command and browser review is executed for one exact clean pushed SHA; wrapper-owned state/result and deterministic test logs remain Git-ignored Workbench evidence",
+    "legacy_campaign_state_imported": false
+  },
   "pre_slow_diagnostic": {
     "argv": [
       "uv",
@@ -46,13 +57,14 @@
     ],
     "observed_implementation_sha": "1d62f3221a5a55add1c592076de2688c2f0b4a89",
     "result": "pass",
-    "purpose": "pre-slow execution of the authoritative pytest command; tests/conftest.py verified all normalized failure signatures recorded by the ledger and rejected any mismatch with exit code 3"
+    "purpose": "historical pre-slow diagnostic only; tests/conftest.py verified all normalized failure signatures recorded by the ledger and rejected any mismatch with exit code 3; this SHA is not final-candidate authority"
   },
   "authoritative_failure_guard": {
     "path": "tests/conftest.py",
     "activation": "--run-full-regression with all approved ledger node IDs collected",
     "accepted_match_exit_code": 1,
     "mismatch_exit_code": 3,
-    "verified_implementation_sha": "1d62f3221a5a55add1c592076de2688c2f0b4a89"
+    "verified_implementation_sha": "1d62f3221a5a55add1c592076de2688c2f0b4a89",
+    "evidence_role": "executable acceptance contract, not final-candidate attestation"
   }
 }

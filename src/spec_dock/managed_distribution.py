@@ -3386,11 +3386,14 @@ class OperationJournalStore:
         completed = set(completed_paths)
         active = journal
         records = {record.path: record for record in journal.actions}
-        rebound_leases: list[DistributionStageOwnership] = []
-        rebound = False
+        cleanup_transitions: dict[
+            str,
+            tuple[DistributionStageOwnership, dict[str, object], dict[str, object]],
+        ] = {}
+        updated_leases = {lease.path: lease for lease in active.staging_leases}
+        leases_changed = False
         for lease in active.staging_leases:
             if lease.path not in completed:
-                rebound_leases.append(lease)
                 continue
             try:
                 parent_chain = _open_distribution_parent_chain(
@@ -3431,7 +3434,6 @@ class OperationJournalStore:
                         or record.postcondition.get("identity") != _distribution_identity_payload(target_identity)
                     ):
                         raise DistributionApplyError("managed staging cleanup failed") from None
-                    rebound_leases.append(lease)
                     continue
                 if lease.device == lease.inode == lease.ctime_ns == 0:
                     record = records.get(lease.path)
@@ -3450,8 +3452,12 @@ class OperationJournalStore:
                         or record.precondition.get("identity") != _distribution_identity_payload(candidate)
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
-                    rebound_leases.append(_distribution_stage_ownership(lease.path, lease.stage_name, stage_info))
-                    rebound = True
+                    updated_leases[lease.path] = _distribution_stage_ownership(
+                        lease.path,
+                        lease.stage_name,
+                        stage_info,
+                    )
+                    leases_changed = True
                     continue
                 if (
                     stage_info.st_dev == lease.device
@@ -3460,7 +3466,6 @@ class OperationJournalStore:
                     and _file_type(stage_info.st_mode) == lease.file_type
                     and stage_info.st_nlink == 1
                 ):
-                    rebound_leases.append(lease)
                     continue
                 record = records.get(lease.path)
                 if record is None or record.action != "upgrade":
@@ -3474,6 +3479,7 @@ class OperationJournalStore:
                 canonical_is_published_lease = (
                     target_info.st_dev == lease.device
                     and target_info.st_ino == lease.inode
+                    and target_info.st_ctime_ns == lease.ctime_ns
                     and _file_type(target_info.st_mode) == lease.file_type
                     and target_info.st_nlink == 1
                     and post.get("identity") == _distribution_identity_payload(target_identity)
@@ -3487,13 +3493,15 @@ class OperationJournalStore:
                 )
                 if not canonical_is_published_lease or not stage_is_displaced_predecessor:
                     raise DistributionApplyError("managed staging cleanup failed")
-                rebound_leases.append(_distribution_stage_ownership(lease.path, lease.stage_name, stage_info))
-                rebound = True
+                cleanup_transitions[lease.path] = (lease, pre, post)
             finally:
                 _close_distribution_parent_chain(parent_chain)
-        if rebound:
+        if leases_changed:
             active = self.write(
-                replace(active, staging_leases=tuple(rebound_leases)),
+                replace(
+                    active,
+                    staging_leases=tuple(updated_leases[lease.path] for lease in active.staging_leases),
+                ),
                 predecessor=active,
             )
         for lease in active.staging_leases:
@@ -3512,7 +3520,7 @@ class OperationJournalStore:
                     stage_info = os.stat(lease.stage_name, dir_fd=parent_chain[-1], follow_symlinks=False)
                 except FileNotFoundError:
                     continue
-                if (
+                if lease.path not in cleanup_transitions and (
                     stage_info.st_dev != lease.device
                     or stage_info.st_ino != lease.inode
                     or stage_info.st_ctime_ns != lease.ctime_ns
@@ -3525,6 +3533,15 @@ class OperationJournalStore:
                     lease.stage_name,
                     stage_info,
                     strict=True,
+                    transition_path=lease.path if lease.path in cleanup_transitions else None,
+                    canonical_name=(PurePosixPath(lease.path).name if lease.path in cleanup_transitions else None),
+                    canonical_ownership=(
+                        cleanup_transitions[lease.path][0] if lease.path in cleanup_transitions else None
+                    ),
+                    canonical_condition=(
+                        cleanup_transitions[lease.path][2] if lease.path in cleanup_transitions else None
+                    ),
+                    stage_condition=(cleanup_transitions[lease.path][1] if lease.path in cleanup_transitions else None),
                 )
             finally:
                 _close_distribution_parent_chain(parent_chain)
@@ -4148,6 +4165,8 @@ def _reconcile_created_parent_bindings(
 ) -> OperationJournal:
     """Bind an empty parent created immediately before an abrupt stop."""
 
+    _assert_created_parent_bindings_closed_set(store.target_root, journal)
+
     actual_parents = {
         parent.relative_path: parent
         for snapshot in dict(assessment.distribution_plan.target_snapshots).values()
@@ -4186,6 +4205,146 @@ def _reconcile_created_parent_bindings(
         ),
         predecessor=journal,
     )
+
+
+def _entry_matches_journal_condition(
+    parent_fd: int,
+    name: str,
+    path: str,
+    condition: dict[str, object],
+) -> bool:
+    try:
+        info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        identity = _distribution_stage_identity(parent_fd, name, path)
+    except (FileNotFoundError, OSError, DistributionApplyError):
+        return False
+    for field_name, actual in (
+        ("device", info.st_dev),
+        ("inode", info.st_ino),
+        ("ctime_ns", info.st_ctime_ns),
+        ("file_type", _file_type(info.st_mode)),
+        ("link_count", info.st_nlink),
+    ):
+        if field_name in condition and condition[field_name] != actual:
+            return False
+    return condition.get("exists") is True and condition.get("identity") == _distribution_identity_payload(identity)
+
+
+def _entry_matches_staging_lease(
+    parent_fd: int,
+    name: str,
+    lease: DistributionStageOwnership,
+    *,
+    require_ctime: bool = True,
+) -> bool:
+    try:
+        info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except (FileNotFoundError, OSError):
+        return False
+    return (
+        lease.device > 0
+        and info.st_dev == lease.device
+        and info.st_ino == lease.inode
+        and (not require_ctime or info.st_ctime_ns == lease.ctime_ns)
+        and _file_type(info.st_mode) == lease.file_type
+        and info.st_nlink == 1
+    )
+
+
+def _assert_created_parent_bindings_closed_set(
+    target_root: Path,
+    journal: OperationJournal,
+) -> None:
+    """Treat recovered parent bindings as hints and re-prove their contents."""
+
+    originally_missing: set[str] = set()
+    for action in journal.actions:
+        parents = action.precondition.get("parents")
+        if not isinstance(parents, list):
+            raise DistributionApplyError("journal-precondition-mismatch")
+        originally_missing.update(
+            parent["relative_path"]
+            for parent in parents
+            if isinstance(parent, dict)
+            and parent.get("exists") is False
+            and isinstance(parent.get("relative_path"), str)
+        )
+    bindings = {binding.relative_path: binding for binding in journal.created_parent_bindings}
+    records = {record.path: record for record in journal.actions}
+    leases = {lease.path: lease for lease in journal.staging_leases}
+    for relative_path, binding in bindings.items():
+        if relative_path not in originally_missing or not binding.exists:
+            continue
+        try:
+            parent_chain = _open_distribution_parent_chain(
+                target_root,
+                f"{relative_path}/.closed-set-probe",
+                create_missing=False,
+            )
+        except DistributionApplyError as exc:
+            raise DistributionApplyError("journal-precondition-mismatch") from exc
+        try:
+            parent_fd = parent_chain[-1]
+            before = os.fstat(parent_fd)
+            if not _same_stat_structure(before, binding):
+                raise DistributionApplyError("journal-precondition-mismatch")
+            try:
+                names = os.listdir(parent_fd)  # noqa: PTH208 - descriptor-relative no-follow inventory
+            except OSError as exc:
+                raise DistributionApplyError("journal-precondition-mismatch") from exc
+            for name in names:
+                child_path = f"{relative_path}/{name}"
+                child_binding = bindings.get(child_path)
+                if child_binding is not None and child_binding.exists:
+                    try:
+                        child_info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                    except OSError as exc:
+                        raise DistributionApplyError("journal-precondition-mismatch") from exc
+                    if child_info.st_nlink < 1 or not _same_stat_structure(child_info, child_binding):
+                        raise DistributionApplyError("journal-precondition-mismatch")
+                    continue
+                record = records.get(child_path)
+                if record is not None:
+                    lease = leases.get(child_path)
+                    canonical_is_exact_lease = lease is not None and _entry_matches_staging_lease(
+                        parent_fd,
+                        name,
+                        lease,
+                        require_ctime=False,
+                    )
+                    if (
+                        record.checkpoint != "pending" or canonical_is_exact_lease
+                    ) and _entry_matches_journal_condition(parent_fd, name, child_path, record.postcondition):
+                        continue
+                matched_stage = False
+                for lease in journal.staging_leases:
+                    if PurePosixPath(lease.path).parent.as_posix() != relative_path or lease.stage_name != name:
+                        continue
+                    if _entry_matches_staging_lease(parent_fd, name, lease):
+                        matched_stage = True
+                        break
+                    record = records.get(lease.path)
+                    canonical_name = PurePosixPath(lease.path).name
+                    if (
+                        record is not None
+                        and record.action == "upgrade"
+                        and _entry_matches_staging_lease(
+                            parent_fd,
+                            canonical_name,
+                            lease,
+                            require_ctime=False,
+                        )
+                        and _entry_matches_journal_condition(parent_fd, name, lease.path, record.precondition)
+                    ):
+                        matched_stage = True
+                        break
+                if not matched_stage:
+                    raise DistributionApplyError("journal-precondition-mismatch")
+            after = os.fstat(parent_fd)
+            if _stat_identity_tuple(after) != _stat_identity_tuple(before):
+                raise DistributionApplyError("journal-precondition-mismatch")
+        finally:
+            _close_distribution_parent_chain(parent_chain)
 
 
 def _journal_version_precondition_identity(journal: OperationJournal) -> DistributionIdentity | None:
@@ -5213,6 +5372,11 @@ def _remove_distribution_stage_if_owned(
     created: os.stat_result,
     *,
     strict: bool = False,
+    transition_path: str | None = None,
+    canonical_name: str | None = None,
+    canonical_ownership: DistributionStageOwnership | None = None,
+    canonical_condition: dict[str, object] | None = None,
+    stage_condition: dict[str, object] | None = None,
 ) -> None:
     try:
         current = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -5233,6 +5397,38 @@ def _remove_distribution_stage_if_owned(
         if strict:
             raise DistributionApplyError("managed staging identity changed")
         return
+    transition_args = (
+        transition_path,
+        canonical_name,
+        canonical_ownership,
+        canonical_condition,
+        stage_condition,
+    )
+    if any(item is not None for item in transition_args):
+        if any(item is None for item in transition_args):
+            raise DistributionApplyError("managed staging cleanup failed")
+        assert transition_path is not None
+        assert canonical_name is not None
+        assert canonical_ownership is not None
+        assert canonical_condition is not None
+        assert stage_condition is not None
+        try:
+            canonical = os.stat(canonical_name, dir_fd=parent_fd, follow_symlinks=False)
+            canonical_identity = _distribution_stage_identity(parent_fd, canonical_name, transition_path)
+            stage_identity = _distribution_stage_identity(parent_fd, stage_name, transition_path)
+        except (FileNotFoundError, OSError, DistributionApplyError) as exc:
+            raise DistributionApplyError("managed staging cleanup failed") from exc
+        canonical_owned = (
+            canonical.st_dev == canonical_ownership.device
+            and canonical.st_ino == canonical_ownership.inode
+            and canonical.st_ctime_ns == canonical_ownership.ctime_ns
+            and _file_type(canonical.st_mode) == canonical_ownership.file_type
+            and canonical.st_nlink == 1
+            and canonical_condition.get("identity") == _distribution_identity_payload(canonical_identity)
+        )
+        stage_owned = stage_condition.get("identity") == _distribution_identity_payload(stage_identity)
+        if not canonical_owned or not stage_owned:
+            raise DistributionApplyError("managed staging cleanup failed")
     try:
         os.unlink(stage_name, dir_fd=parent_fd)
         os.fsync(parent_fd)
@@ -5844,6 +6040,17 @@ def _apply_regular_action(
                             and old_stat.st_nlink == 1
                             and old_digest == target_identity.sha256
                         ):
+                            successor_ownership = _distribution_stage_ownership(
+                                path,
+                                staging_name,
+                                published_successor,
+                            )
+                            successor_condition: dict[str, object] = {
+                                "identity": _distribution_identity_payload(expected)
+                            }
+                            predecessor_condition: dict[str, object] = {
+                                "identity": _distribution_identity_payload(snapshot.target.identity)
+                            }
                             if stage_ownership_recorder is not None:
                                 # Persist the exact canonical successor before
                                 # removing the displaced predecessor.  Retry
@@ -5879,6 +6086,11 @@ def _apply_regular_action(
                                             staging_name,
                                             old_stat,
                                             strict=True,
+                                            transition_path=path,
+                                            canonical_name=target_name,
+                                            canonical_ownership=successor_ownership,
+                                            canonical_condition=successor_condition,
+                                            stage_condition=predecessor_condition,
                                         )
                                     except DistributionApplyError as cleanup_error:
                                         try:
@@ -5887,6 +6099,11 @@ def _apply_regular_action(
                                                 staging_name,
                                                 old_stat,
                                                 strict=True,
+                                                transition_path=path,
+                                                canonical_name=target_name,
+                                                canonical_ownership=successor_ownership,
+                                                canonical_condition=successor_condition,
+                                                stage_condition=predecessor_condition,
                                             )
                                         except DistributionApplyError as retry_cleanup_error:
                                             raise retry_cleanup_error from record_error
@@ -5900,6 +6117,11 @@ def _apply_regular_action(
                                 staging_name,
                                 old_stat,
                                 strict=True,
+                                transition_path=path,
+                                canonical_name=target_name,
+                                canonical_ownership=successor_ownership,
+                                canonical_condition=successor_condition,
+                                stage_condition=predecessor_condition,
                             )
                         else:
                             raise DistributionApplyError("managed staging identity changed")
@@ -6148,6 +6370,17 @@ def _apply_symlink_action(
                             and _same_stat_structure(old_stat, snapshot.target)
                             and old_stat.st_nlink == 1
                         ):
+                            successor_ownership = _distribution_stage_ownership(
+                                action.path,
+                                staging_name,
+                                published_successor,
+                            )
+                            successor_condition: dict[str, object] = {
+                                "identity": _distribution_identity_payload(expected)
+                            }
+                            predecessor_condition: dict[str, object] = {
+                                "identity": _distribution_identity_payload(snapshot.target.identity)
+                            }
                             if stage_ownership_recorder is not None:
                                 # Bind the exact canonical successor before
                                 # removing the displaced predecessor.  Retry
@@ -6182,6 +6415,11 @@ def _apply_symlink_action(
                                             staging_name,
                                             old_stat,
                                             strict=True,
+                                            transition_path=action.path,
+                                            canonical_name=target_name,
+                                            canonical_ownership=successor_ownership,
+                                            canonical_condition=successor_condition,
+                                            stage_condition=predecessor_condition,
                                         )
                                     except DistributionApplyError as cleanup_error:
                                         try:
@@ -6190,6 +6428,11 @@ def _apply_symlink_action(
                                                 staging_name,
                                                 old_stat,
                                                 strict=True,
+                                                transition_path=action.path,
+                                                canonical_name=target_name,
+                                                canonical_ownership=successor_ownership,
+                                                canonical_condition=successor_condition,
+                                                stage_condition=predecessor_condition,
                                             )
                                         except DistributionApplyError as retry_cleanup_error:
                                             raise retry_cleanup_error from record_error
@@ -6203,6 +6446,11 @@ def _apply_symlink_action(
                                 staging_name,
                                 old_stat,
                                 strict=True,
+                                transition_path=action.path,
+                                canonical_name=target_name,
+                                canonical_ownership=successor_ownership,
+                                canonical_condition=successor_condition,
+                                stage_condition=predecessor_condition,
                             )
                     except FileNotFoundError:
                         pass

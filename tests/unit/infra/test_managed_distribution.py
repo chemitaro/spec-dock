@@ -831,6 +831,70 @@ def test_i368_journal_resume_rejects_unbound_parent_authorized_before_creation(t
     assert not (appeared / "ci.yml").exists()
 
 
+def test_i368_journal_resume_rejects_forged_nonempty_created_parent_binding(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    _prepare_guarded_journal(store, build_executable_mutation_plan(assessment))
+    appeared = target_root / ".github" / "workflows"
+    appeared.mkdir(parents=True)
+    sentinel = appeared / "sentinel.txt"
+    sentinel.write_text("user-owned\n", encoding="utf-8")
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    forged_bindings = []
+    for binding in payload["created_parent_bindings"]:
+        path = target_root / binding["relative_path"]
+        if path.exists():
+            info = path.lstat()
+            binding = {
+                "relative_path": binding["relative_path"],
+                "exists": True,
+                "device": info.st_dev,
+                "inode": info.st_ino,
+                "ctime_ns": info.st_ctime_ns,
+                "file_type": "directory",
+                "link_count": info.st_nlink,
+            }
+        forged_bindings.append(binding)
+    payload["created_parent_bindings"] = forged_bindings
+    payload["created_parent_bindings_digest"] = managed_distribution._created_parent_bindings_digest(
+        operation_id=payload["operation_id"],
+        bindings=forged_bindings,
+    )
+    store.path.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-precondition-mismatch"
+    assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+    assert not (appeared / "ci.yml").exists()
+
+
 def test_i368_parent_creation_crash_resumes_from_durable_parent_intent(
     tmp_path: Path,
     monkeypatch,
@@ -2687,7 +2751,7 @@ def test_i368_retry_cleans_exact_stage_created_after_write_ahead_reservation(tmp
         item.identity for item in executable.distribution_plan.current_assets if item.path == ".github/workflows/ci.yml"
     )
     stage_name = managed_distribution._new_distribution_stage_name(".github/workflows/ci.yml", expected)
-    journal = store.record_staging_lease(
+    store.record_staging_lease(
         journal,
         managed_distribution._reserved_distribution_stage_ownership(".github/workflows/ci.yml", stage_name, "regular"),
     )
@@ -2709,7 +2773,7 @@ def test_i368_retry_cleans_exact_stage_created_after_write_ahead_reservation(tmp
     assert not stage.exists()
 
 
-def test_i368_retry_rebinds_displaced_predecessor_after_abrupt_swap(tmp_path: Path) -> None:
+def test_i368_abrupt_swap_requires_exact_post_swap_successor_lease(tmp_path: Path) -> None:
     old = b"old\n"
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(
@@ -2762,8 +2826,31 @@ def test_i368_retry_rebinds_displaced_predecessor_after_abrupt_swap(tmp_path: Pa
         package_version="1.2.3",
     )
 
-    assert result.status == "completed", result.reason
+    assert result.status == "recovery_required"
+    assert result.reason == "managed staging cleanup failed"
     assert target.read_bytes() == b"desired\n"
+    assert stage.read_bytes() == old
+    assert store.path.exists()
+
+    current_journal = store.load_for_assessment(assessment, package_version="1.2.3")
+    store.record_staging_lease(
+        current_journal,
+        managed_distribution._distribution_stage_ownership(
+            ".github/workflows/ci.yml",
+            stage_name,
+            target.lstat(),
+        ),
+    )
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "completed", retry.reason
     assert not stage.exists()
 
 
@@ -6083,6 +6170,200 @@ def test_i368_checkpoint_rejects_same_bytes_different_inode_create_successor(tmp
 
     with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
         store.checkpoint_published(journal, (record.path,))
+
+
+def test_i368_checkpoint_revalidates_successor_immediately_before_predecessor_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, build_executable_mutation_plan(assessment)))
+    record = next(action for action in journal.actions if action.path == ".github/workflows/ci.yml")
+    assert record.action == "upgrade"
+    expected = next(
+        asset.identity for asset in assessment.distribution_plan.current_assets if asset.path == record.path
+    )
+    stage_name = managed_distribution._new_distribution_stage_name(record.path, expected)
+    stage = target.parent / stage_name
+    target.replace(stage)
+    target.write_bytes(desired)
+    target.chmod(expected.mode or 0o644)
+    journal = store.record_staging_lease(
+        journal,
+        managed_distribution._distribution_stage_ownership(record.path, stage_name, target.lstat()),
+    )
+    original_remove = managed_distribution._remove_distribution_stage_if_owned
+    replacement = b"third-party\n"
+    replaced = False
+
+    def replace_successor_before_cleanup(parent_fd, name, created, **kwargs):
+        nonlocal replaced
+        if not replaced and kwargs.get("canonical_name") == target.name:
+            target.unlink()
+            target.write_bytes(replacement)
+            replaced = True
+        return original_remove(parent_fd, name, created, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_stage_if_owned", replace_successor_before_cleanup)
+
+    with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
+        store.checkpoint_published(journal, (record.path,))
+
+    assert replaced is True
+    assert target.read_bytes() == replacement
+    assert stage.read_bytes() == old
+    assert store.path.exists()
+
+
+def test_i368_checkpoint_rejects_same_inode_successor_mutate_restore(
+    tmp_path: Path,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, build_executable_mutation_plan(assessment)))
+    record = next(action for action in journal.actions if action.path == ".github/workflows/ci.yml")
+    expected = next(
+        asset.identity for asset in assessment.distribution_plan.current_assets if asset.path == record.path
+    )
+    stage_name = managed_distribution._new_distribution_stage_name(record.path, expected)
+    stage = target.parent / stage_name
+    target.replace(stage)
+    target.write_bytes(desired)
+    target.chmod(expected.mode or 0o644)
+    successor_before = target.lstat()
+    journal = store.record_staging_lease(
+        journal,
+        managed_distribution._distribution_stage_ownership(record.path, stage_name, successor_before),
+    )
+    with target.open("r+b") as stream:
+        stream.write(b"tampered")
+        stream.flush()
+        os.fsync(stream.fileno())
+        stream.seek(0)
+        stream.write(desired)
+        stream.truncate()
+        stream.flush()
+        os.fsync(stream.fileno())
+    successor_after = target.lstat()
+    assert successor_after.st_ino == successor_before.st_ino
+    assert successor_after.st_ctime_ns != successor_before.st_ctime_ns
+    assert target.read_bytes() == desired
+
+    with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
+        store.checkpoint_published(journal, (record.path,))
+
+    assert target.read_bytes() == desired
+    assert stage.read_bytes() == old
+    assert store.path.exists()
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i368_displaced_cleanup_revalidates_both_namespace_entries(
+    tmp_path: Path,
+    kind: str,
+) -> None:
+    parent = tmp_path / kind
+    parent.mkdir()
+    target = parent / "target"
+    stage = parent / "stage"
+    if kind == "regular":
+        target.write_bytes(b"desired\n")
+        stage.write_bytes(b"old\n")
+        successor_identity = DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(b"desired\n").hexdigest(),
+            mode=stat.S_IMODE(target.lstat().st_mode),
+        )
+        predecessor_identity = DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(b"old\n").hexdigest(),
+            mode=stat.S_IMODE(stage.lstat().st_mode),
+        )
+    else:
+        target.symlink_to("desired-target")
+        stage.symlink_to("old-target")
+        successor_identity = DistributionIdentity(kind="symlink", target="desired-target")
+        predecessor_identity = DistributionIdentity(kind="symlink", target="old-target")
+    successor = managed_distribution._distribution_stage_ownership("target", stage.name, target.lstat())
+    predecessor = stage.lstat()
+    target.unlink()
+    if kind == "regular":
+        target.write_bytes(b"third-party\n")
+    else:
+        target.symlink_to("third-party-target")
+    parent_fd = os.open(parent, os.O_RDONLY)
+    try:
+        with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
+            managed_distribution._remove_distribution_stage_if_owned(
+                parent_fd,
+                stage.name,
+                predecessor,
+                strict=True,
+                transition_path="target",
+                canonical_name=target.name,
+                canonical_ownership=successor,
+                canonical_condition={
+                    "identity": managed_distribution._distribution_identity_payload(successor_identity)
+                },
+                stage_condition={"identity": managed_distribution._distribution_identity_payload(predecessor_identity)},
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert stage.exists() or stage.is_symlink()
 
 
 @pytest.mark.parametrize("kind", ["regular", "symlink"])

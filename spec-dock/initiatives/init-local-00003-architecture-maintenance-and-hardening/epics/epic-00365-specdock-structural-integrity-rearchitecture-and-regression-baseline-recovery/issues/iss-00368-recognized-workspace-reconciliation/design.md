@@ -113,6 +113,10 @@ journal不在のschema-2 forward guardはschema-1 conversionと区別し、既�
 
 stage作成、atomic exchange、prune quarantine、missing parent作成は、可視namespace mutationより先に予約名またはmissing intentをjournalへ記録する。regular stageは可変write中は予約leaseを維持し、bytes/mode確定後にだけexact successor inodeへ昇格する。exchange後は、公開前から保持した stage descriptor が指す exact inode と canonical pathname が一致することを証明し、その successor leaseをdisplaced predecessor cleanupより先にdurable化する。cleanup直前にもcanonicalを同じleaseへ再照合し、same-content replacementからauthorityを再取得しない。強制終了後は予約名、exact canonical successor、displaced predecessor、空のcreated parentが単一の既知遷移に一致する場合だけforward recoveryする。same-contentでもcanonical inodeがleaseと異なる場合、またはexchange後にcanonicalが未知entryへ置換された場合はrollback/cleanupせず両entryを保持してblockする。
 
+recognized route が operation service より前に構築する active fallback assets は、bound root から descriptor-relative / no-follow で取得した private snapshot のみを読む。`.agent`、legacy `.work`、`active`、`initiatives` と必要な retained files を capture 前後の identity へ束縛し、symlink boundary、multi-link file、capture 後の appearance/rebind は service entry 前に拒否する。
+
+`created_parent_bindings` は journal 単独の ownership authority ではなく recovery hint とする。anchored action precondition で originally missing とされた parent closure を no-follow inventory し、child binding、action checkpoint の exact pre/post target、または current stage lease で説明できる entry だけを許可する。unknown sibling、unleased stage-like name、symlink/special child、identity mismatch は target mutation 前に拒否する。空directoryだけが出現した mkdir crash と、exact published/leased transition は従来どおり単調に収束させる。
+
 Action checkpoint:
 
 - `pending`: current state は exact pre-action identity であること
