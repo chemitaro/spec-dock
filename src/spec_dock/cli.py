@@ -1385,6 +1385,8 @@ def _snapshot_active_manifest(
                     normalized_parts.pop()
                 continue
             normalized_parts.append(component)
+            if Path(*normalized_parts) in initiative_aliases:
+                raise RuntimeError("persisted active path traverses an initiative symlink")
         normalized = Path(*normalized_parts)
         if any(normalized == alias or alias in normalized.parents for alias in initiative_aliases):
             raise RuntimeError("persisted active path traverses an initiative symlink")

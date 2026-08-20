@@ -8726,11 +8726,13 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
     @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
     @pytest.mark.parametrize("persisted_style", ["relative", "absolute"])
     @pytest.mark.parametrize("link_target", ["nested-in-repository", "escaping"])
+    @pytest.mark.parametrize("path_shape", ["direct", "alias-dotdot"])
     def test_recognized_reconciliation_blocks_persisted_issue_path_through_initiatives_symlink_before_writes(
         self,
         command: tuple[str, ...],
         persisted_style: str,
         link_target: str,
+        path_shape: str,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "consumer"
@@ -8754,7 +8756,12 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 symlink_target = issue_dir.name
             alias = issue_dir.parent / "iss-local-00001-persisted-alias"
             alias.symlink_to(symlink_target, target_is_directory=True)
-            persisted_path = str(alias) if persisted_style == "absolute" else alias.relative_to(target).as_posix()
+            raw_persisted_path = alias if path_shape == "direct" else alias / ".." / issue_dir.name
+            persisted_path = (
+                str(raw_persisted_path)
+                if persisted_style == "absolute"
+                else raw_persisted_path.relative_to(target).as_posix()
+            )
             self._write_json_force(
                 specdock_dir / ".agent" / "active.json",
                 {
@@ -8787,6 +8794,28 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             )
             if link_target == "escaping":
                 assert (outside_issue / "sentinel.txt").read_text(encoding="utf-8") == "outside-owned\n"
+
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    def test_recognized_reconciliation_allows_untraversed_initiative_symlink(
+        self,
+        command: tuple[str, ...],
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            alias = issue_dir.parent / "iss-local-00001-untraversed-alias"
+            alias.symlink_to(issue_dir.name, target_is_directory=True)
+            managed_target = target / "spec-dock" / "docs" / "README.md"
+            managed_target.unlink()
+
+            assert main([*command, str(target)]) == 0
+
+            assert alias.is_symlink()
+            assert managed_target.is_file()
 
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli

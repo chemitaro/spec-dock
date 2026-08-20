@@ -3475,6 +3475,52 @@ def test_i368_initial_guard_only_crash_reconstructs_exact_prepared_journal(
     assert resumed.source_sha256 == guard.journal_digest
 
 
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i368_prepared_journal_resumes_exact_guard_inherited_stage_lease(
+    tmp_path: Path,
+    kind: str,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    action = next(
+        item
+        for item in executable.actions
+        if (expected := managed_distribution._expected_target_identity(executable.distribution_plan, item.path))
+        is not None
+        and expected.kind == kind
+    )
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    stage = target_root / Path(action.path).parent / stage_name
+    stage.parent.mkdir(parents=True, exist_ok=True)
+    if kind == "regular":
+        stage.write_bytes(b"current\n")
+        stage.chmod(expected.mode or 0o644)
+    else:
+        assert expected.target is not None
+        stage.symlink_to(expected.target)
+    lease = managed_distribution._distribution_stage_ownership(
+        action.path,
+        stage_name,
+        stage.lstat(),
+    )
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(
+        executable,
+        package_version="1.2.3",
+        stage_ownership=(lease,),
+    )
+    store.bind_forward_guard(guard)
+    prepared = store.prepare(executable, package_version="1.2.3")
+    assert prepared.status == "prepared"
+
+    resumed = OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert resumed.status == "prepared"
+    assert resumed.staging_leases == (lease,)
+    assert stage.exists() or stage.is_symlink()
+
+
 def test_i368_initial_guard_rejects_self_rehashed_executing_zero_lease_before_mutation(
     tmp_path: Path,
 ) -> None:
@@ -3573,6 +3619,85 @@ def test_i368_digestless_schema_2_guard_rejects_executing_zero_lease_without_wri
     assert store.path.read_bytes() == journal_before
 
 
+@pytest.mark.parametrize("mutation", ["omit", "add", "reorder"])
+def test_i368_digestless_guard_rejects_forged_initial_created_parent_inventory(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    bindings = payload["created_parent_bindings"]
+    assert len(bindings) > 1
+    if mutation == "omit":
+        bindings = bindings[1:]
+    elif mutation == "add":
+        bindings = [
+            *bindings,
+            {
+                "relative_path": ".forged-parent",
+                "exists": False,
+                "device": None,
+                "inode": None,
+                "ctime_ns": None,
+                "file_type": None,
+                "link_count": None,
+            },
+        ]
+    else:
+        bindings = list(reversed(bindings))
+    payload["created_parent_bindings"] = bindings
+    payload["created_parent_bindings_digest"] = managed_distribution._created_parent_bindings_digest(
+        operation_id=journal.operation_id,
+        bindings=bindings,
+    )
+    store.path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker.pop("journal_digest")
+    marker.pop("journal_predecessor_digest")
+    marker.pop("journal_created_at_ns")
+    marker_path.write_text(
+        json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    marker_before = marker_path.read_bytes()
+    journal_before = store.path.read_bytes()
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert marker_path.read_bytes() == marker_before
+    assert store.path.read_bytes() == journal_before
+
+
+def test_i368_digestless_guard_accepts_initial_inventory_after_owned_parent_mkdir_crash(
+    tmp_path: Path,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    binding = next(item for item in journal.created_parent_bindings if "/" not in item.relative_path)
+    (target_root / binding.relative_path).mkdir()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker.pop("journal_digest")
+    marker.pop("journal_predecessor_digest")
+    marker.pop("journal_created_at_ns")
+    marker_path.write_text(
+        json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    resumed = OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert resumed.status == "prepared"
+
+
 @pytest.mark.parametrize("legacy_state", ["dual-link", "backup-only"])
 def test_i368_roleless_backup_fixture_promotes_and_resumes(
     tmp_path: Path,
@@ -3639,16 +3764,6 @@ def test_i368_roleless_backup_fixture_promotes_and_resumes(
         file_type="regular",
         role="predecessor-quarantine",
     )
-    backup_info = backup.lstat()
-    roleless_backup = managed_distribution.DistributionStageOwnership(
-        path=target_rel,
-        stage_name=backup_name,
-        device=backup_info.st_dev,
-        inode=backup_info.st_ino,
-        ctime_ns=backup_info.st_ctime_ns,
-        file_type="regular",
-        role="backup-dual" if legacy_state == "dual-link" else "backup-only",
-    )
     journal = store.write(
         managed_distribution.replace(
             journal,
@@ -3656,7 +3771,7 @@ def test_i368_roleless_backup_fixture_promotes_and_resumes(
                 managed_distribution.replace(action, checkpoint="published") if action.path == target_rel else action
                 for action in journal.actions
             ),
-            staging_leases=(successor, predecessor, roleless_backup),
+            staging_leases=(successor, predecessor),
         ),
         predecessor=journal,
     )
@@ -7590,6 +7705,85 @@ def test_i368_quarantine_backup_preserves_replacement_and_restores_predecessor(
         assert stage.readlink() == Path("old-target")
         replacement_path = target if race_point == "post-unlink-canonical" else next(parent.glob("*.remove"))
         assert replacement_path.readlink() == Path("third-party-target")
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("race", ["replacement", "unknown-child"])
+def test_i368_final_gc_preserves_exact_source_across_delete_interposition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    race: str,
+) -> None:
+    parent = tmp_path / f"{kind}-{race}"
+    parent.mkdir()
+    stage = parent / "stage"
+    if kind == "regular":
+        stage.write_bytes(b"owned\n")
+    else:
+        stage.symlink_to("owned-target")
+    created = stage.lstat()
+    leases: list[DistributionStageOwnership] = []
+    original_stat = managed_distribution.os.stat
+    injected = False
+    unknown = parent / "unknown-child"
+
+    def interpose_after_final_gc_stat(name, *args, **kwargs):
+        nonlocal injected
+        result = original_stat(name, *args, **kwargs)
+        if (
+            not injected
+            and isinstance(name, str)
+            and name.endswith(".gc")
+            and any(lease.role == "gc-exact" and lease.stage_name == name for lease in leases)
+        ):
+            injected = True
+            if race == "replacement":
+                (parent / name).unlink()
+                if kind == "regular":
+                    (parent / name).write_bytes(b"third-party\n")
+                else:
+                    (parent / name).symlink_to("third-party-target")
+            else:
+                unknown.write_bytes(b"third-party\n")
+        return result
+
+    def validate_namespace() -> None:
+        if unknown.exists():
+            raise DistributionApplyError("journal-precondition-mismatch")
+
+    monkeypatch.setattr(managed_distribution.os, "stat", interpose_after_final_gc_stat)
+    parent_fd = os.open(parent, os.O_RDONLY)
+    try:
+        with pytest.raises(DistributionApplyError):
+            managed_distribution._remove_distribution_stage_if_owned(
+                parent_fd,
+                stage.name,
+                created,
+                strict=True,
+                mutation_validator=validate_namespace,
+                gc_path="managed/target",
+                gc_recorder=leases.append,
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert injected is True
+    gc_name = next(lease.stage_name for lease in leases if lease.role == "gc-exact")
+    gc = parent / gc_name
+    if race == "replacement":
+        if kind == "regular":
+            assert gc.read_bytes() == b"third-party\n"
+        else:
+            assert gc.readlink() == Path("third-party-target")
+    else:
+        assert unknown.read_bytes() == b"third-party\n"
+    owned_candidates = [path for path in (stage, gc) if path.exists() or path.is_symlink()]
+    assert owned_candidates
+    if kind == "regular":
+        assert any(path.read_bytes() == b"owned\n" for path in owned_candidates)
+    else:
+        assert any(path.readlink() == Path("owned-target") for path in owned_candidates)
 
 
 @pytest.mark.parametrize("kind", ["regular", "symlink"])
