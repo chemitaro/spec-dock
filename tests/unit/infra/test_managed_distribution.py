@@ -1140,6 +1140,39 @@ def test_i368_journal_guard_is_rejected_by_the_legacy_marker_contract(tmp_path: 
     assert managed_distribution._read_distribution_retry_marker(target_root) == marker
 
 
+def test_i368_schema_2_guard_without_initial_journal_timestamp_remains_readable(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        intent="update",
+    )
+    marker = OperationJournalStore(target_root).prepare_legacy_guard(
+        build_executable_mutation_plan(assessment),
+        package_version="1.2.3",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    payload = json.loads(marker_path.read_text(encoding="utf-8"))
+    payload.pop("journal_created_at_ns")
+    marker_path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    admitted = managed_distribution._read_distribution_retry_marker(target_root)
+
+    assert admitted is not None
+    assert admitted.journal_digest == marker.journal_digest
+    assert admitted.journal_predecessor_digest == marker.journal_predecessor_digest
+    assert admitted.journal_created_at_ns is None
+
+
 @pytest.mark.parametrize("guard_state", ("absent", "schema-1", "replaced"))
 def test_i368_journal_resume_requires_exact_schema_2_forward_guard(
     tmp_path: Path,
@@ -2978,6 +3011,83 @@ def test_i368_zero_reserved_created_parent_stage_crash_recovery(
         assert journal_path.exists()
 
 
+@pytest.mark.parametrize("unknown_kind", ["regular", "symlink", "fifo", "unleased-stage"])
+def test_i368_stale_cleanup_final_backup_unlink_revalidates_held_created_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    unknown_kind: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    original_open = managed_distribution.os.open
+    crashed = False
+
+    def crash_after_stage_create(path, flags, *args, **kwargs):
+        nonlocal crashed
+        fd = original_open(path, flags, *args, **kwargs)
+        if not crashed and isinstance(path, str) and path.startswith(".spec-dock-file-"):
+            crashed = True
+            os.close(fd)
+            raise SimulatedProcessCrash
+        return fd
+
+    with monkeypatch.context() as fault:
+        fault.setattr(managed_distribution.os, "open", crash_after_stage_create)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    parent = target_root / ".github" / "workflows"
+    original_remove = managed_distribution._remove_distribution_stage_if_owned
+    injected: Path | None = None
+
+    def inject_before_final_backup_unlink(parent_fd, stage_name, created, **kwargs):
+        nonlocal injected
+        if injected is None and isinstance(stage_name, str) and stage_name.startswith(".spec-dock-backup-"):
+            name = ".unknown" if unknown_kind != "unleased-stage" else ".spec-dock-file-unleased"
+            injected = parent / name
+            if unknown_kind == "symlink":
+                injected.symlink_to("third-party")
+            elif unknown_kind == "fifo":
+                os.mkfifo(injected)
+            else:
+                injected.write_bytes(b"third-party\n")
+        return original_remove(parent_fd, stage_name, created, **kwargs)
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_remove_distribution_stage_if_owned",
+        inject_before_final_backup_unlink,
+    )
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert injected is not None
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-precondition-mismatch"
+    assert injected.exists() or injected.is_symlink()
+    assert not (parent / "ci.yml").exists()
+
+
 def test_i368_abrupt_swap_requires_exact_post_swap_successor_lease(tmp_path: Path) -> None:
     old = b"old\n"
     install_root = _minimal_install_root(tmp_path, b"desired\n")
@@ -3205,6 +3315,80 @@ def test_i368_guard_write_ahead_crash_accepts_exact_journal_predecessor(
     resumed = retry_store.resume(executable, package_version="1.2.3")
     assert resumed.status == journal.status
     assert retry_store.mark_executing(resumed).status == "executing"
+
+
+def test_i368_initial_guard_only_crash_reconstructs_exact_prepared_journal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    original_write = OperationJournalStore._write
+    crashed = False
+
+    def crash_before_initial_publish(self, journal, *, predecessor=None, require_absent=False):
+        nonlocal crashed
+        if require_absent and not crashed:
+            crashed = True
+            raise KeyboardInterrupt("guard-only crash")
+        return original_write(
+            self,
+            journal,
+            predecessor=predecessor,
+            require_absent=require_absent,
+        )
+
+    monkeypatch.setattr(OperationJournalStore, "_write", crash_before_initial_publish)
+    with pytest.raises(KeyboardInterrupt, match="guard-only"):
+        store.prepare(executable, package_version="1.2.3")
+    assert crashed is True
+    assert not store.path.exists()
+    guard = managed_distribution._read_distribution_retry_marker(target_root)
+    assert guard is not None
+    assert guard.journal_digest is not None
+    assert guard.journal_created_at_ns is not None
+
+    monkeypatch.setattr(OperationJournalStore, "_write", original_write)
+    resumed = OperationJournalStore(target_root).prepare(executable, package_version="1.2.3")
+    assert resumed.status == "prepared"
+    assert resumed.source_sha256 == guard.journal_digest
+
+
+def test_i368_initial_guard_rejects_self_rehashed_executing_zero_lease_before_mutation(
+    tmp_path: Path,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    action = next(item for item in journal.actions if item.action == "create")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    forged_lease = {
+        "path": action.path,
+        "stage_name": stage_name,
+        "device": 0,
+        "inode": 0,
+        "ctime_ns": 0,
+        "file_type": expected.kind,
+    }
+    payload["status"] = "executing"
+    payload["staging_leases"] = [forged_lease]
+    payload["staging_leases_digest"] = managed_distribution._staging_leases_digest(
+        operation_id=journal.operation_id,
+        leases=[forged_lease],
+    )
+    store.path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert not (target_root / Path(action.path)).exists()
+    assert not (target_root / Path(action.path).parent / stage_name).exists()
 
 
 @pytest.mark.parametrize(
@@ -6590,7 +6774,15 @@ def test_i368_checkpoint_quarantine_unlink_fault_restores_and_converges(
 @pytest.mark.parametrize("kind", ["regular", "symlink"])
 @pytest.mark.parametrize(
     "fault_point",
-    ["reservation-after", "rename-after", "exact-before", "exact-after", "unlink-before"],
+    [
+        "reservation-after",
+        "rename-after",
+        "exact-before",
+        "exact-after",
+        "backup-link-after",
+        "unlink-before",
+        "quarantine-unlink-after",
+    ],
 )
 def test_i368_displaced_quarantine_write_ahead_crash_retry_converges(
     tmp_path: Path,
@@ -6635,6 +6827,7 @@ def test_i368_displaced_quarantine_write_ahead_crash_retry_converges(
 
     original_record = OperationJournalStore.record_staging_lease
     original_rename = managed_distribution._rename_distribution_no_replace
+    original_link = managed_distribution.os.link
     original_unlink = managed_distribution.os.unlink
     injected = False
 
@@ -6667,15 +6860,38 @@ def test_i368_displaced_quarantine_write_ahead_crash_retry_converges(
                 injected = True
                 raise SimulatedProcessCrash
 
+        def crash_after_backup_link(source_name, destination_name, *args, **kwargs):
+            nonlocal injected
+            result = original_link(source_name, destination_name, *args, **kwargs)
+            if (
+                fault_point == "backup-link-after"
+                and isinstance(destination_name, str)
+                and destination_name.startswith(".spec-dock-backup-")
+                and not injected
+            ):
+                injected = True
+                raise SimulatedProcessCrash
+            return result
+
         def crash_before_unlink(name, *args, **kwargs):
             nonlocal injected
             if fault_point == "unlink-before" and isinstance(name, str) and name.endswith(".remove") and not injected:
                 injected = True
                 raise SimulatedProcessCrash
-            return original_unlink(name, *args, **kwargs)
+            result = original_unlink(name, *args, **kwargs)
+            if (
+                fault_point == "quarantine-unlink-after"
+                and isinstance(name, str)
+                and name.endswith(".remove")
+                and not injected
+            ):
+                injected = True
+                raise SimulatedProcessCrash
+            return result
 
         faults.setattr(OperationJournalStore, "record_staging_lease", crash_during_record)
         faults.setattr(managed_distribution, "_rename_distribution_no_replace", crash_after_rename)
+        faults.setattr(managed_distribution.os, "link", crash_after_backup_link)
         faults.setattr(managed_distribution.os, "unlink", crash_before_unlink)
         with pytest.raises(SimulatedProcessCrash):
             execute_recognized_distribution(
@@ -6687,15 +6903,32 @@ def test_i368_displaced_quarantine_write_ahead_crash_retry_converges(
                 package_version="1.2.3",
             )
 
-    assert injected is True
-    retry = execute_recognized_distribution(
-        install_root,
-        manifest_path=manifest_path,
-        scaffold_root=scaffold_root,
-        target_root=target_root,
-        intent="update",
-        package_version="1.2.3",
-    )
+        assert injected is True
+        crashed_payload = json.loads(
+            (target_root / "spec-dock" / ".distribution-journal.json").read_text(encoding="utf-8")
+        )
+        crashed_roles = {
+            lease.get("role", "stage") for lease in crashed_payload["staging_leases"] if lease["path"] == target_rel
+        }
+        assert "predecessor-quarantine" in crashed_roles
+        if fault_point in {"unlink-before", "quarantine-unlink-after"}:
+            assert {"backup-dual", "backup-only-reserved"} <= crashed_roles
+            backup_lease = next(
+                lease
+                for lease in crashed_payload["staging_leases"]
+                if lease.get("role") == "backup-dual" and lease["path"] == target_rel
+            )
+            assert backup_lease["stage_name"].startswith(".spec-dock-backup-")
+        elif fault_point == "backup-link-after":
+            assert "backup-reserved" in crashed_roles
+        retry = execute_recognized_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent="update",
+            package_version="1.2.3",
+        )
 
     assert retry.status == "completed", retry.reason
     if kind == "regular":

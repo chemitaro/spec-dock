@@ -1294,7 +1294,11 @@ def _preserved_inventory_entry_selected(
     if selection == "allowed":
         return name in allowed_names
     if selection == "initiative":
-        return name != ".workbench" and (name == ".meta.json" or stat.S_ISDIR(info.st_mode))
+        if name == ".workbench":
+            return False
+        if stat.S_ISLNK(info.st_mode) or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
+            raise RuntimeError("preserved initiative traversal contains an unsafe entry")
+        return name == ".meta.json" or stat.S_ISDIR(info.st_mode)
     raise RuntimeError("unknown preserved directory inventory selection")
 
 
