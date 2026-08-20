@@ -1146,6 +1146,26 @@ def admit_distribution_operation(
         if operation not in {"update", "init-force"}:
             _admission_block("distribution-retry-present", "recover distribution before this operation")
         distribution_marker = _read_distribution_retry_marker(target_root)
+        if distribution_marker is None:
+            try:
+                terminal_journal = OperationJournalStore(target_root)._read(root_identity)
+            except DistributionApplyError:
+                _admission_block("dual-marker", "distribution recovery states cannot coexist")
+            if (
+                terminal_journal.status != "completed"
+                or terminal_journal.intent != operation
+                or terminal_journal.authority != "recognized-workspace-reconciliation"
+                or terminal_journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+                or not _journal_package_is_compatible(terminal_journal.package_version, package_version)
+                or terminal_journal.staging_leases
+                or any(action.checkpoint != "verified" for action in terminal_journal.actions)
+            ):
+                _admission_block("dual-marker", "distribution recovery states cannot coexist")
+            return DistributionAdmission(
+                operation=operation,
+                status="retry",
+                package_version=package_version,
+            )
         if distribution_marker is None or (
             distribution_marker.purpose != _DISTRIBUTION_JOURNAL_GUARD_PURPOSE
             or distribution_marker.source_snapshot is None
