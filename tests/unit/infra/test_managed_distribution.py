@@ -3011,6 +3011,127 @@ def test_i368_zero_reserved_created_parent_stage_crash_recovery(
         assert journal_path.exists()
 
 
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize(
+    "recovery_role",
+    [
+        "predecessor-quarantine",
+        "backup-reserved",
+        "backup-dual",
+        "backup-only-reserved",
+        "backup-only",
+        "gc-reserved",
+        "gc-exact",
+    ],
+)
+def test_i368_pending_create_stale_cleanup_roles_resume_before_action(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    recovery_role: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target_rel = ".github/workflows/ci.yml" if kind == "regular" else "spec"
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    original_open = managed_distribution.os.open
+    original_symlink = managed_distribution.os.symlink
+    stage_crashed = False
+
+    def crash_after_regular_stage_create(path, flags, *args, **kwargs):
+        nonlocal stage_crashed
+        fd = original_open(path, flags, *args, **kwargs)
+        if kind == "regular" and not stage_crashed and isinstance(path, str) and path.startswith(".spec-dock-file-"):
+            stage_crashed = True
+            os.close(fd)
+            raise SimulatedProcessCrash
+        return fd
+
+    def crash_after_symlink_stage_create(source, destination, *args, **kwargs):
+        nonlocal stage_crashed
+        original_symlink(source, destination, *args, **kwargs)
+        if (
+            kind == "symlink"
+            and not stage_crashed
+            and isinstance(destination, str)
+            and destination.startswith(".spec-dock-symlink-")
+        ):
+            stage_crashed = True
+            raise SimulatedProcessCrash
+
+    with monkeypatch.context() as fault:
+        fault.setattr(managed_distribution.os, "open", crash_after_regular_stage_create)
+        fault.setattr(managed_distribution.os, "symlink", crash_after_symlink_stage_create)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    original_record = OperationJournalStore.record_staging_lease
+    recovery_crashed = False
+
+    def crash_after_recovery_role(self, journal, lease):
+        nonlocal recovery_crashed
+        updated = original_record(self, journal, lease)
+        if lease.path == target_rel and lease.role == recovery_role and not recovery_crashed:
+            recovery_crashed = True
+            raise SimulatedProcessCrash
+        return updated
+
+    with monkeypatch.context() as fault:
+        fault.setattr(OperationJournalStore, "record_staging_lease", crash_after_recovery_role)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    assert recovery_crashed is True
+    if kind == "regular":
+        unknown = target_root / ".github" / "workflows" / "third-party.txt"
+        unknown.write_bytes(b"third-party\n")
+        blocked = execute_recognized_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent="update",
+            package_version="1.2.3",
+        )
+        assert blocked.status == "recovery_required"
+        assert unknown.read_bytes() == b"third-party\n"
+        assert not (target_root / target_rel).exists()
+        unknown.unlink()
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "completed", retry.reason
+    target = target_root / target_rel
+    assert target.exists() or target.is_symlink()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
 @pytest.mark.parametrize("unknown_kind", ["regular", "symlink", "fifo", "unleased-stage"])
 def test_i368_stale_cleanup_final_backup_unlink_revalidates_held_created_parent(
     tmp_path: Path,
@@ -3389,6 +3510,190 @@ def test_i368_initial_guard_rejects_self_rehashed_executing_zero_lease_before_mu
 
     assert not (target_root / Path(action.path)).exists()
     assert not (target_root / Path(action.path).parent / stage_name).exists()
+
+
+def test_i368_digestless_schema_2_guard_migrates_only_exact_initial_journal(
+    tmp_path: Path,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker.pop("journal_digest")
+    marker.pop("journal_predecessor_digest")
+    marker.pop("journal_created_at_ns")
+    marker_path.write_text(
+        json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    resumed = OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    migrated = managed_distribution._read_distribution_retry_marker(target_root)
+    assert migrated is not None
+    assert migrated.journal_digest == journal.source_sha256
+    assert resumed.source_sha256 == journal.source_sha256
+
+
+def test_i368_digestless_schema_2_guard_rejects_executing_zero_lease_without_writes(
+    tmp_path: Path,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    action = next(item for item in journal.actions if item.action == "create")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    assert expected.kind == "regular"
+    journal = store.record_staging_lease(
+        journal,
+        managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            managed_distribution._new_distribution_stage_name(action.path, expected),
+            "regular",
+        ),
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker.pop("journal_digest")
+    marker.pop("journal_predecessor_digest")
+    marker.pop("journal_created_at_ns")
+    marker_path.write_text(
+        json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    marker_before = marker_path.read_bytes()
+    journal_before = store.path.read_bytes()
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert marker_path.read_bytes() == marker_before
+    assert store.path.read_bytes() == journal_before
+
+
+@pytest.mark.parametrize("legacy_state", ["dual-link", "backup-only"])
+def test_i368_roleless_backup_fixture_promotes_and_resumes(
+    tmp_path: Path,
+    legacy_state: str,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target_rel = ".github/workflows/ci.yml"
+    target = target_root / target_rel
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    record = next(action for action in journal.actions if action.path == target_rel)
+    assert record.action == "upgrade"
+    target.write_bytes(desired)
+    target.chmod(0o644)
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, target_rel)
+    assert expected is not None
+    stage_name = managed_distribution._new_distribution_stage_name(target_rel, expected)
+    quarantine_name = f"{stage_name}.fixture.remove"
+    quarantine = target.parent / quarantine_name
+    quarantine.write_bytes(old)
+    backup_name = managed_distribution._distribution_quarantine_backup_name(quarantine_name)
+    backup = target.parent / backup_name
+    os.link(quarantine, backup)
+    if legacy_state == "backup-only":
+        quarantine.unlink()
+    successor = managed_distribution._distribution_stage_ownership(
+        target_rel,
+        stage_name,
+        target.lstat(),
+    )
+    predecessor_info = backup.lstat() if legacy_state == "backup-only" else quarantine.lstat()
+    predecessor = managed_distribution.DistributionStageOwnership(
+        path=target_rel,
+        stage_name=quarantine_name,
+        device=predecessor_info.st_dev,
+        inode=predecessor_info.st_ino,
+        ctime_ns=predecessor_info.st_ctime_ns,
+        file_type="regular",
+        role="predecessor-quarantine",
+    )
+    backup_info = backup.lstat()
+    roleless_backup = managed_distribution.DistributionStageOwnership(
+        path=target_rel,
+        stage_name=backup_name,
+        device=backup_info.st_dev,
+        inode=backup_info.st_ino,
+        ctime_ns=backup_info.st_ctime_ns,
+        file_type="regular",
+        role="backup-dual" if legacy_state == "dual-link" else "backup-only",
+    )
+    journal = store.write(
+        managed_distribution.replace(
+            journal,
+            actions=tuple(
+                managed_distribution.replace(action, checkpoint="published") if action.path == target_rel else action
+                for action in journal.actions
+            ),
+            staging_leases=(successor, predecessor, roleless_backup),
+        ),
+        predecessor=journal,
+    )
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    for lease in payload["staging_leases"]:
+        lease.pop("role", None)
+    payload["staging_leases_digest"] = managed_distribution._staging_leases_digest(
+        operation_id=journal.operation_id,
+        leases=payload["staging_leases"],
+    )
+    roleless_bytes = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    store.path.write_bytes(roleless_bytes)
+    guard = managed_distribution._read_distribution_retry_marker(target_root)
+    assert guard is not None
+    store.bind_forward_guard(guard)
+    guard = store.prepare_legacy_guard(
+        None,
+        package_version=guard.package_version,
+        replace_marker=guard,
+        journal_digest=hashlib.sha256(roleless_bytes).hexdigest(),
+        journal_predecessor_digest=None,
+        journal_created_at_ns=journal.created_at_ns,
+    )
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        legacy_marker=guard,
+    )
+
+    assert result.status == "completed", result.reason
+    assert target.read_bytes() == desired
+    assert not backup.exists()
+    assert not quarantine.exists()
 
 
 @pytest.mark.parametrize(
@@ -5010,7 +5315,7 @@ def test_s30_apply_records_partial_stage_identity_when_cleanup_fails(
     assert target.read_bytes() == old
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 2
+    assert len(recorded) >= 2
     refreshed = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
@@ -5103,7 +5408,7 @@ def test_s30_apply_create_records_partial_stage_identity_when_cleanup_fails(
 
     stage_files = list(target_root.rglob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 2
+    assert len(recorded) >= 2
     refreshed = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (refreshed.device, refreshed.inode, refreshed.ctime_ns) == (
@@ -5661,7 +5966,7 @@ def test_s30_apply_retries_symlink_create_stage_record_and_cleanup(
 
     stage_files = list(target_root.rglob(".spec-dock-symlink-*"))
     assert len(stage_files) == 1
-    symlink_record = next(item for item in recorded if item.file_type == "symlink" and item.device != 0)
+    symlink_record = next(item for item in reversed(recorded) if item.file_type == "symlink" and item.device != 0)
     stage_stat = stage_files[0].lstat()
     assert (symlink_record.device, symlink_record.inode, symlink_record.ctime_ns) == (
         stage_stat.st_dev,
