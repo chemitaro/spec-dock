@@ -977,6 +977,37 @@ def test_i368_preserved_validator_repeats_until_first_operation_owned_parent_mut
     assert created_parent.is_dir()
 
 
+def test_i368_preserved_validator_deactivates_only_after_existing_parent_stage_create(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    observations: list[bool] = []
+
+    def validate_preserved_state() -> None:
+        observations.append(target.exists())
+        if target.exists():
+            raise DistributionApplyError("preserved validator ran after target publication")
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        preserved_state_validator=validate_preserved_state,
+    )
+
+    assert result.status == "completed", result.reason
+    assert target.exists()
+    assert len(observations) > 1
+    assert not any(observations)
+
+
 def test_i368_parent_creation_crash_resumes_from_durable_parent_intent(
     tmp_path: Path,
     monkeypatch,
@@ -3105,6 +3136,75 @@ def test_i368_forward_guard_rejects_reordered_self_rehashed_journal(tmp_path: Pa
 
     with pytest.raises(DistributionApplyError, match="journal-plan-mismatch"):
         store.resume(executable, package_version="1.2.3")
+
+
+def test_i368_guard_anchor_rejects_self_rehashed_zero_reservation_journal(tmp_path: Path) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    action = next(item for item in journal.actions if item.action == "create")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    stage = target_root / Path(action.path).parent / stage_name
+    stage.parent.mkdir(parents=True, exist_ok=True)
+    if expected.kind == "regular":
+        stage.write_bytes(b"syntactically-valid-stage\n")
+    else:
+        stage.symlink_to(expected.target)
+
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    forged_lease = {
+        "path": action.path,
+        "stage_name": stage_name,
+        "device": 0,
+        "inode": 0,
+        "ctime_ns": 0,
+        "file_type": expected.kind,
+    }
+    payload["staging_leases"] = [forged_lease]
+    payload["staging_leases_digest"] = managed_distribution._staging_leases_digest(
+        operation_id=journal.operation_id,
+        leases=[forged_lease],
+    )
+    store.path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        store.resume(executable, package_version="1.2.3")
+
+    assert stage.exists() or stage.is_symlink()
+
+
+def test_i368_guard_write_ahead_crash_accepts_exact_journal_predecessor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    original_swap = managed_distribution._rename_distribution_swap
+    crashed = False
+
+    def crash_before_journal_swap(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal crashed
+        if not crashed and destination_name == store.path.name:
+            crashed = True
+            raise KeyboardInterrupt("crash after guard write-ahead")
+        return original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", crash_before_journal_swap)
+    with pytest.raises(KeyboardInterrupt, match="guard write-ahead"):
+        store.mark_executing(journal)
+    assert crashed is True
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", original_swap)
+    retry_store = OperationJournalStore(target_root)
+    resumed = retry_store.resume(executable, package_version="1.2.3")
+    assert resumed.status == journal.status
+    assert retry_store.mark_executing(resumed).status == "executing"
 
 
 @pytest.mark.parametrize(

@@ -1107,6 +1107,14 @@ class _PreservedReadBinding(NamedTuple):
     link_target: str | None = None
 
 
+class _PreservedDirectoryInventory(NamedTuple):
+    """Resolver-visible children captured from one held directory descriptor."""
+
+    selection: str
+    allowed_names: frozenset[str]
+    children: dict[str, _PreservedReadBinding]
+
+
 def _preserved_read_binding(info: os.stat_result, *, link_target: str | None = None) -> _PreservedReadBinding:
     return _PreservedReadBinding(
         info.st_dev,
@@ -1274,6 +1282,55 @@ def _capture_preserved_directory_at(
                 os.close(fd)
 
 
+def _preserved_inventory_entry_selected(
+    name: str,
+    info: os.stat_result,
+    *,
+    selection: str,
+    allowed_names: frozenset[str],
+) -> bool:
+    if selection == "all":
+        return True
+    if selection == "allowed":
+        return name in allowed_names
+    if selection == "initiative":
+        return name != ".workbench" and (name == ".meta.json" or stat.S_ISDIR(info.st_mode))
+    raise RuntimeError("unknown preserved directory inventory selection")
+
+
+def _capture_preserved_directory_inventory(
+    directory_fd: int,
+    relative_path: Path,
+    inventories: dict[Path, _PreservedDirectoryInventory],
+    *,
+    selection: str,
+    allowed_names: frozenset[str] = frozenset(),
+) -> None:
+    """Capture the resolver-visible child set without reopening its directory."""
+
+    before = os.fstat(directory_fd)
+    captured: dict[str, _PreservedReadBinding] = {}
+    try:
+        names = sorted(os.listdir(directory_fd))
+        for name in names:
+            info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if not _preserved_inventory_entry_selected(
+                name,
+                info,
+                selection=selection,
+                allowed_names=allowed_names,
+            ):
+                continue
+            link_target = os.readlink(name, dir_fd=directory_fd) if stat.S_ISLNK(info.st_mode) else None
+            captured[name] = _preserved_read_binding(info, link_target=link_target)
+        after = os.fstat(directory_fd)
+        if (after.st_dev, after.st_ino, after.st_ctime_ns) != (before.st_dev, before.st_ino, before.st_ctime_ns):
+            raise RuntimeError("preserved state directory inventory changed during capture")
+    except OSError as exc:
+        raise RuntimeError("preserved state directory inventory cannot be captured safely") from exc
+    inventories[relative_path] = _PreservedDirectoryInventory(selection, allowed_names, captured)
+
+
 def _snapshot_active_manifest(content: bytes, *, visible_root: Path) -> bytes:
     """Map absolute in-repository manifest paths into the private snapshot root."""
 
@@ -1331,9 +1388,16 @@ def _snapshot_initiative_metadata(
     destination: Path,
     relative_root: Path,
     bindings: dict[Path, _PreservedReadBinding | None],
+    inventories: dict[Path, _PreservedDirectoryInventory],
 ) -> None:
     """Copy only metadata that the active-state resolver reads from initiatives."""
 
+    _capture_preserved_directory_inventory(
+        source_fd,
+        relative_root,
+        inventories,
+        selection="initiative",
+    )
     for name in sorted(os.listdir(source_fd)):
         if name == ".workbench":
             continue
@@ -1352,7 +1416,13 @@ def _snapshot_initiative_metadata(
                 bindings[relative_path] = _preserved_read_binding(opened)
                 child_destination = destination / name
                 child_destination.mkdir()
-                _snapshot_initiative_metadata(child_fd, child_destination, relative_path, bindings)
+                _snapshot_initiative_metadata(
+                    child_fd,
+                    child_destination,
+                    relative_path,
+                    bindings,
+                    inventories,
+                )
             finally:
                 os.close(child_fd)
             continue
@@ -1375,6 +1445,7 @@ def _snapshot_initiative_metadata(
 def _revalidate_preserved_read_bindings(
     root_fd: int,
     bindings: dict[Path, _PreservedReadBinding | None],
+    inventories: dict[Path, _PreservedDirectoryInventory],
     *,
     allow_directory_metadata_changes: bool = False,
 ) -> None:
@@ -1397,6 +1468,35 @@ def _revalidate_preserved_read_bindings(
         if current is None or _preserved_read_binding(current, link_target=link_target) != expected:
             raise RuntimeError("preserved state path identity changed after capture")
 
+    for relative_path, inventory in inventories.items():
+        parent_chain = _open_preserved_parent_at(root_fd, relative_path / "__inventory__")
+        try:
+            directory_fd = parent_chain[-1]
+            before = os.fstat(directory_fd)
+            current_children: dict[str, _PreservedReadBinding] = {}
+            for name in sorted(os.listdir(directory_fd)):  # noqa: PTH208
+                info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                if not _preserved_inventory_entry_selected(
+                    name,
+                    info,
+                    selection=inventory.selection,
+                    allowed_names=inventory.allowed_names,
+                ):
+                    continue
+                link_target = os.readlink(name, dir_fd=directory_fd) if stat.S_ISLNK(info.st_mode) else None
+                current_children[name] = _preserved_read_binding(info, link_target=link_target)
+            after = os.fstat(directory_fd)
+            if (after.st_dev, after.st_ino, after.st_ctime_ns) != (before.st_dev, before.st_ino, before.st_ctime_ns):
+                raise RuntimeError("preserved state directory inventory changed during revalidation")
+            if current_children != inventory.children:
+                raise RuntimeError("preserved state directory children changed after capture")
+        except OSError as exc:
+            raise RuntimeError("preserved state directory inventory cannot be revalidated safely") from exc
+        finally:
+            for fd in reversed(parent_chain):
+                with suppress(OSError):
+                    os.close(fd)
+
 
 @contextmanager
 def _recognized_preserved_state_snapshot(
@@ -1411,10 +1511,18 @@ def _recognized_preserved_state_snapshot(
     # by an attacker while the held repository remains the mutation authority.
     root_fd = os.open(bound_root, _managed_directory_flags())
     bindings: dict[Path, _PreservedReadBinding | None] = {}
+    inventories: dict[Path, _PreservedDirectoryInventory] = {}
     try:
         specdock_fd = _capture_preserved_directory_at(root_fd, Path("spec-dock"), bindings, required=True)
         assert specdock_fd is not None
         try:
+            _capture_preserved_directory_inventory(
+                specdock_fd,
+                Path("spec-dock"),
+                inventories,
+                selection="allowed",
+                allowed_names=frozenset({".agent", ".work", "active", "initiatives", "system"}),
+            )
             with tempfile.TemporaryDirectory(prefix="spec-dock-preserved-") as tmp:
                 snapshot_root = Path(tmp) / "repo"
                 snapshot_specdock = snapshot_root / "spec-dock"
@@ -1436,6 +1544,13 @@ def _recognized_preserved_state_snapshot(
                 )
                 if system_fd is not None:
                     try:
+                        _capture_preserved_directory_inventory(
+                            system_fd,
+                            system_rel,
+                            inventories,
+                            selection="allowed",
+                            allowed_names=frozenset({"active-none"}),
+                        )
                         active_none_rel = system_rel / "active-none"
                         active_none_fd = _capture_preserved_directory_at(
                             system_fd,
@@ -1446,6 +1561,13 @@ def _recognized_preserved_state_snapshot(
                         )
                         if active_none_fd is not None:
                             try:
+                                _capture_preserved_directory_inventory(
+                                    active_none_fd,
+                                    active_none_rel,
+                                    inventories,
+                                    selection="allowed",
+                                    allowed_names=frozenset({"initiative", "epic", "issue"}),
+                                )
                                 for layer in ("initiative", "epic", "issue"):
                                     layer_fd = _capture_preserved_directory_at(
                                         active_none_fd,
@@ -1455,7 +1577,15 @@ def _recognized_preserved_state_snapshot(
                                         binding_path=active_none_rel / layer,
                                     )
                                     if layer_fd is not None:
-                                        os.close(layer_fd)
+                                        try:
+                                            _capture_preserved_directory_inventory(
+                                                layer_fd,
+                                                active_none_rel / layer,
+                                                inventories,
+                                                selection="all",
+                                            )
+                                        finally:
+                                            os.close(layer_fd)
                             finally:
                                 os.close(active_none_fd)
                     finally:
@@ -1478,6 +1608,7 @@ def _recognized_preserved_state_snapshot(
                             snapshot_initiatives,
                             initiatives_rel,
                             bindings,
+                            inventories,
                         )
                     finally:
                         os.close(initiatives_fd)
@@ -1499,6 +1630,13 @@ def _recognized_preserved_state_snapshot(
                     if directory_fd is None:
                         continue
                     try:
+                        _capture_preserved_directory_inventory(
+                            directory_fd,
+                            directory_rel,
+                            inventories,
+                            selection="allowed",
+                            allowed_names=frozenset(file_names),
+                        )
                         for file_name in file_names:
                             file_rel = directory_rel / file_name
                             captured = _read_preserved_regular_at(
@@ -1537,6 +1675,13 @@ def _recognized_preserved_state_snapshot(
                 )
                 if active_fd is not None:
                     try:
+                        _capture_preserved_directory_inventory(
+                            active_fd,
+                            active_rel,
+                            inventories,
+                            selection="allowed",
+                            allowed_names=frozenset(active_names),
+                        )
                         active_entries = set(os.listdir(active_fd))  # noqa: PTH208
                         for name in active_names:
                             path_rel = active_rel / name
@@ -1594,12 +1739,13 @@ def _recognized_preserved_state_snapshot(
                         os.close(active_fd)
 
                 def revalidate_preserved_state_before_service() -> None:
-                    _revalidate_preserved_read_bindings(root_fd, bindings)
+                    _revalidate_preserved_read_bindings(root_fd, bindings, inventories)
 
                 def revalidate_preserved_state_during_service() -> None:
                     _revalidate_preserved_read_bindings(
                         root_fd,
                         bindings,
+                        inventories,
                         allow_directory_metadata_changes=True,
                     )
 
