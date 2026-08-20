@@ -37,6 +37,7 @@ from spec_dock.managed_distribution import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Literal
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 INSTALL_ROOT = REPO_ROOT / "src" / "spec_dock" / "assets" / "install_root"
@@ -3244,6 +3245,791 @@ def test_i368_multi_name_gc_checkpoint_retry_converges(
         package_version="1.2.3",
     )
     assert retry.status == "completed", retry.reason
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize(
+    "fault_point",
+    [
+        "third-reservation",
+        "retained-rename",
+        "exact-promotion",
+        "first-data-gc-unlink",
+        "retained-only-promotion",
+    ],
+)
+def test_i368_retained_gc_transition_graph_resumes_without_name_ordering(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    fault_point: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    original_open = managed_distribution.os.open
+    original_symlink = managed_distribution.os.symlink
+    stage_crashed = False
+
+    def crash_after_regular_stage_create(path, flags, *args, **kwargs):
+        nonlocal stage_crashed
+        fd = original_open(path, flags, *args, **kwargs)
+        if kind == "regular" and not stage_crashed and isinstance(path, str) and path.startswith(".spec-dock-file-"):
+            stage_crashed = True
+            os.close(fd)
+            raise SimulatedProcessCrash
+        return fd
+
+    def crash_after_symlink_stage_create(source, destination, *args, **kwargs):
+        nonlocal stage_crashed
+        original_symlink(source, destination, *args, **kwargs)
+        if (
+            kind == "symlink"
+            and not stage_crashed
+            and isinstance(destination, str)
+            and destination.startswith(".spec-dock-symlink-")
+        ):
+            stage_crashed = True
+            raise SimulatedProcessCrash
+
+    with monkeypatch.context() as fault:
+        fault.setattr(managed_distribution.os, "open", crash_after_regular_stage_create)
+        fault.setattr(managed_distribution.os, "symlink", crash_after_symlink_stage_create)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    original_record = OperationJournalStore.record_staging_lease
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_unlink = managed_distribution.os.unlink
+    gc_names: list[str] = []
+    injected = False
+    next_token = (1 << 128) - 1
+
+    def descending_token(_size: int = 16) -> str:
+        nonlocal next_token
+        token = f"{next_token:032x}"
+        next_token -= 1
+        return token
+
+    def record_and_fault(self, journal, lease):
+        nonlocal injected
+        updated = original_record(self, journal, lease)
+        if lease.role == "gc-reserved" and lease.stage_name not in gc_names:
+            gc_names.append(lease.stage_name)
+            if fault_point == "third-reservation" and len(gc_names) == 3 and not injected:
+                injected = True
+                raise SimulatedProcessCrash
+        if (
+            fault_point == "exact-promotion"
+            and len(gc_names) == 3
+            and lease.role == "gc-exact"
+            and lease.stage_name == gc_names[2]
+            and not injected
+        ):
+            injected = True
+            raise SimulatedProcessCrash
+        if (
+            fault_point == "retained-only-promotion"
+            and len(gc_names) == 3
+            and lease.role == "backup-only"
+            and lease.stage_name == gc_names[2]
+            and not injected
+        ):
+            injected = True
+            raise SimulatedProcessCrash
+        return updated
+
+    def rename_and_fault(source_fd, source_name, destination_fd, destination_name):
+        nonlocal injected
+        original_rename(source_fd, source_name, destination_fd, destination_name)
+        if fault_point == "retained-rename" and len(gc_names) == 3 and destination_name == gc_names[2] and not injected:
+            injected = True
+            raise SimulatedProcessCrash
+
+    def unlink_and_fault(name, *args, **kwargs):
+        nonlocal injected
+        original_unlink(name, *args, **kwargs)
+        if fault_point == "first-data-gc-unlink" and len(gc_names) == 3 and name == gc_names[1] and not injected:
+            injected = True
+            raise SimulatedProcessCrash
+
+    with monkeypatch.context() as fault:
+        fault.setattr(managed_distribution.secrets, "token_hex", descending_token)
+        fault.setattr(OperationJournalStore, "record_staging_lease", record_and_fault)
+        fault.setattr(managed_distribution, "_rename_distribution_no_replace", rename_and_fault)
+        fault.setattr(managed_distribution.os, "unlink", unlink_and_fault)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    assert injected is True
+    assert len(gc_names) == 3
+    assert gc_names[1] > gc_names[2]
+    persisted = OperationJournalStore(target_root)._read(
+        managed_distribution._root_identity_for_assessment(target_root)
+    )
+    graph = tuple(
+        lease
+        for lease in persisted.staging_leases
+        if lease.path == ".github/workflows/ci.yml" and lease.gc_ordinal is not None
+    )
+    if kind == "symlink":
+        graph = tuple(
+            lease for lease in persisted.staging_leases if lease.path == "spec" and lease.gc_ordinal is not None
+        )
+    ordered = managed_distribution._ordered_gc_transition_leases(persisted)
+    ordered = tuple(lease for lease in ordered if lease.path == graph[0].path)
+    assert [lease.gc_ordinal for lease in ordered] == sorted(
+        lease.gc_ordinal for lease in ordered if lease.gc_ordinal is not None
+    )
+    assert [lease.gc_ordinal for lease in sorted(ordered, key=lambda lease: lease.stage_name)] != [
+        lease.gc_ordinal for lease in ordered
+    ]
+    ordinal_three = next(lease for lease in graph if lease.gc_ordinal == 3)
+    expected_role = {
+        "third-reservation": "gc-reserved",
+        "retained-rename": "gc-reserved",
+        "exact-promotion": "gc-exact",
+        "first-data-gc-unlink": "gc-exact",
+        "retained-only-promotion": "backup-only",
+    }[fault_point]
+    assert ordinal_three.role == expected_role
+    ordinal_three_path = target_root / Path(ordinal_three.path).parent / ordinal_three.stage_name
+    assert (ordinal_three_path.exists() or ordinal_three_path.is_symlink()) is (fault_point != "third-reservation")
+    if fault_point in {"first-data-gc-unlink", "retained-only-promotion"}:
+        ordinal_two = next(lease for lease in graph if lease.gc_ordinal == 2)
+        ordinal_two_path = target_root / Path(ordinal_two.path).parent / ordinal_two.stage_name
+        assert not ordinal_two_path.exists() and not ordinal_two_path.is_symlink()
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+    assert retry.status == "completed", retry.reason
+
+
+@pytest.mark.parametrize(
+    "forgery",
+    [
+        "duplicate-ordinal",
+        "ambiguous-successor",
+        "missing-predecessor",
+        "canonical-predecessor",
+        "canonical-stage",
+        "foreign-predecessor",
+    ],
+)
+def test_i368_gc_graph_forgery_is_rejected_before_namespace_mutation(
+    tmp_path: Path,
+    forgery: str,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    action = next(item for item in journal.actions if item.action == "create")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    assert expected.kind in {"regular", "symlink"}
+    expected_kind: Literal["regular", "symlink"] = "regular" if expected.kind == "regular" else "symlink"
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    first_name = f"{stage_name}.00000000000000000000000000000003.gc"
+    second_name = f"{stage_name}.00000000000000000000000000000002.gc"
+    third_name = f"{stage_name}.00000000000000000000000000000001.gc"
+    first = managed_distribution._reserved_distribution_stage_ownership(
+        action.path,
+        first_name,
+        expected_kind,
+        role="gc-reserved",
+        gc_predecessor_name=stage_name,
+        gc_ordinal=1,
+    )
+    second = managed_distribution._reserved_distribution_stage_ownership(
+        action.path,
+        second_name,
+        expected_kind,
+        role="gc-reserved",
+        gc_predecessor_name=first_name,
+        gc_ordinal=2,
+    )
+    if forgery == "duplicate-ordinal":
+        forged = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            third_name,
+            expected_kind,
+            role="gc-reserved",
+            gc_predecessor_name=first_name,
+            gc_ordinal=2,
+        )
+    elif forgery == "ambiguous-successor":
+        forged = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            third_name,
+            expected_kind,
+            role="gc-reserved",
+            gc_predecessor_name=first_name,
+            gc_ordinal=3,
+        )
+    elif forgery == "missing-predecessor":
+        forged = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            second_name,
+            expected_kind,
+            role="gc-reserved",
+            gc_predecessor_name=f"{stage_name}.foreign.gc",
+            gc_ordinal=2,
+        )
+    elif forgery == "canonical-predecessor":
+        forged = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            second_name,
+            expected_kind,
+            role="gc-reserved",
+            gc_predecessor_name=Path(action.path).name,
+            gc_ordinal=2,
+        )
+    elif forgery == "canonical-stage":
+        forged = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            Path(action.path).name,
+            expected_kind,
+            role="gc-reserved",
+            gc_predecessor_name=first_name,
+            gc_ordinal=2,
+        )
+    else:
+        foreign_action = next(
+            item
+            for item in journal.actions
+            if item.path != action.path
+            and managed_distribution._expected_target_identity(executable.distribution_plan, item.path) is not None
+        )
+        foreign_expected = managed_distribution._expected_target_identity(
+            executable.distribution_plan, foreign_action.path
+        )
+        assert foreign_expected is not None
+        assert foreign_expected.kind in {"regular", "symlink"}
+        foreign_kind: Literal["regular", "symlink"] = "regular" if foreign_expected.kind == "regular" else "symlink"
+        foreign_name = managed_distribution._new_distribution_stage_name(foreign_action.path, foreign_expected)
+        foreign = managed_distribution._reserved_distribution_stage_ownership(
+            foreign_action.path,
+            foreign_name,
+            foreign_kind,
+        )
+        forged = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            second_name,
+            expected_kind,
+            role="gc-reserved",
+            gc_predecessor_name=foreign_name,
+            gc_ordinal=2,
+        )
+    if forgery in {"duplicate-ordinal", "ambiguous-successor"}:
+        leases: tuple[DistributionStageOwnership, ...] = (first, second, forged)
+    elif forgery == "foreign-predecessor":
+        leases = (first, foreign, forged)
+    else:
+        leases = (first, forged)
+    journal = store.write(
+        managed_distribution.replace(journal, staging_leases=leases),
+        predecessor=journal,
+    )
+    journal_before = store.path.read_bytes()
+    guard_path = target_root / "spec-dock" / ".distribution-retry.json"
+    guard_before = guard_path.read_bytes()
+    namespace_before = sorted(
+        (path.relative_to(target_root).as_posix(), path.is_symlink(), path.read_bytes() if path.is_file() else None)
+        for path in target_root.rglob("*")
+    )
+
+    with pytest.raises(DistributionApplyError, match="journal-plan-mismatch"):
+        OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert store.path.read_bytes() == journal_before
+    assert guard_path.read_bytes() == guard_before
+    assert (
+        sorted(
+            (path.relative_to(target_root).as_posix(), path.is_symlink(), path.read_bytes() if path.is_file() else None)
+            for path in target_root.rglob("*")
+        )
+        == namespace_before
+    )
+
+
+def test_i368_production_retry_validates_gc_graph_before_guard_or_workspace_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    action = next(item for item in journal.actions if item.action == "create")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    assert expected.kind in {"regular", "symlink"}
+    expected_kind: Literal["regular", "symlink"] = "regular" if expected.kind == "regular" else "symlink"
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    forged = managed_distribution._reserved_distribution_stage_ownership(
+        action.path,
+        Path(action.path).name,
+        expected_kind,
+        role="gc-reserved",
+        gc_predecessor_name=stage_name,
+        gc_ordinal=1,
+    )
+    store.write(managed_distribution.replace(journal, staging_leases=(forged,)), predecessor=journal)
+
+    def forbidden_read(*_args, **_kwargs):
+        raise AssertionError("managed namespace read preceded GC graph validation")
+
+    monkeypatch.setattr(OperationJournalStore, "_assert_guard_anchors_journal", forbidden_read)
+    monkeypatch.setattr(managed_distribution, "build_workspace_assessment", forbidden_read)
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-plan-mismatch"
+
+
+def test_i368_reserved_ordinal_three_rejects_unrelated_ordinal_two_inode(
+    tmp_path: Path,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    action = next(item for item in journal.actions if item.action == "create")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    assert expected.kind == "regular"
+    parent = target_root / Path(action.path).parent
+    parent.mkdir(parents=True, exist_ok=True)
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    predecessor_name = f"{stage_name}.predecessor.remove"
+    backup_name = managed_distribution._distribution_quarantine_backup_name(predecessor_name)
+    ordinal_two_name = f"{stage_name}.00000000000000000000000000000002.gc"
+    ordinal_three_name = f"{stage_name}.00000000000000000000000000000001.gc"
+    predecessor = parent / predecessor_name
+    backup = parent / backup_name
+    ordinal_two = parent / ordinal_two_name
+    ordinal_three = parent / ordinal_three_name
+    predecessor.write_bytes(b"inode-b\n")
+    os.link(predecessor, backup)
+    ordinal_two.write_bytes(b"inode-a\n")
+    os.link(ordinal_two, ordinal_three)
+    predecessor_info = predecessor.lstat()
+    ordinal_two_info = ordinal_two.lstat()
+    leases = (
+        DistributionStageOwnership(
+            path=action.path,
+            stage_name=predecessor_name,
+            device=predecessor_info.st_dev,
+            inode=predecessor_info.st_ino,
+            ctime_ns=predecessor_info.st_ctime_ns,
+            file_type="regular",
+            role="predecessor-quarantine",
+        ),
+        managed_distribution._distribution_stage_ownership(
+            action.path,
+            backup_name,
+            backup.lstat(),
+            role="backup-dual",
+        ),
+        DistributionStageOwnership(
+            path=action.path,
+            stage_name=ordinal_two_name,
+            device=ordinal_two_info.st_dev,
+            inode=ordinal_two_info.st_ino,
+            ctime_ns=ordinal_two_info.st_ctime_ns,
+            file_type="regular",
+            role="gc-exact",
+            gc_predecessor_name=predecessor_name,
+            gc_ordinal=2,
+        ),
+        managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            ordinal_three_name,
+            "regular",
+            role="gc-reserved",
+            gc_predecessor_name=backup_name,
+            gc_ordinal=3,
+        ),
+    )
+    journal = store.write(managed_distribution.replace(journal, staging_leases=leases), predecessor=journal)
+    journal_before = store.path.read_bytes()
+    namespace_before = {path.name: (path.lstat().st_ino, path.read_bytes()) for path in parent.iterdir()}
+
+    with pytest.raises(DistributionApplyError, match="journal-plan-mismatch"):
+        OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert store.path.read_bytes() == journal_before
+    assert {path.name: (path.lstat().st_ino, path.read_bytes()) for path in parent.iterdir()} == namespace_before
+
+
+@pytest.mark.parametrize("forgery", ["ordinal-two-unrelated-backup", "backup-reserved-wrong-predecessor"])
+def test_i368_reserved_companion_requires_exact_named_predecessor(
+    tmp_path: Path,
+    forgery: str,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    action = next(item for item in journal.actions if item.path == ".github/workflows/ci.yml")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    parent = target_root / ".github" / "workflows"
+    parent.mkdir(parents=True)
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    predecessor_name = f"{stage_name}.predecessor.gc"
+    predecessor = parent / predecessor_name
+    predecessor.write_bytes(b"inode-b\n")
+    predecessor_info = predecessor.lstat()
+    predecessor_lease = DistributionStageOwnership(
+        path=action.path,
+        stage_name=predecessor_name,
+        device=predecessor_info.st_dev,
+        inode=predecessor_info.st_ino,
+        ctime_ns=predecessor_info.st_ctime_ns,
+        file_type="regular",
+        role="gc-exact" if forgery == "ordinal-two-unrelated-backup" else "predecessor-quarantine",
+        gc_predecessor_name=stage_name if forgery == "ordinal-two-unrelated-backup" else None,
+        gc_ordinal=1 if forgery == "ordinal-two-unrelated-backup" else None,
+    )
+    unrelated_name = f"{stage_name}.unrelated"
+    unrelated = parent / unrelated_name
+    unrelated.write_bytes(b"inode-a\n")
+    if forgery == "ordinal-two-unrelated-backup":
+        support_lease = None
+        reserved_name = f"{stage_name}.reserved.gc"
+        reserved = parent / reserved_name
+        os.link(unrelated, reserved)
+        unrelated_info = unrelated.lstat()
+        unrelated_lease = DistributionStageOwnership(
+            path=action.path,
+            stage_name=unrelated_name,
+            device=unrelated_info.st_dev,
+            inode=unrelated_info.st_ino,
+            ctime_ns=unrelated_info.st_ctime_ns,
+            file_type="regular",
+            role="backup-dual",
+        )
+        reserved_lease = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            reserved_name,
+            "regular",
+            role="gc-reserved",
+            gc_predecessor_name=predecessor_name,
+            gc_ordinal=2,
+        )
+    else:
+        predecessor.unlink()
+        unrelated.rename(predecessor)
+        reserved_name = managed_distribution._distribution_quarantine_backup_name(f"{stage_name}.other.remove")
+        reserved = parent / reserved_name
+        os.link(predecessor, reserved)
+        unrelated_info = predecessor.lstat()
+        predecessor_lease = managed_distribution.replace(
+            predecessor_lease,
+            device=unrelated_info.st_dev,
+            inode=unrelated_info.st_ino,
+            ctime_ns=unrelated_info.st_ctime_ns,
+        )
+        unrelated_lease = None
+        support_lease = managed_distribution.replace(
+            predecessor_lease,
+            stage_name=f"{stage_name}.recorded-backup",
+            role="backup-dual",
+        )
+        reserved_lease = managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            reserved_name,
+            "regular",
+            role="backup-reserved",
+        )
+    bindings = tuple(
+        managed_distribution._snapshot_from_stat(binding.relative_path, (target_root / binding.relative_path).lstat())
+        if (target_root / binding.relative_path).is_dir()
+        else binding
+        for binding in journal.created_parent_bindings
+    )
+    if unrelated_lease is not None:
+        leases = (predecessor_lease, unrelated_lease, reserved_lease)
+    else:
+        assert support_lease is not None
+        leases = (predecessor_lease, support_lease, reserved_lease)
+    journal = store.write(
+        managed_distribution.replace(journal, staging_leases=leases, created_parent_bindings=bindings),
+        predecessor=journal,
+    )
+    journal_before = store.path.read_bytes()
+    namespace_before = {path.name: (path.lstat().st_ino, path.read_bytes()) for path in parent.iterdir()}
+    if forgery == "ordinal-two-unrelated-backup":
+        assert unrelated_lease is not None
+        assert reserved.lstat().st_ino == unrelated_lease.inode
+        assert reserved.lstat().st_ino != predecessor_lease.inode
+    else:
+        assert reserved_name != managed_distribution._distribution_quarantine_backup_name(predecessor_name)
+        assert reserved.lstat().st_ino == predecessor_lease.inode
+
+    with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
+        managed_distribution._assert_created_parent_bindings_closed_set(target_root, journal)
+
+    assert store.path.read_bytes() == journal_before
+    assert {path.name: (path.lstat().st_ino, path.read_bytes()) for path in parent.iterdir()} == namespace_before
+
+
+@pytest.mark.parametrize("ambiguous", [False, True])
+def test_i368_resume_ordinal_two_ignores_unrelated_leading_backup_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    ambiguous: bool,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    action = next(item for item in journal.actions if item.path == ".github/workflows/ci.yml")
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, action.path)
+    assert expected is not None
+    parent = target_root / ".github" / "workflows"
+    parent.mkdir(parents=True)
+    stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
+    predecessor_name = f"{stage_name}.missing-predecessor.gc"
+    derived_backup_name = managed_distribution._distribution_quarantine_backup_name(predecessor_name)
+    derived_backup = parent / derived_backup_name
+    derived_support_name = f"{stage_name}.derived-support.remove"
+    derived_support = parent / derived_support_name
+    derived_backup.write_bytes(b"inode-b\n")
+    os.link(derived_backup, derived_support)
+    derived_info = derived_backup.lstat()
+    unrelated_backup_name = f"{stage_name}.unrelated-backup"
+    unrelated_backup = parent / unrelated_backup_name
+    reserved_name = f"{stage_name}.reserved-ordinal-two.gc"
+    reserved = parent / reserved_name
+    unrelated_backup.write_bytes(b"inode-a\n")
+    os.link(unrelated_backup, reserved)
+    unrelated_info = unrelated_backup.lstat()
+    extra_candidate = (
+        (
+            managed_distribution._reserved_distribution_stage_ownership(
+                action.path,
+                predecessor_name.removesuffix(".gc"),
+                "regular",
+                role="backup-reserved",
+            ),
+        )
+        if ambiguous
+        else ()
+    )
+    leases = (
+        managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            unrelated_backup_name,
+            "regular",
+            role="backup-reserved",
+        ),
+        managed_distribution._distribution_stage_ownership(
+            action.path,
+            derived_backup_name,
+            derived_info,
+            role="backup-dual",
+        ),
+        DistributionStageOwnership(
+            path=action.path,
+            stage_name=derived_support_name,
+            device=derived_info.st_dev,
+            inode=derived_info.st_ino,
+            ctime_ns=derived_info.st_ctime_ns,
+            file_type="regular",
+            role="predecessor-quarantine",
+        ),
+        managed_distribution._reserved_distribution_stage_ownership(
+            action.path,
+            reserved_name,
+            "regular",
+            role="gc-reserved",
+            gc_predecessor_name=predecessor_name,
+            gc_ordinal=2,
+        ),
+        *extra_candidate,
+    )
+    bindings = tuple(
+        managed_distribution._snapshot_from_stat(binding.relative_path, (target_root / binding.relative_path).lstat())
+        if (target_root / binding.relative_path).is_dir()
+        else binding
+        for binding in journal.created_parent_bindings
+    )
+    journal = store.write(
+        managed_distribution.replace(journal, staging_leases=leases, created_parent_bindings=bindings),
+        predecessor=journal,
+    )
+    journal_before = store.path.read_bytes()
+    guard_path = target_root / "spec-dock" / ".distribution-retry.json"
+    guard_before = guard_path.read_bytes()
+    namespace_before = {path.name: (path.lstat().st_ino, path.read_bytes()) for path in parent.iterdir()}
+    assert reserved.lstat().st_ino == unrelated_info.st_ino
+    assert reserved.lstat().st_ino != derived_info.st_ino
+
+    def forbidden_write(*_args, **_kwargs):
+        raise AssertionError("unrelated backup was promoted to GC authority")
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", forbidden_write)
+
+    expected_error = "journal-plan-mismatch" if ambiguous else "managed staging cleanup failed"
+    with pytest.raises(DistributionApplyError, match=expected_error):
+        OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert store.path.read_bytes() == journal_before
+    assert guard_path.read_bytes() == guard_before
+    assert {path.name: (path.lstat().st_ino, path.read_bytes()) for path in parent.iterdir()} == namespace_before
+
+
+def test_i368_gc_backup_source_ambiguity_is_rejected_before_earlier_path_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    earlier_action = next(item for item in journal.actions if item.path == ".github/workflows/ci.yml")
+    later_action = next(item for item in journal.actions if item.path == "spec")
+    earlier_expected = managed_distribution._expected_target_identity(
+        executable.distribution_plan,
+        earlier_action.path,
+    )
+    later_expected = managed_distribution._expected_target_identity(executable.distribution_plan, later_action.path)
+    assert earlier_expected is not None and earlier_expected.kind == "regular"
+    assert later_expected is not None and later_expected.kind == "symlink"
+    earlier_parent = target_root / ".github" / "workflows"
+    earlier_parent.mkdir(parents=True)
+    earlier_predecessor_name = managed_distribution._new_distribution_stage_name(
+        earlier_action.path,
+        earlier_expected,
+    )
+    earlier_gc_name = f"{earlier_predecessor_name}.earlier.gc"
+    earlier_gc = earlier_parent / earlier_gc_name
+    earlier_gc.write_bytes(b"earlier\n")
+    earlier_info = earlier_gc.lstat()
+    earlier_predecessor = DistributionStageOwnership(
+        path=earlier_action.path,
+        stage_name=earlier_predecessor_name,
+        device=earlier_info.st_dev,
+        inode=earlier_info.st_ino,
+        ctime_ns=earlier_info.st_ctime_ns,
+        file_type="regular",
+    )
+    earlier_reserved = managed_distribution._reserved_distribution_stage_ownership(
+        earlier_action.path,
+        earlier_gc_name,
+        "regular",
+        role="gc-reserved",
+        gc_predecessor_name=earlier_predecessor_name,
+        gc_ordinal=1,
+    )
+    later_stage_name = managed_distribution._new_distribution_stage_name(later_action.path, later_expected)
+    later_predecessor_name = f"{later_stage_name}.missing-predecessor.gc"
+    later_derived_name = managed_distribution._distribution_quarantine_backup_name(later_predecessor_name)
+    later_prefix_name = later_predecessor_name.removesuffix(".gc")
+    later_derived = DistributionStageOwnership(
+        path=later_action.path,
+        stage_name=later_derived_name,
+        device=1,
+        inode=2,
+        ctime_ns=3,
+        file_type="symlink",
+        role="backup-dual",
+    )
+    later_prefix = managed_distribution._reserved_distribution_stage_ownership(
+        later_action.path,
+        later_prefix_name,
+        "symlink",
+        role="backup-reserved",
+    )
+    later_reserved = managed_distribution._reserved_distribution_stage_ownership(
+        later_action.path,
+        f"{later_stage_name}.reserved.gc",
+        "symlink",
+        role="gc-reserved",
+        gc_predecessor_name=later_predecessor_name,
+        gc_ordinal=2,
+    )
+    journal = store.write(
+        managed_distribution.replace(
+            journal,
+            staging_leases=(
+                earlier_predecessor,
+                earlier_reserved,
+                later_derived,
+                later_prefix,
+                later_reserved,
+            ),
+        ),
+        predecessor=journal,
+    )
+    journal_before = store.path.read_bytes()
+    guard_path = target_root / "spec-dock" / ".distribution-retry.json"
+    guard_before = guard_path.read_bytes()
+    namespace_before = sorted(
+        (path.relative_to(target_root).as_posix(), path.is_symlink(), path.read_bytes() if path.is_file() else None)
+        for path in target_root.rglob("*")
+    )
+
+    def forbidden_write(*_args, **_kwargs):
+        raise AssertionError("earlier GC path mutated before graph-wide ambiguity rejection")
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", forbidden_write)
+
+    with pytest.raises(DistributionApplyError, match="journal-plan-mismatch"):
+        OperationJournalStore(target_root).resume(executable, package_version="1.2.3")
+
+    assert store.path.read_bytes() == journal_before
+    assert guard_path.read_bytes() == guard_before
+    assert (
+        sorted(
+            (path.relative_to(target_root).as_posix(), path.is_symlink(), path.read_bytes() if path.is_file() else None)
+            for path in target_root.rglob("*")
+        )
+        == namespace_before
+    )
 
 
 @pytest.mark.parametrize(
