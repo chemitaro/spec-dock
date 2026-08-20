@@ -8550,6 +8550,107 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 layer: (active_dir / layer).readlink() for layer in ("initiative", "epic", "issue")
             } == original_targets
 
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    @pytest.mark.parametrize(
+        "missing_relative",
+        [Path("system/active-none"), Path("system/active-none/issue")],
+    )
+    def test_recognized_reconciliation_restores_missing_placeholder_directory_hierarchy(
+        self,
+        command: tuple[str, ...],
+        missing_relative: Path,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            shutil.rmtree(specdock_dir / missing_relative)
+
+            assert main([*command, str(target)]) == 0
+
+            placeholder_issue = specdock_dir / "system" / "active-none" / "issue"
+            source_issue = (
+                Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/system/active-none/issue"
+            )
+            assert (placeholder_issue / "report.md").read_bytes() == (source_issue / "report.md").read_bytes()
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder_issue / "README.md"
+            ).read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    @pytest.mark.parametrize(
+        "unsafe_relative",
+        [Path("system"), Path("system/active-none"), Path("system/active-none/issue")],
+    )
+    def test_recognized_reconciliation_blocks_symlinked_placeholder_boundary_before_reads(
+        self,
+        command: tuple[str, ...],
+        unsafe_relative: Path,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            outside = Path(tmp) / "outside-placeholder"
+            target.mkdir()
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            unsafe_path = specdock_dir / unsafe_relative
+            shutil.rmtree(unsafe_path)
+            outside.mkdir()
+            sentinel = outside / "sentinel.txt"
+            sentinel.write_text("user-owned\n", encoding="utf-8")
+            unsafe_path.symlink_to(outside, target_is_directory=True)
+            before = self._relative_file_snapshot(target)
+
+            assert main([*command, str(target)]) == 1
+
+            assert self._relative_file_snapshot(target) == before
+            assert unsafe_path.is_symlink()
+            assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    @pytest.mark.parametrize("boundary_name", [".agent", ".work", "active", "initiatives"])
+    def test_recognized_reconciliation_revalidates_preserved_boundary_inside_service(
+        self,
+        command: tuple[str, ...],
+        boundary_name: str,
+        monkeypatch,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            boundary = specdock_dir / boundary_name
+            displaced = specdock_dir / f"{boundary_name}-before-service-race"
+            original_version = (specdock_dir / "spec-dock.version").read_bytes()
+            validator_called = False
+
+            def inject_boundary_race(
+                *_args: object,
+                preserved_state_validator,
+                **_kwargs: object,
+            ):
+                nonlocal validator_called
+                if boundary.exists():
+                    boundary.rename(displaced)
+                boundary.mkdir()
+                (boundary / "attacker-sentinel.txt").write_text("attacker-owned\n", encoding="utf-8")
+                validator_called = True
+                preserved_state_validator()
+                raise AssertionError("preserved-state validation unexpectedly accepted a boundary race")
+
+            monkeypatch.setattr(cli, "execute_recognized_distribution", inject_boundary_race)
+
+            assert main([*command, str(target)]) == 1
+
+            assert validator_called is True
+            assert (boundary / "attacker-sentinel.txt").read_text(encoding="utf-8") == "attacker-owned\n"
+            assert (specdock_dir / "spec-dock.version").read_bytes() == original_version
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 

@@ -1393,7 +1393,7 @@ def _recognized_preserved_state_snapshot(
     bound_root: Path,
     *,
     visible_root: Path,
-) -> Iterator[tuple[Path, Callable[[], None]]]:
+) -> Iterator[tuple[Path, Callable[[], None], Callable[[], None]]]:
     """Yield a descriptor-captured snapshot for recognized pre-service reads."""
 
     # `_bound_distribution_root` has already fchdir-bound this lexical path to
@@ -1412,24 +1412,44 @@ def _recognized_preserved_state_snapshot(
                 snapshot_root = snapshot_root.resolve()
                 snapshot_specdock = snapshot_root / "spec-dock"
 
-                for relative_path in (
+                placeholder_root = snapshot_specdock / "system" / "active-none"
+                for layer in ("initiative", "epic", "issue"):
+                    (placeholder_root / layer).mkdir(parents=True, exist_ok=True)
+
+                system_rel = Path("spec-dock/system")
+                system_fd = _capture_preserved_directory_at(
+                    specdock_fd,
                     Path("system"),
-                    Path("system/active-none"),
-                    Path("system/active-none/initiative"),
-                    Path("system/active-none/epic"),
-                    Path("system/active-none/issue"),
-                ):
-                    binding_path = Path("spec-dock") / relative_path
-                    directory_fd = _capture_preserved_directory_at(
-                        specdock_fd,
-                        relative_path,
-                        bindings,
-                        required=True,
-                        binding_path=binding_path,
-                    )
-                    assert directory_fd is not None
-                    os.close(directory_fd)
-                    (snapshot_root / binding_path).mkdir(exist_ok=True)
+                    bindings,
+                    required=False,
+                    binding_path=system_rel,
+                )
+                if system_fd is not None:
+                    try:
+                        active_none_rel = system_rel / "active-none"
+                        active_none_fd = _capture_preserved_directory_at(
+                            system_fd,
+                            Path("active-none"),
+                            bindings,
+                            required=False,
+                            binding_path=active_none_rel,
+                        )
+                        if active_none_fd is not None:
+                            try:
+                                for layer in ("initiative", "epic", "issue"):
+                                    layer_fd = _capture_preserved_directory_at(
+                                        active_none_fd,
+                                        Path(layer),
+                                        bindings,
+                                        required=False,
+                                        binding_path=active_none_rel / layer,
+                                    )
+                                    if layer_fd is not None:
+                                        os.close(layer_fd)
+                            finally:
+                                os.close(active_none_fd)
+                    finally:
+                        os.close(system_fd)
 
                 initiatives_rel = Path("spec-dock/initiatives")
                 initiatives_fd = _capture_preserved_directory_at(
@@ -1563,7 +1583,20 @@ def _recognized_preserved_state_snapshot(
                     finally:
                         os.close(active_fd)
 
-                yield snapshot_specdock, lambda: _revalidate_preserved_read_bindings(root_fd, bindings)
+                service_validation_pending = True
+
+                def revalidate_at_service_entry() -> None:
+                    nonlocal service_validation_pending
+                    if not service_validation_pending:
+                        return
+                    _revalidate_preserved_read_bindings(root_fd, bindings)
+                    service_validation_pending = False
+
+                yield (
+                    snapshot_specdock,
+                    lambda: _revalidate_preserved_read_bindings(root_fd, bindings),
+                    revalidate_at_service_entry,
+                )
         finally:
             os.close(specdock_fd)
     finally:
@@ -3474,6 +3507,7 @@ def _install_recognized_distribution_unlocked(
             with _recognized_preserved_state_snapshot(bound_root, visible_root=visible_root) as (
                 snapshot_specdock,
                 revalidate_preserved,
+                revalidate_preserved_during_service,
             ):
                 generated_assets = _active_fallback_distribution_assets(snapshot_specdock)
                 revalidate_preserved()
@@ -3488,6 +3522,7 @@ def _install_recognized_distribution_unlocked(
                     generated_assets=generated_assets,
                     version_refreshable_existing_identities=(version_identity,) if version_identity is not None else (),
                     root_identity_path=visible_root,
+                    preserved_state_validator=revalidate_preserved_during_service,
                 )
             if result.status != "recovery_required":
                 _assert_distribution_root_identity(visible_root, bound_identity)

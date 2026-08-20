@@ -895,6 +895,69 @@ def test_i368_journal_resume_rejects_forged_nonempty_created_parent_binding(tmp_
     assert not (appeared / "ci.yml").exists()
 
 
+@pytest.mark.parametrize("kind", ["regular", "symlink", "fifo", "unleased-stage"])
+def test_i368_created_parent_held_descriptor_rejects_unknown_child_before_target_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_bind = managed_distribution._bind_created_parent_identities
+    injected = False
+
+    def bind_then_inject_unknown_child(
+        target_rel,
+        snapshot,
+        parent_chain,
+        created_parent_bindings,
+        created_parent_recorder=None,
+    ):
+        nonlocal injected
+        original_bind(
+            target_rel,
+            snapshot,
+            parent_chain,
+            created_parent_bindings,
+            created_parent_recorder,
+        )
+        if injected or target_rel != ".github/workflows/ci.yml":
+            return
+        injected = True
+        parent = target_root / ".github" / "workflows"
+        name = ".spec-dock-file-unleased" if kind == "unleased-stage" else f"unknown-{kind}"
+        unknown = parent / name
+        if kind in {"regular", "unleased-stage"}:
+            unknown.write_bytes(b"third-party\n")
+        elif kind == "symlink":
+            unknown.symlink_to("third-party-target")
+        else:
+            os.mkfifo(unknown)
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_bind_created_parent_identities",
+        bind_then_inject_unknown_child,
+    )
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-precondition-mismatch"
+    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+
+
 def test_i368_parent_creation_crash_resumes_from_durable_parent_intent(
     tmp_path: Path,
     monkeypatch,
@@ -4043,7 +4106,7 @@ def test_s30_apply_rebinds_stage_ownership_after_swap_for_retry(
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
     assert target.read_bytes() == b"new\n"
-    assert len(recorded) == 2
+    assert len(recorded) == 3
     rebound = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
@@ -4114,7 +4177,7 @@ def test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail(
 
     stage_files = list(target.parent.glob(".spec-dock-file-*"))
     assert len(stage_files) == 1
-    assert len(recorded) == 2
+    assert len(recorded) == 3
     rebound = recorded[-1]
     stage_stat = stage_files[0].lstat()
     assert (rebound.device, rebound.inode, rebound.ctime_ns) == (
@@ -6219,19 +6282,19 @@ def test_i368_checkpoint_revalidates_successor_immediately_before_predecessor_cl
         journal,
         managed_distribution._distribution_stage_ownership(record.path, stage_name, target.lstat()),
     )
-    original_remove = managed_distribution._remove_distribution_stage_if_owned
+    original_rename = managed_distribution._rename_distribution_no_replace
     replacement = b"third-party\n"
     replaced = False
 
-    def replace_successor_before_cleanup(parent_fd, name, created, **kwargs):
+    def replace_successor_after_quarantine(source_parent_fd, source_name, destination_parent_fd, destination_name):
         nonlocal replaced
-        if not replaced and kwargs.get("canonical_name") == target.name:
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not replaced and source_name == stage_name and destination_name.endswith(".remove"):
             target.unlink()
             target.write_bytes(replacement)
             replaced = True
-        return original_remove(parent_fd, name, created, **kwargs)
 
-    monkeypatch.setattr(managed_distribution, "_remove_distribution_stage_if_owned", replace_successor_before_cleanup)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_successor_after_quarantine)
 
     with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
         store.checkpoint_published(journal, (record.path,))
@@ -6240,6 +6303,286 @@ def test_i368_checkpoint_revalidates_successor_immediately_before_predecessor_cl
     assert target.read_bytes() == replacement
     assert stage.read_bytes() == old
     assert store.path.exists()
+
+
+def test_i368_checkpoint_quarantine_unlink_fault_restores_and_converges(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset(
+                "spec-dock/spec-dock.version",
+                b"1.2.3\n",
+                mode=0o644,
+            ),
+        ),
+    )
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, build_executable_mutation_plan(assessment)))
+    record = next(action for action in journal.actions if action.path == ".github/workflows/ci.yml")
+    expected = next(
+        asset.identity for asset in assessment.distribution_plan.current_assets if asset.path == record.path
+    )
+    stage_name = managed_distribution._new_distribution_stage_name(record.path, expected)
+    stage = target.parent / stage_name
+    target.replace(stage)
+    target.write_bytes(desired)
+    target.chmod(expected.mode or 0o644)
+    journal = store.record_staging_lease(
+        journal,
+        managed_distribution._distribution_stage_ownership(record.path, stage_name, target.lstat()),
+    )
+    original_unlink = managed_distribution.os.unlink
+    failed = False
+
+    def fail_quarantine_unlink_once(name, *args, **kwargs):
+        nonlocal failed
+        if not failed and isinstance(name, str) and name.startswith(stage_name) and name.endswith(".remove"):
+            failed = True
+            raise OSError("injected quarantine unlink failure")
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", fail_quarantine_unlink_once)
+
+    with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
+        store.checkpoint_published(journal, (record.path,))
+
+    assert failed is True
+    assert target.read_bytes() == desired
+    assert stage.read_bytes() == old
+    assert store.path.exists()
+
+    completed = store.checkpoint_published(journal, (record.path,))
+    assert not stage.exists()
+    assert next(action for action in completed.actions if action.path == record.path).checkpoint == "published"
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize(
+    "fault_point",
+    ["reservation-after", "rename-after", "exact-before", "exact-after", "unlink-before"],
+)
+def test_i368_displaced_quarantine_write_ahead_crash_retry_converges(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    fault_point: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    if kind == "regular":
+        manifest_path = _write_manifest(
+            tmp_path,
+            _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", b"old\n")]),
+        )
+        target_rel = ".github/workflows/ci.yml"
+    else:
+        manifest_path = _write_manifest(
+            tmp_path,
+            _manifest_with(
+                historical_shortcuts=[
+                    {
+                        "path": "spec",
+                        "kind": "symlink",
+                        "target": "legacy/spec-dock",
+                        "source": {"kind": "test-fixture", "ref": "issue-368-test"},
+                    }
+                ]
+            ),
+        )
+        target_rel = "spec"
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / target_rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if kind == "regular":
+        target.write_bytes(b"old\n")
+    else:
+        target.symlink_to("legacy/spec-dock")
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    original_record = OperationJournalStore.record_staging_lease
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_unlink = managed_distribution.os.unlink
+    injected = False
+
+    with monkeypatch.context() as faults:
+
+        def crash_during_record(self, journal, lease):
+            nonlocal injected
+            is_quarantine = lease.path == target_rel and lease.stage_name.endswith(".remove")
+            is_reserved = lease.device == lease.inode == lease.ctime_ns == 0
+            if is_quarantine and fault_point == "exact-before" and not is_reserved and not injected:
+                injected = True
+                raise SimulatedProcessCrash
+            updated = original_record(self, journal, lease)
+            if (
+                is_quarantine
+                and not injected
+                and (
+                    (fault_point == "reservation-after" and is_reserved)
+                    or (fault_point == "exact-after" and not is_reserved)
+                )
+            ):
+                injected = True
+                raise SimulatedProcessCrash
+            return updated
+
+        def crash_after_rename(source_parent_fd, source_name, destination_parent_fd, destination_name):
+            nonlocal injected
+            original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+            if fault_point == "rename-after" and destination_name.endswith(".remove") and not injected:
+                injected = True
+                raise SimulatedProcessCrash
+
+        def crash_before_unlink(name, *args, **kwargs):
+            nonlocal injected
+            if fault_point == "unlink-before" and isinstance(name, str) and name.endswith(".remove") and not injected:
+                injected = True
+                raise SimulatedProcessCrash
+            return original_unlink(name, *args, **kwargs)
+
+        faults.setattr(OperationJournalStore, "record_staging_lease", crash_during_record)
+        faults.setattr(managed_distribution, "_rename_distribution_no_replace", crash_after_rename)
+        faults.setattr(managed_distribution.os, "unlink", crash_before_unlink)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    assert injected is True
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "completed", retry.reason
+    if kind == "regular":
+        assert target.read_bytes() == b"desired\n"
+    else:
+        assert target.readlink() == Path("spec-dock/scripts/spec-dock")
+    assert not list(target.parent.glob("*.remove"))
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i368_reserved_displaced_quarantine_mismatch_is_preserved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    if kind == "regular":
+        manifest_path = _write_manifest(
+            tmp_path,
+            _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", b"old\n")]),
+        )
+        target_rel = ".github/workflows/ci.yml"
+    else:
+        manifest_path = _write_manifest(
+            tmp_path,
+            _manifest_with(
+                historical_shortcuts=[
+                    {
+                        "path": "spec",
+                        "kind": "symlink",
+                        "target": "legacy/spec-dock",
+                        "source": {"kind": "test-fixture", "ref": "issue-368-test"},
+                    }
+                ]
+            ),
+        )
+        target_rel = "spec"
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / target_rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if kind == "regular":
+        target.write_bytes(b"old\n")
+    else:
+        target.symlink_to("legacy/spec-dock")
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    original_rename = managed_distribution._rename_distribution_no_replace
+    injected = False
+
+    def crash_after_quarantine_rename(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if destination_name.endswith(".remove") and not injected:
+            injected = True
+            raise SimulatedProcessCrash
+
+    with monkeypatch.context() as faults:
+        faults.setattr(managed_distribution, "_rename_distribution_no_replace", crash_after_quarantine_rename)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    quarantine = next(target.parent.glob("*.remove"))
+    quarantine.unlink()
+    if kind == "regular":
+        quarantine.write_bytes(b"third-party\n")
+    else:
+        quarantine.symlink_to("third-party-target")
+
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "recovery_required"
+    assert retry.reason == "managed staging cleanup failed"
+    if kind == "regular":
+        assert target.read_bytes() == b"desired\n"
+        assert quarantine.read_bytes() == b"third-party\n"
+    else:
+        assert target.readlink() == Path("spec-dock/scripts/spec-dock")
+        assert quarantine.readlink() == Path("third-party-target")
+    assert (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
 def test_i368_checkpoint_rejects_same_inode_successor_mutate_restore(
@@ -6313,6 +6656,7 @@ def test_i368_checkpoint_rejects_same_inode_successor_mutate_restore(
 @pytest.mark.parametrize("kind", ["regular", "symlink"])
 def test_i368_displaced_cleanup_revalidates_both_namespace_entries(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     kind: str,
 ) -> None:
     parent = tmp_path / kind
@@ -6339,11 +6683,21 @@ def test_i368_displaced_cleanup_revalidates_both_namespace_entries(
         predecessor_identity = DistributionIdentity(kind="symlink", target="old-target")
     successor = managed_distribution._distribution_stage_ownership("target", stage.name, target.lstat())
     predecessor = stage.lstat()
-    target.unlink()
-    if kind == "regular":
-        target.write_bytes(b"third-party\n")
-    else:
-        target.symlink_to("third-party-target")
+    original_rename = managed_distribution._rename_distribution_no_replace
+    replaced = False
+
+    def replace_successor_after_quarantine(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal replaced
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not replaced and source_name == stage.name and destination_name.endswith(".remove"):
+            target.unlink()
+            if kind == "regular":
+                target.write_bytes(b"third-party\n")
+            else:
+                target.symlink_to("third-party-target")
+            replaced = True
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_successor_after_quarantine)
     parent_fd = os.open(parent, os.O_RDONLY)
     try:
         with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
@@ -6358,12 +6712,25 @@ def test_i368_displaced_cleanup_revalidates_both_namespace_entries(
                 canonical_condition={
                     "identity": managed_distribution._distribution_identity_payload(successor_identity)
                 },
-                stage_condition={"identity": managed_distribution._distribution_identity_payload(predecessor_identity)},
+                stage_condition={
+                    "device": predecessor.st_dev,
+                    "inode": predecessor.st_ino,
+                    "file_type": managed_distribution._file_type(predecessor.st_mode),
+                    "link_count": predecessor.st_nlink,
+                    "identity": managed_distribution._distribution_identity_payload(predecessor_identity),
+                },
             )
     finally:
         os.close(parent_fd)
 
+    assert replaced is True
     assert stage.exists() or stage.is_symlink()
+    if kind == "regular":
+        assert target.read_bytes() == b"third-party\n"
+        assert stage.read_bytes() == b"old\n"
+    else:
+        assert target.readlink() == Path("third-party-target")
+        assert stage.readlink() == Path("old-target")
 
 
 @pytest.mark.parametrize("kind", ["regular", "symlink"])
