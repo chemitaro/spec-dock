@@ -56,6 +56,8 @@ ID: "iss-00368"
 - 強制終了時に残るfilesystem状態を直接構築する回帰として、予約stage作成直後、regular swap直後、prune quarantine直後、self-rehashed action reorderを追加し、同一plan retryの収束とplan改変のmutation前拒否を固定した。
 - Strict successor の5件 remediationで、exact legacy stage leaseのschema-2引き継ぎ、mutable regular write中のreserved-name lease維持、publish前のexact successor昇格、canonical successorのdisplaced predecessor cleanupより先のdurable化、same-bytes/different-inode create successor拒否を追加した。regular/symlink exchangeはpre-exchange canonical raceのみexact successor/unknown stage pairをCAS rollbackし、post-exchange unknown canonicalはrollback/cleanupせず保持する。legacy guard predecessorはschema-2 successor受理後まで削除しない。
 - Strict successor の guard-only remediationで、journal不在のschema-2 forward guardはlegacy markerとして再発行せず、既存operation/contract/planと再構成planのexact一致時だけ同じguardからjournalを発行する。terminal cleanupはguard削除の成功後までcompleted journalを保持し、guard削除後のcompleted journal-only状態は対象を再適用せずcleanupのみ完了する。
+- `chatgpt-final-quality-gate-strict-new` の次回 remediation では、exact legacy stage leaseをlegacy marker置換と同時にschema-2 guardへ保存し、初回journalがそのleaseを継承するようにした。これによりguard publish直後の停止でもcleanup authorityを保持する。旧版のpost-swap状態はdesired canonicalがexact postconditionを満たす`adopt`に限ってdisplaced predecessor leaseをcleanupし、それ以外は変換しない。
+- regular/symlink exchange後のsuccessor leaseは、公開前から保持したstage inodeとの同一性をcanonicalで確認して構築する。displaced predecessor削除直前にもcanonicalを同じexact leaseへ再照合し、successor記録後のsame-content/different-inode置換ではpredecessorを保持してfail closedとする。
 - `1d62f3221a5a55add1c592076de2688c2f0b4a89` は旧 campaign の実装 anchor であり、その後の Strict remediation で実装とテストを変更したため最終 candidate anchor ではない。最終 exact candidate の SHA と同一 SHA 上の review/test 合否は Strict check attestation を正本とする。
 
 ## Verification
