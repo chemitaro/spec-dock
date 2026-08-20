@@ -4,7 +4,7 @@ ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
 状態: "planned"
-最終更新: "2026-08-18"
+最終更新: "2026-08-21"
 依存: ["requirement.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -58,6 +58,14 @@ RecognizedIntent = update | init-force
 
 `init-force` は overwrite authority ではなく、recognized workspace で installer init semantics を選ぶ intent とする。unknown/modified asset の ownership blocker を解除しない。
 
+### Concurrency authority boundary
+
+recognized operation は target root の no-follow identity に束縛した root operation lock を acquire してから assessment、journal、apply、post-verify、terminal cleanup を実行する。同じ lock contract に協調する `update` / `init --force` / uninstall writer は operation 全体で直列化する。
+
+lock は advisory であり、arbitrary same-UID process に対する kernel namespace capability ではない。このため kernel subset は各 mutation 直前に held descriptor、exact lease、content/link identity、created-parent closed set を再検証し、そこで観測した replacement、rebind、unknown child を preserve-and-block する。一方、非協調 process が最後の検証後かつ単一 `unlinkat` / pathname rename syscall 前だけ private recovery name を差し替える挙動は contract 外とする。Darwin/POSIX の公開 API には expected inode または held file descriptor を条件に pathname を削除する primitive がなく、最後の exact witness を残さず有限完了する protocol と arbitrary same-UID mutation exclusion は同時に提供しない。
+
+この境界は unknown/modified managed target の authority を拡張しない。canonical target、stage、quarantine、created parent に対する既存の再検証と fail-closed recovery は維持し、lock 非協調 writer を自動受理または cleanup authority へ昇格しない。
+
 ### Assessment input
 
 - target root descriptor binding
@@ -107,6 +115,16 @@ absent
 
 crash/exception では `prepared` 以降の journal を保持する。`completed` 前に削除しない。
 
+schema-2 forward guard は journal より先に `operation_id`、`contract_identity`、canonical `plan_digest` を durable publish する。legacy conversion が exact stage lease を伴う場合は、その lease も同じ guard publish に含め、marker 置換から初回 journal 作成までの crash window で cleanup authority を失わない。journal はこの独立アンカーと一致する場合だけ作成・再開でき、journal 内部の action 順序や immutable metadata と digest をまとめて差し替えても authority を再構成できない。
+
+journal不在のschema-2 forward guardはschema-1 conversionと区別し、既存bytes/identityを保持したままoperation/contract/planがexact一致するpre-journal状態だけを再開する。recovery metadata自身の作成で変わるdirectory ctimeはplan digestから除外するが、journal actionのexact preconditionとdevice/inode/type/linkは維持する。terminal cleanupはguardを削除するまでcompleted journalを残し、guard削除後のcompleted journal-onlyは対象mutationを再実行せずcleanupだけを許可する。旧実装が残した曖昧なguard-onlyは保持し `forward-guard-plan-mismatch` で停止する。
+
+stage作成、atomic exchange、prune quarantine、missing parent作成は、可視namespace mutationより先に予約名またはmissing intentをjournalへ記録する。regular stageは可変write中は予約leaseを維持し、bytes/mode確定後にだけexact successor inodeへ昇格する。exchange後は、公開前から保持した stage descriptor が指す exact inode と canonical pathname が一致することを証明し、その successor leaseをdisplaced predecessor cleanupより先にdurable化する。cleanup直前にもcanonicalを同じleaseへ再照合し、same-content replacementからauthorityを再取得しない。強制終了後は予約名、exact canonical successor、displaced predecessor、空のcreated parentが単一の既知遷移に一致する場合だけforward recoveryする。same-contentでもcanonical inodeがleaseと異なる場合、またはexchange後にcanonicalが未知entryへ置換された場合はrollback/cleanupせず両entryを保持してblockする。
+
+recognized route が operation service より前に構築する active fallback assets は、bound root から descriptor-relative / no-follow で取得した private snapshot のみを読む。`.agent`、legacy `.work`、`active`、`initiatives` と必要な retained files を capture 前後の identity へ束縛し、symlink boundary、multi-link file、capture 後の appearance/rebind は service entry 前に拒否する。
+
+`created_parent_bindings` は journal 単独の ownership authority ではなく recovery hint とする。anchored action precondition で originally missing とされた parent closure を no-follow inventory し、child binding、action checkpoint の exact pre/post target、または current stage lease で説明できる entry だけを許可する。unknown sibling、unleased stage-like name、symlink/special child、identity mismatch は target mutation 前に拒否する。空directoryだけが出現した mkdir crash と、exact published/leased transition は従来どおり単調に収束させる。
+
 Action checkpoint:
 
 - `pending`: current state は exact pre-action identity であること
@@ -126,6 +144,8 @@ one-way conversion または compatibility resume の必須条件:
 - `.uninstall-retry.json` と同時存在しない
 - recorded stage ownership が exact no-follow identity に一致
 - current Contract と observation から same remaining plan を一意に再構成できる
+
+exact legacy stage lease がある場合は、対応action、private stage name family、parent chain、device/inode/ctime/type/link count を照合し、schema-2 guardと初回journalへleaseを引き継いでからcleanup/resumeする。旧実装がswap後にdesired canonicalとdisplaced predecessor stageを残した状態は、再構成actionが`adopt`でcanonical postconditionがexact一致する場合に限り、stage leaseをcleanup authorityとして変換する。guard conversion中のlegacy predecessorはschema-2 successorのcanonical identity/bytes受理が終わるまでprivate recovery nameに保持する。
 
 一つでも証明できなければ marker を書き換えず `legacy-marker-unconvertible` とする。
 
@@ -204,6 +224,7 @@ fresh-only flow、uninstall/purge behavior、package/platform final parity は�
 - journal lifecycle tests: prepared/executing/verifying/completed、checkpoint failure、atomic publish failure
 - resume tests: same-plan convergence、root/intent/plan/protocol/SHA mismatch
 - kernel negative tests: parent/root rebind、target appearance、provider mutation、staging collision、unknown stage sibling
+- concurrency tests: root operation lock に協調する concurrent invocation の直列化、mutation-boundary replacement / unknown-child interposition の preserve-and-block
 - CLI tests: recognized update/init-force success/error、unmanaged preservation、no prompt/backup on no-write path、current output/exit、および fresh entrypoint matrix が D1 で変化しないこと
 - absence tests: recognized flow から `scaffold_applier`、legacy phase writer、plan outside mutation への dependency がない
 
@@ -213,3 +234,4 @@ fresh-only flow、uninstall/purge behavior、package/platform final parity は�
 - digest canonicalization の誤り: stable serialization fixture と order permutation negative test を作る。
 - marker conversion が authority を推測する risk: exact required fields と failure reason を code/test/docs で同時固定する。
 - current behavior drift: existing tests を先に characterization し、新実装の都合で unknown preservation expectation を弱めない。
+- advisory lock 外の arbitrary same-UID mutationをkernel CASとして誤って約束するrisk: public Darwin/POSIX surfaceのpathname delete制約を明記し、保証対象をroot operation lock協調writerとmutation境界で観測可能な変更に固定する。

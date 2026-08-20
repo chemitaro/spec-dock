@@ -4,7 +4,7 @@ ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
 状態: "planned"
-最終更新: "2026-08-18"
+最終更新: "2026-08-21"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -93,9 +93,15 @@ Exit: assessment test は filesystem write を観測せず、plan digest fixture
 ### Step 3 — Journal と kernel の recognized subset を実装する
 
 - operation journal の schema/protocol version、root/intent/authority/contract/plan binding を実装する。
+- schema-2 forward guard に operation/contract/canonical plan の独立アンカーを先行publishし、journalのself-rehashed改変を拒否する。
+- journal不在のschema-2 guardはlegacy conversionと分岐し、existing operation/contract/planと再構成planがexact一致するpre-journal状態だけを再開する。terminal cleanupはguard削除完了までcompleted journalを保持し、completed journal-onlyは再適用せずcleanupのみ行う。
 - regular/symlink/directory/staging identity を用途別 type に分ける。
 - exact pre-action SHA と expected post-action identity を action record に入れる。
 - descriptor-bound create/replace/remove/mode/staging/journal operation を kernel に集約する。
+- stage、exchange、prune quarantine、missing parentのnamespace transitionをwrite-ahead reservationとexact successor leaseで再開可能にする。
+- recognized pre-service read set を descriptor-bound private snapshot へ限定し、unsafe preserved boundary と capture 後の rebind を write-zero で拒否する。
+- recovered created-parent binding の内容を action checkpoint / exact lease の closed set で再証明し、journal内digestだけで ownership authority を得られないようにする。
+- recognized mutation と terminal cleanup を root operation lock 内に保ち、協調する SpecDock writer を直列化する。各 mutation 境界の exact identity / content / link topology / created-parent inventory 再検証は維持し、advisory lock を無視する同一 UID process の最終 pathname syscall 間差し替えは kernel CAS の保証対象に含めない。
 - checkpoint は atomic publish 後の re-observation を通して単調更新する。
 
 Negative tests:
@@ -107,6 +113,8 @@ Negative tests:
 - hardlink/symlink swap
 - staging write/publish/cleanup failure
 - checkpoint write failure後の pre/post ambiguous state
+- root operation lock に協調する concurrent invocation の直列化
+- final cleanup を含む mutation-boundary replacement / unknown-child interposition の preserve-and-block
 
 Exit: same-process failure と simulated crash state の双方で journal が安全に残る。
 
@@ -148,10 +156,17 @@ Exit: update と init-force が second grammar を持たず、intent mismatch �
 - root、operation、package/protocol、stage lease、same-plan reconstruction を全て満たす caseだけ one-way conversion/compatibility resumeする。
 - malformed、dual、cross-root、different-operation、newer target、unknown stage、plan mismatchは markerを変更せず blockする。
 - conversion後は new journalだけをwriterとし、legacy markerを再生成しない。
+- exact legacy stage leaseはcurrent planのaction/name family/parent chain/no-follow identityと照合し、legacy markerを置換するschema-2 guardと初回journalの双方へ引き継いでからcleanup/resumeする。
+- 旧版がswap後にdesired canonicalとdisplaced predecessor stageを残した場合は、再構成actionが`adopt`かつcanonical postconditionがexact一致する状態だけをcleanup可能な遷移として認識する。
+- guard exchangeのlegacy predecessorはsuccessor受理後まで削除せず、交換後raceでcanonicalが未知になった場合は両entryを保持する。
 
 Forward-recovery test:
 
 - interrupted current update fixture → safe conversion → same desired postcondition
+- partial regular stageを持つexact legacy lease → conversion → cleanup → desired postcondition
+- desired canonicalとdisplaced predecessor stageを持つpost-swap legacy lease → adopt conversion → predecessor cleanup
+- guard publish直後・journal作成前の停止 → guard内leaseからsame-plan retry → cleanup
+- post-swap successor record直後のsame-content inode replacement → predecessorを保持してblock
 - exact pre-action SHA mismatch → block
 - compatible newer package → same plan only resume
 - incompatible/downgrade → block
@@ -210,10 +225,11 @@ conversion前のlegacy markerは失敗時に書き換えない。conversion成�
 
 ## exit / handoff
 
-- I368-R01〜R10とacceptance 1〜10がtest/evidenceに結び付く。
+- I368-R01〜R11とacceptance 1〜11がtest/evidenceに結び付く。
 - update/init-forceのlegacy execution routeが削除済み。
 - current safety testsを弱めず、新negative/resume testsが成功。
 - current public command/flag/text/exit behaviorが維持。
 - new journal protocol、exact-SHA rule、legacy conversion conditionがdocsと一致。
+- concurrency contract が root operation lock 協調 writer と mutation-boundary observation に固定され、非協調 same-UID writer を delete-by-inode 相当として誤って保証しない。
 - D2へ、fresh intentを追加できるstable Contract/Assessment/Kernel/Journal/Result seamを引き渡す。
 - residual riskはfresh-only scaffold semantics、deprovision/purge action、final Linux/macOS/package parityであり、D2〜D5へ明示的に渡す。

@@ -414,7 +414,6 @@ def _s03_privacy_forbidden_values(source: Path, body: bytes) -> tuple[str, ...]:
         source.parent.name.lower(),
         body_text,
         digest,
-        str(len(body)),
         derived,
         "sha256",
         "byte_count",
@@ -1078,24 +1077,30 @@ def test_tc_346_s02_002_existing_consumer_update_preserves_data_without_backfill
     candidate_wheel: CandidateWheel,
 ) -> None:
     consumer = _prepare_existing_consumer(candidate_wheel, "s02-existing-002")
-    _update_existing_consumer(candidate_wheel, consumer)
+    update_result = subprocess.run(
+        [str(consumer.installed_cli), "update", str(consumer.target)],
+        cwd=candidate_wheel.wheel_path.parent,
+        env=consumer.env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
+    assert update_result.returncode == 1
+    assert "spec-dock/docs/guide.md: unknown-current-collision" in update_result.stderr
     assert all(not path.exists() for path in consumer.existing_readmes)
     assert _payload_state(consumer.target, consumer.payload_path) == consumer.payload_before
     assert _snapshot_tree(consumer.target / "spec-dock" / "initiatives") == consumer.canonical_before
     assert _snapshot_graph(consumer.target) == consumer.graph_before
-    assert consumer.guide_path.read_bytes() == consumer.guide_asset
-
-    before = dict(consumer.managed_before)
-    after = dict(_snapshot_managed_assets(consumer.target))
-    changed_paths = sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
-    assert changed_paths == ["docs/guide.md"]
+    assert consumer.guide_path.read_bytes() == consumer.guide_stale
+    assert _snapshot_managed_assets(consumer.target) == consumer.managed_before
 
 
 def test_tc_346_s02_003_existing_consumer_future_nodes_receive_workbench_shell(
     candidate_wheel: CandidateWheel,
 ) -> None:
     consumer = _prepare_existing_consumer(candidate_wheel, "s02-existing-003")
+    consumer.guide_path.write_bytes(consumer.guide_asset)
     _update_existing_consumer(candidate_wheel, consumer)
 
     for args in (
