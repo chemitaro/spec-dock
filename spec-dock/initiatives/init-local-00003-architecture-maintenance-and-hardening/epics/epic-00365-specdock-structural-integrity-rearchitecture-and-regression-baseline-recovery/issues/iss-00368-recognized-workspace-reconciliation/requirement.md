@@ -68,6 +68,8 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 - journal create/publish に失敗した場合、managed target mutation は 0 件である。
 - action publish と checkpoint の間で crash した場合、resume は exact pre/post identity から状態を一意判定する。曖昧なら block する。
 - stale staging entry は journal に記録された exact lease identity と一致する場合だけ cleanup する。stage-like unknown sibling は保持する。
+- recognized service より前に読む `.agent` / `.work` / `active` / `initiatives` の preserved state は no-follow descriptor と single-link file identity に束縛する。unsafe boundary、hard link、または capture 後の rebind は guard/journal/target write 0 で block する。
+- originally missing parent の journal binding は recovery hint として扱い、action checkpoint、exact lease、pre/post identity から説明できない unknown child が一件でもあれば descendant mutation 前に block する。
 - current marker が newer package/operation で same plan を証明できない場合は変換しない。
 - `init --force` であっても unknown/modified content を force overwrite しない。
 

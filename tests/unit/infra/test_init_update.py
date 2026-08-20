@@ -7616,6 +7616,35 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "- state (local): `./spec-dock/scripts/spec-dock sync`" not in context_pack_text
             assert "- state (github): `./spec-dock/scripts/spec-dock sync --github`" not in context_pack_text
 
+    def test_update_rebuilds_active_entrypoints_from_absolute_in_repository_manifest_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            self._clear_active_entrypoints(target)
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {"id": "init-local-00001", "path": str(initiative_dir)},
+                    "epic": {"id": "epic-local-00001", "path": str(epic_dir)},
+                    "issue": {"id": "iss-local-00001", "path": str(issue_dir)},
+                },
+            )
+
+            assert main(["update", str(target)]) == 0
+
+            assert self._read_active_pointer_text(target, "initiative", "requirement.md") == (
+                initiative_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "epic", "requirement.md") == (
+                epic_dir / "requirement.md"
+            ).read_text(encoding="utf-8")
+            assert self._read_active_pointer_text(target, "issue", "report.md") == (issue_dir / "report.md").read_text(
+                encoding="utf-8"
+            )
+
     def test_update_rebuilds_placeholder_symlink_entrypoints_from_persisted_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -8386,6 +8415,141 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert user_content.read_text(encoding="utf-8") == "user-owned context\n"
             assert not (specdock_dir / ".distribution-journal.json").exists()
 
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    @pytest.mark.parametrize("boundary_name", [".agent", "active", "initiatives"])
+    def test_recognized_reconciliation_blocks_symlinked_preserved_boundary_before_read(
+        self,
+        command: tuple[str, ...],
+        boundary_name: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            outside = Path(tmp) / f"outside-{boundary_name.lstrip('.')}"
+            target.mkdir()
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            boundary = specdock_dir / boundary_name
+            shutil.rmtree(boundary)
+            outside.mkdir()
+            outside_sentinel = outside / ("active.json" if boundary_name == ".agent" else "sentinel.txt")
+            outside_sentinel.write_text(
+                json.dumps({
+                    "schema_version": 2,
+                    "initiative": None,
+                    "epic": None,
+                    "issue": None,
+                })
+                + "\n",
+                encoding="utf-8",
+            )
+            boundary.symlink_to(outside, target_is_directory=True)
+            before = self._relative_file_snapshot(target)
+
+            exit_code = main([*command, str(target)])
+
+            assert exit_code == 1
+            assert self._relative_file_snapshot(target) == before
+            assert boundary.is_symlink()
+            assert outside_sentinel.read_text(encoding="utf-8").endswith("\n")
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    def test_recognized_reconciliation_blocks_hardlinked_active_manifest_before_preserved_state_read(
+        self,
+        command: tuple[str, ...],
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            target.mkdir()
+            assert main(["init", str(target)]) == 0
+
+            specdock_dir = target / "spec-dock"
+            active_manifest = specdock_dir / ".agent" / "active.json"
+            outside_manifest = Path(tmp) / "outside-active.json"
+            outside_manifest.write_text(
+                json.dumps({
+                    "schema_version": 2,
+                    "initiative": None,
+                    "epic": None,
+                    "issue": None,
+                })
+                + "\n",
+                encoding="utf-8",
+            )
+            os.link(outside_manifest, active_manifest)
+            before = self._relative_file_snapshot(target)
+
+            exit_code = main([*command, str(target)])
+
+            assert exit_code == 1
+            assert self._relative_file_snapshot(target) == before
+            assert active_manifest.stat().st_nlink == 2
+            assert outside_manifest.read_bytes() == active_manifest.read_bytes()
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    def test_recognized_reconciliation_blocks_lexically_escaping_active_symlink_before_resolution(
+        self,
+        command: tuple[str, ...],
+        monkeypatch,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            outside = Path(tmp) / "outside-initiative"
+            target.mkdir()
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            active_pointer = specdock_dir / "active" / "initiative"
+            active_pointer.unlink()
+            outside.mkdir()
+            sentinel = outside / "sentinel.txt"
+            sentinel.write_text("user-owned\n", encoding="utf-8")
+            active_pointer.symlink_to("../../../outside-initiative", target_is_directory=True)
+            before = self._relative_file_snapshot(target)
+            resolver_called = False
+
+            def fail_if_resolver_called(*_args: object, **_kwargs: object):
+                nonlocal resolver_called
+                resolver_called = True
+                raise RuntimeError("escaping preserved symlink must be blocked before active-state resolution")
+
+            monkeypatch.setattr(cli, "_active_fallback_distribution_assets", fail_if_resolver_called)
+
+            assert main([*command, str(target)]) == 1
+
+            assert resolver_called is False
+            assert self._relative_file_snapshot(target) == before
+            assert active_pointer.is_symlink()
+            assert active_pointer.readlink() == Path("../../../outside-initiative")
+            assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    def test_recognized_reconciliation_accepts_normal_internal_active_symlinks(
+        self,
+        command: tuple[str, ...],
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            active_dir = target / "spec-dock" / "active"
+            original_targets = {layer: (active_dir / layer).readlink() for layer in ("initiative", "epic", "issue")}
+
+            assert main([*command, str(target)]) == 0
+
+            assert {
+                layer: (active_dir / layer).readlink() for layer in ("initiative", "epic", "issue")
+            } == original_targets
+
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 
@@ -8970,4 +9134,47 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert pointer.is_symlink()
             assert pointer.resolve() == external.resolve()
             assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+
+    def test_update_blocks_preserved_boundary_rebind_before_distribution_service(self, monkeypatch) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            outside = Path(tmp) / "outside-agent"
+            target.mkdir()
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            agent_dir = specdock_dir / ".agent"
+            displaced_agent = specdock_dir / ".agent-before-race"
+            outside.mkdir()
+            sentinel = outside / "sentinel.txt"
+            sentinel.write_text("user-owned\n", encoding="utf-8")
+            original_version = (specdock_dir / "spec-dock.version").read_bytes()
+            original_assets = cli._active_fallback_distribution_assets
+            service_called = False
+
+            def capture_then_rebind(snapshot_specdock: Path):
+                assets = original_assets(snapshot_specdock)
+                agent_dir.rename(displaced_agent)
+                agent_dir.symlink_to(outside, target_is_directory=True)
+                return assets
+
+            def fail_if_service_called(*_args: object, **_kwargs: object):
+                nonlocal service_called
+                service_called = True
+                raise RuntimeError("distribution service must not run after a preserved-boundary rebind")
+
+            monkeypatch.setattr(cli, "_active_fallback_distribution_assets", capture_then_rebind)
+            monkeypatch.setattr(cli, "execute_recognized_distribution", fail_if_service_called)
+
+            assert main(["update", str(target)]) == 1
+
+            assert service_called is False
+            assert agent_dir.is_symlink()
+            assert agent_dir.resolve() == outside.resolve()
+            assert displaced_agent.is_dir()
+            assert sentinel.read_text(encoding="utf-8") == "user-owned\n"
+            assert (specdock_dir / "spec-dock.version").read_bytes() == original_version
             assert not (specdock_dir / ".distribution-journal.json").exists()
