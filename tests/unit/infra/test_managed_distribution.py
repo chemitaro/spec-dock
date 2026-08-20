@@ -4089,7 +4089,7 @@ def test_i368_post_swap_same_content_replacement_preserves_displaced_predecessor
         replacement = target.with_name("ci.concurrent")
         replacement.write_bytes(desired)
         replacement.chmod(stat.S_IMODE(canonical.st_mode))
-        os.replace(replacement, target)
+        replacement.replace(target)
         replaced = True
 
     with pytest.raises(DistributionApplyError, match="managed target identity changed"):
@@ -6002,9 +6002,7 @@ def test_i368_legacy_post_swap_stage_converts_as_adopt_cleanup(tmp_path: Path) -
     executable = build_executable_mutation_plan(assessment)
     action = next(item for item in executable.actions if item.path == ".github/workflows/ci.yml")
     assert action.action == "adopt"
-    expected = next(
-        item.identity for item in executable.distribution_plan.current_assets if item.path == action.path
-    )
+    expected = next(item.identity for item in executable.distribution_plan.current_assets if item.path == action.path)
     stage_name = managed_distribution._new_distribution_stage_name(action.path, expected)
     stage = target.parent / stage_name
     stage.write_bytes(old)
@@ -6019,14 +6017,16 @@ def test_i368_legacy_post_swap_stage_converts_as_adopt_cleanup(tmp_path: Path) -
             "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
             "last_completed_phase": "preflight-complete",
             "purpose": "distribution-rerun",
-            "stage_ownership": [{
-                "path": action.path,
-                "stage_name": stage_name,
-                "device": stage_stat.st_dev,
-                "inode": stage_stat.st_ino,
-                "ctime_ns": stage_stat.st_ctime_ns,
-                "file_type": "regular",
-            }],
+            "stage_ownership": [
+                {
+                    "path": action.path,
+                    "stage_name": stage_name,
+                    "device": stage_stat.st_dev,
+                    "inode": stage_stat.st_ino,
+                    "ctime_ns": stage_stat.st_ctime_ns,
+                    "file_type": "regular",
+                }
+            ],
         }),
         encoding="utf-8",
     )

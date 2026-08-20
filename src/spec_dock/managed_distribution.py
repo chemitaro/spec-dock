@@ -6197,9 +6197,7 @@ def _apply_symlink_action(
                                     raise
                             current_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
                             if _stat_identity_tuple(current_successor) != _stat_identity_tuple(published_successor):
-                                raise DistributionApplyError(
-                                    f"managed target identity changed for '{action.path}'"
-                                )
+                                raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
                             _remove_distribution_stage_if_owned(
                                 parent_fd,
                                 staging_name,
