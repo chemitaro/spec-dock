@@ -17,7 +17,7 @@ ID: "iss-00368"
 - recognized target の `update` と `init --force` を `execute_recognized_distribution()` の単一路線へ切り替えた。
 - read-only `WorkspaceAssessment` と blocker-free `ExecutableMutationPlan` を分離し、root / intent / contract / canonical plan digest に束縛した `.distribution-journal.json` を導入した。
 - managed regular file / symlink / obsolete prune / generated version / active fallback を既存 descriptor-bound kernel で適用し、action checkpoint、staging lease、exact pre/postcondition から partial failure を forward recovery できるようにした。
-- legacy `.distribution-retry.json` は、同一 root/operation の `preflight-complete` かつ staging lease なしで、実行 package が同一または compatible newer の場合だけ one-way conversion し、それ以外と dual recovery state は mutation 前に拒否する。
+- legacy `.distribution-retry.json` は、同一 root/operation の `preflight-complete` で、実行 package が同一または compatible newer の場合だけ one-way conversion する。staging lease がある場合も action/name family/parent chain/device/inode/ctime/type/link count のexact一致を証明できれば schema-2 journal へ引き継ぎ、それ以外と dual recovery state は mutation 前に拒否する。
 - recognized flow から旧 scaffold callback、CLI-owned marker transition、plan 外の version write を除去し、fresh-only compatibility route は `iss-00369` の対象として到達不能のまま残した。
 - README と shipped/dogfooding docs の recovery guidance を new journal contract に更新した。
 - Strict bounded review で検出した journal action 改変、generated path traversal、parent rebind、plan 外 active mutation、no-op journal 作成を根因単位で修正し、回帰テストを追加した。
@@ -55,6 +55,7 @@ ID: "iss-00368"
 - managed stage名とprune quarantine名は作成・rename前にzero-identityの予約leaseとしてjournalへ記録し、作成後のexact inode leaseへ昇格する。swap直後に停止してdesired inodeがcanonicalへ移り旧precondition inodeがstageへ移った状態、およびprune rename直後の予約quarantineは、journalへ遷移後identityをwrite-ahead記録してからcleanupする。元はmissingの親directoryは、全descendant actionがpendingかつ出現したreal directoryが空の場合だけexact inode bindingへ昇格し、非空・symlink・計画外出現は拒否する。
 - 強制終了時に残るfilesystem状態を直接構築する回帰として、予約stage作成直後、regular swap直後、prune quarantine直後、self-rehashed action reorderを追加し、同一plan retryの収束とplan改変のmutation前拒否を固定した。
 - Strict successor の5件 remediationで、exact legacy stage leaseのschema-2引き継ぎ、mutable regular write中のreserved-name lease維持、publish前のexact successor昇格、canonical successorのdisplaced predecessor cleanupより先のdurable化、same-bytes/different-inode create successor拒否を追加した。regular/symlink exchangeはpre-exchange canonical raceのみexact successor/unknown stage pairをCAS rollbackし、post-exchange unknown canonicalはrollback/cleanupせず保持する。legacy guard predecessorはschema-2 successor受理後まで削除しない。
+- Strict successor の guard-only remediationで、journal不在のschema-2 forward guardはlegacy markerとして再発行せず、既存operation/contract/planと再構成planのexact一致時だけ同じguardからjournalを発行する。terminal cleanupはguard削除の成功後までcompleted journalを保持し、guard削除後のcompleted journal-only状態は対象を再適用せずcleanupのみ完了する。
 - `1d62f3221a5a55add1c592076de2688c2f0b4a89` は旧 campaign の実装 anchor であり、その後の Strict remediation で実装とテストを変更したため最終 candidate anchor ではない。最終 exact candidate の SHA と同一 SHA 上の review/test 合否は Strict check attestation を正本とする。
 
 ## Verification
@@ -84,7 +85,7 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
 - [x] `uv run pytest -q` — 1099 passed、1053 policy-skipped
 - [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — write-ahead reservation、abrupt swap/prune recovery、plan anchor、symlink CAS race を含む 176 passed
-- [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — legacy exact-stage conversion、mutable stage lifecycle、same-bytes inode replacement拒否、post-exchange third-party preservation、guard predecessor保持を含む 181 passed
+- [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — legacy exact-stage conversion、mutable stage lifecycle、same-bytes inode replacement拒否、post-exchange third-party preservation、guard predecessor保持、schema-2 guard-only drift拒否、terminal journal-only cleanupを含む 185 passed
 - [x] `uv run pytest tests/unit/test_provider_test_lanes.py -q` — missing ledger / missing node / incomplete selection を含む 12 passed
 - [x] `make lint` — ruff check / format check / mypy が成功
 - [x] `uv run pytest -q` — 1115 passed、1053 policy-skipped

@@ -168,10 +168,12 @@ Notes:
   incompatible packages stop before further mutation; inspect the reported repository-relative reason
   instead of rolling back to older installer code.
 - A legacy `spec-dock/.distribution-retry.json` is converted one way only when it is the exact
-  same-root, same-operation pre-write state with no staging lease and the executing package is the same
-  or a compatible newer version. Malformed, later-phase, cross-root, different-operation, downgrade,
-  incompatible-package, unknown-stage, or dual recovery state is preserved and rejected for manual
-  diagnosis.
+  same-root, same-operation pre-write state and the executing package is the same or a compatible newer
+  version. An exact legacy staging lease is accepted only when its action, private stage-name family,
+  parent chain, device, inode, ctime, type, and link count all match the reconstructed plan; otherwise
+  the marker and stage are preserved for manual diagnosis. Malformed, later-phase, cross-root,
+  different-operation, downgrade, incompatible-package, unknown-stage, or dual recovery state is
+  rejected without rewriting recovery authority.
 - `uninstall` is dry-run by default. `--apply` requires a complete ownership-safe plan; partial
   failures retain `.uninstall-retry.json` until post-verification succeeds, and `--remove-specs` is
   required before spec history is deleted. `--keep-specs` preserves initiatives and unknown content.
