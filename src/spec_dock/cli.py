@@ -1295,10 +1295,12 @@ def _preserved_inventory_entry_selected(
         return name in allowed_names
     if selection == "initiative":
         if name == ".workbench":
-            return False
-        if stat.S_ISLNK(info.st_mode) or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+                raise RuntimeError("preserved initiative workbench boundary is unsafe")
+            return True
+        if not (stat.S_ISLNK(info.st_mode) or stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
             raise RuntimeError("preserved initiative traversal contains an unsafe entry")
-        return name == ".meta.json" or stat.S_ISDIR(info.st_mode)
+        return stat.S_ISLNK(info.st_mode) or name == ".meta.json" or stat.S_ISDIR(info.st_mode)
     raise RuntimeError("unknown preserved directory inventory selection")
 
 
@@ -1335,7 +1337,12 @@ def _capture_preserved_directory_inventory(
     inventories[relative_path] = _PreservedDirectoryInventory(selection, allowed_names, captured)
 
 
-def _snapshot_active_manifest(content: bytes, *, visible_root: Path) -> bytes:
+def _snapshot_active_manifest(
+    content: bytes,
+    *,
+    visible_root: Path,
+    initiative_aliases: frozenset[Path],
+) -> bytes:
     """Map absolute in-repository manifest paths into the private snapshot root."""
 
     try:
@@ -1350,15 +1357,37 @@ def _snapshot_active_manifest(content: bytes, *, visible_root: Path) -> bytes:
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
             continue
         raw_path = Path(entry["path"])
-        if not raw_path.is_absolute():
-            continue
-        try:
-            relative = raw_path.relative_to(visible_root)
-        except ValueError:
-            entry["path"] = "__preserved-state-outside-repository__"
-        else:
+        if raw_path.is_absolute():
+            try:
+                relative = raw_path.relative_to(visible_root)
+            except ValueError:
+                try:
+                    specdock_index = raw_path.parts.index("spec-dock")
+                    lexical_root = Path(*raw_path.parts[:specdock_index])
+                    same_root = lexical_root.samefile(visible_root)
+                except (OSError, ValueError):
+                    same_root = False
+                if not same_root:
+                    entry["path"] = "__preserved-state-outside-repository__"
+                    changed = True
+                    continue
+                relative = Path(*raw_path.parts[specdock_index:])
             entry["path"] = relative.as_posix()
-        changed = True
+            changed = True
+        else:
+            relative = raw_path
+        normalized_parts: list[str] = []
+        for component in relative.parts:
+            if component in ("", "."):
+                continue
+            if component == "..":
+                if normalized_parts:
+                    normalized_parts.pop()
+                continue
+            normalized_parts.append(component)
+        normalized = Path(*normalized_parts)
+        if any(normalized == alias or alias in normalized.parents for alias in initiative_aliases):
+            raise RuntimeError("persisted active path traverses an initiative symlink")
     if not changed:
         return content
     return (json.dumps(loaded, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
@@ -1492,8 +1521,19 @@ def _revalidate_preserved_read_bindings(
             after = os.fstat(directory_fd)
             if (after.st_dev, after.st_ino, after.st_ctime_ns) != (before.st_dev, before.st_ino, before.st_ctime_ns):
                 raise RuntimeError("preserved state directory inventory changed during revalidation")
-            if current_children != inventory.children:
+            if current_children.keys() != inventory.children.keys():
                 raise RuntimeError("preserved state directory children changed after capture")
+            for name, expected_child in inventory.children.items():
+                current_child = current_children[name]
+                if inventory.selection == "initiative" and name == ".workbench":
+                    if not stat.S_ISDIR(current_child.mode) or (current_child.device, current_child.inode) != (
+                        expected_child.device,
+                        expected_child.inode,
+                    ):
+                        raise RuntimeError("preserved initiative workbench boundary changed after capture")
+                    continue
+                if current_child != expected_child:
+                    raise RuntimeError("preserved state directory child identity changed after capture")
         except OSError as exc:
             raise RuntimeError("preserved state directory inventory cannot be revalidated safely") from exc
         finally:
@@ -1617,6 +1657,14 @@ def _recognized_preserved_state_snapshot(
                     finally:
                         os.close(initiatives_fd)
 
+                initiative_aliases = frozenset(
+                    relative_path / name
+                    for relative_path, inventory in inventories.items()
+                    if inventory.selection == "initiative"
+                    for name, child in inventory.children.items()
+                    if stat.S_ISLNK(child.mode)
+                )
+
                 for directory_name, file_names in (
                     (".agent", ("active.json",)),
                     (".work", ("active.json", "current.json")),
@@ -1653,7 +1701,13 @@ def _recognized_preserved_state_snapshot(
                                 continue
                             content, mode, _binding = captured
                             target = snapshot_root / file_rel
-                            target.write_bytes(_snapshot_active_manifest(content, visible_root=visible_root))
+                            target.write_bytes(
+                                _snapshot_active_manifest(
+                                    content,
+                                    visible_root=visible_root,
+                                    initiative_aliases=initiative_aliases,
+                                )
+                            )
                             target.chmod(mode)
                     finally:
                         os.close(directory_fd)

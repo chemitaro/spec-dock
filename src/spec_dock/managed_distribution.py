@@ -318,6 +318,8 @@ class DistributionStageOwnership:
         "backup-dual",
         "backup-only-reserved",
         "backup-only",
+        "gc-reserved",
+        "gc-exact",
     ] = "stage"
 
 
@@ -2582,6 +2584,8 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
                 "backup-dual",
                 "backup-only-reserved",
                 "backup-only",
+                "gc-reserved",
+                "gc-exact",
             }
         ):
             raise DistributionApplyError("journal-protocol-incompatible")
@@ -2864,6 +2868,56 @@ class OperationJournalStore:
         }:
             raise DistributionApplyError("journal-precondition-mismatch")
 
+    def _anchor_digestless_initial_journal(
+        self,
+        journal: OperationJournal,
+        plan: ExecutableMutationPlan,
+    ) -> None:
+        guard = self._forward_guard
+        if guard is None or guard.journal_digest is not None:
+            return
+        if (
+            journal.status != "prepared"
+            or journal.staging_leases
+            or any(action.checkpoint != "pending" for action in journal.actions)
+            or journal.source_sha256 is None
+            or _journal_digest(journal) != plan.plan_digest
+        ):
+            raise DistributionApplyError("journal-precondition-mismatch")
+        expected_actions = {
+            action.path: (
+                action.action,
+                action.provenance,
+                action.reason,
+                _action_precondition_payload(plan.distribution_plan, action),
+                _action_postcondition_payload(plan.distribution_plan, action),
+            )
+            for action in plan.actions
+        }
+        if len(expected_actions) != len(journal.actions):
+            raise DistributionApplyError("journal-precondition-mismatch")
+        for record in journal.actions:
+            expected = expected_actions.get(record.path)
+            if expected is None or (record.action, record.provenance, record.reason) != expected[:3]:
+                raise DistributionApplyError("journal-precondition-mismatch")
+            for recorded_condition, expected_condition in (
+                (record.precondition, expected[3]),
+                (record.postcondition, expected[4]),
+            ):
+                normalized = OperationJournalStore._normalize_initial_action_condition(expected_condition)
+                if recorded_condition != expected_condition and recorded_condition != normalized:
+                    raise DistributionApplyError("journal-precondition-mismatch")
+        anchored = self.prepare_legacy_guard(
+            None,
+            package_version=guard.package_version,
+            replace_marker=guard,
+            stage_ownership=(),
+            journal_digest=journal.source_sha256,
+            journal_predecessor_digest=None,
+            journal_created_at_ns=journal.created_at_ns,
+        )
+        self.bind_forward_guard(anchored)
+
     def _write(
         self,
         journal: OperationJournal,
@@ -2931,8 +2985,7 @@ class OperationJournalStore:
                 if (
                     not _same_stat_identity(destination_info, expected_snapshot)
                     or _stat_identity_tuple(os.fstat(destination_fd)) != _stat_identity_tuple(destination_info)
-                    or (predecessor_bytes := _read_fd_bytes(destination_fd)) != predecessor_content
-                    or hashlib.sha256(predecessor_bytes).hexdigest() != expected_sha256
+                    or hashlib.sha256(_read_fd_bytes(destination_fd)).hexdigest() != expected_sha256
                     or _stat_identity_tuple(os.fstat(destination_fd)) != _stat_identity_tuple(destination_info)
                 ):
                     raise DistributionApplyError("journal-precondition-mismatch")
@@ -3106,6 +3159,24 @@ class OperationJournalStore:
             os.close(parent_fd)
             os.close(root_fd)
 
+    @staticmethod
+    def _normalize_initial_action_condition(condition: dict[str, object]) -> dict[str, object]:
+        parents = condition.get("parents")
+        if not isinstance(parents, list):
+            return condition
+        normalized_parents = [
+            {
+                **parent,
+                **(
+                    {"ctime_ns": 0, "link_count": 0}
+                    if isinstance(parent, dict) and parent.get("relative_path") == "spec-dock"
+                    else {}
+                ),
+            }
+            for parent in parents
+        ]
+        return {**condition, "parents": normalized_parents}
+
     def _initial_journal(
         self,
         plan: ExecutableMutationPlan,
@@ -3114,23 +3185,6 @@ class OperationJournalStore:
         operation_id: str,
         created_at_ns: int,
     ) -> OperationJournal:
-        def normalized_condition(condition: dict[str, object]) -> dict[str, object]:
-            parents = condition.get("parents")
-            if not isinstance(parents, list):
-                return condition
-            normalized_parents = [
-                {
-                    **parent,
-                    **(
-                        {"ctime_ns": 0, "link_count": 0}
-                        if isinstance(parent, dict) and parent.get("relative_path") == "spec-dock"
-                        else {}
-                    ),
-                }
-                for parent in parents
-            ]
-            return {**condition, "parents": normalized_parents}
-
         try:
             workspace_info = os.lstat(self.target_root / "spec-dock")
         except OSError as exc:
@@ -3164,8 +3218,12 @@ class OperationJournalStore:
                     action=action.action,
                     provenance=action.provenance,
                     reason=action.reason,
-                    precondition=normalized_condition(_action_precondition_payload(plan.distribution_plan, action)),
-                    postcondition=normalized_condition(_action_postcondition_payload(plan.distribution_plan, action)),
+                    precondition=self._normalize_initial_action_condition(
+                        _action_precondition_payload(plan.distribution_plan, action)
+                    ),
+                    postcondition=self._normalize_initial_action_condition(
+                        _action_postcondition_payload(plan.distribution_plan, action)
+                    ),
                 )
                 for action in sorted(plan.actions, key=lambda item: (item.path, item.action, item.reason))
             ),
@@ -3518,7 +3576,12 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-contract-mismatch")
         if journal.plan_digest != plan.plan_digest:
             raise DistributionApplyError("journal-plan-mismatch")
+        self._anchor_digestless_initial_journal(journal, plan)
         self._assert_guard_anchors_journal(journal)
+        journal = self._resume_displaced_quarantine_cleanup(
+            journal,
+            {action.path for action in journal.actions if action.checkpoint != "pending"},
+        )
         return journal
 
     def load_for_assessment(
@@ -3550,7 +3613,16 @@ class OperationJournalStore:
         if journal.contract_identity != assessment.contract_identity:
             raise DistributionApplyError("journal-contract-mismatch")
         if require_guard:
+            if self._forward_guard is not None and self._forward_guard.journal_digest is None:
+                self._anchor_digestless_initial_journal(
+                    journal,
+                    _resume_executable_plan(assessment, journal),
+                )
             self._assert_guard_anchors_journal(journal)
+            journal = self._resume_displaced_quarantine_cleanup(
+                journal,
+                {action.path for action in journal.actions if action.checkpoint != "pending"},
+            )
         return journal
 
     def write(
@@ -3791,8 +3863,15 @@ class OperationJournalStore:
                     raise DistributionApplyError("managed staging cleanup failed")
                 target_name = PurePosixPath(lease.path).name
                 if record.action == "prune":
-                    if _stat_optional_no_follow(parent_fd, target_name) is not None:
-                        raise DistributionApplyError("managed staging cleanup failed")
+
+                    def validate_prune_backup_gc(
+                        bound_parent_fd: int = parent_fd,
+                        bound_target_name: str = target_name,
+                    ) -> None:
+                        if _stat_optional_no_follow(bound_parent_fd, bound_target_name) is not None:
+                            raise DistributionApplyError("managed staging cleanup failed")
+
+                    validate_backup_gc: Callable[[], None] = validate_prune_backup_gc
                 else:
                     successors = tuple(
                         item for item in published.staging_leases if item.path == lease.path and item.role == "stage"
@@ -3806,8 +3885,37 @@ class OperationJournalStore:
                         successors[0],
                         record.postcondition,
                     )
-                os.unlink(backup_name, dir_fd=parent_fd)
-                os.fsync(parent_fd)
+
+                    def validate_successor_backup_gc(
+                        bound_parent_fd: int = parent_fd,
+                        bound_target_name: str = target_name,
+                        bound_path: str = lease.path,
+                        bound_successor: DistributionStageOwnership = successors[0],
+                        bound_postcondition: dict[str, object] = record.postcondition,
+                    ) -> None:
+                        self._assert_exact_canonical_successor(
+                            bound_parent_fd,
+                            bound_target_name,
+                            bound_path,
+                            bound_successor,
+                            bound_postcondition,
+                        )
+
+                    validate_backup_gc = validate_successor_backup_gc
+
+                def record_backup_gc(updated: DistributionStageOwnership) -> None:
+                    nonlocal published
+                    published = self.record_staging_lease(published, updated)
+
+                _remove_distribution_stage_if_owned(
+                    parent_fd,
+                    backup_name,
+                    backup,
+                    strict=True,
+                    mutation_validator=validate_backup_gc,
+                    gc_path=lease.path,
+                    gc_recorder=record_backup_gc,
+                )
             finally:
                 _close_distribution_parent_chain(parent_chain)
         staging_leases = tuple(lease for lease in published.staging_leases if lease.path not in completed)
@@ -3843,24 +3951,37 @@ class OperationJournalStore:
     ) -> OperationJournal:
         """Finish a write-ahead predecessor quarantine without losing its successor lease."""
 
-        active = journal
+        active = self._resume_gc_cleanup(journal)
+        active = self._promote_roleless_backup_leases(active)
+        records = {record.path: record for record in active.actions}
         quarantine_leases = tuple(
             lease
             for lease in active.staging_leases
-            if lease.path in completed and lease.role == "predecessor-quarantine"
+            if lease.role == "predecessor-quarantine"
+            and (
+                lease.path in completed
+                or (
+                    (record := records.get(lease.path)) is not None
+                    and record.checkpoint == "pending"
+                    and record.action in {"create", "adopt"}
+                )
+            )
         )
         if not quarantine_leases:
             return active
-        records = {record.path: record for record in active.actions}
         if len({lease.path for lease in quarantine_leases}) != len(quarantine_leases):
             raise DistributionApplyError("managed staging cleanup failed")
 
         for quarantine_lease in quarantine_leases:
             record = records.get(quarantine_lease.path)
+            original_stage_name = quarantine_lease.stage_name.rsplit(".", 2)[0]
             successors = tuple(
                 lease
                 for lease in active.staging_leases
-                if lease.path == quarantine_lease.path and lease.role == "stage"
+                if lease.path == quarantine_lease.path
+                and lease.role == "stage"
+                and (record is None or record.action == "upgrade" or lease.stage_name != original_stage_name)
+                and lease.stage_name != _distribution_quarantine_backup_name(quarantine_lease.stage_name)
             )
             backup_leases = tuple(
                 lease
@@ -3870,13 +3991,12 @@ class OperationJournalStore:
             )
             if (
                 record is None
-                or record.action not in {"upgrade", "prune"}
+                or record.action not in {"create", "adopt", "upgrade", "prune"}
                 or (record.action == "upgrade" and len(successors) != 1)
-                or (record.action == "prune" and successors)
+                or (record.action != "upgrade" and successors)
             ):
                 raise DistributionApplyError("managed staging cleanup failed")
             successor = successors[0] if successors else None
-            original_stage_name = quarantine_lease.stage_name.rsplit(".", 2)[0]
             if successor is not None and not quarantine_lease.stage_name.startswith(f"{successor.stage_name}."):
                 raise DistributionApplyError("managed staging cleanup failed")
             try:
@@ -3890,10 +4010,36 @@ class OperationJournalStore:
             try:
                 parent_fd = parent_chain[-1]
                 target_name = PurePosixPath(quarantine_lease.path).name
-                if successor is None:
-                    if _stat_optional_no_follow(parent_fd, target_name) is not None:
+
+                def validate_canonical_authority(
+                    bound_record: OperationJournalAction = record,
+                    bound_successor: DistributionStageOwnership | None = successor,
+                    bound_parent_fd: int = parent_fd,
+                    bound_target_name: str = target_name,
+                    bound_path: str = quarantine_lease.path,
+                ) -> None:
+                    if bound_record.action == "upgrade":
+                        assert bound_successor is not None
+                        self._assert_exact_canonical_successor(
+                            bound_parent_fd,
+                            bound_target_name,
+                            bound_path,
+                            bound_successor,
+                            bound_record.postcondition,
+                        )
+                    elif bound_record.action == "prune":
+                        if _stat_optional_no_follow(bound_parent_fd, bound_target_name) is not None:
+                            raise DistributionApplyError("managed staging cleanup failed")
+                    elif not _entry_matches_journal_condition(
+                        bound_parent_fd,
+                        bound_target_name,
+                        bound_path,
+                        bound_record.precondition,
+                    ):
                         raise DistributionApplyError("managed staging cleanup failed")
-                else:
+
+                validate_canonical_authority()
+                if successor is not None:
                     self._assert_exact_canonical_successor(
                         parent_fd,
                         target_name,
@@ -3952,9 +4098,6 @@ class OperationJournalStore:
                             or backup_info.st_nlink != 1
                         ):
                             raise DistributionApplyError("managed staging cleanup failed")
-                        os.unlink(backup_name, dir_fd=parent_fd)
-                        os.fsync(parent_fd)
-                        backup_info = None
                     else:
                         exact_dual = tuple(lease for lease in backup_leases if lease.role == "backup-dual")
                         if not exact_dual:
@@ -4011,21 +4154,66 @@ class OperationJournalStore:
 
                 reserved = quarantine_lease.device == quarantine_lease.inode == quarantine_lease.ctime_ns == 0
                 if original_info is not None:
-                    if successor is None:
-                        raise DistributionApplyError("managed staging cleanup failed")
-                    _remove_distribution_stage_if_owned(
-                        parent_fd,
-                        original_stage_name,
-                        original_info,
-                        strict=True,
-                        transition_path=quarantine_lease.path,
-                        canonical_name=target_name,
-                        canonical_ownership=successor,
-                        canonical_condition=record.postcondition,
-                        stage_condition=record.precondition,
-                        transition_name=quarantine_lease.stage_name,
-                        transition_recorder=record_transition,
-                    )
+                    if record.action in {"create", "adopt"}:
+                        source_leases = tuple(
+                            lease
+                            for lease in active.staging_leases
+                            if lease.path == quarantine_lease.path
+                            and lease.role == "stage"
+                            and lease.stage_name == original_stage_name
+                        )
+                        if (
+                            len(source_leases) == 1
+                            and source_leases[0].device == source_leases[0].inode == source_leases[0].ctime_ns == 0
+                            and _file_type(original_info.st_mode) == source_leases[0].file_type
+                            and original_info.st_nlink == 1
+                        ):
+                            record_transition(
+                                _distribution_stage_ownership(
+                                    quarantine_lease.path,
+                                    original_stage_name,
+                                    original_info,
+                                )
+                            )
+                            source_leases = tuple(
+                                lease
+                                for lease in active.staging_leases
+                                if lease.path == quarantine_lease.path
+                                and lease.role == "stage"
+                                and lease.stage_name == original_stage_name
+                            )
+                        if (
+                            len(source_leases) != 1
+                            or original_info.st_dev != source_leases[0].device
+                            or original_info.st_ino != source_leases[0].inode
+                            or original_info.st_ctime_ns != source_leases[0].ctime_ns
+                        ):
+                            raise DistributionApplyError("managed staging cleanup failed")
+                        _remove_distribution_target_if_bound(
+                            parent_fd,
+                            original_stage_name,
+                            original_info,
+                            identity_message="managed staging cleanup failed",
+                            transition_path=quarantine_lease.path,
+                            transition_name=quarantine_lease.stage_name,
+                            transition_recorder=record_transition,
+                            canonical_validator=validate_canonical_authority,
+                        )
+                    else:
+                        assert successor is not None
+                        _remove_distribution_stage_if_owned(
+                            parent_fd,
+                            original_stage_name,
+                            original_info,
+                            strict=True,
+                            transition_path=quarantine_lease.path,
+                            canonical_name=target_name,
+                            canonical_ownership=successor,
+                            canonical_condition=record.postcondition,
+                            stage_condition=record.precondition,
+                            transition_name=quarantine_lease.stage_name,
+                            transition_recorder=record_transition,
+                        )
                 elif quarantine_info is not None:
                     dual_backup = next(
                         (lease for lease in backup_leases if lease.role == "backup-dual"),
@@ -4038,10 +4226,32 @@ class OperationJournalStore:
                         quarantine_lease.path,
                         allow_backup_link=backup_info is not None,
                     )
+                    stale_source = next(
+                        (
+                            lease
+                            for lease in active.staging_leases
+                            if lease.path == quarantine_lease.path
+                            and lease.role == "stage"
+                            and lease.stage_name == original_stage_name
+                        ),
+                        None,
+                    )
+                    if record.action in {"create", "adopt"}:
+                        payload_is_owned = stale_source is not None and (
+                            stale_source.device == stale_source.inode == stale_source.ctime_ns == 0
+                            or (
+                                quarantine_info.st_dev == stale_source.device
+                                and quarantine_info.st_ino == stale_source.inode
+                            )
+                        )
+                    else:
+                        payload_is_owned = record.precondition.get("identity") == _distribution_identity_payload(
+                            quarantine_identity
+                        )
                     if (
                         _file_type(quarantine_info.st_mode) != quarantine_lease.file_type
                         or quarantine_info.st_nlink not in ({1, 2} if backup_info is not None else {1})
-                        or record.precondition.get("identity") != _distribution_identity_payload(quarantine_identity)
+                        or not payload_is_owned
                         or (
                             not reserved
                             and (
@@ -4062,17 +4272,7 @@ class OperationJournalStore:
                                 role="predecessor-quarantine",
                             )
                         )
-                    if successor is None:
-                        if _stat_optional_no_follow(parent_fd, target_name) is not None:
-                            raise DistributionApplyError("managed staging cleanup failed")
-                    else:
-                        self._assert_exact_canonical_successor(
-                            parent_fd,
-                            target_name,
-                            quarantine_lease.path,
-                            successor,
-                            record.postcondition,
-                        )
+                    validate_canonical_authority()
 
                     def validate_canonical_for_unlink(
                         bound_parent_fd: int = parent_fd,
@@ -4080,11 +4280,12 @@ class OperationJournalStore:
                         bound_path: str = quarantine_lease.path,
                         bound_successor: DistributionStageOwnership | None = successor,
                         bound_postcondition: dict[str, object] = record.postcondition,
+                        bound_action: str = record.action,
                     ) -> None:
-                        if bound_successor is None:
-                            if _stat_optional_no_follow(bound_parent_fd, bound_target_name) is not None:
-                                raise DistributionApplyError("managed staging cleanup failed")
+                        if bound_action in {"create", "adopt", "prune"}:
+                            validate_canonical_authority()
                         else:
+                            assert bound_successor is not None
                             self._assert_exact_canonical_successor(
                                 bound_parent_fd,
                                 bound_target_name,
@@ -4126,17 +4327,7 @@ class OperationJournalStore:
             )
             try:
                 parent_fd = parent_chain[-1]
-                if successor is None:
-                    if _stat_optional_no_follow(parent_fd, PurePosixPath(quarantine_lease.path).name) is not None:
-                        raise DistributionApplyError("managed staging cleanup failed")
-                else:
-                    self._assert_exact_canonical_successor(
-                        parent_fd,
-                        PurePosixPath(quarantine_lease.path).name,
-                        quarantine_lease.path,
-                        successor,
-                        record.postcondition,
-                    )
+                validate_canonical_authority()
                 backup_name = retained_backup.stage_name
                 backup = _stat_optional_no_follow(parent_fd, backup_name)
                 if backup is not None:
@@ -4148,8 +4339,19 @@ class OperationJournalStore:
                         or backup.st_nlink != 1
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
-                    os.unlink(backup_name, dir_fd=parent_fd)
-                    os.fsync(parent_fd)
+
+                    def validate_backup_gc() -> None:
+                        validate_canonical_authority()
+
+                    _remove_distribution_stage_if_owned(
+                        parent_fd,
+                        backup_name,
+                        backup,
+                        strict=True,
+                        mutation_validator=validate_backup_gc,
+                        gc_path=quarantine_lease.path,
+                        gc_recorder=record_transition,
+                    )
             finally:
                 _close_distribution_parent_chain(parent_chain)
 
@@ -4158,17 +4360,244 @@ class OperationJournalStore:
                 for lease in active.staging_leases
                 if not (
                     lease.path == quarantine_lease.path
-                    and lease.role
-                    in {
-                        "predecessor-quarantine",
-                        "backup-reserved",
-                        "backup-dual",
-                        "backup-only-reserved",
-                        "backup-only",
-                    }
+                    and (
+                        lease.role
+                        in {
+                            "predecessor-quarantine",
+                            "backup-reserved",
+                            "backup-dual",
+                            "backup-only-reserved",
+                            "backup-only",
+                            "gc-reserved",
+                            "gc-exact",
+                        }
+                        or (
+                            record.action in {"create", "adopt"}
+                            and lease.role == "stage"
+                            and lease.stage_name == original_stage_name
+                        )
+                    )
                 )
             )
             active = self.write(replace(active, staging_leases=retained), predecessor=active)
+        return active
+
+    def _resume_gc_cleanup(self, journal: OperationJournal) -> OperationJournal:
+        """Finish journal-owned private-name GC before any target action resumes."""
+
+        active = journal
+        records = {record.path: record for record in active.actions}
+        gc_leases = tuple(lease for lease in active.staging_leases if lease.role in {"gc-reserved", "gc-exact"})
+        if len({lease.path for lease in gc_leases}) != len(gc_leases):
+            raise DistributionApplyError("managed staging cleanup failed")
+        for gc_lease in gc_leases:
+            record = records.get(gc_lease.path)
+            if record is None:
+                raise DistributionApplyError("managed staging cleanup failed")
+            original_name = gc_lease.stage_name.rsplit(".", 2)[0]
+            sources = tuple(
+                lease
+                for lease in active.staging_leases
+                if lease.path == gc_lease.path
+                and lease.stage_name == original_name
+                and lease.role not in {"gc-reserved", "gc-exact"}
+            )
+            if len(sources) != 1:
+                raise DistributionApplyError("managed staging cleanup failed")
+            source = sources[0]
+            parent_chain = _open_distribution_parent_chain(
+                self.target_root,
+                gc_lease.path,
+                create_missing=False,
+            )
+            try:
+                parent_fd = parent_chain[-1]
+                target_name = PurePosixPath(gc_lease.path).name
+
+                def validate_gc_authority(
+                    bound_record: OperationJournalAction = record,
+                    bound_parent_fd: int = parent_fd,
+                    bound_target_name: str = target_name,
+                    bound_path: str = gc_lease.path,
+                ) -> None:
+                    _assert_created_parent_bindings_closed_set(self.target_root, active)  # noqa: B023
+                    if bound_record.checkpoint == "pending" and bound_record.action in {"create", "adopt"}:
+                        condition = bound_record.precondition
+                    else:
+                        condition = bound_record.postcondition
+                    if not _entry_matches_journal_condition(
+                        bound_parent_fd,
+                        bound_target_name,
+                        bound_path,
+                        condition,
+                    ):
+                        raise DistributionApplyError("managed staging cleanup failed")
+
+                original = _stat_optional_no_follow(parent_fd, original_name)
+                quarantined = _stat_optional_no_follow(parent_fd, gc_lease.stage_name)
+
+                def record_gc(updated: DistributionStageOwnership) -> None:
+                    nonlocal active
+                    active = self.record_staging_lease(active, updated)
+
+                if quarantined is None and original is not None:
+                    if (
+                        original.st_dev != source.device
+                        or original.st_ino != source.inode
+                        or original.st_ctime_ns != source.ctime_ns
+                        or _file_type(original.st_mode) != source.file_type
+                        or original.st_nlink != 1
+                    ):
+                        raise DistributionApplyError("managed staging cleanup failed")
+                    _remove_distribution_stage_if_owned(
+                        parent_fd,
+                        original_name,
+                        original,
+                        strict=True,
+                        mutation_validator=validate_gc_authority,
+                        gc_path=gc_lease.path,
+                        gc_recorder=record_gc,
+                        gc_name=gc_lease.stage_name,
+                    )
+                    quarantined = None
+                elif quarantined is not None:
+                    if gc_lease.role == "gc-reserved":
+                        if (
+                            quarantined.st_dev != source.device
+                            or quarantined.st_ino != source.inode
+                            or _file_type(quarantined.st_mode) != source.file_type
+                            or quarantined.st_nlink != 1
+                        ):
+                            raise DistributionApplyError("managed staging cleanup failed")
+                        record_gc(
+                            _distribution_stage_ownership(
+                                gc_lease.path,
+                                gc_lease.stage_name,
+                                quarantined,
+                                role="gc-exact",
+                            )
+                        )
+                        gc_lease = next(
+                            lease
+                            for lease in active.staging_leases
+                            if lease.path == gc_lease.path and lease.role == "gc-exact"
+                        )
+                    if (
+                        quarantined.st_dev != gc_lease.device
+                        or quarantined.st_ino != gc_lease.inode
+                        or quarantined.st_ctime_ns != gc_lease.ctime_ns
+                        or _file_type(quarantined.st_mode) != gc_lease.file_type
+                        or quarantined.st_nlink != 1
+                    ):
+                        raise DistributionApplyError("managed staging cleanup failed")
+                    validate_gc_authority()
+                    verified = os.stat(gc_lease.stage_name, dir_fd=parent_fd, follow_symlinks=False)
+                    if _stat_identity_tuple(verified) != _stat_identity_tuple(quarantined):
+                        raise DistributionApplyError("managed staging cleanup failed")
+                    os.unlink(gc_lease.stage_name, dir_fd=parent_fd)
+                    os.fsync(parent_fd)
+                    validate_gc_authority()
+            finally:
+                _close_distribution_parent_chain(parent_chain)
+            completed_quarantines = {
+                lease.stage_name
+                for lease in active.staging_leases
+                if source.role == "backup-only"
+                and lease.path == gc_lease.path
+                and lease.role == "predecessor-quarantine"
+                and _distribution_quarantine_backup_name(lease.stage_name) == original_name
+            }
+            if source.role == "backup-only" and len(completed_quarantines) != 1:
+                raise DistributionApplyError("managed staging cleanup failed")
+            retained = tuple(
+                lease
+                for lease in active.staging_leases
+                if not (
+                    lease.path == gc_lease.path
+                    and (
+                        lease.stage_name in {original_name, gc_lease.stage_name}
+                        or lease.stage_name in completed_quarantines
+                    )
+                )
+            )
+            active = self.write(replace(active, staging_leases=retained), predecessor=active)
+        return active
+
+    def _promote_roleless_backup_leases(self, journal: OperationJournal) -> OperationJournal:
+        """Upgrade prior roleless backup records only from their exact namespace state."""
+
+        active = journal
+        records = {record.path: record for record in active.actions}
+        quarantine_leases = tuple(lease for lease in active.staging_leases if lease.role == "predecessor-quarantine")
+        for quarantine in quarantine_leases:
+            backup_name = _distribution_quarantine_backup_name(quarantine.stage_name)
+            roleless = tuple(
+                lease
+                for lease in active.staging_leases
+                if lease.path == quarantine.path and lease.role == "stage" and lease.stage_name == backup_name
+            )
+            if not roleless:
+                continue
+            if len(roleless) != 1:
+                raise DistributionApplyError("managed staging cleanup failed")
+            legacy = roleless[0]
+            record = records.get(quarantine.path)
+            if record is None or record.action not in {"upgrade", "prune"}:
+                raise DistributionApplyError("managed staging cleanup failed")
+            parent_chain = _open_distribution_parent_chain(
+                self.target_root,
+                quarantine.path,
+                create_missing=False,
+            )
+            try:
+                parent_fd = parent_chain[-1]
+                backup = _stat_optional_no_follow(parent_fd, backup_name)
+                visible_quarantine = _stat_optional_no_follow(parent_fd, quarantine.stage_name)
+                if (
+                    backup is None
+                    or backup.st_dev != legacy.device
+                    or backup.st_ino != legacy.inode
+                    or backup.st_ctime_ns != legacy.ctime_ns
+                    or _file_type(backup.st_mode) != legacy.file_type
+                ):
+                    raise DistributionApplyError("managed staging cleanup failed")
+                backup_identity = _distribution_stage_identity(
+                    parent_fd,
+                    backup_name,
+                    quarantine.path,
+                    allow_backup_link=visible_quarantine is not None,
+                )
+                if record.precondition.get("identity") != _distribution_identity_payload(backup_identity):
+                    raise DistributionApplyError("managed staging cleanup failed")
+                if visible_quarantine is None:
+                    if backup.st_nlink != 1:
+                        raise DistributionApplyError("managed staging cleanup failed")
+                    role: Literal["backup-dual", "backup-only"] = "backup-only"
+                else:
+                    if (
+                        backup.st_nlink != 2
+                        or visible_quarantine.st_dev != backup.st_dev
+                        or visible_quarantine.st_ino != backup.st_ino
+                        or visible_quarantine.st_nlink != 2
+                    ):
+                        raise DistributionApplyError("managed staging cleanup failed")
+                    role = "backup-dual"
+                promoted = DistributionStageOwnership(
+                    path=legacy.path,
+                    stage_name=legacy.stage_name,
+                    device=legacy.device,
+                    inode=legacy.inode,
+                    ctime_ns=legacy.ctime_ns,
+                    file_type=legacy.file_type,
+                    role=role,
+                )
+            finally:
+                _close_distribution_parent_chain(parent_chain)
+            retained = tuple(item for item in active.staging_leases if item is not legacy)
+            active = self.write(
+                replace(active, staging_leases=(*retained, promoted)),
+                predecessor=active,
+            )
         return active
 
     def record_staging_lease(
@@ -4182,6 +4611,7 @@ class OperationJournalStore:
             "backup-only-reserved",
             "backup-only",
         }
+        gc_roles = {"gc-reserved", "gc-exact"}
         if lease.role == "predecessor-quarantine":
             retained = tuple(
                 item
@@ -4197,6 +4627,10 @@ class OperationJournalStore:
                     and item.role in backup_roles
                     and (lease.role in {"backup-only", "backup-reserved", "backup-dual"} or item.role == lease.role)
                 )
+            )
+        elif lease.role in gc_roles:
+            retained = tuple(
+                item for item in journal.staging_leases if not (item.path == lease.path and item.role in gc_roles)
             )
         else:
             retained = tuple(item for item in journal.staging_leases if item.path != lease.path or item.role != "stage")
@@ -4845,7 +5279,9 @@ def _entry_matches_journal_condition(
     try:
         info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
         identity = _distribution_stage_identity(parent_fd, name, path)
-    except (FileNotFoundError, OSError, DistributionApplyError):
+    except FileNotFoundError:
+        return condition.get("exists") is False
+    except (OSError, DistributionApplyError):
         return False
     for field_name, actual in (
         ("device", info.st_dev),
@@ -6134,6 +6570,7 @@ def _remove_distribution_target_if_bound(
     transition_name: str | None = None,
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     mutation_validator: Callable[[], None] | None = None,
+    canonical_validator: Callable[[], None] | None = None,
 ) -> None:
     """Delete only the inode bound before the pathname mutation.
 
@@ -6205,7 +6642,9 @@ def _remove_distribution_target_if_bound(
             else:
 
                 def assert_pruned_canonical_absent() -> None:
-                    if _stat_optional_no_follow(parent_fd, target_name) is not None:
+                    if canonical_validator is not None:
+                        canonical_validator()
+                    elif _stat_optional_no_follow(parent_fd, target_name) is not None:
                         raise DistributionApplyError(identity_message)
 
                 _unlink_distribution_quarantine_with_backup(
@@ -6386,15 +6825,18 @@ def _remove_distribution_stage_if_owned(
     transition_name: str | None = None,
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     mutation_validator: Callable[[], None] | None = None,
-) -> None:
+    gc_path: str | None = None,
+    gc_recorder: Callable[[DistributionStageOwnership], None] | None = None,
+    gc_name: str | None = None,
+) -> str | None:
     try:
         current = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
     except FileNotFoundError:
-        return
+        return None
     except OSError as exc:
         if strict:
             raise DistributionApplyError("managed staging cleanup failed") from exc
-        return
+        return None
     owned = (
         current.st_dev == created.st_dev
         and current.st_ino == created.st_ino
@@ -6405,7 +6847,7 @@ def _remove_distribution_stage_if_owned(
     if not owned:
         if strict:
             raise DistributionApplyError("managed staging identity changed")
-        return
+        return None
     transition_args = (
         transition_path,
         canonical_name,
@@ -6533,7 +6975,7 @@ def _remove_distribution_stage_if_owned(
                 backup_recorder=transition_recorder,
                 transition_path=transition_path,
             )
-            return
+            return None
         except (DistributionApplyError, OSError) as exc:
             with suppress(DistributionApplyError):
                 _restore_distribution_quarantine(
@@ -6563,17 +7005,135 @@ def _remove_distribution_stage_if_owned(
             if held_fd is not None:
                 os.close(held_fd)
     try:
-        if mutation_validator is not None:
-            mutation_validator()
-        os.unlink(stage_name, dir_fd=parent_fd)
-        os.fsync(parent_fd)
-        if mutation_validator is not None:
-            mutation_validator()
+        quarantine_name = gc_name or f"{stage_name}.{secrets.token_hex(16)}.gc"
+        gc_held_fd: int | None = None
+        gc_original_link: str | None = None
+        if stat.S_ISREG(current.st_mode):
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("platform lacks required no-follow file support")
+            gc_held_fd = os.open(
+                stage_name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+            if _stat_identity_tuple(os.fstat(gc_held_fd)) != _stat_identity_tuple(current):
+                raise DistributionApplyError("managed staging identity changed")
+        elif stat.S_ISLNK(current.st_mode):
+            gc_original_link = os.readlink(stage_name, dir_fd=parent_fd)
+            if _stat_identity_tuple(
+                os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
+            ) != _stat_identity_tuple(current):
+                raise DistributionApplyError("managed staging identity changed")
+        else:
+            raise DistributionApplyError("managed staging identity changed")
+        try:
+            if gc_recorder is not None:
+                if gc_path is None:
+                    raise DistributionApplyError("managed staging cleanup failed")
+                gc_recorder(
+                    _reserved_distribution_stage_ownership(
+                        gc_path,
+                        quarantine_name,
+                        "regular" if stat.S_ISREG(current.st_mode) else "symlink",
+                        role="gc-reserved",
+                    )
+                )
+            if mutation_validator is not None:
+                mutation_validator()
+            _rename_distribution_no_replace(parent_fd, stage_name, parent_fd, quarantine_name)
+            os.fsync(parent_fd)
+            moved = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+            moved_is_exact = (
+                _stat_identity_tuple(moved) == _stat_identity_tuple(os.fstat(gc_held_fd))
+                if gc_held_fd is not None
+                else (
+                    gc_original_link is not None
+                    and moved.st_dev == current.st_dev
+                    and moved.st_ino == current.st_ino
+                    and moved.st_mode == current.st_mode
+                    and moved.st_nlink == current.st_nlink
+                    and os.readlink(quarantine_name, dir_fd=parent_fd) == gc_original_link
+                )
+            )
+            if not moved_is_exact:
+                _restore_distribution_quarantine(
+                    parent_fd,
+                    quarantine_name,
+                    stage_name,
+                    failure_message="managed staging cleanup failed",
+                )
+                raise DistributionApplyError("managed staging identity changed")
+            if gc_recorder is not None:
+                assert gc_path is not None
+                gc_recorder(
+                    _distribution_stage_ownership(
+                        gc_path,
+                        quarantine_name,
+                        moved,
+                        role="gc-exact",
+                    )
+                )
+                try:
+                    if mutation_validator is not None:
+                        mutation_validator()
+                except DistributionApplyError:
+                    _restore_distribution_quarantine(
+                        parent_fd,
+                        quarantine_name,
+                        stage_name,
+                        failure_message="managed staging cleanup failed",
+                    )
+                    raise
+            verified = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+            if (
+                verified.st_dev != moved.st_dev
+                or verified.st_ino != moved.st_ino
+                or verified.st_mode != moved.st_mode
+                or verified.st_nlink != moved.st_nlink
+                or (stat.S_ISLNK(moved.st_mode) and os.readlink(quarantine_name, dir_fd=parent_fd) != gc_original_link)
+            ):
+                raise DistributionApplyError("managed staging identity changed")
+            os.unlink(quarantine_name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+            if mutation_validator is not None and gc_recorder is not None:
+                mutation_validator()
+            return quarantine_name
+        except Exception:
+            with suppress(OSError, DistributionApplyError):
+                retained = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+                retained_is_exact = (
+                    _stat_identity_tuple(retained) == _stat_identity_tuple(os.fstat(gc_held_fd))
+                    if gc_held_fd is not None
+                    else (
+                        gc_original_link is not None
+                        and retained.st_dev == current.st_dev
+                        and retained.st_ino == current.st_ino
+                        and retained.st_mode == current.st_mode
+                        and retained.st_nlink == current.st_nlink
+                        and os.readlink(quarantine_name, dir_fd=parent_fd) == gc_original_link
+                    )
+                )
+                if retained_is_exact and _stat_optional_no_follow(parent_fd, stage_name) is None:
+                    _restore_distribution_quarantine(
+                        parent_fd,
+                        quarantine_name,
+                        stage_name,
+                        failure_message="managed staging cleanup failed",
+                    )
+                    if recovery_stage_recorder is not None and gc_path is not None:
+                        restored = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
+                        recovery_stage_recorder(_distribution_stage_ownership(gc_path, stage_name, restored))
+            raise
+        finally:
+            if gc_held_fd is not None:
+                os.close(gc_held_fd)
     except FileNotFoundError:
-        return
+        return None
     except OSError as exc:
         if strict:
             raise DistributionApplyError("managed staging cleanup failed") from exc
+        return None
 
 
 def _distribution_stage_identity(
@@ -6642,6 +7202,8 @@ def _distribution_stage_ownership(
         "backup-dual",
         "backup-only-reserved",
         "backup-only",
+        "gc-reserved",
+        "gc-exact",
     ] = "stage",
 ) -> DistributionStageOwnership:
     kind = _file_type(info.st_mode)
@@ -6672,6 +7234,8 @@ def _reserved_distribution_stage_ownership(
         "backup-dual",
         "backup-only-reserved",
         "backup-only",
+        "gc-reserved",
+        "gc-exact",
     ] = "stage",
 ) -> DistributionStageOwnership:
     """Persist a private stage name before its namespace entry is created."""
@@ -6848,16 +7412,18 @@ def _cleanup_stale_distribution_stages(
             backup_name = _distribution_quarantine_backup_name(quarantine_name)
             backup = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
             validate_cleanup_namespace()
-            _remove_distribution_stage_if_owned(
+            gc_name = _remove_distribution_stage_if_owned(
                 parent_fd,
                 backup_name,
                 backup,
                 strict=True,
                 mutation_validator=validate_cleanup_namespace,
+                gc_path=owned.path,
+                gc_recorder=stage_ownership_recorder,
             )
             stage_ownership_remover(
                 owned.path,
-                (owned.stage_name, quarantine_name, backup_name),
+                tuple(name for name in (owned.stage_name, quarantine_name, backup_name, gc_name) if name is not None),
             )
             cleaned = True
         if mismatch_detected and not cleaned:
@@ -7107,6 +7673,8 @@ def _apply_regular_action(
                             stage_identity,
                             strict=True,
                             mutation_validator=validate_held_namespace,
+                            gc_path=path,
+                            recovery_stage_recorder=stage_ownership_recorder,
                         )
             published_fd = os.open(target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
             try:
@@ -7281,6 +7849,8 @@ def _apply_regular_action(
                                 stage_identity,
                                 strict=True,
                                 mutation_validator=validate_held_namespace,
+                                gc_path=path,
+                                recovery_stage_recorder=stage_ownership_recorder,
                             )
                 else:
                     published_successor = staged_successor
@@ -7540,6 +8110,8 @@ def _apply_symlink_action(
                             staging_stat,
                             strict=True,
                             mutation_validator=validate_held_namespace,
+                            gc_path=action.path,
+                            recovery_stage_recorder=stage_ownership_recorder,
                         )
             created_target = _normalized_link_target_for_path(action.path, os.readlink(target_name, dir_fd=parent_fd))
             if created_target != expected_target:
@@ -7665,6 +8237,8 @@ def _apply_symlink_action(
                             cleanup_stage_stat,
                             strict=True,
                             mutation_validator=validate_held_namespace,
+                            gc_path=action.path,
+                            recovery_stage_recorder=stage_ownership_recorder,
                         )
                 else:
                     current_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
