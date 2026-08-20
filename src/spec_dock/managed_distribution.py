@@ -2201,6 +2201,22 @@ def _path_snapshot_condition(snapshot: PathIdentitySnapshot) -> dict[str, object
     }
 
 
+def _plan_digest_condition(condition: dict[str, object]) -> dict[str, object]:
+    """Exclude directory ctime noise that recovery metadata itself changes."""
+
+    normalized = dict(condition)
+    root = normalized.get("root")
+    if isinstance(root, dict):
+        normalized["root"] = {key: value for key, value in root.items() if key != "ctime_ns"}
+    parents = normalized.get("parents")
+    if isinstance(parents, list):
+        normalized["parents"] = [
+            {key: value for key, value in parent.items() if key != "ctime_ns"} if isinstance(parent, dict) else parent
+            for parent in parents
+        ]
+    return normalized
+
+
 def _mutation_plan_digest(assessment: WorkspaceAssessment) -> str:
     plan = assessment.distribution_plan
     ordered_actions = sorted(assessment.actions, key=lambda action: (action.path, action.action, action.reason))
@@ -2218,8 +2234,8 @@ def _mutation_plan_digest(assessment: WorkspaceAssessment) -> str:
                 "action": action.action,
                 "provenance": action.provenance,
                 "reason": action.reason,
-                "precondition": _action_precondition_payload(plan, action),
-                "postcondition": _action_postcondition_payload(plan, action),
+                "precondition": _plan_digest_condition(_action_precondition_payload(plan, action)),
+                "postcondition": _plan_digest_condition(_action_postcondition_payload(plan, action)),
             }
             for action in ordered_actions
         ],
@@ -3293,9 +3309,13 @@ class OperationJournalStore:
         assessment: WorkspaceAssessment,
         *,
         package_version: str,
+        require_guard: bool = True,
     ) -> OperationJournal:
         journal = self._read(assessment.root_identity)
-        self._assert_guard_anchors_journal(journal)
+        if require_guard:
+            self._assert_guard_anchors_journal(journal)
+        elif journal.status != "completed":
+            raise DistributionApplyError("dual-recovery-state")
         if journal.root_identity != assessment.root_identity:
             raise DistributionApplyError("journal-root-mismatch")
         if journal.intent != assessment.intent:
@@ -3527,14 +3547,18 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-precondition-mismatch")
         return self.write(replace(journal, status="completed"), predecessor=journal)
 
-    def remove_completed(self, journal: OperationJournal) -> None:
+    def remove_completed(self, journal: OperationJournal, *, guard_already_removed: bool = False) -> None:
         if (
             journal.status != "completed"
             or journal.staging_leases
             or any(action.checkpoint != "verified" for action in journal.actions)
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
-        self._remove_exact(journal, failure_reason="journal finalization failed")
+        self._remove_exact(
+            journal,
+            failure_reason="journal finalization failed",
+            require_guard=not guard_already_removed,
+        )
 
     def discard_prepared(self, journal: OperationJournal) -> None:
         """Roll back a journal that has not acquired leases or mutation progress."""
@@ -3547,11 +3571,18 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-precondition-mismatch")
         self._remove_exact(journal, failure_reason="journal rollback failed")
 
-    def _remove_exact(self, journal: OperationJournal, *, failure_reason: str) -> None:
+    def _remove_exact(
+        self,
+        journal: OperationJournal,
+        *,
+        failure_reason: str,
+        require_guard: bool = True,
+    ) -> None:
         root_fd, parent_fd = self._open_parent(journal.root_identity)
         guard_fd: int | None = None
         try:
-            guard_fd = self._open_bound_forward_guard(parent_fd)
+            if require_guard:
+                guard_fd = self._open_bound_forward_guard(parent_fd)
             name = _DISTRIBUTION_JOURNAL_REL.name
             try:
                 info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
@@ -3569,7 +3600,9 @@ class OperationJournalStore:
                 info,
                 expected_snapshot=expected_snapshot,
                 expected_sha256=expected_sha256,
-                pre_delete_check=lambda: self._assert_bound_forward_guard(parent_fd, guard_fd),
+                pre_delete_check=(
+                    (lambda: self._assert_bound_forward_guard(parent_fd, guard_fd)) if require_guard else None
+                ),
                 identity_error="journal-precondition-mismatch",
                 failure_reason=failure_reason,
             )
@@ -3794,8 +3827,8 @@ def _journal_digest(journal: OperationJournal) -> str:
                 "action": action.action,
                 "provenance": action.provenance,
                 "reason": action.reason,
-                "precondition": action.precondition,
-                "postcondition": action.postcondition,
+                "precondition": _plan_digest_condition(action.precondition),
+                "postcondition": _plan_digest_condition(action.postcondition),
             }
             for action in journal.actions
         ],
@@ -4213,10 +4246,20 @@ def execute_recognized_distribution(
 
     store = OperationJournalStore(target_root, identity_path=root_identity_path)
     journal_present = _path_present_no_follow(store.path)
+    legacy_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
     journal_seed: OperationJournal | None = None
     guard_marker = legacy_marker
+    marker_read_error: DistributionAdmissionError | None = None
     operation_package_version = package_version
     version_refresh_identities = version_refreshable_existing_identities
+    terminal_journal_without_guard = False
+    if not journal_present and legacy_present and guard_marker is None:
+        try:
+            guard_marker = _read_distribution_retry_marker(target_root)
+        except DistributionAdmissionError as exc:
+            marker_read_error = exc
+    if not journal_present and guard_marker is not None and guard_marker.purpose == _DISTRIBUTION_JOURNAL_GUARD_PURPOSE:
+        operation_package_version = guard_marker.package_version
     if journal_present:
         try:
             journal_seed = store._read(_root_identity_for_assessment(target_root))
@@ -4225,7 +4268,8 @@ def execute_recognized_distribution(
                     guard_marker = _read_distribution_retry_marker(target_root)
                 except DistributionAdmissionError as exc:
                     raise DistributionApplyError("dual-recovery-state") from exc
-            if (
+            terminal_journal_without_guard = journal_seed.status == "completed" and guard_marker is None
+            if not terminal_journal_without_guard and (
                 guard_marker is None
                 or guard_marker.purpose != _DISTRIBUTION_JOURNAL_GUARD_PURPOSE
                 or guard_marker.operation != journal_seed.intent
@@ -4235,8 +4279,9 @@ def execute_recognized_distribution(
                 or guard_marker.stage_ownership
             ):
                 raise DistributionApplyError("dual-recovery-state")
-            store.bind_forward_guard(guard_marker)
-            store._assert_guard_anchors_journal(journal_seed)
+            if guard_marker is not None:
+                store.bind_forward_guard(guard_marker)
+                store._assert_guard_anchors_journal(journal_seed)
             operation_package_version = journal_seed.package_version
             journal_version_identity = _journal_version_precondition_identity(journal_seed)
             if journal_version_identity is not None:
@@ -4262,7 +4307,13 @@ def execute_recognized_distribution(
         intent=intent,
         generated_assets=(version_asset, *generated_assets),
     )
-    legacy_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
+    if marker_read_error is not None:
+        return DistributionProcessResult(
+            status="recovery_required",
+            intent=intent,
+            actions=assessment.actions,
+            reason="legacy-marker-unconvertible",
+        )
     if not journal_present and not legacy_present and assessment.blockers:
         reasons = ", ".join(f"{action.path}: {action.reason}" for action in assessment.blockers)
         return DistributionProcessResult(
@@ -4313,24 +4364,43 @@ def execute_recognized_distribution(
                     or guard_marker.last_completed_phase != "preflight-complete"
                 ):
                     raise DistributionApplyError("legacy-marker-unconvertible")
-                legacy_stage_leases = _validated_legacy_stage_leases(executable, guard_marker, target_root)
-                guard_marker = store.prepare_legacy_guard(
-                    executable,
-                    package_version=package_version,
-                    replace_marker=guard_marker,
-                )
-                store.bind_forward_guard(guard_marker)
-                journal = store.prepare(executable, package_version=package_version)
-                if legacy_stage_leases:
-                    journal = store.write(
-                        replace(journal, staging_leases=legacy_stage_leases),
-                        predecessor=journal,
+                if guard_marker.purpose == _DISTRIBUTION_JOURNAL_GUARD_PURPOSE:
+                    if (
+                        guard_marker.stage_ownership
+                        or guard_marker.operation_id is None
+                        or guard_marker.contract_identity != executable.contract_identity
+                        or guard_marker.plan_digest != executable.plan_digest
+                    ):
+                        raise DistributionApplyError("forward-guard-plan-mismatch")
+                    store.bind_forward_guard(guard_marker)
+                    journal = store.prepare(executable, package_version=guard_marker.package_version)
+                else:
+                    legacy_stage_leases = _validated_legacy_stage_leases(executable, guard_marker, target_root)
+                    guard_marker = store.prepare_legacy_guard(
+                        executable,
+                        package_version=package_version,
+                        replace_marker=guard_marker,
                     )
+                    store.bind_forward_guard(guard_marker)
+                    journal = store.prepare(executable, package_version=package_version)
+                    if legacy_stage_leases:
+                        journal = store.write(
+                            replace(journal, staging_leases=legacy_stage_leases),
+                            predecessor=journal,
+                        )
             else:
                 assert journal_seed is not None
-                journal = store.load_for_assessment(assessment, package_version=package_version)
+                journal = store.load_for_assessment(
+                    assessment,
+                    package_version=package_version,
+                    require_guard=not terminal_journal_without_guard,
+                )
         elif journal_present:
-            journal = store.load_for_assessment(assessment, package_version=package_version)
+            journal = store.load_for_assessment(
+                assessment,
+                package_version=package_version,
+                require_guard=not terminal_journal_without_guard,
+            )
         if journal_present:
             assert journal is not None
             journal = _reconcile_created_parent_bindings(store, assessment, journal)
@@ -4340,9 +4410,9 @@ def execute_recognized_distribution(
                     action.action not in {"adopt", "preserve"} for action in assessment.actions
                 ):
                     raise DistributionApplyError("distribution postcondition failed")
-                store.remove_completed(journal)
                 if guard_marker is not None:
                     store.remove_legacy_marker(guard_marker)
+                store.remove_completed(journal, guard_already_removed=True)
                 if journal.package_version != package_version:
                     return execute_recognized_distribution(
                         install_root,
@@ -4368,9 +4438,9 @@ def execute_recognized_distribution(
                 ):
                     raise DistributionApplyError("distribution postcondition failed")
                 journal = store.mark_completed(journal)
-                store.remove_completed(journal)
                 if guard_marker is not None:
                     store.remove_legacy_marker(guard_marker)
+                store.remove_completed(journal, guard_already_removed=True)
                 if journal.package_version != package_version:
                     return execute_recognized_distribution(
                         install_root,
@@ -4461,9 +4531,9 @@ def execute_recognized_distribution(
             raise DistributionApplyError("distribution postcondition failed")
         active_journal = store.mark_verified(active_journal)
         active_journal = store.mark_completed(active_journal)
-        store.remove_completed(active_journal)
         if guard_marker is not None:
             store.remove_legacy_marker(guard_marker)
+        store.remove_completed(active_journal, guard_already_removed=True)
         journal = active_journal
     except Exception as exc:
         if not isinstance(exc, DistributionApplyError):
