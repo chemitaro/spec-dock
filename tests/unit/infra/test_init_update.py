@@ -18,6 +18,7 @@ import zipfile
 import pytest
 
 import spec_dock.cli as cli
+import spec_dock.managed_distribution as managed_distribution
 from tests.cli_runtime.harness import (
     _EXPECTED_MANAGED_SKILL_NAMES as _HARNESS_EXPECTED_MANAGED_SKILL_NAMES,
     CliRuntimeHarness,
@@ -8613,7 +8614,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
     @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
     @pytest.mark.parametrize("boundary_name", [".agent", ".work", "active", "initiatives"])
-    def test_recognized_reconciliation_revalidates_preserved_boundary_inside_service(
+    def test_recognized_reconciliation_revalidates_preserved_boundary_before_first_service_mutation(
         self,
         command: tuple[str, ...],
         boundary_name: str,
@@ -8625,31 +8626,43 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             specdock_dir = target / "spec-dock"
             boundary = specdock_dir / boundary_name
             displaced = specdock_dir / f"{boundary_name}-before-service-race"
+            managed_target = specdock_dir / "docs" / "README.md"
+            managed_target.unlink()
             original_version = (specdock_dir / "spec-dock.version").read_bytes()
-            validator_called = False
+            original_assessment = managed_distribution.build_workspace_assessment
+            assessment_calls = 0
+            post_race_snapshot: dict[str, str] | None = None
 
-            def inject_boundary_race(
-                *_args: object,
-                preserved_state_validator,
-                **_kwargs: object,
-            ):
-                nonlocal validator_called
+            def inject_boundary_race(*args: object, **kwargs: object):
+                nonlocal assessment_calls, post_race_snapshot
+                assessment = original_assessment(*args, **kwargs)
+                assessment_calls += 1
+                if assessment_calls != 1:
+                    return assessment
                 if boundary.exists():
                     boundary.rename(displaced)
                 boundary.mkdir()
                 (boundary / "attacker-sentinel.txt").write_text("attacker-owned\n", encoding="utf-8")
-                validator_called = True
-                preserved_state_validator()
-                raise AssertionError("preserved-state validation unexpectedly accepted a boundary race")
+                post_race_snapshot = self._relative_file_snapshot(target)
+                return assessment
 
-            monkeypatch.setattr(cli, "execute_recognized_distribution", inject_boundary_race)
+            monkeypatch.setattr(managed_distribution, "build_workspace_assessment", inject_boundary_race)
 
             assert main([*command, str(target)]) == 1
 
-            assert validator_called is True
+            assert assessment_calls == 1
+            assert post_race_snapshot is not None
+            assert self._relative_file_snapshot(target) == post_race_snapshot
             assert (boundary / "attacker-sentinel.txt").read_text(encoding="utf-8") == "attacker-owned\n"
             assert (specdock_dir / "spec-dock.version").read_bytes() == original_version
+            assert not managed_target.exists()
+            assert not (specdock_dir / ".distribution-retry.json").exists()
             assert not (specdock_dir / ".distribution-journal.json").exists()
+            assert not any(
+                path.name.startswith((".spec-dock-file-", ".spec-dock-symlink-"))
+                or (path.name.startswith(".distribution-") and path.name.endswith((".stage", ".remove")))
+                for path in target.rglob("*")
+            )
 
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli

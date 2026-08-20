@@ -1375,6 +1375,8 @@ def _snapshot_initiative_metadata(
 def _revalidate_preserved_read_bindings(
     root_fd: int,
     bindings: dict[Path, _PreservedReadBinding | None],
+    *,
+    allow_directory_metadata_changes: bool = False,
 ) -> None:
     """Reject any preserved input that appeared, vanished, or rebound before service entry."""
 
@@ -1383,6 +1385,14 @@ def _revalidate_preserved_read_bindings(
         if expected is None:
             if current is not None:
                 raise RuntimeError("preserved state path appeared after capture")
+            continue
+        if allow_directory_metadata_changes and stat.S_ISDIR(expected.mode):
+            if (
+                current is None
+                or not stat.S_ISDIR(current.st_mode)
+                or (current.st_dev, current.st_ino) != (expected.device, expected.inode)
+            ):
+                raise RuntimeError("preserved state path identity changed after capture")
             continue
         if current is None or _preserved_read_binding(current, link_target=link_target) != expected:
             raise RuntimeError("preserved state path identity changed after capture")
@@ -1583,19 +1593,20 @@ def _recognized_preserved_state_snapshot(
                     finally:
                         os.close(active_fd)
 
-                service_validation_pending = True
-
-                def revalidate_at_service_entry() -> None:
-                    nonlocal service_validation_pending
-                    if not service_validation_pending:
-                        return
+                def revalidate_preserved_state_before_service() -> None:
                     _revalidate_preserved_read_bindings(root_fd, bindings)
-                    service_validation_pending = False
+
+                def revalidate_preserved_state_during_service() -> None:
+                    _revalidate_preserved_read_bindings(
+                        root_fd,
+                        bindings,
+                        allow_directory_metadata_changes=True,
+                    )
 
                 yield (
                     snapshot_specdock,
-                    lambda: _revalidate_preserved_read_bindings(root_fd, bindings),
-                    revalidate_at_service_entry,
+                    revalidate_preserved_state_before_service,
+                    revalidate_preserved_state_during_service,
                 )
         finally:
             os.close(specdock_fd)

@@ -906,25 +906,13 @@ def test_i368_created_parent_held_descriptor_rejects_unknown_child_before_target
     scaffold_root = _minimal_scaffold_root(tmp_path)
     target_root = tmp_path / "consumer"
     (target_root / "spec-dock").mkdir(parents=True)
-    original_bind = managed_distribution._bind_created_parent_identities
+    original_assert = managed_distribution._assert_created_parent_binding_fd_closed_set
     injected = False
 
-    def bind_then_inject_unknown_child(
-        target_rel,
-        snapshot,
-        parent_chain,
-        created_parent_bindings,
-        created_parent_recorder=None,
-    ):
+    def validate_then_inject_unknown_child(parent_fd, relative_path, binding, journal):
         nonlocal injected
-        original_bind(
-            target_rel,
-            snapshot,
-            parent_chain,
-            created_parent_bindings,
-            created_parent_recorder,
-        )
-        if injected or target_rel != ".github/workflows/ci.yml":
+        original_assert(parent_fd, relative_path, binding, journal)
+        if injected or relative_path != ".github/workflows":
             return
         injected = True
         parent = target_root / ".github" / "workflows"
@@ -939,8 +927,8 @@ def test_i368_created_parent_held_descriptor_rejects_unknown_child_before_target
 
     monkeypatch.setattr(
         managed_distribution,
-        "_bind_created_parent_identities",
-        bind_then_inject_unknown_child,
+        "_assert_created_parent_binding_fd_closed_set",
+        validate_then_inject_unknown_child,
     )
 
     result = execute_recognized_distribution(
@@ -956,6 +944,37 @@ def test_i368_created_parent_held_descriptor_rejects_unknown_child_before_target
     assert result.status == "recovery_required"
     assert result.reason == "journal-precondition-mismatch"
     assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+
+
+def test_i368_preserved_validator_repeats_until_first_operation_owned_parent_mutation(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    created_parent = target_root / ".github"
+    observations: list[bool] = []
+
+    def validate_preserved_state() -> None:
+        appeared = created_parent.exists()
+        observations.append(appeared)
+        if appeared:
+            raise DistributionApplyError("preserved validator ran after first target mutation")
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        preserved_state_validator=validate_preserved_state,
+    )
+
+    assert result.status == "completed", result.reason
+    assert len(observations) >= 3
+    assert not any(observations)
+    assert created_parent.is_dir()
 
 
 def test_i368_parent_creation_crash_resumes_from_durable_parent_intent(
@@ -2834,6 +2853,98 @@ def test_i368_retry_cleans_exact_stage_created_after_write_ahead_reservation(tmp
     assert result.status == "completed", result.reason
     assert (parent / "ci.yml").read_bytes() == b"desired\n"
     assert not stage.exists()
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("outcome", ["converges", "mismatch"])
+def test_i368_zero_reserved_created_parent_stage_crash_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    outcome: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target_rel = ".github/workflows/ci.yml" if kind == "regular" else "spec"
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    original_open = managed_distribution.os.open
+    original_symlink = managed_distribution.os.symlink
+    crashed = False
+
+    def crash_after_regular_stage_create(path, flags, *args, **kwargs):
+        nonlocal crashed
+        fd = original_open(path, flags, *args, **kwargs)
+        if kind == "regular" and not crashed and isinstance(path, str) and path.startswith(".spec-dock-file-"):
+            crashed = True
+            os.close(fd)
+            raise SimulatedProcessCrash
+        return fd
+
+    def crash_after_symlink_stage_create(source, destination, *args, **kwargs):
+        nonlocal crashed
+        original_symlink(source, destination, *args, **kwargs)
+        if (
+            kind == "symlink"
+            and not crashed
+            and isinstance(destination, str)
+            and destination.startswith(".spec-dock-symlink-")
+        ):
+            crashed = True
+            raise SimulatedProcessCrash
+
+    with monkeypatch.context() as fault:
+        fault.setattr(managed_distribution.os, "open", crash_after_regular_stage_create)
+        fault.setattr(managed_distribution.os, "symlink", crash_after_symlink_stage_create)
+        with pytest.raises(SimulatedProcessCrash):
+            execute_recognized_distribution(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                intent="update",
+                package_version="1.2.3",
+            )
+
+    assert crashed is True
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    reserved = next(
+        lease
+        for lease in payload["staging_leases"]
+        if lease["path"] == target_rel and lease["device"] == lease["inode"] == lease["ctime_ns"] == 0
+    )
+    stage = target_root / Path(target_rel).parent / reserved["stage_name"]
+    assert stage.exists() or stage.is_symlink()
+    if outcome == "mismatch":
+        stage.unlink()
+        if kind == "regular":
+            stage.symlink_to("third-party-target")
+        else:
+            stage.write_bytes(b"third-party\n")
+
+    retry = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    if outcome == "converges":
+        assert retry.status == "completed", retry.reason
+        assert not stage.exists() and not stage.is_symlink()
+    else:
+        assert retry.status == "recovery_required"
+        assert retry.reason in {"journal-precondition-mismatch", "managed staging identity changed"}
+        assert stage.exists() or stage.is_symlink()
+        assert journal_path.exists()
 
 
 def test_i368_abrupt_swap_requires_exact_post_swap_successor_lease(tmp_path: Path) -> None:
@@ -6731,6 +6842,116 @@ def test_i368_displaced_cleanup_revalidates_both_namespace_entries(
     else:
         assert target.readlink() == Path("third-party-target")
         assert stage.readlink() == Path("old-target")
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("race_point", ["after-final-stat", "post-unlink-canonical"])
+def test_i368_quarantine_backup_preserves_replacement_and_restores_predecessor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    race_point: str,
+) -> None:
+    parent = tmp_path / f"{kind}-{race_point}"
+    parent.mkdir()
+    target = parent / "target"
+    stage = parent / "stage"
+    if kind == "regular":
+        target.write_bytes(b"desired\n")
+        stage.write_bytes(b"old\n")
+        successor_identity = DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(b"desired\n").hexdigest(),
+            mode=stat.S_IMODE(target.lstat().st_mode),
+        )
+        predecessor_identity = DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(b"old\n").hexdigest(),
+            mode=stat.S_IMODE(stage.lstat().st_mode),
+        )
+    else:
+        target.symlink_to("desired-target")
+        stage.symlink_to("old-target")
+        successor_identity = DistributionIdentity(kind="symlink", target="desired-target")
+        predecessor_identity = DistributionIdentity(kind="symlink", target="old-target")
+    successor = managed_distribution._distribution_stage_ownership("target", stage.name, target.lstat())
+    predecessor = stage.lstat()
+    original_stat = managed_distribution.os.stat
+    original_unlink = managed_distribution.os.unlink
+    replaced = False
+
+    def install_third_party(path: Path) -> None:
+        nonlocal replaced
+        path.unlink(missing_ok=True)
+        if kind == "regular":
+            path.write_bytes(b"third-party\n")
+        else:
+            path.symlink_to("third-party-target")
+        replaced = True
+
+    def replace_quarantine_after_final_stat(name, *args, **kwargs):
+        result = original_stat(name, *args, **kwargs)
+        if (
+            race_point == "after-final-stat"
+            and not replaced
+            and isinstance(name, str)
+            and name.endswith(".remove")
+            and (
+                (parent / managed_distribution._distribution_quarantine_backup_name(name)).exists()
+                or (parent / managed_distribution._distribution_quarantine_backup_name(name)).is_symlink()
+            )
+        ):
+            install_third_party(parent / name)
+        return result
+
+    def replace_canonical_after_quarantine_unlink(name, *args, **kwargs):
+        result = original_unlink(name, *args, **kwargs)
+        if (
+            race_point == "post-unlink-canonical"
+            and not replaced
+            and isinstance(name, str)
+            and name.endswith(".remove")
+        ):
+            install_third_party(target)
+        return result
+
+    monkeypatch.setattr(managed_distribution.os, "stat", replace_quarantine_after_final_stat)
+    monkeypatch.setattr(managed_distribution.os, "unlink", replace_canonical_after_quarantine_unlink)
+    parent_fd = os.open(parent, os.O_RDONLY)
+    try:
+        with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
+            managed_distribution._remove_distribution_stage_if_owned(
+                parent_fd,
+                stage.name,
+                predecessor,
+                strict=True,
+                transition_path="target",
+                canonical_name=target.name,
+                canonical_ownership=successor,
+                canonical_condition={
+                    "identity": managed_distribution._distribution_identity_payload(successor_identity)
+                },
+                stage_condition={
+                    "device": predecessor.st_dev,
+                    "inode": predecessor.st_ino,
+                    "file_type": managed_distribution._file_type(predecessor.st_mode),
+                    "link_count": predecessor.st_nlink,
+                    "identity": managed_distribution._distribution_identity_payload(predecessor_identity),
+                },
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert replaced is True
+    assert stage.exists() or stage.is_symlink()
+    if kind == "regular":
+        assert stage.read_bytes() == b"old\n"
+        replacement_path = target if race_point == "post-unlink-canonical" else next(parent.glob("*.remove"))
+        assert replacement_path.read_bytes() == b"third-party\n"
+    else:
+        assert stage.readlink() == Path("old-target")
+        replacement_path = target if race_point == "post-unlink-canonical" else next(parent.glob("*.remove"))
+        assert replacement_path.readlink() == Path("third-party-target")
 
 
 @pytest.mark.parametrize("kind", ["regular", "symlink"])
