@@ -8664,6 +8664,65 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 for path in target.rglob("*")
             )
 
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    @pytest.mark.parametrize("injection", ["new-initiative", "metadata-child", "active-child"])
+    def test_recognized_reconciliation_revalidates_preserved_child_inventory_before_first_service_mutation(
+        self,
+        command: tuple[str, ...],
+        injection: str,
+        monkeypatch,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            initiative_dir, _epic_dir, _issue_dir = self._create_minimal_local_tree(target)
+            specdock_dir = target / "spec-dock"
+            managed_target = specdock_dir / "docs" / "README.md"
+            managed_target.unlink()
+            original_version = (specdock_dir / "spec-dock.version").read_bytes()
+            original_assessment = managed_distribution.build_workspace_assessment
+            assessment_calls = 0
+            post_race_snapshot: dict[str, str] | None = None
+
+            def inject_child_race(*args: object, **kwargs: object):
+                nonlocal assessment_calls, post_race_snapshot
+                assessment = original_assessment(*args, **kwargs)
+                assessment_calls += 1
+                if assessment_calls != 1:
+                    return assessment
+                if injection == "new-initiative":
+                    (specdock_dir / "initiatives" / "init-attacker-new").mkdir()
+                elif injection == "metadata-child":
+                    attacker = initiative_dir / "epics" / "epic-attacker-new"
+                    attacker.mkdir()
+                    (attacker / ".meta.json").write_text(
+                        '{"schema_version":1,"type":"epic","id":"epic-attacker-new"}\n',
+                        encoding="utf-8",
+                    )
+                else:
+                    active_child = specdock_dir / "active" / "issue.path"
+                    assert not active_child.exists()
+                    active_child.write_text("../system/active-none/issue\n", encoding="utf-8")
+                post_race_snapshot = self._relative_file_snapshot(target)
+                return assessment
+
+            monkeypatch.setattr(managed_distribution, "build_workspace_assessment", inject_child_race)
+
+            assert main([*command, str(target)]) == 1
+
+            assert assessment_calls == 1
+            assert post_race_snapshot is not None
+            assert self._relative_file_snapshot(target) == post_race_snapshot
+            assert (specdock_dir / "spec-dock.version").read_bytes() == original_version
+            assert not managed_target.exists()
+            assert not (specdock_dir / ".distribution-retry.json").exists()
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+            assert not any(
+                path.name.startswith((".spec-dock-file-", ".spec-dock-symlink-"))
+                or (path.name.startswith(".distribution-") and path.name.endswith((".stage", ".remove")))
+                for path in target.rglob("*")
+            )
+
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 
