@@ -109,7 +109,7 @@ crash/exception では `prepared` 以降の journal を保持する。`completed
 
 schema-2 forward guard は journal より先に `operation_id`、`contract_identity`、canonical `plan_digest` を durable publish する。journal はこの独立アンカーと一致する場合だけ作成・再開でき、journal 内部の action 順序や immutable metadata と digest をまとめて差し替えても authority を再構成できない。
 
-stage作成、atomic exchange、prune quarantine、missing parent作成は、可視namespace mutationより先に予約名またはmissing intentをjournalへ記録する。作成後またはexchange後はexact inodeへleaseを昇格してからcleanupし、強制終了後は予約名、canonical postcondition、displaced predecessor、空のcreated parentが単一の既知遷移に一致する場合だけforward recoveryする。未知entryまたは複数状態に一致する場合は保持してblockする。
+stage作成、atomic exchange、prune quarantine、missing parent作成は、可視namespace mutationより先に予約名またはmissing intentをjournalへ記録する。regular stageは可変write中は予約leaseを維持し、bytes/mode確定後にだけexact successor inodeへ昇格する。exchange後はcanonical successor leaseをdisplaced predecessor cleanupより先にdurable化する。強制終了後は予約名、exact canonical successor、displaced predecessor、空のcreated parentが単一の既知遷移に一致する場合だけforward recoveryする。same-contentでもcanonical inodeがleaseと異なる場合、またはexchange後にcanonicalが未知entryへ置換された場合はrollback/cleanupせず両entryを保持してblockする。
 
 Action checkpoint:
 
@@ -130,6 +130,8 @@ one-way conversion または compatibility resume の必須条件:
 - `.uninstall-retry.json` と同時存在しない
 - recorded stage ownership が exact no-follow identity に一致
 - current Contract と observation から same remaining plan を一意に再構成できる
+
+exact legacy stage lease がある場合は、対応action、private stage name family、parent chain、device/inode/ctime/type/link count を照合し、schema-2 journalへleaseを引き継いでからcleanup/resumeする。guard conversion中のlegacy predecessorはschema-2 successorのcanonical identity/bytes受理が終わるまでprivate recovery nameに保持する。
 
 一つでも証明できなければ marker を書き換えず `legacy-marker-unconvertible` とする。
 

@@ -54,6 +54,7 @@ ID: "iss-00368"
 - schema-2 forward guard はjournal作成前に `operation_id`、`contract_identity`、canonical `plan_digest` を永続化する。再開時はguardとjournalの独立アンカーを照合するため、action順序やimmutable metadataを変更してjournal内部のdigestを再計算してもmutation前に拒否する。
 - managed stage名とprune quarantine名は作成・rename前にzero-identityの予約leaseとしてjournalへ記録し、作成後のexact inode leaseへ昇格する。swap直後に停止してdesired inodeがcanonicalへ移り旧precondition inodeがstageへ移った状態、およびprune rename直後の予約quarantineは、journalへ遷移後identityをwrite-ahead記録してからcleanupする。元はmissingの親directoryは、全descendant actionがpendingかつ出現したreal directoryが空の場合だけexact inode bindingへ昇格し、非空・symlink・計画外出現は拒否する。
 - 強制終了時に残るfilesystem状態を直接構築する回帰として、予約stage作成直後、regular swap直後、prune quarantine直後、self-rehashed action reorderを追加し、同一plan retryの収束とplan改変のmutation前拒否を固定した。
+- Strict successor の5件 remediationで、exact legacy stage leaseのschema-2引き継ぎ、mutable regular write中のreserved-name lease維持、publish前のexact successor昇格、canonical successorのdisplaced predecessor cleanupより先のdurable化、same-bytes/different-inode create successor拒否を追加した。regular/symlink exchangeはpre-exchange canonical raceのみexact successor/unknown stage pairをCAS rollbackし、post-exchange unknown canonicalはrollback/cleanupせず保持する。legacy guard predecessorはschema-2 successor受理後まで削除しない。
 - `1d62f3221a5a55add1c592076de2688c2f0b4a89` は旧 campaign の実装 anchor であり、その後の Strict remediation で実装とテストを変更したため最終 candidate anchor ではない。最終 exact candidate の SHA と同一 SHA 上の review/test 合否は Strict check attestation を正本とする。
 
 ## Verification
@@ -83,6 +84,7 @@ exact candidate の SHA と合否の正本は、当該 report 自身を含む `r
 - [x] `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py tests/cli_runtime/test_distribution_cutover.py -q` — 275 passed、1 failed。残る failure は既知の Issue 359 retained-skill golden
 - [x] `uv run pytest -q` — 1099 passed、1053 policy-skipped
 - [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — write-ahead reservation、abrupt swap/prune recovery、plan anchor、symlink CAS race を含む 176 passed
+- [x] `uv run pytest tests/unit/infra/test_managed_distribution.py -q` — legacy exact-stage conversion、mutable stage lifecycle、same-bytes inode replacement拒否、post-exchange third-party preservation、guard predecessor保持を含む 181 passed
 - [x] `uv run pytest tests/unit/test_provider_test_lanes.py -q` — missing ledger / missing node / incomplete selection を含む 12 passed
 - [x] `make lint` — ruff check / format check / mypy が成功
 - [x] `uv run pytest -q` — 1115 passed、1053 policy-skipped
