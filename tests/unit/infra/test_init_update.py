@@ -8723,6 +8723,71 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
                 for path in target.rglob("*")
             )
 
+    @pytest.mark.parametrize("command", [("update",), ("init", "--force")])
+    @pytest.mark.parametrize("persisted_style", ["relative", "absolute"])
+    @pytest.mark.parametrize("link_target", ["nested-in-repository", "escaping"])
+    def test_recognized_reconciliation_blocks_persisted_issue_path_through_initiatives_symlink_before_writes(
+        self,
+        command: tuple[str, ...],
+        persisted_style: str,
+        link_target: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "consumer"
+            target.mkdir()
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink is not supported in this environment")
+
+            assert main(["init", str(target)]) == 0
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            specdock_dir = target / "spec-dock"
+            outside_issue = Path(tmp) / "outside-issue"
+            if link_target == "escaping":
+                outside_issue.mkdir()
+                self._write_json_force(
+                    outside_issue / ".meta.json",
+                    {"schema_version": 1, "type": "issue", "id": "iss-local-00001"},
+                )
+                (outside_issue / "sentinel.txt").write_text("outside-owned\n", encoding="utf-8")
+                symlink_target = os.path.relpath(outside_issue, start=issue_dir.parent)
+            else:
+                symlink_target = issue_dir.name
+            alias = issue_dir.parent / "iss-local-00001-persisted-alias"
+            alias.symlink_to(symlink_target, target_is_directory=True)
+            persisted_path = str(alias) if persisted_style == "absolute" else alias.relative_to(target).as_posix()
+            self._write_json_force(
+                specdock_dir / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {
+                        "id": "init-local-00001",
+                        "path": initiative_dir.relative_to(target).as_posix(),
+                    },
+                    "epic": {"id": "epic-local-00001", "path": epic_dir.relative_to(target).as_posix()},
+                    "issue": {"id": "iss-local-00001", "path": persisted_path},
+                },
+            )
+            managed_target = specdock_dir / "docs" / "README.md"
+            managed_target.unlink()
+            original_version = (specdock_dir / "spec-dock.version").read_bytes()
+            before = self._relative_file_snapshot(target)
+
+            assert main([*command, str(target)]) == 1
+
+            assert self._relative_file_snapshot(target) == before
+            assert alias.is_symlink()
+            assert (specdock_dir / "spec-dock.version").read_bytes() == original_version
+            assert not managed_target.exists()
+            assert not (specdock_dir / ".distribution-retry.json").exists()
+            assert not (specdock_dir / ".distribution-journal.json").exists()
+            assert not any(
+                path.name.startswith((".spec-dock-file-", ".spec-dock-symlink-"))
+                or (path.name.startswith(".distribution-") and path.name.endswith((".stage", ".remove")))
+                for path in target.rglob("*")
+            )
+            if link_target == "escaping":
+                assert (outside_issue / "sentinel.txt").read_text(encoding="utf-8") == "outside-owned\n"
+
     def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
         import spec_dock.cli as cli
 
