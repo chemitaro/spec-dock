@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "kind": "chatgpt_final_quality_gate_plan",
+  "task_id": "ISS-00368",
+  "registry_version": "1.0.0",
+  "fixed_point": "7588d54114a2b8be7661353952f65741169320bd",
+  "evidence_only_paths": [
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/chatgpt-final-quality-gate-campaign-plan.json",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/chatgpt-final-quality-gate-plan.json",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/final-quality-gate-check-profile.json",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/report.md"
+  ],
+  "additional_perspective_ids": [
+    "compatibility-regression",
+    "integration-boundaries",
+    "e2e-user-flow",
+    "data-migration",
+    "reliability-recovery",
+    "release-rollback"
+  ],
+  "selection_rationale": {
+    "compatibility-regression": "recognized update と init --force の既存 public behavior および fresh/uninstall 非回帰を確認するため",
+    "integration-boundaries": "CLI adapter、assessment、journal、filesystem kernel、shipped assets の境界を横断するため",
+    "e2e-user-flow": "public update と init --force の成功、block、partial failure、retry を end-to-end で確認するため",
+    "data-migration": "legacy .distribution-retry.json から new journal への one-way conversion を含むため",
+    "reliability-recovery": "checkpoint、staging lease、exact pre/postcondition、forward recovery が中核要件のため",
+    "release-rollback": "new journal 作成後の old-code rollback 禁止と package distribution の復旧契約を確認するため"
+  }
+}

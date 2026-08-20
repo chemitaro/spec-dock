@@ -1,7 +1,10 @@
 from collections.abc import Mapping
+import json
 from pathlib import Path
 import subprocess
 import sys
+
+from tests.conftest import _normalize_failure_message
 
 REQUIRED_FAST_NODE_IDS = frozenset({
     "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_legacy_flag_reports_parser_error",
@@ -18,6 +21,38 @@ REQUIRED_FAST_NODE_IDS = frozenset({
 })
 
 POLICY_SKIP_HINT = "--run-full-regression"
+
+
+def test_full_regression_signature_normalization_is_platform_independent() -> None:
+    repository = Path("/repo")
+    macos_runtime_error = (
+        "RuntimeError: retry `/private/var/folders/aa/bb/T/tmpabc/spec-dock/scripts/spec-dock update`."
+    )
+    linux_runtime_error = "RuntimeError: retry `/tmp/tmpxyz/spec-dock/scripts/spec-dock update`."
+    compact_assertion = (
+        "AssertionError: assert [] == [('/repo', 10000)]\n"
+        "  \n"
+        "  Right contains one more item: ('/repo', 10000)\n"
+        "  Use -v to get more diff"
+    )
+    expanded_assertion = (
+        "AssertionError: assert [] == [('/repo', 10000)]\n"
+        "  \n"
+        "  Right contains one more item: ('/repo', 10000)\n"
+        "  \n"
+        "  Full diff:\n"
+        "  + []\n"
+        "  - [('/repo', 10000)]"
+    )
+
+    assert _normalize_failure_message(macos_runtime_error, repository) == _normalize_failure_message(
+        linux_runtime_error,
+        repository,
+    )
+    assert _normalize_failure_message(compact_assertion, repository) == _normalize_failure_message(
+        expanded_assertion,
+        repository,
+    )
 
 
 def _repo_root() -> Path:
@@ -42,16 +77,24 @@ def _collected_node_ids(result: subprocess.CompletedProcess[str]) -> set[str]:
     return {line for line in result.stdout.splitlines() if line.startswith("tests/") and "::" in line}
 
 
-def _prepare_mini_project(tmp_path: Path, test_files: Mapping[str, str]) -> Path:
+def _prepare_mini_project(
+    tmp_path: Path,
+    test_files: Mapping[str, str],
+    *,
+    ledger_guard: bool = False,
+) -> Path:
     classifier_path = _repo_root() / "tests" / "conftest.py"
     assert classifier_path.is_file(), f"S01 classifier is missing: {classifier_path}"
 
     tests_root = tmp_path / "tests"
     tests_root.mkdir(parents=True)
-    (tests_root / "conftest.py").write_text(
-        classifier_path.read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
+    classifier = classifier_path.read_text(encoding="utf-8")
+    if not ledger_guard:
+        classifier = classifier.replace(
+            "if run_full_regression and not config.option.collectonly:\n",
+            "if False and run_full_regression and not config.option.collectonly:\n",
+        )
+    (tests_root / "conftest.py").write_text(classifier, encoding="utf-8")
     (tmp_path / "pytest.ini").write_text(
         "[pytest]\n"
         "addopts = --strict-markers\n"
@@ -67,6 +110,33 @@ def _prepare_mini_project(tmp_path: Path, test_files: Mapping[str, str]) -> Path
         target.write_text(source, encoding="utf-8")
 
     return tmp_path
+
+
+def _write_full_regression_ledger(project: Path, nodeids: tuple[str, ...]) -> None:
+    ledger = (
+        project
+        / "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics"
+        / "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues"
+        / "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
+    )
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(
+        json.dumps({
+            "failure_paths": [
+                {
+                    "nodeid": nodeid,
+                    "current_status": "failed",
+                    "fixed_point_status": "failed",
+                    "disposition": "approved-no-op",
+                    "failure_signature_match": True,
+                    "current_signature_sha256": "0" * 64,
+                    "fixed_point_signature_sha256": "0" * 64,
+                }
+                for nodeid in nodeids
+            ]
+        }),
+        encoding="utf-8",
+    )
 
 
 def test_focused_collection_does_not_require_global_inventory(tmp_path: Path) -> None:
@@ -483,3 +553,63 @@ def test_full_permission_preserves_legitimate_outcomes_and_heavy_failure(
     assert failing_result.returncode == 1, failing_output
     assert "controlled heavy failure" in failing_output
     assert "1 failed" in failing_output
+
+
+def test_full_regression_guard_rejects_missing_ledger(tmp_path: Path) -> None:
+    project = _prepare_mini_project(
+        tmp_path,
+        {"tests/cli_runtime/test_sample.py": "def test_sample():\n    pass\n"},
+        ledger_guard=True,
+    )
+
+    result = _run_pytest(project, "-q", "-p", "no:cacheprovider", "--run-full-regression")
+    output = _result_output(result)
+
+    assert result.returncode == 3, output
+    assert "ledger_errors" in output
+    assert "verified " not in output
+
+
+def test_full_regression_guard_rejects_deleted_or_renamed_ledger_node(tmp_path: Path) -> None:
+    project = _prepare_mini_project(
+        tmp_path,
+        {"tests/cli_runtime/test_renamed.py": "def test_renamed():\n    pass\n"},
+        ledger_guard=True,
+    )
+    missing_node = "tests/cli_runtime/test_deleted.py::test_deleted"
+    _write_full_regression_ledger(project, (missing_node,))
+
+    result = _run_pytest(project, "-q", "-p", "no:cacheprovider", "--run-full-regression")
+    output = _result_output(result)
+
+    assert result.returncode == 3, output
+    assert missing_node in output
+    assert "verified " not in output
+
+
+def test_full_regression_guard_rejects_incomplete_selected_suite(tmp_path: Path) -> None:
+    selected = "tests/cli_runtime/test_selected.py::test_selected"
+    omitted = "tests/cli_runtime/test_omitted.py::test_omitted"
+    project = _prepare_mini_project(
+        tmp_path,
+        {
+            "tests/cli_runtime/test_selected.py": "def test_selected():\n    pass\n",
+            "tests/cli_runtime/test_omitted.py": "def test_omitted():\n    pass\n",
+        },
+        ledger_guard=True,
+    )
+    _write_full_regression_ledger(project, (selected, omitted))
+
+    result = _run_pytest(
+        project,
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "--run-full-regression",
+        selected,
+    )
+    output = _result_output(result)
+
+    assert result.returncode == 3, output
+    assert omitted in output
+    assert "verified " not in output

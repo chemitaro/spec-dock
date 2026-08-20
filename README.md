@@ -47,7 +47,7 @@ uvx --from ~/src/spec-dock spec-dock update
 
 `spec-dock update` refreshes the recognized managed distribution through one plan/apply path. It
 preserves user-owned and unknown paths, blocks before writing when ownership or workspace identity is
-ambiguous, and records a same-root retry marker when an apply is interrupted. It is distinct from
+ambiguous, and records a root/intent/contract/plan-bound operation journal when an apply starts. It is distinct from
 `init --force`; older or incompatible workspaces may still require manual normalization or rebuild.
 
 既存環境の更新手順と、旧配布面からの移行・復旧方針は [移行ガイド](spec-dock/docs/migration.md) を参照してください。
@@ -161,9 +161,19 @@ Notes:
 - `update` and `init --force` use the same recognized distribution classifier and fail closed on
   unknown, modified, symlinked, hard-linked, or root-rebound targets. No pathname-based recursive
   cleanup is used for unknown paths.
-- An interrupted update may leave `.distribution-retry.json`; rerun the same package and operation
-  against the same repository root to continue. A different root, package, operation, malformed
-  marker, or dual marker is rejected before mutation.
+- An interrupted recognized update or `init --force` may leave
+  `spec-dock/.distribution-journal.json`. Rerun the same operation against the same repository root
+  with the same package or a compatible newer package to resume from exact action pre/postconditions.
+  Root, intent, authority, contract, plan, protocol, or exact target-state mismatches, downgrades, and
+  incompatible packages stop before further mutation; inspect the reported repository-relative reason
+  instead of rolling back to older installer code.
+- A legacy `spec-dock/.distribution-retry.json` is converted one way only when it is the exact
+  same-root, same-operation pre-write state and the executing package is the same or a compatible newer
+  version. An exact legacy staging lease is accepted only when its action, private stage-name family,
+  parent chain, device, inode, ctime, type, and link count all match the reconstructed plan; otherwise
+  the marker and stage are preserved for manual diagnosis. Malformed, later-phase, cross-root,
+  different-operation, downgrade, incompatible-package, unknown-stage, or dual recovery state is
+  rejected without rewriting recovery authority.
 - `uninstall` is dry-run by default. `--apply` requires a complete ownership-safe plan; partial
   failures retain `.uninstall-retry.json` until post-verification succeeds, and `--remove-specs` is
   required before spec history is deleted. `--keep-specs` preserves initiatives and unknown content.

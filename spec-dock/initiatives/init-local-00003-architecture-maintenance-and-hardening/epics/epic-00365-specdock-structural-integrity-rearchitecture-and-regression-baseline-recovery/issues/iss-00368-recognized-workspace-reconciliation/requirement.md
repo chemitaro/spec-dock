@@ -4,7 +4,7 @@ ID: "iss-00368"
 タイトル: "Recognized Workspace Reconciliation"
 関連GitHub: ["#368"]
 状態: "planned"
-最終更新: "2026-08-18"
+最終更新: "2026-08-21"
 親: ["epic-00365", "init-local-00003"]
 ---
 
@@ -36,6 +36,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 | I368-R08 | `.distribution-retry.json` は exact conversion または限定 compatibility resume が証明できる場合だけ受け入れる。different root/package/operation、malformed、dual marker、plan mismatch は write 前に拒否する。 |
 | I368-R09 | operation 完了時は desired managed assets と version/postcondition を再評価し、成功後だけ journal/staging を完了する。 |
 | I368-R10 | human output と exit behavior は現行 `update` / `init --force` semantics を維持し、error diagnostic は repository-relative path と stable reason に限定する。 |
+| I368-R11 | recognized mutation の排他境界は root operation lock に協調する SpecDock writer とする。lock 保持中も各 filesystem mutation 境界で no-follow identity、content、link topology、parent closed set を再検証し、観測した外部変更は fail closed にする。同一 UID の非協調 process が advisory lock を無視し、最後の検証と単一 pathname syscall の間だけ private recovery name を差し替える挙動は保証対象外とする。 |
 
 ## スコープ
 
@@ -68,6 +69,9 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 - journal create/publish に失敗した場合、managed target mutation は 0 件である。
 - action publish と checkpoint の間で crash した場合、resume は exact pre/post identity から状態を一意判定する。曖昧なら block する。
 - stale staging entry は journal に記録された exact lease identity と一致する場合だけ cleanup する。stage-like unknown sibling は保持する。
+- recognized service より前に読む `.agent` / `.work` / `active` / `initiatives` の preserved state は no-follow descriptor と single-link file identity に束縛する。unsafe boundary、hard link、または capture 後の rebind は guard/journal/target write 0 で block する。
+- originally missing parent の journal binding は recovery hint として扱い、action checkpoint、exact lease、pre/post identity から説明できない unknown child が一件でもあれば descendant mutation 前に block する。
+- root operation lock は SpecDock writer 間の operation-wide exclusion authority である。外部 process については mutation 境界で観測できた rebind、replacement、unknown child を block するが、同一 UID の非協調 process による検証後かつ単一 pathname syscall 前の差し替えまでを atomic CAS として保証しない。
 - current marker が newer package/operation で same plan を証明できない場合は変換しない。
 - `init --force` であっても unknown/modified content を force overwrite しない。
 
@@ -83,6 +87,7 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 8. `update` / `init --force` 対象の legacy scaffold callback、marker transition、plan 外 mutation route が削除され、同じ flow を二経路で実行できない。
 9. `tests/unit/infra/test_managed_distribution.py` と `tests/unit/infra/test_init_update.py` の affected tests が成功する。
 10. fresh target の `init` / `init --force` / `update`、uninstall、purge の public behavior はこの Issue で変更せず、fresh entrypoint matrix の characterization test を D2 へ引き渡す。
+11. `update` / `init --force` は recognized mutation と terminal cleanup を同じ root operation lock 内で実行し、lock に協調する concurrent SpecDock invocation を直列化する。既存の target/parent/created-parent/stage interposition tests は mutation 境界での replacement と unknown child を引き続き preserve-and-block する。
 
 ## 制約・前提
 
@@ -91,3 +96,4 @@ exact commit `51a0586f8eb02f622f386a1fe32f15d90fcac4bc` では、recognized work
 - current `.distribution-retry.json` field は implementation factとして扱うが、legacy schema を将来の public contract にしない。
 - regular-file recovery は exact SHA-256 を使い、historical catalog entry の position を identity として使わない。
 - Windows support と generic transaction framework は含めない。
+- advisory root lock を無視する同一 UID process に対する kernel-enforced namespace isolation、delete-by-inode、または native privileged helper は含めない。

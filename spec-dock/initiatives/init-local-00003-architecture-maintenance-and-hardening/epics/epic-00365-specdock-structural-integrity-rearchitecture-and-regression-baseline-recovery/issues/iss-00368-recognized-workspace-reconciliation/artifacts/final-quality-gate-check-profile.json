@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "kind": "final_quality_gate_check_profile_evidence",
+  "profile": {
+    "id": "specdock-issue368-slow-v1",
+    "version": "1.0.0",
+    "lane": "slow",
+    "reuse": "exact-candidate-workbench-only",
+    "checks": [
+      {
+        "id": "full-regression",
+        "argv": ["uv", "run", "pytest", "--run-full-regression", "-q"],
+        "timeout_seconds": 7200,
+        "accepted_nonzero": {
+          "type": "pytest-failure-ledger-v1",
+          "exit_codes": [1],
+          "ledger_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json",
+          "ledger_kind": "issue368_full_regression_failure_ledger",
+          "allowed_dispositions": ["approved-no-op"]
+        }
+      },
+      {
+        "id": "package-build",
+        "argv": ["uv", "build"],
+        "timeout_seconds": 900
+      },
+      {
+        "id": "consumer-validate",
+        "argv": ["./spec-dock/scripts/spec-dock", "validate"],
+        "timeout_seconds": 300
+      },
+      {
+        "id": "dependency-readiness",
+        "argv": ["./spec-dock/scripts/spec-dock", "deps", "check", "iss-00368", "--no-github"],
+        "timeout_seconds": 300
+      }
+    ]
+  },
+  "evidence_contract": {
+    "gate": "chatgpt-final-quality-gate-strict-new",
+    "review_authority": [
+      "quality-gate-state.json",
+      "quality-gate-result.json"
+    ],
+    "test_authority": "test-results/manifest.json",
+    "log_directory": "test-results/",
+    "binding": "every required command and browser review is executed for one exact clean pushed SHA; wrapper-owned state/result and deterministic test logs remain Git-ignored Workbench evidence",
+    "legacy_campaign_state_imported": false
+  },
+  "pre_slow_diagnostic": {
+    "argv": [
+      "uv",
+      "run",
+      "pytest",
+      "--run-full-regression",
+      "-q"
+    ],
+    "observed_implementation_sha": "1d62f3221a5a55add1c592076de2688c2f0b4a89",
+    "result": "pass",
+    "purpose": "historical pre-slow diagnostic only; tests/conftest.py verified all normalized failure signatures recorded by the ledger and rejected any mismatch with exit code 3; this SHA is not final-candidate authority"
+  },
+  "authoritative_failure_guard": {
+    "path": "tests/conftest.py",
+    "activation": "--run-full-regression with all approved ledger node IDs collected",
+    "accepted_match_exit_code": 1,
+    "mismatch_exit_code": 3,
+    "verified_implementation_sha": "1d62f3221a5a55add1c592076de2688c2f0b4a89",
+    "evidence_role": "executable acceptance contract, not final-candidate attestation"
+  }
+}
