@@ -3562,6 +3562,26 @@ class OperationJournalStore:
             predecessor=active,
         )
 
+    @staticmethod
+    def _assert_exact_canonical_successor(
+        parent_fd: int,
+        target_name: str,
+        path: str,
+        successor: DistributionStageOwnership,
+        postcondition: dict[str, object],
+    ) -> None:
+        canonical = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+        canonical_identity = _distribution_stage_identity(parent_fd, target_name, path)
+        if (
+            canonical.st_dev != successor.device
+            or canonical.st_ino != successor.inode
+            or canonical.st_ctime_ns != successor.ctime_ns
+            or _file_type(canonical.st_mode) != successor.file_type
+            or canonical.st_nlink != 1
+            or postcondition.get("identity") != _distribution_identity_payload(canonical_identity)
+        ):
+            raise DistributionApplyError("managed staging cleanup failed")
+
     def _resume_displaced_quarantine_cleanup(
         self,
         journal: OperationJournal,
@@ -3617,6 +3637,32 @@ class OperationJournalStore:
 
                 quarantine_info = _stat_optional_no_follow(parent_fd, quarantine_lease.stage_name)
                 original_info = _stat_optional_no_follow(parent_fd, original_stage_name)
+                backup_name = _distribution_quarantine_backup_name(quarantine_lease.stage_name)
+                backup_info = _stat_optional_no_follow(parent_fd, backup_name)
+                if backup_info is not None:
+                    if original_info is not None:
+                        raise DistributionApplyError("managed staging cleanup failed")
+                    if quarantine_info is None:
+                        os.link(
+                            backup_name,
+                            quarantine_lease.stage_name,
+                            src_dir_fd=parent_fd,
+                            dst_dir_fd=parent_fd,
+                            follow_symlinks=False,
+                        )
+                        os.fsync(parent_fd)
+                        quarantine_info = os.stat(
+                            quarantine_lease.stage_name,
+                            dir_fd=parent_fd,
+                            follow_symlinks=False,
+                        )
+                    if (
+                        quarantine_info.st_dev != backup_info.st_dev
+                        or quarantine_info.st_ino != backup_info.st_ino
+                        or quarantine_info.st_dev != quarantine_lease.device
+                        or quarantine_info.st_ino != quarantine_lease.inode
+                    ):
+                        raise DistributionApplyError("managed staging cleanup failed")
                 if quarantine_info is not None and original_info is not None:
                     raise DistributionApplyError("managed staging cleanup failed")
 
@@ -3644,17 +3690,18 @@ class OperationJournalStore:
                         parent_fd,
                         quarantine_lease.stage_name,
                         quarantine_lease.path,
+                        allow_backup_link=backup_info is not None,
                     )
                     if (
                         _file_type(quarantine_info.st_mode) != quarantine_lease.file_type
-                        or quarantine_info.st_nlink != 1
+                        or quarantine_info.st_nlink not in ({1, 2} if backup_info is not None else {1})
                         or record.precondition.get("identity") != _distribution_identity_payload(quarantine_identity)
                         or (
                             not reserved
                             and (
                                 quarantine_info.st_dev != quarantine_lease.device
                                 or quarantine_info.st_ino != quarantine_lease.inode
-                                or quarantine_info.st_ctime_ns != quarantine_lease.ctime_ns
+                                or (backup_info is None and quarantine_info.st_ctime_ns != quarantine_lease.ctime_ns)
                             )
                         )
                     ):
@@ -3682,11 +3729,29 @@ class OperationJournalStore:
                         or record.postcondition.get("identity") != _distribution_identity_payload(canonical_identity)
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
-                    _remove_distribution_stage_if_owned(
+
+                    def validate_canonical_for_unlink(
+                        bound_parent_fd: int = parent_fd,
+                        bound_target_name: str = target_name,
+                        bound_path: str = quarantine_lease.path,
+                        bound_successor: DistributionStageOwnership = successor,
+                        bound_postcondition: dict[str, object] = record.postcondition,
+                    ) -> None:
+                        self._assert_exact_canonical_successor(
+                            bound_parent_fd,
+                            bound_target_name,
+                            bound_path,
+                            bound_successor,
+                            bound_postcondition,
+                        )
+
+                    _unlink_distribution_quarantine_with_backup(
                         parent_fd,
                         quarantine_lease.stage_name,
+                        original_stage_name,
                         quarantine_info,
-                        strict=True,
+                        canonical_validator=validate_canonical_for_unlink,
+                        mutation_validator=None,
                     )
                 elif reserved:
                     raise DistributionApplyError("managed staging cleanup failed")
@@ -4489,8 +4554,46 @@ def _assert_created_parent_binding_fd_closed_set(
                 continue
         matched_stage = False
         for lease in journal.staging_leases:
-            if PurePosixPath(lease.path).parent.as_posix() != relative_path or lease.stage_name != name:
+            if PurePosixPath(lease.path).parent.as_posix() != relative_path:
                 continue
+            if name == _distribution_quarantine_backup_name(lease.stage_name):
+                try:
+                    backup_info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                except OSError as exc:
+                    raise DistributionApplyError("journal-precondition-mismatch") from exc
+                if (
+                    lease.device != 0
+                    and backup_info.st_dev == lease.device
+                    and backup_info.st_ino == lease.inode
+                    and _file_type(backup_info.st_mode) == lease.file_type
+                    and backup_info.st_nlink in {1, 2}
+                ):
+                    matched_stage = True
+                    break
+                continue
+            if lease.stage_name != name:
+                continue
+            if lease.device == lease.inode == lease.ctime_ns == 0:
+                try:
+                    reserved_info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                except OSError as exc:
+                    raise DistributionApplyError("journal-precondition-mismatch") from exc
+                if _file_type(reserved_info.st_mode) == lease.file_type and reserved_info.st_nlink == 1:
+                    matched_stage = True
+                    break
+            backup_name = _distribution_quarantine_backup_name(lease.stage_name)
+            stage_backup_info = _stat_optional_no_follow(parent_fd, backup_name)
+            if stage_backup_info is not None:
+                stage_info = _stat_optional_no_follow(parent_fd, name)
+                if (
+                    stage_info is not None
+                    and stage_info.st_dev == stage_backup_info.st_dev == lease.device
+                    and stage_info.st_ino == stage_backup_info.st_ino == lease.inode
+                    and _file_type(stage_info.st_mode) == lease.file_type
+                    and stage_info.st_nlink == stage_backup_info.st_nlink == 2
+                ):
+                    matched_stage = True
+                    break
             if _entry_matches_staging_lease(parent_fd, name, lease):
                 matched_stage = True
                 break
@@ -4611,9 +4714,16 @@ def execute_recognized_distribution(
 ) -> DistributionProcessResult:
     """Execute one recognized update/init-force through the journaled service."""
 
+    preserved_validation_active = True
+
     def validate_preserved_state() -> None:
-        if preserved_state_validator is not None:
+        if preserved_validation_active and preserved_state_validator is not None:
             preserved_state_validator()
+
+    def validate_first_target_mutation() -> None:
+        nonlocal preserved_validation_active
+        validate_preserved_state()
+        preserved_validation_active = False
 
     store = OperationJournalStore(target_root, identity_path=root_identity_path)
     journal_present = _path_present_no_follow(store.path)
@@ -4941,7 +5051,13 @@ def execute_recognized_distribution(
             progress_recorder=record_progress,
             before_mutation=validate_mutation_boundary,
             held_parent_validator=validate_held_parent_boundary,
+            first_target_mutation_validator=validate_first_target_mutation,
         )
+        # No later callback may reinterpret service-owned output as an
+        # externally appeared preserved path.  Mutation paths deactivate at
+        # their first namespace write; an all-adopt/preserve plan reaches this
+        # boundary without a target mutation and is deactivated here.
+        preserved_validation_active = False
         post = build_workspace_assessment(
             install_root,
             manifest_path=manifest_path,
@@ -5385,6 +5501,95 @@ def _stat_optional_no_follow(parent_fd: int, name: str) -> os.stat_result | None
         raise DistributionApplyError("managed staging cleanup failed") from exc
 
 
+def _distribution_quarantine_backup_name(quarantine_name: str) -> str:
+    return f".spec-dock-backup-{hashlib.sha256(quarantine_name.encode()).hexdigest()[:32]}"
+
+
+def _unlink_distribution_quarantine_with_backup(
+    parent_fd: int,
+    quarantine_name: str,
+    stage_name: str,
+    expected: os.stat_result,
+    *,
+    canonical_validator: Callable[[], None],
+    mutation_validator: Callable[[], None] | None,
+) -> None:
+    """Unlink one exact quarantine while retaining a restorable hardlink."""
+
+    backup_name = _distribution_quarantine_backup_name(quarantine_name)
+    if mutation_validator is not None:
+        mutation_validator()
+    try:
+        existing_backup = _stat_optional_no_follow(parent_fd, backup_name)
+        if existing_backup is None:
+            os.link(
+                quarantine_name,
+                backup_name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            os.fsync(parent_fd)
+        backup = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
+        visible = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            visible.st_dev != backup.st_dev
+            or visible.st_ino != backup.st_ino
+            or _file_type(visible.st_mode) != _file_type(backup.st_mode)
+            or backup.st_nlink < 2
+            or visible.st_nlink < 2
+            or visible.st_dev != expected.st_dev
+            or visible.st_ino != expected.st_ino
+        ):
+            raise DistributionApplyError("managed staging cleanup failed")
+        canonical_validator()
+        # A second no-follow observation closes an interposition after the
+        # first final stat.  The backup remains an independent exact reference.
+        final_visible = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+        final_backup = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            final_visible.st_dev != final_backup.st_dev
+            or final_visible.st_ino != final_backup.st_ino
+            or _file_type(final_visible.st_mode) != _file_type(final_backup.st_mode)
+            or final_visible.st_nlink < 2
+            or final_backup.st_nlink < 2
+        ):
+            with suppress(OSError):
+                _rename_distribution_no_replace(parent_fd, backup_name, parent_fd, stage_name)
+                os.fsync(parent_fd)
+            raise DistributionApplyError("managed staging cleanup failed")
+        if mutation_validator is not None:
+            mutation_validator()
+        os.unlink(quarantine_name, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+        try:
+            canonical_validator()
+        except DistributionApplyError:
+            with suppress(OSError):
+                os.link(
+                    backup_name,
+                    quarantine_name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+                os.fsync(parent_fd)
+            raise
+        final_backup = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
+        if final_backup.st_dev != backup.st_dev or final_backup.st_ino != backup.st_ino:
+            raise DistributionApplyError("managed staging cleanup failed")
+        os.unlink(backup_name, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+    except (OSError, DistributionApplyError) as exc:
+        with suppress(OSError):
+            visible = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+            retained = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
+            if visible.st_dev == retained.st_dev and visible.st_ino == retained.st_ino:
+                os.unlink(backup_name, dir_fd=parent_fd)
+                os.fsync(parent_fd)
+        raise DistributionApplyError("managed staging cleanup failed") from exc
+
+
 def _stat_structure_tuple(info: os.stat_result) -> tuple[int, int, str, int]:
     return (info.st_dev, info.st_ino, _file_type(info.st_mode), info.st_nlink)
 
@@ -5413,6 +5618,7 @@ def _remove_distribution_target_if_bound(
     transition_path: str | None = None,
     transition_name: str | None = None,
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
+    mutation_validator: Callable[[], None] | None = None,
 ) -> None:
     """Delete only the inode bound before the pathname mutation.
 
@@ -5438,6 +5644,8 @@ def _remove_distribution_target_if_bound(
                 "regular" if file_type == "regular" else "symlink",
             )
         )
+    if mutation_validator is not None:
+        mutation_validator()
     try:
         _rename_distribution_no_replace(parent_fd, target_name, parent_fd, quarantine_name)
     except OSError as exc:
@@ -5457,6 +5665,8 @@ def _remove_distribution_target_if_bound(
         if transition_recorder is not None:
             assert transition_path is not None
             transition_recorder(_distribution_stage_ownership(transition_path, quarantine_name, moved))
+        if mutation_validator is not None:
+            mutation_validator()
         try:
             _remove_distribution_stage_if_owned(parent_fd, quarantine_name, moved, strict=True)
         except DistributionApplyError as exc:
@@ -5626,6 +5836,7 @@ def _remove_distribution_stage_if_owned(
     recovery_stage_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     transition_name: str | None = None,
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
+    mutation_validator: Callable[[], None] | None = None,
 ) -> None:
     try:
         current = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -5718,6 +5929,8 @@ def _remove_distribution_stage_if_owned(
                         "regular" if stat.S_ISREG(current.st_mode) else "symlink",
                     )
                 )
+            if mutation_validator is not None:
+                mutation_validator()
             _rename_distribution_no_replace(parent_fd, stage_name, parent_fd, quarantine_name)
             os.fsync(parent_fd)
             moved = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -5736,18 +5949,31 @@ def _remove_distribution_stage_if_owned(
                 raise DistributionApplyError("managed staging cleanup failed")
             if transition_recorder is not None:
                 transition_recorder(_distribution_stage_ownership(transition_path, quarantine_name, moved))
-            canonical = os.stat(canonical_name, dir_fd=parent_fd, follow_symlinks=False)
-            canonical_identity = _distribution_stage_identity(parent_fd, canonical_name, transition_path)
-            if (
-                canonical.st_dev != canonical_ownership.device
-                or canonical.st_ino != canonical_ownership.inode
-                or canonical.st_ctime_ns != canonical_ownership.ctime_ns
-                or _file_type(canonical.st_mode) != canonical_ownership.file_type
-                or canonical.st_nlink != 1
-                or canonical_condition.get("identity") != _distribution_identity_payload(canonical_identity)
-            ):
-                raise DistributionApplyError("managed staging cleanup failed")
-            _remove_distribution_stage_if_owned(parent_fd, quarantine_name, moved, strict=True)
+            if mutation_validator is not None:
+                mutation_validator()
+
+            def assert_canonical_successor() -> None:
+                canonical = os.stat(canonical_name, dir_fd=parent_fd, follow_symlinks=False)
+                canonical_identity = _distribution_stage_identity(parent_fd, canonical_name, transition_path)
+                if (
+                    canonical.st_dev != canonical_ownership.device
+                    or canonical.st_ino != canonical_ownership.inode
+                    or canonical.st_ctime_ns != canonical_ownership.ctime_ns
+                    or _file_type(canonical.st_mode) != canonical_ownership.file_type
+                    or canonical.st_nlink != 1
+                    or canonical_condition.get("identity") != _distribution_identity_payload(canonical_identity)
+                ):
+                    raise DistributionApplyError("managed staging cleanup failed")
+
+            assert_canonical_successor()
+            _unlink_distribution_quarantine_with_backup(
+                parent_fd,
+                quarantine_name,
+                stage_name,
+                moved,
+                canonical_validator=assert_canonical_successor,
+                mutation_validator=mutation_validator,
+            )
             return
         except (DistributionApplyError, OSError) as exc:
             with suppress(DistributionApplyError):
@@ -5786,7 +6012,13 @@ def _remove_distribution_stage_if_owned(
             raise DistributionApplyError("managed staging cleanup failed") from exc
 
 
-def _distribution_stage_identity(parent_fd: int, stage_name: str, path: str) -> DistributionIdentity | None:
+def _distribution_stage_identity(
+    parent_fd: int,
+    stage_name: str,
+    path: str,
+    *,
+    allow_backup_link: bool = False,
+) -> DistributionIdentity | None:
     """Read a private stage identity without following its final path."""
     nofollow = getattr(os, "O_NOFOLLOW", None)
     if not isinstance(nofollow, int):
@@ -5797,7 +6029,7 @@ def _distribution_stage_identity(parent_fd: int, stage_name: str, path: str) -> 
         return None
     except OSError as exc:
         raise DistributionApplyError("managed staging artifact cannot be inspected safely") from exc
-    if info.st_nlink != 1:
+    if info.st_nlink not in ({1, 2} if allow_backup_link else {1}):
         return None
     kind = _file_type(info.st_mode)
     if kind == "regular":
@@ -5811,7 +6043,7 @@ def _distribution_stage_identity(parent_fd: int, stage_name: str, path: str) -> 
                 opened.st_dev != info.st_dev
                 or opened.st_ino != info.st_ino
                 or opened.st_ctime_ns != info.st_ctime_ns
-                or opened.st_nlink != 1
+                or opened.st_nlink != info.st_nlink
                 or not stat.S_ISREG(opened.st_mode)
             ):
                 raise DistributionApplyError("managed staging identity changed")
@@ -6108,10 +6340,13 @@ def _apply_regular_action(
     write_ahead_stage_reservations: bool,
     before_mutation: Callable[[], None] | None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None,
+    first_target_mutation_validator: Callable[[], None] | None,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
         return
+    if action.action == "create" and first_target_mutation_validator is not None:
+        first_target_mutation_validator()
     parent_chain = _open_distribution_parent_chain(
         target_root,
         path,
@@ -6130,10 +6365,14 @@ def _apply_regular_action(
             created_parent_bindings,
             created_parent_recorder,
         )
-        if before_mutation is not None:
-            before_mutation()
-        if held_parent_validator is not None:
-            held_parent_validator(path, parent_chain)
+
+        def validate_held_namespace() -> None:
+            if before_mutation is not None:
+                before_mutation()
+            if held_parent_validator is not None:
+                held_parent_validator(path, parent_chain)
+
+        validate_held_namespace()
         parent_fd = parent_chain[-1]
         target_name = PurePosixPath(path).name
         try:
@@ -6155,6 +6394,10 @@ def _apply_regular_action(
             staging_name = _new_distribution_stage_name(path, expected)
             if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(path, staging_name, "regular"))
+                validate_held_namespace()
+            if first_target_mutation_validator is not None:
+                first_target_mutation_validator()
+            validate_held_namespace()
             fd = os.open(
                 staging_name,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -6162,6 +6405,7 @@ def _apply_regular_action(
                 dir_fd=parent_fd,
             )
             created = os.fstat(fd)
+            validate_held_namespace()
             stage_identity = created
             try:
                 if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
@@ -6193,7 +6437,9 @@ def _apply_regular_action(
                 stage_identity = verified
                 if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                     stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, verified))
+                    validate_held_namespace()
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
+                validate_held_namespace()
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
                 os.fsync(parent_fd)
             finally:
@@ -6217,6 +6463,7 @@ def _apply_regular_action(
                             staging_name,
                             stage_identity,
                             strict=True,
+                            mutation_validator=validate_held_namespace,
                         )
             published_fd = os.open(target_name, os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
             try:
@@ -6255,6 +6502,9 @@ def _apply_regular_action(
                     raise DistributionApplyError(f"managed target identity changed for '{path}'")
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
+                if first_target_mutation_validator is not None:
+                    first_target_mutation_validator()
+                validate_held_namespace()
                 _remove_distribution_target_if_bound(
                     parent_fd,
                     target_name,
@@ -6264,6 +6514,7 @@ def _apply_regular_action(
                     transition_path=path,
                     transition_name=_new_distribution_stage_name(path, target_identity),
                     transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
+                    mutation_validator=validate_held_namespace,
                 )
                 return
             if action.action != "upgrade":
@@ -6281,6 +6532,10 @@ def _apply_regular_action(
             staging_name = _new_distribution_stage_name(path, expected)
             if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(path, staging_name, "regular"))
+                validate_held_namespace()
+            if first_target_mutation_validator is not None:
+                first_target_mutation_validator()
+            validate_held_namespace()
             staging_fd = os.open(
                 staging_name,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
@@ -6288,6 +6543,7 @@ def _apply_regular_action(
                 dir_fd=parent_fd,
             )
             staging_stat = os.fstat(staging_fd)
+            validate_held_namespace()
             stage_identity = staging_stat
             swapped = False
             try:
@@ -6314,11 +6570,13 @@ def _apply_regular_action(
                 stage_identity = staged
                 if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                     stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, staged))
+                    validate_held_namespace()
 
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
                 if hashlib.sha256(_read_fd_bytes(fd)).hexdigest() != target_identity.sha256:
                     raise DistributionApplyError(f"managed target identity changed for '{path}'")
+                validate_held_namespace()
                 _swap_regular_distribution_target_if_bound(
                     parent_fd,
                     staging_name,
@@ -6373,6 +6631,7 @@ def _apply_regular_action(
                                 staging_name,
                                 stage_identity,
                                 strict=True,
+                                mutation_validator=validate_held_namespace,
                             )
                 else:
                     published_successor = staged_successor
@@ -6454,6 +6713,7 @@ def _apply_regular_action(
                                             transition_recorder=(
                                                 stage_ownership_recorder if write_ahead_stage_reservations else None
                                             ),
+                                            mutation_validator=validate_held_namespace,
                                         )
                                     except DistributionApplyError as cleanup_error:
                                         # Quarantine restoration changes ctime.  Do not
@@ -6482,6 +6742,7 @@ def _apply_regular_action(
                                 transition_recorder=(
                                     stage_ownership_recorder if write_ahead_stage_reservations else None
                                 ),
+                                mutation_validator=validate_held_namespace,
                             )
                         else:
                             raise DistributionApplyError("managed staging identity changed")
@@ -6509,12 +6770,15 @@ def _apply_symlink_action(
     write_ahead_stage_reservations: bool,
     before_mutation: Callable[[], None] | None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None,
+    first_target_mutation_validator: Callable[[], None] | None,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
     expected_target = expected.target
     if action.action == "prune" and not snapshot.target.exists:
         return
+    if action.action == "create" and first_target_mutation_validator is not None:
+        first_target_mutation_validator()
     parent_chain = _open_distribution_parent_chain(
         target_root,
         action.path,
@@ -6533,10 +6797,14 @@ def _apply_symlink_action(
             created_parent_bindings,
             created_parent_recorder,
         )
-        if before_mutation is not None:
-            before_mutation()
-        if held_parent_validator is not None:
-            held_parent_validator(action.path, parent_chain)
+
+        def validate_held_namespace() -> None:
+            if before_mutation is not None:
+                before_mutation()
+            if held_parent_validator is not None:
+                held_parent_validator(action.path, parent_chain)
+
+        validate_held_namespace()
         parent_fd = parent_chain[-1]
         target_name = PurePosixPath(action.path).name
         try:
@@ -6568,8 +6836,13 @@ def _apply_symlink_action(
             staging_name = _new_distribution_stage_name(action.path, expected)
             if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(action.path, staging_name, "symlink"))
+                validate_held_namespace()
+            if first_target_mutation_validator is not None:
+                first_target_mutation_validator()
+            validate_held_namespace()
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            validate_held_namespace()
             published = False
             try:
                 staged_target = _normalized_link_target_for_path(
@@ -6579,7 +6852,9 @@ def _apply_symlink_action(
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
                 if stage_ownership_recorder is not None:
                     stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
+                    validate_held_namespace()
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
+                validate_held_namespace()
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
                 os.fsync(parent_fd)
                 published = True
@@ -6603,6 +6878,7 @@ def _apply_symlink_action(
                             staging_name,
                             staging_stat,
                             strict=True,
+                            mutation_validator=validate_held_namespace,
                         )
             created_target = _normalized_link_target_for_path(action.path, os.readlink(target_name, dir_fd=parent_fd))
             if created_target != expected_target:
@@ -6620,6 +6896,9 @@ def _apply_symlink_action(
             latest_target = _normalized_link_target_for_path(action.path, os.readlink(target_name, dir_fd=parent_fd))
             if latest_target != snapshot.target.identity.target:
                 raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+            if first_target_mutation_validator is not None:
+                first_target_mutation_validator()
+            validate_held_namespace()
             _remove_distribution_target_if_bound(
                 parent_fd,
                 target_name,
@@ -6628,6 +6907,7 @@ def _apply_symlink_action(
                 transition_path=action.path,
                 transition_name=_new_distribution_stage_name(action.path, snapshot.target.identity),
                 transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
+                mutation_validator=validate_held_namespace,
             )
             return
         if action.action == "upgrade":
@@ -6639,8 +6919,13 @@ def _apply_symlink_action(
             staging_name = _new_distribution_stage_name(action.path, expected)
             if write_ahead_stage_reservations and stage_ownership_recorder is not None:
                 stage_ownership_recorder(_reserved_distribution_stage_ownership(action.path, staging_name, "symlink"))
+                validate_held_namespace()
+            if first_target_mutation_validator is not None:
+                first_target_mutation_validator()
+            validate_held_namespace()
             os.symlink(expected_target, staging_name, dir_fd=parent_fd)
             staging_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            validate_held_namespace()
             cleanup_stage_stat = staging_stat
             swapped = False
             try:
@@ -6651,6 +6936,7 @@ def _apply_symlink_action(
                     raise DistributionApplyError(f"managed target staging failed for '{action.path}'")
                 if stage_ownership_recorder is not None:
                     stage_ownership_recorder(_distribution_stage_ownership(action.path, staging_name, staging_stat))
+                    validate_held_namespace()
                 latest_stat = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
                 if not _same_stat_identity(latest_stat, snapshot.target) or latest_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
@@ -6661,6 +6947,7 @@ def _apply_symlink_action(
                     if latest_target != snapshot.target.identity.target:
                         raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
                 _assert_visible_distribution_chain_bound(target_root, action.path, parent_chain)
+                validate_held_namespace()
                 _swap_symlink_distribution_target_if_bound(
                     parent_fd,
                     staging_name,
@@ -6710,6 +6997,7 @@ def _apply_symlink_action(
                             staging_name,
                             cleanup_stage_stat,
                             strict=True,
+                            mutation_validator=validate_held_namespace,
                         )
                 else:
                     current_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -6792,6 +7080,7 @@ def _apply_symlink_action(
                                             transition_recorder=(
                                                 stage_ownership_recorder if write_ahead_stage_reservations else None
                                             ),
+                                            mutation_validator=validate_held_namespace,
                                         )
                                     except DistributionApplyError as cleanup_error:
                                         # Restoration changes ctime; only a
@@ -6818,6 +7107,7 @@ def _apply_symlink_action(
                                 transition_recorder=(
                                     stage_ownership_recorder if write_ahead_stage_reservations else None
                                 ),
+                                mutation_validator=validate_held_namespace,
                             )
                     except FileNotFoundError:
                         pass
@@ -6842,6 +7132,7 @@ def _apply_distribution_action(
     write_ahead_stage_reservations: bool = False,
     before_mutation: Callable[[], None] | None = None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None = None,
+    first_target_mutation_validator: Callable[[], None] | None = None,
 ) -> None:
     if action.action in {"adopt", "preserve"}:
         return
@@ -6896,6 +7187,7 @@ def _apply_distribution_action(
             write_ahead_stage_reservations=write_ahead_stage_reservations,
             before_mutation=before_mutation,
             held_parent_validator=held_parent_validator,
+            first_target_mutation_validator=first_target_mutation_validator,
         )
         return
     if expected is None and target_kind == "symlink":
@@ -6915,6 +7207,7 @@ def _apply_distribution_action(
             write_ahead_stage_reservations=write_ahead_stage_reservations,
             before_mutation=before_mutation,
             held_parent_validator=held_parent_validator,
+            first_target_mutation_validator=first_target_mutation_validator,
         )
         return
     if expected is None and target_kind != "regular":
@@ -6932,6 +7225,7 @@ def _apply_distribution_action(
         write_ahead_stage_reservations=write_ahead_stage_reservations,
         before_mutation=before_mutation,
         held_parent_validator=held_parent_validator,
+        first_target_mutation_validator=first_target_mutation_validator,
     )
 
 
@@ -6949,6 +7243,7 @@ def apply_distribution_plan(
     progress_recorder: Callable[[str, tuple[str, ...], tuple[str, ...], bool], None] | None = None,
     before_mutation: Callable[[], None] | None = None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None = None,
+    first_target_mutation_validator: Callable[[], None] | None = None,
 ) -> DistributionResult:
     """Apply a validated plan with no-follow identity checks at every action.
 
@@ -6997,6 +7292,8 @@ def apply_distribution_plan(
         try:
             if before_mutation is not None:
                 before_mutation()
+            if first_target_mutation_validator is not None:
+                first_target_mutation_validator()
             scaffold_applier()
             for action in plan.actions:
                 if action.path not in scaffold_paths:
@@ -7111,6 +7408,7 @@ def apply_distribution_plan(
                                 created_parent_bindings_by_path,
                                 before_mutation=before_mutation,
                                 held_parent_validator=held_parent_validator,
+                                first_target_mutation_validator=first_target_mutation_validator,
                             )
                     elif stage_ownership_recorder is None:
                         if before_mutation is None:
@@ -7132,6 +7430,7 @@ def apply_distribution_plan(
                                 created_parent_recorder=created_parent_recorder,
                                 before_mutation=before_mutation,
                                 held_parent_validator=held_parent_validator,
+                                first_target_mutation_validator=first_target_mutation_validator,
                             )
                     elif before_mutation is None:
                         _apply_distribution_action(
@@ -7156,6 +7455,7 @@ def apply_distribution_plan(
                             write_ahead_stage_reservations,
                             before_mutation,
                             held_parent_validator,
+                            first_target_mutation_validator,
                         )
                 applied_paths.append(action.path)
                 pending_paths.remove(action.path)
