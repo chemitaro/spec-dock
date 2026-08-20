@@ -1799,6 +1799,61 @@ def test_i368_terminal_journal_without_guard_finishes_cleanup_without_reapplying
     assert not journal_path.exists()
 
 
+def test_i368_admission_allows_only_terminal_journal_without_guard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_remove = OperationJournalStore.remove_completed
+
+    def fail_journal_removal(*_args, **_kwargs) -> None:
+        raise DistributionApplyError("injected completed journal removal failure")
+
+    monkeypatch.setattr(OperationJournalStore, "remove_completed", fail_journal_removal)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    admission = admit_distribution_operation(
+        target_root,
+        operation="update",
+        package_version="1.2.3",
+        manifest_path=manifest_path,
+    )
+
+    assert admission.status == "retry"
+    assert admission.marker is None
+    monkeypatch.setattr(OperationJournalStore, "remove_completed", original_remove)
+
+
+def test_i368_admission_rejects_nonterminal_journal_without_guard(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    store.prepare(executable, package_version="1.2.3")
+    (target_root / "spec-dock" / ".distribution-retry.json").unlink()
+
+    with pytest.raises(DistributionAdmissionError, match="dual-marker"):
+        admit_distribution_operation(
+            target_root,
+            operation="update",
+            package_version="1.2.3",
+            manifest_path=manifest_path,
+        )
+
+
 def test_i368_legacy_conversion_rejects_marker_replaced_after_admission(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())
