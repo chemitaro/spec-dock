@@ -150,10 +150,13 @@ Exit: update と init-force が second grammar を持たず、intent mismatch �
 - root、operation、package/protocol、stage lease、same-plan reconstruction を全て満たす caseだけ one-way conversion/compatibility resumeする。
 - malformed、dual、cross-root、different-operation、newer target、unknown stage、plan mismatchは markerを変更せず blockする。
 - conversion後は new journalだけをwriterとし、legacy markerを再生成しない。
+- exact legacy stage leaseはcurrent planのaction/name family/parent chain/no-follow identityと照合し、schema-2 journalへ引き継いでからcleanup/resumeする。
+- guard exchangeのlegacy predecessorはsuccessor受理後まで削除せず、交換後raceでcanonicalが未知になった場合は両entryを保持する。
 
 Forward-recovery test:
 
 - interrupted current update fixture → safe conversion → same desired postcondition
+- partial regular stageを持つexact legacy lease → conversion → cleanup → desired postcondition
 - exact pre-action SHA mismatch → block
 - compatible newer package → same plan only resume
 - incompatible/downgrade → block
