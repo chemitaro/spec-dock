@@ -1030,7 +1030,7 @@ def test_i368_journal_resume_requires_exact_schema_2_forward_guard(
     assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
 
 
-def test_i368_journal_publish_restores_predecessor_after_stage_replacement(
+def test_i368_journal_publish_preserves_ambiguous_pair_after_stage_replacement(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -1072,8 +1072,8 @@ def test_i368_journal_publish_restores_predecessor_after_stage_replacement(
         store.mark_executing(prepared)
 
     assert replaced_stage is not None
-    assert store.path.read_bytes() == before
-    assert replaced_stage.read_bytes() == replacement
+    assert store.path.read_bytes() == replacement
+    assert replaced_stage.read_bytes() == before
 
 
 def test_i368_journal_publish_restores_raced_canonical_predecessor(
@@ -5584,3 +5584,243 @@ def test_i368_finalization_rejects_replacement_before_authority_reacquisition(
 
     assert replaced is True
     assert target.read_bytes() == replacement
+
+
+def test_i368_legacy_marker_with_exact_partial_stage_converts_and_resumes(tmp_path: Path) -> None:
+    old = b"old\n"
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        generated_assets=(
+            managed_distribution._generated_regular_asset("spec-dock/spec-dock.version", b"1.2.3\n", mode=0o644),
+        ),
+    )
+    executable = build_executable_mutation_plan(assessment)
+    expected = next(
+        item.identity for item in executable.distribution_plan.current_assets if item.path == ".github/workflows/ci.yml"
+    )
+    stage_name = managed_distribution._new_distribution_stage_name(".github/workflows/ci.yml", expected)
+    stage = target.parent / stage_name
+    stage.write_bytes(b"partial\n")
+    stage_stat = stage.lstat()
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "operation": "update",
+                "package_version": "1.2.3",
+                "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+                "last_completed_phase": "preflight-complete",
+                "purpose": "distribution-rerun",
+                "stage_ownership": [
+                    {
+                        "path": ".github/workflows/ci.yml",
+                        "stage_name": stage_name,
+                        "device": stage_stat.st_dev,
+                        "inode": stage_stat.st_ino,
+                        "ctime_ns": stage_stat.st_ctime_ns,
+                        "file_type": "regular",
+                    }
+                ],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    marker = managed_distribution._read_distribution_retry_marker(target_root)
+    assert marker is not None
+
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+        legacy_marker=marker,
+    )
+
+    assert result.status == "completed", result.reason
+    assert target.read_bytes() == b"desired\n"
+    assert not stage.exists()
+
+
+def test_i368_checkpoint_rejects_same_bytes_different_inode_create_successor(tmp_path: Path) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    record = next(item for item in journal.actions if item.action == "create")
+    target = target_root / record.path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    post_identity = record.postcondition["identity"]
+    assert isinstance(post_identity, dict)
+    asset = next(asset for asset in executable.distribution_plan.current_assets if asset.path == record.path)
+    assert executable.distribution_plan.install_root is not None
+    source = executable.distribution_plan.install_root / (asset.source_path or asset.path)
+    target.write_bytes(source.read_bytes())
+    target.chmod(post_identity["mode"])
+    exact_successor = target.lstat()
+    lease = managed_distribution._distribution_stage_ownership(
+        record.path,
+        managed_distribution._new_distribution_stage_name(
+            record.path,
+            managed_distribution.DistributionIdentity(
+                kind="regular",
+                sha256=post_identity["sha256"],
+                mode=post_identity["mode"],
+            ),
+        ),
+        exact_successor,
+    )
+    journal = store.record_staging_lease(journal, lease)
+    replacement = target.read_bytes()
+    target.unlink()
+    target.write_bytes(replacement)
+    target.chmod(post_identity["mode"])
+
+    with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
+        store.checkpoint_published(journal, (record.path,))
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i368_post_exchange_race_preserves_third_party_canonical(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    parent = tmp_path / kind
+    parent.mkdir()
+    target = parent / "target"
+    stage = parent / "stage"
+    if kind == "regular":
+        target.write_bytes(b"old\n")
+        stage.write_bytes(b"new\n")
+    else:
+        target.symlink_to("old-target")
+        stage.symlink_to("new-target")
+    target_before = target.lstat()
+    stage_before = stage.lstat()
+    original_swap = managed_distribution._rename_distribution_swap
+    swapped = False
+
+    def replace_after_exchange(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal swapped
+        original_swap(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not swapped:
+            swapped = True
+            target.unlink()
+            if kind == "regular":
+                target.write_bytes(b"third-party\n")
+            else:
+                target.symlink_to("third-party-target")
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_swap", replace_after_exchange)
+    parent_fd = os.open(parent, os.O_RDONLY)
+    try:
+        with pytest.raises(DistributionApplyError, match="raced"):
+            if kind == "regular":
+                target_fd = os.open(target.name, os.O_RDONLY, dir_fd=parent_fd)
+                stage_fd = os.open(stage.name, os.O_RDONLY, dir_fd=parent_fd)
+                try:
+                    managed_distribution._swap_regular_distribution_target_if_bound(
+                        parent_fd,
+                        stage.name,
+                        target.name,
+                        target_fd=target_fd,
+                        staging_fd=stage_fd,
+                        expected_target=target_before,
+                        identity_message="raced",
+                    )
+                finally:
+                    os.close(stage_fd)
+                    os.close(target_fd)
+            else:
+                expected_snapshot = managed_distribution.replace(
+                    managed_distribution._snapshot_from_stat("target", target_before),
+                    identity=managed_distribution.DistributionIdentity(kind="symlink", target="old-target"),
+                )
+                managed_distribution._swap_symlink_distribution_target_if_bound(
+                    parent_fd,
+                    stage.name,
+                    target.name,
+                    expected_target=expected_snapshot,
+                    staging_stat=stage_before,
+                    identity_message="raced",
+                )
+    finally:
+        os.close(parent_fd)
+
+    if kind == "regular":
+        assert target.read_bytes() == b"third-party\n"
+        assert stage.read_bytes() == b"old\n"
+    else:
+        assert target.readlink() == Path("third-party-target")
+        assert stage.readlink() == Path("old-target")
+
+
+def test_i368_guard_conversion_failure_retains_legacy_predecessor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target_root, executable = _i368_minimal_executable(tmp_path)
+    store = OperationJournalStore(target_root)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "operation": "update",
+                "package_version": "1.2.3",
+                "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+                "last_completed_phase": "preflight-complete",
+                "purpose": "distribution-rerun",
+                "stage_ownership": [],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    legacy_bytes = marker_path.read_bytes()
+    marker = managed_distribution._read_distribution_retry_marker(target_root)
+    assert marker is not None
+    original_assert = OperationJournalStore._assert_bound_regular_entry
+
+    def replace_guard_before_acceptance(
+        self, parent_fd, name, held_fd, expected_snapshot, expected_sha256, *, identity_error
+    ):
+        marker_path.unlink()
+        marker_path.write_bytes(b"third-party\n")
+        return original_assert(
+            parent_fd,
+            name,
+            held_fd,
+            expected_snapshot,
+            expected_sha256,
+            identity_error=identity_error,
+        )
+
+    monkeypatch.setattr(OperationJournalStore, "_assert_bound_regular_entry", replace_guard_before_acceptance)
+
+    with pytest.raises(DistributionApplyError, match="legacy-marker-unconvertible"):
+        store.prepare_legacy_guard(executable, package_version="1.2.3", replace_marker=marker)
+
+    assert marker_path.read_bytes() == b"third-party\n"
+    recovery_entries = list(marker_path.parent.glob(".distribution-retry-*.stage"))
+    assert any(path.read_bytes() == legacy_bytes for path in recovery_entries)

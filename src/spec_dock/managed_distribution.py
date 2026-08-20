@@ -3098,6 +3098,7 @@ class OperationJournalStore:
         destination = _DISTRIBUTION_RETRY_MARKER_REL.name
         stage = f".distribution-retry-{secrets.token_hex(16)}.stage"
         stage_info: os.stat_result | None = None
+        swapped_out: os.stat_result | None = None
         held_fd: int | None = None
         stage_fd: int | None = None
         try:
@@ -3228,12 +3229,6 @@ class OperationJournalStore:
                     except OSError as exc:
                         raise DistributionApplyError("legacy-marker-unconvertible") from exc
                     raise DistributionApplyError("legacy-marker-unconvertible")
-                _remove_distribution_stage_if_owned(
-                    parent_fd,
-                    stage,
-                    swapped_out,
-                    strict=True,
-                )
             os.fsync(parent_fd)
             published_info = os.fstat(stage_fd)
             successor_snapshot = _snapshot_from_stat(
@@ -3248,6 +3243,14 @@ class OperationJournalStore:
                 hashlib.sha256(content).hexdigest(),
                 identity_error="legacy-marker-unconvertible",
             )
+            if swapped_out is not None:
+                _remove_distribution_stage_if_owned(
+                    parent_fd,
+                    stage,
+                    swapped_out,
+                    strict=True,
+                )
+                os.fsync(parent_fd)
             return replace(
                 marker,
                 source_snapshot=successor_snapshot,
@@ -3349,6 +3352,27 @@ class OperationJournalStore:
                 try:
                     stage_info = os.stat(lease.stage_name, dir_fd=parent_chain[-1], follow_symlinks=False)
                 except FileNotFoundError:
+                    if lease.device == lease.inode == lease.ctime_ns == 0:
+                        raise DistributionApplyError("managed staging cleanup failed") from None
+                    record = records.get(lease.path)
+                    if record is None:
+                        raise DistributionApplyError("managed staging cleanup failed") from None
+                    target_name = PurePosixPath(lease.path).name
+                    try:
+                        target_info = os.stat(target_name, dir_fd=parent_chain[-1], follow_symlinks=False)
+                    except FileNotFoundError as exc:
+                        if record.action == "prune" and record.postcondition.get("exists") is False:
+                            continue
+                        raise DistributionApplyError("managed staging cleanup failed") from exc
+                    target_identity = _distribution_stage_identity(parent_chain[-1], target_name, lease.path)
+                    if (
+                        target_info.st_dev != lease.device
+                        or target_info.st_ino != lease.inode
+                        or _file_type(target_info.st_mode) != lease.file_type
+                        or target_info.st_nlink != 1
+                        or record.postcondition.get("identity") != _distribution_identity_payload(target_identity)
+                    ):
+                        raise DistributionApplyError("managed staging cleanup failed") from None
                     rebound_leases.append(lease)
                     continue
                 if lease.device == lease.inode == lease.ctime_ns == 0:
@@ -3468,9 +3492,10 @@ class OperationJournalStore:
         journal: OperationJournal,
         lease: DistributionStageOwnership,
     ) -> OperationJournal:
-        retained = tuple(
-            item for item in journal.staging_leases if (item.path, item.stage_name) != (lease.path, lease.stage_name)
-        )
+        # One action owns at most one live private-stage transition.  A new
+        # attempt is recorded only after stale-stage cleanup, so it supersedes
+        # any earlier lease for the same canonical path.
+        retained = tuple(item for item in journal.staging_leases if item.path != lease.path)
         return self.write(replace(journal, staging_leases=(*retained, lease)), predecessor=journal)
 
     def record_created_parent_bindings(
@@ -4111,6 +4136,66 @@ def _journal_version_precondition_identity(journal: OperationJournal) -> Distrib
     return None
 
 
+def _validated_legacy_stage_leases(
+    plan: ExecutableMutationPlan,
+    marker: DistributionRetryMarker,
+    target_root: Path,
+) -> tuple[DistributionStageOwnership, ...]:
+    """Bind exact legacy private stages to the reconstructed current plan."""
+
+    if not marker.stage_ownership:
+        return ()
+    actions = {action.path: action for action in plan.actions}
+    snapshots = _plan_snapshot_map(plan.distribution_plan)
+    seen: set[tuple[str, str]] = set()
+    validated: list[DistributionStageOwnership] = []
+    for lease in marker.stage_ownership:
+        key = (lease.path, lease.stage_name)
+        action = actions.get(lease.path)
+        snapshot = snapshots.get(lease.path)
+        expected = _expected_target_identity(plan.distribution_plan, lease.path)
+        historical = _historical_stage_identities(plan.distribution_plan, lease.path)
+        if (
+            key in seen
+            or action is None
+            or action.action not in {"create", "upgrade", "prune"}
+            or snapshot is None
+            or expected is None
+            or not any(
+                _matches_distribution_stage_name(lease.stage_name, lease.path, identity)
+                for identity in (expected, *historical)
+            )
+        ):
+            raise DistributionApplyError("legacy-marker-unconvertible")
+        seen.add(key)
+        try:
+            parent_chain = _open_distribution_parent_chain(
+                target_root,
+                lease.path,
+                create_missing=False,
+                expected_snapshot=snapshot,
+            )
+        except DistributionApplyError as exc:
+            raise DistributionApplyError("legacy-marker-unconvertible") from exc
+        try:
+            try:
+                current = os.stat(lease.stage_name, dir_fd=parent_chain[-1], follow_symlinks=False)
+            except OSError as exc:
+                raise DistributionApplyError("legacy-marker-unconvertible") from exc
+            if (
+                current.st_dev != lease.device
+                or current.st_ino != lease.inode
+                or current.st_ctime_ns != lease.ctime_ns
+                or _file_type(current.st_mode) != lease.file_type
+                or current.st_nlink != 1
+            ):
+                raise DistributionApplyError("legacy-marker-unconvertible")
+        finally:
+            _close_distribution_parent_chain(parent_chain)
+        validated.append(lease)
+    return tuple(validated)
+
+
 def execute_recognized_distribution(
     install_root: Path,
     *,
@@ -4226,9 +4311,9 @@ def execute_recognized_distribution(
                     or not _journal_package_is_compatible(guard_marker.package_version, package_version)
                     or guard_marker.target_root != executable.root_identity
                     or guard_marker.last_completed_phase != "preflight-complete"
-                    or guard_marker.stage_ownership
                 ):
                     raise DistributionApplyError("legacy-marker-unconvertible")
+                legacy_stage_leases = _validated_legacy_stage_leases(executable, guard_marker, target_root)
                 guard_marker = store.prepare_legacy_guard(
                     executable,
                     package_version=package_version,
@@ -4236,6 +4321,11 @@ def execute_recognized_distribution(
                 )
                 store.bind_forward_guard(guard_marker)
                 journal = store.prepare(executable, package_version=package_version)
+                if legacy_stage_leases:
+                    journal = store.write(
+                        replace(journal, staging_leases=legacy_stage_leases),
+                        predecessor=journal,
+                    )
             else:
                 assert journal_seed is not None
                 journal = store.load_for_assessment(assessment, package_version=package_version)
@@ -4901,11 +4991,28 @@ def _swap_regular_distribution_target_if_bound(
     if _stat_identity_tuple(moved_target) != _stat_identity_tuple(os.fstat(target_fd)) or _stat_identity_tuple(
         published
     ) != _stat_identity_tuple(os.fstat(staging_fd)):
-        try:
+        if _stat_identity_tuple(published) == _stat_identity_tuple(os.fstat(staging_fd)):
+            # The canonical predecessor changed before the exchange: the
+            # exact successor is canonical and the unknown entry is at stage.
+            # Re-check that pair and exchange it back so the unknown entry
+            # returns to its original canonical name.
+            rollback_target = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+            rollback_stage = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            if _stat_identity_tuple(rollback_target) != _stat_identity_tuple(published) or _stat_identity_tuple(
+                rollback_stage
+            ) != _stat_identity_tuple(moved_target):
+                raise DistributionApplyError(identity_message)
             _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
             os.fsync(parent_fd)
-        except OSError as exc:
-            raise DistributionApplyError(identity_message) from exc
+            restored_target = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+            restored_stage = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+            if _stat_identity_tuple(restored_target) != _stat_identity_tuple(moved_target) or _stat_identity_tuple(
+                restored_stage
+            ) != _stat_identity_tuple(published):
+                raise DistributionApplyError(identity_message)
+        # The exchange already happened.  An unknown canonical entry may have
+        # been published after it, so exchanging again would move or delete a
+        # third-party entry.  Preserve both names for journaled recovery.
         raise DistributionApplyError(identity_message)
     return moved_target
 
@@ -4968,56 +5075,32 @@ def _swap_symlink_distribution_target_if_bound(
         or _stat_structure_tuple(published) != _stat_structure_tuple(staging_stat)
         or published_link != staged_target
     ):
-        # The first exchange may have raced after the pre-check.  Bind the
-        # exact pair now visible at the two names, then exchange only that
-        # pair back.  A second race is detected by the post-check and leaves
-        # both entries preserved for recovery rather than authorizing cleanup
-        # from a refreshed ambiguous pathname.
-        rollback_target_identity = _stat_identity_tuple(published)
-        rollback_target_link = published_link
-        rollback_stage_identity = _stat_identity_tuple(moved_target)
-        rollback_stage_link = moved_target_link
-        before_target, before_target_link = read_exact_symlink(target_name)
-        before_stage, before_stage_link = read_exact_symlink(staging_name)
-        if (
-            _stat_identity_tuple(before_target) != rollback_target_identity
-            or before_target_link != rollback_target_link
-            or _stat_identity_tuple(before_stage) != rollback_stage_identity
-            or before_stage_link != rollback_stage_link
-        ):
-            raise DistributionApplyError(identity_message)
-        try:
+        published_is_exact_successor = (
+            _stat_structure_tuple(published) == _stat_structure_tuple(staging_stat) and published_link == staged_target
+        )
+        if published_is_exact_successor:
+            rollback_target, rollback_target_link = read_exact_symlink(target_name)
+            rollback_stage, rollback_stage_link = read_exact_symlink(staging_name)
+            if (
+                _stat_identity_tuple(rollback_target) != _stat_identity_tuple(published)
+                or rollback_target_link != published_link
+                or _stat_identity_tuple(rollback_stage) != _stat_identity_tuple(moved_target)
+                or rollback_stage_link != moved_target_link
+            ):
+                raise DistributionApplyError(identity_message)
             _rename_distribution_swap(parent_fd, staging_name, parent_fd, target_name)
             os.fsync(parent_fd)
-        except OSError as exc:
-            raise DistributionApplyError(identity_message) from exc
-        restored_target, restored_target_link = read_exact_symlink(target_name)
-        restored_stage, restored_stage_link = read_exact_symlink(staging_name)
-        if (
-            _stat_structure_tuple(restored_target)
-            != (
-                rollback_stage_identity[0],
-                rollback_stage_identity[1],
-                _file_type(rollback_stage_identity[3]),
-                rollback_stage_identity[4],
-            )
-            or restored_target_link != rollback_stage_link
-            or _stat_structure_tuple(restored_stage)
-            != (
-                rollback_target_identity[0],
-                rollback_target_identity[1],
-                _file_type(rollback_target_identity[3]),
-                rollback_target_identity[4],
-            )
-            or restored_stage_link != rollback_target_link
-        ):
-            raise DistributionApplyError(identity_message)
-        _remove_distribution_stage_if_owned(
-            parent_fd,
-            staging_name,
-            restored_stage,
-            strict=True,
-        )
+            restored_target, restored_target_link = read_exact_symlink(target_name)
+            restored_stage, restored_stage_link = read_exact_symlink(staging_name)
+            if (
+                _stat_identity_tuple(restored_target) != _stat_identity_tuple(moved_target)
+                or restored_target_link != moved_target_link
+                or _stat_identity_tuple(restored_stage) != _stat_identity_tuple(published)
+                or restored_stage_link != published_link
+            ):
+                raise DistributionApplyError(identity_message)
+        # Never roll an unknown post-exchange canonical entry through the
+        # private stage name.  The journal owns recovery; both entries remain.
         raise DistributionApplyError(identity_message)
     return moved_target
 
@@ -5232,8 +5315,7 @@ def _cleanup_stale_distribution_stages(
             except OSError as exc:
                 raise DistributionApplyError("managed staging artifact cannot be inspected safely") from exc
             if owned.device == owned.inode == owned.ctime_ns == 0:
-                candidate = _distribution_stage_identity(parent_fd, owned.stage_name, owned.path)
-                if candidate not in known_identities or _file_type(current.st_mode) != owned.file_type:
+                if _file_type(current.st_mode) != owned.file_type or current.st_nlink != 1:
                     mismatch_detected = True
                     continue
                 _remove_distribution_stage_if_owned(
@@ -5433,7 +5515,7 @@ def _apply_regular_action(
             try:
                 if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
                     raise DistributionApplyError(f"managed target is unsafe for '{path}'")
-                if stage_ownership_recorder is not None:
+                if stage_ownership_recorder is not None and not write_ahead_stage_reservations:
                     stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, created))
                 mutation_phase = "pre"
 
@@ -5458,6 +5540,8 @@ def _apply_regular_action(
                 ):
                     raise DistributionApplyError(f"managed target verification failed for '{path}'")
                 stage_identity = verified
+                if write_ahead_stage_reservations and stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, verified))
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _rename_distribution_no_replace(parent_fd, staging_name, parent_fd, target_name)
                 os.fsync(parent_fd)
@@ -5471,7 +5555,7 @@ def _apply_regular_action(
                     # attempting ownership-checked cleanup.  The refreshed
                     # marker lets the next same-package retry identify a
                     # partial stage even when cleanup fails here.
-                    if stage_ownership_recorder is not None:
+                    if stage_ownership_recorder is not None and not write_ahead_stage_reservations:
                         stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, stage_identity))
                 finally:
                     try:
@@ -5558,7 +5642,7 @@ def _apply_regular_action(
             try:
                 if not stat.S_ISREG(staging_stat.st_mode) or staging_stat.st_nlink != 1:
                     raise DistributionApplyError(f"managed target staging failed for '{path}'")
-                if stage_ownership_recorder is not None:
+                if stage_ownership_recorder is not None and not write_ahead_stage_reservations:
                     stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, staging_stat))
 
                 def check_before_stage_write() -> None:
@@ -5577,6 +5661,8 @@ def _apply_regular_action(
                 ):
                     raise DistributionApplyError(f"managed target staging verification failed for '{path}'")
                 stage_identity = staged
+                if write_ahead_stage_reservations and stage_ownership_recorder is not None:
+                    stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, staged))
 
                 _assert_visible_distribution_chain_bound(target_root, path, parent_chain)
                 _assert_regular_fd_safe(fd, snapshot.target, path, exact=True)
@@ -5612,10 +5698,18 @@ def _apply_regular_action(
                     # creation-time stat is then stale (ctime changes), so
                     # refresh and publish the no-follow identity before
                     # attempting ownership-checked cleanup.
+                    visible_stage_matches = False
                     with suppress(OSError):
                         stage_identity = os.fstat(staging_fd)
+                        visible_stage = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
+                        visible_stage_matches = _stat_identity_tuple(visible_stage) == _stat_identity_tuple(
+                            stage_identity
+                        )
+                    if not visible_stage_matches:
+                        os.close(staging_fd)
+                        raise DistributionApplyError(f"managed target identity changed for '{path}'")
                     try:
-                        if stage_ownership_recorder is not None:
+                        if stage_ownership_recorder is not None and not write_ahead_stage_reservations:
                             stage_ownership_recorder(_distribution_stage_ownership(path, staging_name, stage_identity))
                     finally:
                         try:
@@ -5628,6 +5722,7 @@ def _apply_regular_action(
                                 strict=True,
                             )
                 else:
+                    published_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
                     os.close(staging_fd)
                     try:
                         old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -5646,16 +5741,18 @@ def _apply_regular_action(
                             and old_digest == target_identity.sha256
                         ):
                             if stage_ownership_recorder is not None:
-                                # The swap rebinds the stage pathname to the
-                                # former target.  Persist that new identity
-                                # before cleanup so a failed unlink can be
-                                # recovered by the next retry.  If marker
-                                # publication itself fails, remove the old
-                                # target immediately so the stale pre-swap
-                                # marker cannot hide a managed payload.
+                                # Persist the exact canonical successor before
+                                # removing the displaced predecessor.  Retry
+                                # can then prove both sides of an interrupted
+                                # publish/cleanup transition and rebind the
+                                # stage lease when needed.
                                 try:
                                     stage_ownership_recorder(
-                                        _distribution_stage_ownership(path, staging_name, old_stat)
+                                        _distribution_stage_ownership(
+                                            path,
+                                            staging_name,
+                                            published_successor if write_ahead_stage_reservations else old_stat,
+                                        )
                                     )
                                 except Exception as record_error:
                                     # The swap has already published the new
@@ -5666,7 +5763,11 @@ def _apply_regular_action(
                                     # once before falling back to cleanup.
                                     with suppress(Exception):
                                         stage_ownership_recorder(
-                                            _distribution_stage_ownership(path, staging_name, old_stat)
+                                            _distribution_stage_ownership(
+                                                path,
+                                                staging_name,
+                                                published_successor if write_ahead_stage_reservations else old_stat,
+                                            )
                                         )
                                     try:
                                         _remove_distribution_stage_if_owned(
@@ -5894,14 +5995,15 @@ def _apply_symlink_action(
                         )
                         visible_stage_after = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
                         stage_is_original = (
-                            _stat_identity_tuple(visible_stage) == _stat_identity_tuple(cleanup_stage_stat)
-                            and _stat_identity_tuple(visible_stage_after) == _stat_identity_tuple(cleanup_stage_stat)
+                            _stat_structure_tuple(visible_stage) == _stat_structure_tuple(cleanup_stage_stat)
+                            and _stat_identity_tuple(visible_stage_after) == _stat_identity_tuple(visible_stage)
                             and visible_target == expected_target
                         )
                     except (FileNotFoundError, OSError, DistributionApplyError):
                         stage_is_original = False
                     if not stage_is_original:
                         raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                    cleanup_stage_stat = visible_stage
                     try:
                         if stage_ownership_recorder is not None:
                             stage_ownership_recorder(
@@ -5915,6 +6017,7 @@ def _apply_symlink_action(
                             strict=True,
                         )
                 else:
+                    published_successor = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
                     try:
                         old_stat = os.stat(staging_name, dir_fd=parent_fd, follow_symlinks=False)
                         old_target = (
@@ -5929,13 +6032,16 @@ def _apply_symlink_action(
                             and old_stat.st_nlink == 1
                         ):
                             if stage_ownership_recorder is not None:
-                                # After the atomic swap, the stage pathname
-                                # owns the former target.  Record that inode
-                                # before unlink so a failed cleanup remains
-                                # safely retryable.
+                                # Bind the exact canonical successor before
+                                # removing the displaced predecessor.  Retry
+                                # can validate both namespace roles.
                                 try:
                                     stage_ownership_recorder(
-                                        _distribution_stage_ownership(action.path, staging_name, old_stat)
+                                        _distribution_stage_ownership(
+                                            action.path,
+                                            staging_name,
+                                            published_successor if write_ahead_stage_reservations else old_stat,
+                                        )
                                     )
                                 except Exception as record_error:
                                     # The swap already published the new
@@ -5947,7 +6053,11 @@ def _apply_symlink_action(
                                     # failure.
                                     with suppress(Exception):
                                         stage_ownership_recorder(
-                                            _distribution_stage_ownership(action.path, staging_name, old_stat)
+                                            _distribution_stage_ownership(
+                                                action.path,
+                                                staging_name,
+                                                published_successor if write_ahead_stage_reservations else old_stat,
+                                            )
                                         )
                                     try:
                                         _remove_distribution_stage_if_owned(
