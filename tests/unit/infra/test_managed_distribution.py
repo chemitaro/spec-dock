@@ -1569,6 +1569,89 @@ def test_i369_fresh_completed_journal_does_not_reenter_for_newer_package(
     assert not journal_path.exists()
 
 
+def test_i369_fresh_executing_journal_does_not_reenter_for_newer_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_mark_verified = OperationJournalStore.mark_verified
+
+    def interrupt_before_verified(*_args, **_kwargs):
+        raise DistributionApplyError("injected verification interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_verified", interrupt_before_verified)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["status"] == "executing"
+    assert journal["package_version"] == "1.2.3"
+
+    monkeypatch.setattr(OperationJournalStore, "mark_verified", original_mark_verified)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.3.0",
+    )
+
+    assert second.status == "completed", second.reason
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+    assert not journal_path.exists()
+
+
+def test_i369_fresh_journal_retry_rejects_new_workspace_root_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_mark_completed = OperationJournalStore.mark_completed
+
+    def interrupt_before_completed(*_args, **_kwargs):
+        raise DistributionApplyError("injected terminal interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", interrupt_before_completed)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert journal_path.exists()
+    (target_root / "spec-dock" / "foreign").write_text("user\n", encoding="utf-8")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", original_mark_completed)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-parent-mismatch"
+    assert journal_path.exists()
+
+
 def test_i368_journal_rejects_rebound_workspace_parent(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())

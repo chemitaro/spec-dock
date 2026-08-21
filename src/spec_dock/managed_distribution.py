@@ -6962,9 +6962,15 @@ def _execute_distribution_reconciliation(
 
     preserved_validation_active = True
     journal: OperationJournal | None = None
+    boundary_workspace_identity = created_workspace_identity
+    boundary_journal: OperationJournal | None = None
 
     def validate_preserved_state() -> None:
-        _assert_created_workspace_closed_set(target_root, created_workspace_identity, journal)
+        _assert_created_workspace_closed_set(
+            target_root,
+            boundary_workspace_identity,
+            journal or boundary_journal,
+        )
         if preserved_validation_active and preserved_state_validator is not None:
             preserved_state_validator()
 
@@ -7005,6 +7011,13 @@ def _execute_distribution_reconciliation(
         try:
             journal_seed = store._read(_root_identity_for_assessment(target_root))
             _assert_gc_transition_graph(journal_seed)
+            if intent == "fresh":
+                workspace_device = journal_seed.workspace_identity.device
+                workspace_inode = journal_seed.workspace_identity.inode
+                if not isinstance(workspace_device, int) or not isinstance(workspace_inode, int):
+                    raise DistributionApplyError("journal-protocol-incompatible")
+                boundary_workspace_identity = (workspace_device, workspace_inode)
+                boundary_journal = journal_seed
             if guard_marker is None:
                 try:
                     guard_marker = _read_distribution_retry_marker(target_root)
@@ -7407,7 +7420,7 @@ def _execute_distribution_reconciliation(
                 else ()
             ),
         )
-    if operation_package_version != package_version:
+    if operation_package_version != package_version and intent != "fresh":
         return _execute_distribution_reconciliation(
             install_root,
             manifest_path=manifest_path,
