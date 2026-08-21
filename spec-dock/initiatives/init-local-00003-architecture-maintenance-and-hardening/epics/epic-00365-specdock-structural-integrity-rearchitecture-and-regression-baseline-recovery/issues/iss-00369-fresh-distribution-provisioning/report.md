@@ -3,7 +3,7 @@
 ID: "iss-00369"
 タイトル: "Fresh Distribution Provisioning"
 関連GitHub: ["#369"]
-最終更新: "2026-08-21"
+最終更新: "2026-08-22"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -21,13 +21,13 @@ fresh contract には current/scaffold/generated assets、active fallback、vers
 ## Verification
 
 - `make lint`: pass（ruff、format check、mypy）
-- `uv run pytest -q`: pass（1247 passed / 1109 skipped）
+- `uv run pytest -q`: pass（1259 passed / 1119 skipped）
 - `./spec-dock/scripts/spec-dock validate`: pass（nodes=227）
 - `git diff --check`: pass
-- full-regression ledger: clean candidate SHA での最終実行をコミット後に実施予定。作業ツリーが dirty な状態での予備実行では 2278 passed / 48 skipped / 30 failed となり、Issue 369 による marker retry と legacy hidden workspace の期待値を追加修正した。
+- `uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py`: pass（candidate `e7e1afffd721915df42e8c10de4322ab47e4a241`、`27 failed / 2303 passed / 48 skipped`、`14884.54s (4:08:04)`）。27件の失敗はすべて full-regression ledger の approved failure signatures と一致し、検証器は `verified 27 approved failure signatures` を出力した。
 
 ## Residual Risks / Follow-ups
 
-- full-regression は 2356 tests を一括実行するため、予備実行で約3時間50分を要した。clean candidate で同じ ledger verifier を再実行し、approved failure signatures との一致を確認する。
-- Issue 368 から継承した approved failure ledger の既知失敗は本 Issue の変更範囲外として維持する。
+- full-regression は 2378 tests（27 failed / 2303 passed / 48 skipped）を一括実行し約4時間8分を要した。27件の approved failure ledger は Issue 368 から継承した本 Issue の変更範囲外であり、candidate SHA 上で署名一致を確認済み。
+- Issue 369 の fresh provisioning 変更に起因する unexpected failure/error は検出されていない。
 - marker/journal の terminal cleanup failure では、journal と forward guard を残して同一 plan の再試行へ進む。異なる root、contract、plan、または未知の child は fail closed とする。
