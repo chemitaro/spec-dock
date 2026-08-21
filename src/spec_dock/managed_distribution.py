@@ -7009,12 +7009,18 @@ def _execute_distribution_reconciliation(
             if not journal_present:
                 executable = build_executable_mutation_plan(assessment)
                 plan_digest = executable.plan_digest
+                legacy_fresh_conversion = (
+                    guard_marker is not None
+                    and guard_marker.purpose == _DISTRIBUTION_RETRY_PURPOSE
+                    and guard_marker.operation == "fresh"
+                    and intent == "fresh"
+                )
                 if (
                     guard_marker is None
                     or guard_marker.operation != intent
                     or not _journal_package_is_compatible(guard_marker.package_version, package_version)
                     or guard_marker.target_root != executable.root_identity
-                    or guard_marker.last_completed_phase != "preflight-complete"
+                    or (guard_marker.last_completed_phase != "preflight-complete" and not legacy_fresh_conversion)
                 ):
                     raise DistributionApplyError("legacy-marker-unconvertible")
                 if guard_marker.purpose == _journal_guard_purpose_for_intent(intent):

@@ -32,6 +32,7 @@ from spec_dock.managed_distribution import (
     build_distribution_plan,
     build_executable_mutation_plan,
     build_workspace_assessment,
+    execute_fresh_distribution,
     execute_recognized_distribution,
 )
 
@@ -5247,6 +5248,54 @@ def test_i369_update_missing_and_empty_workspace_admit_fresh(tmp_path: Path) -> 
         )
         assert admission.status == "fresh"
         assert admission.intent == "fresh"
+
+
+@pytest.mark.parametrize(
+    "phase",
+    (
+        "managed-scaffold-refreshed",
+        "current-external-materialized",
+        "obsolete-pruned",
+        "post-verified",
+        "version-written",
+    ),
+)
+def test_i369_fresh_legacy_later_phase_reassesses_and_converts_without_checkpoint_skip(
+    tmp_path: Path,
+    phase: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "fresh",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": phase,
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert not marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
 
 
 def test_s25_missing_current_target_is_create(tmp_path: Path) -> None:
