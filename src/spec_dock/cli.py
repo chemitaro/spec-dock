@@ -2782,7 +2782,7 @@ def _install_fresh_distribution(
         admission = _admit_distribution_cli(target_root, operation=requested_operation)
         if admission.status not in {"fresh", "retry"} or (admission.intent != "fresh"):
             raise RuntimeError("Fresh distribution target changed during operation admission")
-        _install_fresh_distribution_unlocked(
+        _execute_fresh_distribution_unlocked(
             target_root,
             requested_operation=requested_operation,
             retry_marker=admission if admission.status == "retry" else None,
@@ -2845,7 +2845,7 @@ def _prepare_fresh_workspace_boundary(
     return None
 
 
-def _install_fresh_distribution_unlocked(
+def _execute_fresh_distribution_unlocked(
     target_root: Path,
     *,
     requested_operation: JournaledDistributionIntent = "fresh",
@@ -2925,7 +2925,14 @@ def _install_fresh_distribution_unlocked(
         raise RuntimeError(f"distribution preflight blocked: {result.reason}")
     if result.status == "recovery_required":
         target_label = _require_retry_target_label(target_root)
-        retry = _distribution_retry_command(requested_operation, target_label=target_label)
+        retry_operation: DistributionOperation = requested_operation
+        if (
+            retry_marker is not None
+            and retry_marker.marker is not None
+            and retry_marker.marker.purpose == "distribution-rerun"
+        ):
+            retry_operation = "fresh"
+        retry = _distribution_retry_command(retry_operation, target_label=target_label)
         raise RuntimeError(
             "distribution partial failure during fresh provisioning; "
             "target=spec-dock/.distribution-journal.json; "
@@ -3001,7 +3008,7 @@ def _install_recognized_distribution(
             admission.status == "fresh" or (admission.status == "retry" and admission.intent == "fresh")
         ):
             fresh_operation = cast("JournaledDistributionIntent", operation)
-            _install_fresh_distribution_unlocked(
+            _execute_fresh_distribution_unlocked(
                 target_root,
                 requested_operation=fresh_operation,
                 retry_marker=admission if admission.status == "retry" else None,
