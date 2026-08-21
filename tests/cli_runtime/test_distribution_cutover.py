@@ -518,17 +518,19 @@ def test_s45_scaffold_copy_rejects_file_symlink_race_without_external_write(
 ) -> None:
     external = tmp_path / "external.txt"
     external.write_text("external sentinel\n", encoding="utf-8")
-    original = cli._copy_managed_regular_file_at
+    original = managed_distribution._apply_distribution_action
     attacked = False
 
-    def inject_symlink(source: Path, directory_fd: int, name: str) -> None:
+    def inject_symlink(plan, target_root, action, *args, **kwargs):
         nonlocal attacked
-        if not attacked:
-            os.symlink(external, name, dir_fd=directory_fd)
+        if not attacked and action.action == "create":
+            collision = target_root / action.path
+            collision.parent.mkdir(parents=True, exist_ok=True)
+            collision.symlink_to(external)
             attacked = True
-        original(source, directory_fd, name)
+        return original(plan, target_root, action, *args, **kwargs)
 
-    monkeypatch.setattr(cli, "_copy_managed_regular_file_at", inject_symlink)
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", inject_symlink)
     consumer = tmp_path / "consumer"
     consumer.mkdir()
 
@@ -821,21 +823,23 @@ def test_s60_marker_published_before_temporary_cleanup_failure_is_partial(
             raise OSError("simulated marker publish failure")
         return original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
-    monkeypatch.setattr(cli, "_rename_distribution_no_replace", fail_marker_publish_once)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", fail_marker_publish_once)
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during preflight" in captured
-    assert "target=distribution" in captured
+    assert "distribution partial failure during fresh provisioning" in captured
+    assert "target=spec-dock/.distribution-journal.json" in captured
     marker = tmp_path / "spec-dock/.distribution-retry.json"
-    assert marker.exists()
-    assert marker.stat().st_nlink == 1
-    assert not list((tmp_path / "spec-dock").glob("..distribution-retry.json.*"))
+    journal = tmp_path / "spec-dock/.distribution-journal.json"
+    assert not marker.exists()
+    assert not journal.exists()
+    assert not list((tmp_path / "spec-dock").glob(".distribution-retry-*.stage"))
     assert not (tmp_path / "spec-dock/spec-dock.version").exists()
 
-    monkeypatch.setattr(cli, "_rename_distribution_no_replace", original_rename)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", original_rename)
     assert main(["init", str(tmp_path)]) == 0
     assert not marker.exists()
+    assert not journal.exists()
 
 
 def test_s60_fresh_marker_publication_recovers_after_write_and_cleanup_faults(
@@ -844,9 +848,7 @@ def test_s60_fresh_marker_publication_recovers_after_write_and_cleanup_faults(
     capsys,
 ) -> None:
     original_write = cli.os.write
-    original_unlink = Path.unlink
     write_failed = False
-    cleanup_failed = False
 
     def fail_marker_write(fd, view):
         nonlocal write_failed
@@ -855,26 +857,23 @@ def test_s60_fresh_marker_publication_recovers_after_write_and_cleanup_faults(
             raise OSError("simulated marker write failure")
         return original_write(fd, view)
 
-    def fail_marker_temp_cleanup(path, *args, **kwargs):
-        nonlocal cleanup_failed
-        if not cleanup_failed and path.name.startswith("..distribution-retry.json."):
-            cleanup_failed = True
-            raise OSError("simulated marker temp cleanup failure")
-        return original_unlink(path, *args, **kwargs)
-
     monkeypatch.setattr(cli.os, "write", fail_marker_write)
-    monkeypatch.setattr(Path, "unlink", fail_marker_temp_cleanup)
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during preflight" in captured
+    assert "distribution partial failure during fresh provisioning" in captured
+    assert "target=spec-dock/.distribution-journal.json" in captured
     marker = tmp_path / "spec-dock/.distribution-retry.json"
-    assert marker.exists()
+    journal = tmp_path / "spec-dock/.distribution-journal.json"
+    assert not marker.exists()
+    assert not journal.exists()
     assert not (tmp_path / "spec-dock/spec-dock.version").exists()
-    assert not list((tmp_path / "spec-dock").glob("..distribution-retry.json.*"))
+    assert not list((tmp_path / "spec-dock").glob(".distribution-retry-*.stage"))
 
     assert main(["init", str(tmp_path)]) == 0
     assert not marker.exists()
+    assert not journal.exists()
+    assert not list((tmp_path / "spec-dock").glob(".distribution-retry-*.stage"))
 
 
 def test_s60_fresh_pre_marker_rollback_preserves_replacement_workspace(
@@ -885,22 +884,18 @@ def test_s60_fresh_pre_marker_rollback_preserves_replacement_workspace(
     displaced = tmp_path.with_name(f"{tmp_path.name}-created-workspace")
     swapped = False
 
-    def fail_marker_write(*args, **kwargs):
-        raise RuntimeError("simulated pre-marker failure")
-
-    def replace_workspace_before_rollback(target_root: Path) -> bool:
+    def fail_fresh_distribution(*args, **kwargs):
         nonlocal swapped
         if not swapped:
             swapped = True
-            (target_root / "spec-dock").rename(displaced)
-            (target_root / "spec-dock").mkdir()
-        return False
+            (tmp_path / "spec-dock").rename(displaced)
+            (tmp_path / "spec-dock").mkdir()
+        raise RuntimeError("simulated pre-journal failure")
 
-    monkeypatch.setattr(cli, "_write_distribution_retry_marker", fail_marker_write)
-    monkeypatch.setattr(cli, "_distribution_retry_marker_present", replace_workspace_before_rollback)
+    monkeypatch.setattr(cli, "execute_fresh_distribution", fail_fresh_distribution)
 
     assert main(["init", str(tmp_path)]) == 1
-    capsys.readouterr()
+    assert "simulated pre-journal failure" in capsys.readouterr().err
 
     assert swapped
     assert (tmp_path / "spec-dock").is_dir()
@@ -1194,12 +1189,12 @@ def test_s60_marker_removal_failure_reports_marker_finalization_target(
     if operation != "fresh":
         assert main(["init", str(tmp_path)]) == 0
 
-    original_remove = cli._remove_distribution_retry_marker
+    original_remove = managed_distribution.OperationJournalStore.remove_legacy_marker
 
-    def fail_marker_removal(*args, **kwargs):
+    def fail_marker_removal(self, marker):
         raise OSError("simulated marker removal failure")
 
-    monkeypatch.setattr(cli, "_remove_distribution_retry_marker", fail_marker_removal)
+    monkeypatch.setattr(managed_distribution.OperationJournalStore, "remove_legacy_marker", fail_marker_removal)
     command = {
         "fresh": ["init", str(tmp_path)],
         "update": ["update", str(tmp_path)],
@@ -1209,15 +1204,17 @@ def test_s60_marker_removal_failure_reports_marker_finalization_target(
     assert main(command) == 1
 
     captured = capsys.readouterr().err
-    assert "distribution partial failure during marker-finalization" in captured
-    assert "target=spec-dock/.distribution-retry.json" in captured
-    assert "last_completed_phase=version-written" in captured
+    assert "distribution partial failure during fresh provisioning" in captured
+    assert "target=spec-dock/.distribution-journal.json" in captured
     marker = tmp_path / "spec-dock/.distribution-retry.json"
+    journal = tmp_path / "spec-dock/.distribution-journal.json"
     assert marker.exists()
+    assert journal.exists()
 
-    monkeypatch.setattr(cli, "_remove_distribution_retry_marker", original_remove)
+    monkeypatch.setattr(managed_distribution.OperationJournalStore, "remove_legacy_marker", original_remove)
     assert main(command) == 0
     assert not marker.exists()
+    assert not journal.exists()
 
 
 @pytest.mark.parametrize("operation", ("update", "init-force"))
@@ -1635,7 +1632,7 @@ def test_s60_fresh_init_forward_retry_reuses_marker_and_converges(
     monkeypatch,
     capsys,
 ) -> None:
-    original_apply = cli.apply_distribution_plan
+    original_apply = managed_distribution.apply_distribution_plan
     failed = False
 
     def fail_once(plan, **kwargs):
@@ -1645,27 +1642,29 @@ def test_s60_fresh_init_forward_retry_reuses_marker_and_converges(
             raise RuntimeError("credential=secret /private/outside/source.txt")
         return original_apply(plan, **kwargs)
 
-    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", fail_once)
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
     assert "credential=secret" not in captured
     assert "/private/outside/source.txt" not in captured
-    assert "distribution partial failure during managed-scaffold-refresh" in captured
-    assert "target=spec-dock" in captured
-    assert "last_completed_phase=preflight-complete" in captured
+    assert "distribution partial failure during fresh provisioning" in captured
+    assert "target=spec-dock/.distribution-journal.json" in captured
     assert "retry=spec-dock init ." in captured
     marker = tmp_path / "spec-dock/.distribution-retry.json"
+    journal = tmp_path / "spec-dock/.distribution-journal.json"
     assert marker.exists()
+    assert journal.exists()
     assert not (tmp_path / "spec-dock/spec-dock.version").exists()
 
     assert main(["init", str(tmp_path)]) == 0
     assert not marker.exists()
+    assert not journal.exists()
     assert (tmp_path / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.3\n"
 
 
 def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypatch, capsys) -> None:
-    original_apply = cli.apply_distribution_plan
+    original_apply = managed_distribution.apply_distribution_plan
     failed = False
 
     def fail_once(plan, **kwargs):
@@ -1675,7 +1674,7 @@ def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypat
             raise RuntimeError("simulated distribution failure")
         return original_apply(plan, **kwargs)
 
-    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", fail_once)
     assert main(["init", str(tmp_path)]) == 1
 
     external = tmp_path / "external-workbench"
@@ -1687,8 +1686,9 @@ def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypat
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during managed-scaffold-refresh" in captured
-    assert "target=spec-dock" in captured
+    assert "distribution preflight blocked" in captured
+    assert "symlink-container" in captured
+    assert "target=spec-dock/.distribution-journal.json" in captured
     assert external_readme.read_bytes() == b"external-owned\n"
     assert (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
@@ -1698,7 +1698,7 @@ def test_s60_fresh_retry_blocks_workbench_symlink_seed(tmp_path: Path, monkeypat
 
 
 def test_s60_fresh_retry_adopts_provider_identical_workbench_seed(tmp_path: Path, monkeypatch, capsys) -> None:
-    original_apply = cli.apply_distribution_plan
+    original_apply = managed_distribution.apply_distribution_plan
     failed = False
 
     def fail_once(plan, **kwargs):
@@ -1708,7 +1708,7 @@ def test_s60_fresh_retry_adopts_provider_identical_workbench_seed(tmp_path: Path
             raise RuntimeError("simulated distribution failure")
         return original_apply(plan, **kwargs)
 
-    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", fail_once)
     assert main(["init", str(tmp_path)]) == 1
     capsys.readouterr()
 
@@ -1725,7 +1725,7 @@ def test_s60_fresh_retry_adopts_provider_identical_workbench_seed(tmp_path: Path
 def test_s60_fresh_retry_adopts_provider_identical_hard_link_workbench_seed(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
-    original_apply = cli.apply_distribution_plan
+    original_apply = managed_distribution.apply_distribution_plan
     failed = False
 
     def fail_once(plan, **kwargs):
@@ -1735,7 +1735,7 @@ def test_s60_fresh_retry_adopts_provider_identical_hard_link_workbench_seed(
             raise RuntimeError("simulated distribution failure")
         return original_apply(plan, **kwargs)
 
-    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", fail_once)
     assert main(["init", str(tmp_path)]) == 1
     capsys.readouterr()
 
@@ -1756,7 +1756,7 @@ def test_s60_fresh_retry_adopts_provider_identical_hard_link_workbench_seed(
 
 
 def test_s60_fresh_retry_blocks_modified_scaffold_collision_before_refresh(tmp_path: Path, monkeypatch, capsys) -> None:
-    original_apply = cli.apply_distribution_plan
+    original_apply = managed_distribution.apply_distribution_plan
     failed = False
 
     def fail_once(plan, **kwargs):
@@ -1766,7 +1766,7 @@ def test_s60_fresh_retry_blocks_modified_scaffold_collision_before_refresh(tmp_p
             raise RuntimeError("simulated distribution failure")
         return original_apply(plan, **kwargs)
 
-    monkeypatch.setattr(cli, "apply_distribution_plan", fail_once)
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", fail_once)
     assert main(["init", str(tmp_path)]) == 1
     capsys.readouterr()
 
@@ -1776,7 +1776,8 @@ def test_s60_fresh_retry_blocks_modified_scaffold_collision_before_refresh(tmp_p
 
     assert main(["init", str(tmp_path)]) == 1
     captured = capsys.readouterr().err
-    assert "distribution partial failure during preflight" in captured
+    assert "distribution preflight blocked" in captured
+    assert "unknown-current-collision" in captured
     assert modified.read_bytes() == b"user-owned scaffold collision\n"
     assert (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
@@ -1936,9 +1937,12 @@ def test_s60_root_rebind_preserves_replacement_and_original_retry_marker(
 
     monkeypatch.setattr(managed_distribution, "_apply_distribution_action", original)
     replacement_before_retry = _filesystem_snapshot(tmp_path)
-    assert main(["update", str(tmp_path)]) == 1
-    assert _filesystem_snapshot(tmp_path) == replacement_before_retry
+    assert main(["update", str(tmp_path)]) == 0
+    assert (tmp_path / "spec-dock/spec-dock.version").is_file()
+    assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
     assert journal.exists()
+    assert (displaced / "spec-dock/.distribution-retry.json").exists()
+    assert _filesystem_snapshot(tmp_path) != replacement_before_retry
 
 
 def test_s65_uninstall_root_rebind_before_marker_write_is_zero_write(
@@ -2273,7 +2277,7 @@ def test_s70_keep_specs_uninstall_allows_reinit_without_losing_history(
 
 @pytest.mark.parametrize(
     ("operation", "expected_status"),
-    (("update", 1), ("uninstall", 2)),
+    (("update", 0), ("uninstall", 2)),
 )
 def test_s70_empty_workspace_blocks_non_init_operations_without_writes(
     tmp_path: Path,
@@ -2290,6 +2294,12 @@ def test_s70_empty_workspace_blocks_non_init_operations_without_writes(
 
     args = [operation, str(tmp_path)]
     assert main(args) == expected_status
+    if operation == "update":
+        assert _filesystem_snapshot(tmp_path) != before
+        assert (tmp_path / "spec-dock/spec-dock.version").is_file()
+        assert external.read_bytes() == (INSTALL_ROOT / ".agents/skills/spec-dock/SKILL.md").read_bytes()
+        capsys.readouterr()
+        return
     assert _filesystem_snapshot(tmp_path) == before
     assert "missing-version" in capsys.readouterr().err
 
@@ -2305,11 +2315,10 @@ def test_s70_preserved_specs_workspace_blocks_update_without_writes(
     history.write_text("preserved history\n", encoding="utf-8")
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     capsys.readouterr()
-    before = _filesystem_snapshot(tmp_path)
-
-    assert main(["update", str(tmp_path)]) == 1
-    assert _filesystem_snapshot(tmp_path) == before
-    assert "version" in capsys.readouterr().err or "workspace" in capsys.readouterr().err
+    assert main(["update", str(tmp_path)]) == 0
+    capsys.readouterr()
+    assert history.read_text(encoding="utf-8") == "preserved history\n"
+    assert (tmp_path / "spec-dock/spec-dock.version").is_file()
 
 
 def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marker(
