@@ -431,6 +431,32 @@ def test_i368_journal_prepare_records_bound_actions_before_target_mutation(tmp_p
     assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
 
 
+def test_i369_fresh_journal_uses_isolated_authority_and_directory_actions(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        intent="fresh",
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    assert guard.purpose == "fresh-journal-forward-only"
+    store.bind_forward_guard(guard)
+    journal = store.prepare(executable, package_version="1.2.3")
+    payload = json.loads((target_root / "spec-dock/.distribution-journal.json").read_text(encoding="utf-8"))
+
+    assert journal.intent == "fresh"
+    assert journal.authority == "fresh-distribution-provisioning"
+    assert payload["schema_version"] == managed_distribution._DISTRIBUTION_JOURNAL_SCHEMA_VERSION
+    assert {action.action for action in journal.actions} >= {"ensure-directory", "create"}
+    assert payload["authority"] == "fresh-distribution-provisioning"
+
+
 def test_i368_journal_resume_rejects_intent_mismatch_without_rewrite(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -5117,8 +5143,110 @@ def test_s25_fresh_classifies_missing_and_current_identical_without_mutation(tmp
     assert by_path[".github/workflows/ci.yml"].blocked is False
     assert by_path[".github/workflows/ci.yml"].reason == "current-identity-match"
     assert by_path["spec"].action == "create"
-    assert set(by_path) == {".github/workflows/ci.yml", "spec"}
+    assert by_path[".github"].action == "adopt"
+    assert by_path[".github/workflows"].action == "adopt"
+    assert by_path["spec-dock"].action == "ensure-directory"
+    assert set(by_path) == {
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        "spec",
+        "spec-dock",
+        "spec-dock/.agent",
+        "spec-dock/initiatives",
+    }
     assert target.read_bytes() == b"current\n"
+
+
+def test_i369_fresh_required_directories_are_top_down_and_non_destructive(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    nested_source = install_root / "zz" / "nested" / "asset.txt"
+    nested_source.parent.mkdir(parents=True)
+    nested_source.write_bytes(b"nested\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    required_paths = tuple(item.path for item in plan.required_directories)
+    assert required_paths == tuple(sorted(required_paths, key=lambda path: (len(Path(path).parts), path)))
+    assert required_paths[:3] == (".github", "spec-dock", "zz")
+    actions = {action.path: action for action in plan.actions}
+    assert all(actions[path].action == "ensure-directory" for path in required_paths)
+    assert {action.action for action in plan.actions} <= {"create", "ensure-directory"}
+    assert "spec-dock/.workbench/README.md" in actions
+
+
+def test_i369_required_directory_collisions_are_blocked_without_mutation(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / ".github").write_text("user-owned\n", encoding="utf-8")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github")
+    assert action.action == "preserve"
+    assert action.blocked is True
+    assert action.reason == "required-directory-file"
+    assert (target_root / ".github").read_text(encoding="utf-8") == "user-owned\n"
+
+
+def test_i369_fresh_scaffold_seed_uses_template_source_and_update_does_not_backfill(
+    tmp_path: Path,
+) -> None:
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    install_root = _minimal_install_root(tmp_path)
+    fresh = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        operation="fresh",
+    )
+    fresh_seed = next(asset for asset in fresh.scaffold_assets if asset.path == "spec-dock/.workbench/README.md")
+    assert fresh_seed.source_path == "templates/root/.workbench/README.md"
+
+    update = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        operation="update",
+    )
+    assert all(asset.path != "spec-dock/.workbench/README.md" for asset in update.scaffold_assets)
+
+
+def test_i369_update_missing_and_empty_workspace_admit_fresh(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    for target_root, create_workspace in (
+        (tmp_path / "missing", False),
+        (tmp_path / "empty", True),
+    ):
+        target_root.mkdir()
+        if create_workspace:
+            (target_root / "spec-dock").mkdir()
+        admission = admit_distribution_operation(
+            target_root,
+            operation="update",
+            package_version="1.2.3",
+            manifest_path=manifest_path,
+        )
+        assert admission.status == "fresh"
+        assert admission.intent == "fresh"
 
 
 def test_s25_missing_current_target_is_create(tmp_path: Path) -> None:
@@ -6377,7 +6505,7 @@ def test_s30_apply_rejects_external_parent_created_after_preflight(
     ) -> None:
         nonlocal injected
         original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
-        if not injected:
+        if not injected and getattr(action, "path", "") == ".github":
             injected = True
             (root / "zz").mkdir()
 
@@ -6386,7 +6514,8 @@ def test_s30_apply_rejects_external_parent_created_after_preflight(
     with pytest.raises(DistributionApplyError, match="identity"):
         apply_distribution_plan(plan)
 
-    assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"first\n"
+    assert (target_root / ".github").is_dir()
+    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
     assert not (target_root / "zz" / "second.yml").exists()
 
 
@@ -6423,7 +6552,7 @@ def test_s30_apply_rejects_external_nested_parent_after_operation_parent_creatio
     ) -> None:
         nonlocal injected
         original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
-        if not injected and getattr(action, "path", "") == "zz/first.yml":
+        if not injected and getattr(action, "path", "") == "zz":
             injected = True
             (root / "zz" / "yy").mkdir()
 
@@ -6432,7 +6561,7 @@ def test_s30_apply_rejects_external_nested_parent_after_operation_parent_creatio
     with pytest.raises(DistributionApplyError, match="identity"):
         apply_distribution_plan(plan)
 
-    assert (target_root / "zz" / "first.yml").read_bytes() == b"first nested\n"
+    assert not (target_root / "zz" / "first.yml").exists()
     assert (target_root / "zz" / "yy").is_dir()
     assert not (target_root / "zz" / "yy" / "second.yml").exists()
 

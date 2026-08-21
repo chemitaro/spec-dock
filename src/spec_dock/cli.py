@@ -26,7 +26,7 @@ import subprocess
 import sys
 import tempfile
 import threading
-from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
+from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn, cast
 
 try:
     import fcntl
@@ -36,19 +36,20 @@ except ImportError:  # pragma: no cover - Windows has no POSIX flock module.
 from spec_dock import __version__
 from spec_dock.managed_distribution import (
     DistributionAdmission,
-    DistributionApplyError,
     DistributionAsset,
     DistributionIdentity,
     DistributionOperation,
     DistributionRootIdentity,
     DistributionStageOwnership,
+    JournaledDistributionIntent,
     RecognizedDistributionIntent,
     _remove_distribution_target_if_bound,
     _rename_distribution_no_replace,
     _swap_regular_distribution_target_if_bound,
     admit_distribution_operation,
-    apply_distribution_plan,
+    apply_distribution_plan,  # noqa: F401 - retained for test seam compatibility
     build_distribution_plan,
+    execute_fresh_distribution,
     execute_recognized_distribution,
 )
 
@@ -342,63 +343,6 @@ def _assert_managed_path_identity(path: Path, expected: _ManagedPathIdentity | N
     current = _managed_path_identity(path)
     if (current.device, current.inode) != (expected.device, expected.inode):
         raise RuntimeError(f"managed scaffold target identity changed: {path}")
-
-
-def _assert_managed_scaffold_tree_safe(specdock_dir: Path) -> None:
-    """Reject unsafe entries before a managed scaffold tree replacement."""
-    for name in _MANAGED_DIRS:
-        managed_dir = specdock_dir / name
-        try:
-            root_info = os.lstat(managed_dir)
-        except FileNotFoundError:
-            continue
-        except OSError as exc:
-            raise RuntimeError(f"managed scaffold target cannot be inspected safely: {managed_dir}") from exc
-        if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
-            raise RuntimeError(f"managed scaffold target is not a safe directory: {managed_dir}")
-
-        def fail_incomplete_walk(exc: OSError, managed_path: Path = managed_dir) -> NoReturn:
-            raise RuntimeError(f"managed scaffold target cannot be inspected safely: {managed_path}") from exc
-
-        for current_root, dir_names, file_names in os.walk(
-            managed_dir,
-            topdown=True,
-            followlinks=False,
-            onerror=fail_incomplete_walk,
-        ):
-            current = Path(current_root)
-            for entry_name in (*dir_names, *file_names):
-                entry = current / entry_name
-                try:
-                    info = os.lstat(entry)
-                except OSError as exc:
-                    raise RuntimeError(f"managed scaffold target cannot be inspected safely: {entry}") from exc
-                if stat.S_ISLNK(info.st_mode):
-                    raise RuntimeError(f"managed scaffold target contains symlinked entry: {entry}")
-                if stat.S_ISREG(info.st_mode):
-                    if info.st_nlink != 1:
-                        raise RuntimeError(f"managed scaffold target contains hard-linked file: {entry}")
-                elif not stat.S_ISDIR(info.st_mode):
-                    raise RuntimeError(f"managed scaffold target contains special entry: {entry}")
-
-
-def _assert_managed_scaffold_file_identities(
-    expected_identities: dict[Path, _ManagedFileIdentity | None] | None,
-    *,
-    root: Path | None = None,
-) -> None:
-    """Revalidate every exact scaffold file before a recursive replacement."""
-    if expected_identities is None:
-        return
-    root_absolute = root.absolute() if root is not None else None
-    for path, expected in expected_identities.items():
-        if root_absolute is not None and not path.absolute().is_relative_to(root_absolute):
-            continue
-        _assert_managed_file_identity(
-            path,
-            expected,
-            allow_hard_link=_is_root_workbench_seed_path(path),
-        )
 
 
 def _managed_directory_flags() -> int:
@@ -2036,148 +1980,6 @@ def _active_fallback_distribution_assets(specdock_dir: Path) -> tuple[Distributi
     return tuple(assets)
 
 
-def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
-    """Ensure `spec-dock/active/*` fallback entrypoints exist after init/update."""
-    active_dir = specdock_dir / "active"
-    active_dir.mkdir(parents=True, exist_ok=True)
-    persisted = _load_persisted_active_entries(specdock_dir)
-
-    for layer in ("initiative", "epic", "issue"):
-        link = active_dir / layer
-        pathfile = active_dir / f"{layer}.path"
-        desired_target: Path
-        # Repair stale symlinks so update can restore fallback pointers.
-        if link.is_symlink() and not link.exists():
-            link.unlink(missing_ok=True)
-
-        persisted_id, persisted_path = persisted[layer]
-        existing_entrypoint = _resolve_existing_active_entrypoint(
-            specdock_dir,
-            active_dir=active_dir,
-            layer=layer,
-        )
-        force_rebuild = False
-        if existing_entrypoint is not None and existing_entrypoint[1] is not None:
-            existing_target, _existing_id = existing_entrypoint
-            resolved_link_target: Path | None = None
-            if link.exists() or link.is_symlink():
-                try:
-                    resolved_link_target = link.resolve()
-                except OSError:
-                    resolved_link_target = None
-            # Keep healthy real entrypoints as highest priority, but if the
-            # user-visible pointer disagrees (e.g. placeholder link + real
-            # `.path`), normalize the pointer to the same real target.
-            if (link.is_symlink() and resolved_link_target != existing_target) or (
-                link.exists() and not link.is_symlink() and resolved_link_target != existing_target
-            ):
-                force_rebuild = True
-            desired_target = existing_target
-            if not force_rebuild:
-                continue
-        else:
-            resolved_target = _resolve_manifest_target_dir(
-                specdock_dir,
-                layer,
-                expected_id=persisted_id,
-                persisted_path=persisted_path,
-            )
-            if resolved_target is None:
-                resolved_target = _resolve_persisted_path_dir(
-                    specdock_dir,
-                    layer=layer,
-                    expected_id=persisted_id,
-                    persisted_path=persisted_path,
-                )
-            desired_target = (
-                resolved_target if resolved_target is not None else _active_placeholder_dir(specdock_dir, layer)
-            )
-
-        if existing_entrypoint is not None:
-            existing_target, _existing_id = existing_entrypoint
-            should_rebuild = force_rebuild or existing_target != desired_target.resolve()
-            # Placeholder is already the desired fallback target.
-            if not should_rebuild:
-                continue
-
-            # Placeholder entrypoint exists but persisted target resolved to real node.
-            # For managed pointer conflicts, clear `active/<layer>` first. If that
-            # fails, keep `.path` untouched so we do not lose the valid target hint.
-            if link.exists() or link.is_symlink():
-                if link.is_symlink() or link.is_file():
-                    link.unlink(missing_ok=True)
-                elif link.is_dir():
-                    with suppress(OSError, RuntimeError):
-                        target_root = specdock_dir.parent
-                        rel_path = link.absolute().relative_to(target_root.absolute())
-                        if rel_path.parts != (_SPEC_DOCK_DIRNAME, "active", layer):
-                            raise RuntimeError("active fallback path is outside the generated boundary")
-                        _remove_bound_directory_tree(
-                            target_root,
-                            rel_path,
-                            expected_identity=_managed_path_identity(link),
-                            expected_root_identity=_distribution_root_identity(target_root),
-                        )
-            if link.exists() or link.is_symlink():
-                continue
-            if pathfile.exists() or pathfile.is_symlink():
-                with suppress(OSError):
-                    pathfile.unlink()
-            if pathfile.exists() or pathfile.is_symlink():
-                continue
-
-        # If `.path` exists but does not resolve to a valid active entrypoint,
-        # treat it as stale so recovery can rebuild from persisted state/placeholder.
-        else:
-            if link.is_symlink():
-                with suppress(OSError):
-                    link.unlink()
-            if pathfile.exists() or pathfile.is_symlink():
-                with suppress(OSError):
-                    pathfile.unlink()
-
-        if link.exists() or link.is_symlink() or pathfile.exists() or pathfile.is_symlink():
-            continue
-
-        rel_target = os.path.relpath(desired_target, start=active_dir)
-        try:
-            Path(link).symlink_to(rel_target)
-        except OSError:
-            _write_active_pathfile(active_dir, layer, desired_target)
-
-    # Context pack must come from currently-resolved active entrypoints only.
-    resolved_ids: dict[str, str | None] = {"initiative": None, "epic": None, "issue": None}
-    for layer in ("initiative", "epic", "issue"):
-        existing_entrypoint = _resolve_existing_active_entrypoint(
-            specdock_dir,
-            active_dir=active_dir,
-            layer=layer,
-        )
-        if existing_entrypoint is not None:
-            resolved_ids[layer] = existing_entrypoint[1]
-
-    context_pack_path = active_dir / "context-pack.md"
-    desired_context_pack = _render_context_pack(
-        initiative_id=resolved_ids["initiative"],
-        epic_id=resolved_ids["epic"],
-        issue_id=resolved_ids["issue"],
-    )
-    current_context_pack: str | None = None
-    if context_pack_path.exists() or context_pack_path.is_symlink():
-        try:
-            context_pack_info = os.lstat(context_pack_path)
-            if stat.S_ISREG(context_pack_info.st_mode) and context_pack_info.st_nlink == 1:
-                current_context_pack = context_pack_path.read_text(encoding="utf-8")
-        except OSError:
-            current_context_pack = None
-    if current_context_pack != desired_context_pack:
-        _write_atomic_regular_file(
-            context_pack_path,
-            desired_context_pack.encode("utf-8"),
-            mode=0o644,
-        )
-
-
 def _install_repo_root_shortcut(target_root: Path) -> None:
     """Best-effort: create a repo-root `./spec` shortcut to the runtime script.
 
@@ -2838,207 +2640,6 @@ def _remove_distribution_retry_marker(
                     os.close(parent_fd)
 
 
-def _install_spec_dock_bound(
-    target_root: Path,
-    *,
-    force: bool,
-    install_root_shortcut: bool = True,
-    write_version: bool = True,
-    expected_root_identity: DistributionRootIdentity | None = None,
-    root_identity_path: Path | None = None,
-    expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
-    expected_managed_scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] | None = None,
-    expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
-    managed_gitignore_identity_checked: bool = False,
-    seed_root_workbench: bool | None = None,
-) -> None:
-    """Install/update `spec-dock/` scaffold into the target repository."""
-    identity_path = root_identity_path or target_root
-
-    def guard_root() -> None:
-        if expected_root_identity is not None:
-            _assert_distribution_root_identity(identity_path, expected_root_identity)
-
-    guard_root()
-    specdock_dir = _specdock_dir(target_root)
-    fresh_specdock = not os.path.lexists(specdock_dir)
-    should_seed_root_workbench = fresh_specdock if seed_root_workbench is None else seed_root_workbench
-    if specdock_dir.exists() and not force:
-        raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'.")
-
-    with _assets_dir() as assets_dir:
-        src_spec_dock = assets_dir / "spec_dock"
-        if not src_spec_dock.is_dir():
-            raise RuntimeError("Missing asset directory: spec_dock")
-
-        # `.gitignore` is a required shipped asset.  Do not fall back to an
-        # embedded copy: a package that omits it is incomplete and must fail
-        # before creating or replacing any consumer state.
-        src_gitignore = src_spec_dock / ".gitignore"
-        if not src_gitignore.is_file() or src_gitignore.is_symlink():
-            raise RuntimeError("Missing asset file: spec_dock/.gitignore")
-
-        # Preflight all managed scaffold directories before any write.
-        managed_scaffold_sync_plan: list[tuple[Path, Path]] = []
-        for name in _MANAGED_DIRS:
-            src = src_spec_dock / name
-            if not src.exists():
-                raise RuntimeError(f"Missing asset directory: spec_dock/{name}")
-            if not src.is_dir():
-                raise RuntimeError(f"Invalid asset directory: spec_dock/{name}")
-            managed_scaffold_sync_plan.append((src, specdock_dir / name))
-
-        root_workbench_readme: Path | None = None
-        if seed_root_workbench is not None:
-            _assert_root_workbench_parent_safe(specdock_dir)
-            if seed_root_workbench:
-                root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
-                if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
-                    raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
-
-        guard_root()
-        _assert_managed_scaffold_tree_safe(specdock_dir)
-        _assert_managed_scaffold_file_identities(expected_managed_scaffold_file_identities)
-        if expected_managed_scaffold_identities is not None:
-            _assert_managed_path_identity(
-                specdock_dir,
-                expected_managed_scaffold_identities[specdock_dir],
-            )
-        specdock_dir.mkdir(parents=True, exist_ok=True)
-        guard_root()
-
-        # Managed directories are owned by the installer and can be replaced on update.
-        # The actual spec tree (`spec-dock/initiatives/**`) must be persistent and is
-        # never removed by this installer.
-        for src, dest in managed_scaffold_sync_plan:
-            guard_root()
-            _assert_managed_scaffold_tree_safe(specdock_dir)
-            _assert_managed_scaffold_file_identities(
-                expected_managed_scaffold_file_identities,
-                root=dest,
-            )
-            if expected_managed_scaffold_identities is not None:
-                _assert_managed_path_identity(
-                    dest,
-                    expected_managed_scaffold_identities[dest],
-                )
-            if dest.exists() or force:
-                _sync_tree(
-                    src,
-                    dest,
-                    expected_identity=(
-                        expected_managed_scaffold_identities.get(dest)
-                        if expected_managed_scaffold_identities is not None
-                        else None
-                    ),
-                    identity_checked=expected_managed_scaffold_identities is not None,
-                    target_root=target_root,
-                    expected_root_identity=expected_root_identity,
-                )
-            else:
-                _copy_managed_scaffold_tree(src, dest)
-            guard_root()
-
-        guard_root()
-        gitignore_mode = stat.S_IMODE(src_gitignore.stat().st_mode)
-        _write_atomic_regular_file(
-            specdock_dir / ".gitignore",
-            src_gitignore.read_bytes(),
-            mode=gitignore_mode,
-            expected_identity=expected_managed_gitignore_identity,
-            identity_checked=managed_gitignore_identity_checked,
-        )
-        guard_root()
-
-        if should_seed_root_workbench:
-            _assert_root_workbench_seed_target_safe(specdock_dir)
-            assert root_workbench_readme is not None
-            guard_root()
-            workbench_seed_target = specdock_dir / ".workbench" / "README.md"
-            workbench_seed_target.parent.mkdir(parents=True, exist_ok=True)
-            source_info = os.lstat(root_workbench_readme)
-            _write_atomic_regular_file(
-                workbench_seed_target,
-                root_workbench_readme.read_bytes(),
-                mode=stat.S_IMODE(source_info.st_mode),
-            )
-            guard_root()
-
-        # Spec tree root + generated directories.
-        guard_root()
-        (specdock_dir / "initiatives").mkdir(parents=True, exist_ok=True)
-        guard_root()
-        (specdock_dir / "active").mkdir(parents=True, exist_ok=True)
-        guard_root()
-        (specdock_dir / ".agent").mkdir(parents=True, exist_ok=True)
-        guard_root()
-
-        # Ensure runtime scripts are executable (best-effort).
-        for runtime_name in ("spec-dock",):
-            runtime_script = specdock_dir / "scripts" / runtime_name
-            if runtime_script.exists():
-                guard_root()
-                _make_executable(runtime_script)
-                guard_root()
-
-        # Best-effort: placeholders are not user-authored specs; discourage edits.
-        guard_root()
-        _make_readonly_tree(specdock_dir / "system" / "active-none")
-        guard_root()
-
-        # Ensure active fallback entrypoints exist before runtime `active clear/set`.
-        guard_root()
-        _ensure_active_fallback_entrypoints(specdock_dir)
-        guard_root()
-
-        if write_version:
-            _write_spec_dock_version(
-                target_root,
-                expected_root_identity=expected_root_identity,
-                root_identity_path=identity_path,
-            )
-
-        # Best-effort: provide `./spec` at repo root for convenience.
-        if install_root_shortcut:
-            guard_root()
-            _install_repo_root_shortcut(target_root)
-            guard_root()
-
-
-def _install_spec_dock(
-    target_root: Path,
-    *,
-    force: bool,
-    install_root_shortcut: bool = True,
-    write_version: bool = True,
-    expected_root_identity: DistributionRootIdentity | None = None,
-    expected_managed_scaffold_identities: dict[Path, _ManagedPathIdentity | None] | None = None,
-    expected_managed_scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] | None = None,
-    expected_managed_gitignore_identity: _ManagedFileIdentity | None = None,
-    managed_gitignore_identity_checked: bool = False,
-    seed_root_workbench: bool | None = None,
-) -> None:
-    """Install/update scaffold while binding all writes to the opened root."""
-    with _bound_distribution_root(target_root, expected_root_identity) as (
-        bound_root,
-        visible_root,
-        bound_identity,
-    ):
-        _install_spec_dock_bound(
-            bound_root,
-            force=force,
-            install_root_shortcut=install_root_shortcut,
-            write_version=write_version,
-            expected_root_identity=bound_identity,
-            root_identity_path=visible_root,
-            expected_managed_scaffold_identities=expected_managed_scaffold_identities,
-            expected_managed_scaffold_file_identities=expected_managed_scaffold_file_identities,
-            expected_managed_gitignore_identity=expected_managed_gitignore_identity,
-            managed_gitignore_identity_checked=managed_gitignore_identity_checked,
-            seed_root_workbench=seed_root_workbench,
-        )
-
-
 def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
     """Validate the Fresh scaffold sources before the first target write."""
     src_spec_dock = assets_dir / "spec_dock"
@@ -3072,86 +2673,6 @@ def _preflight_fresh_spec_dock_assets(assets_dir: Path) -> None:
     root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
     if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
         raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
-
-
-def _preflight_managed_scaffold_target_paths(
-    target_root: Path,
-    *,
-    expected_gitignore_bytes: bytes,
-    expected_scaffold_file_paths: tuple[str, ...] = (),
-) -> tuple[
-    dict[Path, _ManagedPathIdentity | None],
-    dict[Path, _ManagedFileIdentity | None],
-    _ManagedFileIdentity | None,
-]:
-    """Reject unsafe existing scaffold targets before a recognized update.
-
-    The scaffold refresh replaces the four provider-managed directories and
-    rewrites a small set of marker files.  Every existing target must therefore
-    be a real directory or a single-link regular file; a symlink, hard link, or
-    non-directory at any mutation boundary is a preserve-and-block collision.
-    """
-
-    specdock_dir = _specdock_dir(target_root)
-    identities: dict[Path, _ManagedPathIdentity | None] = {}
-
-    def require_directory(path: Path, *, label: str) -> None:
-        try:
-            info = os.lstat(path)
-        except FileNotFoundError:
-            return
-        except OSError as exc:
-            raise RuntimeError(f"cannot inspect managed scaffold target '{label}' safely") from exc
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or info.st_nlink < 1:
-            raise RuntimeError(f"managed scaffold target '{label}' is not a safe directory")
-
-    def require_regular_file(path: Path, *, label: str) -> None:
-        try:
-            info = os.lstat(path)
-        except FileNotFoundError:
-            return
-        except OSError as exc:
-            raise RuntimeError(f"cannot inspect managed scaffold target '{label}' safely") from exc
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise RuntimeError(f"managed scaffold target '{label}' is not a safe regular file")
-
-    require_directory(specdock_dir, label="spec-dock")
-    identities[specdock_dir] = _managed_path_identity(specdock_dir) if os.path.lexists(specdock_dir) else None
-    _assert_managed_scaffold_tree_safe(specdock_dir)
-    for name in _MANAGED_DIRS:
-        managed_dir = specdock_dir / name
-        require_directory(managed_dir, label=f"spec-dock/{name}")
-        identities[managed_dir] = _managed_path_identity(managed_dir) if os.path.lexists(managed_dir) else None
-        if not managed_dir.exists():
-            continue
-
-    scaffold_file_identities: dict[Path, _ManagedFileIdentity | None] = {}
-    for relative_path in expected_scaffold_file_paths:
-        path = target_root / relative_path
-        scaffold_file_identities[path] = _managed_file_identity(
-            path,
-            allow_hard_link=_is_root_workbench_seed_path(path),
-        )
-
-    gitignore_path = specdock_dir / ".gitignore"
-    require_regular_file(gitignore_path, label="spec-dock/.gitignore")
-    gitignore_identity = _managed_file_identity(gitignore_path)
-    if (
-        gitignore_identity is not None
-        and gitignore_identity.sha256 != hashlib.sha256(expected_gitignore_bytes).hexdigest()
-    ):
-        raise RuntimeError("managed scaffold target 'spec-dock/.gitignore' has unknown content; preserve-and-block")
-    require_regular_file(specdock_dir / "spec-dock.version", label="spec-dock/spec-dock.version")
-
-    # These directories hold persistent or generated state and are only
-    # created/updated through known child paths.  Their top-level boundary must
-    # not be a link or a replacement file.
-    for name in ("initiatives", "active", ".agent"):
-        require_directory(specdock_dir / name, label=f"spec-dock/{name}")
-    require_regular_file(specdock_dir / "active" / "context-pack.md", label="spec-dock/active/context-pack.md")
-    require_regular_file(specdock_dir / ".agent" / "active.json", label="spec-dock/.agent/active.json")
-
-    return identities, scaffold_file_identities, gitignore_identity
 
 
 def _shell_join(argv: list[str]) -> str:
@@ -3252,454 +2773,166 @@ def _raise_distribution_partial_failure(
     ) from None
 
 
+def _install_fresh_distribution(
+    target_root: Path,
+    *,
+    requested_operation: JournaledDistributionIntent = "fresh",
+) -> None:
+    with _exclusive_distribution_operation(target_root) as locked_root_identity:
+        admission = _admit_distribution_cli(target_root, operation=requested_operation)
+        if admission.status not in {"fresh", "retry"} or (admission.intent != "fresh"):
+            raise RuntimeError("Fresh distribution target changed during operation admission")
+        _install_fresh_distribution_unlocked(
+            target_root,
+            requested_operation=requested_operation,
+            retry_marker=admission if admission.status == "retry" else None,
+            expected_root_identity=locked_root_identity,
+        )
+
+
+def _prepare_fresh_workspace_boundary(
+    target_root: Path,
+    *,
+    expected_root_identity: DistributionRootIdentity,
+) -> _ManagedPathIdentity | None:
+    """Create the journal parent only when the fresh workspace is absent."""
+
+    created_identity: _ManagedPathIdentity | None = None
+    with _bound_distribution_root(target_root, expected_root_identity) as (
+        bound_root,
+        visible_root,
+        bound_identity,
+    ):
+        specdock_dir = _specdock_dir(bound_root)
+        try:
+            info = os.lstat(specdock_dir)
+        except FileNotFoundError:
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            directory = getattr(os, "O_DIRECTORY", None)
+            if not isinstance(nofollow, int) or not isinstance(directory, int):
+                raise RuntimeError("fresh workspace bootstrap requires no-follow directory support") from None
+            parent_fd = os.open(
+                ".",
+                os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0),
+            )
+            try:
+                try:
+                    os.mkdir(specdock_dir.name, dir_fd=parent_fd)
+                except FileExistsError as exc:
+                    raise RuntimeError("Fresh distribution workspace appeared during bootstrap") from exc
+                created_identity = _managed_path_identity(specdock_dir)
+                os.fsync(parent_fd)
+            except Exception:
+                if created_identity is not None:
+                    with suppress(OSError, RuntimeError):
+                        _remove_empty_bound_directory(
+                            target_root,
+                            Path(_SPEC_DOCK_DIRNAME),
+                            expected_identity=created_identity,
+                            expected_root_identity=bound_identity,
+                        )
+                    created_identity = None
+                raise
+            finally:
+                os.close(parent_fd)
+            _assert_distribution_root_identity(visible_root, bound_identity)
+            return created_identity
+        except OSError as exc:
+            raise RuntimeError("fresh workspace cannot be inspected safely") from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or info.st_nlink < 1:
+            raise RuntimeError("fresh workspace must be a real directory")
+        _assert_distribution_root_identity(visible_root, bound_identity)
+    return None
+
+
 def _install_fresh_distribution_unlocked(
     target_root: Path,
     *,
+    requested_operation: JournaledDistributionIntent = "fresh",
+    retry_marker: DistributionAdmission | None = None,
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> None:
-    """Apply one validated Fresh distribution with forward-retry recovery."""
+    """Run a fresh request through the shared journaled distribution service."""
+
+    if requested_operation not in {"fresh", "update", "init-force"}:
+        raise RuntimeError(f"unsupported fresh requested operation: {requested_operation}")
     _require_retry_target_label(target_root)
-    phase = "preflight"
-    marker_started = False
-    last_completed_phase = "not-started"
     root_identity = expected_root_identity or _distribution_root_identity(target_root)
     _assert_distribution_root_identity(target_root, root_identity)
-    fresh_workspace_created = False
-    fresh_workspace_identity: _ManagedPathIdentity | None = None
-    stage_ownership: list[DistributionStageOwnership] = []
-    applied_paths: tuple[str, ...] = ()
-    pending_paths: tuple[str, ...] = ()
-    with _assets_dir() as assets_dir:
+
+    with _assets_dir() as packaged_assets_dir:
+        assets_dir = packaged_assets_dir.resolve()
+        _preflight_fresh_spec_dock_assets(assets_dir)
+        preflight_plan = build_distribution_plan(
+            assets_dir / "install_root",
+            manifest_path=assets_dir / "managed_distribution.json",
+            scaffold_root=assets_dir / "spec_dock",
+            target_root=target_root,
+            operation="fresh",
+        )
+        if preflight_plan.blocked:
+            reasons = ", ".join(
+                f"{action.path}: {action.reason}" for action in preflight_plan.actions if action.blocked
+            )
+            raise RuntimeError(f"distribution preflight blocked: {reasons}")
+
+        created_workspace = _prepare_fresh_workspace_boundary(
+            target_root,
+            expected_root_identity=root_identity,
+        )
         try:
-            _preflight_fresh_spec_dock_assets(assets_dir)
-            plan = build_distribution_plan(
-                assets_dir / "install_root",
-                manifest_path=assets_dir / "managed_distribution.json",
-                scaffold_root=assets_dir / "spec_dock",
-                target_root=target_root,
-                operation="fresh",
-            )
-            blocked_actions = [action for action in plan.actions if action.blocked]
-            if blocked_actions:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
-                raise RuntimeError(f"distribution preflight blocked: {reasons}")
-
-            _assert_distribution_root_identity(target_root, root_identity)
-            specdock_dir = _specdock_dir(target_root)
-            if not os.path.lexists(specdock_dir):
-                # Create the first workspace boundary relative to the held
-                # root directory.  A concurrent pathname replacement must
-                # not redirect this mutation to an unrelated visible root.
-                with _bound_distribution_root(target_root, root_identity) as (
-                    bound_root,
-                    _visible_root,
-                    _bound_identity,
-                ):
-                    try:
-                        _specdock_dir(bound_root).mkdir()
-                    except FileExistsError as exc:
-                        raise RuntimeError("Fresh distribution workspace appeared during preflight") from exc
-                    fresh_workspace_identity = _managed_path_identity(_specdock_dir(bound_root))
-                fresh_workspace_created = True
-            _write_distribution_retry_marker(
-                target_root,
-                operation="fresh",
-                last_completed_phase="preflight-complete",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            marker_started = True
-            last_completed_phase = "preflight-complete"
-
-            def record_stage_ownership(record: DistributionStageOwnership) -> None:
-                stage_ownership.append(record)
-                _write_distribution_retry_marker(
-                    target_root,
-                    operation="fresh",
-                    last_completed_phase=last_completed_phase,
-                    expected_root_identity=root_identity,
-                    stage_ownership=tuple(stage_ownership),
+            with _bound_distribution_root(target_root, root_identity) as (
+                bound_root,
+                visible_root,
+                bound_identity,
+            ):
+                generated_assets = _active_fallback_distribution_assets(_specdock_dir(bound_root))
+                result = execute_fresh_distribution(
+                    assets_dir / "install_root",
+                    manifest_path=assets_dir / "managed_distribution.json",
+                    scaffold_root=assets_dir / "spec_dock",
+                    target_root=bound_root,
+                    package_version=_tool_version(),
+                    legacy_marker=retry_marker.marker if retry_marker is not None else None,
+                    generated_assets=generated_assets,
+                    root_identity_path=visible_root,
                 )
-
-            # Creating the marker's `spec-dock/` parent is itself a target-root
-            # mutation and therefore updates the root ctime.  Rebuild the
-            # read-only plan after that first mutation so apply-time snapshots
-            # remain bound to the current root identity.
-            plan = build_distribution_plan(
-                assets_dir / "install_root",
-                manifest_path=assets_dir / "managed_distribution.json",
-                scaffold_root=assets_dir / "spec_dock",
-                target_root=target_root,
-                operation="fresh",
-            )
-            blocked_actions = [action for action in plan.actions if action.blocked]
-            if blocked_actions:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
-                raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
-            pending_paths = tuple(action.path for action in plan.actions)
-
-            def apply_scaffold() -> None:
-                _assert_distribution_root_identity(target_root, root_identity)
-                _install_spec_dock(
-                    target_root,
-                    force=True,
-                    install_root_shortcut=False,
-                    write_version=False,
-                    expected_root_identity=root_identity,
-                    seed_root_workbench=_root_workbench_seed_decision(
-                        specdock_dir,
-                        assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
-                    ),
-                )
-
-            def record_progress(
-                progress_phase: str,
-                completed: tuple[str, ...],
-                pending: tuple[str, ...],
-                phase_complete: bool,
-            ) -> None:
-                nonlocal phase, last_completed_phase, applied_paths, pending_paths
-                phase = progress_phase
-                applied_paths = completed
-                pending_paths = pending
-                if not phase_complete:
-                    return
-                marker_phase = {
-                    "managed-scaffold-refresh": "managed-scaffold-refreshed",
-                    "current-external-materialize": "current-external-materialized",
-                    "obsolete-prune": "obsolete-pruned",
-                }[progress_phase]
-                _write_distribution_retry_marker(
-                    target_root,
-                    operation="fresh",
-                    last_completed_phase=marker_phase,
-                    expected_root_identity=root_identity,
-                    stage_ownership=tuple(stage_ownership),
-                )
-                last_completed_phase = marker_phase
-
-            phase = "managed-scaffold-refresh"
-            _assert_distribution_root_identity(target_root, root_identity)
-            apply_distribution_plan(
-                plan,
-                allow_blocked_scaffold_paths=False,
-                stage_ownership_recorder=record_stage_ownership,
-                scaffold_applier=apply_scaffold,
-                progress_recorder=record_progress,
-            )
-
-            phase = "post-verify"
-            _assert_distribution_root_identity(target_root, root_identity)
-            post_plan = build_distribution_plan(
-                assets_dir / "install_root",
-                manifest_path=assets_dir / "managed_distribution.json",
-                scaffold_root=assets_dir / "spec_dock",
-                target_root=target_root,
-                operation="fresh",
-            )
-            if post_plan.blocked:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in post_plan.actions if action.blocked)
-                raise RuntimeError(f"distribution post-verify blocked: {reasons}")
-            non_adopted = [action.path for action in post_plan.actions if action.action != "adopt"]
-            if non_adopted:
-                joined = ", ".join(non_adopted)
-                raise RuntimeError(f"distribution post-verify incomplete: {joined}")
-            _write_distribution_retry_marker(
-                target_root,
-                operation="fresh",
-                last_completed_phase="post-verified",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            last_completed_phase = "post-verified"
-
-            phase = "version-write"
-            _write_spec_dock_version(target_root, expected_root_identity=root_identity)
-            _write_distribution_retry_marker(
-                target_root,
-                operation="fresh",
-                last_completed_phase="version-written",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            last_completed_phase = "version-written"
-            phase = "marker-finalization"
-            _remove_distribution_retry_marker(target_root, expected_root_identity=root_identity)
-            last_completed_phase = "marker-finalized"
-        except Exception as exc:
-            if isinstance(exc, DistributionApplyError):
-                phase = exc.phase or phase
-                applied_paths = exc.applied_paths or applied_paths
-                pending_paths = exc.pending_paths or pending_paths
-            if _distribution_retry_marker_present(target_root):
-                marker_started = True
-            if marker_started:
-                _raise_distribution_partial_failure(
-                    exc,
-                    target_root=target_root,
-                    operation="fresh",
-                    phase=phase,
-                    last_completed_phase=last_completed_phase,
-                    applied_paths=applied_paths,
-                    pending_paths=pending_paths,
-                )
-            if fresh_workspace_created and fresh_workspace_identity is not None:
+                if result.status != "recovery_required":
+                    _assert_distribution_root_identity(visible_root, bound_identity)
+        except Exception:
+            if created_workspace is not None and not (
+                _distribution_retry_marker_present(target_root)
+                or os.path.lexists(target_root / "spec-dock/.distribution-journal.json")
+            ):
                 with suppress(OSError, RuntimeError):
-                    _assert_distribution_root_identity(target_root, root_identity)
                     _remove_empty_bound_directory(
                         target_root,
                         Path(_SPEC_DOCK_DIRNAME),
-                        expected_identity=fresh_workspace_identity,
+                        expected_identity=created_workspace,
                         expected_root_identity=root_identity,
                     )
             raise
 
-
-def _install_fresh_distribution(target_root: Path) -> None:
-    with _exclusive_distribution_operation(target_root) as locked_root_identity:
-        admission = _admit_distribution_cli(target_root, operation="fresh")
-        if admission.status == "retry":
-            _install_fresh_compatibility_distribution_unlocked(
-                target_root,
-                operation="fresh",
-                retry_marker=admission,
-                expected_root_identity=locked_root_identity,
-            )
-            return
-        if admission.status != "fresh":
-            raise RuntimeError("Fresh distribution target changed during operation admission")
-        _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
-
-
-def _install_fresh_compatibility_distribution_unlocked(
-    target_root: Path,
-    *,
-    operation: DistributionOperation,
-    retry_marker: DistributionAdmission | None = None,
-    expected_root_identity: DistributionRootIdentity | None = None,
-) -> None:
-    """Apply the D2-owned fresh compatibility flow with forward recovery."""
-    if operation != "fresh":
-        raise RuntimeError("fresh compatibility flow requires the fresh operation")
-    _require_retry_target_label(target_root)
-    phase = "preflight"
-    marker_started = False
-    last_completed_phase = "not-started"
-    root_identity = expected_root_identity or _distribution_root_identity(target_root)
-    _assert_distribution_root_identity(target_root, root_identity)
-    retry_recovery = _distribution_retry_marker_present(target_root)
-    applied_paths: tuple[str, ...] = ()
-    pending_paths: tuple[str, ...] = ()
-    stage_ownership: list[DistributionStageOwnership] = list(
-        retry_marker.marker.stage_ownership if retry_marker is not None and retry_marker.marker is not None else ()
-    )
-    with _assets_dir() as assets_dir:
-        try:
-            # Recognized updates may mutate external distribution files before
-            # the scaffold refresh. Validate the complete scaffold source
-            # catalog before publishing the retry marker or touching targets.
-            _preflight_fresh_spec_dock_assets(assets_dir)
-            src_gitignore = assets_dir / "spec_dock" / ".gitignore"
-            if not src_gitignore.is_file() or src_gitignore.is_symlink():
-                raise RuntimeError("Missing asset file: spec_dock/.gitignore")
-            expected_gitignore_bytes = src_gitignore.read_bytes()
-            plan = build_distribution_plan(
-                assets_dir / "install_root",
-                manifest_path=assets_dir / "managed_distribution.json",
-                scaffold_root=assets_dir / "spec_dock",
-                target_root=target_root,
-                operation=operation,
-            )
-            blocked_actions = [
-                action
-                for action in plan.actions
-                if action.blocked and (operation == "fresh" or action.path not in plan.scaffold_paths)
-            ]
-            if blocked_actions:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
-                raise RuntimeError(f"distribution preflight blocked: {reasons}")
-
-            _assert_distribution_root_identity(target_root, root_identity)
-            absolute_scaffold_identities, scaffold_file_identities, gitignore_identity = (
-                _preflight_managed_scaffold_target_paths(
+    if result.status == "blocked":
+        if created_workspace is not None:
+            with suppress(OSError, RuntimeError):
+                _remove_empty_bound_directory(
                     target_root,
-                    expected_gitignore_bytes=expected_gitignore_bytes,
-                    expected_scaffold_file_paths=tuple(asset.path for asset in plan.scaffold_assets),
-                )
-            )
-            managed_scaffold_identities = {
-                path.relative_to(target_root): identity for path, identity in absolute_scaffold_identities.items()
-            }
-            _write_distribution_retry_marker(
-                target_root,
-                operation=operation,
-                last_completed_phase="preflight-complete",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            marker_started = True
-            last_completed_phase = "preflight-complete"
-
-            # Publishing the retry marker mutates the `spec-dock/` parent
-            # directory. Rebuild the complete distribution plan after that
-            # mutation so scaffold target snapshots are bound to the state
-            # that apply will actually observe.
-            plan = build_distribution_plan(
-                assets_dir / "install_root",
-                manifest_path=assets_dir / "managed_distribution.json",
-                scaffold_root=assets_dir / "spec_dock",
-                target_root=target_root,
-                operation=operation,
-            )
-            blocked_actions = [
-                action
-                for action in plan.actions
-                if action.blocked and (operation == "fresh" or action.path not in plan.scaffold_paths)
-            ]
-            if blocked_actions:
-                reasons = ", ".join(f"{action.path}: {action.reason}" for action in blocked_actions)
-                raise RuntimeError(f"distribution preflight blocked after marker: {reasons}")
-            pending_paths = tuple(action.path for action in plan.actions)
-
-            def record_stage_ownership(record: DistributionStageOwnership) -> None:
-                existing = next(
-                    (
-                        item
-                        for item in stage_ownership
-                        if item.path == record.path and item.stage_name == record.stage_name
-                    ),
-                    None,
-                )
-                if existing is not None:
-                    stage_ownership.remove(existing)
-                stage_ownership.append(record)
-                _write_distribution_retry_marker(
-                    target_root,
-                    operation=operation,
-                    last_completed_phase=last_completed_phase,
+                    Path(_SPEC_DOCK_DIRNAME),
+                    expected_identity=created_workspace,
                     expected_root_identity=root_identity,
-                    stage_ownership=tuple(stage_ownership),
                 )
-
-            def apply_scaffold() -> None:
-                _assert_distribution_root_identity(target_root, root_identity)
-                _install_spec_dock(
-                    target_root,
-                    force=True,
-                    install_root_shortcut=False,
-                    write_version=False,
-                    expected_root_identity=root_identity,
-                    expected_managed_scaffold_identities=managed_scaffold_identities,
-                    expected_managed_scaffold_file_identities=scaffold_file_identities,
-                    expected_managed_gitignore_identity=gitignore_identity,
-                    managed_gitignore_identity_checked=True,
-                    seed_root_workbench=(
-                        _root_workbench_seed_decision(
-                            _specdock_dir(target_root),
-                            assets_dir / "spec_dock" / "templates" / "root" / ".workbench" / "README.md",
-                        )
-                        if operation == "fresh"
-                        else None
-                    ),
-                )
-
-            def record_progress(
-                progress_phase: str,
-                completed: tuple[str, ...],
-                pending: tuple[str, ...],
-                phase_complete: bool,
-            ) -> None:
-                nonlocal phase, last_completed_phase, applied_paths, pending_paths
-                phase = progress_phase
-                applied_paths = completed
-                pending_paths = pending
-                if not phase_complete:
-                    return
-                marker_phase = {
-                    "managed-scaffold-refresh": "managed-scaffold-refreshed",
-                    "current-external-materialize": "current-external-materialized",
-                    "obsolete-prune": "obsolete-pruned",
-                }[progress_phase]
-                _write_distribution_retry_marker(
-                    target_root,
-                    operation=operation,
-                    last_completed_phase=marker_phase,
-                    expected_root_identity=root_identity,
-                    stage_ownership=tuple(stage_ownership),
-                )
-                last_completed_phase = marker_phase
-
-            phase = "managed-scaffold-refresh"
-            _assert_distribution_root_identity(target_root, root_identity)
-            apply_distribution_plan(
-                plan,
-                allow_blocked_scaffold_paths=operation != "fresh",
-                allow_stale_stage_cleanup=retry_recovery,
-                stage_ownership=tuple(stage_ownership),
-                stage_ownership_recorder=record_stage_ownership,
-                scaffold_applier=apply_scaffold,
-                progress_recorder=record_progress,
-            )
-
-            phase = "post-verify"
-            _assert_distribution_root_identity(target_root, root_identity)
-            post_plan = build_distribution_plan(
-                assets_dir / "install_root",
-                manifest_path=assets_dir / "managed_distribution.json",
-                scaffold_root=assets_dir / "spec_dock",
-                target_root=target_root,
-                operation=operation,
-            )
-            if post_plan.blocked:
-                raise RuntimeError("distribution post-verify blocked")
-            if any(action.action != "adopt" for action in post_plan.actions):
-                raise RuntimeError("distribution post-verify incomplete")
-            _write_distribution_retry_marker(
-                target_root,
-                operation=operation,
-                last_completed_phase="post-verified",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            last_completed_phase = "post-verified"
-
-            phase = "version-write"
-            _write_spec_dock_version(
-                target_root,
-                expected_root_identity=root_identity,
-            )
-            _write_distribution_retry_marker(
-                target_root,
-                operation=operation,
-                last_completed_phase="version-written",
-                expected_root_identity=root_identity,
-                stage_ownership=tuple(stage_ownership),
-            )
-            last_completed_phase = "version-written"
-            phase = "marker-finalization"
-            _remove_distribution_retry_marker(
-                target_root,
-                expected_root_identity=root_identity,
-            )
-            last_completed_phase = "marker-finalized"
-        except Exception as exc:
-            if isinstance(exc, DistributionApplyError):
-                phase = exc.phase or phase
-                applied_paths = exc.applied_paths or applied_paths
-                pending_paths = exc.pending_paths or pending_paths
-            if _distribution_retry_marker_present(target_root):
-                marker_started = True
-            if marker_started:
-                _raise_distribution_partial_failure(
-                    exc,
-                    target_root=target_root,
-                    operation=operation,
-                    phase=phase,
-                    last_completed_phase=last_completed_phase,
-                    applied_paths=applied_paths,
-                    pending_paths=pending_paths,
-                )
-            raise exc
+        raise RuntimeError(f"distribution preflight blocked: {result.reason}")
+    if result.status == "recovery_required":
+        target_label = _require_retry_target_label(target_root)
+        retry = _distribution_retry_command(requested_operation, target_label=target_label)
+        raise RuntimeError(
+            "distribution partial failure during fresh provisioning; "
+            "target=spec-dock/.distribution-journal.json; "
+            f"applied_paths={json.dumps(result.applied_paths, separators=(',', ':'))}; "
+            f"pending_paths={json.dumps(result.pending_paths, separators=(',', ':'))}; "
+            f"retry={retry}; reason={result.reason}"
+        )
 
 
 def _install_recognized_distribution_unlocked(
@@ -3764,8 +2997,16 @@ def _install_recognized_distribution(
 ) -> None:
     with _exclusive_distribution_operation(target_root) as locked_root_identity:
         admission = _admit_distribution_cli(target_root, operation=operation)
-        if admission.status == "fresh":
-            _install_fresh_distribution_unlocked(target_root, expected_root_identity=locked_root_identity)
+        if operation in {"update", "init-force"} and (
+            admission.status == "fresh" or (admission.status == "retry" and admission.intent == "fresh")
+        ):
+            fresh_operation = cast("JournaledDistributionIntent", operation)
+            _install_fresh_distribution_unlocked(
+                target_root,
+                requested_operation=fresh_operation,
+                retry_marker=admission if admission.status == "retry" else None,
+                expected_root_identity=locked_root_identity,
+            )
             return
         if admission.status not in {"recognized", "retry", "uninstall-retry"}:
             raise RuntimeError("recognized distribution target changed during operation admission")
@@ -5992,20 +5233,20 @@ def main(argv: list[str] | None = None) -> int:
             )
             if not ns.force:
                 if admission.status in {"retry", "fresh"}:
-                    _install_fresh_distribution(target_root)
+                    _install_fresh_distribution(target_root, requested_operation="fresh")
                 elif os.path.lexists(_specdock_dir(target_root)):
                     raise RuntimeError("'spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
                 else:
-                    _install_fresh_distribution(target_root)
+                    _install_fresh_distribution(target_root, requested_operation="fresh")
             else:
-                if admission.status == "fresh":
-                    _install_fresh_distribution(target_root)
+                if admission.status == "fresh" or (admission.status == "retry" and admission.intent == "fresh"):
+                    _install_fresh_distribution(target_root, requested_operation="init-force")
                 else:
                     _install_recognized_distribution(target_root, operation="init-force")
         elif ns.command == "update":
             admission = _admit_distribution_cli(target_root, operation="update")
-            if admission.status == "fresh":
-                _install_fresh_distribution(target_root)
+            if admission.status == "fresh" or (admission.status == "retry" and admission.intent == "fresh"):
+                _install_fresh_distribution(target_root, requested_operation="update")
             else:
                 _install_recognized_distribution(target_root, operation="update")
         else:
