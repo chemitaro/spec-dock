@@ -1529,6 +1529,46 @@ def test_i368_newer_package_finishes_original_journal_then_refreshes_version(
     assert not (target_root / "spec-dock" / ".distribution-retry.json").exists()
 
 
+def test_i369_fresh_completed_journal_does_not_reenter_for_newer_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_mark_completed = OperationJournalStore.mark_completed
+
+    def interrupt_before_completed(*_args, **_kwargs):
+        raise DistributionApplyError("injected terminal interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", interrupt_before_completed)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["package_version"] == "1.2.3"
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", original_mark_completed)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.3.0",
+    )
+
+    assert second.status == "completed", second.reason
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+    assert not journal_path.exists()
+
+
 def test_i368_journal_rejects_rebound_workspace_parent(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -5250,6 +5290,40 @@ def test_i369_update_missing_and_empty_workspace_admit_fresh(tmp_path: Path) -> 
         assert admission.intent == "fresh"
 
 
+def test_i369_created_fresh_workspace_rejects_foreign_root_child_before_journal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    workspace_info = workspace.stat()
+    original_prepare_legacy_guard = OperationJournalStore.prepare_legacy_guard
+
+    def inject_foreign_child(self, plan, **kwargs):
+        (self.target_root / "spec-dock" / "foreign").write_text("user\n", encoding="utf-8")
+        return original_prepare_legacy_guard(self, plan, **kwargs)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", inject_foreign_child)
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        created_workspace_identity=(workspace_info.st_dev, workspace_info.st_ino),
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-parent-mismatch"
+    assert (workspace / "foreign").exists()
+    assert (workspace / ".distribution-retry.json").exists()
+    assert not (workspace / ".distribution-journal.json").exists()
+
+
 @pytest.mark.parametrize(
     "phase",
     (
@@ -5296,6 +5370,49 @@ def test_i369_fresh_legacy_later_phase_reassesses_and_converts_without_checkpoin
     assert not marker_path.exists()
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
     assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+
+
+def test_i369_fresh_schema1_marker_rejects_newer_package_conversion(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker = DistributionRetryMarker(
+        operation="fresh",
+        package_version="1.2.3",
+        target_root=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+        last_completed_phase="preflight-complete",
+        purpose="distribution-rerun",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": marker.operation,
+            "package_version": marker.package_version,
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": marker.last_completed_phase,
+            "purpose": marker.purpose,
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.3.0",
+        legacy_marker=marker,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "legacy-marker-unconvertible"
+    assert marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
 def test_s25_missing_current_target_is_create(tmp_path: Path) -> None:
@@ -5682,7 +5799,7 @@ def test_s25_historical_hard_link_is_blocked_for_mutation(tmp_path: Path) -> Non
     assert action.blocked is True
 
 
-@pytest.mark.parametrize("operation", ["update", "init-force", "uninstall"])
+@pytest.mark.parametrize("operation", ["fresh", "update", "init-force", "uninstall"])
 def test_s25_current_hard_link_is_blocked_for_mutation(
     tmp_path: Path,
     operation: managed_distribution.DistributionOperation,
@@ -5708,6 +5825,28 @@ def test_s25_current_hard_link_is_blocked_for_mutation(
     assert action.provenance == "current"
     assert action.reason == "hard-link-mutation-unsafe"
     assert action.blocked is True
+
+
+def test_i369_required_directory_classification_reuses_captured_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observation = managed_distribution._TargetObservation("missing")
+
+    def fail_reobserve(*_args, **_kwargs):
+        raise AssertionError("required directory was observed twice")
+
+    monkeypatch.setattr(managed_distribution, "_observe_target", fail_reobserve)
+
+    action = managed_distribution._classify_required_directory(
+        target_root=tmp_path,
+        path="spec-dock/initiatives",
+        operation="fresh",
+        observation=observation,
+    )
+
+    assert action.action == "ensure-directory"
+    assert action.reason == "required-directory-missing"
 
 
 def test_s25_current_mode_mismatch_is_preserved_and_blocked_for_uninstall(tmp_path: Path) -> None:
