@@ -40,7 +40,7 @@ root operation lock で束縛した target root が real directory であり、�
 1. `spec-dock` が存在しない。
 2. `spec-dock` が exact empty real directory である。
 3. successful `uninstall --apply --keep-specs` が残した、`spec-dock/initiatives` だけを持つ exact preserved-specs workspace である。
-4. fresh intent に属する有効な schema-1 marker、schema-2 forward guard、または operation journal があり、同じ root と authority で recovery 可能である。
+4. fresh intent に属する有効な schema-1 marker、`purpose="fresh-journal-forward-only"` の schema-2 forward guard、または operation journal があり、同じ root と authority で recovery 可能である。
 
 `spec-dock` が symlink、non-directory、説明不能な non-empty workspace、または別 intent の recovery state である場合は fresh target とみなさず、write 前に拒否する。
 
@@ -67,8 +67,8 @@ root operation lock で束縛した target root が real directory であり、�
 | I369-R09 | fresh-only Workbench seed は target `spec-dock/.workbench/README.md` が absent の場合だけ `create` する。provider bytes と mode が exact に一致する既存 regular fileは `adopt` し、現行で許容される identical hard link も書き換えない。modified content、wrong mode、symlink/unsafe parent は preserve-and-block とする。recognized `update` / `init-force` は seed を backfill しない。 |
 | I369-R10 | fresh mutation grammar は `ensure-directory`、`create`、`adopt`、`preserve`、`block` に限定する。fresh intent は existing entry を `upgrade` または `prune` しない。`upgrade` と `prune` は recognized/deprovision owner のままとする。 |
 | I369-R11 | regular file create は staged write、captured mode、fsync、exact digest verification、no-replace publish を使用する。symlink create は normalized in-root target、unique stage、no-replace publish を使用する。destination が assessment 後に出現した場合は上書きへ fallback せず、外部 entry を保持して recovery-required とする。 |
-| I369-R12 | `spec-dock` が absent の場合だけ、root lock と root descriptor に束縛した fresh bootstrap が top-level real directory を一度作成できる。bootstrap 後は schema-2 forward guard と journal を最初の managed asset mutation より前に発行する。guard/journal 発行が同期的に失敗した場合、作成した exact inode が空であり replacement がないと証明できるときだけ rmdir する。crash で exact empty boundary が残った場合は次回 fresh admission が再開する。 |
-| I369-R13 | 新規 fresh operation は既存 schema-2 forward guard wire shape、root/operation/contract/plan binding、`.distribution-journal.json`、action pre/postcondition、checkpoint、staging lease、created-directory binding を使用する。journal `intent` は `fresh`、`authority` は fresh 固有値とし、recognized journal authority と混同しない。 |
+| I369-R12 | `spec-dock` が absent の場合だけ、root lock と root descriptor に束縛した fresh bootstrap が top-level real directory を一度作成できる。bootstrap 後は fresh 専用 schema-2 forward guard と journal を最初の managed asset mutation より前に発行する。guard/journal 発行が同期的に失敗した場合、作成した exact inode が空であり replacement がないと証明できるときだけ rmdir する。crash で exact empty boundary が残った場合は次回 fresh admission が再開する。 |
+| I369-R13 | 新規 fresh operation は schema version 2 の既存 field shape と root/operation/contract/plan bindingを再利用するが、guard `purpose` は fresh 専用の `fresh-journal-forward-only` とする。Issue 368 parserがこのpurposeをunsupportedとしてmanaged target mutation前に拒否し、`recognized-journal-forward-only` はrecognized `update` / `init-force`専用のまま維持する。新parserはpurposeとoperation/intent/authorityの組合せを検証し、fresh guardをlegacy schema-1 writerへ渡さない。journal `intent` は `fresh`、`authority` は `fresh-distribution-provisioning` とし、recognized journal authorityと混同しない。 |
 | I369-R14 | no-op または blocker-only path は、bootstrap が不要な場合、prompt、backup、schema-1 marker、schema-2 guard、journal、staging entry を作成しない。現行実装に存在しない prompt/backup を追加しない。 |
 | I369-R15 | partial failure は root identity、effective intent `fresh`、authority、package/contract identity、canonical plan digest、action order、exact pre/postcondition、stage/GC lease、created-directory binding に束縛した forward recovery state を残す。同じ contract と exact stateだけが resume でき、unknown divergence は mutation 前に拒否する。whole-operation rollback は要求しない。 |
 | I369-R16 | fresh recovery state は `init`、`init --force`、`update` のいずれから到達しても effective intent `fresh` のまま再開する。requested entrypoint を recognized `update` / `init-force` authority に読み替えてはならない。`uninstall`、Issue 371 purge、別 root、downgrade package、contract mismatch は拒否する。 |
@@ -133,7 +133,7 @@ root operation lock で束縛した target root が real directory であり、�
 6. unrelated root content、preserved initiatives、unknown siblings、existing root Workbench contentが変更されない。
 7. Current collision、wrong mode、symlink/directory/special collision、unsafe parent、provider mutation、root rebindが外部entryを変更せずblockまたはrecovery-requiredになる。
 8. fresh-only Workbench seedのabsent/create、exact/adopt、hard-link/adopt、modified/block、symlink-parent/blockと、recognized no-backfillがtestsで固定される。
-9. top-level bootstrap、guard-only、journal-prepared、created-directory、stage reservation/write/publish、checkpoint、terminal cleanupのfault injectionからsame-plan retryが収束するかtyped blockerになる。
+9. top-level bootstrap、guard-only、journal-prepared、created-directory、stage reservation/write/publish、checkpoint、terminal cleanupのfault injectionからsame-plan retryが収束するかtyped blockerになる。fresh guard-only fixtureをIssue 368 parserへ入力した場合はmarker bytesを再書込せずmanaged target mutation 0で拒否し、Issue 369 parserでは同じguardからfresh journal recoveryへだけ進む。
 10. schema-1 fresh markerは証明可能なstateだけがschema-2へone-way conversionされ、unsupported/mismatched/forged stateはmarkerを保持してwrite前に拒否される。
 11. source inspectionとcall-graph testにより、fresh routeから`scaffold_applier`、recursive scaffold mutation、CLI schema-1 marker writer、plan外version writeが到達不能または削除済みである。
 12. ordinary focused tests、ordinary fast-lane suite、repository-wide ledger-aware full-regression verifier、lint、SpecDock validation、`git diff --check`の有効なcommand setが定義される。実行結果は実装reportまたはquality-gate evidenceで別途記録し、本要件書だけをpass evidenceにしない。
@@ -141,7 +141,7 @@ root operation lock で束縛した target root が real directory であり、�
 ## 制約・前提・未確定事項
 
 - verified commit 時点の journal wire field shapeは再利用できる。`fresh` intentと`ensure-directory`は既存field内のenum拡張で表現し、不要なschema migrationを行わない。wire field追加が必要になった場合は、protocol versionを上げ、既存recognized journal protocolのresumeを同時に維持しなければならない。
-- schema-2 guard の wire literal `purpose="recognized-journal-forward-only"` は名称がrecognized固有だが、旧installerをfail closedにするcompatibility tokenである。本Issueではrenameせず、semantic authorityはjournalの`intent` / `authority`で分離する。
+- schema-2 guardのfield shapeとschema version 2は再利用するが、wire literalはrecognized用`purpose="recognized-journal-forward-only"`とfresh用`purpose="fresh-journal-forward-only"`に分離する。Issue 368 parserはfresh purposeをsupported guard/legacy markerのどちらにも分類できず、extra binding fieldsを含むfixtureを`marker-invalid`としてmutation前に拒否する。このwire discriminatorをpackage-version比較だけへ置き換えてはならない。
 - exact required-directory inventoryは `_install_spec_dock_bound()`、package asset parents、generated assets、current testsから導出する。pathnameを推測して新しいempty directoryを追加しない。
 - fresh `update` successは現行動作に存在しないため、成功outputは既存`update` success formatを再利用するという本Issueの新規contractである。
 - fresh `init --force` / `update` failure時のrequested-entrypoint retry mappingは、現行fresh `init` retry contractを壊さず追加する。legacy markerにはrequested entrypointが保存されていないためcanonical `init`へfallbackする。

@@ -247,10 +247,13 @@ recognized `update` / `init-force`、uninstall、purgeは既存ownerのまま維
 6. fresh journal:
    - `intent="fresh"`
    - `authority="fresh-distribution-provisioning"`
-   - existing schema-2 guard wire
+   - schema version 2と既存binding field shape
+   - fresh専用guard `purpose="fresh-journal-forward-only"`
    - existing journal field shape
-7. guard/journal publish failure時のexact-empty rollbackを実装する。
-8. guard publish後はforward recoveryだけを許可する。
+7. guard parserをpurpose/operation pairで分岐し、recognized `purpose="recognized-journal-forward-only"`のbehaviorを維持する。
+8. fresh guard-only admissionをnew fresh recovery serviceへ直接接続し、legacy compatibility routeとschema-1 writerを到達不能にする。
+9. guard/journal publish failure時のexact-empty rollbackを実装する。
+10. guard publish後はforward recoveryだけを許可する。
 
 ### Failure injection
 
@@ -261,6 +264,8 @@ recognized `update` / `init-force`、uninstall、purgeは既存ownerのまま維
 - mkdir success、guard未発行crash
 - guard stage write/publish/fsync failure
 - guard publish後journal failure
+- fresh guard-only fixtureをIssue 368 parserで読むdowngrade attempt
+- forged purpose/operation pair
 - exact empty rollback中replacement
 - created workspace non-empty化
 - terminal guard/journal cleanup failure
@@ -271,6 +276,8 @@ recognized `update` / `init-force`、uninstall、purgeは既存ownerのまま維
 - top-level bootstrap以外のfresh mutationはjournaled kernelを通る。
 - crashでempty workspaceが残っても次回entrypointがfresh recoveryへ進む。
 - replacement workspaceをrmdirしない。
+- Issue 368 parserはfresh guardを`marker-invalid`としてmarker bytes不変・managed target mutation 0で拒否する。
+- Issue 369 parserはfresh guard-only stateをlegacy schema-1 markerへ再書込せず、fresh journal recoveryへだけ進める。
 
 ## Step 6 — Shared execution core と `execute_fresh_distribution()`
 
@@ -332,7 +339,7 @@ recognized `update` / `init-force`、uninstall、purgeは既存ownerのまま維
 1. schema-1 fresh markerをread-only conversion inputにする。
 2. exact marker identity/bytes、root、same package、phase、stage ownershipを検証する。
 3. current treeをfresh assessmentで再分類し、legacy phaseからcheckpointを推測しない。
-4. exact schema-1 markerをschema-2 guardへatomic swapする。
+4. exact schema-1 markerを`purpose="fresh-journal-forward-only"`のschema-2 guardへatomic swapする。
 5. guard anchored planからjournalを発行する。
 6. invalid/unconvertible markerを保持して`recovery_required`を返す。
 7. `main()`のentrypoint dispatchを`DistributionAdmission.intent`へ切り替える。
@@ -355,6 +362,9 @@ recognized `update` / `init-force`、uninstall、purgeは既存ownerのまま維
 - conversion guard publish failure
 - conversion後journal publish failure
 - legacy marker retained on every refusal
+- converted fresh guardをIssue 368 parserへ渡すとmarker bytes不変・managed target mutation 0で`marker-invalid`になる
+- converted fresh guardをIssue 369 parserへ渡すとlegacy writerを経由せずfresh journal recoveryへ進む
+- `fresh-journal-forward-only`と`update` / `init-force`、または`recognized-journal-forward-only`と`fresh`のforged pairを拒否する
 
 ### CLI matrix tests
 

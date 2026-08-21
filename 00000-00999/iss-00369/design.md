@@ -332,24 +332,32 @@ preserved-specs workspaceまたはexisting empty workspaceではbootstrap mkdir�
 - journal: `spec-dock/.distribution-journal.json`
 - journal schema/protocol field shape: current schema 1 / protocol 1
 - forward guard schema: current schema 2
-- guard wire purpose: `recognized-journal-forward-only`
+- recognized guard wire purpose: `recognized-journal-forward-only`
+- fresh guard wire purpose: `fresh-journal-forward-only`
 
-最後のliteralは旧installerとのcompatibility tokenとして維持する。fresh semantic authorityは次で分離する。
+schema versionとfield shapeは共通化するが、purposeはintent境界で分離する。fresh guardは次を使用する。
 
 ```text
+guard.schema_version = 2
+guard.purpose = "fresh-journal-forward-only"
 guard.operation = "fresh"
 journal.intent = "fresh"
 journal.authority = "fresh-distribution-provisioning"
 ```
 
-recognized journalは従来どおり次を維持する。
+recognized guard/journalは従来どおり次を維持する。
 
 ```text
+guard.schema_version = 2
+guard.purpose = "recognized-journal-forward-only"
+guard.operation = "update" | "init-force"
 journal.intent = "update" | "init-force"
 journal.authority = "recognized-workspace-reconciliation"
 ```
 
-parserはintent/authorityの有効な組合せを検証し、cross-authority replayを拒否する。field shapeを増やさないためprotocol bumpは不要である。実装中に新fieldが不可避となった場合だけprotocolを上げ、protocol 1 recognized journal resumeを残す。
+Issue 368 parserはschema 2であってもfresh purposeをsupported guardとして認識できず、`operation_id`、`contract_identity`、`plan_digest`を含むfield setをschema-1としても受理できないため、`marker-invalid`でmanaged target mutation前に停止する。これによりguard publish後・journal publish前に旧installerがfresh markerを`retry` admissionし、schema-1 `distribution-rerun`へ書き戻す降格を防ぐ。
+
+Issue 369 parserはpurposeとoperationを先に組として検証する。`fresh-journal-forward-only`は`operation="fresh"`だけ、`recognized-journal-forward-only`は`operation="update"|"init-force"`だけを許可する。fresh guard-only stateはnew fresh recovery serviceへだけ渡し、`_install_fresh_compatibility_distribution_unlocked()`または`_write_distribution_retry_marker()`へ到達させない。field shapeを増やさないためjournal protocol bumpは不要である。実装中に新fieldが不可避となった場合だけprotocolを上げ、protocol 1 recognized journal resumeを残す。
 
 ### journal authority
 
@@ -372,7 +380,7 @@ fresh journalは少なくとも次に束縛する。
 
 ### recovery state rules
 
-- guard-only stateは同じroot/intent/contract/planをreconstructできる場合だけjournalを発行する。
+- fresh guard-only stateはpurpose/operationを含む同じroot/intent/contract/planをreconstructできる場合だけfresh journalを発行する。Issue 368 parserによる読取はmarker bytes不変・managed target mutation 0で拒否される。
 - journal+guardは独立anchorを照合する。
 - completed journal+guardはtarget actionを再適用せず、postcondition確認後cleanupする。
 - completed journal-onlyはIssue 368と同じterminal cleanup compatibilityを維持する。
