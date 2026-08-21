@@ -58,10 +58,11 @@ def test_issue_368_recognized_handler_has_single_service_route() -> None:
 
 
 def test_i369_fresh_route_uses_shared_journaled_service() -> None:
-    fresh_source = inspect.getsource(cli._install_fresh_distribution_unlocked)
+    fresh_source = inspect.getsource(cli._execute_fresh_distribution_unlocked)
     recognized_source = inspect.getsource(cli._install_recognized_distribution_unlocked)
 
     assert "execute_fresh_distribution(" in fresh_source
+    assert "_install_fresh_distribution_unlocked" not in inspect.getsource(cli)
     assert "scaffold_applier" not in fresh_source
     assert "_install_spec_dock_bound(" not in fresh_source
     assert "_write_distribution_retry_marker(" not in fresh_source

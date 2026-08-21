@@ -306,6 +306,69 @@ def test_s35_cli_rejects_dual_retry_markers_without_writes(tmp_path: Path, capsy
     assert (marker.read_bytes(), uninstall_marker.read_bytes()) == before
 
 
+def test_i369_legacy_fresh_marker_retry_uses_canonical_init_guidance(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    specdock = target / "spec-dock"
+    specdock.mkdir()
+    root_stat = target.stat()
+    marker = specdock / ".distribution-retry.json"
+    marker.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "fresh",
+            "package_version": "0.2.3",
+            "target_root": {"device": root_stat.st_dev, "inode": root_stat.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+        }),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        cli,
+        "execute_fresh_distribution",
+        lambda *_args, **_kwargs: managed_distribution.DistributionProcessResult(
+            status="recovery_required",
+            intent="fresh",
+            actions=(),
+            reason="injected",
+        ),
+    )
+
+    assert main(["update", str(target)]) == 1
+    captured = capsys.readouterr().err
+    assert "retry=spec-dock init ." in captured
+    assert "retry=spec-dock update ." not in captured
+    assert marker.exists()
+
+
+@pytest.mark.parametrize("workspace_state", ("absent", "empty", "preserved"))
+@pytest.mark.parametrize("operation", (("init",), ("init", "--force"), ("update",)))
+def test_i369_fresh_entrypoint_matrix_provisions_all_workspace_states(
+    tmp_path: Path,
+    workspace_state: str,
+    operation: tuple[str, ...],
+    capsys,
+) -> None:
+    history = tmp_path / "spec-dock/initiatives/preserved/requirement.md"
+    if workspace_state != "absent":
+        (tmp_path / "spec-dock").mkdir()
+    if workspace_state == "preserved":
+        history.parent.mkdir(parents=True)
+        history.write_text("preserved history\n", encoding="utf-8")
+
+    assert main([*operation, str(tmp_path)]) == 0
+    capsys.readouterr()
+    assert (tmp_path / "spec-dock/spec-dock.version").is_file()
+    if workspace_state == "preserved":
+        assert history.read_text(encoding="utf-8") == "preserved history\n"
+
+
 def test_s40b_retained_ci_and_gitignore_are_deterministic_assets() -> None:
     ci = (INSTALL_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert "python3 ./spec-dock/scripts/spec-dock sync" in ci
