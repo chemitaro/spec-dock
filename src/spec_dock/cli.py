@@ -2896,6 +2896,9 @@ def _execute_fresh_distribution_unlocked(
                     legacy_marker=retry_marker.marker if retry_marker is not None else None,
                     generated_assets=generated_assets,
                     root_identity_path=visible_root,
+                    created_workspace_identity=(
+                        (created_workspace.device, created_workspace.inode) if created_workspace is not None else None
+                    ),
                 )
                 if result.status != "recovery_required":
                     _assert_distribution_root_identity(visible_root, bound_identity)
