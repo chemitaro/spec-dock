@@ -533,6 +533,7 @@ Issue 369で新規failureをledgerへ追加して許可しない。unexpected fa
 - schema-1 marker conversion前はold packageでlegacy retry可能である。conversion後はold packageへ戻さない。
 - created directory、stage、quarantine、backup、GC entryはexact leaseなしに削除しない。
 - package rollbackでcontract identityが変わる場合、resumeしない。
+- successor structural identityをjournal postconditionへ追加したためjournal writerはprotocol 2を発行し、protocol 1 readerはexact stage leaseが残る場合だけprotocol 2へ移行する。証明不能なguard付きsemantic-only stateはfail closed、completed journal-onlyは非破壊terminal cleanupだけを許可する。
 - journal/guard protocolを変更する場合、recognized protocol 1 resumeを同時に検証する。
 
 ## Exit criteria
