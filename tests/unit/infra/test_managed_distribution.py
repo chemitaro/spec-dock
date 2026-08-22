@@ -5597,6 +5597,62 @@ def test_i369_existing_required_directory_adopt_checkpoint_retries(
     assert not journal_path.exists()
 
 
+def test_i369_fresh_workbench_hard_link_adopt_checkpoint_retries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    seed_source = scaffold_root / "templates/root/.workbench/README.md"
+    seed_target = workspace / ".workbench/README.md"
+    seed_target.parent.mkdir()
+    seed_target.hardlink_to(seed_source)
+    alias = tmp_path / "workbench-seed-alias"
+    alias.hardlink_to(seed_target)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_workbench_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec-dock/.workbench/README.md" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected Workbench checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_workbench_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = workspace / ".distribution-journal.json"
+    assert journal_path.exists()
+    assert seed_target.lstat().st_nlink == 3
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert seed_target.lstat().st_nlink == 3
+    assert alias.is_file()
+    assert not journal_path.exists()
+
+
 @pytest.mark.parametrize(
     "phase",
     (
@@ -6350,6 +6406,69 @@ def test_i369_recognized_symlink_adopt_checkpoint_retry_preserves_link_topology(
     assert shortcut.lstat().st_nlink == 2
     assert alias.is_symlink()
     assert not journal_path.exists()
+
+
+def test_i369_recognized_adopt_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_shortcut_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected recognized shortcut checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_shortcut_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    original_inode = shortcut.lstat().st_ino
+
+    shortcut.unlink()
+    alias.unlink()
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    os.link(shortcut, alias, follow_symlinks=False)
+    assert shortcut.lstat().st_ino != original_inode
+    assert shortcut.lstat().st_nlink == 2
+
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert journal_path.exists()
+    assert shortcut.is_symlink()
+    assert alias.is_symlink()
 
 
 def test_s25_historical_hard_linked_shortcut_is_blocked_for_update(tmp_path: Path) -> None:
