@@ -2480,6 +2480,19 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
             "link_count": 0,
             "identity": _distribution_identity_payload(expected),
         }
+    if action.action == "adopt" and snapshot.target.exists and snapshot.target.file_type == "symlink":
+        if snapshot.target.link_count is None:
+            raise DistributionPlanError(f"assessment is missing link count for '{action.path}'")
+        return {
+            **boundary,
+            "exists": True,
+            # Recognized adoption does not mutate the symlink.  Preserve its
+            # observed link topology so an interrupted checkpoint can resume
+            # without requiring a single-link fiction.
+            "file_type": "symlink",
+            "link_count": snapshot.target.link_count,
+            "identity": _distribution_identity_payload(expected),
+        }
     return {
         **boundary,
         "exists": True,
@@ -6294,7 +6307,8 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             and (
                 record.postcondition.get("exists") is not True
                 or record.postcondition.get("file_type") != expected_identity.kind
-                or record.postcondition.get("link_count") != 1
+                or record.postcondition.get("link_count")
+                != (dict(plan.target_snapshots)[record.path].target.link_count if record.action == "adopt" else 1)
                 or record.postcondition.get("identity") != _distribution_identity_payload(expected_identity)
             )
         ):
@@ -7689,12 +7703,14 @@ def _execute_distribution_reconciliation(
             restore_legacy_marker_on_failure
             and legacy_marker_replaced
             and legacy_marker_bytes is not None
-            and guard_marker is not None
             and journal is None
         ):
             try:
                 store.require_journal_absent = False
-                store.restore_marker_bytes(guard_marker, legacy_marker_bytes)
+                current_guard = store._forward_guard or guard_marker
+                if current_guard is None:
+                    raise DistributionApplyError("dual-recovery-state")
+                store.restore_marker_bytes(current_guard, legacy_marker_bytes)
                 legacy_marker_replaced = False
             except Exception:
                 failure = DistributionApplyError("dual-recovery-state")
