@@ -2510,6 +2510,24 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
     }
 
 
+def _legacy_action_postcondition_payload(
+    plan: DistributionPlan,
+    action: DistributionAction,
+) -> dict[str, object]:
+    """Reconstruct the schema-1/protocol-1 adopt condition shape.
+
+    The journal protocol remains version 1 even though current adopt
+    postconditions now retain structural identity.  Older journals therefore
+    legitimately omit device/inode/ctime for an existing non-directory adopt.
+    Keep the old wire shape available for plan-digest compatibility checks.
+    """
+
+    payload = _action_postcondition_payload(plan, action)
+    if action.action != "adopt" or payload.get("file_type") == "directory":
+        return payload
+    return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
+
+
 def _path_snapshot_condition(snapshot: PathIdentitySnapshot) -> dict[str, object]:
     return {
         "relative_path": snapshot.relative_path,
@@ -2543,21 +2561,26 @@ def _plan_digest_condition(condition: dict[str, object]) -> dict[str, object]:
     return normalized
 
 
-def _mutation_plan_digest(assessment: WorkspaceAssessment) -> str:
-    plan = assessment.distribution_plan
-    ordered_actions = sorted(assessment.actions, key=lambda action: (action.path, action.action, action.reason))
+def _distribution_plan_digest(
+    *,
+    intent: JournaledDistributionIntent,
+    root_identity: DistributionRootIdentity,
+    contract_identity: str,
+    plan: DistributionPlan,
+    actions: tuple[DistributionAction, ...],
+    legacy_adopt_postconditions: bool = False,
+) -> str:
+    ordered_actions = sorted(actions, key=lambda action: (action.path, action.action, action.reason))
     payload: dict[str, object] = {
         "schema_version": (
-            _DISTRIBUTION_FRESH_JOURNAL_SCHEMA_VERSION
-            if assessment.intent == "fresh"
-            else _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
+            _DISTRIBUTION_FRESH_JOURNAL_SCHEMA_VERSION if intent == "fresh" else _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
         ),
-        "intent": assessment.intent,
+        "intent": intent,
         "root_binding": {
-            "device": assessment.root_identity.device,
-            "inode": assessment.root_identity.inode,
+            "device": root_identity.device,
+            "inode": root_identity.inode,
         },
-        "contract_identity": assessment.contract_identity,
+        "contract_identity": contract_identity,
         "actions": [
             {
                 "path": action.path,
@@ -2565,15 +2588,56 @@ def _mutation_plan_digest(assessment: WorkspaceAssessment) -> str:
                 "provenance": action.provenance,
                 "reason": action.reason,
                 "precondition": _plan_digest_condition(_action_precondition_payload(plan, action)),
-                "postcondition": _plan_digest_condition(_action_postcondition_payload(plan, action)),
+                "postcondition": _plan_digest_condition(
+                    _legacy_action_postcondition_payload(plan, action)
+                    if legacy_adopt_postconditions
+                    else _action_postcondition_payload(plan, action)
+                ),
             }
             for action in ordered_actions
         ],
     }
-    if assessment.intent == "fresh":
+    if intent == "fresh":
         payload["required_directories"] = sorted(item.path for item in plan.required_directories)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _mutation_plan_digest(
+    assessment: WorkspaceAssessment,
+    *,
+    legacy_adopt_postconditions: bool = False,
+) -> str:
+    return _distribution_plan_digest(
+        intent=assessment.intent,
+        root_identity=assessment.root_identity,
+        contract_identity=assessment.contract_identity,
+        plan=assessment.distribution_plan,
+        actions=assessment.actions,
+        legacy_adopt_postconditions=legacy_adopt_postconditions,
+    )
+
+
+def _executable_plan_digest(
+    plan: ExecutableMutationPlan,
+    *,
+    legacy_adopt_postconditions: bool = False,
+) -> str:
+    return _distribution_plan_digest(
+        intent=plan.intent,
+        root_identity=plan.root_identity,
+        contract_identity=plan.contract_identity,
+        plan=plan.distribution_plan,
+        actions=plan.actions,
+        legacy_adopt_postconditions=legacy_adopt_postconditions,
+    )
+
+
+def _plan_digest_matches(plan: ExecutableMutationPlan, stored_digest: str | None) -> bool:
+    return stored_digest in {
+        plan.plan_digest,
+        _executable_plan_digest(plan, legacy_adopt_postconditions=True),
+    }
 
 
 def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> ExecutableMutationPlan:
@@ -3224,7 +3288,11 @@ class OperationJournalStore:
             or journal.staging_leases != expected_staging_leases
             or any(action.checkpoint != "pending" for action in journal.actions)
             or journal.source_sha256 is None
-            or _journal_digest(journal) != plan.plan_digest
+            or _journal_digest(journal)
+            not in {
+                plan.plan_digest,
+                _executable_plan_digest(plan, legacy_adopt_postconditions=True),
+            }
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
         expected_initial = self._initial_journal(
@@ -3242,6 +3310,7 @@ class OperationJournalStore:
                 action.reason,
                 _action_precondition_payload(plan.distribution_plan, action),
                 _action_postcondition_payload(plan.distribution_plan, action),
+                _legacy_action_postcondition_payload(plan.distribution_plan, action),
             )
             for action in plan.actions
         }
@@ -3251,12 +3320,17 @@ class OperationJournalStore:
             expected = expected_actions.get(record.path)
             if expected is None or (record.action, record.provenance, record.reason) != expected[:3]:
                 raise DistributionApplyError("journal-precondition-mismatch")
-            for recorded_condition, expected_condition in (
-                (record.precondition, expected[3]),
-                (record.postcondition, expected[4]),
-            ):
-                normalized = OperationJournalStore._normalize_initial_action_condition(expected_condition)
-                if recorded_condition != expected_condition and recorded_condition != normalized:
+            expected_conditions = [expected[3]]
+            if record.action == "adopt" and record.postcondition.get("file_type") != "directory":
+                expected_conditions.extend((expected[4], expected[5]))
+            else:
+                expected_conditions.append(expected[4])
+            for index, recorded_condition in enumerate((record.precondition, record.postcondition)):
+                candidates = expected_conditions if index == 1 else [expected[3]]
+                normalized_candidates = [
+                    OperationJournalStore._normalize_initial_action_condition(candidate) for candidate in candidates
+                ]
+                if recorded_condition not in candidates and recorded_condition not in normalized_candidates:
                     raise DistributionApplyError("journal-precondition-mismatch")
         anchored = self.prepare_legacy_guard(
             None,
@@ -3631,13 +3705,25 @@ class OperationJournalStore:
             else:
                 guard = self.prepare_legacy_guard(plan, package_version=package_version)
             self.bind_forward_guard(guard)
+        legacy_plan_digest = _executable_plan_digest(plan, legacy_adopt_postconditions=True)
         if (
             guard.operation_id is None
             or guard.contract_identity != plan.contract_identity
-            or guard.plan_digest != plan.plan_digest
+            or guard.plan_digest not in {plan.plan_digest, legacy_plan_digest}
         ):
             raise DistributionApplyError("dual-recovery-state")
+        if guard.plan_digest == legacy_plan_digest and guard.plan_digest != plan.plan_digest:
+            guard = self.prepare_legacy_guard(
+                None,
+                package_version=guard.package_version,
+                replace_marker=guard,
+                plan_digest_override=plan.plan_digest,
+                stage_ownership=guard.stage_ownership,
+            )
+            self.bind_forward_guard(guard)
         operation_id = guard.operation_id
+        if operation_id is None:
+            raise DistributionApplyError("dual-recovery-state")
         created_at_ns = guard.journal_created_at_ns or time.time_ns()
         journal = replace(
             self._initial_journal(
@@ -3670,6 +3756,7 @@ class OperationJournalStore:
         *,
         package_version: str,
         replace_marker: DistributionRetryMarker | None = None,
+        plan_digest_override: str | None = None,
         stage_ownership: tuple[DistributionStageOwnership, ...] = (),
         journal_digest: str | None = None,
         journal_predecessor_digest: str | None = None,
@@ -3685,7 +3772,7 @@ class OperationJournalStore:
             target_root = replace_marker.target_root
             operation_id = replace_marker.operation_id
             contract_identity = replace_marker.contract_identity
-            plan_digest = replace_marker.plan_digest
+            plan_digest = plan_digest_override or replace_marker.plan_digest
         else:
             operation = plan.intent
             target_root = plan.root_identity
@@ -3719,7 +3806,9 @@ class OperationJournalStore:
             journal_digest=journal_digest,
             journal_predecessor_digest=journal_predecessor_digest,
             journal_created_at_ns=(
-                journal_created_at_ns
+                None
+                if plan_digest_override is not None and journal_digest is None
+                else journal_created_at_ns
                 if journal_created_at_ns is not None
                 else (replace_marker.journal_created_at_ns if replace_marker is not None else None)
             ),
@@ -4062,7 +4151,7 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-protocol-incompatible")
         if journal.contract_identity != plan.contract_identity:
             raise DistributionApplyError("journal-contract-mismatch")
-        if journal.plan_digest != plan.plan_digest:
+        if not _plan_digest_matches(plan, journal.plan_digest):
             raise DistributionApplyError("journal-plan-mismatch")
         if journal.status == "prepared" and journal.staging_leases:
             validated_guard_leases = _validated_legacy_stage_leases(
@@ -4184,14 +4273,15 @@ class OperationJournalStore:
                     try:
                         target_info = os.stat(target_name, dir_fd=parent_chain[-1], follow_symlinks=False)
                     except FileNotFoundError as exc:
-                        if record.action == "prune" and record.postcondition.get("exists") is False:
+                        if record.action == "prune" and _journal_postcondition(record).get("exists") is False:
                             continue
                         raise DistributionApplyError("managed staging cleanup failed") from exc
                     target_identity = _distribution_stage_identity(parent_chain[-1], target_name, lease.path)
                     if (
                         record.action == "adopt"
                         and target_info.st_nlink == 1
-                        and record.postcondition.get("identity") == _distribution_identity_payload(target_identity)
+                        and _journal_postcondition(record).get("identity")
+                        == _distribution_identity_payload(target_identity)
                     ):
                         continue
                     if (
@@ -4199,7 +4289,8 @@ class OperationJournalStore:
                         or target_info.st_ino != lease.inode
                         or _file_type(target_info.st_mode) != lease.file_type
                         or target_info.st_nlink != 1
-                        or record.postcondition.get("identity") != _distribution_identity_payload(target_identity)
+                        or _journal_postcondition(record).get("identity")
+                        != _distribution_identity_payload(target_identity)
                     ):
                         raise DistributionApplyError("managed staging cleanup failed") from None
                     continue
@@ -4243,7 +4334,7 @@ class OperationJournalStore:
                 target_identity = _distribution_stage_identity(parent_chain[-1], target_name, lease.path)
                 stage_identity = _distribution_stage_identity(parent_chain[-1], lease.stage_name, lease.path)
                 pre = record.precondition
-                post = record.postcondition
+                post = _journal_postcondition(record)
                 canonical_is_published_lease = (
                     target_info.st_dev == lease.device
                     and target_info.st_ino == lease.inode
@@ -4376,12 +4467,13 @@ class OperationJournalStore:
                     )
                     if len(successors) != 1:
                         raise DistributionApplyError("managed staging cleanup failed")
+                    bound_postcondition = _journal_postcondition(record)
                     self._assert_exact_canonical_successor(
                         parent_fd,
                         target_name,
                         lease.path,
                         successors[0],
-                        record.postcondition,
+                        bound_postcondition,
                     )
 
                     def validate_successor_backup_gc(
@@ -4389,7 +4481,7 @@ class OperationJournalStore:
                         bound_target_name: str = target_name,
                         bound_path: str = lease.path,
                         bound_successor: DistributionStageOwnership = successors[0],
-                        bound_postcondition: dict[str, object] = record.postcondition,
+                        bound_postcondition: dict[str, object] = bound_postcondition,
                     ) -> None:
                         self._assert_exact_canonical_successor(
                             bound_parent_fd,
@@ -4523,7 +4615,7 @@ class OperationJournalStore:
                             bound_target_name,
                             bound_path,
                             bound_successor,
-                            bound_record.postcondition,
+                            _journal_postcondition(bound_record),
                         )
                     elif bound_record.action == "prune":
                         if _stat_optional_no_follow(bound_parent_fd, bound_target_name) is not None:
@@ -4537,13 +4629,14 @@ class OperationJournalStore:
                         raise DistributionApplyError("managed staging cleanup failed")
 
                 validate_canonical_authority()
+                bound_postcondition = _journal_postcondition(record)
                 if successor is not None:
                     self._assert_exact_canonical_successor(
                         parent_fd,
                         target_name,
                         quarantine_lease.path,
                         successor,
-                        record.postcondition,
+                        bound_postcondition,
                     )
 
                 quarantine_info = _stat_optional_no_follow(parent_fd, quarantine_lease.stage_name)
@@ -4707,7 +4800,7 @@ class OperationJournalStore:
                             transition_path=quarantine_lease.path,
                             canonical_name=target_name,
                             canonical_ownership=successor,
-                            canonical_condition=record.postcondition,
+                            canonical_condition=_journal_postcondition(record),
                             stage_condition=record.precondition,
                             transition_name=quarantine_lease.stage_name,
                             transition_recorder=record_transition,
@@ -4777,7 +4870,7 @@ class OperationJournalStore:
                         bound_target_name: str = target_name,
                         bound_path: str = quarantine_lease.path,
                         bound_successor: DistributionStageOwnership | None = successor,
-                        bound_postcondition: dict[str, object] = record.postcondition,
+                        bound_postcondition: dict[str, object] = bound_postcondition,
                         bound_action: str = record.action,
                     ) -> None:
                         if bound_action in {"create", "adopt", "prune"}:
@@ -4986,7 +5079,7 @@ class OperationJournalStore:
                     if bound_record.checkpoint == "pending" and bound_record.action in {"create", "adopt"}:
                         condition = bound_record.precondition
                     else:
-                        condition = bound_record.postcondition
+                        condition = _journal_postcondition(bound_record)
                     if not _entry_matches_journal_condition(
                         bound_parent_fd,
                         bound_target_name,
@@ -5798,6 +5891,45 @@ def _journal_digest(journal: OperationJournal) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _is_legacy_adopt_postcondition(record: OperationJournalAction) -> bool:
+    condition = record.postcondition
+    return (
+        record.action == "adopt"
+        and condition.get("exists") is True
+        and condition.get("file_type") != "directory"
+        and not {"device", "inode", "ctime_ns"}.intersection(condition)
+        and set(condition) == {"root", "parents", "exists", "file_type", "link_count", "identity"}
+        and all(field in record.precondition for field in ("device", "inode", "ctime_ns"))
+    )
+
+
+def _journal_postcondition(record: OperationJournalAction) -> dict[str, object]:
+    """Return a validated postcondition view across protocol-1 revisions.
+
+    Protocol 1 journals written before Issue 369's structural-identity
+    strengthening contain a non-directory ``adopt`` postcondition without
+    device/inode/ctime.  The precondition was already required to capture
+    those fields, so derive only the missing fields from that immutable
+    witness while preserving the legacy link-count value.  Malformed or
+    partially expanded shapes are returned unchanged and remain fail-closed
+    in the normal contract validator.
+    """
+
+    condition = record.postcondition
+    if not _is_legacy_adopt_postcondition(record):
+        return condition
+    precondition = record.precondition
+    required = ("device", "inode", "ctime_ns")
+    if any(field not in precondition for field in required):
+        return condition
+    return {
+        **condition,
+        "device": precondition["device"],
+        "inode": precondition["inode"],
+        "ctime_ns": precondition["ctime_ns"],
+    }
+
+
 def _snapshot_matches_condition(
     snapshot: DistributionTargetSnapshot,
     condition: dict[str, object],
@@ -6288,9 +6420,10 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
     }
     obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files} - set(current_specs)
     for record in journal.actions:
+        postcondition = _journal_postcondition(record)
         expected_identity: DistributionIdentity | None = None
         if record.action == "prune":
-            if record.path not in obsolete_paths or record.postcondition.get("exists") is not False:
+            if record.path not in obsolete_paths or postcondition.get("exists") is not False:
                 raise DistributionApplyError("journal-plan-mismatch")
         elif record.action == "ensure-directory":
             if not any(item.path == record.path for item in plan.required_directories):
@@ -6304,9 +6437,9 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
         if record.action == "ensure-directory":
             assert expected_identity is not None
             if (
-                record.postcondition.get("exists") is not True
-                or record.postcondition.get("file_type") != "directory"
-                or record.postcondition.get("identity") != _distribution_identity_payload(expected_identity)
+                postcondition.get("exists") is not True
+                or postcondition.get("file_type") != "directory"
+                or postcondition.get("identity") != _distribution_identity_payload(expected_identity)
             ):
                 raise DistributionApplyError("journal-plan-mismatch")
         elif (
@@ -6314,23 +6447,34 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             and expected_identity is not None
             and expected_identity.kind != "directory"
             and (
-                record.postcondition.get("exists") is not True
-                or record.postcondition.get("file_type") != expected_identity.kind
+                postcondition.get("exists") is not True
+                or postcondition.get("file_type") != expected_identity.kind
                 or (
                     record.action == "adopt"
                     and (
                         target_snapshot is None
                         or any(
-                            record.postcondition.get(field) != getattr(target_snapshot.target, field)
+                            postcondition.get(field) != getattr(target_snapshot.target, field)
                             for field in ("device", "inode", "ctime_ns")
                         )
                     )
                 )
-                or record.postcondition.get("link_count")
-                != (
-                    target_snapshot.target.link_count if record.action == "adopt" and target_snapshot is not None else 1
+                or (
+                    postcondition.get("link_count")
+                    != (
+                        target_snapshot.target.link_count
+                        if record.action == "adopt" and target_snapshot is not None
+                        else 1
+                    )
+                    and not (
+                        _is_legacy_adopt_postcondition(record)
+                        and record.path == "spec-dock/.workbench/README.md"
+                        and target_snapshot is not None
+                        and isinstance(target_snapshot.target.link_count, int)
+                        and target_snapshot.target.link_count >= 1
+                    )
                 )
-                or record.postcondition.get("identity") != _distribution_identity_payload(expected_identity)
+                or postcondition.get("identity") != _distribution_identity_payload(expected_identity)
             )
         ):
             raise DistributionApplyError("journal-plan-mismatch")
@@ -6340,7 +6484,7 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
         if (
             snapshot is None
             or not _condition_has_complete_parent_chain(snapshot, record.precondition)
-            or not _condition_has_complete_parent_chain(snapshot, record.postcondition)
+            or not _condition_has_complete_parent_chain(snapshot, postcondition)
         ):
             raise DistributionApplyError("journal-plan-mismatch")
         if record.checkpoint == "pending":
@@ -6363,7 +6507,10 @@ def _resume_executable_plan(
     assessment: WorkspaceAssessment,
     journal: OperationJournal,
 ) -> ExecutableMutationPlan:
-    if _journal_digest(journal) != journal.plan_digest:
+    if _journal_digest(journal) not in {
+        journal.plan_digest,
+        _mutation_plan_digest(assessment, legacy_adopt_postconditions=True),
+    }:
         raise DistributionApplyError("journal-plan-mismatch")
     _assert_journal_action_contract(assessment, journal)
     plan = assessment.distribution_plan
@@ -6378,7 +6525,7 @@ def _resume_executable_plan(
             snapshot = _observe_target(plan.target_root, record.path).snapshot
         if snapshot is None:
             raise DistributionApplyError("journal-precondition-mismatch")
-        expected = record.precondition if record.checkpoint == "pending" else record.postcondition
+        expected = record.precondition if record.checkpoint == "pending" else _journal_postcondition(record)
         if not _snapshot_matches_condition(snapshot, expected, journal.created_parent_bindings):
             raise DistributionApplyError("journal-precondition-mismatch")
         action = DistributionAction(
@@ -6419,7 +6566,11 @@ def _reconcile_pending_journal_actions(
         if snapshot is None:
             raise DistributionApplyError("journal-precondition-mismatch")
         matches_pre = _snapshot_matches_condition(snapshot, record.precondition, journal.created_parent_bindings)
-        matches_post = _snapshot_matches_condition(snapshot, record.postcondition, journal.created_parent_bindings)
+        matches_post = _snapshot_matches_condition(
+            snapshot,
+            _journal_postcondition(record),
+            journal.created_parent_bindings,
+        )
         if matches_post and (not matches_pre or record.action in {"adopt", "preserve"}):
             reconciled.append(replace(record, checkpoint="published"))
             changed = True
@@ -6486,7 +6637,7 @@ def _reconcile_created_parent_bindings(
                 or snapshot is None
                 or not _snapshot_matches_condition(
                     snapshot,
-                    record.postcondition,
+                    _journal_postcondition(record),
                     tentative_bindings,
                 )
             ):
@@ -6811,7 +6962,7 @@ def _assert_created_parent_binding_fd_closed_set(
                 for lease in journal.staging_leases
             )
             if (record.checkpoint != "pending" or canonical_is_exact_lease) and _entry_matches_journal_condition(
-                parent_fd, name, child_path, record.postcondition
+                parent_fd, name, child_path, _journal_postcondition(record)
             ):
                 continue
         matched_stage = False
@@ -7453,7 +7604,7 @@ def _execute_distribution_reconciliation(
                     if (
                         guard_marker.operation_id is None
                         or guard_marker.contract_identity != executable.contract_identity
-                        or guard_marker.plan_digest != executable.plan_digest
+                        or not _plan_digest_matches(executable, guard_marker.plan_digest)
                     ):
                         raise DistributionApplyError("forward-guard-plan-mismatch")
                     _validated_legacy_stage_leases(executable, guard_marker, target_root)
