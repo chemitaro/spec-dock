@@ -5521,6 +5521,81 @@ def test_i369_created_fresh_workspace_rejects_foreign_root_child_before_journal(
     assert (workspace / ".distribution-retry.json").read_bytes() == marker_before_retry
     assert not (workspace / ".distribution-journal.json").exists()
 
+    (workspace / "foreign").unlink()
+    original_prepare = OperationJournalStore.prepare
+
+    def inject_foreign_child_after_guard(self, plan, *, package_version):
+        (workspace / "late-foreign").write_text("user\n", encoding="utf-8")
+        return original_prepare(self, plan, package_version=package_version)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", inject_foreign_child_after_guard)
+    late_retry = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert late_retry.status == "recovery_required"
+    assert late_retry.reason == "journal-precondition-mismatch"
+    assert (workspace / "late-foreign").exists()
+    assert (workspace / ".distribution-retry.json").read_bytes() == marker_before_retry
+    assert not (workspace / ".distribution-journal.json").exists()
+
+
+def test_i369_existing_required_directory_adopt_checkpoint_retries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    initiatives = target_root / "spec-dock" / "initiatives"
+    initiatives.mkdir(parents=True)
+    (initiatives / "preserved.md").write_text("history\n", encoding="utf-8")
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_adopt_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec-dock/initiatives" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected existing directory checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_adopt_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    assert any(
+        item["path"] == "spec-dock/initiatives" and item["checkpoint"] == "published"
+        for item in json.loads(journal_path.read_text(encoding="utf-8"))["actions"]
+    )
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert (initiatives / "preserved.md").read_text(encoding="utf-8") == "history\n"
+    assert not journal_path.exists()
+
 
 @pytest.mark.parametrize(
     "phase",
@@ -5611,6 +5686,52 @@ def test_i369_fresh_schema1_marker_rejects_newer_package_conversion(tmp_path: Pa
     assert result.reason == "legacy-marker-unconvertible"
     assert marker_path.exists()
     assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i369_fresh_schema1_conversion_preserves_legacy_marker_when_journal_appears(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = workspace / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "fresh",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    legacy_bytes = marker_path.read_bytes()
+    original_prepare = OperationJournalStore.prepare
+
+    def publish_raced_journal(self, plan, *, package_version):
+        self.path.write_bytes(b"raced journal\n")
+        return original_prepare(self, plan, package_version=package_version)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", publish_raced_journal)
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert marker_path.read_bytes() == legacy_bytes
+    assert (workspace / ".distribution-journal.json").read_bytes() == b"raced journal\n"
 
 
 def test_s25_missing_current_target_is_create(tmp_path: Path) -> None:
@@ -6076,10 +6197,14 @@ def test_s25_current_mode_mismatch_is_preserved_and_blocked_for_uninstall(tmp_pa
     assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
 
 
-@pytest.mark.parametrize("operation", ["fresh", "update", "init-force", "uninstall"])
+@pytest.mark.parametrize(
+    ("operation", "expected_action"),
+    [("fresh", "block"), ("update", "adopt"), ("init-force", "adopt"), ("uninstall", "block")],
+)
 def test_s25_current_hard_linked_shortcut_is_blocked_for_mutation(
     tmp_path: Path,
     operation: managed_distribution.DistributionOperation,
+    expected_action: str,
 ) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -6099,10 +6224,14 @@ def test_s25_current_hard_linked_shortcut_is_blocked_for_mutation(
     )
 
     action = next(item for item in plan.actions if item.path == "spec")
-    assert action.action == "block"
+    assert action.action == expected_action
     assert action.provenance == "current"
-    assert action.reason == "hard-link-mutation-unsafe"
-    assert action.blocked is True
+    if expected_action == "block":
+        assert action.reason == "hard-link-mutation-unsafe"
+        assert action.blocked is True
+    else:
+        assert action.reason == "current-identity-match"
+        assert action.blocked is False
 
 
 def test_s25_historical_hard_linked_shortcut_is_blocked_for_update(tmp_path: Path) -> None:
