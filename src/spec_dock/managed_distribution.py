@@ -700,7 +700,12 @@ _DISTRIBUTION_JOURNAL_SCHEMA_VERSION = 1
 # Fresh journals reuse the existing schema-1 field shape.  The schema-2
 # discriminator belongs to the forward guard, not to the journal payload.
 _DISTRIBUTION_FRESH_JOURNAL_SCHEMA_VERSION = _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
-_DISTRIBUTION_JOURNAL_PROTOCOL_VERSION = 1
+_DISTRIBUTION_LEGACY_JOURNAL_PROTOCOL_VERSION = 1
+_DISTRIBUTION_JOURNAL_PROTOCOL_VERSION = 2
+_DISTRIBUTION_SUPPORTED_JOURNAL_PROTOCOL_VERSIONS = frozenset({
+    _DISTRIBUTION_LEGACY_JOURNAL_PROTOCOL_VERSION,
+    _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION,
+})
 _DISTRIBUTION_RETRY_SCHEMA_VERSION = 1
 _DISTRIBUTION_RETRY_PURPOSE: Literal["distribution-rerun"] = "distribution-rerun"
 _DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION = 2
@@ -1275,7 +1280,7 @@ def admit_distribution_operation(
                 terminal_journal.status != "completed"
                 or terminal_journal.intent not in {"fresh", "update", "init-force"}
                 or terminal_journal.authority != _journal_authority_for_intent(terminal_journal.intent)
-                or terminal_journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+                or terminal_journal.protocol_version not in _DISTRIBUTION_SUPPORTED_JOURNAL_PROTOCOL_VERSIONS
                 or not _journal_package_is_compatible(terminal_journal.package_version, package_version)
                 or terminal_journal.staging_leases
                 or any(action.checkpoint != "verified" for action in terminal_journal.actions)
@@ -2878,7 +2883,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         or not schema_intent_supported
         or not journal_intent_supported
         or not journal_authority_supported
-        or payload["protocol_version"] != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+        or payload["protocol_version"] not in _DISTRIBUTION_SUPPORTED_JOURNAL_PROTOCOL_VERSIONS
         or not isinstance(root, dict)
         or set(root) != {"device", "inode"}
         or not all(isinstance(root[field], int) for field in ("device", "inode"))
@@ -4179,9 +4184,12 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-intent-mismatch")
         if journal.authority != _journal_authority_for_intent(plan.intent):
             raise DistributionApplyError("journal-authority-mismatch")
-        if journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION or not _journal_package_is_compatible(
-            journal.package_version,
-            package_version,
+        if (
+            journal.protocol_version not in _DISTRIBUTION_SUPPORTED_JOURNAL_PROTOCOL_VERSIONS
+            or not _journal_package_is_compatible(
+                journal.package_version,
+                package_version,
+            )
         ):
             raise DistributionApplyError("journal-protocol-incompatible")
         if journal.contract_identity != plan.contract_identity:
@@ -4199,6 +4207,7 @@ class OperationJournalStore:
                 raise DistributionApplyError("journal-precondition-mismatch")
         self._anchor_digestless_initial_journal(journal, plan)
         self._assert_guard_anchors_journal(journal)
+        journal = self._migrate_legacy_protocol_journal(journal, plan.distribution_plan)
         journal = self._resume_displaced_quarantine_cleanup(
             journal,
             {action.path for action in journal.actions if action.checkpoint != "pending"},
@@ -4227,9 +4236,12 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-intent-mismatch")
         if journal.authority != _journal_authority_for_intent(assessment.intent):
             raise DistributionApplyError("journal-authority-mismatch")
-        if journal.protocol_version != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION or not _journal_package_is_compatible(
-            journal.package_version,
-            package_version,
+        if (
+            journal.protocol_version not in _DISTRIBUTION_SUPPORTED_JOURNAL_PROTOCOL_VERSIONS
+            or not _journal_package_is_compatible(
+                journal.package_version,
+                package_version,
+            )
         ):
             raise DistributionApplyError("journal-protocol-incompatible")
         if journal.contract_identity != assessment.contract_identity:
@@ -4241,11 +4253,67 @@ class OperationJournalStore:
                     _resume_executable_plan(assessment, journal),
                 )
             self._assert_guard_anchors_journal(journal)
+            journal = self._migrate_legacy_protocol_journal(journal, assessment.distribution_plan)
             journal = self._resume_displaced_quarantine_cleanup(
                 journal,
                 {action.path for action in journal.actions if action.checkpoint != "pending"},
             )
         return journal
+
+    def _migrate_legacy_protocol_journal(
+        self,
+        journal: OperationJournal,
+        plan: DistributionPlan,
+    ) -> OperationJournal:
+        """Promote protocol-1 successor records before current validation.
+
+        Protocol 1 did not persist the structural identity of a published
+        regular/symlink successor.  Such a record is compatible only when its
+        semantic postcondition still matches the current target; the current
+        observation is then write-ahead as the protocol-2 exact binding before
+        any further resume or cleanup transition.
+        """
+
+        if journal.protocol_version != _DISTRIBUTION_LEGACY_JOURNAL_PROTOCOL_VERSION:
+            return journal
+        snapshots = dict(plan.target_snapshots)
+        migrated_actions: list[OperationJournalAction] = []
+        for record in journal.actions:
+            if not _is_legacy_successor_postcondition(record):
+                migrated_actions.append(record)
+                continue
+            snapshot = snapshots.get(record.path)
+            if snapshot is None or not _snapshot_matches_condition(
+                snapshot,
+                record.postcondition,
+                journal.created_parent_bindings,
+            ):
+                raise DistributionApplyError("journal-precondition-mismatch")
+            target = snapshot.target
+            if (
+                not target.exists
+                or target.file_type == "directory"
+                or any(value is None for value in (target.device, target.inode, target.ctime_ns, target.link_count))
+            ):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            migrated_actions.append(
+                replace(
+                    record,
+                    postcondition={
+                        **record.postcondition,
+                        "device": target.device,
+                        "inode": target.inode,
+                        "ctime_ns": target.ctime_ns,
+                        "link_count": target.link_count,
+                    },
+                )
+            )
+        migrated = replace(
+            journal,
+            protocol_version=_DISTRIBUTION_JOURNAL_PROTOCOL_VERSION,
+            actions=tuple(migrated_actions),
+        )
+        return self.write(migrated, predecessor=journal)
 
     def write(
         self,
@@ -5665,13 +5733,38 @@ class OperationJournalStore:
             or any(not binding.exists for binding in journal.created_parent_bindings)
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
+        self._assert_published_successor_postconditions(journal)
         actions = tuple(replace(action, checkpoint="verified") for action in journal.actions)
         return self.write(replace(journal, status="verifying", actions=actions), predecessor=journal)
 
     def mark_completed(self, journal: OperationJournal) -> OperationJournal:
         if journal.staging_leases or any(action.checkpoint != "verified" for action in journal.actions):
             raise DistributionApplyError("journal-precondition-mismatch")
+        self._assert_published_successor_postconditions(journal)
         return self.write(replace(journal, status="completed"), predecessor=journal)
+
+    def _assert_published_successor_postconditions(self, journal: OperationJournal) -> None:
+        for record in journal.actions:
+            if record.action not in {"create", "upgrade"} or record.checkpoint == "pending":
+                continue
+            condition = _journal_postcondition(record)
+            if any(field not in condition for field in ("device", "inode", "ctime_ns", "link_count")):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            parent_chain = _open_distribution_parent_chain(
+                self.target_root,
+                record.path,
+                create_missing=False,
+            )
+            try:
+                if not _entry_matches_journal_condition(
+                    parent_chain[-1],
+                    PurePosixPath(record.path).name,
+                    record.path,
+                    condition,
+                ):
+                    raise DistributionApplyError("journal-precondition-mismatch")
+            finally:
+                _close_distribution_parent_chain(parent_chain)
 
     def remove_completed(self, journal: OperationJournal, *, guard_already_removed: bool = False) -> None:
         if (
@@ -5999,6 +6092,19 @@ def _is_legacy_adopt_postcondition(record: OperationJournalAction) -> bool:
         and not {"device", "inode", "ctime_ns"}.intersection(condition)
         and set(condition) == {"root", "parents", "exists", "file_type", "link_count", "identity"}
         and all(field in record.precondition for field in ("device", "inode", "ctime_ns", "link_count"))
+    )
+
+
+def _is_legacy_successor_postcondition(record: OperationJournalAction) -> bool:
+    condition = record.postcondition
+    return (
+        record.checkpoint != "pending"
+        and record.action in {"create", "upgrade"}
+        and condition.get("exists") is True
+        and condition.get("file_type") in {"regular", "symlink"}
+        and not {"device", "inode", "ctime_ns"}.intersection(condition)
+        and set(condition) == {"root", "parents", "exists", "file_type", "link_count", "identity"}
+        and condition.get("link_count") == 1
     )
 
 
@@ -7962,6 +8068,7 @@ def _execute_distribution_reconciliation(
         if post.blockers or any(action.action not in {"adopt", "preserve"} for action in post.actions):
             raise DistributionApplyError("distribution postcondition failed")
         validate_preserved_state()
+        _resume_executable_plan(post, active_journal)
         active_journal = store.mark_verified(active_journal)
         validate_preserved_state()
         active_journal = store.mark_completed(active_journal)
