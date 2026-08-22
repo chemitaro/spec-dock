@@ -3343,8 +3343,8 @@ def _rewrite_published_successors_as_protocol1(target_root: Path) -> None:
     store = OperationJournalStore(target_root)
     journal = store._read(managed_distribution._root_identity_for_assessment(target_root))
     marker = managed_distribution._read_distribution_retry_marker(target_root)
-    assert marker is not None
-    store.bind_forward_guard(marker)
+    if marker is not None:
+        store.bind_forward_guard(marker)
     legacy_actions = tuple(
         replace(
             record,
@@ -3366,7 +3366,7 @@ def _rewrite_published_successors_as_protocol1(target_root: Path) -> None:
     )
 
 
-def test_i369_protocol1_published_create_migrates_successor_identity(
+def test_i369_protocol1_published_create_without_witness_refuses(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3406,11 +3406,13 @@ def test_i369_protocol1_published_create_migrates_successor_identity(
         package_version="1.2.3",
     )
 
-    assert second.status == "completed", second.reason
-    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-protocol-incompatible"
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").exists()
 
 
-def test_i369_protocol1_published_upgrade_migrates_successor_identity(
+def test_i369_protocol1_published_upgrade_without_witness_refuses(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3457,6 +3459,54 @@ def test_i369_protocol1_published_upgrade_migrates_successor_identity(
         scaffold_root=scaffold_root,
         target_root=target_root,
         intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-protocol-incompatible"
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_i369_protocol1_completed_journal_only_cleans_up_semantic_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_remove_marker = OperationJournalStore.remove_legacy_marker
+    stopped = False
+
+    def stop_after_guard_removal(self, marker):
+        nonlocal stopped
+        original_remove_marker(self, marker)
+        if not stopped:
+            stopped = True
+            raise DistributionApplyError("injected terminal journal-only stop")
+
+    monkeypatch.setattr(OperationJournalStore, "remove_legacy_marker", stop_after_guard_removal)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    _rewrite_published_successors_as_protocol1(target_root)
+
+    monkeypatch.setattr(OperationJournalStore, "remove_legacy_marker", original_remove_marker)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
         package_version="1.2.3",
     )
 

@@ -330,7 +330,7 @@ preserved-specs workspaceまたはexisting empty workspaceではbootstrap mkdir�
 
 - forward guard: `spec-dock/.distribution-retry.json`
 - journal: `spec-dock/.distribution-journal.json`
-- journal schema/protocol field shape: current schema 1 / protocol 1
+- journal schema/protocol field shape: schema 1 / protocol 2（protocol 1 readerを保持）
 - forward guard schema: current schema 2
 - recognized guard wire purpose: `recognized-journal-forward-only`
 - fresh guard wire purpose: `fresh-journal-forward-only`
@@ -357,7 +357,9 @@ journal.authority = "recognized-workspace-reconciliation"
 
 Issue 368 parserはschema 2であってもfresh purposeをsupported guardとして認識できず、`operation_id`、`contract_identity`、`plan_digest`を含むfield setをschema-1としても受理できないため、`marker-invalid`でmanaged target mutation前に停止する。これによりguard publish後・journal publish前に旧installerがfresh markerを`retry` admissionし、schema-1 `distribution-rerun`へ書き戻す降格を防ぐ。
 
-Issue 369 parserはpurposeとoperationを先に組として検証する。`fresh-journal-forward-only`は`operation="fresh"`だけ、`recognized-journal-forward-only`は`operation="update"|"init-force"`だけを許可する。fresh guard-only stateはnew fresh recovery serviceへだけ渡し、`_install_fresh_compatibility_distribution_unlocked()`または`_write_distribution_retry_marker()`へ到達させない。field shapeを増やさないためjournal protocol bumpは不要である。実装中に新fieldが不可避となった場合だけprotocolを上げ、protocol 1 recognized journal resumeを残す。
+Issue 369 parserはpurposeとoperationを先に組として検証する。`fresh-journal-forward-only`は`operation="fresh"`だけ、`recognized-journal-forward-only`は`operation="update"|"init-force"`だけを許可する。fresh guard-only stateはnew fresh recovery serviceへだけ渡し、`_install_fresh_compatibility_distribution_unlocked()`または`_write_distribution_retry_marker()`へ到達させない。published regular/symlink successorのdevice/inode/ctime/link countをdurable postconditionへ追加したため、current writerはjournal protocol 2を発行する。protocol 1 readerは残し、旧published create/upgradeをprotocol 2へ移行する。
+
+protocol 1のpublished create/upgrade postconditionにoriginal successorのstructural witnessがない場合、current targetの観測だけをoperation-owned identityへ昇格してはならない。exact stage leaseが残り、canonical targetがそのleaseと一致する状態だけをprotocol 2へwrite-ahead移行する。guard付きでleaseもないsemantic-only stateはmutation・cleanupを行わずfail closedとする。completed journal-onlyのprotocol 1 stateはtargetを再適用せず、semantic postconditionを確認した上でterminal journal cleanupだけを許可する。
 
 ### journal authority
 
