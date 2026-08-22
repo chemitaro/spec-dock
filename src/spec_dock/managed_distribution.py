@@ -5778,7 +5778,12 @@ class OperationJournalStore:
             if record.action not in {"create", "upgrade"} or record.checkpoint == "pending":
                 continue
             condition = _journal_postcondition(record)
-            if any(field not in condition for field in ("device", "inode", "ctime_ns", "link_count")):
+            if any(
+                field not in condition for field in ("device", "inode", "ctime_ns", "link_count")
+            ) and not _is_nonowning_fresh_workbench_seed(
+                journal,
+                record,
+            ):
                 raise DistributionApplyError("journal-protocol-incompatible")
             parent_chain = _open_distribution_parent_chain(
                 self.target_root,
@@ -6135,6 +6140,28 @@ def _is_legacy_successor_postcondition(record: OperationJournalAction) -> bool:
         and not {"device", "inode", "ctime_ns"}.intersection(condition)
         and set(condition) == {"root", "parents", "exists", "file_type", "link_count", "identity"}
         and condition.get("link_count") == 1
+    )
+
+
+def _is_nonowning_fresh_workbench_seed(
+    journal: OperationJournal,
+    record: OperationJournalAction,
+) -> bool:
+    """Allow the explicit fresh seed adoption exception without weakening ownership checks."""
+
+    condition = record.postcondition
+    return (
+        journal.intent == "fresh"
+        and journal.protocol_version == _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
+        and record.path == "spec-dock/.workbench/README.md"
+        and record.action == "create"
+        and record.checkpoint != "pending"
+        and record.provenance == "missing"
+        and record.reason == "target-missing"
+        and not any(lease.path == record.path and lease.role == "stage" for lease in journal.staging_leases)
+        and condition.get("exists") is True
+        and condition.get("file_type") == "regular"
+        and not {"device", "inode", "ctime_ns"}.intersection(condition)
     )
 
 
@@ -6699,6 +6726,7 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
                 or (
                     record.action in {"create", "upgrade"}
                     and record.checkpoint != "pending"
+                    and not _is_nonowning_fresh_workbench_seed(journal, record)
                     and (
                         target_snapshot is None
                         or any(
