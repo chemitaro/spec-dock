@@ -5778,12 +5778,7 @@ class OperationJournalStore:
             if record.action not in {"create", "upgrade"} or record.checkpoint == "pending":
                 continue
             condition = _journal_postcondition(record)
-            if any(
-                field not in condition for field in ("device", "inode", "ctime_ns", "link_count")
-            ) and not _is_nonowning_fresh_workbench_seed(
-                journal,
-                record,
-            ):
+            if any(field not in condition for field in ("device", "inode", "ctime_ns", "link_count")):
                 raise DistributionApplyError("journal-protocol-incompatible")
             parent_chain = _open_distribution_parent_chain(
                 self.target_root,
@@ -6143,26 +6138,50 @@ def _is_legacy_successor_postcondition(record: OperationJournalAction) -> bool:
     )
 
 
-def _is_nonowning_fresh_workbench_seed(
+def _is_fresh_workbench_seed_create(
     journal: OperationJournal,
     record: OperationJournalAction,
 ) -> bool:
-    """Allow the explicit fresh seed adoption exception without weakening ownership checks."""
-
-    condition = record.postcondition
     return (
         journal.intent == "fresh"
         and journal.protocol_version == _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION
         and record.path == "spec-dock/.workbench/README.md"
         and record.action == "create"
-        and record.checkpoint != "pending"
         and record.provenance == "missing"
         and record.reason == "target-missing"
-        and not any(lease.path == record.path and lease.role == "stage" for lease in journal.staging_leases)
-        and condition.get("exists") is True
-        and condition.get("file_type") == "regular"
-        and not {"device", "inode", "ctime_ns"}.intersection(condition)
     )
+
+
+def _fresh_workbench_seed_recovery_postcondition(
+    snapshot: DistributionTargetSnapshot,
+    journal: OperationJournal,
+    record: OperationJournalAction,
+) -> dict[str, object]:
+    """Bind an externally appeared fresh seed to its observed node identity."""
+
+    condition = _journal_postcondition(record)
+    if not _is_fresh_workbench_seed_create(journal, record) or record.checkpoint != "pending":
+        return condition
+    structural_fields = {"device", "inode", "ctime_ns"}
+    present_fields = structural_fields.intersection(condition)
+    if present_fields:
+        if present_fields != structural_fields:
+            raise DistributionApplyError("journal-precondition-mismatch")
+        return condition
+    target = snapshot.target
+    if not target.exists:
+        return condition
+    if target.file_type != "regular" or any(
+        getattr(target, field) is None for field in ("device", "inode", "ctime_ns", "link_count")
+    ):
+        raise DistributionApplyError("journal-precondition-mismatch")
+    return {
+        **condition,
+        "device": target.device,
+        "inode": target.inode,
+        "ctime_ns": target.ctime_ns,
+        "link_count": target.link_count,
+    }
 
 
 def _journal_postcondition(record: OperationJournalAction) -> dict[str, object]:
@@ -6263,18 +6282,7 @@ def _snapshot_matches_condition(
         return False
     if "link_count" in condition and not directory_metadata_wildcard and not directory_identity_wildcard:
         expected_link_count = condition.get("link_count")
-        workbench_seed_hard_link = (
-            target.relative_path == "spec-dock/.workbench/README.md"
-            and target.file_type == "regular"
-            and condition.get("file_type") == "regular"
-            and condition.get("identity") == _distribution_identity_payload(target.identity)
-            and expected_link_count == 1
-            and isinstance(target.link_count, int)
-            and target.link_count >= 1
-        )
-        if not workbench_seed_hard_link and expected_link_count not in (
-            {0} if directory_wildcard else {target.link_count}
-        ):
+        if expected_link_count not in ({0} if directory_wildcard else {target.link_count}):
             return False
     if directory_wildcard:
         bound_target = bound_parents.get(target.relative_path)
@@ -6726,7 +6734,6 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
                 or (
                     record.action in {"create", "upgrade"}
                     and record.checkpoint != "pending"
-                    and not _is_nonowning_fresh_workbench_seed(journal, record)
                     and (
                         target_snapshot is None
                         or any(
@@ -6739,7 +6746,17 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
                     postcondition.get("link_count")
                     != (
                         target_snapshot.target.link_count
-                        if record.action == "adopt" and target_snapshot is not None
+                        if target_snapshot is not None
+                        and (
+                            record.action == "adopt"
+                            or (
+                                _is_fresh_workbench_seed_create(journal, record)
+                                and record.checkpoint != "pending"
+                                and all(
+                                    field in postcondition for field in ("device", "inode", "ctime_ns", "link_count")
+                                )
+                            )
+                        )
                         else 1
                     )
                 )
@@ -6832,13 +6849,14 @@ def _reconcile_pending_journal_actions(
         if snapshot is None:
             raise DistributionApplyError("journal-precondition-mismatch")
         matches_pre = _snapshot_matches_condition(snapshot, record.precondition, journal.created_parent_bindings)
+        postcondition = _fresh_workbench_seed_recovery_postcondition(snapshot, journal, record)
         matches_post = _snapshot_matches_condition(
             snapshot,
-            _journal_postcondition(record),
+            postcondition,
             journal.created_parent_bindings,
         )
         if matches_post and (not matches_pre or record.action in {"adopt", "preserve"}):
-            reconciled.append(replace(record, checkpoint="published"))
+            reconciled.append(replace(record, checkpoint="published", postcondition=postcondition))
             changed = True
             continue
         if matches_pre and not matches_post:
@@ -6946,14 +6964,6 @@ def _entry_matches_journal_condition(
         ("file_type", _file_type(info.st_mode)),
         ("link_count", info.st_nlink),
     ):
-        workbench_seed_hard_link = (
-            path == "spec-dock/.workbench/README.md"
-            and field_name == "link_count"
-            and condition.get("file_type") == "regular"
-            and condition.get("link_count") == 1
-            and isinstance(actual, int)
-            and actual >= 1
-        )
         if (
             field_name in condition
             and not (
@@ -6961,7 +6971,6 @@ def _entry_matches_journal_condition(
                 and field_name in {"device", "inode", "ctime_ns", "link_count"}
                 and condition.get("file_type") == "directory"
             )
-            and not workbench_seed_hard_link
             and condition[field_name] != actual
         ):
             return False

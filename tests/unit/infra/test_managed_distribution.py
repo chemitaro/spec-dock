@@ -3339,6 +3339,104 @@ def test_i369_same_run_recognized_upgrade_rejects_same_semantics_new_inode(
     assert (target_root / "spec-dock/.distribution-journal.json").exists()
 
 
+@pytest.mark.parametrize("divergence", ("replacement", "hard-link", "mutate-restore"))
+def test_i369_fresh_workbench_retry_binds_exact_external_seed_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    divergence: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_apply = managed_distribution.apply_distribution_plan
+    failed = False
+
+    def fail_once(plan, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise DistributionApplyError("injected fresh seed interruption")
+        return original_apply(plan, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", fail_once)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", original_apply)
+
+    source = scaffold_root / "templates/root/.workbench/README.md"
+    target = target_root / "spec-dock/.workbench/README.md"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(source.read_bytes())
+    target.chmod(stat.S_IMODE(source.stat().st_mode))
+    original_identity = target.stat()
+    extra_link = tmp_path / "external-workbench-link"
+
+    original_write = OperationJournalStore.write
+    injected = False
+
+    def diverge_after_seed_reconciliation(self, journal, *, predecessor=None):
+        nonlocal injected
+        result = original_write(self, journal, predecessor=predecessor)
+        seed_record = next(
+            (
+                record
+                for record in result.actions
+                if record.path == "spec-dock/.workbench/README.md"
+                and record.checkpoint == "published"
+                and all(field in record.postcondition for field in ("device", "inode", "ctime_ns", "link_count"))
+            ),
+            None,
+        )
+        if not injected and seed_record is not None:
+            injected = True
+            if divergence == "replacement":
+                replacement = target.with_name("README.external")
+                replacement.write_bytes(target.read_bytes())
+                replacement.chmod(stat.S_IMODE(target.stat().st_mode))
+                target.unlink()
+                replacement.rename(target)
+            elif divergence == "hard-link":
+                os.link(target, extra_link)
+            else:
+                original_mode = stat.S_IMODE(target.stat().st_mode)
+                target.chmod(original_mode ^ 0o100)
+                target.chmod(original_mode)
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "write", diverge_after_seed_reconciliation)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert injected is True
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").exists()
+    assert target.read_bytes() == source.read_bytes()
+    if divergence == "replacement":
+        assert target.stat().st_ino != original_identity.st_ino
+    elif divergence == "hard-link":
+        assert target.stat().st_ino == original_identity.st_ino
+        assert target.stat().st_nlink == 2
+        assert extra_link.exists()
+    else:
+        assert target.stat().st_ino == original_identity.st_ino
+        assert target.stat().st_ctime_ns != original_identity.st_ctime_ns
+
+
 def _rewrite_published_successors_as_protocol1(target_root: Path) -> None:
     store = OperationJournalStore(target_root)
     journal = store._read(managed_distribution._root_identity_for_assessment(target_root))
