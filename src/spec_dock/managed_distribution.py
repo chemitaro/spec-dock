@@ -2513,6 +2513,8 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
 def _legacy_action_postcondition_payload(
     plan: DistributionPlan,
     action: DistributionAction,
+    *,
+    fixed_link_count: bool = False,
 ) -> dict[str, object]:
     """Reconstruct the schema-1/protocol-1 adopt condition shape.
 
@@ -2525,6 +2527,8 @@ def _legacy_action_postcondition_payload(
     payload = _action_postcondition_payload(plan, action)
     if action.action != "adopt" or payload.get("file_type") == "directory":
         return payload
+    if fixed_link_count:
+        payload = {**payload, "link_count": 1}
     return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
 
 
@@ -2569,6 +2573,7 @@ def _distribution_plan_digest(
     plan: DistributionPlan,
     actions: tuple[DistributionAction, ...],
     legacy_adopt_postconditions: bool = False,
+    legacy_adopt_fixed_link_count: bool = False,
 ) -> str:
     ordered_actions = sorted(actions, key=lambda action: (action.path, action.action, action.reason))
     payload: dict[str, object] = {
@@ -2589,7 +2594,11 @@ def _distribution_plan_digest(
                 "reason": action.reason,
                 "precondition": _plan_digest_condition(_action_precondition_payload(plan, action)),
                 "postcondition": _plan_digest_condition(
-                    _legacy_action_postcondition_payload(plan, action)
+                    _legacy_action_postcondition_payload(
+                        plan,
+                        action,
+                        fixed_link_count=legacy_adopt_fixed_link_count,
+                    )
                     if legacy_adopt_postconditions
                     else _action_postcondition_payload(plan, action)
                 ),
@@ -2607,6 +2616,7 @@ def _mutation_plan_digest(
     assessment: WorkspaceAssessment,
     *,
     legacy_adopt_postconditions: bool = False,
+    legacy_adopt_fixed_link_count: bool = False,
 ) -> str:
     return _distribution_plan_digest(
         intent=assessment.intent,
@@ -2615,6 +2625,7 @@ def _mutation_plan_digest(
         plan=assessment.distribution_plan,
         actions=assessment.actions,
         legacy_adopt_postconditions=legacy_adopt_postconditions,
+        legacy_adopt_fixed_link_count=legacy_adopt_fixed_link_count,
     )
 
 
@@ -2622,6 +2633,7 @@ def _executable_plan_digest(
     plan: ExecutableMutationPlan,
     *,
     legacy_adopt_postconditions: bool = False,
+    legacy_adopt_fixed_link_count: bool = False,
 ) -> str:
     return _distribution_plan_digest(
         intent=plan.intent,
@@ -2630,14 +2642,36 @@ def _executable_plan_digest(
         plan=plan.distribution_plan,
         actions=plan.actions,
         legacy_adopt_postconditions=legacy_adopt_postconditions,
+        legacy_adopt_fixed_link_count=legacy_adopt_fixed_link_count,
     )
 
 
-def _plan_digest_matches(plan: ExecutableMutationPlan, stored_digest: str | None) -> bool:
-    return stored_digest in {
+def _mutation_plan_digest_candidates(assessment: WorkspaceAssessment) -> frozenset[str]:
+    return frozenset({
+        _mutation_plan_digest(assessment),
+        _mutation_plan_digest(assessment, legacy_adopt_postconditions=True),
+        _mutation_plan_digest(
+            assessment,
+            legacy_adopt_postconditions=True,
+            legacy_adopt_fixed_link_count=True,
+        ),
+    })
+
+
+def _executable_plan_digest_candidates(plan: ExecutableMutationPlan) -> frozenset[str]:
+    return frozenset({
         plan.plan_digest,
         _executable_plan_digest(plan, legacy_adopt_postconditions=True),
-    }
+        _executable_plan_digest(
+            plan,
+            legacy_adopt_postconditions=True,
+            legacy_adopt_fixed_link_count=True,
+        ),
+    })
+
+
+def _plan_digest_matches(plan: ExecutableMutationPlan, stored_digest: str | None) -> bool:
+    return stored_digest in _executable_plan_digest_candidates(plan)
 
 
 def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> ExecutableMutationPlan:
@@ -3288,11 +3322,7 @@ class OperationJournalStore:
             or journal.staging_leases != expected_staging_leases
             or any(action.checkpoint != "pending" for action in journal.actions)
             or journal.source_sha256 is None
-            or _journal_digest(journal)
-            not in {
-                plan.plan_digest,
-                _executable_plan_digest(plan, legacy_adopt_postconditions=True),
-            }
+            or _journal_digest(journal) not in _executable_plan_digest_candidates(plan)
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
         expected_initial = self._initial_journal(
@@ -3311,6 +3341,11 @@ class OperationJournalStore:
                 _action_precondition_payload(plan.distribution_plan, action),
                 _action_postcondition_payload(plan.distribution_plan, action),
                 _legacy_action_postcondition_payload(plan.distribution_plan, action),
+                _legacy_action_postcondition_payload(
+                    plan.distribution_plan,
+                    action,
+                    fixed_link_count=True,
+                ),
             )
             for action in plan.actions
         }
@@ -3322,7 +3357,7 @@ class OperationJournalStore:
                 raise DistributionApplyError("journal-precondition-mismatch")
             expected_conditions = [expected[3]]
             if record.action == "adopt" and record.postcondition.get("file_type") != "directory":
-                expected_conditions.extend((expected[4], expected[5]))
+                expected_conditions.extend((expected[4], expected[5], expected[6]))
             else:
                 expected_conditions.append(expected[4])
             for index, recorded_condition in enumerate((record.precondition, record.postcondition)):
@@ -3705,14 +3740,14 @@ class OperationJournalStore:
             else:
                 guard = self.prepare_legacy_guard(plan, package_version=package_version)
             self.bind_forward_guard(guard)
-        legacy_plan_digest = _executable_plan_digest(plan, legacy_adopt_postconditions=True)
+        legacy_plan_digests = _executable_plan_digest_candidates(plan)
         if (
             guard.operation_id is None
             or guard.contract_identity != plan.contract_identity
-            or guard.plan_digest not in {plan.plan_digest, legacy_plan_digest}
+            or guard.plan_digest not in legacy_plan_digests
         ):
             raise DistributionApplyError("dual-recovery-state")
-        if guard.plan_digest == legacy_plan_digest and guard.plan_digest != plan.plan_digest:
+        if guard.plan_digest != plan.plan_digest:
             guard = self.prepare_legacy_guard(
                 None,
                 package_version=guard.package_version,
@@ -5899,7 +5934,7 @@ def _is_legacy_adopt_postcondition(record: OperationJournalAction) -> bool:
         and condition.get("file_type") != "directory"
         and not {"device", "inode", "ctime_ns"}.intersection(condition)
         and set(condition) == {"root", "parents", "exists", "file_type", "link_count", "identity"}
-        and all(field in record.precondition for field in ("device", "inode", "ctime_ns"))
+        and all(field in record.precondition for field in ("device", "inode", "ctime_ns", "link_count"))
     )
 
 
@@ -5908,18 +5943,19 @@ def _journal_postcondition(record: OperationJournalAction) -> dict[str, object]:
 
     Protocol 1 journals written before Issue 369's structural-identity
     strengthening contain a non-directory ``adopt`` postcondition without
-    device/inode/ctime.  The precondition was already required to capture
-    those fields, so derive only the missing fields from that immutable
-    witness while preserving the legacy link-count value.  Malformed or
-    partially expanded shapes are returned unchanged and remain fail-closed
-    in the normal contract validator.
+    device/inode/ctime.  The precondition was already required to capture the
+    complete structural identity, so derive all structural fields from that
+    immutable witness.  This covers both the original fixed-link-count
+    serializer and the intermediate symlink serializer without weakening
+    replacement detection.  Malformed or partially expanded shapes are
+    returned unchanged and remain fail-closed in the normal contract validator.
     """
 
     condition = record.postcondition
     if not _is_legacy_adopt_postcondition(record):
         return condition
     precondition = record.precondition
-    required = ("device", "inode", "ctime_ns")
+    required = ("device", "inode", "ctime_ns", "link_count")
     if any(field not in precondition for field in required):
         return condition
     return {
@@ -5927,6 +5963,7 @@ def _journal_postcondition(record: OperationJournalAction) -> dict[str, object]:
         "device": precondition["device"],
         "inode": precondition["inode"],
         "ctime_ns": precondition["ctime_ns"],
+        "link_count": precondition["link_count"],
     }
 
 
@@ -6466,13 +6503,6 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
                         if record.action == "adopt" and target_snapshot is not None
                         else 1
                     )
-                    and not (
-                        _is_legacy_adopt_postcondition(record)
-                        and record.path == "spec-dock/.workbench/README.md"
-                        and target_snapshot is not None
-                        and isinstance(target_snapshot.target.link_count, int)
-                        and target_snapshot.target.link_count >= 1
-                    )
                 )
                 or postcondition.get("identity") != _distribution_identity_payload(expected_identity)
             )
@@ -6507,10 +6537,7 @@ def _resume_executable_plan(
     assessment: WorkspaceAssessment,
     journal: OperationJournal,
 ) -> ExecutableMutationPlan:
-    if _journal_digest(journal) not in {
-        journal.plan_digest,
-        _mutation_plan_digest(assessment, legacy_adopt_postconditions=True),
-    }:
+    if _journal_digest(journal) not in {journal.plan_digest, *_mutation_plan_digest_candidates(assessment)}:
         raise DistributionApplyError("journal-plan-mismatch")
     _assert_journal_action_contract(assessment, journal)
     plan = assessment.distribution_plan
