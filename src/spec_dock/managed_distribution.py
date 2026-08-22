@@ -2480,16 +2480,24 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
             "link_count": 0,
             "identity": _distribution_identity_payload(expected),
         }
-    if action.action == "adopt" and snapshot.target.exists and snapshot.target.file_type == "symlink":
-        if snapshot.target.link_count is None:
-            raise DistributionPlanError(f"assessment is missing link count for '{action.path}'")
+    if action.action == "adopt" and snapshot.target.exists and snapshot.target.file_type != "directory":
+        if (
+            snapshot.target.device is None
+            or snapshot.target.inode is None
+            or snapshot.target.ctime_ns is None
+            or snapshot.target.link_count is None
+        ):
+            raise DistributionPlanError(f"assessment is missing structural identity for '{action.path}'")
         return {
             **boundary,
             "exists": True,
-            # Recognized adoption does not mutate the symlink.  Preserve its
-            # observed link topology so an interrupted checkpoint can resume
-            # without requiring a single-link fiction.
-            "file_type": "symlink",
+            # Adoption does not mutate a non-directory target.  Preserve the
+            # observed node identity and link topology so an interrupted
+            # checkpoint cannot resume against an external replacement.
+            "device": snapshot.target.device,
+            "inode": snapshot.target.inode,
+            "ctime_ns": snapshot.target.ctime_ns,
+            "file_type": snapshot.target.file_type,
             "link_count": snapshot.target.link_count,
             "identity": _distribution_identity_payload(expected),
         }
@@ -6292,6 +6300,7 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             expected_identity = current_specs.get(record.path)
             if expected_identity is None or record.action not in {"create", "adopt", "upgrade", "preserve"}:
                 raise DistributionApplyError("journal-plan-mismatch")
+        target_snapshot = dict(plan.target_snapshots).get(record.path)
         if record.action == "ensure-directory":
             assert expected_identity is not None
             if (
@@ -6307,8 +6316,20 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             and (
                 record.postcondition.get("exists") is not True
                 or record.postcondition.get("file_type") != expected_identity.kind
+                or (
+                    record.action == "adopt"
+                    and (
+                        target_snapshot is None
+                        or any(
+                            record.postcondition.get(field) != getattr(target_snapshot.target, field)
+                            for field in ("device", "inode", "ctime_ns")
+                        )
+                    )
+                )
                 or record.postcondition.get("link_count")
-                != (dict(plan.target_snapshots)[record.path].target.link_count if record.action == "adopt" else 1)
+                != (
+                    target_snapshot.target.link_count if record.action == "adopt" and target_snapshot is not None else 1
+                )
                 or record.postcondition.get("identity") != _distribution_identity_payload(expected_identity)
             )
         ):
