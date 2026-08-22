@@ -4253,11 +4253,11 @@ class OperationJournalStore:
                     _resume_executable_plan(assessment, journal),
                 )
             self._assert_guard_anchors_journal(journal)
-            journal = self._migrate_legacy_protocol_journal(journal, assessment.distribution_plan)
             journal = self._resume_displaced_quarantine_cleanup(
                 journal,
                 {action.path for action in journal.actions if action.checkpoint != "pending"},
             )
+        journal = self._migrate_legacy_protocol_journal(journal, assessment.distribution_plan)
         return journal
 
     def _migrate_legacy_protocol_journal(
@@ -4278,10 +4278,12 @@ class OperationJournalStore:
             return journal
         snapshots = dict(plan.target_snapshots)
         migrated_actions: list[OperationJournalAction] = []
+        has_legacy_successor = False
         for record in journal.actions:
             if not _is_legacy_successor_postcondition(record):
                 migrated_actions.append(record)
                 continue
+            has_legacy_successor = True
             snapshot = snapshots.get(record.path)
             if snapshot is None or not _snapshot_matches_condition(
                 snapshot,
@@ -4296,24 +4298,52 @@ class OperationJournalStore:
                 or any(value is None for value in (target.device, target.inode, target.ctime_ns, target.link_count))
             ):
                 raise DistributionApplyError("journal-protocol-incompatible")
-            migrated_actions.append(
-                replace(
-                    record,
-                    postcondition={
-                        **record.postcondition,
-                        "device": target.device,
-                        "inode": target.inode,
-                        "ctime_ns": target.ctime_ns,
-                        "link_count": target.link_count,
-                    },
-                )
+            lease = next(
+                (item for item in journal.staging_leases if item.path == record.path and item.role == "stage"),
+                None,
             )
-        migrated = replace(
+            if lease is None:
+                if journal.status != "completed" or self._forward_guard is not None:
+                    raise DistributionApplyError("journal-protocol-incompatible")
+                migrated_actions.append(
+                    replace(
+                        record,
+                        postcondition={
+                            **record.postcondition,
+                            "device": target.device,
+                            "inode": target.inode,
+                            "ctime_ns": target.ctime_ns,
+                            "link_count": target.link_count,
+                        },
+                    )
+                )
+                continue
+            parent_chain = _open_distribution_parent_chain(
+                self.target_root,
+                record.path,
+                create_missing=False,
+            )
+            try:
+                successor_postcondition = self._capture_exact_canonical_successor(
+                    parent_chain[-1],
+                    PurePosixPath(record.path).name,
+                    record.path,
+                    lease,
+                    record.postcondition,
+                )
+            finally:
+                _close_distribution_parent_chain(parent_chain)
+            migrated_actions.append(replace(record, postcondition=successor_postcondition))
+        if not has_legacy_successor:
+            return journal
+        migrated_journal = replace(
             journal,
             protocol_version=_DISTRIBUTION_JOURNAL_PROTOCOL_VERSION,
             actions=tuple(migrated_actions),
         )
-        return self.write(migrated, predecessor=journal)
+        if journal.status == "completed" and self._forward_guard is None:
+            return migrated_journal
+        return self.write(migrated_journal, predecessor=journal)
 
     def write(
         self,
