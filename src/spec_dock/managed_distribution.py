@@ -2094,7 +2094,7 @@ def _classify_current_target(
         actual.kind == "symlink"
         and observation.link_count is not None
         and observation.link_count > 1
-        and operation in {"fresh", "update", "init-force", "uninstall"}
+        and operation in {"fresh", "uninstall"}
     ):
         return _blocked_action(
             path,
@@ -2452,6 +2452,21 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
         expected = snapshot.target.identity
     expected_type = expected.kind if expected is not None else snapshot.target.file_type
     if expected_type == "directory":
+        if action.action == "adopt" and snapshot.target.exists and snapshot.target.file_type == "directory":
+            return {
+                **boundary,
+                "exists": True,
+                # An adopted directory is not mutated by the action, but
+                # publishing children below it may change ctime/link-count.
+                # Keep the captured device/inode as the exact recovery
+                # identity while treating those metadata fields as wildcards.
+                "device": snapshot.target.device,
+                "inode": snapshot.target.inode,
+                "ctime_ns": 0,
+                "file_type": "directory",
+                "link_count": 0,
+                "identity": _distribution_identity_payload(expected),
+            }
         return {
             **boundary,
             "exists": True,
@@ -2973,12 +2988,21 @@ class OperationJournalStore:
         *,
         identity_path: Path | None = None,
         expected_workspace_identity: tuple[int, int] | None = None,
+        workspace_closed_set_validator: Callable[[tuple[str, ...]], None] | None = None,
     ) -> None:
         self.target_root = Path(target_root)
         self.identity_path = Path(identity_path) if identity_path is not None else self.target_root
         self.path = self.target_root / _DISTRIBUTION_JOURNAL_REL
         self.expected_workspace_identity = expected_workspace_identity
+        self.workspace_closed_set_validator = workspace_closed_set_validator
+        self.require_journal_absent = False
         self._forward_guard: DistributionRetryMarker | None = None
+
+    def _validate_workspace_closed_set(self, extra_entries: tuple[str, ...] = ()) -> None:
+        if self.require_journal_absent and _path_present_no_follow(self.path):
+            raise DistributionApplyError("dual-recovery-state")
+        if self.workspace_closed_set_validator is not None:
+            self.workspace_closed_set_validator(extra_entries)
 
     @staticmethod
     def _workspace_condition(journal: OperationJournal) -> dict[str, object]:
@@ -2997,6 +3021,7 @@ class OperationJournalStore:
                 "inode": self.expected_workspace_identity[1],
             }
         flags = _distribution_directory_flags()
+        parent_fd: int | None = None
         try:
             root_fd = os.open(self.target_root, flags)
         except OSError as exc:
@@ -3024,9 +3049,13 @@ class OperationJournalStore:
                     )
                 ):
                     raise DistributionApplyError("journal-parent-mismatch")
+            self._validate_workspace_closed_set()
         except Exception:
+            if parent_fd is not None:
+                os.close(parent_fd)
             os.close(root_fd)
             raise
+        assert parent_fd is not None
         return root_fd, parent_fd
 
     @staticmethod
@@ -3307,6 +3336,7 @@ class OperationJournalStore:
                 stage_fd, content
             ):
                 raise DistributionApplyError("journal-precondition-mismatch")
+            self._validate_workspace_closed_set((stage,))
             self._assert_bound_forward_guard(parent_fd, guard_fd)
             if destination_info is None:
                 _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
@@ -3824,6 +3854,7 @@ class OperationJournalStore:
                 stage_fd, content
             ):
                 raise DistributionApplyError("legacy-marker-unconvertible")
+            self._validate_workspace_closed_set((stage,))
             if replace_marker is None:
                 _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
                 published = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
@@ -3886,6 +3917,101 @@ class OperationJournalStore:
                 with suppress(OSError, DistributionApplyError):
                     orphan_info = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
                     _remove_distribution_stage_if_owned(parent_fd, stage, orphan_info)
+            raise
+        finally:
+            if stage_fd is not None:
+                os.close(stage_fd)
+            if held_fd is not None:
+                os.close(held_fd)
+            os.close(parent_fd)
+            os.close(root_fd)
+
+    def restore_marker_bytes(self, marker: DistributionRetryMarker, content: bytes) -> None:
+        """Restore a legacy marker after a conversion lost its journal race."""
+
+        expected = marker.source_snapshot
+        expected_sha256 = marker.source_sha256
+        if expected is None or expected_sha256 is None:
+            raise DistributionApplyError("legacy-marker-unconvertible")
+        root_fd, parent_fd = self._open_parent(marker.target_root)
+        stage = f".distribution-retry-{secrets.token_hex(16)}.restore"
+        stage_info: os.stat_result | None = None
+        stage_fd: int | None = None
+        held_fd: int | None = None
+        swapped_out: os.stat_result | None = None
+        try:
+            try:
+                destination_info = os.stat(
+                    _DISTRIBUTION_RETRY_MARKER_REL.name,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+            except OSError as exc:
+                raise DistributionApplyError("legacy-marker-unconvertible") from exc
+            if (
+                not stat.S_ISREG(destination_info.st_mode)
+                or destination_info.st_nlink != 1
+                or destination_info.st_dev != expected.device
+                or destination_info.st_ino != expected.inode
+                or destination_info.st_ctime_ns != expected.ctime_ns
+                or _file_type(destination_info.st_mode) != expected.file_type
+                or destination_info.st_nlink != expected.link_count
+            ):
+                raise DistributionApplyError("legacy-marker-unconvertible")
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("platform lacks required no-follow file support")
+            held_fd = os.open(
+                _DISTRIBUTION_RETRY_MARKER_REL.name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+            if _stat_identity_tuple(os.fstat(held_fd)) != _stat_identity_tuple(destination_info):
+                raise DistributionApplyError("legacy-marker-unconvertible")
+            stage_fd = os.open(
+                stage,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                0o600,
+                dir_fd=parent_fd,
+            )
+            _write_fd_bytes(stage_fd, content)
+            os.fchmod(stage_fd, 0o600)
+            stage_info = os.fstat(stage_fd)
+            visible_stage = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
+            if _stat_identity_tuple(visible_stage) != _stat_identity_tuple(stage_info) or not _held_fd_has_exact_bytes(
+                stage_fd, content
+            ):
+                raise DistributionApplyError("legacy-marker-unconvertible")
+            self._validate_workspace_closed_set((stage,))
+            swapped_out = _swap_regular_distribution_target_if_bound(
+                parent_fd,
+                stage,
+                _DISTRIBUTION_RETRY_MARKER_REL.name,
+                target_fd=held_fd,
+                staging_fd=stage_fd,
+                expected_target=destination_info,
+                identity_message="legacy-marker-unconvertible",
+            )
+            os.fsync(parent_fd)
+            published = os.fstat(stage_fd)
+            successor_snapshot = _snapshot_from_stat(
+                _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+                published,
+            )
+            self._assert_bound_regular_entry(
+                parent_fd,
+                _DISTRIBUTION_RETRY_MARKER_REL.name,
+                stage_fd,
+                successor_snapshot,
+                hashlib.sha256(content).hexdigest(),
+                identity_error="legacy-marker-unconvertible",
+            )
+            _remove_distribution_stage_if_owned(parent_fd, stage, swapped_out, strict=True)
+            os.fsync(parent_fd)
+        except Exception:
+            if stage_info is not None and swapped_out is None:
+                with suppress(OSError, DistributionApplyError):
+                    _remove_distribution_stage_if_owned(parent_fd, stage, stage_info, strict=True)
             raise
         finally:
             if stage_fd is not None:
@@ -5686,12 +5812,25 @@ def _snapshot_matches_condition(
     if condition.get("exists") != target.exists:
         return False
     directory_metadata_wildcard = condition.get("file_type") == "directory" and condition.get("identity") is None
-    directory_wildcard = condition.get("file_type") == "directory" and condition.get("identity") == {
-        "kind": "directory",
-        "sha256": None,
-        "mode": None,
-        "target": None,
-    }
+    directory_wildcard = (
+        condition.get("file_type") == "directory"
+        and condition.get("identity")
+        == {
+            "kind": "directory",
+            "sha256": None,
+            "mode": None,
+            "target": None,
+        }
+        and condition.get("device") == 0
+        and condition.get("inode") == 0
+    )
+    identity_condition = condition.get("identity")
+    directory_identity_wildcard = (
+        condition.get("file_type") == "directory"
+        and isinstance(identity_condition, dict)
+        and identity_condition.get("kind") == "directory"
+        and not directory_wildcard
+    )
     if "device" in condition and condition.get("device") not in ({0} if directory_wildcard else {target.device}):
         return False
     if "inode" in condition and condition.get("inode") not in ({0} if directory_wildcard else {target.inode}):
@@ -5699,12 +5838,13 @@ def _snapshot_matches_condition(
     if (
         "ctime_ns" in condition
         and not directory_metadata_wildcard
+        and not directory_identity_wildcard
         and condition.get("ctime_ns") not in ({0} if directory_wildcard else {target.ctime_ns})
     ):
         return False
     if "file_type" in condition and condition.get("file_type") != target.file_type:
         return False
-    if "link_count" in condition and not directory_metadata_wildcard:
+    if "link_count" in condition and not directory_metadata_wildcard and not directory_identity_wildcard:
         expected_link_count = condition.get("link_count")
         workbench_seed_hard_link = (
             target.relative_path == "spec-dock/.workbench/README.md"
@@ -5732,6 +5872,8 @@ def _snapshot_matches_condition(
         # root/workspace identity checks; it is the only directory postcondition
         # that intentionally has no created-parent record.
         return target.relative_path == "spec-dock" and target.file_type == "directory" and target.exists
+    if directory_identity_wildcard:
+        return target.file_type == "directory" and target.exists
     return condition.get("identity") == _distribution_identity_payload(target.identity)
 
 
@@ -6403,10 +6545,34 @@ def _entry_matches_staging_lease(
     )
 
 
+def _assert_workspace_closed_set_tree(workspace: Path, allowed: frozenset[str]) -> None:
+    def walk(current: Path, relative: str) -> None:
+        try:
+            entries = tuple(os.scandir(current))
+        except OSError as exc:
+            raise DistributionApplyError("journal-parent-mismatch") from exc
+        for entry in entries:
+            child = f"{relative}/{entry.name}" if relative else entry.name
+            has_allowed_descendant = any(path.startswith(f"{child}/") for path in allowed)
+            if child not in allowed and not has_allowed_descendant:
+                raise DistributionApplyError("journal-parent-mismatch")
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise DistributionApplyError("journal-parent-mismatch") from exc
+            if has_allowed_descendant:
+                if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+                    raise DistributionApplyError("journal-parent-mismatch")
+                walk(Path(entry.path), child)
+
+    walk(workspace, "")
+
+
 def _assert_created_workspace_closed_set(
     target_root: Path,
     expected_identity: tuple[int, int] | None,
     journal: OperationJournal | None,
+    allowed_workspace_entries: frozenset[str] | None = None,
 ) -> None:
     """Re-prove a fresh bootstrap directory and reject unknown root children."""
 
@@ -6419,6 +6585,9 @@ def _assert_created_workspace_closed_set(
         raise DistributionApplyError("journal-parent-mismatch") from exc
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or (info.st_dev, info.st_ino) != expected_identity:
         raise DistributionApplyError("journal-parent-mismatch")
+    if allowed_workspace_entries is not None and journal is None:
+        _assert_workspace_closed_set_tree(workspace, allowed_workspace_entries)
+        return
     workspace_fd: int | None = None
     try:
         workspace_fd = os.open(workspace, _distribution_directory_flags())
@@ -6458,7 +6627,8 @@ def _assert_fresh_guard_only_closed_set(
     target_root: Path,
     plan: ExecutableMutationPlan,
     marker: DistributionRetryMarker,
-) -> None:
+    extra_entries: tuple[str, ...] = (),
+) -> tuple[tuple[int, int], frozenset[str]]:
     """Re-prove a fresh workspace before converting a guard-only retry.
 
     A guard-only retry has no journal from which the bootstrap witness can be
@@ -6511,27 +6681,14 @@ def _assert_fresh_guard_only_closed_set(
         if len(lease_parts) >= 2 and lease_parts[0] == "spec-dock":
             lease_parent = PurePosixPath(*lease_parts[1:-1])
             allowed.add((lease_parent / lease.stage_name).as_posix() if lease_parent.parts else lease.stage_name)
+    for extra in extra_entries:
+        relative = PurePosixPath(extra)
+        if relative.is_absolute() or ".." in relative.parts or len(relative.parts) != 1:
+            raise DistributionApplyError("journal-parent-mismatch")
+        allowed.add(relative.as_posix())
 
-    def walk(current: Path, relative: str) -> None:
-        try:
-            entries = tuple(os.scandir(current))
-        except OSError as exc:
-            raise DistributionApplyError("journal-parent-mismatch") from exc
-        for entry in entries:
-            child = f"{relative}/{entry.name}" if relative else entry.name
-            has_allowed_descendant = any(path.startswith(f"{child}/") for path in allowed)
-            if child not in allowed and not has_allowed_descendant:
-                raise DistributionApplyError("journal-parent-mismatch")
-            try:
-                info = entry.stat(follow_symlinks=False)
-            except OSError as exc:
-                raise DistributionApplyError("journal-parent-mismatch") from exc
-            if has_allowed_descendant:
-                if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-                    raise DistributionApplyError("journal-parent-mismatch")
-                walk(Path(entry.path), child)
-
-    walk(workspace, "")
+    _assert_workspace_closed_set_tree(workspace, frozenset(allowed))
+    return (workspace_info.st_dev, workspace_info.st_ino), frozenset(allowed)
 
 
 def _assert_created_parent_bindings_closed_set(
@@ -7056,13 +7213,27 @@ def _execute_distribution_reconciliation(
     preserved_validation_active = True
     journal: OperationJournal | None = None
     boundary_workspace_identity = created_workspace_identity
+    boundary_workspace_closed_set: frozenset[str] | None = None
+    guard_only_plan: ExecutableMutationPlan | None = None
+    guard_only_marker: DistributionRetryMarker | None = None
     boundary_journal: OperationJournal | None = None
+
+    def revalidate_guard_only_workspace(extra_entries: tuple[str, ...] = ()) -> None:
+        if guard_only_plan is None or guard_only_marker is None:
+            return
+        _assert_fresh_guard_only_closed_set(
+            target_root,
+            guard_only_plan,
+            guard_only_marker,
+            extra_entries,
+        )
 
     def validate_preserved_state() -> None:
         _assert_created_workspace_closed_set(
             target_root,
             boundary_workspace_identity,
             journal or boundary_journal,
+            boundary_workspace_closed_set if journal is None else None,
         )
         if preserved_validation_active and preserved_state_validator is not None:
             preserved_state_validator()
@@ -7080,6 +7251,7 @@ def _execute_distribution_reconciliation(
         target_root,
         identity_path=root_identity_path,
         expected_workspace_identity=created_workspace_identity,
+        workspace_closed_set_validator=revalidate_guard_only_workspace,
     )
     journal_present = _path_present_no_follow(store.path)
     legacy_present = _path_present_no_follow(target_root / _DISTRIBUTION_RETRY_MARKER_REL)
@@ -7191,6 +7363,9 @@ def _execute_distribution_reconciliation(
         )
     plan_digest: str | None = None
     journal = None
+    legacy_marker_bytes: bytes | None = None
+    legacy_marker_replaced = False
+    restore_legacy_marker_on_failure = False
     try:
         if legacy_present and guard_marker is None:
             guard_marker = _read_distribution_retry_marker(target_root)
@@ -7219,7 +7394,13 @@ def _execute_distribution_reconciliation(
                 )
                 if intent == "fresh" and created_workspace_identity is None:
                     assert guard_marker is not None
-                    _assert_fresh_guard_only_closed_set(target_root, executable, guard_marker)
+                    (
+                        boundary_workspace_identity,
+                        boundary_workspace_closed_set,
+                    ) = _assert_fresh_guard_only_closed_set(target_root, executable, guard_marker)
+                    store.expected_workspace_identity = boundary_workspace_identity
+                    guard_only_plan = executable
+                    guard_only_marker = guard_marker
                 package_compatible = guard_marker is not None and (
                     guard_marker.package_version == package_version
                     if legacy_fresh_conversion
@@ -7244,18 +7425,35 @@ def _execute_distribution_reconciliation(
                     store.bind_forward_guard(guard_marker)
                     validate_preserved_state()
                     journal = store.prepare(executable, package_version=guard_marker.package_version)
+                    store.workspace_closed_set_validator = None
+                    guard_only_plan = None
+                    guard_only_marker = None
                 else:
                     legacy_stage_leases = _validated_legacy_stage_leases(executable, guard_marker, target_root)
+                    store.require_journal_absent = legacy_fresh_conversion
+                    restore_legacy_marker_on_failure = legacy_fresh_conversion
+                    store._validate_workspace_closed_set()
                     validate_preserved_state()
+                    legacy_marker_bytes = _read_no_follow_regular(
+                        target_root / _DISTRIBUTION_RETRY_MARKER_REL,
+                        label="distribution retry marker",
+                    )
                     guard_marker = store.prepare_legacy_guard(
                         executable,
                         package_version=package_version,
                         replace_marker=guard_marker,
                         stage_ownership=legacy_stage_leases,
                     )
+                    legacy_marker_replaced = True
+                    guard_only_marker = guard_marker
                     store.bind_forward_guard(guard_marker)
                     validate_preserved_state()
                     journal = store.prepare(executable, package_version=package_version)
+                    legacy_marker_replaced = False
+                    store.require_journal_absent = False
+                    store.workspace_closed_set_validator = None
+                    guard_only_plan = None
+                    guard_only_marker = None
             else:
                 assert journal_seed is not None
                 journal = store.load_for_assessment(
@@ -7485,11 +7683,25 @@ def _execute_distribution_reconciliation(
         validate_preserved_state()
         store.remove_completed(active_journal, guard_already_removed=True)
         journal = active_journal
-    except Exception as exc:
-        if not isinstance(exc, DistributionApplyError):
+    except Exception as caught:
+        failure: Exception = caught
+        if (
+            restore_legacy_marker_on_failure
+            and legacy_marker_replaced
+            and legacy_marker_bytes is not None
+            and guard_marker is not None
+            and journal is None
+        ):
+            try:
+                store.require_journal_absent = False
+                store.restore_marker_bytes(guard_marker, legacy_marker_bytes)
+                legacy_marker_replaced = False
+            except Exception:
+                failure = DistributionApplyError("dual-recovery-state")
+        if not isinstance(failure, DistributionApplyError):
             reason = "generated-state-reconciliation-failed"
         else:
-            reason = str(exc)
+            reason = str(failure)
             sensitive_paths = tuple(
                 str(path) for path in (install_root, scaffold_root, target_root) if path.is_absolute()
             )
