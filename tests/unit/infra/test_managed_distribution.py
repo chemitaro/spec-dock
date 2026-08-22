@@ -456,6 +456,106 @@ def test_i369_fresh_journal_uses_isolated_authority_and_directory_actions(tmp_pa
     assert payload["schema_version"] == managed_distribution._DISTRIBUTION_JOURNAL_SCHEMA_VERSION
     assert {action.action for action in journal.actions} >= {"ensure-directory", "create"}
     assert payload["authority"] == "fresh-distribution-provisioning"
+    assert {binding.relative_path for binding in journal.created_parent_bindings} >= {
+        "spec-dock/.agent",
+        "spec-dock/initiatives",
+    }
+
+
+def test_i369_standalone_directory_binding_recovers_after_mkdir_before_publish(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_record = OperationJournalStore.record_created_parent_bindings
+    failed = False
+
+    def fail_after_mkdir(self, journal, bindings):
+        nonlocal failed
+        if not failed and any(item.relative_path == "spec-dock/.agent" and item.exists for item in bindings):
+            failed = True
+            raise DistributionApplyError("injected standalone binding publish failure")
+        return original_record(self, journal, bindings)
+
+    monkeypatch.setattr(OperationJournalStore, "record_created_parent_bindings", fail_after_mkdir)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    bindings = {item["relative_path"]: item for item in payload["created_parent_bindings"]}
+    assert bindings["spec-dock/.agent"]["exists"] is False
+    assert (target_root / "spec-dock/.agent").is_dir()
+
+    monkeypatch.setattr(OperationJournalStore, "record_created_parent_bindings", original_record)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert not journal_path.exists()
+
+
+def test_i369_standalone_directory_closed_set_rejects_unknown_child_after_checkpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_directory_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec-dock/.agent" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected standalone checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_directory_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    (target_root / "spec-dock/.agent/foreign").write_text("user\n", encoding="utf-8")
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-precondition-mismatch"
+    assert journal_path.exists()
 
 
 def test_i368_journal_resume_rejects_intent_mismatch_without_rewrite(tmp_path: Path) -> None:
@@ -5406,6 +5506,21 @@ def test_i369_created_fresh_workspace_rejects_foreign_root_child_before_journal(
     assert (workspace / ".distribution-retry.json").exists()
     assert not (workspace / ".distribution-journal.json").exists()
 
+    marker_before_retry = (workspace / ".distribution-retry.json").read_bytes()
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", original_prepare_legacy_guard)
+    retry = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "recovery_required"
+    assert retry.reason == "journal-parent-mismatch"
+    assert (workspace / ".distribution-retry.json").read_bytes() == marker_before_retry
+    assert not (workspace / ".distribution-journal.json").exists()
+
 
 @pytest.mark.parametrize(
     "phase",
@@ -5961,7 +6076,11 @@ def test_s25_current_mode_mismatch_is_preserved_and_blocked_for_uninstall(tmp_pa
     assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
 
 
-def test_s25_current_hard_linked_shortcut_is_blocked_for_uninstall(tmp_path: Path) -> None:
+@pytest.mark.parametrize("operation", ["fresh", "update", "init-force", "uninstall"])
+def test_s25_current_hard_linked_shortcut_is_blocked_for_mutation(
+    tmp_path: Path,
+    operation: managed_distribution.DistributionOperation,
+) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
     target_root = tmp_path / "consumer"
@@ -5976,7 +6095,7 @@ def test_s25_current_hard_linked_shortcut_is_blocked_for_uninstall(tmp_path: Pat
         install_root,
         manifest_path=manifest_path,
         target_root=target_root,
-        operation="uninstall",
+        operation=operation,
     )
 
     action = next(item for item in plan.actions if item.path == "spec")

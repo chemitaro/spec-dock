@@ -2094,7 +2094,7 @@ def _classify_current_target(
         actual.kind == "symlink"
         and observation.link_count is not None
         and observation.link_count > 1
-        and operation == "uninstall"
+        and operation in {"fresh", "update", "init-force", "uninstall"}
     ):
         return _blocked_action(
             path,
@@ -3551,10 +3551,18 @@ class OperationJournalStore:
             created_parent_bindings=tuple(
                 _missing_snapshot(path)
                 for path in sorted({
-                    parent.relative_path
-                    for action in plan.actions
-                    for parent in dict(plan.distribution_plan.target_snapshots)[action.path].parents
-                    if not parent.exists
+                    *{
+                        parent.relative_path
+                        for action in plan.actions
+                        for parent in dict(plan.distribution_plan.target_snapshots)[action.path].parents
+                        if not parent.exists
+                    },
+                    *{
+                        action.path
+                        for action in plan.actions
+                        if action.action == "ensure-directory"
+                        and not dict(plan.distribution_plan.target_snapshots)[action.path].target.exists
+                    },
                 })
             ),
             staging_leases=(),
@@ -6274,6 +6282,9 @@ def _reconcile_created_parent_bindings(
         if binding.exists:
             continue
         actual = actual_parents.get(relative_path)
+        if actual is None:
+            directory_snapshot = dict(assessment.distribution_plan.target_snapshots).get(relative_path)
+            actual = directory_snapshot.target if directory_snapshot is not None else None
         if actual is None or not actual.exists:
             continue
         if actual.file_type != "directory":
@@ -6443,6 +6454,86 @@ def _assert_created_workspace_closed_set(
         raise DistributionApplyError("journal-parent-mismatch")
 
 
+def _assert_fresh_guard_only_closed_set(
+    target_root: Path,
+    plan: ExecutableMutationPlan,
+    marker: DistributionRetryMarker,
+) -> None:
+    """Re-prove a fresh workspace before converting a guard-only retry.
+
+    A guard-only retry has no journal from which the bootstrap witness can be
+    restored.  The guard plan still binds the current workspace identity via
+    its action preconditions, so reject any child that is not an exact prefix
+    of a planned path or an operation-owned recovery entry before publishing a
+    journal.
+    """
+
+    workspace = target_root / "spec-dock"
+    try:
+        workspace_info = os.lstat(workspace)
+    except OSError as exc:
+        raise DistributionApplyError("journal-parent-mismatch") from exc
+    if stat.S_ISLNK(workspace_info.st_mode) or not stat.S_ISDIR(workspace_info.st_mode):
+        raise DistributionApplyError("journal-parent-mismatch")
+
+    workspace_identities: set[tuple[int, int]] = set()
+    for _, snapshot in plan.distribution_plan.target_snapshots:
+        for parent in snapshot.parents:
+            if parent.relative_path == "spec-dock" and parent.exists:
+                if parent.file_type != "directory" or parent.device is None or parent.inode is None:
+                    raise DistributionApplyError("journal-parent-mismatch")
+                workspace_identities.add((parent.device, parent.inode))
+        target = snapshot.target
+        if target.relative_path == "spec-dock" and target.exists:
+            if target.file_type != "directory" or target.device is None or target.inode is None:
+                raise DistributionApplyError("journal-parent-mismatch")
+            workspace_identities.add((target.device, target.inode))
+    if len(workspace_identities) != 1 or (workspace_info.st_dev, workspace_info.st_ino) not in workspace_identities:
+        raise DistributionApplyError("journal-parent-mismatch")
+
+    allowed: set[str] = {
+        _DISTRIBUTION_RETRY_MARKER_REL.name,
+        _DISTRIBUTION_JOURNAL_REL.name,
+    }
+
+    def add_path(relative_path: str) -> None:
+        parts = PurePosixPath(relative_path).parts
+        if not parts or parts[0] != "spec-dock":
+            return
+        for index in range(1, len(parts) + 1):
+            allowed.add(PurePosixPath(*parts[1:index]).as_posix())
+
+    for action in plan.actions:
+        add_path(action.path)
+    for lease in marker.stage_ownership:
+        add_path(lease.path)
+        lease_parts = PurePosixPath(lease.path).parts
+        if len(lease_parts) >= 2 and lease_parts[0] == "spec-dock":
+            lease_parent = PurePosixPath(*lease_parts[1:-1])
+            allowed.add((lease_parent / lease.stage_name).as_posix() if lease_parent.parts else lease.stage_name)
+
+    def walk(current: Path, relative: str) -> None:
+        try:
+            entries = tuple(os.scandir(current))
+        except OSError as exc:
+            raise DistributionApplyError("journal-parent-mismatch") from exc
+        for entry in entries:
+            child = f"{relative}/{entry.name}" if relative else entry.name
+            has_allowed_descendant = any(path.startswith(f"{child}/") for path in allowed)
+            if child not in allowed and not has_allowed_descendant:
+                raise DistributionApplyError("journal-parent-mismatch")
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise DistributionApplyError("journal-parent-mismatch") from exc
+            if has_allowed_descendant:
+                if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+                    raise DistributionApplyError("journal-parent-mismatch")
+                walk(Path(entry.path), child)
+
+    walk(workspace, "")
+
+
 def _assert_created_parent_bindings_closed_set(
     target_root: Path,
     journal: OperationJournal,
@@ -6454,6 +6545,8 @@ def _assert_created_parent_bindings_closed_set(
         parents = action.precondition.get("parents")
         if not isinstance(parents, list):
             raise DistributionApplyError("journal-precondition-mismatch")
+        if action.action == "ensure-directory" and action.precondition.get("exists") is False:
+            originally_missing.add(action.path)
         originally_missing.update(
             parent["relative_path"]
             for parent in parents
@@ -7124,6 +7217,9 @@ def _execute_distribution_reconciliation(
                     and guard_marker.operation == "fresh"
                     and intent == "fresh"
                 )
+                if intent == "fresh" and created_workspace_identity is None:
+                    assert guard_marker is not None
+                    _assert_fresh_guard_only_closed_set(target_root, executable, guard_marker)
                 package_compatible = guard_marker is not None and (
                     guard_marker.package_version == package_version
                     if legacy_fresh_conversion
