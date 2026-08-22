@@ -3123,6 +3123,133 @@ def test_i368_checkpoint_write_failure_recovers_from_exact_postcondition(tmp_pat
     assert not journal_path.exists()
 
 
+def test_i369_published_fresh_create_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    replaced = False
+
+    def replace_after_create_checkpoint(self, journal, completed_paths):
+        nonlocal replaced
+        result = original_checkpoint(self, journal, completed_paths)
+        if not replaced and ".github/workflows/ci.yml" in completed_paths:
+            target = target_root / ".github/workflows/ci.yml"
+            replacement = target.with_name("ci.yml.external")
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(target.stat().st_mode & 0o777)
+            target.unlink()
+            replacement.rename(target)
+            replaced = True
+            raise DistributionApplyError("injected post-checkpoint create replacement")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", replace_after_create_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert replaced is True, first.reason
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    record = next(item for item in journal_payload["actions"] if item["path"] == ".github/workflows/ci.yml")
+    assert record["action"] == "create"
+    assert record["checkpoint"] == "published"
+    assert all(field in record["postcondition"] for field in ("device", "inode", "ctime_ns", "link_count"))
+    assert record["postcondition"]["inode"] != (target_root / ".github/workflows/ci.yml").stat().st_ino
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert journal_path.exists()
+
+
+def test_i369_published_recognized_upgrade_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github/workflows/ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    replaced = False
+
+    def replace_after_upgrade_checkpoint(self, journal, completed_paths):
+        nonlocal replaced
+        result = original_checkpoint(self, journal, completed_paths)
+        if not replaced and ".github/workflows/ci.yml" in completed_paths:
+            replacement = target.with_name("ci.yml.external")
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(target.stat().st_mode & 0o777)
+            target.unlink()
+            replacement.rename(target)
+            replaced = True
+            raise DistributionApplyError("injected post-checkpoint upgrade replacement")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", replace_after_upgrade_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert replaced is True
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    record = next(item for item in journal_payload["actions"] if item["path"] == ".github/workflows/ci.yml")
+    assert record["action"] == "upgrade"
+    assert record["checkpoint"] == "published"
+    assert all(field in record["postcondition"] for field in ("device", "inode", "ctime_ns", "link_count"))
+    assert record["postcondition"]["inode"] != target.stat().st_ino
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert journal_path.exists()
+
+
 def test_i368_retry_cleans_exact_stage_created_after_write_ahead_reservation(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, b"desired\n")
     manifest_path = _write_manifest(tmp_path, _manifest_with())

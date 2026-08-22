@@ -4398,6 +4398,39 @@ class OperationJournalStore:
                 ),
                 predecessor=active,
             )
+        successor_actions: dict[str, OperationJournalAction] = {}
+        for lease in active.staging_leases:
+            if lease.path not in completed or lease.role != "stage":
+                continue
+            record = next((item for item in active.actions if item.path == lease.path), None)
+            if record is None or record.action not in {"create", "upgrade"}:
+                continue
+            if record.postcondition.get("file_type") == "directory":
+                continue
+            parent_chain = _open_distribution_parent_chain(
+                self.target_root,
+                lease.path,
+                create_missing=False,
+            )
+            try:
+                successor_postcondition = self._capture_exact_canonical_successor(
+                    parent_chain[-1],
+                    PurePosixPath(lease.path).name,
+                    lease.path,
+                    lease,
+                    record.postcondition,
+                )
+            finally:
+                _close_distribution_parent_chain(parent_chain)
+            successor_actions[lease.path] = replace(record, postcondition=successor_postcondition)
+        if successor_actions:
+            active = self.write(
+                replace(
+                    active,
+                    actions=tuple(successor_actions.get(record.path, record) for record in active.actions),
+                ),
+                predecessor=active,
+            )
         for lease in active.staging_leases:
             if lease.path not in completed or lease.role != "stage":
                 continue
@@ -4550,6 +4583,32 @@ class OperationJournalStore:
         )
 
     @staticmethod
+    def _capture_exact_canonical_successor(
+        parent_fd: int,
+        target_name: str,
+        path: str,
+        successor: DistributionStageOwnership,
+        postcondition: dict[str, object],
+    ) -> dict[str, object]:
+        canonical = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+        canonical_identity = _distribution_stage_identity(parent_fd, target_name, path)
+        if (
+            canonical.st_dev != successor.device
+            or canonical.st_ino != successor.inode
+            or _file_type(canonical.st_mode) != successor.file_type
+            or canonical.st_nlink != 1
+            or postcondition.get("identity") != _distribution_identity_payload(canonical_identity)
+        ):
+            raise DistributionApplyError("managed staging cleanup failed")
+        return {
+            **postcondition,
+            "device": canonical.st_dev,
+            "inode": canonical.st_ino,
+            "ctime_ns": canonical.st_ctime_ns,
+            "link_count": canonical.st_nlink,
+        }
+
+    @staticmethod
     def _assert_exact_canonical_successor(
         parent_fd: int,
         target_name: str,
@@ -4557,17 +4616,13 @@ class OperationJournalStore:
         successor: DistributionStageOwnership,
         postcondition: dict[str, object],
     ) -> None:
-        canonical = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
-        canonical_identity = _distribution_stage_identity(parent_fd, target_name, path)
-        if (
-            canonical.st_dev != successor.device
-            or canonical.st_ino != successor.inode
-            or canonical.st_ctime_ns != successor.ctime_ns
-            or _file_type(canonical.st_mode) != successor.file_type
-            or canonical.st_nlink != 1
-            or postcondition.get("identity") != _distribution_identity_payload(canonical_identity)
-        ):
-            raise DistributionApplyError("managed staging cleanup failed")
+        OperationJournalStore._capture_exact_canonical_successor(
+            parent_fd,
+            target_name,
+            path,
+            successor,
+            postcondition,
+        )
 
     def _resume_displaced_quarantine_cleanup(
         self,
@@ -5906,7 +5961,7 @@ def _journal_digest(journal: OperationJournal) -> str:
                 "provenance": action.provenance,
                 "reason": action.reason,
                 "precondition": _plan_digest_condition(action.precondition),
-                "postcondition": _plan_digest_condition(action.postcondition),
+                "postcondition": _plan_digest_condition(_journal_digest_postcondition(action)),
             }
             for action in journal.actions
         ],
@@ -5924,6 +5979,15 @@ def _journal_digest(journal: OperationJournal) -> str:
         payload["required_directories"] = required_directories
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _journal_digest_postcondition(action: OperationJournalAction) -> dict[str, object]:
+    """Exclude runtime successor identity from the canonical plan digest."""
+
+    condition = action.postcondition
+    if action.action not in {"create", "upgrade"} or condition.get("file_type") == "directory":
+        return condition
+    return {key: value for key, value in condition.items() if key not in {"device", "inode", "ctime_ns"}}
 
 
 def _is_legacy_adopt_postcondition(record: OperationJournalAction) -> bool:
@@ -6493,6 +6557,17 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
                         or any(
                             postcondition.get(field) != getattr(target_snapshot.target, field)
                             for field in ("device", "inode", "ctime_ns")
+                        )
+                    )
+                )
+                or (
+                    record.action in {"create", "upgrade"}
+                    and record.checkpoint != "pending"
+                    and (
+                        target_snapshot is None
+                        or any(
+                            postcondition.get(field) != getattr(target_snapshot.target, field)
+                            for field in ("device", "inode", "ctime_ns", "link_count")
                         )
                     )
                 )
