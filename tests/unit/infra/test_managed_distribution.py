@@ -5734,6 +5734,67 @@ def test_i369_fresh_schema1_conversion_preserves_legacy_marker_when_journal_appe
     assert (workspace / ".distribution-journal.json").read_bytes() == b"raced journal\n"
 
 
+def test_i369_fresh_schema1_conversion_restores_marker_after_digest_anchor_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = workspace / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "fresh",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    legacy_bytes = marker_path.read_bytes()
+    original_prepare_legacy_guard = OperationJournalStore.prepare_legacy_guard
+
+    def publish_raced_journal_after_anchor(self, plan, **kwargs):
+        marker = original_prepare_legacy_guard(self, plan, **kwargs)
+        if plan is not None and kwargs.get("replace_marker") is not None and marker.journal_digest is not None:
+            marker_path = self.target_root / managed_distribution._DISTRIBUTION_RETRY_MARKER_REL
+            payload = json.loads(marker_path.read_text(encoding="utf-8"))
+            payload.pop("journal_digest", None)
+            payload.pop("journal_predecessor_digest", None)
+            payload.pop("journal_created_at_ns", None)
+            marker_path.write_text(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+            restored = managed_distribution._read_distribution_retry_marker(self.target_root)
+            assert restored is not None
+            marker = restored
+        if plan is None and kwargs.get("journal_digest") is not None:
+            self.path.write_bytes(b"raced after digest anchor\n")
+        return marker
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", publish_raced_journal_after_anchor)
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert marker_path.read_bytes() == legacy_bytes
+    assert (workspace / ".distribution-journal.json").read_bytes() == b"raced after digest anchor\n"
+
+
 def test_s25_missing_current_target_is_create(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -6232,6 +6293,63 @@ def test_s25_current_hard_linked_shortcut_is_blocked_for_mutation(
     else:
         assert action.reason == "current-identity-match"
         assert action.blocked is False
+
+
+def test_i369_recognized_symlink_adopt_checkpoint_retry_preserves_link_topology(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_shortcut_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected recognized shortcut checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_shortcut_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert any(item["path"] == "spec" and item["checkpoint"] == "published" for item in journal_payload["actions"])
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert shortcut.lstat().st_nlink == 2
+    assert alias.is_symlink()
+    assert not journal_path.exists()
 
 
 def test_s25_historical_hard_linked_shortcut_is_blocked_for_update(tmp_path: Path) -> None:
