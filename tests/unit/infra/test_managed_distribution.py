@@ -5777,6 +5777,140 @@ def test_i369_protocol1_adopt_postcondition_guard_only_migrates_compatibility(
     assert not marker_path.exists()
 
 
+def test_i369_protocol1_fixed_link_count_symlink_journal_retry_compatibility(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_payload = managed_distribution._action_postcondition_payload
+
+    def fixed_link_count_payload(plan, action):
+        payload = original_payload(plan, action)
+        if action.action == "adopt" and payload.get("file_type") != "directory":
+            payload = {**payload, "link_count": 1}
+            return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
+        return payload
+
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_shortcut_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected fixed-link-count protocol-1 stop")
+        return result
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", fixed_link_count_payload)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_shortcut_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    adopted = next(item for item in journal_payload["actions"] if item["path"] == "spec")
+    assert adopted["action"] == "adopt"
+    assert adopted["postcondition"]["link_count"] == 1
+    assert all(field not in adopted["postcondition"] for field in ("device", "inode", "ctime_ns"))
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", original_payload)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert shortcut.lstat().st_nlink == 2
+    assert alias.is_symlink()
+    assert not journal_path.exists()
+
+
+def test_i369_protocol1_fixed_link_count_symlink_guard_only_migrates_compatibility(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_payload = managed_distribution._action_postcondition_payload
+
+    def fixed_link_count_payload(plan, action):
+        payload = original_payload(plan, action)
+        if action.action == "adopt" and payload.get("file_type") != "directory":
+            payload = {**payload, "link_count": 1}
+            return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
+        return payload
+
+    original_prepare = OperationJournalStore.prepare
+
+    def stop_after_fixed_link_count_guard(self, plan, *, package_version):
+        raise DistributionApplyError("injected fixed-link-count guard-only stop")
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", fixed_link_count_payload)
+    monkeypatch.setattr(OperationJournalStore, "prepare", stop_after_fixed_link_count_guard)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    marker_path = target_root / "spec-dock/.distribution-retry.json"
+    assert not journal_path.exists()
+    marker_before = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert marker_before["purpose"] == "recognized-journal-forward-only"
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", original_payload)
+    monkeypatch.setattr(OperationJournalStore, "prepare", original_prepare)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert shortcut.lstat().st_nlink == 2
+    assert alias.is_symlink()
+    assert not journal_path.exists()
+    assert not marker_path.exists()
+
+
 @pytest.mark.parametrize(
     "phase",
     (
