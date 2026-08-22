@@ -3,7 +3,7 @@
 ID: "iss-00369"
 タイトル: "Fresh Distribution Provisioning"
 関連GitHub: ["#369"]
-最終更新: "2026-08-22"
+最終更新: "2026-08-23"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -21,13 +21,14 @@ fresh contract には current/scaffold/generated assets、active fallback、vers
 ## Verification
 
 - `make lint`: pass（ruff、format check、mypy）
-- `uv run pytest -q`: pass（1259 passed / 1119 skipped）
+- `uv run pytest -q`: pass（1281 passed / 1119 skipped、candidate `69f19ee8a056d98bb2563ee77e27872a4d9cea81`）
 - `./spec-dock/scripts/spec-dock validate`: pass（nodes=227）
 - `git diff --check`: pass
-- `uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py`: pass（candidate `e7e1afffd721915df42e8c10de4322ab47e4a241`、`27 failed / 2303 passed / 48 skipped`、`14884.54s (4:08:04)`）。27件の失敗はすべて full-regression ledger の approved failure signatures と一致し、検証器は `verified 27 approved failure signatures` を出力した。
+- `uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py`: pass（candidate `69f19ee8a056d98bb2563ee77e27872a4d9cea81`、raw pytest `27 failed / 2325 passed / 48 skipped`、`16171.42s (4:29:31)`、検証器終了コード0）。27件の失敗はすべて full-regression ledger の approved failure signatures と完全一致し、検証器は `verified 27 approved failure signatures on candidate 69f19ee8a056d98bb2563ee77e27872a4d9cea81` を出力した。reported candidate以降の変更はこの証跡更新を含むdocs-only successorとして扱う。
 
 ## Residual Risks / Follow-ups
 
-- full-regression は 2378 tests（27 failed / 2303 passed / 48 skipped）を一括実行し約4時間8分を要した。27件の approved failure ledger は Issue 368 から継承した本 Issue の変更範囲外であり、candidate SHA 上で署名一致を確認済み。
+- full-regression は 2400 tests（27 failed / 2325 passed / 48 skipped）を一括実行し約4時間29分を要した。27件の approved failure ledger は Issue 368 から継承した本 Issue の変更範囲外であり、candidate SHA 上で署名完全一致を確認済み。
 - Issue 369 の fresh provisioning 変更に起因する unexpected failure/error は検出されていない。
 - marker/journal の terminal cleanup failure では、journal と forward guard を残して同一 plan の再試行へ進む。異なる root、contract、plan、または未知の child は fail closed とする。
+- Strict v2 の advisory P2 として、protocol-1 の pending write が最初の current publication 前に protocol-2へ昇格されない境界が残る。P0/P1ではなく、将来のprotocol migration hardeningとしてIssue 370以降で扱う。
