@@ -2581,6 +2581,25 @@ def _distribution_plan_digest(
     legacy_adopt_fixed_link_count: bool = False,
 ) -> str:
     ordered_actions = sorted(actions, key=lambda action: (action.path, action.action, action.reason))
+
+    def digest_postcondition(action: DistributionAction) -> dict[str, object]:
+        postcondition = (
+            _legacy_action_postcondition_payload(
+                plan,
+                action,
+                fixed_link_count=legacy_adopt_fixed_link_count,
+            )
+            if legacy_adopt_postconditions
+            else _action_postcondition_payload(plan, action)
+        )
+        if action.action in {"create", "upgrade"} and postcondition.get("file_type") != "directory":
+            return {
+                key: value
+                for key, value in postcondition.items()
+                if key not in {"device", "inode", "ctime_ns", "link_count"}
+            }
+        return postcondition
+
     payload: dict[str, object] = {
         "schema_version": (
             _DISTRIBUTION_FRESH_JOURNAL_SCHEMA_VERSION if intent == "fresh" else _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
@@ -2598,15 +2617,7 @@ def _distribution_plan_digest(
                 "provenance": action.provenance,
                 "reason": action.reason,
                 "precondition": _plan_digest_condition(_action_precondition_payload(plan, action)),
-                "postcondition": _plan_digest_condition(
-                    _legacy_action_postcondition_payload(
-                        plan,
-                        action,
-                        fixed_link_count=legacy_adopt_fixed_link_count,
-                    )
-                    if legacy_adopt_postconditions
-                    else _action_postcondition_payload(plan, action)
-                ),
+                "postcondition": _plan_digest_condition(digest_postcondition(action)),
             }
             for action in ordered_actions
         ],
@@ -6110,7 +6121,7 @@ def _journal_digest_postcondition(action: OperationJournalAction) -> dict[str, o
     condition = action.postcondition
     if action.action not in {"create", "upgrade"} or condition.get("file_type") == "directory":
         return condition
-    return {key: value for key, value in condition.items() if key not in {"device", "inode", "ctime_ns"}}
+    return {key: value for key, value in condition.items() if key not in {"device", "inode", "ctime_ns", "link_count"}}
 
 
 def _is_legacy_adopt_postcondition(record: OperationJournalAction) -> bool:
@@ -6889,9 +6900,26 @@ def _reconcile_created_parent_bindings(
         for parent in snapshot.parents
     }
     bindings = {binding.relative_path: binding for binding in journal.created_parent_bindings}
+    pending_directory_records = {
+        record.path: record
+        for record in journal.actions
+        if record.checkpoint == "pending"
+        and record.action == "ensure-directory"
+        and record.precondition.get("exists") is False
+    }
     changed = False
-    for relative_path, binding in tuple(bindings.items()):
-        if binding.exists:
+    candidate_paths = tuple(
+        sorted(
+            {
+                *bindings,
+                *pending_directory_records,
+            },
+            key=lambda path: (path.count("/"), path),
+        )
+    )
+    for relative_path in candidate_paths:
+        binding = bindings.get(relative_path)
+        if binding is not None and binding.exists:
             continue
         actual = actual_parents.get(relative_path)
         if actual is None:
@@ -6916,14 +6944,16 @@ def _reconcile_created_parent_bindings(
             child_path = f"{relative_path}/{child.name}"
             record = records.get(child_path)
             snapshot = snapshots.get(child_path)
+            child_postcondition = (
+                _fresh_workbench_seed_recovery_postcondition(snapshot, journal, record)
+                if record is not None and snapshot is not None
+                else None
+            )
             if (
                 record is None
                 or snapshot is None
-                or not _snapshot_matches_condition(
-                    snapshot,
-                    _journal_postcondition(record),
-                    tentative_bindings,
-                )
+                or child_postcondition is None
+                or not _snapshot_matches_condition(snapshot, child_postcondition, tentative_bindings)
             ):
                 raise DistributionApplyError("journal-precondition-mismatch")
         bindings[relative_path] = actual
