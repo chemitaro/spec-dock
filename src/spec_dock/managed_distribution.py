@@ -2537,6 +2537,28 @@ def _legacy_action_postcondition_payload(
     return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
 
 
+def _legacy_fixed_link_count_create_upgrade_postcondition_payload(
+    plan: DistributionPlan,
+    action: DistributionAction,
+) -> dict[str, object]:
+    """Reconstruct the pre-identity create/upgrade digest postcondition.
+
+    The Issue 368 writer hashed non-directory create/upgrade postconditions
+    with a fixed ``link_count: 1``.  Current journals retain the observed
+    successor identity, so that runtime metadata is excluded from the
+    canonical digest; this helper keeps the old digest candidate bounded to
+    the historical fixed-link-count shape.
+    """
+
+    payload = _action_postcondition_payload(plan, action)
+    if action.action not in {"create", "upgrade"} or payload.get("file_type") == "directory":
+        return payload
+    return {
+        **{key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns", "link_count"}},
+        "link_count": 1,
+    }
+
+
 def _path_snapshot_condition(snapshot: PathIdentitySnapshot) -> dict[str, object]:
     return {
         "relative_path": snapshot.relative_path,
@@ -2579,6 +2601,7 @@ def _distribution_plan_digest(
     actions: tuple[DistributionAction, ...],
     legacy_adopt_postconditions: bool = False,
     legacy_adopt_fixed_link_count: bool = False,
+    legacy_create_upgrade_fixed_link_count: bool = False,
 ) -> str:
     ordered_actions = sorted(actions, key=lambda action: (action.path, action.action, action.reason))
 
@@ -2592,7 +2615,11 @@ def _distribution_plan_digest(
             if legacy_adopt_postconditions
             else _action_postcondition_payload(plan, action)
         )
+        if legacy_create_upgrade_fixed_link_count and action.action in {"create", "upgrade"}:
+            postcondition = _legacy_fixed_link_count_create_upgrade_postcondition_payload(plan, action)
         if action.action in {"create", "upgrade"} and postcondition.get("file_type") != "directory":
+            if legacy_create_upgrade_fixed_link_count:
+                return postcondition
             return {
                 key: value
                 for key, value in postcondition.items()
@@ -2633,6 +2660,7 @@ def _mutation_plan_digest(
     *,
     legacy_adopt_postconditions: bool = False,
     legacy_adopt_fixed_link_count: bool = False,
+    legacy_create_upgrade_fixed_link_count: bool = False,
 ) -> str:
     return _distribution_plan_digest(
         intent=assessment.intent,
@@ -2642,6 +2670,7 @@ def _mutation_plan_digest(
         actions=assessment.actions,
         legacy_adopt_postconditions=legacy_adopt_postconditions,
         legacy_adopt_fixed_link_count=legacy_adopt_fixed_link_count,
+        legacy_create_upgrade_fixed_link_count=legacy_create_upgrade_fixed_link_count,
     )
 
 
@@ -2650,6 +2679,7 @@ def _executable_plan_digest(
     *,
     legacy_adopt_postconditions: bool = False,
     legacy_adopt_fixed_link_count: bool = False,
+    legacy_create_upgrade_fixed_link_count: bool = False,
 ) -> str:
     return _distribution_plan_digest(
         intent=plan.intent,
@@ -2659,6 +2689,7 @@ def _executable_plan_digest(
         actions=plan.actions,
         legacy_adopt_postconditions=legacy_adopt_postconditions,
         legacy_adopt_fixed_link_count=legacy_adopt_fixed_link_count,
+        legacy_create_upgrade_fixed_link_count=legacy_create_upgrade_fixed_link_count,
     )
 
 
@@ -2671,6 +2702,18 @@ def _mutation_plan_digest_candidates(assessment: WorkspaceAssessment) -> frozens
             legacy_adopt_postconditions=True,
             legacy_adopt_fixed_link_count=True,
         ),
+        _mutation_plan_digest(assessment, legacy_create_upgrade_fixed_link_count=True),
+        _mutation_plan_digest(
+            assessment,
+            legacy_adopt_postconditions=True,
+            legacy_create_upgrade_fixed_link_count=True,
+        ),
+        _mutation_plan_digest(
+            assessment,
+            legacy_adopt_postconditions=True,
+            legacy_adopt_fixed_link_count=True,
+            legacy_create_upgrade_fixed_link_count=True,
+        ),
     })
 
 
@@ -2682,6 +2725,18 @@ def _executable_plan_digest_candidates(plan: ExecutableMutationPlan) -> frozense
             plan,
             legacy_adopt_postconditions=True,
             legacy_adopt_fixed_link_count=True,
+        ),
+        _executable_plan_digest(plan, legacy_create_upgrade_fixed_link_count=True),
+        _executable_plan_digest(
+            plan,
+            legacy_adopt_postconditions=True,
+            legacy_create_upgrade_fixed_link_count=True,
+        ),
+        _executable_plan_digest(
+            plan,
+            legacy_adopt_postconditions=True,
+            legacy_adopt_fixed_link_count=True,
+            legacy_create_upgrade_fixed_link_count=True,
         ),
     })
 
@@ -6075,7 +6130,11 @@ def _generated_regular_asset(
     )
 
 
-def _journal_digest(journal: OperationJournal) -> str:
+def _journal_digest(
+    journal: OperationJournal,
+    *,
+    legacy_create_upgrade_fixed_link_count: bool = False,
+) -> str:
     payload: dict[str, object] = {
         "schema_version": (
             _DISTRIBUTION_FRESH_JOURNAL_SCHEMA_VERSION
@@ -6095,7 +6154,12 @@ def _journal_digest(journal: OperationJournal) -> str:
                 "provenance": action.provenance,
                 "reason": action.reason,
                 "precondition": _plan_digest_condition(action.precondition),
-                "postcondition": _plan_digest_condition(_journal_digest_postcondition(action)),
+                "postcondition": _plan_digest_condition(
+                    _journal_digest_postcondition(
+                        action,
+                        legacy_create_upgrade_fixed_link_count=legacy_create_upgrade_fixed_link_count,
+                    )
+                ),
             }
             for action in journal.actions
         ],
@@ -6115,13 +6179,22 @@ def _journal_digest(journal: OperationJournal) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _journal_digest_postcondition(action: OperationJournalAction) -> dict[str, object]:
+def _journal_digest_postcondition(
+    action: OperationJournalAction,
+    *,
+    legacy_create_upgrade_fixed_link_count: bool = False,
+) -> dict[str, object]:
     """Exclude runtime successor identity from the canonical plan digest."""
 
     condition = action.postcondition
     if action.action not in {"create", "upgrade"} or condition.get("file_type") == "directory":
         return condition
-    return {key: value for key, value in condition.items() if key not in {"device", "inode", "ctime_ns", "link_count"}}
+    normalized = {
+        key: value for key, value in condition.items() if key not in {"device", "inode", "ctime_ns", "link_count"}
+    }
+    if legacy_create_upgrade_fixed_link_count:
+        normalized["link_count"] = 1
+    return normalized
 
 
 def _is_legacy_adopt_postcondition(record: OperationJournalAction) -> bool:
@@ -6804,7 +6877,12 @@ def _resume_executable_plan(
     assessment: WorkspaceAssessment,
     journal: OperationJournal,
 ) -> ExecutableMutationPlan:
-    if _journal_digest(journal) not in {journal.plan_digest, *_mutation_plan_digest_candidates(assessment)}:
+    journal_digests = {
+        _journal_digest(journal),
+        _journal_digest(journal, legacy_create_upgrade_fixed_link_count=True),
+    }
+    expected_digests = {journal.plan_digest, *_mutation_plan_digest_candidates(assessment)}
+    if not journal_digests.intersection(expected_digests):
         raise DistributionApplyError("journal-plan-mismatch")
     _assert_journal_action_contract(assessment, journal)
     plan = assessment.distribution_plan
