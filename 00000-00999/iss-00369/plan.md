@@ -506,7 +506,7 @@ uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-an
 git diff --check
 ```
 
-`verify-full-regression.py` は内部でrepository-wide `pytest --run-full-regression -q --junitxml=...`を実行し、approved baseline failureのnode IDとnormalized signatureが完全一致する場合だけwrapperとしてexit 0を返す。raw pytest exit 1またはfocused exit 3を手動で成功へ読み替えない。
+`verify-full-regression.py` は最初に `--collect-only` で全 node を収集し、重複のない4 shardへ明示的に分割する。各 shard は `pytest --run-full-regression --full-regression-shard` を600秒 hard timeout、行単位ストリーミング、`--junitxml` 付きで実行し、shardごとのJUnit・ログ・resultを `.workbench/full-regression/<run-id>/` に保存する。verifier は全 shard の node と approved baseline failure の normalized signature を統合し、完全一致した場合だけ exit 0 を返す。raw shard exit 1 は ledger failure の候補として扱うが、timeout、exit 3、欠落/重複 node、setup/teardown error、signature mismatch は必ず失敗とする。raw pytest exit や focused exit 3 を手動で成功へ読み替えない。
 
 Issue 369で新規failureをledgerへ追加して許可しない。unexpected failure、missing baseline node、signature mismatch、setup/teardown errorはexit criteria failureである。
 
