@@ -5924,7 +5924,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "        run: make lint" in workflow_lines["fast"]
         assert workflow_lines["fast"].count("        run: uv run pytest") == 1
         assert "--run-full-regression" not in workflow_texts["fast"]
-        assert workflow_lines["full"].count("        run: uv run pytest --run-full-regression") == 1
+        assert "verify-full-regression.py" in workflow_texts["full"]
+        assert "--timeout-seconds 600 --shards 4" in workflow_texts["full"]
+        assert "run: uv run pytest --run-full-regression" not in workflow_texts["full"]
         assert "continue-on-error:" not in workflow_texts["full"]
 
         for name, workflow_text in workflow_texts.items():

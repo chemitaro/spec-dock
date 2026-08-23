@@ -41,6 +41,7 @@ _full_regression_failures: dict[str, str] = {}
 _full_regression_errors: list[str] = []
 _full_regression_missing_nodes: set[str] = set()
 _full_regression_ledger_errors: list[str] = []
+_full_regression_shard_mode = False
 
 
 def _normalize_failure_message(message: str, repository: Path) -> str:
@@ -88,6 +89,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Run full_regression tests instead of applying the default policy skip.",
     )
+    parser.addoption(
+        "--full-regression-shard",
+        action="store_true",
+        default=False,
+        help="Run an explicitly selected full-regression shard without global ledger completeness checks.",
+    )
 
 
 def _classification_error(item: pytest.Item, reason: str) -> pytest.UsageError:
@@ -100,8 +107,12 @@ def pytest_collection_modifyitems(
     items: list[pytest.Item],
 ) -> None:
     global _full_regression_guard_active, _full_regression_expected, _full_regression_missing_nodes
+    global _full_regression_shard_mode
 
     run_full_regression = config.getoption("--run-full-regression")
+    _full_regression_shard_mode = config.getoption("--full-regression-shard")
+    if _full_regression_shard_mode and not run_full_regression:
+        raise pytest.UsageError("--full-regression-shard requires --run-full-regression")
 
     for item in items:
         has_fast = item.get_closest_marker("fast") is not None
@@ -143,6 +154,8 @@ def pytest_collection_modifyitems(
             item.add_marker(pytest.mark.skip(reason=POLICY_SKIP_REASON))
 
     if run_full_regression and not config.option.collectonly:
+        if _full_regression_shard_mode:
+            return
         _full_regression_guard_active = True
         try:
             expected = _approved_full_regression_signatures()
