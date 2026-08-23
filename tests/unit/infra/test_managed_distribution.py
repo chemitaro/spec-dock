@@ -388,6 +388,46 @@ def test_i368_executable_plan_digest_is_stable_for_equivalent_assessment(tmp_pat
     assert first.root_identity == second.root_identity
 
 
+def test_i369_legacy_create_upgrade_fixed_link_count_guard_migrates(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    legacy_digest = managed_distribution._executable_plan_digest(
+        executable,
+        legacy_adopt_postconditions=True,
+        legacy_adopt_fixed_link_count=True,
+        legacy_create_upgrade_fixed_link_count=True,
+    )
+
+    assert legacy_digest != executable.plan_digest
+    assert legacy_digest in managed_distribution._executable_plan_digest_candidates(executable)
+
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    legacy_guard = store.prepare_legacy_guard(
+        None,
+        package_version="1.2.3",
+        replace_marker=guard,
+        plan_digest_override=legacy_digest,
+    )
+    store.bind_forward_guard(legacy_guard)
+    journal = store.prepare(executable, package_version="1.2.3")
+
+    assert journal.plan_digest == executable.plan_digest
+    marker = json.loads((target_root / "spec-dock/.distribution-retry.json").read_text(encoding="utf-8"))
+    assert marker["plan_digest"] == executable.plan_digest
+
+
 def test_i368_generated_asset_path_must_be_canonical_and_repository_relative(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
