@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 
 import pytest
 
@@ -29,6 +31,7 @@ _TEMPLATE_MODULES = frozenset({
     "tests.cli_runtime.test_doctor",
     "tests.cli_runtime.test_import",
     "tests.cli_runtime.test_issue_lifecycle",
+    "tests.cli_runtime.test_new",
     "tests.cli_runtime.test_storage_core_cli",
     "tests.cli_runtime.test_sync",
     "tests.cli_runtime.test_uninstall",
@@ -40,31 +43,19 @@ _TEMPLATE_MODULES = frozenset({
 })
 
 
-def _remove_tree_entry(path: Path) -> None:
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.is_dir():
-        shutil.rmtree(path)
-
-
-def _copy_tree_replace_symlinks(source: Path, target: Path) -> None:
-    """Copy a setup tree without following or colliding with target symlinks."""
+def _clone_tree_contents(source: Path, target: Path) -> None:
+    """Clone a setup tree with copy-on-write when the host supports it."""
 
     target.mkdir(parents=True, exist_ok=True)
-    for source_entry in source.iterdir():
-        target_entry = target / source_entry.name
-        if source_entry.is_symlink():
-            if target_entry.exists() or target_entry.is_symlink():
-                _remove_tree_entry(target_entry)
-            target_entry.symlink_to(source_entry.readlink())
-        elif source_entry.is_dir():
-            if target_entry.is_symlink() or target_entry.is_file():
-                _remove_tree_entry(target_entry)
-            _copy_tree_replace_symlinks(source_entry, target_entry)
-        else:
-            if target_entry.exists() or target_entry.is_symlink():
-                _remove_tree_entry(target_entry)
-            shutil.copy2(source_entry, target_entry)
+    command = (
+        ["cp", "-cR", f"{source}/.", str(target)]
+        if sys.platform == "darwin"
+        else ["cp", "--reflink=auto", "-a", f"{source}/.", str(target)]
+    )
+    try:
+        subprocess.run(command, check=True, capture_output=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        shutil.copytree(source, target, symlinks=True, dirs_exist_ok=True)
 
 
 @pytest.fixture(scope="session")
@@ -76,22 +67,13 @@ def _fresh_init_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return template
 
 
-@pytest.fixture(scope="session")
-def _linked_hierarchy_templates(
-    _fresh_init_template: Path,
-) -> dict[tuple[object, ...], Path]:
-    """Hold materialized ``new initiative/epic/issue`` setup templates."""
-
-    return {}
-
-
-@pytest.fixture
+# Dynamic usefixtures markers are added after fixture closure construction;
+# autouse plus the nodeid allow-list is required for deterministic activation.
+@pytest.fixture(autouse=True)  # noqa: RUF076
 def _reuse_fresh_init_result(
     request: pytest.FixtureRequest,
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path_factory: pytest.TempPathFactory,
     _fresh_init_template: Path,
-    _linked_hierarchy_templates: dict[tuple[object, ...], Path],
 ) -> None:
     """Copy the real init result only for tests that use it as a precondition.
 
@@ -101,12 +83,11 @@ def _reuse_fresh_init_result(
     semantics while removing repeated setup from command-behaviour tests.
     """
 
-    module_name = request.module.__name__
+    module_name = request.node.nodeid.split("::", 1)[0][:-3].replace("/", ".")
     if module_name not in _TEMPLATE_MODULES:
         return
 
     real_main = request.module.main
-    fresh_targets: set[Path] = set()
 
     def cached_main(args: list[str]) -> int:
         if len(args) != 2 or args[0] != "init":
@@ -114,44 +95,7 @@ def _reuse_fresh_init_result(
         target = Path(args[1])
         if not target.is_dir() or any(target.iterdir()):
             return real_main(args)
-        shutil.copytree(_fresh_init_template, target, symlinks=True, dirs_exist_ok=True)
-        fresh_targets.add(target.resolve())
+        _clone_tree_contents(_fresh_init_template, target)
         return 0
 
     monkeypatch.setattr(request.module, "main", cached_main)
-
-    instance = request.instance
-    if instance is None or not hasattr(instance, "_create_same_repo_linked_hierarchy"):
-        return
-    real_create = instance._create_same_repo_linked_hierarchy
-
-    def cached_create(target: Path, *args: object, **kwargs: object) -> None:
-        initiatives = target / "spec-dock" / "initiatives"
-        if (
-            target.is_symlink()
-            or target.resolve() not in fresh_targets
-            or (target / ".git").exists()
-            or not initiatives.is_dir()
-            or any(initiatives.iterdir())
-        ):
-            real_create(target, *args, **kwargs)
-            return
-
-        key = (type(instance), args, tuple(sorted(kwargs.items(), key=lambda item: item[0])))
-        template = _linked_hierarchy_templates.get(key)
-        if template is None:
-            template = tmp_path_factory.mktemp("spec-dock-linked-hierarchy")
-            shutil.copytree(_fresh_init_template, template, symlinks=True, dirs_exist_ok=True)
-            real_create(template, *args, **kwargs)
-            _linked_hierarchy_templates[key] = template
-        _copy_tree_replace_symlinks(template, target)
-        fresh_targets.discard(target.resolve())
-
-    monkeypatch.setattr(instance, "_create_same_repo_linked_hierarchy", cached_create)
-
-
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    for item in items:
-        module_name = item.nodeid.split("::", 1)[0][:-3].replace("/", ".")
-        if module_name in _TEMPLATE_MODULES:
-            item.add_marker(pytest.mark.usefixtures("_reuse_fresh_init_result"))

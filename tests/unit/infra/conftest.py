@@ -1,30 +1,53 @@
-"""Avoid repeating provider installation for dogfooding parity tests."""
+"""Avoid repeating provider installation used only as an infra-test precondition."""
 
 from __future__ import annotations
 
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 
 import pytest
 
+_SETUP_ONLY_PREFIXES = (
+    "test_checked_in_dogfooding_",
+    "test_recognized_reconciliation_",
+    "test_uninstall_",
+    "test_update_",
+)
+
+
+def _clone_tree_contents(source: Path, target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    command = (
+        ["cp", "-cR", f"{source}/.", str(target)]
+        if sys.platform == "darwin"
+        else ["cp", "--reflink=auto", "-a", f"{source}/.", str(target)]
+    )
+    try:
+        subprocess.run(command, check=True, capture_output=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        shutil.copytree(source, target, symlinks=True, dirs_exist_ok=True)
+
 
 @pytest.fixture(scope="session")
-def _dogfooding_init_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+def _infra_init_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     module = pytest.importorskip("tests.unit.infra.test_init_update")
-    template = tmp_path_factory.mktemp("spec-dock-dogfooding-init-template")
+    template = tmp_path_factory.mktemp("spec-dock-infra-init-template")
     assert module.main(["init", str(template)]) == 0
     return template
 
 
-@pytest.fixture
-def _reuse_dogfooding_init_result(
+@pytest.fixture(autouse=True)  # noqa: RUF076
+def _reuse_infra_init_result(
     request: pytest.FixtureRequest,
     monkeypatch: pytest.MonkeyPatch,
-    _dogfooding_init_template: Path,
+    _infra_init_template: Path,
 ) -> None:
-    if request.module.__name__ != "tests.unit.infra.test_init_update":
+    module_name = request.node.nodeid.split("::", 1)[0][:-3].replace("/", ".")
+    if module_name != "tests.unit.infra.test_init_update":
         return
-    if "checked_in_dogfooding" not in request.node.originalname:
+    if not request.node.originalname.startswith(_SETUP_ONLY_PREFIXES):
         return
 
     real_main = request.module.main
@@ -35,16 +58,7 @@ def _reuse_dogfooding_init_result(
         target = Path(args[1])
         if not target.is_dir() or any(target.iterdir()):
             return real_main(args)
-        shutil.copytree(_dogfooding_init_template, target, symlinks=True, dirs_exist_ok=True)
+        _clone_tree_contents(_infra_init_template, target)
         return 0
 
     monkeypatch.setattr(request.module, "main", cached_main)
-
-
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    for item in items:
-        module_name = item.nodeid.split("::", 1)[0][:-3].replace("/", ".")
-        if module_name != "tests.unit.infra.test_init_update":
-            continue
-        if "checked_in_dogfooding" in item.nodeid:
-            item.add_marker(pytest.mark.usefixtures("_reuse_dogfooding_init_result"))

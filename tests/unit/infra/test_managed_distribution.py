@@ -7426,6 +7426,75 @@ def test_s30_apply_materializes_missing_regular_target_without_replacing_existin
     assert target.stat().st_nlink == 1
 
 
+def test_i369_apply_observation_count_scales_linearly_for_adopt_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = tmp_path / "install-root"
+    target_root = tmp_path / "consumer"
+    for index in range(40):
+        relative_path = Path(".github") / "generated" / f"asset-{index:03d}.txt"
+        source = install_root / relative_path
+        target = target_root / relative_path
+        source.parent.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = f"asset {index}\n".encode()
+        source.write_bytes(content)
+        target.write_bytes(content)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    real_observe_target = managed_distribution._observe_target
+    observation_count = 0
+
+    def counted_observe_target(root: Path, relative_path: str):
+        nonlocal observation_count
+        observation_count += 1
+        return real_observe_target(root, relative_path)
+
+    monkeypatch.setattr(managed_distribution, "_observe_target", counted_observe_target)
+
+    result = apply_distribution_plan(plan)
+
+    assert result.status == "complete"
+    assert observation_count <= len(plan.actions) * 4
+
+
+def test_i369_fresh_checkpoints_are_bounded_by_phase_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    checkpoints: list[tuple[str, ...]] = []
+
+    def capture_checkpoint(self, journal, completed_paths):
+        checkpoints.append(completed_paths)
+        return original_checkpoint(self, journal, completed_paths)
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", capture_checkpoint)
+
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert len(checkpoints) <= 4
+    assert any(len(completed_paths) > 1 for completed_paths in checkpoints)
+
+
 def test_s30_apply_upgrades_historical_regular_target_atomically(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"new\n")
     old = b"old\n"
