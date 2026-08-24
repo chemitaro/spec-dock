@@ -200,6 +200,37 @@ def test_full_regression_leader_exit_cannot_leave_stdout_descendant(
         assert expected_output in output_path.read_text(encoding="utf-8")
 
 
+def test_full_regression_leader_exit_checks_group_after_pipe_eof(tmp_path: Path) -> None:
+    verifier = _load_full_regression_verifier()
+    child = tmp_path / "child.py"
+    parent = tmp_path / "parent.py"
+    output_path = tmp_path / "closed-descendant.log"
+    child.write_text("import time\ntime.sleep(5)\n", encoding="utf-8")
+    parent.write_text(
+        "import subprocess, sys, time\n"
+        "subprocess.Popen(\n"
+        "    [sys.executable, 'child.py'],\n"
+        "    stdout=subprocess.DEVNULL,\n"
+        "    stderr=subprocess.DEVNULL,\n"
+        ")\n"
+        "time.sleep(0.1)\n",
+        encoding="utf-8",
+    )
+    started = time.monotonic()
+
+    code, timed_out = verifier._run_streamed(
+        [sys.executable, str(parent)],
+        cwd=tmp_path,
+        output_path=output_path,
+        timeout_seconds=0.5,
+        stream=False,
+    )
+
+    assert timed_out is True
+    assert code == 124
+    assert time.monotonic() - started < 1.5
+
+
 def test_full_regression_final_result_rechecks_deadline_after_postprocessing(monkeypatch) -> None:
     verifier = _load_full_regression_verifier()
     monkeypatch.setattr(verifier.time, "monotonic", lambda: 600.001)

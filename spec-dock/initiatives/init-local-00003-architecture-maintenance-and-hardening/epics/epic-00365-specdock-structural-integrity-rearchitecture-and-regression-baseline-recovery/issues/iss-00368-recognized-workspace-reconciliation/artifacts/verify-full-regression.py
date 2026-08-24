@@ -142,6 +142,17 @@ def _run_streamed(
             except ProcessLookupError:
                 pass
 
+        def process_group_exists() -> bool:
+            if not hasattr(os, "killpg"):
+                return process.poll() is None
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                return True
+            return True
+
         def stop_process_group(*, deadline: float) -> None:
             signal_process_group(signal.SIGTERM)
             grace_deadline = min(deadline, time.monotonic() + 0.2)
@@ -166,7 +177,7 @@ def _run_streamed(
                     break
                 if process.poll() is not None:
                     eof, drain_timed_out = drain_available(deadline=started + timeout_seconds)
-                    if not eof:
+                    if not eof or process_group_exists():
                         timed_out = True
                     timed_out = timed_out or drain_timed_out
                     break
