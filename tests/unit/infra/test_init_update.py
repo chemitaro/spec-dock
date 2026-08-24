@@ -57,13 +57,17 @@ def test_issue_368_recognized_handler_has_single_service_route() -> None:
         assert forbidden not in source
 
 
-def test_issue_368_fresh_retry_is_owned_outside_recognized_handler() -> None:
-    fresh_source = inspect.getsource(cli._install_fresh_distribution)
-    compatibility_source = inspect.getsource(cli._install_fresh_compatibility_distribution_unlocked)
+def test_i369_fresh_route_uses_shared_journaled_service() -> None:
+    fresh_source = inspect.getsource(cli._execute_fresh_distribution_unlocked)
+    recognized_source = inspect.getsource(cli._install_recognized_distribution_unlocked)
 
-    assert "_install_fresh_compatibility_distribution_unlocked(" in fresh_source
-    assert 'if operation != "fresh":' in compatibility_source
-    assert "fresh compatibility flow requires the fresh operation" in compatibility_source
+    assert "execute_fresh_distribution(" in fresh_source
+    assert "_install_fresh_distribution_unlocked" not in inspect.getsource(cli)
+    assert "scaffold_applier" not in fresh_source
+    assert "_install_spec_dock_bound(" not in fresh_source
+    assert "_write_distribution_retry_marker(" not in fresh_source
+    assert "_write_spec_dock_version(" not in fresh_source
+    assert "execute_recognized_distribution(" in recognized_source
 
 
 @contextmanager
@@ -1735,22 +1739,23 @@ class TestInitUpdate(CliRuntimeHarness):
             assert marker_path.read_text(encoding="utf-8") == "legacy data\n"
             assert "Please rename it before installing" not in stderr.getvalue()
 
-    def test_issue_78_update_reports_manual_migration_guidance_without_rename(self) -> None:
+    def test_i369_update_provisions_when_legacy_hidden_workspace_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
-            (target / ".spec-dock").mkdir(parents=True, exist_ok=True)
+            legacy_dir = target / ".spec-dock"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            marker_path = legacy_dir / "legacy-marker.txt"
+            marker_path.write_text("legacy data\n", encoding="utf-8")
 
             stderr = io.StringIO()
             with redirect_stderr(stderr):
                 exit_code = main(["update", str(target)])
 
-            assert exit_code == 1
-            error_text = stderr.getvalue()
-            assert "workspace-missing" in error_text
-            assert "'spec-dock' not found." in error_text
-            assert "Run 'spec-dock init'" in error_text
-            assert "Please rename it" not in error_text
-            assert "mv .spec-dock spec-dock" not in error_text
+            assert exit_code == 0
+            assert (target / "spec-dock").is_dir()
+            assert legacy_dir.is_dir()
+            assert marker_path.read_text(encoding="utf-8") == "legacy data\n"
+            assert "workspace-missing" not in stderr.getvalue()
 
     def test_issue_78_update_keeps_legacy_hidden_workspace_untouched_during_coexistence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -5919,7 +5924,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "        run: make lint" in workflow_lines["fast"]
         assert workflow_lines["fast"].count("        run: uv run pytest") == 1
         assert "--run-full-regression" not in workflow_texts["fast"]
-        assert workflow_lines["full"].count("        run: uv run pytest --run-full-regression") == 1
+        assert "verify-full-regression.py" in workflow_texts["full"]
+        assert "--timeout-seconds 600 --max-total-seconds 600 --shards 4" in workflow_texts["full"]
+        assert "run: uv run pytest --run-full-regression" not in workflow_texts["full"]
         assert "continue-on-error:" not in workflow_texts["full"]
 
         for name, workflow_text in workflow_texts.items():

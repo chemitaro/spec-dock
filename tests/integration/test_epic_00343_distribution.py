@@ -1322,7 +1322,11 @@ def test_tc_346_s03_003_actual_cross_filesystem_source(candidate_wheel: Candidat
     target: Path | None = None
     source_parent: Path | None = None
     try:
-        target = Path(tempfile.mkdtemp(prefix=".iss346-cross-fs-", dir=str(candidate_wheel.repo_root)))
+        # Keep the same-device target invisible to concurrent Git status
+        # assertions while another full-regression shard executes this test.
+        target_root = candidate_wheel.repo_root / "spec-dock" / ".workbench"
+        target_root.mkdir(parents=True, exist_ok=True)
+        target = Path(tempfile.mkdtemp(prefix="iss346-cross-fs-", dir=str(target_root)))
         source_root = Path("/private/tmp") if Path("/private/tmp").is_dir() else Path("/tmp")
         if not source_root.is_dir() or not os.access(source_root, os.W_OK):
             pytest.skip("portable temporary source root is unavailable")

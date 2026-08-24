@@ -1,8 +1,12 @@
 from collections.abc import Mapping
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
 import sys
+import time
+
+import pytest
 
 from tests.conftest import _normalize_failure_message
 
@@ -21,6 +25,11 @@ REQUIRED_FAST_NODE_IDS = frozenset({
 })
 
 POLICY_SKIP_HINT = "--run-full-regression"
+FULL_REGRESSION_VERIFIER = (
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
+    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
+    "iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py"
+)
 
 
 def test_full_regression_signature_normalization_is_platform_independent() -> None:
@@ -57,6 +66,256 @@ def test_full_regression_signature_normalization_is_platform_independent() -> No
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
+
+
+def _load_full_regression_verifier():
+    path = _repo_root() / FULL_REGRESSION_VERIFIER
+    spec = importlib.util.spec_from_file_location("issue_368_full_regression_verifier", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_full_regression_total_slo_evidence_includes_collection_and_shards(monkeypatch) -> None:
+    verifier = _load_full_regression_verifier()
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 610.0)
+
+    evidence = verifier._timing_evidence(
+        overall_started=0.0,
+        collection_seconds=110.0,
+        shard_elapsed_seconds=500.0,
+        slo_seconds=600.0,
+    )
+
+    assert evidence == {
+        "collection_seconds": 110.0,
+        "shard_elapsed_seconds": 500.0,
+        "total_elapsed_seconds": 610.0,
+        "slo_seconds": 600.0,
+        "slo_status": "fail",
+    }
+
+
+def test_full_regression_phase_budget_cannot_extend_the_total_deadline(monkeypatch) -> None:
+    verifier = _load_full_regression_verifier()
+    now = 110.0
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: now)
+
+    assert (
+        abs(
+            verifier._remaining_phase_budget(
+                overall_started=0.0,
+                max_total_seconds=600.0,
+                phase_timeout_seconds=600.0,
+            )
+            - 490.0
+        )
+        < 1e-9
+    )
+
+    now = 610.0
+    assert (
+        abs(
+            verifier._remaining_phase_budget(
+                overall_started=0.0,
+                max_total_seconds=600.0,
+                phase_timeout_seconds=600.0,
+            )
+        )
+        < 1e-9
+    )
+
+
+def test_full_regression_stream_timeout_survives_unterminated_output(tmp_path: Path) -> None:
+    verifier = _load_full_regression_verifier()
+    output_path = tmp_path / "unterminated.log"
+    started = time.monotonic()
+
+    code, timed_out = verifier._run_streamed(
+        [
+            sys.executable,
+            "-c",
+            "import sys, time; sys.stdout.write('unterminated'); sys.stdout.flush(); time.sleep(2)",
+        ],
+        cwd=tmp_path,
+        output_path=output_path,
+        timeout_seconds=0.1,
+        stream=False,
+    )
+
+    assert timed_out is True
+    assert code != 0
+    assert time.monotonic() - started < 1.5
+    assert "unterminated" in output_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("child_body", "expected_output"),
+    [
+        (
+            "import sys, time\n"
+            "while True:\n"
+            "    sys.stdout.write('continuous\\n')\n"
+            "    sys.stdout.flush()\n"
+            "    time.sleep(0.001)\n",
+            "continuous",
+        ),
+        (
+            "import sys, time\nsys.stdout.write('intermittent\\n')\nsys.stdout.flush()\ntime.sleep(5)\n",
+            "intermittent",
+        ),
+        ("import time\ntime.sleep(5)\n", None),
+    ],
+    ids=("continuous-write", "intermittent-write", "silent"),
+)
+def test_full_regression_leader_exit_cannot_leave_stdout_descendant(
+    tmp_path: Path,
+    child_body: str,
+    expected_output: str | None,
+) -> None:
+    verifier = _load_full_regression_verifier()
+    child = tmp_path / "child.py"
+    parent = tmp_path / "parent.py"
+    output_path = tmp_path / "descendant.log"
+    child.write_text(child_body, encoding="utf-8")
+    parent.write_text(
+        "import subprocess, sys, time\nsubprocess.Popen([sys.executable, 'child.py'])\ntime.sleep(0.1)\n",
+        encoding="utf-8",
+    )
+    started = time.monotonic()
+
+    code, timed_out = verifier._run_streamed(
+        [sys.executable, str(parent)],
+        cwd=tmp_path,
+        output_path=output_path,
+        timeout_seconds=0.5,
+        stream=False,
+    )
+
+    assert timed_out is True
+    assert code == 124
+    assert time.monotonic() - started < 1.5
+    if expected_output is not None:
+        assert expected_output in output_path.read_text(encoding="utf-8")
+
+
+def test_full_regression_leader_exit_checks_group_after_pipe_eof(tmp_path: Path) -> None:
+    verifier = _load_full_regression_verifier()
+    child = tmp_path / "child.py"
+    parent = tmp_path / "parent.py"
+    output_path = tmp_path / "closed-descendant.log"
+    child.write_text("import time\ntime.sleep(5)\n", encoding="utf-8")
+    parent.write_text(
+        "import subprocess, sys, time\n"
+        "subprocess.Popen(\n"
+        "    [sys.executable, 'child.py'],\n"
+        "    stdout=subprocess.DEVNULL,\n"
+        "    stderr=subprocess.DEVNULL,\n"
+        ")\n"
+        "time.sleep(0.1)\n",
+        encoding="utf-8",
+    )
+    started = time.monotonic()
+
+    code, timed_out = verifier._run_streamed(
+        [sys.executable, str(parent)],
+        cwd=tmp_path,
+        output_path=output_path,
+        timeout_seconds=0.5,
+        stream=False,
+    )
+
+    assert timed_out is True
+    assert code == 124
+    assert time.monotonic() - started < 1.5
+
+
+def test_full_regression_final_result_rechecks_deadline_after_postprocessing(monkeypatch) -> None:
+    verifier = _load_full_regression_verifier()
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 600.001)
+
+    result = verifier._finalize_result(
+        {"status": "verified", "candidate_sha": "a" * 40},
+        overall_started=0.0,
+        collection_seconds=0.25,
+        shard_elapsed_seconds=599.0,
+        slo_seconds=600.0,
+    )
+
+    assert result["status"] == "total-timeout"
+    assert result["underlying_status"] == "verified"
+    assert result["slo_status"] == "fail"
+    assert abs(result["total_elapsed_seconds"] - 600.001) < 1e-9
+
+
+def test_full_regression_weighted_shards_are_deterministic_and_preserve_collection_order() -> None:
+    verifier = _load_full_regression_verifier()
+    nodeids = [
+        "tests/sample.py::test_d",
+        "tests/sample.py::test_c",
+        "tests/sample.py::test_b",
+        "tests/sample.py::test_a",
+    ]
+
+    shards = verifier._partition_nodeids(
+        nodeids,
+        2,
+        timing_weights={
+            "tests/sample.py::test_a": 8.0,
+            "tests/sample.py::test_b": 7.0,
+        },
+        default_weight=1.0,
+    )
+
+    assert shards == [
+        ["tests/sample.py::test_c", "tests/sample.py::test_a"],
+        ["tests/sample.py::test_d", "tests/sample.py::test_b"],
+    ]
+    assert sorted(nodeid for shard in shards for nodeid in shard) == sorted(nodeids)
+
+
+def test_full_regression_weighted_shards_spread_known_slow_nodes() -> None:
+    verifier = _load_full_regression_verifier()
+    slow = [f"tests/sample.py::test_slow_{index}" for index in range(4)]
+    fast = [f"tests/sample.py::test_fast_{index}" for index in range(8)]
+
+    shards = verifier._partition_nodeids(
+        [*slow, *fast],
+        4,
+        timing_weights=dict.fromkeys(slow, 10.0),
+        default_weight=1.0,
+    )
+
+    assert all(len(set(shard) & set(slow)) == 1 for shard in shards)
+    assert {nodeid for shard in shards for nodeid in shard} == {*slow, *fast}
+
+
+def test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup() -> None:
+    from tests.cli_runtime.conftest import _can_reuse_fresh_init_result
+
+    module = "tests.cli_runtime.test_distribution_cutover"
+
+    assert _can_reuse_fresh_init_result(module, "test_s50_update_restores_missing_asset")
+    assert _can_reuse_fresh_init_result(module, "test_s70_uninstall_removes_managed_asset")
+    assert _can_reuse_fresh_init_result(module, "test_i368_recognized_update_stays_on_held_root")
+    assert not _can_reuse_fresh_init_result(module, "test_i369_fresh_entrypoint_matrix")
+    assert not _can_reuse_fresh_init_result(module, "test_s70_uninstall_allows_fresh_reinit")
+    assert not _can_reuse_fresh_init_result(module, "test_s45_init_materializes_current_catalog")
+
+
+def test_full_regression_workflow_enforces_the_total_slo() -> None:
+    workflow = (_repo_root() / ".github/workflows/provider-full-regression.yml").read_text(encoding="utf-8")
+
+    assert "--timeout-seconds 600 --max-total-seconds 600 --shards 4" in workflow
+    assert "timeout-minutes: 12" in workflow
+
+
+def test_full_regression_shards_preserve_ledger_assertion_verbosity() -> None:
+    verifier = (_repo_root() / FULL_REGRESSION_VERIFIER).read_text(encoding="utf-8")
+
+    assert '"-q",' in verifier
+    assert '"-vv",' not in verifier
 
 
 def _run_pytest(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:

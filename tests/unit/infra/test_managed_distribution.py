@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
 import json
 import os
@@ -32,6 +33,7 @@ from spec_dock.managed_distribution import (
     build_distribution_plan,
     build_executable_mutation_plan,
     build_workspace_assessment,
+    execute_fresh_distribution,
     execute_recognized_distribution,
 )
 
@@ -358,6 +360,58 @@ def test_i368_forged_assessment_cannot_prune_outside_manifest_authority(tmp_path
     assert sentinel.read_text(encoding="utf-8") == "keep\n"
 
 
+@pytest.mark.parametrize("forged_action_name", ["upgrade", "prune"])
+def test_i369_fresh_action_grammar_is_enforced_at_every_mutation_boundary(
+    tmp_path: Path,
+    forged_action_name: Literal["upgrade", "prune"],
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    sentinel = target_root / "user-owned.txt"
+    sentinel.write_text("keep\n", encoding="utf-8")
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        intent="fresh",
+    )
+    original_action = next(action for action in assessment.actions if action.action == "create")
+    forged_action = replace(
+        original_action,
+        action=forged_action_name,
+        provenance="historical" if forged_action_name == "prune" else "current",
+        reason=f"forged-fresh-{forged_action_name}",
+    )
+    forged_plan = replace(assessment.distribution_plan, actions=(forged_action,))
+    forged_assessment = replace(
+        assessment,
+        distribution_plan=forged_plan,
+        actions=(forged_action,),
+    )
+
+    with pytest.raises(DistributionPlanError, match="not allowed for its intent"):
+        build_executable_mutation_plan(forged_assessment)
+
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    original_record = next(record for record in journal.actions if record.path == original_action.path)
+    forged_record = replace(original_record, action=forged_action_name)
+    forged_journal = replace(
+        journal,
+        actions=tuple(forged_record if record.path == original_action.path else record for record in journal.actions),
+    )
+    with pytest.raises(DistributionApplyError, match="journal-plan-mismatch"):
+        managed_distribution._assert_journal_action_contract(assessment, forged_journal)
+
+    with pytest.raises(DistributionApplyError, match="not allowed for its intent"):
+        apply_distribution_plan(forged_plan)
+
+    assert sentinel.read_text(encoding="utf-8") == "keep\n"
+
+
 def test_i368_executable_plan_digest_is_stable_for_equivalent_assessment(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
@@ -384,6 +438,46 @@ def test_i368_executable_plan_digest_is_stable_for_equivalent_assessment(tmp_pat
     assert first.plan_digest == second.plan_digest
     assert len(first.plan_digest) == 64
     assert first.root_identity == second.root_identity
+
+
+def test_i369_legacy_create_upgrade_fixed_link_count_guard_migrates(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    executable = build_executable_mutation_plan(
+        build_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            target_root=target_root,
+            intent="update",
+        )
+    )
+    legacy_digest = managed_distribution._executable_plan_digest(
+        executable,
+        legacy_adopt_postconditions=True,
+        legacy_adopt_fixed_link_count=True,
+        legacy_create_upgrade_fixed_link_count=True,
+    )
+
+    assert legacy_digest != executable.plan_digest
+    assert legacy_digest in managed_distribution._executable_plan_digest_candidates(executable)
+
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    legacy_guard = store.prepare_legacy_guard(
+        None,
+        package_version="1.2.3",
+        replace_marker=guard,
+        plan_digest_override=legacy_digest,
+    )
+    store.bind_forward_guard(legacy_guard)
+    journal = store.prepare(executable, package_version="1.2.3")
+
+    assert journal.plan_digest == executable.plan_digest
+    marker = json.loads((target_root / "spec-dock/.distribution-retry.json").read_text(encoding="utf-8"))
+    assert marker["plan_digest"] == executable.plan_digest
 
 
 def test_i368_generated_asset_path_must_be_canonical_and_repository_relative(tmp_path: Path) -> None:
@@ -429,6 +523,132 @@ def test_i368_journal_prepare_records_bound_actions_before_target_mutation(tmp_p
     assert journal.actions
     assert {action.checkpoint for action in journal.actions} == {"pending"}
     assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
+
+
+def test_i369_fresh_journal_uses_isolated_authority_and_directory_actions(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        intent="fresh",
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    assert guard.purpose == "fresh-journal-forward-only"
+    store.bind_forward_guard(guard)
+    journal = store.prepare(executable, package_version="1.2.3")
+    payload = json.loads((target_root / "spec-dock/.distribution-journal.json").read_text(encoding="utf-8"))
+
+    assert journal.intent == "fresh"
+    assert journal.authority == "fresh-distribution-provisioning"
+    assert payload["schema_version"] == managed_distribution._DISTRIBUTION_JOURNAL_SCHEMA_VERSION
+    assert {action.action for action in journal.actions} >= {"ensure-directory", "create"}
+    assert payload["authority"] == "fresh-distribution-provisioning"
+    assert {binding.relative_path for binding in journal.created_parent_bindings} >= {
+        "spec-dock/.agent",
+        "spec-dock/initiatives",
+    }
+
+
+def test_i369_standalone_directory_binding_recovers_after_mkdir_before_publish(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_record = OperationJournalStore.record_created_parent_bindings
+    failed = False
+
+    def fail_after_mkdir(self, journal, bindings):
+        nonlocal failed
+        if not failed and any(item.relative_path == "spec-dock/.agent" and item.exists for item in bindings):
+            failed = True
+            raise DistributionApplyError("injected standalone binding publish failure")
+        return original_record(self, journal, bindings)
+
+    monkeypatch.setattr(OperationJournalStore, "record_created_parent_bindings", fail_after_mkdir)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    bindings = {item["relative_path"]: item for item in payload["created_parent_bindings"]}
+    assert bindings["spec-dock/.agent"]["exists"] is False
+    assert (target_root / "spec-dock/.agent").is_dir()
+
+    monkeypatch.setattr(OperationJournalStore, "record_created_parent_bindings", original_record)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert not journal_path.exists()
+
+
+def test_i369_standalone_directory_closed_set_rejects_unknown_child_after_checkpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_directory_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec-dock/.agent" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected standalone checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_directory_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    (target_root / "spec-dock/.agent/foreign").write_text("user\n", encoding="utf-8")
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-precondition-mismatch"
+    assert journal_path.exists()
 
 
 def test_i368_journal_resume_rejects_intent_mismatch_without_rewrite(tmp_path: Path) -> None:
@@ -1500,6 +1720,129 @@ def test_i368_newer_package_finishes_original_journal_then_refreshes_version(
     assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.3.0\n"
     assert not journal_path.exists()
     assert not (target_root / "spec-dock" / ".distribution-retry.json").exists()
+
+
+def test_i369_fresh_completed_journal_does_not_reenter_for_newer_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_mark_completed = OperationJournalStore.mark_completed
+
+    def interrupt_before_completed(*_args, **_kwargs):
+        raise DistributionApplyError("injected terminal interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", interrupt_before_completed)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["package_version"] == "1.2.3"
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", original_mark_completed)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.3.0",
+    )
+
+    assert second.status == "completed", second.reason
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+    assert not journal_path.exists()
+
+
+def test_i369_fresh_executing_journal_does_not_reenter_for_newer_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_mark_verified = OperationJournalStore.mark_verified
+
+    def interrupt_before_verified(*_args, **_kwargs):
+        raise DistributionApplyError("injected verification interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_verified", interrupt_before_verified)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["status"] == "executing"
+    assert journal["package_version"] == "1.2.3"
+
+    monkeypatch.setattr(OperationJournalStore, "mark_verified", original_mark_verified)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.3.0",
+    )
+
+    assert second.status == "completed", second.reason
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+    assert not journal_path.exists()
+
+
+def test_i369_fresh_journal_retry_rejects_new_workspace_root_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_mark_completed = OperationJournalStore.mark_completed
+
+    def interrupt_before_completed(*_args, **_kwargs):
+        raise DistributionApplyError("injected terminal interruption")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", interrupt_before_completed)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    assert journal_path.exists()
+    (target_root / "spec-dock" / "foreign").write_text("user\n", encoding="utf-8")
+
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", original_mark_completed)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-parent-mismatch"
+    assert journal_path.exists()
 
 
 def test_i368_journal_rejects_rebound_workspace_parent(tmp_path: Path) -> None:
@@ -2871,6 +3214,494 @@ def test_i368_checkpoint_write_failure_recovers_from_exact_postcondition(tmp_pat
 
     assert second.status == "completed", second.reason
     assert not journal_path.exists()
+
+
+def test_i369_published_fresh_create_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    replaced = False
+
+    def replace_after_create_checkpoint(self, journal, completed_paths):
+        nonlocal replaced
+        result = original_checkpoint(self, journal, completed_paths)
+        if not replaced and ".github/workflows/ci.yml" in completed_paths:
+            target = target_root / ".github/workflows/ci.yml"
+            replacement = target.with_name("ci.yml.external")
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(target.stat().st_mode & 0o777)
+            target.unlink()
+            replacement.rename(target)
+            replaced = True
+            raise DistributionApplyError("injected post-checkpoint create replacement")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", replace_after_create_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert replaced is True, first.reason
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    record = next(item for item in journal_payload["actions"] if item["path"] == ".github/workflows/ci.yml")
+    assert record["action"] == "create"
+    assert record["checkpoint"] == "published"
+    assert all(field in record["postcondition"] for field in ("device", "inode", "ctime_ns", "link_count"))
+    assert record["postcondition"]["inode"] != (target_root / ".github/workflows/ci.yml").stat().st_ino
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert journal_path.exists()
+
+
+def test_i369_published_recognized_upgrade_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github/workflows/ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    replaced = False
+
+    def replace_after_upgrade_checkpoint(self, journal, completed_paths):
+        nonlocal replaced
+        result = original_checkpoint(self, journal, completed_paths)
+        if not replaced and ".github/workflows/ci.yml" in completed_paths:
+            replacement = target.with_name("ci.yml.external")
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(target.stat().st_mode & 0o777)
+            target.unlink()
+            replacement.rename(target)
+            replaced = True
+            raise DistributionApplyError("injected post-checkpoint upgrade replacement")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", replace_after_upgrade_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert replaced is True
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    record = next(item for item in journal_payload["actions"] if item["path"] == ".github/workflows/ci.yml")
+    assert record["action"] == "upgrade"
+    assert record["checkpoint"] == "published"
+    assert all(field in record["postcondition"] for field in ("device", "inode", "ctime_ns", "link_count"))
+    assert record["postcondition"]["inode"] != target.stat().st_ino
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert journal_path.exists()
+
+
+def test_i369_same_run_fresh_create_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    replaced = False
+
+    def replace_after_create_checkpoint(self, journal, completed_paths):
+        nonlocal replaced
+        result = original_checkpoint(self, journal, completed_paths)
+        if not replaced and ".github/workflows/ci.yml" in completed_paths:
+            target = target_root / ".github/workflows/ci.yml"
+            replacement = target.with_name("ci.yml.external")
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(target.stat().st_mode & 0o777)
+            target.unlink()
+            replacement.rename(target)
+            replaced = True
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", replace_after_create_checkpoint)
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-precondition-mismatch"
+    assert replaced is True
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+def test_i369_same_run_recognized_upgrade_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github/workflows/ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    replaced = False
+
+    def replace_after_upgrade_checkpoint(self, journal, completed_paths):
+        nonlocal replaced
+        result = original_checkpoint(self, journal, completed_paths)
+        if not replaced and ".github/workflows/ci.yml" in completed_paths:
+            replacement = target.with_name("ci.yml.external")
+            replacement.write_bytes(target.read_bytes())
+            replacement.chmod(target.stat().st_mode & 0o777)
+            target.unlink()
+            replacement.rename(target)
+            replaced = True
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", replace_after_upgrade_checkpoint)
+    result = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert replaced is True
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+@pytest.mark.parametrize("divergence", ("replacement", "hard-link", "mutate-restore"))
+def test_i369_fresh_workbench_retry_binds_exact_external_seed_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    divergence: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_apply = managed_distribution.apply_distribution_plan
+    failed = False
+
+    def fail_once(plan, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise DistributionApplyError("injected fresh seed interruption")
+        return original_apply(plan, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", fail_once)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    monkeypatch.setattr(managed_distribution, "apply_distribution_plan", original_apply)
+
+    source = scaffold_root / "templates/root/.workbench/README.md"
+    target = target_root / "spec-dock/.workbench/README.md"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(source.read_bytes())
+    target.chmod(stat.S_IMODE(source.stat().st_mode))
+    original_identity = target.stat()
+    extra_link = tmp_path / "external-workbench-link"
+
+    original_write = OperationJournalStore.write
+    injected = False
+
+    def diverge_after_seed_reconciliation(self, journal, *, predecessor=None):
+        nonlocal injected
+        result = original_write(self, journal, predecessor=predecessor)
+        seed_record = next(
+            (
+                record
+                for record in result.actions
+                if record.path == "spec-dock/.workbench/README.md"
+                and record.checkpoint == "published"
+                and all(field in record.postcondition for field in ("device", "inode", "ctime_ns", "link_count"))
+            ),
+            None,
+        )
+        if not injected and seed_record is not None:
+            injected = True
+            if divergence == "replacement":
+                replacement = target.with_name("README.external")
+                replacement.write_bytes(target.read_bytes())
+                replacement.chmod(stat.S_IMODE(target.stat().st_mode))
+                target.unlink()
+                replacement.rename(target)
+            elif divergence == "hard-link":
+                os.link(target, extra_link)
+            else:
+                original_mode = stat.S_IMODE(target.stat().st_mode)
+                target.chmod(original_mode ^ 0o100)
+                target.chmod(original_mode)
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "write", diverge_after_seed_reconciliation)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert injected is True
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").exists()
+    assert target.read_bytes() == source.read_bytes()
+    if divergence == "replacement":
+        assert target.stat().st_ino != original_identity.st_ino
+    elif divergence == "hard-link":
+        assert target.stat().st_ino == original_identity.st_ino
+        assert target.stat().st_nlink == 2
+        assert extra_link.exists()
+    else:
+        assert target.stat().st_ino == original_identity.st_ino
+        assert target.stat().st_ctime_ns != original_identity.st_ctime_ns
+
+
+def _rewrite_published_successors_as_protocol1(target_root: Path) -> None:
+    store = OperationJournalStore(target_root)
+    journal = store._read(managed_distribution._root_identity_for_assessment(target_root))
+    marker = managed_distribution._read_distribution_retry_marker(target_root)
+    if marker is not None:
+        store.bind_forward_guard(marker)
+    legacy_actions = tuple(
+        replace(
+            record,
+            postcondition={
+                key: value for key, value in record.postcondition.items() if key not in {"device", "inode", "ctime_ns"}
+            },
+        )
+        if record.action in {"create", "upgrade"} and record.checkpoint != "pending"
+        else record
+        for record in journal.actions
+    )
+    store.write(
+        replace(
+            journal,
+            protocol_version=managed_distribution._DISTRIBUTION_LEGACY_JOURNAL_PROTOCOL_VERSION,
+            actions=legacy_actions,
+        ),
+        predecessor=journal,
+    )
+
+
+def test_i369_protocol1_published_create_without_witness_refuses(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    stopped = False
+
+    def stop_after_create_checkpoint(self, journal, completed_paths):
+        nonlocal stopped
+        result = original_checkpoint(self, journal, completed_paths)
+        if not stopped and ".github/workflows/ci.yml" in completed_paths:
+            stopped = True
+            raise DistributionApplyError("injected protocol-1 create stop")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", stop_after_create_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    _rewrite_published_successors_as_protocol1(target_root)
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-protocol-incompatible"
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_i369_protocol1_published_upgrade_without_witness_refuses(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = b"old\n"
+    desired = b"desired\n"
+    install_root = _minimal_install_root(tmp_path, desired)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[_regular_record(".github/workflows/ci.yml", old)]),
+    )
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github/workflows/ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    stopped = False
+
+    def stop_after_upgrade_checkpoint(self, journal, completed_paths):
+        nonlocal stopped
+        result = original_checkpoint(self, journal, completed_paths)
+        if not stopped and ".github/workflows/ci.yml" in completed_paths:
+            stopped = True
+            raise DistributionApplyError("injected protocol-1 upgrade stop")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", stop_after_upgrade_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+    assert first.status == "recovery_required"
+    _rewrite_published_successors_as_protocol1(target_root)
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason == "journal-protocol-incompatible"
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").exists()
+
+
+def test_i369_protocol1_completed_journal_only_cleans_up_semantic_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"desired\n")
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_remove_marker = OperationJournalStore.remove_legacy_marker
+    stopped = False
+
+    def stop_after_guard_removal(self, marker):
+        nonlocal stopped
+        original_remove_marker(self, marker)
+        if not stopped:
+            stopped = True
+            raise DistributionApplyError("injected terminal journal-only stop")
+
+    monkeypatch.setattr(OperationJournalStore, "remove_legacy_marker", stop_after_guard_removal)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    assert (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    _rewrite_published_successors_as_protocol1(target_root)
+
+    monkeypatch.setattr(OperationJournalStore, "remove_legacy_marker", original_remove_marker)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
 
 
 def test_i368_retry_cleans_exact_stage_created_after_write_ahead_reservation(tmp_path: Path) -> None:
@@ -5117,8 +5948,746 @@ def test_s25_fresh_classifies_missing_and_current_identical_without_mutation(tmp
     assert by_path[".github/workflows/ci.yml"].blocked is False
     assert by_path[".github/workflows/ci.yml"].reason == "current-identity-match"
     assert by_path["spec"].action == "create"
-    assert set(by_path) == {".github/workflows/ci.yml", "spec"}
+    assert by_path[".github"].action == "adopt"
+    assert by_path[".github/workflows"].action == "adopt"
+    assert by_path["spec-dock"].action == "ensure-directory"
+    assert set(by_path) == {
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        "spec",
+        "spec-dock",
+        "spec-dock/.agent",
+        "spec-dock/initiatives",
+    }
     assert target.read_bytes() == b"current\n"
+
+
+def test_i369_fresh_required_directories_are_top_down_and_non_destructive(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    nested_source = install_root / "zz" / "nested" / "asset.txt"
+    nested_source.parent.mkdir(parents=True)
+    nested_source.write_bytes(b"nested\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    required_paths = tuple(item.path for item in plan.required_directories)
+    assert required_paths == tuple(sorted(required_paths, key=lambda path: (len(Path(path).parts), path)))
+    assert required_paths[:3] == (".github", "spec-dock", "zz")
+    actions = {action.path: action for action in plan.actions}
+    assert all(actions[path].action == "ensure-directory" for path in required_paths)
+    assert {action.action for action in plan.actions} <= {"create", "ensure-directory"}
+    assert "spec-dock/.workbench/README.md" in actions
+
+
+def test_i369_required_directory_collisions_are_blocked_without_mutation(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / ".github").write_text("user-owned\n", encoding="utf-8")
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github")
+    assert action.action == "preserve"
+    assert action.blocked is True
+    assert action.reason == "required-directory-file"
+    assert (target_root / ".github").read_text(encoding="utf-8") == "user-owned\n"
+
+
+def test_i369_fresh_scaffold_seed_uses_template_source_and_update_does_not_backfill(
+    tmp_path: Path,
+) -> None:
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    install_root = _minimal_install_root(tmp_path)
+    fresh = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        operation="fresh",
+    )
+    fresh_seed = next(asset for asset in fresh.scaffold_assets if asset.path == "spec-dock/.workbench/README.md")
+    assert fresh_seed.source_path == "templates/root/.workbench/README.md"
+
+    update = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        operation="update",
+    )
+    assert all(asset.path != "spec-dock/.workbench/README.md" for asset in update.scaffold_assets)
+
+
+def test_i369_update_missing_and_empty_workspace_admit_fresh(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    for target_root, create_workspace in (
+        (tmp_path / "missing", False),
+        (tmp_path / "empty", True),
+    ):
+        target_root.mkdir()
+        if create_workspace:
+            (target_root / "spec-dock").mkdir()
+        admission = admit_distribution_operation(
+            target_root,
+            operation="update",
+            package_version="1.2.3",
+            manifest_path=manifest_path,
+        )
+        assert admission.status == "fresh"
+        assert admission.intent == "fresh"
+
+
+def test_i369_created_fresh_workspace_rejects_foreign_root_child_before_journal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    workspace_info = workspace.stat()
+    original_prepare_legacy_guard = OperationJournalStore.prepare_legacy_guard
+
+    def inject_foreign_child(self, plan, **kwargs):
+        (self.target_root / "spec-dock" / "foreign").write_text("user\n", encoding="utf-8")
+        return original_prepare_legacy_guard(self, plan, **kwargs)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", inject_foreign_child)
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        created_workspace_identity=(workspace_info.st_dev, workspace_info.st_ino),
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "journal-parent-mismatch"
+    assert (workspace / "foreign").exists()
+    assert (workspace / ".distribution-retry.json").exists()
+    assert not (workspace / ".distribution-journal.json").exists()
+
+    marker_before_retry = (workspace / ".distribution-retry.json").read_bytes()
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", original_prepare_legacy_guard)
+    retry = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert retry.status == "recovery_required"
+    assert retry.reason == "journal-parent-mismatch"
+    assert (workspace / ".distribution-retry.json").read_bytes() == marker_before_retry
+    assert not (workspace / ".distribution-journal.json").exists()
+
+    (workspace / "foreign").unlink()
+    original_prepare = OperationJournalStore.prepare
+
+    def inject_foreign_child_after_guard(self, plan, *, package_version):
+        (workspace / "late-foreign").write_text("user\n", encoding="utf-8")
+        return original_prepare(self, plan, package_version=package_version)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", inject_foreign_child_after_guard)
+    late_retry = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert late_retry.status == "recovery_required"
+    assert late_retry.reason == "journal-precondition-mismatch"
+    assert (workspace / "late-foreign").exists()
+    assert (workspace / ".distribution-retry.json").read_bytes() == marker_before_retry
+    assert not (workspace / ".distribution-journal.json").exists()
+
+
+def test_i369_existing_required_directory_adopt_checkpoint_retries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    initiatives = target_root / "spec-dock" / "initiatives"
+    initiatives.mkdir(parents=True)
+    (initiatives / "preserved.md").write_text("history\n", encoding="utf-8")
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_adopt_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec-dock/initiatives" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected existing directory checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_adopt_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    assert any(
+        item["path"] == "spec-dock/initiatives" and item["checkpoint"] == "published"
+        for item in json.loads(journal_path.read_text(encoding="utf-8"))["actions"]
+    )
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert (initiatives / "preserved.md").read_text(encoding="utf-8") == "history\n"
+    assert not journal_path.exists()
+
+
+def test_i369_fresh_workbench_hard_link_adopt_checkpoint_retries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    seed_source = scaffold_root / "templates/root/.workbench/README.md"
+    seed_target = workspace / ".workbench/README.md"
+    seed_target.parent.mkdir()
+    seed_target.hardlink_to(seed_source)
+    alias = tmp_path / "workbench-seed-alias"
+    alias.hardlink_to(seed_target)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_workbench_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec-dock/.workbench/README.md" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected Workbench checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_workbench_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = workspace / ".distribution-journal.json"
+    assert journal_path.exists()
+    assert seed_target.lstat().st_nlink == 3
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert seed_target.lstat().st_nlink == 3
+    assert alias.is_file()
+    assert not journal_path.exists()
+
+
+def test_i369_protocol1_adopt_postcondition_journal_retry_compatibility(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"current\n")
+    (target_root / "spec-dock").mkdir()
+    original_payload = managed_distribution._action_postcondition_payload
+
+    def legacy_payload(plan, action):
+        payload = original_payload(plan, action)
+        if action.action == "adopt" and payload.get("file_type") != "directory":
+            return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
+        return payload
+
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_legacy_adopt_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and ".github/workflows/ci.yml" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected protocol-1 journal stop")
+        return result
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", legacy_payload)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_legacy_adopt_checkpoint)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert first.reason == "injected protocol-1 journal stop"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    adopted = next(item for item in journal["actions"] if item["path"] == ".github/workflows/ci.yml")
+    assert adopted["action"] == "adopt"
+    assert adopted["checkpoint"] == "published"
+    assert all(field not in adopted["postcondition"] for field in ("device", "inode", "ctime_ns"))
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", original_payload)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert target.read_bytes() == b"current\n"
+    assert not journal_path.exists()
+
+
+def test_i369_protocol1_adopt_postcondition_guard_only_migrates_compatibility(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"current\n")
+    (target_root / "spec-dock").mkdir()
+    original_payload = managed_distribution._action_postcondition_payload
+
+    def legacy_payload(plan, action):
+        payload = original_payload(plan, action)
+        if action.action == "adopt" and payload.get("file_type") != "directory":
+            return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
+        return payload
+
+    original_prepare = OperationJournalStore.prepare
+
+    def stop_after_legacy_guard(self, plan, *, package_version):
+        raise DistributionApplyError("injected protocol-1 guard-only stop")
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", legacy_payload)
+    monkeypatch.setattr(OperationJournalStore, "prepare", stop_after_legacy_guard)
+    first = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert first.reason == "injected protocol-1 guard-only stop"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    marker_path = target_root / "spec-dock/.distribution-retry.json"
+    assert not journal_path.exists()
+    marker_before = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert marker_before["purpose"] == "fresh-journal-forward-only"
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", original_payload)
+    monkeypatch.setattr(OperationJournalStore, "prepare", original_prepare)
+    second = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert target.read_bytes() == b"current\n"
+    assert not journal_path.exists()
+    assert not marker_path.exists()
+
+
+def test_i369_protocol1_fixed_link_count_symlink_journal_retry_compatibility(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_payload = managed_distribution._action_postcondition_payload
+
+    def fixed_link_count_payload(plan, action):
+        payload = original_payload(plan, action)
+        if action.action == "adopt" and payload.get("file_type") != "directory":
+            payload = {**payload, "link_count": 1}
+            return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
+        return payload
+
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_shortcut_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected fixed-link-count protocol-1 stop")
+        return result
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", fixed_link_count_payload)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_shortcut_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    adopted = next(item for item in journal_payload["actions"] if item["path"] == "spec")
+    assert adopted["action"] == "adopt"
+    assert adopted["postcondition"]["link_count"] == 1
+    assert all(field not in adopted["postcondition"] for field in ("device", "inode", "ctime_ns"))
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", original_payload)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert shortcut.lstat().st_nlink == 2
+    assert alias.is_symlink()
+    assert not journal_path.exists()
+
+
+def test_i369_protocol1_fixed_link_count_symlink_guard_only_migrates_compatibility(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_payload = managed_distribution._action_postcondition_payload
+
+    def fixed_link_count_payload(plan, action):
+        payload = original_payload(plan, action)
+        if action.action == "adopt" and payload.get("file_type") != "directory":
+            payload = {**payload, "link_count": 1}
+            return {key: value for key, value in payload.items() if key not in {"device", "inode", "ctime_ns"}}
+        return payload
+
+    original_prepare = OperationJournalStore.prepare
+
+    def stop_after_fixed_link_count_guard(self, plan, *, package_version):
+        raise DistributionApplyError("injected fixed-link-count guard-only stop")
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", fixed_link_count_payload)
+    monkeypatch.setattr(OperationJournalStore, "prepare", stop_after_fixed_link_count_guard)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required", first.reason
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    marker_path = target_root / "spec-dock/.distribution-retry.json"
+    assert not journal_path.exists()
+    marker_before = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert marker_before["purpose"] == "recognized-journal-forward-only"
+
+    monkeypatch.setattr(managed_distribution, "_action_postcondition_payload", original_payload)
+    monkeypatch.setattr(OperationJournalStore, "prepare", original_prepare)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert shortcut.lstat().st_nlink == 2
+    assert alias.is_symlink()
+    assert not journal_path.exists()
+    assert not marker_path.exists()
+
+
+@pytest.mark.parametrize(
+    "phase",
+    (
+        "managed-scaffold-refreshed",
+        "current-external-materialized",
+        "obsolete-pruned",
+        "post-verified",
+        "version-written",
+    ),
+)
+def test_i369_fresh_legacy_later_phase_reassesses_and_converts_without_checkpoint_skip(
+    tmp_path: Path,
+    phase: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "fresh",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": phase,
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert not marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+    assert (target_root / "spec-dock" / "spec-dock.version").read_text(encoding="utf-8") == "1.2.3\n"
+
+
+def test_i369_fresh_schema1_marker_rejects_newer_package_conversion(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    root_info = target_root.stat()
+    marker = DistributionRetryMarker(
+        operation="fresh",
+        package_version="1.2.3",
+        target_root=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+        last_completed_phase="preflight-complete",
+        purpose="distribution-rerun",
+    )
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": marker.operation,
+            "package_version": marker.package_version,
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": marker.last_completed_phase,
+            "purpose": marker.purpose,
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.3.0",
+        legacy_marker=marker,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "legacy-marker-unconvertible"
+    assert marker_path.exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i369_fresh_schema1_conversion_preserves_legacy_marker_when_journal_appears(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = workspace / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "fresh",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    legacy_bytes = marker_path.read_bytes()
+    original_prepare = OperationJournalStore.prepare
+
+    def publish_raced_journal(self, plan, *, package_version):
+        self.path.write_bytes(b"raced journal\n")
+        return original_prepare(self, plan, package_version=package_version)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", publish_raced_journal)
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert marker_path.read_bytes() == legacy_bytes
+    assert (workspace / ".distribution-journal.json").read_bytes() == b"raced journal\n"
+
+
+def test_i369_fresh_schema1_conversion_restores_marker_after_digest_anchor_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    workspace = target_root / "spec-dock"
+    workspace.mkdir(parents=True)
+    root_info = target_root.stat()
+    marker_path = workspace / ".distribution-retry.json"
+    marker_path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "operation": "fresh",
+            "package_version": "1.2.3",
+            "target_root": {"device": root_info.st_dev, "inode": root_info.st_ino},
+            "last_completed_phase": "preflight-complete",
+            "purpose": "distribution-rerun",
+            "stage_ownership": [],
+        }),
+        encoding="utf-8",
+    )
+    legacy_bytes = marker_path.read_bytes()
+    original_prepare_legacy_guard = OperationJournalStore.prepare_legacy_guard
+
+    def publish_raced_journal_after_anchor(self, plan, **kwargs):
+        marker = original_prepare_legacy_guard(self, plan, **kwargs)
+        if plan is not None and kwargs.get("replace_marker") is not None and marker.journal_digest is not None:
+            marker_path = self.target_root / managed_distribution._DISTRIBUTION_RETRY_MARKER_REL
+            payload = json.loads(marker_path.read_text(encoding="utf-8"))
+            payload.pop("journal_digest", None)
+            payload.pop("journal_predecessor_digest", None)
+            payload.pop("journal_created_at_ns", None)
+            marker_path.write_text(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+            restored = managed_distribution._read_distribution_retry_marker(self.target_root)
+            assert restored is not None
+            marker = restored
+        if plan is None and kwargs.get("journal_digest") is not None:
+            self.path.write_bytes(b"raced after digest anchor\n")
+        return marker
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", publish_raced_journal_after_anchor)
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert marker_path.read_bytes() == legacy_bytes
+    assert (workspace / ".distribution-journal.json").read_bytes() == b"raced after digest anchor\n"
 
 
 def test_s25_missing_current_target_is_create(tmp_path: Path) -> None:
@@ -5505,7 +7074,7 @@ def test_s25_historical_hard_link_is_blocked_for_mutation(tmp_path: Path) -> Non
     assert action.blocked is True
 
 
-@pytest.mark.parametrize("operation", ["update", "init-force", "uninstall"])
+@pytest.mark.parametrize("operation", ["fresh", "update", "init-force", "uninstall"])
 def test_s25_current_hard_link_is_blocked_for_mutation(
     tmp_path: Path,
     operation: managed_distribution.DistributionOperation,
@@ -5531,6 +7100,28 @@ def test_s25_current_hard_link_is_blocked_for_mutation(
     assert action.provenance == "current"
     assert action.reason == "hard-link-mutation-unsafe"
     assert action.blocked is True
+
+
+def test_i369_required_directory_classification_reuses_captured_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observation = managed_distribution._TargetObservation("missing")
+
+    def fail_reobserve(*_args, **_kwargs):
+        raise AssertionError("required directory was observed twice")
+
+    monkeypatch.setattr(managed_distribution, "_observe_target", fail_reobserve)
+
+    action = managed_distribution._classify_required_directory(
+        target_root=tmp_path,
+        path="spec-dock/initiatives",
+        operation="fresh",
+        observation=observation,
+    )
+
+    assert action.action == "ensure-directory"
+    assert action.reason == "required-directory-missing"
 
 
 def test_s25_current_mode_mismatch_is_preserved_and_blocked_for_uninstall(tmp_path: Path) -> None:
@@ -5562,7 +7153,15 @@ def test_s25_current_mode_mismatch_is_preserved_and_blocked_for_uninstall(tmp_pa
     assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == before
 
 
-def test_s25_current_hard_linked_shortcut_is_blocked_for_uninstall(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("operation", "expected_action"),
+    [("fresh", "block"), ("update", "adopt"), ("init-force", "adopt"), ("uninstall", "block")],
+)
+def test_s25_current_hard_linked_shortcut_is_blocked_for_mutation(
+    tmp_path: Path,
+    operation: managed_distribution.DistributionOperation,
+    expected_action: str,
+) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
     target_root = tmp_path / "consumer"
@@ -5577,14 +7176,138 @@ def test_s25_current_hard_linked_shortcut_is_blocked_for_uninstall(tmp_path: Pat
         install_root,
         manifest_path=manifest_path,
         target_root=target_root,
-        operation="uninstall",
+        operation=operation,
     )
 
     action = next(item for item in plan.actions if item.path == "spec")
-    assert action.action == "block"
+    assert action.action == expected_action
     assert action.provenance == "current"
-    assert action.reason == "hard-link-mutation-unsafe"
-    assert action.blocked is True
+    if expected_action == "block":
+        assert action.reason == "hard-link-mutation-unsafe"
+        assert action.blocked is True
+    else:
+        assert action.reason == "current-identity-match"
+        assert action.blocked is False
+
+
+def test_i369_recognized_symlink_adopt_checkpoint_retry_preserves_link_topology(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_shortcut_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected recognized shortcut checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_shortcut_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert any(item["path"] == "spec" and item["checkpoint"] == "published" for item in journal_payload["actions"])
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "completed", second.reason
+    assert shortcut.lstat().st_nlink == 2
+    assert alias.is_symlink()
+    assert not journal_path.exists()
+
+
+def test_i369_recognized_adopt_rejects_same_semantics_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    target_root.mkdir()
+    (target_root / "spec-dock").mkdir()
+    shortcut = target_root / "spec"
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias = target_root / "shortcut-alias"
+    os.link(shortcut, alias, follow_symlinks=False)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    failed = False
+
+    def fail_after_shortcut_checkpoint(self, journal, completed_paths):
+        nonlocal failed
+        result = original_checkpoint(self, journal, completed_paths)
+        if not failed and "spec" in completed_paths:
+            failed = True
+            raise DistributionApplyError("injected recognized shortcut checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_shortcut_checkpoint)
+    first = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert first.status == "recovery_required"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert journal_path.exists()
+    original_inode = shortcut.lstat().st_ino
+
+    shortcut.unlink()
+    shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias.unlink()
+    os.link(shortcut, alias, follow_symlinks=False)
+    assert shortcut.lstat().st_ino != original_inode
+    assert shortcut.lstat().st_nlink == 2
+
+    second = execute_recognized_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        intent="update",
+        package_version="1.2.3",
+    )
+
+    assert second.status == "recovery_required"
+    assert second.reason in {"journal-plan-mismatch", "journal-precondition-mismatch"}
+    assert journal_path.exists()
+    assert shortcut.is_symlink()
+    assert alias.is_symlink()
 
 
 def test_s25_historical_hard_linked_shortcut_is_blocked_for_update(tmp_path: Path) -> None:
@@ -5753,6 +7476,75 @@ def test_s30_apply_materializes_missing_regular_target_without_replacing_existin
     target = target_root / ".github" / "workflows" / "ci.yml"
     assert target.read_bytes() == b"current\n"
     assert target.stat().st_nlink == 1
+
+
+def test_i369_apply_observation_count_scales_linearly_for_adopt_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = tmp_path / "install-root"
+    target_root = tmp_path / "consumer"
+    for index in range(40):
+        relative_path = Path(".github") / "generated" / f"asset-{index:03d}.txt"
+        source = install_root / relative_path
+        target = target_root / relative_path
+        source.parent.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = f"asset {index}\n".encode()
+        source.write_bytes(content)
+        target.write_bytes(content)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="fresh",
+    )
+    real_observe_target = managed_distribution._observe_target
+    observation_count = 0
+
+    def counted_observe_target(root: Path, relative_path: str):
+        nonlocal observation_count
+        observation_count += 1
+        return real_observe_target(root, relative_path)
+
+    monkeypatch.setattr(managed_distribution, "_observe_target", counted_observe_target)
+
+    result = apply_distribution_plan(plan)
+
+    assert result.status == "complete"
+    assert observation_count <= len(plan.actions) * 4
+
+
+def test_i369_fresh_checkpoints_are_bounded_by_phase_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    checkpoints: list[tuple[str, ...]] = []
+
+    def capture_checkpoint(self, journal, completed_paths):
+        checkpoints.append(completed_paths)
+        return original_checkpoint(self, journal, completed_paths)
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", capture_checkpoint)
+
+    result = execute_fresh_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+    )
+
+    assert result.status == "completed", result.reason
+    assert len(checkpoints) <= 4
+    assert any(len(completed_paths) > 1 for completed_paths in checkpoints)
 
 
 def test_s30_apply_upgrades_historical_regular_target_atomically(tmp_path: Path) -> None:
@@ -6377,7 +8169,7 @@ def test_s30_apply_rejects_external_parent_created_after_preflight(
     ) -> None:
         nonlocal injected
         original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
-        if not injected:
+        if not injected and getattr(action, "path", "") == ".github":
             injected = True
             (root / "zz").mkdir()
 
@@ -6386,7 +8178,8 @@ def test_s30_apply_rejects_external_parent_created_after_preflight(
     with pytest.raises(DistributionApplyError, match="identity"):
         apply_distribution_plan(plan)
 
-    assert (target_root / ".github" / "workflows" / "ci.yml").read_bytes() == b"first\n"
+    assert (target_root / ".github").is_dir()
+    assert not (target_root / ".github" / "workflows" / "ci.yml").exists()
     assert not (target_root / "zz" / "second.yml").exists()
 
 
@@ -6423,7 +8216,7 @@ def test_s30_apply_rejects_external_nested_parent_after_operation_parent_creatio
     ) -> None:
         nonlocal injected
         original_apply(current_plan, root, action, snapshot, bindings)  # type: ignore[arg-type]
-        if not injected and getattr(action, "path", "") == "zz/first.yml":
+        if not injected and getattr(action, "path", "") == "zz":
             injected = True
             (root / "zz" / "yy").mkdir()
 
@@ -6432,7 +8225,7 @@ def test_s30_apply_rejects_external_nested_parent_after_operation_parent_creatio
     with pytest.raises(DistributionApplyError, match="identity"):
         apply_distribution_plan(plan)
 
-    assert (target_root / "zz" / "first.yml").read_bytes() == b"first nested\n"
+    assert not (target_root / "zz" / "first.yml").exists()
     assert (target_root / "zz" / "yy").is_dir()
     assert not (target_root / "zz" / "yy" / "second.yml").exists()
 
