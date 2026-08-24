@@ -6,6 +6,8 @@ import subprocess
 import sys
 import time
 
+import pytest
+
 from tests.conftest import _normalize_failure_message
 
 REQUIRED_FAST_NODE_IDS = frozenset({
@@ -146,6 +148,56 @@ def test_full_regression_stream_timeout_survives_unterminated_output(tmp_path: P
     assert code != 0
     assert time.monotonic() - started < 1.5
     assert "unterminated" in output_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("child_body", "expected_output"),
+    [
+        (
+            "import sys, time\n"
+            "while True:\n"
+            "    sys.stdout.write('continuous\\n')\n"
+            "    sys.stdout.flush()\n"
+            "    time.sleep(0.001)\n",
+            "continuous",
+        ),
+        (
+            "import sys, time\nsys.stdout.write('intermittent\\n')\nsys.stdout.flush()\ntime.sleep(5)\n",
+            "intermittent",
+        ),
+        ("import time\ntime.sleep(5)\n", None),
+    ],
+    ids=("continuous-write", "intermittent-write", "silent"),
+)
+def test_full_regression_leader_exit_cannot_leave_stdout_descendant(
+    tmp_path: Path,
+    child_body: str,
+    expected_output: str | None,
+) -> None:
+    verifier = _load_full_regression_verifier()
+    child = tmp_path / "child.py"
+    parent = tmp_path / "parent.py"
+    output_path = tmp_path / "descendant.log"
+    child.write_text(child_body, encoding="utf-8")
+    parent.write_text(
+        "import subprocess, sys, time\nsubprocess.Popen([sys.executable, 'child.py'])\ntime.sleep(0.1)\n",
+        encoding="utf-8",
+    )
+    started = time.monotonic()
+
+    code, timed_out = verifier._run_streamed(
+        [sys.executable, str(parent)],
+        cwd=tmp_path,
+        output_path=output_path,
+        timeout_seconds=0.5,
+        stream=False,
+    )
+
+    assert timed_out is True
+    assert code == 124
+    assert time.monotonic() - started < 1.5
+    if expected_output is not None:
+        assert expected_output in output_path.read_text(encoding="utf-8")
 
 
 def test_full_regression_final_result_rechecks_deadline_after_postprocessing(monkeypatch) -> None:
