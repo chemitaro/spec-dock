@@ -211,6 +211,8 @@ merge-ready PR: a human performs the merge.
 
 - Commits follow Conventional Commits in Japanese.
 - Use a multi-line message: `type(scope): summary`, blank line, bullet body.
+- Before committing, verify both `git config user.name` and `git config user.email` resolve to `chemitaro` and `84865385+chemitaro@users.noreply.github.com`.
+- Preserve verified GitHub App, Bot, and third-party identities; never reassign them merely to increase contributions.
 - PRs should include the problem statement, linked issue, test output, and notes on scaffold/template/runtime impact.
 
 ## Security & Configuration Tips
