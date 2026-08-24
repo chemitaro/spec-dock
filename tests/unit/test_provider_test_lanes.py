@@ -166,6 +166,48 @@ def test_full_regression_final_result_rechecks_deadline_after_postprocessing(mon
     assert abs(result["total_elapsed_seconds"] - 600.001) < 1e-9
 
 
+def test_full_regression_weighted_shards_are_deterministic_and_preserve_collection_order() -> None:
+    verifier = _load_full_regression_verifier()
+    nodeids = [
+        "tests/sample.py::test_d",
+        "tests/sample.py::test_c",
+        "tests/sample.py::test_b",
+        "tests/sample.py::test_a",
+    ]
+
+    shards = verifier._partition_nodeids(
+        nodeids,
+        2,
+        timing_weights={
+            "tests/sample.py::test_a": 8.0,
+            "tests/sample.py::test_b": 7.0,
+        },
+        default_weight=1.0,
+    )
+
+    assert shards == [
+        ["tests/sample.py::test_c", "tests/sample.py::test_a"],
+        ["tests/sample.py::test_d", "tests/sample.py::test_b"],
+    ]
+    assert sorted(nodeid for shard in shards for nodeid in shard) == sorted(nodeids)
+
+
+def test_full_regression_weighted_shards_spread_known_slow_nodes() -> None:
+    verifier = _load_full_regression_verifier()
+    slow = [f"tests/sample.py::test_slow_{index}" for index in range(4)]
+    fast = [f"tests/sample.py::test_fast_{index}" for index in range(8)]
+
+    shards = verifier._partition_nodeids(
+        [*slow, *fast],
+        4,
+        timing_weights=dict.fromkeys(slow, 10.0),
+        default_weight=1.0,
+    )
+
+    assert all(len(set(shard) & set(slow)) == 1 for shard in shards)
+    assert {nodeid for shard in shards for nodeid in shard} == {*slow, *fast}
+
+
 def test_full_regression_workflow_enforces_the_total_slo() -> None:
     workflow = (_repo_root() / ".github/workflows/provider-full-regression.yml").read_text(encoding="utf-8")
 

@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -18,6 +19,7 @@ import xml.etree.ElementTree as ET
 
 
 LEDGER = Path(__file__).with_name("full-regression-ledger.json")
+TIMING_WEIGHTS = Path(__file__).with_name("full-regression-timing-weights.json")
 DEFAULT_TIMEOUT_SECONDS = 600.0
 DEFAULT_MAX_TOTAL_SECONDS = 600.0
 
@@ -257,12 +259,71 @@ def _remaining_phase_budget(
     return max(0.0, min(phase_timeout_seconds, remaining))
 
 
-def _partition_nodeids(nodeids: list[str], shard_count: int) -> list[list[str]]:
-    """Distribute collected nodes deterministically while preserving collection order."""
+def _load_timing_weights(repository: Path, head: str) -> tuple[dict[str, float], float]:
+    """Load an ancestor-bound timing profile used only for shard balancing."""
 
+    payload = json.loads(TIMING_WEIGHTS.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 1:
+        raise ValueError("full-regression timing weights have an unsupported schema")
+    observed_sha = payload.get("observed_sha")
+    if not isinstance(observed_sha, str):
+        raise ValueError("full-regression timing weights have no observation SHA")
+    ancestry = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", observed_sha, head],
+        cwd=repository,
+        check=False,
+    )
+    if ancestry.returncode != 0:
+        raise ValueError("full-regression timing weights are not an ancestor of HEAD")
+    default_weight = payload.get("default_seconds")
+    raw_weights = payload.get("node_seconds")
+    if (
+        isinstance(default_weight, bool)
+        or not isinstance(default_weight, (int, float))
+        or not math.isfinite(default_weight)
+        or default_weight <= 0
+        or not isinstance(raw_weights, dict)
+    ):
+        raise ValueError("full-regression timing weights are malformed")
+    weights: dict[str, float] = {}
+    for nodeid, raw_weight in raw_weights.items():
+        if (
+            not isinstance(nodeid, str)
+            or isinstance(raw_weight, bool)
+            or not isinstance(raw_weight, (int, float))
+            or not math.isfinite(raw_weight)
+            or raw_weight < default_weight
+        ):
+            raise ValueError("full-regression timing weights are malformed")
+        weights[nodeid] = float(raw_weight)
+    return weights, float(default_weight)
+
+
+def _partition_nodeids(
+    nodeids: list[str],
+    shard_count: int,
+    *,
+    timing_weights: dict[str, float],
+    default_weight: float,
+) -> list[list[str]]:
+    """Balance estimated runtime deterministically and preserve per-shard order."""
+
+    collection_order = {nodeid: index for index, nodeid in enumerate(nodeids)}
     shards: list[list[str]] = [[] for _ in range(shard_count)]
-    for index, nodeid in enumerate(nodeids):
-        shards[index % shard_count].append(nodeid)
+    shard_weights = [0.0] * shard_count
+    weighted_nodes = sorted(
+        nodeids,
+        key=lambda nodeid: (-timing_weights.get(nodeid, default_weight), collection_order[nodeid]),
+    )
+    for nodeid in weighted_nodes:
+        destination = min(
+            range(shard_count),
+            key=lambda index: (shard_weights[index], len(shards[index]), index),
+        )
+        shards[destination].append(nodeid)
+        shard_weights[destination] += timing_weights.get(nodeid, default_weight)
+    for shard in shards:
+        shard.sort(key=collection_order.__getitem__)
     return shards
 
 
@@ -372,7 +433,28 @@ def main() -> int:
         return 1
     print(f"[collection] {len(nodeids)} tests collected; running {min(args.shards, len(nodeids))} shards", flush=True)
     shard_count = min(args.shards, len(nodeids))
-    shards = _partition_nodeids(nodeids, shard_count)
+    try:
+        timing_weights, default_weight = _load_timing_weights(repository, head)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        result = {
+            "status": "timing-weights-invalid",
+            "reason": str(exc),
+            **_timing_evidence(
+                overall_started=overall_started,
+                collection_seconds=collection_seconds,
+                shard_elapsed_seconds=0.0,
+                slo_seconds=args.max_total_seconds,
+            ),
+        }
+        (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps(result, sort_keys=True), file=sys.stderr)
+        return 1
+    shards = _partition_nodeids(
+        nodeids,
+        shard_count,
+        timing_weights=timing_weights,
+        default_weight=default_weight,
+    )
 
     shard_started = time.monotonic()
 
@@ -504,13 +586,13 @@ def main() -> int:
         return 1
     result = _finalize_result(
         {
-        "status": "verified",
-        "candidate_sha": head,
-        "approved_failure_count": len(actual),
-        "shards": [
-            {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
-            for _code, _timed_out, junit_path, pytest_log in shard_results
-        ],
+            "status": "verified",
+            "candidate_sha": head,
+            "approved_failure_count": len(actual),
+            "shards": [
+                {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
+                for _code, _timed_out, junit_path, pytest_log in shard_results
+            ],
         },
         overall_started=overall_started,
         collection_seconds=collection_seconds,
