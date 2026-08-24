@@ -114,6 +114,17 @@ DistributionActionName = Literal[
 ]
 DistributionProvenance = Literal["missing", "current", "historical", "unknown"]
 
+_FRESH_DISTRIBUTION_ACTIONS = frozenset({"create", "adopt", "preserve", "block", "ensure-directory"})
+
+
+def _intent_allows_distribution_action(
+    intent: DistributionOperation,
+    action: DistributionActionName,
+) -> bool:
+    """Return whether an action belongs to the mutation grammar for an intent."""
+
+    return intent != "fresh" or action in _FRESH_DISTRIBUTION_ACTIONS
+
 
 @dataclass(frozen=True)
 class DistributionAction:
@@ -2780,6 +2791,8 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
             raise DistributionPlanError("workspace assessment contains an unsafe managed path") from exc
         if action.operation != assessment.intent:
             raise DistributionPlanError("workspace assessment action intent mismatch")
+        if not _intent_allows_distribution_action(assessment.intent, action.action):
+            raise DistributionPlanError("workspace assessment action is not allowed for its intent")
         if action.action == "ensure-directory":
             if not any(item.path == action.path for item in plan.required_directories):
                 raise DistributionPlanError("workspace assessment ensure-directory is outside directory authority")
@@ -6707,7 +6720,7 @@ def _assert_gc_transition_graph(journal: OperationJournal) -> None:
 
 def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: OperationJournal) -> None:
     plan = assessment.distribution_plan
-    if plan.target_root is None:
+    if plan.target_root is None or journal.intent != assessment.intent:
         raise DistributionApplyError("journal-plan-mismatch")
     current_actions = {action.path: action for action in assessment.actions}
     records = {record.path: record for record in journal.actions}
@@ -6776,6 +6789,8 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
     }
     obsolete_paths = {item["path"] for item in plan.manifest.obsolete_exact_files} - set(current_specs)
     for record in journal.actions:
+        if not _intent_allows_distribution_action(journal.intent, record.action):
+            raise DistributionApplyError("journal-plan-mismatch")
         postcondition = _journal_postcondition(record)
         expected_identity: DistributionIdentity | None = None
         if record.action == "prune":
@@ -11295,6 +11310,9 @@ def apply_distribution_plan(
     siblings untouched.  Any preflight or identity mismatch raises before the
     corresponding action writes or removes a target path.
     """
+
+    if any(not _intent_allows_distribution_action(plan.operation, action.action) for action in plan.actions):
+        raise DistributionApplyError("distribution plan action is not allowed for its intent")
 
     target_root = plan.target_root
     if target_root is None or plan.install_root is None:
