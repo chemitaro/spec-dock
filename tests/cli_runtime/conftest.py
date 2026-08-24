@@ -41,6 +41,22 @@ _TEMPLATE_MODULES = frozenset({
     "tests.cli_runtime.test_worktree",
     "tests.cli_runtime.test_wrappers",
 })
+_DISTRIBUTION_CUTOVER_MODULE = "tests.cli_runtime.test_distribution_cutover"
+_DISTRIBUTION_SETUP_OPERATIONS = ("update", "uninstall", "recognized")
+
+
+def _can_reuse_fresh_init_result(module_name: str, test_name: str) -> bool:
+    """Return whether plain init is only a precondition for this test."""
+
+    if module_name in _TEMPLATE_MODULES:
+        return True
+    if module_name != _DISTRIBUTION_CUTOVER_MODULE:
+        return False
+    return (
+        any(operation in test_name for operation in _DISTRIBUTION_SETUP_OPERATIONS)
+        and "fresh" not in test_name
+        and "reinit" not in test_name
+    )
 
 
 def _clone_tree_contents(source: Path, target: Path) -> None:
@@ -84,7 +100,7 @@ def _reuse_fresh_init_result(
     """
 
     module_name = request.node.nodeid.split("::", 1)[0][:-3].replace("/", ".")
-    if module_name not in _TEMPLATE_MODULES:
+    if not _can_reuse_fresh_init_result(module_name, request.node.originalname):
         return
 
     real_main = request.module.main

@@ -208,6 +208,19 @@ def test_full_regression_weighted_shards_spread_known_slow_nodes() -> None:
     assert {nodeid for shard in shards for nodeid in shard} == {*slow, *fast}
 
 
+def test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup() -> None:
+    from tests.cli_runtime.conftest import _can_reuse_fresh_init_result
+
+    module = "tests.cli_runtime.test_distribution_cutover"
+
+    assert _can_reuse_fresh_init_result(module, "test_s50_update_restores_missing_asset")
+    assert _can_reuse_fresh_init_result(module, "test_s70_uninstall_removes_managed_asset")
+    assert _can_reuse_fresh_init_result(module, "test_i368_recognized_update_stays_on_held_root")
+    assert not _can_reuse_fresh_init_result(module, "test_i369_fresh_entrypoint_matrix")
+    assert not _can_reuse_fresh_init_result(module, "test_s70_uninstall_allows_fresh_reinit")
+    assert not _can_reuse_fresh_init_result(module, "test_s45_init_materializes_current_catalog")
+
+
 def test_full_regression_workflow_enforces_the_total_slo() -> None:
     workflow = (_repo_root() / ".github/workflows/provider-full-regression.yml").read_text(encoding="utf-8")
 
