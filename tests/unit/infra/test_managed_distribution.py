@@ -360,6 +360,58 @@ def test_i368_forged_assessment_cannot_prune_outside_manifest_authority(tmp_path
     assert sentinel.read_text(encoding="utf-8") == "keep\n"
 
 
+@pytest.mark.parametrize("forged_action_name", ["upgrade", "prune"])
+def test_i369_fresh_action_grammar_is_enforced_at_every_mutation_boundary(
+    tmp_path: Path,
+    forged_action_name: Literal["upgrade", "prune"],
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    sentinel = target_root / "user-owned.txt"
+    sentinel.write_text("keep\n", encoding="utf-8")
+    assessment = build_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        intent="fresh",
+    )
+    original_action = next(action for action in assessment.actions if action.action == "create")
+    forged_action = replace(
+        original_action,
+        action=forged_action_name,
+        provenance="historical" if forged_action_name == "prune" else "current",
+        reason=f"forged-fresh-{forged_action_name}",
+    )
+    forged_plan = replace(assessment.distribution_plan, actions=(forged_action,))
+    forged_assessment = replace(
+        assessment,
+        distribution_plan=forged_plan,
+        actions=(forged_action,),
+    )
+
+    with pytest.raises(DistributionPlanError, match="not allowed for its intent"):
+        build_executable_mutation_plan(forged_assessment)
+
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    original_record = next(record for record in journal.actions if record.path == original_action.path)
+    forged_record = replace(original_record, action=forged_action_name)
+    forged_journal = replace(
+        journal,
+        actions=tuple(forged_record if record.path == original_action.path else record for record in journal.actions),
+    )
+    with pytest.raises(DistributionApplyError, match="journal-plan-mismatch"):
+        managed_distribution._assert_journal_action_contract(assessment, forged_journal)
+
+    with pytest.raises(DistributionApplyError, match="not allowed for its intent"):
+        apply_distribution_plan(forged_plan)
+
+    assert sentinel.read_text(encoding="utf-8") == "keep\n"
+
+
 def test_i368_executable_plan_digest_is_stable_for_equivalent_assessment(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())
