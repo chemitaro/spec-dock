@@ -7137,11 +7137,27 @@ def _assert_workspace_closed_set_tree(workspace: Path, allowed: frozenset[str]) 
     walk(workspace, "")
 
 
+def _journal_workspace_top_level_entries(journal: OperationJournal) -> frozenset[str]:
+    """Index immutable journal paths that may appear below ``spec-dock``."""
+
+    allowed: set[str] = set()
+    for path in (
+        *(action.path for action in journal.actions),
+        *(binding.relative_path for binding in journal.created_parent_bindings),
+        *(lease.path for lease in journal.staging_leases),
+    ):
+        root, separator, remainder = path.partition("/")
+        if root == "spec-dock" and separator and remainder:
+            allowed.add(remainder.partition("/")[0])
+    return frozenset(allowed)
+
+
 def _assert_created_workspace_closed_set(
     target_root: Path,
     expected_identity: tuple[int, int] | None,
     journal: OperationJournal | None,
     allowed_workspace_entries: frozenset[str] | None = None,
+    journal_workspace_entries: frozenset[str] | None = None,
 ) -> None:
     """Re-prove a fresh bootstrap directory and reject unknown root children."""
 
@@ -7176,17 +7192,14 @@ def _assert_created_workspace_closed_set(
         allowed.add(_DISTRIBUTION_RETRY_MARKER_REL.name)
     if journal is not None:
         allowed.add(_DISTRIBUTION_JOURNAL_REL.name)
-        for path in (
-            *(action.path for action in journal.actions),
-            *(binding.relative_path for binding in journal.created_parent_bindings),
-            *(lease.path for lease in journal.staging_leases),
-        ):
-            parts = PurePosixPath(path).parts
-            if len(parts) > 1 and parts[0] == "spec-dock":
-                allowed.add(parts[1])
+        allowed.update(
+            journal_workspace_entries
+            if journal_workspace_entries is not None
+            else _journal_workspace_top_level_entries(journal)
+        )
         for lease in journal.staging_leases:
-            parts = PurePosixPath(lease.path).parts
-            if len(parts) == 2 and parts[0] == "spec-dock":
+            root, separator, remainder = lease.path.partition("/")
+            if root == "spec-dock" and separator and remainder and "/" not in remainder:
                 allowed.add(lease.stage_name)
     if names - allowed:
         raise DistributionApplyError("journal-parent-mismatch")
@@ -7786,6 +7799,7 @@ def _execute_distribution_reconciliation(
     guard_only_plan: ExecutableMutationPlan | None = None
     guard_only_marker: DistributionRetryMarker | None = None
     boundary_journal: OperationJournal | None = None
+    journal_workspace_entries: frozenset[str] | None = None
 
     def revalidate_guard_only_workspace(extra_entries: tuple[str, ...] = ()) -> None:
         if guard_only_plan is None or guard_only_marker is None:
@@ -7803,6 +7817,7 @@ def _execute_distribution_reconciliation(
             boundary_workspace_identity,
             journal or boundary_journal,
             boundary_workspace_closed_set if journal is None else None,
+            journal_workspace_entries,
         )
         if preserved_validation_active and preserved_state_validator is not None:
             preserved_state_validator()
@@ -8124,6 +8139,7 @@ def _execute_distribution_reconciliation(
         validate_preserved_state()
         journal = store.mark_executing(journal)
         active_journal = journal
+        journal_workspace_entries = _journal_workspace_top_level_entries(active_journal)
         refreshed_assessment = build_workspace_assessment(
             install_root,
             manifest_path=manifest_path,
@@ -8135,6 +8151,10 @@ def _execute_distribution_reconciliation(
         refreshed_executable = _resume_executable_plan(refreshed_assessment, journal)
 
         recorded_completed: tuple[str, ...] = ()
+        recorded_phase: str | None = None
+        batch_fresh_progress = intent == "fresh" and all(
+            record.action in {"create", "adopt", "preserve", "ensure-directory"} for record in active_journal.actions
+        )
 
         def record_staging_lease(lease: DistributionStageOwnership) -> None:
             nonlocal active_journal, journal
@@ -8172,25 +8192,29 @@ def _execute_distribution_reconciliation(
             journal = active_journal
 
         def record_progress(
-            _phase: str,
+            phase: str,
             completed: tuple[str, ...],
             _pending: tuple[str, ...],
-            _phase_complete: bool,
+            phase_complete: bool,
         ) -> None:
-            nonlocal active_journal, journal, recorded_completed
-            if completed == recorded_completed:
-                return
-            validate_preserved_state()
-            active_journal = store.checkpoint_published(active_journal, completed)
-            journal = active_journal
-            recorded_completed = completed
+            nonlocal active_journal, journal, recorded_completed, recorded_phase
+            phase_boundary = phase != recorded_phase or phase_complete
+            if phase_boundary:
+                validate_preserved_state()
+                _assert_created_parent_bindings_closed_set(target_root, active_journal)
+            checkpoint_due = phase_complete or not batch_fresh_progress
+            if checkpoint_due and completed != recorded_completed:
+                active_journal = store.checkpoint_published(active_journal, completed)
+                journal = active_journal
+                recorded_completed = completed
+            recorded_phase = phase
 
         def validate_mutation_boundary() -> None:
             validate_preserved_state()
-            _assert_created_parent_bindings_closed_set(target_root, active_journal)
+            if intent != "fresh":
+                _assert_created_parent_bindings_closed_set(target_root, active_journal)
 
         def validate_held_parent_boundary(path: str, parent_chain: tuple[int, ...]) -> None:
-            validate_preserved_state()
             record = next((item for item in active_journal.actions if item.path == path), None)
             if record is None:
                 raise DistributionApplyError("journal-precondition-mismatch")
@@ -10098,6 +10122,126 @@ def _assert_pending_snapshot_stable(
         raise DistributionApplyError(f"managed target identity changed for '{path}'")
 
 
+def _assert_action_snapshots_stable(
+    target_root: Path,
+    actions: tuple[DistributionAction, ...],
+    snapshots: dict[str, DistributionTargetSnapshot],
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+) -> None:
+    """Validate each action once at its phase boundary."""
+
+    for action in actions:
+        observation = _observe_target(target_root, action.path)
+        if observation.snapshot is None:
+            raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+        _assert_pending_snapshot_stable(
+            observation.snapshot,
+            snapshots[action.path],
+            action.path,
+            created_parent_bindings,
+        )
+
+
+def _pending_unbound_directory_guards(
+    actions: tuple[DistributionAction, ...],
+    snapshots: dict[str, DistributionTargetSnapshot],
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+    required_directory_paths: set[str],
+) -> tuple[str, ...]:
+    """Return the first still-unbound missing directory for each pending action."""
+
+    guards: set[str] = set()
+    for action in actions:
+        snapshot = snapshots[action.path]
+        candidates = [
+            parent.relative_path
+            for parent in snapshot.parents
+            if not parent.exists and parent.relative_path in required_directory_paths
+        ]
+        if action.path in required_directory_paths and not snapshot.target.exists:
+            candidates.append(action.path)
+        for candidate in candidates:
+            binding = created_parent_bindings.get(candidate)
+            if binding is None or not binding.exists:
+                guards.add(candidate)
+                break
+    return tuple(sorted(guards))
+
+
+def _assert_pending_unbound_directories_stable(
+    target_root: Path,
+    actions: tuple[DistributionAction, ...],
+    snapshots: dict[str, DistributionTargetSnapshot],
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+    required_directory_paths: set[str],
+) -> None:
+    """Fail early when an external actor creates a pending operation parent."""
+
+    for path in _pending_unbound_directory_guards(
+        actions,
+        snapshots,
+        created_parent_bindings,
+        required_directory_paths,
+    ):
+        observation = _observe_target(target_root, path)
+        if observation.snapshot is None:
+            raise DistributionApplyError(f"managed target identity changed for '{path}'")
+        _assert_pending_snapshot_stable(
+            observation.snapshot,
+            snapshots[path],
+            path,
+            created_parent_bindings,
+        )
+
+
+def _refresh_pending_parent_snapshots(
+    actions: tuple[DistributionAction, ...],
+    snapshots: dict[str, DistributionTargetSnapshot],
+    operation_observation: DistributionTargetSnapshot,
+) -> None:
+    """Propagate exact parent identities observed after an owned mutation."""
+
+    observed_parents = {parent.relative_path: parent for parent in operation_observation.parents}
+    for action in actions:
+        snapshot = snapshots[action.path]
+        updated_root = snapshot.root
+        if _same_structure_identity(operation_observation.root, snapshot.root):
+            updated_root = operation_observation.root
+        updated_parents: list[PathIdentitySnapshot] = []
+        changed = updated_root != snapshot.root
+        for parent in snapshot.parents:
+            observed = observed_parents.get(parent.relative_path)
+            if observed is not None and _same_structure_identity(observed, parent):
+                updated_parents.append(observed)
+                changed = changed or observed != parent
+            else:
+                updated_parents.append(parent)
+        if changed:
+            snapshots[action.path] = replace(snapshot, root=updated_root, parents=tuple(updated_parents))
+
+
+def _refresh_pending_action_snapshots(
+    target_root: Path,
+    actions: tuple[DistributionAction, ...],
+    snapshots: dict[str, DistributionTargetSnapshot],
+    created_parent_bindings: dict[str, PathIdentitySnapshot],
+) -> None:
+    """Re-observe all pending actions for destructive reconciliation paths."""
+
+    for action in actions:
+        snapshot = snapshots[action.path]
+        observation = _observe_target(target_root, action.path)
+        if observation.snapshot is None:
+            raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+        _assert_pending_snapshot_stable(
+            observation.snapshot,
+            snapshot,
+            action.path,
+            created_parent_bindings,
+        )
+        snapshots[action.path] = observation.snapshot
+
+
 def _bind_created_parent_identities(
     target_rel: str,
     snapshot: DistributionTargetSnapshot,
@@ -11264,6 +11408,12 @@ def apply_distribution_plan(
             continue
         if progress_recorder is not None:
             progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), False)
+        _assert_action_snapshots_stable(
+            target_root,
+            actions,
+            snapshots,
+            created_parent_bindings_by_path,
+        )
         for action in actions:
             index = action_index[id(action)]
             try:
@@ -11291,9 +11441,9 @@ def apply_distribution_plan(
                         stage_ownership_recorder=stage_ownership_recorder,
                         stage_ownership_remover=stage_ownership_remover,
                     )
-                # Removing a known stale stage mutates the parent directory ctime.  The
-                # target itself must remain unchanged, but every later action needs the
-                # refreshed parent snapshot before it can be applied or adopted.
+                # A known stale-stage cleanup may mutate the current parent ctime.
+                # Propagate only that operation-observed parent identity to pending
+                # siblings; do not re-observe every pending target.
                 refreshed = _observe_target(target_root, action.path)
                 if refreshed.snapshot is None:
                     raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
@@ -11305,18 +11455,19 @@ def apply_distribution_plan(
                 )
                 snapshot = refreshed.snapshot
                 snapshots[action.path] = snapshot
-                for pending in actions_to_apply[index + 1 :]:
-                    pending_snapshot = snapshots[pending.path]
-                    pending_observation = _observe_target(target_root, pending.path)
-                    if pending_observation.snapshot is None:
-                        raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
-                    _assert_pending_snapshot_stable(
-                        pending_observation.snapshot,
-                        pending_snapshot,
-                        pending.path,
+                if plan.operation == "fresh":
+                    _refresh_pending_parent_snapshots(
+                        actions_to_apply[index + 1 :],
+                        snapshots,
+                        refreshed.snapshot,
+                    )
+                else:
+                    _refresh_pending_action_snapshots(
+                        target_root,
+                        actions_to_apply[index + 1 :],
+                        snapshots,
                         created_parent_bindings_by_path,
                     )
-                    snapshots[pending.path] = pending_observation.snapshot
                 if action.action not in {"adopt", "preserve"}:
                     if before_mutation is not None:
                         before_mutation()
@@ -11387,22 +11538,33 @@ def apply_distribution_plan(
                             held_parent_validator,
                             first_target_mutation_validator,
                         )
+                    post_observation = _observe_target(target_root, action.path)
+                    if post_observation.snapshot is None:
+                        raise DistributionApplyError(f"managed target identity changed for '{action.path}'")
+                    _refresh_pending_parent_snapshots(
+                        actions_to_apply[index + 1 :],
+                        snapshots,
+                        post_observation.snapshot,
+                    )
                 applied_paths.append(action.path)
                 pending_paths.remove(action.path)
                 if progress_recorder is not None:
                     progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), False)
-                for pending in actions_to_apply[index + 1 :]:
-                    pending_snapshot = snapshots[pending.path]
-                    pending_observation = _observe_target(target_root, pending.path)
-                    if pending_observation.snapshot is None:
-                        raise DistributionApplyError(f"managed target identity changed for '{pending.path}'")
-                    _assert_pending_snapshot_stable(
-                        pending_observation.snapshot,
-                        pending_snapshot,
-                        pending.path,
+                if plan.operation == "fresh":
+                    _assert_pending_unbound_directories_stable(
+                        target_root,
+                        actions_to_apply[index + 1 :],
+                        snapshots,
+                        created_parent_bindings_by_path,
+                        required_directory_paths,
+                    )
+                else:
+                    _refresh_pending_action_snapshots(
+                        target_root,
+                        actions_to_apply[index + 1 :],
+                        snapshots,
                         created_parent_bindings_by_path,
                     )
-                    snapshots[pending.path] = pending_observation.snapshot
             except Exception as exc:
                 if isinstance(exc, DistributionApplyError) and exc.phase is not None:
                     raise
