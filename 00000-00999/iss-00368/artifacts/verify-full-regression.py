@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 
 LEDGER = Path(__file__).with_name("full-regression-ledger.json")
 DEFAULT_TIMEOUT_SECONDS = 600.0
+DEFAULT_MAX_TOTAL_SECONDS = 600.0
 
 
 def _normalize(message: str, repository: Path) -> str:
@@ -156,6 +157,12 @@ def _parse_args() -> argparse.Namespace:
         help="hard timeout for each pytest phase (default: 600 seconds)",
     )
     parser.add_argument(
+        "--max-total-seconds",
+        type=float,
+        default=DEFAULT_MAX_TOTAL_SECONDS,
+        help="hard deadline including collection and every shard (default: 600 seconds)",
+    )
+    parser.add_argument(
         "--artifact-dir",
         type=Path,
         default=None,
@@ -170,9 +177,38 @@ def _parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.timeout_seconds <= 0:
         parser.error("--timeout-seconds must be greater than zero")
+    if args.max_total_seconds <= 0:
+        parser.error("--max-total-seconds must be greater than zero")
     if args.shards <= 0:
         parser.error("--shards must be greater than zero")
     return args
+
+
+def _timing_evidence(
+    *,
+    overall_started: float,
+    collection_seconds: float,
+    shard_elapsed_seconds: float,
+    slo_seconds: float,
+) -> dict[str, object]:
+    total_elapsed_seconds = time.monotonic() - overall_started
+    return {
+        "collection_seconds": round(collection_seconds, 3),
+        "shard_elapsed_seconds": round(shard_elapsed_seconds, 3),
+        "total_elapsed_seconds": round(total_elapsed_seconds, 3),
+        "slo_seconds": slo_seconds,
+        "slo_status": "pass" if total_elapsed_seconds <= slo_seconds else "fail",
+    }
+
+
+def _remaining_phase_budget(
+    *,
+    overall_started: float,
+    max_total_seconds: float,
+    phase_timeout_seconds: float,
+) -> float:
+    remaining = max_total_seconds - (time.monotonic() - overall_started)
+    return max(0.0, min(phase_timeout_seconds, remaining))
 
 
 def _partition_nodeids(nodeids: list[str], shard_count: int) -> list[list[str]]:
@@ -186,6 +222,7 @@ def _partition_nodeids(nodeids: list[str], shard_count: int) -> list[list[str]]:
 
 def main() -> int:
     args = _parse_args()
+    overall_started = time.monotonic()
     repository = Path.cwd().resolve()
     ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
     head = subprocess.run(
@@ -227,18 +264,43 @@ def main() -> int:
     run_dir = artifact_root / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     collection_log = run_dir / "collection.log"
+    collection_started = time.monotonic()
+    collection_budget = _remaining_phase_budget(
+        overall_started=overall_started,
+        max_total_seconds=args.max_total_seconds,
+        phase_timeout_seconds=min(args.timeout_seconds, 120.0),
+    )
+    if collection_budget <= 0:
+        result = {
+            "status": "total-timeout",
+            **_timing_evidence(
+                overall_started=overall_started,
+                collection_seconds=0.0,
+                shard_elapsed_seconds=0.0,
+                slo_seconds=args.max_total_seconds,
+            ),
+        }
+        (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        return 1
     collection_code, collection_timeout = _run_streamed(
         [sys.executable, "-m", "pytest", "--run-full-regression", "--collect-only", "-q"],
         cwd=repository,
         output_path=collection_log,
-        timeout_seconds=min(args.timeout_seconds, 120.0),
+        timeout_seconds=collection_budget,
         stream=False,
     )
+    collection_seconds = time.monotonic() - collection_started
     if collection_timeout or collection_code != 0:
         result = {
             "status": "collection-timeout" if collection_timeout else "collection-failed",
             "exit_code": collection_code,
             "timeout_seconds": args.timeout_seconds,
+            **_timing_evidence(
+                overall_started=overall_started,
+                collection_seconds=collection_seconds,
+                shard_elapsed_seconds=0.0,
+                slo_seconds=args.max_total_seconds,
+            ),
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         return 1
@@ -249,7 +311,16 @@ def main() -> int:
         if "] tests/" in line and "::" in line
     ]
     if not nodeids:
-        result = {"status": "collection-empty", "collection_log": str(collection_log)}
+        result = {
+            "status": "collection-empty",
+            "collection_log": str(collection_log),
+            **_timing_evidence(
+                overall_started=overall_started,
+                collection_seconds=collection_seconds,
+                shard_elapsed_seconds=0.0,
+                slo_seconds=args.max_total_seconds,
+            ),
+        }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
         return 1
@@ -257,11 +328,18 @@ def main() -> int:
     shard_count = min(args.shards, len(nodeids))
     shards = _partition_nodeids(nodeids, shard_count)
 
-    started = time.monotonic()
+    shard_started = time.monotonic()
 
     def run_shard(index: int, selected: list[str]) -> tuple[int, bool, Path, Path]:
         junit_path = run_dir / f"shard-{index + 1}.xml"
         pytest_log = run_dir / f"shard-{index + 1}.log"
+        remaining_total_seconds = _remaining_phase_budget(
+            overall_started=overall_started,
+            max_total_seconds=args.max_total_seconds,
+            phase_timeout_seconds=args.timeout_seconds,
+        )
+        if remaining_total_seconds <= 0:
+            return 124, True, junit_path, pytest_log
         code, timed_out = _run_streamed(
             [
                 sys.executable,
@@ -269,20 +347,35 @@ def main() -> int:
                 "pytest",
                 "--run-full-regression",
                 "--full-regression-shard",
-                "-vv",
+                "-q",
                 "--durations=50",
                 f"--junitxml={junit_path}",
                 *selected,
             ],
             cwd=repository,
             output_path=pytest_log,
-            timeout_seconds=args.timeout_seconds,
+            timeout_seconds=remaining_total_seconds,
         )
         return code, timed_out, junit_path, pytest_log
 
     with ThreadPoolExecutor(max_workers=shard_count) as executor:
         shard_results = list(executor.map(lambda item: run_shard(*item), enumerate(shards)))
-    elapsed_seconds = time.monotonic() - started
+    shard_elapsed_seconds = time.monotonic() - shard_started
+    timing = _timing_evidence(
+        overall_started=overall_started,
+        collection_seconds=collection_seconds,
+        shard_elapsed_seconds=shard_elapsed_seconds,
+        slo_seconds=args.max_total_seconds,
+    )
+    if timing["slo_status"] != "pass":
+        result = {
+            "status": "total-timeout",
+            "timeout_seconds": args.timeout_seconds,
+            **timing,
+        }
+        (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps(result, sort_keys=True), file=sys.stderr)
+        return 1
     invalid_shards = [
         {
             "shard": index + 1,
@@ -297,9 +390,9 @@ def main() -> int:
     if invalid_shards:
         result = {
             "status": "shard-timeout-or-failed",
-            "elapsed_seconds": round(elapsed_seconds, 3),
             "timeout_seconds": args.timeout_seconds,
             "shards": invalid_shards,
+            **timing,
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
@@ -315,7 +408,7 @@ def main() -> int:
             result = {
                 "status": "duplicate-shard-node",
                 "nodeids": sorted(overlap),
-                "elapsed_seconds": round(elapsed_seconds, 3),
+                **timing,
             }
             (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
             print(json.dumps(result, sort_keys=True), file=sys.stderr)
@@ -327,7 +420,7 @@ def main() -> int:
             result = {
                 "status": "duplicate-shard-node",
                 "nodeids": sorted(failure_overlap),
-                "elapsed_seconds": round(elapsed_seconds, 3),
+                **timing,
             }
             (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
             print(json.dumps(result, sort_keys=True), file=sys.stderr)
@@ -337,9 +430,9 @@ def main() -> int:
     if executed_nodes != selected_nodes:
         result = {
             "status": "node-coverage-mismatch",
-            "elapsed_seconds": round(elapsed_seconds, 3),
             "missing_nodes": sorted(selected_nodes - executed_nodes),
             "unexpected_nodes": sorted(executed_nodes - selected_nodes),
+            **timing,
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
@@ -348,7 +441,6 @@ def main() -> int:
         result = {
             "status": "ledger-mismatch",
             "candidate_sha": head,
-            "elapsed_seconds": round(elapsed_seconds, 3),
             "unexpected_errors": sorted(errors),
             "missing_failures": sorted(set(expected) - set(actual)),
             "unexpected_failures": sorted(set(actual) - set(expected)),
@@ -359,6 +451,7 @@ def main() -> int:
                 {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
                 for _code, _timed_out, junit_path, pytest_log in shard_results
             ],
+            **timing,
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
@@ -366,12 +459,12 @@ def main() -> int:
     result = {
         "status": "verified",
         "candidate_sha": head,
-        "elapsed_seconds": round(elapsed_seconds, 3),
         "approved_failure_count": len(actual),
         "shards": [
             {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
             for _code, _timed_out, junit_path, pytest_log in shard_results
         ],
+        **timing,
     }
     (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(f"verified {len(actual)} approved failure signatures on candidate {head}")
