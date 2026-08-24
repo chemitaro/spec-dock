@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import codecs
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import hashlib
@@ -87,13 +88,42 @@ def _run_streamed(
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+            bufsize=0,
             start_new_session=True,
         )
         assert process.stdout is not None
+        os.set_blocking(process.stdout.fileno(), False)
         selector = selectors.DefaultSelector()
         selector.register(process.stdout, selectors.EVENT_READ)
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        pending = ""
+
+        def emit_available(chunk: bytes, *, final: bool = False) -> None:
+            nonlocal pending
+            pending += decoder.decode(chunk, final=final)
+            lines = pending.splitlines(keepends=True)
+            if lines and not lines[-1].endswith(("\n", "\r")) and not final:
+                pending = lines.pop()
+            else:
+                pending = ""
+            for line in lines:
+                rendered = f"[{time.monotonic() - started:8.1f}s] {line}"
+                if stream:
+                    print(rendered, end="", flush=True)
+                saved.write(rendered)
+            if lines:
+                saved.flush()
+
+        def drain_available() -> None:
+            while True:
+                try:
+                    chunk = os.read(process.stdout.fileno(), 65536)
+                except BlockingIOError:
+                    return
+                if not chunk:
+                    return
+                emit_available(chunk)
+
         try:
             while True:
                 elapsed = time.monotonic() - started
@@ -101,26 +131,16 @@ def _run_streamed(
                     timed_out = True
                     break
                 if process.poll() is not None:
-                    remaining = process.stdout.read()
-                    if remaining:
-                        for line in remaining.splitlines(keepends=True):
-                            rendered = f"[{time.monotonic() - started:8.1f}s] {line}"
-                            if stream:
-                                print(rendered, end="", flush=True)
-                            saved.write(rendered)
-                        saved.flush()
+                    drain_available()
+                    emit_available(b"", final=True)
                     break
                 events = selector.select(timeout=min(0.25, timeout_seconds - elapsed))
                 if not events:
                     continue
-                line = process.stdout.readline()
-                if not line:
+                chunk = os.read(process.stdout.fileno(), 65536)
+                if not chunk:
                     continue
-                rendered = f"[{time.monotonic() - started:8.1f}s] {line}"
-                if stream:
-                    print(rendered, end="", flush=True)
-                saved.write(rendered)
-                saved.flush()
+                emit_available(chunk)
             if timed_out and process.poll() is None:
                 if hasattr(os, "killpg"):
                     os.killpg(process.pid, signal.SIGTERM)
@@ -136,6 +156,9 @@ def _run_streamed(
                     process.wait()
             else:
                 process.wait()
+            if timed_out:
+                drain_available()
+                emit_available(b"", final=True)
         finally:
             selector.close()
             if process.stdout is not None:
@@ -145,7 +168,7 @@ def _run_streamed(
         print(timeout_line, end="", file=sys.stderr, flush=True)
         with output_path.open("a", encoding="utf-8") as saved:
             saved.write(timeout_line)
-    return process.returncode if process.returncode is not None else 124, timed_out
+    return 124 if timed_out else process.returncode or 0, timed_out
 
 
 def _parse_args() -> argparse.Namespace:
@@ -199,6 +222,29 @@ def _timing_evidence(
         "slo_seconds": slo_seconds,
         "slo_status": "pass" if total_elapsed_seconds <= slo_seconds else "fail",
     }
+
+
+def _finalize_result(
+    result: dict[str, object],
+    *,
+    overall_started: float,
+    collection_seconds: float,
+    shard_elapsed_seconds: float,
+    slo_seconds: float,
+) -> dict[str, object]:
+    finalized = {
+        **result,
+        **_timing_evidence(
+            overall_started=overall_started,
+            collection_seconds=collection_seconds,
+            shard_elapsed_seconds=shard_elapsed_seconds,
+            slo_seconds=slo_seconds,
+        ),
+    }
+    if finalized["slo_status"] != "pass" and finalized["status"] != "total-timeout":
+        finalized["underlying_status"] = finalized["status"]
+        finalized["status"] = "total-timeout"
+    return finalized
 
 
 def _remaining_phase_budget(
@@ -456,7 +502,8 @@ def main() -> int:
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
         return 1
-    result = {
+    result = _finalize_result(
+        {
         "status": "verified",
         "candidate_sha": head,
         "approved_failure_count": len(actual),
@@ -464,9 +511,16 @@ def main() -> int:
             {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
             for _code, _timed_out, junit_path, pytest_log in shard_results
         ],
-        **timing,
-    }
+        },
+        overall_started=overall_started,
+        collection_seconds=collection_seconds,
+        shard_elapsed_seconds=shard_elapsed_seconds,
+        slo_seconds=args.max_total_seconds,
+    )
     (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    if result["status"] != "verified":
+        print(json.dumps(result, sort_keys=True), file=sys.stderr)
+        return 1
     print(f"verified {len(actual)} approved failure signatures on candidate {head}")
     return 0
 
