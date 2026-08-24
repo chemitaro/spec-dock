@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 from tests.conftest import _normalize_failure_message
 
@@ -122,6 +123,47 @@ def test_full_regression_phase_budget_cannot_extend_the_total_deadline(monkeypat
         )
         < 1e-9
     )
+
+
+def test_full_regression_stream_timeout_survives_unterminated_output(tmp_path: Path) -> None:
+    verifier = _load_full_regression_verifier()
+    output_path = tmp_path / "unterminated.log"
+    started = time.monotonic()
+
+    code, timed_out = verifier._run_streamed(
+        [
+            sys.executable,
+            "-c",
+            "import sys, time; sys.stdout.write('unterminated'); sys.stdout.flush(); time.sleep(2)",
+        ],
+        cwd=tmp_path,
+        output_path=output_path,
+        timeout_seconds=0.1,
+        stream=False,
+    )
+
+    assert timed_out is True
+    assert code != 0
+    assert time.monotonic() - started < 1.5
+    assert "unterminated" in output_path.read_text(encoding="utf-8")
+
+
+def test_full_regression_final_result_rechecks_deadline_after_postprocessing(monkeypatch) -> None:
+    verifier = _load_full_regression_verifier()
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 600.001)
+
+    result = verifier._finalize_result(
+        {"status": "verified", "candidate_sha": "a" * 40},
+        overall_started=0.0,
+        collection_seconds=0.25,
+        shard_elapsed_seconds=599.0,
+        slo_seconds=600.0,
+    )
+
+    assert result["status"] == "total-timeout"
+    assert result["underlying_status"] == "verified"
+    assert result["slo_status"] == "fail"
+    assert abs(result["total_elapsed_seconds"] - 600.001) < 1e-9
 
 
 def test_full_regression_workflow_enforces_the_total_slo() -> None:
