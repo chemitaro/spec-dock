@@ -7288,8 +7288,8 @@ def test_i369_recognized_adopt_rejects_same_semantics_new_inode(
     original_inode = shortcut.lstat().st_ino
 
     shortcut.unlink()
-    alias.unlink()
     shortcut.symlink_to("spec-dock/scripts/spec-dock")
+    alias.unlink()
     os.link(shortcut, alias, follow_symlinks=False)
     assert shortcut.lstat().st_ino != original_inode
     assert shortcut.lstat().st_nlink == 2
