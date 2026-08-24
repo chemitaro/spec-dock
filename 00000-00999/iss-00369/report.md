@@ -28,23 +28,23 @@ Final Quality Gate Strict v2 で検出された fresh action grammar の防御�
 
 4シャードの単純round-robinは、実行環境の変動下で重いnodeが偏り、正しい最終deadline判定により600秒でfailする余地が残っていた。成功したancestor candidateのJUnitから2秒以上のnode実測値を抽出し、未登録nodeを2秒として扱う決定的LPTへ置き換えた。timing evidenceのschema、有限正数、ancestor SHAをfail closedで検証し、各shard内のcollection order、全nodeの一意性・coverage、approved failure signature照合は維持する。
 
-全回帰検証器のstream監督は、pytest leaderの終了とstdout pipe EOFを別の状態として扱う。leader終了後もstdoutを継承した子processが残る場合は検証成功とせず、各nonblocking readでdeadlineを再評価し、残存process groupをTERM/KILLして有限回の最終drainを行う。連続出力、間欠出力、無出力のdescendantを再現するtestにより、600秒超過、tail待ちの無期限化、leaderだけの終了によるfalse verificationを拒否する。
+全回帰検証器のstream監督は、pytest leaderの終了、stdout pipe EOF、process-group完了を独立した状態として扱う。各nonblocking readでdeadlineを再評価し、leader終了時はpipe EOF後もgroupの生存を確認する。残存groupは検証成功とせずTERM/KILLし、有限回の最終drainだけを行う。連続出力、間欠出力、無出力に加えstdout/stderrを`DEVNULL`へ切り替えたdescendantを再現するtestにより、600秒超過、tail待ちの無期限化、leaderまたはpipeだけの終了によるfalse verificationを拒否する。
 
 ## Verification
 
-- 検証対象 implementation candidate: `e7ecf0ecedda481a1a08f4bdf444733a78529f7b`
+- 検証対象 implementation candidate: `4dc2a46dd197c07543d995ad5bd71786aed47c78`
 - `make lint`: pass（ruff、266 files format check、mypy 174 source files）
-- `uv run pytest -q`: pass（1301 passed / 1119 skipped、51.09秒）
+- `uv run pytest -q`: pass（1302 passed / 1119 skipped、64.83秒）
 - `uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "fresh_action_grammar or forged_assessment_cannot_prune"`: pass（3 passed / 346 deselected、5.20秒）
-- `uv run pytest -q tests/unit/test_provider_test_lanes.py`: pass（25 passed、4.29秒。leader終了後の連続出力・間欠出力・無出力descendantを含む）
+- `uv run pytest -q tests/unit/test_provider_test_lanes.py`: pass（26 passed、5.06秒。leader終了後の連続出力・間欠出力・無出力・`DEVNULL` descendantを含む）
 - `./spec-dock/scripts/spec-dock validate`: pass（nodes=227）
 - `git diff --check`: pass
-- `uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00369-fresh-distribution-provisioning/artifacts/benchmark-fresh-distribution.py --warmup 1 --runs 5`: pass（median 4.095622秒、max 4.260831秒。各runの`observe_target=1934`、`journal_publications=395`）
-- `uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py --timeout-seconds 600 --max-total-seconds 600 --shards 4`: pass（2420 tests、raw pytest `27 failed / 2345 passed / 48 skipped`、collection 0.388秒、shards 554.810秒、total 555.256秒、SLO 600秒）。27件の失敗はすべてfull-regression ledgerのapproved failure signaturesと完全一致し、unexpected failure/error、欠落、重複は0件だった。
+- `uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00369-fresh-distribution-provisioning/artifacts/benchmark-fresh-distribution.py --warmup 1 --runs 5`: pass（median 4.275711秒、max 4.931594秒。各runの`observe_target=1934`、`journal_publications=395`）
+- `uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py --timeout-seconds 600 --max-total-seconds 600 --shards 4`: pass（2421 tests、raw pytest `27 failed / 2346 passed / 48 skipped`、collection 0.792秒、shards 592.164秒、total 593.041秒、SLO 600秒）。27件の失敗はすべてfull-regression ledgerのapproved failure signaturesと完全一致し、unexpected failure/error、欠落、重複は0件だった。
 
 ## Residual Risks / Follow-ups
 
-- full-regression は4シャードで2420 tests（27 failed / 2345 passed / 48 skipped）を555.256秒で実行した。27件のapproved failure ledgerはIssue 368から継承した本Issueの変更範囲外であり、implementation candidate `e7ecf0ecedda481a1a08f4bdf444733a78529f7b`上で署名完全一致を確認済み。
+- full-regression は4シャードで2421 tests（27 failed / 2346 passed / 48 skipped）を593.041秒で実行した。27件のapproved failure ledgerはIssue 368から継承した本Issueの変更範囲外であり、implementation candidate `4dc2a46dd197c07543d995ad5bd71786aed47c78`上で署名完全一致を確認済み。
 - fresh benchmarkはwall-time契約（median 5秒以下、max 8秒以下）を満たす一方、観測回数とjournal publicationには追加削減余地がある。安全性を損なうlease batchingは本修正へ含めず、600秒SLOと安全回帰を優先した。
 - Issue 369 の fresh provisioning 変更に起因する unexpected failure/error は検出されていない。
 - fresh Workbench seed の親 directory が assessment 後に出現するケースでは、pending `ensure-directory` と子 action の閉集合・exact identity を満たす場合だけ採用する。未知の子、symlink/file parent、内容変更、別 inode 置換は guard/journal を保持して拒否する。
