@@ -116,15 +116,47 @@ def _run_streamed(
             if lines:
                 saved.flush()
 
-        def drain_available() -> None:
-            while True:
+        def drain_available(
+            *, deadline: float | None, max_reads: int | None = None
+        ) -> tuple[bool, bool]:
+            reads = 0
+            while max_reads is None or reads < max_reads:
+                if deadline is not None and time.monotonic() >= deadline:
+                    return False, True
                 try:
                     chunk = os.read(process.stdout.fileno(), 65536)
                 except BlockingIOError:
-                    return
+                    return False, False
                 if not chunk:
-                    return
+                    return True, False
                 emit_available(chunk)
+                reads += 1
+            return False, False
+
+        def signal_process_group(sig: signal.Signals) -> None:
+            try:
+                if hasattr(os, "killpg"):
+                    os.killpg(process.pid, sig)
+                elif process.poll() is None:
+                    process.send_signal(sig)
+            except ProcessLookupError:
+                pass
+
+        def stop_process_group(*, deadline: float) -> None:
+            signal_process_group(signal.SIGTERM)
+            grace_deadline = min(deadline, time.monotonic() + 0.2)
+            while time.monotonic() < grace_deadline:
+                eof, _ = drain_available(deadline=grace_deadline, max_reads=1)
+                if eof:
+                    break
+                time.sleep(min(0.01, max(0.0, grace_deadline - time.monotonic())))
+            signal_process_group(signal.SIGKILL)
+            if process.poll() is None:
+                try:
+                    process.wait(timeout=max(0.01, deadline - time.monotonic()))
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
 
         try:
             while True:
@@ -133,8 +165,10 @@ def _run_streamed(
                     timed_out = True
                     break
                 if process.poll() is not None:
-                    drain_available()
-                    emit_available(b"", final=True)
+                    eof, drain_timed_out = drain_available(deadline=started + timeout_seconds)
+                    if not eof:
+                        timed_out = True
+                    timed_out = timed_out or drain_timed_out
                     break
                 events = selector.select(timeout=min(0.25, timeout_seconds - elapsed))
                 if not events:
@@ -143,24 +177,15 @@ def _run_streamed(
                 if not chunk:
                     continue
                 emit_available(chunk)
-            if timed_out and process.poll() is None:
-                if hasattr(os, "killpg"):
-                    os.killpg(process.pid, signal.SIGTERM)
-                else:
-                    process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    if hasattr(os, "killpg"):
-                        os.killpg(process.pid, signal.SIGKILL)
-                    else:
-                        process.kill()
-                    process.wait()
+            if timed_out:
+                stop_process_group(deadline=started + timeout_seconds)
             else:
                 process.wait()
-            if timed_out:
-                drain_available()
-                emit_available(b"", final=True)
+            drain_available(
+                deadline=None,
+                max_reads=32,
+            )
+            emit_available(b"", final=True)
         finally:
             selector.close()
             if process.stdout is not None:
