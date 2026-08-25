@@ -4903,6 +4903,41 @@ def _uninstall_guidance_from_result(
     ]
 
 
+_UNINSTALL_PUBLIC_OPERATION_ERRORS = {
+    "deprovision-preflight-failed": "Managed distribution deprovision preflight failed.",
+    "deprovision-target-not-directory": "target path is not a directory",
+    "deprovision-specs-mode-required": (
+        "uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs"
+    ),
+    "deprovision-retry-target-unrepresentable": (
+        "retry target cannot be represented safely from the current working directory"
+    ),
+    "deprovision-root-binding-required": "Managed distribution deprovision requires a bound target root.",
+    "deprovision-root-binding-mismatch": "Managed distribution deprovision target binding changed.",
+    "managed-workspace-evidence-missing": (
+        "target is not a managed SpecDock repo: missing managed "
+        "'spec-dock/spec-dock.version' state or exact managed distribution evidence"
+    ),
+    "deprovision-preflight-blocked": "Managed distribution deprovision is blocked by preserved state.",
+    "deprovision-no-op-postcondition-changed": "Managed distribution deprovision is blocked by preserved state.",
+    "deprovision-recovery-required": "Managed distribution deprovision recovery is required.",
+    "deprovision-recovery-mismatch": "Managed distribution deprovision recovery evidence does not match.",
+    "legacy-marker-unconvertible": "Legacy uninstall recovery requires manual review.",
+    "legacy-marker-invalid": "Legacy uninstall recovery evidence is invalid.",
+    "dual-recovery-state": "Conflicting uninstall recovery evidence requires manual review.",
+}
+_UNINSTALL_GENERIC_OPERATION_ERROR = "Managed distribution deprovision failed."
+_UNINSTALL_GENERIC_ACTION_ERROR = "Managed distribution deprovision action failed."
+
+
+def _uninstall_public_operation_error(error: DistributionProcessError) -> str:
+    return _UNINSTALL_PUBLIC_OPERATION_ERRORS.get(error.code, _UNINSTALL_GENERIC_OPERATION_ERROR)
+
+
+def _uninstall_public_action_error(error: str | None) -> str | None:
+    return _UNINSTALL_GENERIC_ACTION_ERROR if error is not None else None
+
+
 def _uninstall_payload_from_result(
     result: DistributionProcessResult,
     *,
@@ -4946,12 +4981,12 @@ def _uninstall_payload_from_result(
                 "category": outcome.category,
                 "status": outcome.status,
                 "reason": outcome.reason,
-                "error": outcome.error,
+                "error": _uninstall_public_action_error(outcome.error),
             }
             for outcome in result.action_outcomes
         ],
         "guidance": _uninstall_guidance_from_result(result, apply=apply),
-        "errors": [error.message for error in result.errors],
+        "errors": [_uninstall_public_operation_error(error) for error in result.errors],
     }
 
 
@@ -5008,7 +5043,11 @@ def _render_uninstall_text(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _deprovision_request_error_result(message: str) -> DistributionProcessResult:
+def _deprovision_request_error_result(
+    message: str,
+    *,
+    code: str = "deprovision-preflight-failed",
+) -> DistributionProcessResult:
     return DistributionProcessResult(
         status="error",
         intent="deprovision",
@@ -5017,7 +5056,7 @@ def _deprovision_request_error_result(message: str) -> DistributionProcessResult
         last_completed_phase="not-started",
         errors=(
             DistributionProcessError(
-                code="deprovision-preflight-failed",
+                code=code,
                 message=message,
             ),
         ),
@@ -5042,7 +5081,7 @@ def _emit_uninstall_deprovision_result(
     if json_requested:
         print(json.dumps(payload, sort_keys=True))
     elif result.status == "error":
-        message = result.errors[0].message if result.errors else "Managed distribution deprovision failed."
+        message = payload["errors"][0] if payload["errors"] else _UNINSTALL_GENERIC_OPERATION_ERROR
         print(f"error: {message}", file=sys.stderr)
     else:
         print(_render_uninstall_text(payload))
@@ -5063,7 +5102,10 @@ def _run_uninstall_deprovision(
     apply_requested = bool(ns.apply)
     json_requested = bool(ns.json)
     if not target_root.exists() or not target_root.is_dir():
-        result = _deprovision_request_error_result(f"target path is not a directory: {target_root}")
+        result = _deprovision_request_error_result(
+            "target path is not a directory",
+            code="deprovision-target-not-directory",
+        )
         return _emit_uninstall_deprovision_result(
             result,
             target_root=target_root,
@@ -5073,7 +5115,8 @@ def _run_uninstall_deprovision(
         )
     if apply_requested and specs_mode is None:
         result = _deprovision_request_error_result(
-            "uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs"
+            "uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs",
+            code="deprovision-specs-mode-required",
         )
         return _emit_uninstall_deprovision_result(
             result,
@@ -5086,7 +5129,8 @@ def _run_uninstall_deprovision(
         _require_retry_target_label(target_root)
     except RuntimeError:
         result = _deprovision_request_error_result(
-            "retry target cannot be represented safely from the current working directory"
+            "retry target cannot be represented safely from the current working directory",
+            code="deprovision-retry-target-unrepresentable",
         )
         return _emit_uninstall_deprovision_result(
             result,

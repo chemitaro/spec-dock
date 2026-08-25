@@ -966,6 +966,133 @@ def test_i370_generated_state_producer_accepts_exact_active_state_and_blocks_unk
     assert blocked.blockers[0].reason == "unknown-generated-state-entry"
 
 
+def test_i370_generated_state_regular_read_rejects_same_bytes_new_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """I370-T-OWN-001/I370-T-ID-001: producer bytes stay bound to one observed inode."""
+
+    target_root = tmp_path / "consumer"
+    agent_dir = target_root / "spec-dock" / ".agent"
+    agent_dir.mkdir(parents=True)
+    active = agent_dir / "active.json"
+    active.write_text(
+        json.dumps({
+            "schema_version": 2,
+            "updated_at": "2026-08-25T12:00:00+09:00",
+            "initiative": None,
+            "epic": None,
+            "issue": None,
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    original_generated_entry = managed_distribution._generated_entry
+    observed_inode: int | None = None
+    replacement_inode: int | None = None
+
+    def replace_after_observation(*args, **kwargs):
+        nonlocal observed_inode, replacement_inode
+        entry = original_generated_entry(*args, **kwargs)
+        if kwargs.get("expected_kind") == "regular" and args[1] == "spec-dock/.agent/active.json":
+            assert entry is not None
+            observed_inode = entry.observed.inode
+            replacement = active.with_name("active.replacement")
+            replacement.write_bytes(active.read_bytes())
+            replacement.chmod(active.stat().st_mode)
+            replacement.replace(active)
+            replacement_inode = active.stat().st_ino
+        return entry
+
+    monkeypatch.setattr(managed_distribution, "_generated_entry", replace_after_observation)
+    root_info = target_root.stat()
+
+    contract = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert observed_inode is not None
+    assert replacement_inode is not None
+    assert replacement_inode != observed_inode
+    assert all(entry.path != "spec-dock/.agent/active.json" for entry in contract.entries)
+    assert any(
+        action.path == "spec-dock/.agent/active.json" and action.reason == "generated-state-invalid"
+        for action in contract.blockers
+    )
+
+
+def test_i370_generated_state_replacement_before_classification_blocks_apply(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """I370-T-OWN-001/I370-T-RACE-001: producer identity reaches first mutation."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    agent_dir = target_root / "spec-dock" / ".agent"
+    agent_dir.mkdir(parents=True)
+    active = agent_dir / "active.json"
+    active.write_text(
+        json.dumps({
+            "schema_version": 2,
+            "updated_at": "2026-08-25T12:00:00+09:00",
+            "initiative": None,
+            "epic": None,
+            "issue": None,
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    outside = target_root / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    original_classify_target = managed_distribution._classify_target
+    original_inode = active.stat().st_ino
+    replacement_inode: int | None = None
+
+    def replace_before_classification(*args, **kwargs):
+        nonlocal replacement_inode
+        if replacement_inode is None:
+            replacement = tmp_path / "active-classification-replacement"
+            replacement.write_bytes(active.read_bytes())
+            replacement.chmod(stat.S_IMODE(active.stat().st_mode))
+            replacement.replace(active)
+            replacement_inode = active.stat().st_ino
+        return original_classify_target(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_classify_target", replace_before_classification)
+    root_info = target_root.stat()
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert replacement_inode is not None
+    assert replacement_inode != original_inode
+    assert result.status == "blocked"
+    assert result.reason == "deprovision-preflight-blocked"
+    assert "spec-dock/.agent/active.json" in result.failed_paths
+    active_action = next(action for action in result.actions if action.path == "spec-dock/.agent/active.json")
+    assert active_action.action == "preserve"
+    assert active_action.blocked is True
+    assert active.stat().st_ino == replacement_inode
+    assert active.read_bytes().endswith(b"\n")
+    assert managed.read_bytes() == b"managed\n"
+    assert outside.read_bytes() == b"outside\n"
+    assert not (target_root / "spec-dock" / ".distribution-retry.json").exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
 def test_i370_generated_state_producer_blocks_cross_artifact_batch_conflict(
     tmp_path: Path,
 ) -> None:
