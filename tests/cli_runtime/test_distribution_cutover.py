@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from contextlib import contextmanager
 import hashlib
 import inspect
@@ -2013,29 +2014,39 @@ def test_s65_uninstall_root_rebind_before_marker_write_is_zero_write(
     monkeypatch,
     capsys,
 ) -> None:
+    """I370-T-RACE-001: root rebind before the schema-2 guard writes nowhere."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     displaced = tmp_path.with_name(f"{tmp_path.name}-uninstall-displaced")
-    original_create = cli._create_uninstall_retry_marker
+    original_prepare_guard = managed_distribution.OperationJournalStore.prepare_legacy_guard
     switched = False
 
-    def rebind_before_marker(*args, **kwargs):
+    def rebind_before_guard(store, *args, **kwargs):
         nonlocal switched
         if not switched:
             switched = True
             tmp_path.rename(displaced)
             tmp_path.mkdir()
             (tmp_path / "replacement-sentinel.txt").write_text("keep\n", encoding="utf-8")
-        return original_create(*args, **kwargs)
+        return original_prepare_guard(store, *args, **kwargs)
 
-    monkeypatch.setattr(cli, "_create_uninstall_retry_marker", rebind_before_marker)
+    monkeypatch.setattr(
+        managed_distribution.OperationJournalStore,
+        "prepare_legacy_guard",
+        rebind_before_guard,
+    )
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 2
     payload = json.loads(capsys.readouterr().out)
-    assert payload["status"] == "partial_failure"
+    assert payload["status"] == "error"
     assert (tmp_path / "replacement-sentinel.txt").read_text(encoding="utf-8") == "keep\n"
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert not (displaced / "spec-dock/.uninstall-retry.json").exists()
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+    assert not (displaced / "spec-dock/.distribution-retry.json").exists()
+    assert not (tmp_path / "spec-dock/.distribution-journal.json").exists()
+    assert not (displaced / "spec-dock/.distribution-journal.json").exists()
 
 
 @pytest.mark.parametrize("relative_root", ("spec-dock/active", "spec-dock/.agent"))
@@ -2182,12 +2193,15 @@ def test_s65_uninstall_invalid_version_is_zero_write(tmp_path: Path, capsys) -> 
     assert main(["uninstall", str(tmp_path)]) == 2
 
     captured = capsys.readouterr().err
-    assert "spec-dock.version" in captured
+    assert captured == "error: Managed distribution deprovision preflight failed.\n"
     assert _filesystem_snapshot(tmp_path) == before
 
 
 def test_s65_uninstall_distribution_or_dual_marker_is_zero_write(tmp_path: Path, capsys) -> None:
+    """I370-T-LEG-001: foreign guard and dual evidence are typed, read-only recovery states."""
+
     assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
     root_stat = tmp_path.stat()
     distribution_marker = tmp_path / "spec-dock/.distribution-retry.json"
     distribution_marker.write_text(
@@ -2207,8 +2221,11 @@ def test_s65_uninstall_distribution_or_dual_marker_is_zero_write(tmp_path: Path,
     )
     before_distribution = _filesystem_snapshot(tmp_path)
 
-    assert main(["uninstall", str(tmp_path)]) == 2
-    assert "recover distribution" in capsys.readouterr().err
+    assert main(["uninstall", str(tmp_path), "--json"]) == 1
+    distribution_payload = json.loads(capsys.readouterr().out)
+    assert distribution_payload["status"] == "partial_failure"
+    assert distribution_payload["failed_paths"] == ["spec-dock/.distribution-retry.json"]
+    assert distribution_payload["errors"] == ["Managed distribution deprovision recovery evidence does not match."]
     assert _filesystem_snapshot(tmp_path) == before_distribution
 
     uninstall_marker = tmp_path / "spec-dock/.uninstall-retry.json"
@@ -2222,12 +2239,23 @@ def test_s65_uninstall_distribution_or_dual_marker_is_zero_write(tmp_path: Path,
     )
     before_dual = _filesystem_snapshot(tmp_path)
 
-    assert main(["uninstall", str(tmp_path)]) == 2
-    assert "dual-marker" in capsys.readouterr().err
+    assert main(["uninstall", str(tmp_path), "--json"]) == 1
+    dual_payload = json.loads(capsys.readouterr().out)
+    assert dual_payload["status"] == "partial_failure"
+    assert dual_payload["failed_paths"] == [
+        "spec-dock/.distribution-retry.json",
+        "spec-dock/.uninstall-retry.json",
+    ]
+    assert dual_payload["errors"] == ["Conflicting uninstall recovery evidence requires manual review."]
     assert _filesystem_snapshot(tmp_path) == before_dual
 
 
-def test_s65_uninstall_legacy_retry_marker_without_version_is_admissible_and_read_only(tmp_path: Path) -> None:
+def test_s65_uninstall_legacy_retry_marker_without_version_requires_manual_recovery_and_is_read_only(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    """I370-T-LEG-001: information-poor legacy state is never admitted or converted."""
+
     specdock = tmp_path / "spec-dock"
     specdock.mkdir()
     marker = specdock / ".uninstall-retry.json"
@@ -2241,7 +2269,12 @@ def test_s65_uninstall_legacy_retry_marker_without_version_is_admissible_and_rea
     )
     before = _filesystem_snapshot(tmp_path)
 
-    assert main(["uninstall", str(tmp_path)]) == 0
+    assert main(["uninstall", str(tmp_path), "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "partial_failure"
+    assert payload["failed_paths"] == ["spec-dock/.uninstall-retry.json"]
+    assert payload["retry_command"] is None
+    assert payload["errors"] == ["Legacy uninstall recovery requires manual review."]
     assert _filesystem_snapshot(tmp_path) == before
 
 
@@ -2272,57 +2305,76 @@ def test_s65_uninstall_dry_run_surfaces_known_obsolete_identity(tmp_path: Path, 
     action = next(item for item in payload["actions"] if item["path"] == ".codex/config.toml")
     assert action["status"] == "would_remove"
     assert action["category"] == "obsolete_managed"
-    assert "known obsolete" in action["reason"]
+    assert action["reason"] == "direct-obsolete-identity-match"
     assert obsolete.exists()
 
 
-def test_s70_uninstall_apply_removes_unproven_legacy_scaffold_entry_with_managed_root(
+def test_s70_uninstall_apply_preserves_unproven_legacy_scaffold_entry_and_blocks(
     tmp_path: Path,
     capsys,
 ) -> None:
+    """I370-T-PRES-002: a legacy name has no recursive-root deletion authority."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     legacy = tmp_path / "spec-dock/scripts/spec-dock-chatgpt"
     legacy.write_text("legacy managed scaffold\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "completed"
+    assert payload["status"] == "blocked"
     actions = {action["path"]: action for action in payload["actions"]}
-    assert actions["spec-dock/scripts"]["category"] == "scaffold_managed"
-    assert actions["spec-dock/scripts"]["status"] == "removed"
-    assert not legacy.exists()
+    assert "spec-dock/scripts" not in actions
+    assert actions["spec-dock/scripts/spec-dock-chatgpt"]["category"] == "scaffold_managed"
+    assert actions["spec-dock/scripts/spec-dock-chatgpt"]["status"] == "preserved"
+    assert actions["spec-dock/scripts/spec-dock-chatgpt"]["reason"] == "unknown-managed-entry"
+    assert _filesystem_snapshot(tmp_path) == before
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
-def test_s70_uninstall_apply_removes_modified_managed_scaffold_with_managed_root(
+def test_s70_uninstall_apply_preserves_modified_managed_scaffold_and_blocks(
     tmp_path: Path,
     capsys,
 ) -> None:
+    """I370-T-PRES-002: modified exact leaves block the whole operation."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     managed = tmp_path / "spec-dock/docs/README.md"
     managed.write_text("locally modified managed scaffold\n", encoding="utf-8")
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    before = _filesystem_snapshot(tmp_path)
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "completed"
-    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs")
+    assert payload["status"] == "blocked"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs/README.md")
     assert action["category"] == "scaffold_managed"
-    assert action["status"] == "removed"
-    assert not managed.exists()
+    assert action["status"] == "preserved"
+    assert action["reason"] == "unknown-current-collision"
+    assert _filesystem_snapshot(tmp_path) == before
 
 
 def test_s70_keep_specs_uninstall_allows_reinit_without_losing_history(
     tmp_path: Path,
     capsys,
 ) -> None:
+    """I370-T-PRES-001: keep deprovision and re-init preserve both witness trees exactly."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     history = tmp_path / "spec-dock/initiatives/init-preserved/requirement.md"
     history.parent.mkdir(parents=True)
     history.write_text("preserved history\n", encoding="utf-8")
+    empty_history_dir = history.parent / "empty"
+    empty_history_dir.mkdir()
+    history_link = history.parent / "requirement-link.md"
+    history_link.symlink_to("requirement.md")
+    workbench_note = tmp_path / "spec-dock/.workbench/product-note.md"
+    workbench_note.write_text("preserved workbench\n", encoding="utf-8")
+    history_before = _filesystem_snapshot(tmp_path / "spec-dock/initiatives")
+    workbench_before = _filesystem_snapshot(tmp_path / "spec-dock/.workbench")
 
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -2334,13 +2386,15 @@ def test_s70_keep_specs_uninstall_allows_reinit_without_losing_history(
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     assert history.read_text(encoding="utf-8") == "preserved history\n"
+    assert _filesystem_snapshot(tmp_path / "spec-dock/initiatives") == history_before
+    assert _filesystem_snapshot(tmp_path / "spec-dock/.workbench") == workbench_before
     assert (tmp_path / "spec-dock/spec-dock.version").is_file()
     assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
 
 
 @pytest.mark.parametrize(
     ("operation", "expected_status"),
-    (("update", 0), ("uninstall", 2)),
+    (("update", 0), ("uninstall", 0)),
 )
 def test_s70_empty_workspace_blocks_non_init_operations_without_writes(
     tmp_path: Path,
@@ -2364,7 +2418,9 @@ def test_s70_empty_workspace_blocks_non_init_operations_without_writes(
         capsys.readouterr()
         return
     assert _filesystem_snapshot(tmp_path) == before
-    assert "missing-version" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert "status: planned" in captured.out
 
 
 def test_s70_preserved_specs_workspace_blocks_update_without_writes(
@@ -2404,22 +2460,26 @@ def test_s70_uninstall_apply_blocks_symlink_inside_managed_scaffold_before_marke
     assert external.read_text(encoding="utf-8") == "user-owned\n"
 
 
-def test_s70_uninstall_apply_removes_unknown_scaffold_entry_with_managed_root(
+def test_s70_uninstall_apply_preserves_unknown_scaffold_entry_and_blocks(
     tmp_path: Path,
     capsys,
 ) -> None:
+    """I370-T-PRES-002: an unknown managed-root child blocks without safe-subset deletion."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     sentinel = tmp_path / "spec-dock/docs/rebind-sentinel.md"
     sentinel.write_text("managed root payload\n", encoding="utf-8")
+    before = _filesystem_snapshot(tmp_path)
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["status"] == "completed"
-    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs")
-    assert action["status"] == "removed"
-    assert not sentinel.exists()
+    assert payload["status"] == "blocked"
+    action = next(item for item in payload["actions"] if item["path"] == "spec-dock/docs/rebind-sentinel.md")
+    assert action["status"] == "preserved"
+    assert action["reason"] == "unknown-managed-entry"
+    assert _filesystem_snapshot(tmp_path) == before
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
@@ -2476,22 +2536,33 @@ def test_s70_uninstall_apply_rejects_rewritten_target_after_plan(
     monkeypatch,
     capsys,
 ) -> None:
+    """I370-T-RACE-001: target replacement after guard publication remains pending."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     managed = tmp_path / ".agents/skills/spec-dock/SKILL.md"
-    original_write_marker = cli._write_uninstall_retry_marker
+    original_prepare_guard = managed_distribution.OperationJournalStore.prepare_legacy_guard
 
-    def rewrite_after_marker(*args, **kwargs):
-        original_write_marker(*args, **kwargs)
+    def rewrite_after_guard(store, *args, **kwargs):
+        guard = original_prepare_guard(store, *args, **kwargs)
         managed.write_text("replacement after uninstall plan\n", encoding="utf-8")
+        return guard
 
-    monkeypatch.setattr(cli, "_write_uninstall_retry_marker", rewrite_after_marker)
+    monkeypatch.setattr(
+        managed_distribution.OperationJournalStore,
+        "prepare_legacy_guard",
+        rewrite_after_guard,
+    )
 
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "partial_failure"
+    assert ".agents/skills/spec-dock/SKILL.md" in payload["failed_paths"]
+    assert ".agents/skills/spec-dock/SKILL.md" in payload["pending_paths"]
     assert managed.read_text(encoding="utf-8") == "replacement after uninstall plan\n"
-    assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
+    assert (tmp_path / "spec-dock/.distribution-retry.json").is_file()
+    assert (tmp_path / "spec-dock/.distribution-journal.json").is_file()
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
 def test_s70_uninstall_apply_rejects_same_target_symlink_replacement_after_plan(
@@ -2499,30 +2570,40 @@ def test_s70_uninstall_apply_rejects_same_target_symlink_replacement_after_plan(
     monkeypatch,
     capsys,
 ) -> None:
+    """I370-T-RACE-001: same-text symlink replacement fails descriptor binding."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     active_issue = tmp_path / "spec-dock/active/issue"
     original_target = active_issue.readlink()
-    original_write_marker = cli._write_uninstall_retry_marker
+    original_prepare_guard = managed_distribution.OperationJournalStore.prepare_legacy_guard
 
-    def replace_after_marker(*args, **kwargs):
-        original_write_marker(*args, **kwargs)
+    def replace_after_guard(store, *args, **kwargs):
+        guard = original_prepare_guard(store, *args, **kwargs)
         active_issue.unlink()
         active_issue.symlink_to(original_target)
+        return guard
 
-    monkeypatch.setattr(cli, "_write_uninstall_retry_marker", replace_after_marker)
+    monkeypatch.setattr(
+        managed_distribution.OperationJournalStore,
+        "prepare_legacy_guard",
+        replace_after_guard,
+    )
 
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
     assert payload["status"] == "partial_failure"
     action = next(item for item in payload["actions"] if item["path"] == "spec-dock/active/issue")
-    assert action["status"] == "failed"
-    assert action["error"] == "uninstall action failed safely; inspect the relative action and retry command"
+    assert action["status"] == "pending"
+    assert action["error"] is None
     assert "spec-dock/active/issue" in payload["failed_paths"]
+    assert "spec-dock/active/issue" in payload["pending_paths"]
     assert active_issue.is_symlink()
     assert active_issue.readlink() == original_target
-    assert (tmp_path / "spec-dock/.uninstall-retry.json").is_file()
+    assert (tmp_path / "spec-dock/.distribution-retry.json").is_file()
+    assert (tmp_path / "spec-dock/.distribution-journal.json").is_file()
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
 
 def test_s70_uninstall_apply_blocks_generated_hard_link_before_marker_write(tmp_path: Path, capsys) -> None:
@@ -2543,7 +2624,7 @@ def test_s70_uninstall_apply_blocks_generated_hard_link_before_marker_write(tmp_
     assert payload["status"] == "blocked"
     action = next(item for item in payload["actions"] if item["path"] == "spec-dock/active/context-pack.md")
     assert action["status"] == "preserved"
-    assert "unsafe identity" in action["reason"]
+    assert action["reason"] == "generated-state-invalid"
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert generated.is_file()
     assert external.read_bytes() == generated.read_bytes()
@@ -2568,7 +2649,7 @@ def test_s70_uninstall_apply_blocks_hard_linked_generated_symlink_before_marker_
     assert payload["status"] == "blocked"
     action = next(item for item in payload["actions"] if item["path"] == "spec-dock/active/issue")
     assert action["status"] == "preserved"
-    assert "unsafe identity" in action["reason"]
+    assert action["reason"] == "generated-state-invalid"
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert generated.is_symlink()
     assert alias.is_symlink()
@@ -2588,7 +2669,7 @@ def test_s70_uninstall_apply_blocks_agent_symlink_before_marker_write(tmp_path: 
     assert payload["status"] == "blocked"
     action = next(item for item in payload["actions"] if item["path"] == "spec-dock/.agent/unsafe-link")
     assert action["status"] == "preserved"
-    assert "symlink identity" in action["reason"]
+    assert action["reason"] == "unknown-generated-state-entry"
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
     assert unsafe.is_symlink()
     assert external.read_text(encoding="utf-8") == "keep\n"
@@ -2622,19 +2703,25 @@ def test_s70_uninstall_apply_does_not_recreate_vanished_specdock_parent(
     monkeypatch,
     capsys,
 ) -> None:
+    """I370-T-RACE-001: vanished protocol parent is never recreated by guard publication."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
-    original_write_marker = cli._write_uninstall_retry_marker
+    original_prepare_guard = managed_distribution.OperationJournalStore.prepare_legacy_guard
 
-    def remove_parent_before_marker(*args, **kwargs):
+    def remove_parent_before_guard(store, *args, **kwargs):
         shutil.rmtree(tmp_path / "spec-dock")
-        return original_write_marker(*args, **kwargs)
+        return original_prepare_guard(store, *args, **kwargs)
 
-    monkeypatch.setattr(cli, "_write_uninstall_retry_marker", remove_parent_before_marker)
+    monkeypatch.setattr(
+        managed_distribution.OperationJournalStore,
+        "prepare_legacy_guard",
+        remove_parent_before_guard,
+    )
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 2
     payload = json.loads(capsys.readouterr().out)
-    assert payload["status"] == "partial_failure"
+    assert payload["status"] == "error"
     assert not (tmp_path / "spec-dock").exists()
 
 
@@ -2734,11 +2821,18 @@ def test_s70_uninstall_marker_is_removed_last_after_success(tmp_path: Path, caps
     assert payload["status"] == "completed"
     assert payload["phase"] == "complete"
     assert payload["last_completed_phase"] == "marker-finalized"
-    assert payload["retry_command"] == "spec-dock uninstall --apply --keep-specs ."
+    assert shlex.split(payload["retry_command"]) == [
+        "spec-dock",
+        "uninstall",
+        "--apply",
+        "--keep-specs",
+        os.path.relpath(tmp_path.resolve(), Path.cwd()),
+    ]
     assert payload["pending_paths"] == []
-    marker_action = next(action for action in payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json")
-    assert marker_action["status"] == "removed"
+    assert all(action["path"] != "spec-dock/.uninstall-retry.json" for action in payload["actions"])
     assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
+    assert not (tmp_path / "spec-dock/.distribution-retry.json").exists()
+    assert not (tmp_path / "spec-dock/.distribution-journal.json").exists()
 
 
 def test_s70_uninstall_does_not_run_fallible_workspace_cleanup_after_marker_finalization(
@@ -2781,24 +2875,25 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
     monkeypatch,
     capsys,
 ) -> None:
+    """I370-T-REC-001: protocol-2 guard/journal survive failure and forward retry."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
-    original_remove = cli._remove_uninstall_path
+    original_apply = managed_distribution._apply_distribution_action
+    failed = False
 
-    def fail_one(
-        target_root: Path,
-        action,
-        *,
-        expected_root_identity: cli.DistributionRootIdentity | None = None,
-    ):
-        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
-            raise OSError("injected uninstall unlink failure")
-        return original_remove(target_root, action, expected_root_identity=expected_root_identity)
+    def fail_first_deprovision_action(plan, target_root, action, *args, **kwargs):
+        nonlocal failed
+        if not failed and action.operation == "uninstall":
+            failed = True
+            raise managed_distribution.DistributionApplyError("injected deprovision unlink failure")
+        return original_apply(plan, target_root, action, *args, **kwargs)
 
-    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_one)
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", fail_first_deprovision_action)
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     first_payload = json.loads(capsys.readouterr().out)
-    marker = tmp_path / "spec-dock/.uninstall-retry.json"
+    guard = tmp_path / "spec-dock/.distribution-retry.json"
+    journal = tmp_path / "spec-dock/.distribution-journal.json"
     assert first_payload["status"] == "partial_failure"
     assert first_payload["phase"] == "uninstall-apply"
     assert first_payload["last_completed_phase"] == "marker-written"
@@ -2806,39 +2901,53 @@ def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
     assert first_payload["retry_command"] == f"spec-dock uninstall --apply --keep-specs {expected_target}"
     assert first_payload["pending_paths"]
     assert first_payload["summary"]["pending"] == len(first_payload["pending_paths"])
-    assert marker.is_file()
+    assert guard.is_file()
+    assert journal.is_file()
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
-    monkeypatch.setattr(cli, "_remove_uninstall_path", original_remove)
+    monkeypatch.setattr(managed_distribution, "_apply_distribution_action", original_apply)
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     second_payload = json.loads(capsys.readouterr().out)
     assert second_payload["status"] == "completed"
-    assert (
-        next(action for action in second_payload["actions"] if action["path"] == "spec-dock/.uninstall-retry.json")[
-            "status"
-        ]
-        == "removed"
-    )
-    assert not marker.exists()
+    assert not guard.exists()
+    assert not journal.exists()
 
 
-def test_s70_uninstall_partial_failure_json_sanitizes_target_and_error(
+def test_s70_uninstall_partial_failure_json_maps_typed_safe_result(
     tmp_path: Path,
     monkeypatch,
     capsys,
 ) -> None:
-    assert main(["init", str(tmp_path)]) == 0
-    capsys.readouterr()
-    original_remove = cli._remove_uninstall_path
+    """I370-T-JSON-001: JSON is a pure projection of an allowlisted typed failure."""
 
-    def fail_with_sensitive_error(target_root: Path, action, **kwargs):
-        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
-            return action._replace(
-                status="failed",
-                error=f"token=secret source=/outside/source {tmp_path}/private.txt",
-            )
-        return original_remove(target_root, action, **kwargs)
+    failure_path = ".agents/skills/spec-dock/SKILL.md"
+    result = managed_distribution.DistributionProcessResult(
+        status="recovery_required",
+        intent="deprovision",
+        actions=(),
+        action_outcomes=(
+            managed_distribution.DistributionActionOutcome(
+                path=failure_path,
+                category="agent_skill",
+                status="pending",
+                reason="current-identity-match",
+                error="Managed distribution deprovision action failed.",
+            ),
+        ),
+        phase="uninstall-apply",
+        last_completed_phase="marker-written",
+        failed_paths=(failure_path,),
+        pending_paths=(failure_path,),
+        errors=(
+            managed_distribution.DistributionProcessError(
+                code="deprovision-recovery-required",
+                message="Managed distribution deprovision recovery is required.",
+            ),
+        ),
+        retry_policy="same-keep-command",
+    )
+    monkeypatch.setattr(cli, "execute_deprovision_distribution", lambda *_args, **_kwargs: result)
 
-    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_with_sensitive_error)
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     serialized = json.dumps(payload, sort_keys=True)
@@ -2847,7 +2956,9 @@ def test_s70_uninstall_partial_failure_json_sanitizes_target_and_error(
     assert payload["status"] == "partial_failure"
     assert payload["target"] == expected_target
     assert payload["retry_command"] == f"spec-dock uninstall --apply --keep-specs {expected_target}"
-    assert ".agents/skills/spec-dock/SKILL.md" in payload["failed_paths"]
+    assert payload["failed_paths"] == [failure_path]
+    assert payload["pending_paths"] == [failure_path]
+    assert payload["errors"] == ["Managed distribution deprovision recovery is required."]
     assert not payload["target"].startswith("/")
     assert "secret" not in serialized
     assert "/outside/source" not in serialized
@@ -2858,16 +2969,36 @@ def test_s70_uninstall_partial_failure_text_shows_recovery_contract(
     monkeypatch,
     capsys,
 ) -> None:
-    assert main(["init", str(tmp_path)]) == 0
-    capsys.readouterr()
-    original_remove = cli._remove_uninstall_path
+    """I370-T-TEXT-001: text consumes the same typed recovery result as JSON."""
 
-    def fail_one(target_root: Path, action, **kwargs):
-        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
-            return action._replace(status="failed", error="credential=should-not-leak")
-        return original_remove(target_root, action, **kwargs)
+    failure_path = ".agents/skills/spec-dock/SKILL.md"
+    result = managed_distribution.DistributionProcessResult(
+        status="recovery_required",
+        intent="deprovision",
+        actions=(),
+        action_outcomes=(
+            managed_distribution.DistributionActionOutcome(
+                path=failure_path,
+                category="agent_skill",
+                status="pending",
+                reason="current-identity-match",
+                error="Managed distribution deprovision action failed.",
+            ),
+        ),
+        phase="uninstall-apply",
+        last_completed_phase="marker-written",
+        failed_paths=(failure_path,),
+        pending_paths=(failure_path,),
+        errors=(
+            managed_distribution.DistributionProcessError(
+                code="deprovision-recovery-required",
+                message="Managed distribution deprovision recovery is required.",
+            ),
+        ),
+        retry_policy="same-keep-command",
+    )
+    monkeypatch.setattr(cli, "execute_deprovision_distribution", lambda *_args, **_kwargs: result)
 
-    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_one)
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs"]) == 1
     output = capsys.readouterr().out
 
@@ -2876,8 +3007,8 @@ def test_s70_uninstall_partial_failure_text_shows_recovery_contract(
     assert "last_completed_phase: marker-written" in output
     expected_target = Path(os.path.relpath(tmp_path, Path.cwd())).as_posix()
     assert f"retry_command: spec-dock uninstall --apply --keep-specs {expected_target}" in output
-    assert "failed_paths: .agents/skills/spec-dock/SKILL.md" in output
-    assert "uninstall action failed safely" in output
+    assert f"failed_paths: {failure_path}" in output
+    assert "Managed distribution deprovision action failed." in output
     assert "credential=should-not-leak" not in output
     assert f"-> {tmp_path}" not in output
 
@@ -2887,21 +3018,48 @@ def test_s70_uninstall_retry_command_runs_for_special_explicit_target(
     monkeypatch: pytest.MonkeyPatch,
     capsys,
 ) -> None:
+    """I370-T-JSON-001: a shell-safe retry re-enters the same typed keep route."""
+
     parent = tmp_path.parent
     target = parent / "-uninstall target"
     target.mkdir()
     monkeypatch.chdir(parent)
-    assert main(["init", str(target)]) == 0
-    capsys.readouterr()
-    original_remove = cli._remove_uninstall_path
+    failure_path = ".agents/skills/spec-dock/SKILL.md"
+    results = iter((
+        managed_distribution.DistributionProcessResult(
+            status="recovery_required",
+            intent="deprovision",
+            actions=(),
+            phase="uninstall-apply",
+            last_completed_phase="marker-written",
+            failed_paths=(failure_path,),
+            pending_paths=(failure_path,),
+            errors=(
+                managed_distribution.DistributionProcessError(
+                    code="deprovision-recovery-required",
+                    message="Managed distribution deprovision recovery is required.",
+                ),
+            ),
+            retry_policy="same-keep-command",
+        ),
+        managed_distribution.DistributionProcessResult(
+            status="completed",
+            intent="deprovision",
+            actions=(),
+            phase="complete",
+            last_completed_phase="marker-finalized",
+            retry_policy="same-keep-command",
+        ),
+    ))
+    service_calls: list[Path] = []
 
-    def fail_once(target_root: Path, action, **kwargs):
-        if action.rel_path == ".agents/skills/spec-dock/SKILL.md":
-            monkeypatch.setattr(cli, "_remove_uninstall_path", original_remove)
-            raise OSError("injected uninstall unlink failure")
-        return original_remove(target_root, action, **kwargs)
+    def fake_service(_install_root: Path, **kwargs: object) -> managed_distribution.DistributionProcessResult:
+        target_root = kwargs["target_root"]
+        assert isinstance(target_root, Path)
+        service_calls.append(target_root)
+        return next(results)
 
-    monkeypatch.setattr(cli, "_remove_uninstall_path", fail_once)
+    monkeypatch.setattr(cli, "execute_deprovision_distribution", fake_service)
     assert main(["uninstall", str(target), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     retry = "spec-dock uninstall --apply --keep-specs -- '-uninstall target'"
@@ -2909,6 +3067,7 @@ def test_s70_uninstall_retry_command_runs_for_special_explicit_target(
 
     assert main(shlex.split(retry)[1:]) == 0
     capsys.readouterr()
+    assert service_calls == [target.resolve(), target.resolve()]
     assert not (target / "spec-dock/.uninstall-retry.json").exists()
 
 
@@ -2917,31 +3076,39 @@ def test_s70_uninstall_marker_write_failure_is_retryable(
     monkeypatch,
     capsys,
 ) -> None:
+    """I370-T-REC-001: journal publication failure leaves a resumable guard-only state."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
-    original_write = cli._write_file_descriptor
+    original_prepare = managed_distribution.OperationJournalStore.prepare
     failed = False
 
-    def fail_marker_write(fd, content, **kwargs):
+    def fail_journal_prepare(store, *args, **kwargs):
         nonlocal failed
         if not failed:
             failed = True
-            raise OSError("injected uninstall marker write failure")
-        return original_write(fd, content, **kwargs)
+            raise managed_distribution.DistributionApplyError("injected deprovision journal write failure")
+        return original_prepare(store, *args, **kwargs)
 
-    monkeypatch.setattr(cli, "_write_file_descriptor", fail_marker_write)
-    marker = tmp_path / "spec-dock/.uninstall-retry.json"
+    monkeypatch.setattr(managed_distribution.OperationJournalStore, "prepare", fail_journal_prepare)
+    guard = tmp_path / "spec-dock/.distribution-retry.json"
+    journal = tmp_path / "spec-dock/.distribution-journal.json"
 
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     first_payload = json.loads(capsys.readouterr().out)
     assert first_payload["status"] == "partial_failure"
-    assert not marker.exists()
+    assert first_payload["phase"] == "marker-write"
+    assert first_payload["last_completed_phase"] == "marker-written"
+    assert guard.is_file()
+    assert not journal.exists()
+    assert not (tmp_path / "spec-dock/.uninstall-retry.json").exists()
 
-    monkeypatch.setattr(cli, "_write_file_descriptor", original_write)
+    monkeypatch.setattr(managed_distribution.OperationJournalStore, "prepare", original_prepare)
     assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
     second_payload = json.loads(capsys.readouterr().out)
     assert second_payload["status"] == "completed"
-    assert not marker.exists()
+    assert not guard.exists()
+    assert not journal.exists()
 
 
 def test_s70_uninstall_existing_partial_marker_is_rejected_before_reuse(tmp_path: Path) -> None:
@@ -3032,6 +3199,8 @@ def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
     tmp_path: Path,
     capsys,
 ) -> None:
+    """I370-T-PRES-002: an unknown empty child blocks all cleanup, including safe subsets."""
+
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     empty_initiative = tmp_path / "spec-dock/initiatives/empty-preserved"
@@ -3040,14 +3209,452 @@ def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
     empty_workbench.mkdir(parents=True)
     empty_unknown = tmp_path / ".codex/user-owned-empty"
     empty_unknown.mkdir(parents=True)
+    before = _filesystem_snapshot(tmp_path)
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 0
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     removed_empty_paths = {action["path"] for action in payload["actions"] if action["status"] == "empty_dir_removed"}
+    unknown_action = next(action for action in payload["actions"] if action["path"] == ".codex/user-owned-empty")
 
+    assert payload["status"] == "blocked"
+    assert unknown_action["status"] == "preserved"
+    assert unknown_action["reason"] == "unknown-managed-entry"
     assert empty_initiative.is_dir()
     assert empty_workbench.is_dir()
     assert empty_unknown.is_dir()
     assert "spec-dock/initiatives/empty-preserved" not in removed_empty_paths
     assert "spec-dock/.workbench/empty-payload" not in removed_empty_paths
     assert ".codex/user-owned-empty" not in removed_empty_paths
+    assert removed_empty_paths == set()
+    assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_i370_uninstall_routes_default_and_keep_only_to_deprovision_service(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    """I370-T-CLI-001: default/keep and remove-specs have disjoint route owners."""
+
+    service_calls: list[dict[str, object]] = []
+    compatibility_calls: list[tuple[Path, bool, str | None]] = []
+
+    def fake_deprovision_service(
+        install_root: Path,
+        **kwargs: object,
+    ) -> managed_distribution.DistributionProcessResult:
+        service_calls.append({"install_root": install_root, **kwargs})
+        apply = bool(kwargs["apply"])
+        return managed_distribution.DistributionProcessResult(
+            status="completed" if apply else "planned",
+            intent="deprovision",
+            actions=(),
+            phase="complete" if apply else "preflight",
+            last_completed_phase="marker-finalized" if apply else "preflight-complete",
+            retry_policy="same-keep-command",
+        )
+
+    def fake_remove_specs_compatibility(
+        target_root: Path,
+        ns: object,
+        *,
+        specs_mode: str,
+        expected_root_identity: object = None,
+    ) -> int:
+        del expected_root_identity
+        compatibility_calls.append((
+            target_root,
+            bool(ns.apply),  # type: ignore[attr-defined]
+            specs_mode,
+        ))
+        return 0
+
+    monkeypatch.setattr(cli, "execute_deprovision_distribution", fake_deprovision_service)
+    monkeypatch.setattr(cli, "_run_uninstall_remove_specs_compatibility", fake_remove_specs_compatibility)
+
+    target = tmp_path / "consumer"
+    target.mkdir()
+    default_args = ["uninstall", str(target), "--json"]
+    keep_dry_args = ["uninstall", str(target), "--keep-specs", "--json"]
+    keep_apply_args = ["uninstall", str(target), "--apply", "--keep-specs", "--json"]
+    remove_dry_args = ["uninstall", str(target), "--remove-specs", "--json"]
+    remove_apply_args = ["uninstall", str(target), "--apply", "--remove-specs", "--json"]
+
+    for args in (default_args, keep_dry_args, keep_apply_args, remove_dry_args, remove_apply_args):
+        assert main(args) == 0
+        capsys.readouterr()
+
+    assert [call["apply"] for call in service_calls] == [False, False, True]
+    assert all("specs_mode" not in call for call in service_calls)
+    assert service_calls[2]["expected_root_identity"] is not None
+    assert compatibility_calls == [
+        (target.resolve(), False, "remove"),
+        (target.resolve(), True, "remove"),
+    ]
+
+
+def test_i370_cutover_ast_has_one_deprovision_owner_and_isolated_remove_compatibility() -> None:
+    """I370-T-ABS-001: actual call edges isolate default/keep from D4 mutation helpers."""
+
+    tree = ast.parse(inspect.getsource(cli))
+    call_edges: dict[str, set[str]] = {}
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        call_edges[node.name] = {
+            child.func.id
+            for child in ast.walk(node)
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+        }
+
+    legacy_mutation_edges = {
+        "_build_uninstall_plan",
+        "_apply_uninstall_plan",
+        "_verify_uninstall_postcondition",
+        "_write_uninstall_retry_marker",
+        "_remove_uninstall_tree_fd",
+        "_remove_uninstall_path",
+        "_cleanup_empty_uninstall_dirs",
+        "_finalize_uninstall_retry_marker",
+    }
+    assert call_edges["_run_uninstall_deprovision"].isdisjoint(legacy_mutation_edges)
+    assert call_edges["_run_uninstall"].isdisjoint(legacy_mutation_edges)
+    assert "execute_deprovision_distribution" in call_edges["_run_uninstall_deprovision"]
+    assert "_run_uninstall_deprovision" in call_edges["_run_uninstall"]
+    assert "_run_uninstall_remove_specs_compatibility" in call_edges["_run_uninstall"]
+
+    callers = {
+        callee: {caller for caller, callees in call_edges.items() if callee in callees}
+        for callee in legacy_mutation_edges
+    }
+    assert callers["_build_uninstall_plan"] == {"_run_uninstall_remove_specs_compatibility"}
+    assert callers["_apply_uninstall_plan"] == {"_run_uninstall_remove_specs_compatibility"}
+    assert callers["_verify_uninstall_postcondition"] == {"_run_uninstall_remove_specs_compatibility"}
+    assert callers["_write_uninstall_retry_marker"] == {"_run_uninstall_remove_specs_compatibility"}
+    assert callers["_finalize_uninstall_retry_marker"] == {"_run_uninstall_remove_specs_compatibility"}
+    assert callers["_remove_uninstall_path"] == {"_apply_uninstall_plan"}
+    assert callers["_cleanup_empty_uninstall_dirs"] == {
+        "_apply_uninstall_plan",
+        "_run_uninstall_remove_specs_compatibility",
+    }
+    assert callers["_remove_uninstall_tree_fd"] == {
+        "_remove_bound_directory_tree",
+        "_remove_uninstall_path",
+        "_remove_uninstall_tree_fd",
+    }
+
+
+def test_i370_typed_uninstall_mapper_preserves_schema_status_and_retry_contract(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """I370-T-RESULT-001/I370-T-JSON-001: one typed result owns every public field."""
+
+    monkeypatch.chdir(tmp_path)
+    target = (tmp_path / "-consumer target").resolve()
+    normal_error = managed_distribution.DistributionProcessError(
+        code="deprovision-preflight-failed",
+        message="Managed distribution deprovision preflight failed.",
+    )
+    recovery_error = managed_distribution.DistributionProcessError(
+        code="deprovision-recovery-required",
+        message="Managed distribution deprovision recovery is required.",
+    )
+    cases = (
+        (
+            "default-planned",
+            None,
+            False,
+            managed_distribution.DistributionProcessResult(
+                status="planned",
+                intent="deprovision",
+                actions=(),
+                action_outcomes=(
+                    managed_distribution.DistributionActionOutcome(
+                        path="spec-dock/docs/README.md",
+                        category="scaffold_managed",
+                        status="would_remove",
+                        reason="exact managed asset",
+                    ),
+                ),
+                phase="preflight",
+                last_completed_phase="preflight-complete",
+                retry_policy="same-keep-command",
+            ),
+            "planned",
+            str(target),
+            None,
+            0,
+        ),
+        (
+            "keep-planned",
+            "keep",
+            False,
+            managed_distribution.DistributionProcessResult(
+                status="planned",
+                intent="deprovision",
+                actions=(),
+                phase="preflight",
+                last_completed_phase="preflight-complete",
+                retry_policy="same-keep-command",
+            ),
+            "planned",
+            str(target),
+            "spec-dock uninstall --apply --keep-specs -- '-consumer target'",
+            0,
+        ),
+        (
+            "keep-completed",
+            "keep",
+            True,
+            managed_distribution.DistributionProcessResult(
+                status="completed",
+                intent="deprovision",
+                actions=(),
+                action_outcomes=(
+                    managed_distribution.DistributionActionOutcome(
+                        path="spec-dock/docs/README.md",
+                        category="scaffold_managed",
+                        status="removed",
+                        reason="exact managed asset removed",
+                    ),
+                ),
+                phase="complete",
+                last_completed_phase="marker-finalized",
+                retry_policy="same-keep-command",
+            ),
+            "completed",
+            str(target),
+            "spec-dock uninstall --apply --keep-specs -- '-consumer target'",
+            0,
+        ),
+        (
+            "keep-blocked",
+            "keep",
+            True,
+            managed_distribution.DistributionProcessResult(
+                status="blocked",
+                intent="deprovision",
+                actions=(),
+                action_outcomes=(
+                    managed_distribution.DistributionActionOutcome(
+                        path="spec-dock/docs/unknown.txt",
+                        category="unmanaged",
+                        status="preserved",
+                        reason="unproven ownership",
+                    ),
+                ),
+                phase="preflight",
+                last_completed_phase="preflight-complete",
+                failed_paths=("spec-dock/docs/unknown.txt",),
+                errors=(normal_error,),
+                retry_policy="same-keep-command",
+            ),
+            "blocked",
+            "-consumer target",
+            "spec-dock uninstall --apply --keep-specs -- '-consumer target'",
+            1,
+        ),
+        (
+            "keep-recovery",
+            "keep",
+            True,
+            managed_distribution.DistributionProcessResult(
+                status="recovery_required",
+                intent="deprovision",
+                actions=(),
+                action_outcomes=(
+                    managed_distribution.DistributionActionOutcome(
+                        path="spec-dock/docs/README.md",
+                        category="scaffold_managed",
+                        status="pending",
+                        reason="exact managed asset",
+                        error="Managed distribution deprovision action failed.",
+                    ),
+                ),
+                phase="uninstall-apply",
+                last_completed_phase="marker-written",
+                failed_paths=("spec-dock/docs/README.md",),
+                pending_paths=("spec-dock/docs/README.md",),
+                errors=(recovery_error,),
+                retry_policy="same-keep-command",
+            ),
+            "partial_failure",
+            "-consumer target",
+            "spec-dock uninstall --apply --keep-specs -- '-consumer target'",
+            1,
+        ),
+        (
+            "keep-error",
+            "keep",
+            True,
+            managed_distribution.DistributionProcessResult(
+                status="error",
+                intent="deprovision",
+                actions=(),
+                phase="preflight",
+                last_completed_phase="not-started",
+                errors=(normal_error,),
+                retry_policy="same-keep-command",
+            ),
+            "error",
+            str(target),
+            "spec-dock uninstall --apply --keep-specs -- '-consumer target'",
+            2,
+        ),
+        (
+            "legacy-marker",
+            "keep",
+            True,
+            managed_distribution.DistributionProcessResult(
+                status="recovery_required",
+                intent="deprovision",
+                actions=(),
+                reason="legacy-marker-unconvertible",
+                phase="preflight",
+                last_completed_phase="not-started",
+                failed_paths=("spec-dock/.uninstall-retry.json",),
+                errors=(
+                    managed_distribution.DistributionProcessError(
+                        code="legacy-marker-unconvertible",
+                        message="Legacy uninstall recovery requires manual review.",
+                    ),
+                ),
+                retry_policy="manual-recovery",
+            ),
+            "partial_failure",
+            "-consumer target",
+            None,
+            1,
+        ),
+    )
+
+    for case_name, specs_mode, apply, result, status, expected_target, retry, exit_code in cases:
+        payload = cli._uninstall_payload_from_result(
+            result,
+            target_root=target,
+            apply=apply,
+            specs_mode=specs_mode,
+        )
+
+        assert set(payload) == {
+            "schema_version",
+            "target",
+            "mode",
+            "apply",
+            "specs_mode",
+            "status",
+            "phase",
+            "last_completed_phase",
+            "retry_command",
+            "failed_paths",
+            "pending_paths",
+            "summary",
+            "actions",
+            "guidance",
+            "errors",
+        }, case_name
+        assert payload["schema_version"] == 1
+        assert payload["status"] == status
+        assert payload["target"] == expected_target
+        assert payload["retry_command"] == retry
+        assert payload["phase"] == result.phase
+        assert payload["last_completed_phase"] == result.last_completed_phase
+        assert payload["failed_paths"] == list(result.failed_paths)
+        assert payload["pending_paths"] == list(result.pending_paths)
+        assert set(result.pending_paths).issubset(result.failed_paths)
+        assert payload["errors"] == [error.message for error in result.errors]
+        assert cli._uninstall_exit_code_from_result(result) == exit_code
+        assert all("--remove-specs" not in guidance for guidance in payload["guidance"])
+
+    planned_payload = cli._uninstall_payload_from_result(
+        cases[0][3],
+        target_root=target,
+        apply=False,
+        specs_mode=None,
+    )
+    assert planned_payload["summary"] == {
+        "would_remove": 1,
+        "removed": 0,
+        "already_removed": 0,
+        "preserved": 0,
+        "failed": 0,
+        "pending": 0,
+        "empty_dir_removed": 0,
+    }
+    assert planned_payload["actions"] == [
+        {
+            "path": "spec-dock/docs/README.md",
+            "category": "scaffold_managed",
+            "status": "would_remove",
+            "reason": "exact managed asset",
+            "error": None,
+        }
+    ]
+    recovery_payload = cli._uninstall_payload_from_result(
+        cases[4][3],
+        target_root=target,
+        apply=True,
+        specs_mode="keep",
+    )
+    assert recovery_payload["actions"][0]["error"] == "Managed distribution deprovision action failed."
+
+    mapper_source = inspect.getsource(cli._uninstall_payload_from_result)
+    assert "OperationJournalStore" not in mapper_source
+    assert ".distribution-journal" not in mapper_source
+    assert ".distribution-retry" not in mapper_source
+
+
+def test_i370_uninstall_text_uses_typed_payload_section_order(tmp_path: Path) -> None:
+    """I370-T-TEXT-001: text renders the one typed payload in the public order."""
+
+    result = managed_distribution.DistributionProcessResult(
+        status="recovery_required",
+        intent="deprovision",
+        actions=(),
+        action_outcomes=(
+            managed_distribution.DistributionActionOutcome(
+                path="spec-dock/docs/README.md",
+                category="scaffold_managed",
+                status="pending",
+                reason="exact managed asset",
+            ),
+        ),
+        phase="uninstall-apply",
+        last_completed_phase="marker-written",
+        failed_paths=("spec-dock/docs/README.md",),
+        pending_paths=("spec-dock/docs/README.md",),
+        errors=(
+            managed_distribution.DistributionProcessError(
+                code="deprovision-recovery-required",
+                message="Managed distribution deprovision recovery is required.",
+            ),
+        ),
+        retry_policy="same-keep-command",
+    )
+    payload = cli._uninstall_payload_from_result(
+        result,
+        target_root=(tmp_path / "consumer").resolve(),
+        apply=True,
+        specs_mode="keep",
+    )
+    rendered = cli._render_uninstall_text(payload)
+
+    ordered_labels = (
+        "spec-dock: uninstall result (apply)",
+        "specs_mode:",
+        "status:",
+        "phase:",
+        "last_completed_phase:",
+        "retry_command:",
+        "failed_paths:",
+        "summary:",
+        "actions:",
+        "errors:",
+        "guidance:",
+    )
+    positions = tuple(rendered.index(label) for label in ordered_labels)
+    assert positions == tuple(sorted(positions))
+    assert "status: partial_failure" in rendered
+    assert "phase: uninstall-apply" in rendered
+    assert "last_completed_phase: marker-written" in rendered

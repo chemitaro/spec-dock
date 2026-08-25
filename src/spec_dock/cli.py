@@ -26,7 +26,7 @@ import subprocess
 import sys
 import tempfile
 import threading
-from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn, cast
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, NoReturn, cast
 
 try:
     import fcntl
@@ -39,16 +39,19 @@ from spec_dock.managed_distribution import (
     DistributionAsset,
     DistributionIdentity,
     DistributionOperation,
+    DistributionProcessError,
+    DistributionProcessResult,
     DistributionRootIdentity,
     DistributionStageOwnership,
-    JournaledDistributionIntent,
     RecognizedDistributionIntent,
     _remove_distribution_target_if_bound,
     _rename_distribution_no_replace,
+    _render_context_pack,
     _swap_regular_distribution_target_if_bound,
     admit_distribution_operation,
     apply_distribution_plan,  # noqa: F401 - retained for test seam compatibility
     build_distribution_plan,
+    execute_deprovision_distribution,
     execute_fresh_distribution,
     execute_recognized_distribution,
 )
@@ -79,6 +82,8 @@ _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _DISTRIBUTION_RETRY_MARKER_PAYLOAD_VERSION = 1
 _DISTRIBUTION_RETRY_MARKER_PURPOSE = "distribution-rerun"
 _DISTRIBUTION_CWD_LOCK = threading.RLock()
+
+_FreshDistributionIntent = Literal["fresh", "update", "init-force"]
 
 
 @contextmanager
@@ -938,65 +943,6 @@ def _resolve_existing_active_entrypoint(
             continue
         return (candidate, entry_id)
     return placeholder_candidate
-
-
-def _render_context_pack(*, initiative_id: str | None, epic_id: str | None, issue_id: str | None) -> str:
-    """Render context-pack content used before runtime active commands run."""
-    has_init = initiative_id is not None
-    has_epic = epic_id is not None
-    has_issue = issue_id is not None
-    init_value = initiative_id if has_init else "(none)"
-    epic_value = epic_id if has_epic else "(none)"
-    issue_value = issue_id if has_issue else "(none)"
-    lines: list[str] = []
-    lines.append("# Context Pack (generated)")
-    lines.append("")
-    lines.append("## Active")
-    lines.append(f"- initiative: {init_value}")
-    lines.append(f"- epic: {epic_value}")
-    lines.append(f"- issue: {issue_value}")
-    lines.append("")
-    lines.append("## Generated state")
-    lines.append("- entry: `spec-dock/.agent/active.json`")
-    lines.append("- default working set: `spec-dock/.agent/index.json`")
-    lines.append("- default dependency view: `spec-dock/.agent/deps-issues.json`")
-    lines.append("- escalation only: `spec-dock/.agent/index-all.json`")
-    lines.append("- human-oriented tree: `spec-dock/.agent/tree.json`")
-    lines.append("")
-    lines.append("## Read order")
-    lines.append("- Start with `spec-dock/.agent/active.json`.")
-    lines.append("- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.")
-    lines.append("- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.")
-    lines.append(
-        "- `spec-dock/active/context-pack.md` is human guidance that mirrors this contract; it is not the sole source of truth."
-    )
-    lines.append("- Then follow the active documents:")
-    if has_init:
-        lines.append("- `spec-dock/active/initiative/requirement.md`")
-        lines.append("- `spec-dock/active/initiative/design.md`")
-        lines.append("- `spec-dock/active/initiative/plan.md`")
-    else:
-        lines.append("- `spec-dock/active/initiative/README.md`")
-    if has_epic:
-        lines.append("- `spec-dock/active/epic/requirement.md`")
-        lines.append("- `spec-dock/active/epic/design.md`")
-        lines.append("- `spec-dock/active/epic/plan.md`")
-    else:
-        lines.append("- `spec-dock/active/epic/README.md`")
-    if has_issue:
-        lines.append("- `spec-dock/active/issue/requirement.md`")
-        lines.append("- `spec-dock/active/issue/design.md`")
-        lines.append("- `spec-dock/active/issue/plan.md`")
-        lines.append("- `spec-dock/active/issue/report.md`")
-    else:
-        lines.append("- `spec-dock/active/issue/README.md`")
-    lines.append("")
-    lines.append("## Commands")
-    lines.append("- state (github default): `./spec-dock/scripts/spec-dock sync`")
-    lines.append("- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`")
-    lines.append("- validate: `./spec-dock/scripts/spec-dock validate`")
-    lines.append("")
-    return "\n".join(lines) + "\n"
 
 
 def _render_default_context_pack() -> str:
@@ -2776,7 +2722,7 @@ def _raise_distribution_partial_failure(
 def _install_fresh_distribution(
     target_root: Path,
     *,
-    requested_operation: JournaledDistributionIntent = "fresh",
+    requested_operation: _FreshDistributionIntent = "fresh",
 ) -> None:
     with _exclusive_distribution_operation(target_root) as locked_root_identity:
         admission = _admit_distribution_cli(target_root, operation=requested_operation)
@@ -2848,7 +2794,7 @@ def _prepare_fresh_workspace_boundary(
 def _execute_fresh_distribution_unlocked(
     target_root: Path,
     *,
-    requested_operation: JournaledDistributionIntent = "fresh",
+    requested_operation: _FreshDistributionIntent = "fresh",
     retry_marker: DistributionAdmission | None = None,
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> None:
@@ -3010,7 +2956,7 @@ def _install_recognized_distribution(
         if operation in {"update", "init-force"} and (
             admission.status == "fresh" or (admission.status == "retry" and admission.intent == "fresh")
         ):
-            fresh_operation = cast("JournaledDistributionIntent", operation)
+            fresh_operation = cast("_FreshDistributionIntent", operation)
             _execute_fresh_distribution_unlocked(
                 target_root,
                 requested_operation=fresh_operation,
@@ -3087,7 +3033,7 @@ def _prune_empty_obsolete_parent_dirs(
 
 
 class _UninstallTargetIdentity(NamedTuple):
-    """No-follow identity captured before an uninstall mutation."""
+    """Issue 371 remove-specs compatibility identity; not deprovision authority."""
 
     kind: str
     device: int
@@ -3100,6 +3046,8 @@ class _UninstallTargetIdentity(NamedTuple):
 
 
 class _UninstallAction(NamedTuple):
+    """Issue 371 remove-specs compatibility ledger; default/keep use the typed service."""
+
     rel_path: str
     category: str
     status: str
@@ -4248,7 +4196,7 @@ def _build_uninstall_plan(
     specs_mode: str | None,
     include_missing_removals: bool = False,
 ) -> tuple[_UninstallAction, ...]:
-    """Build the S02 dry-run inventory and classification plan."""
+    """Build only the Issue 371 remove-specs compatibility plan."""
     actions: list[_UninstallAction] = []
     known_rel_paths: set[Path] = set()
 
@@ -4878,6 +4826,135 @@ def _uninstall_payload(
     }
 
 
+def _validate_uninstall_process_result(result: DistributionProcessResult) -> None:
+    """Reject incomplete deprovision results instead of interpreting durable state in the CLI."""
+
+    if result.intent != "deprovision" or result.phase is None or result.last_completed_phase is None:
+        raise RuntimeError("managed deprovision service returned an incomplete typed result")
+    if result.pending_paths != tuple(sorted(set(result.pending_paths), key=os.fsencode)):
+        raise RuntimeError("managed deprovision service returned non-canonical pending paths")
+    if result.failed_paths != tuple(sorted(set(result.failed_paths), key=os.fsencode)):
+        raise RuntimeError("managed deprovision service returned non-canonical failed paths")
+    if not set(result.pending_paths).issubset(result.failed_paths):
+        raise RuntimeError("managed deprovision service returned pending paths without failure diagnostics")
+    if result.status in {"planned", "completed"}:
+        if result.errors or result.failed_paths or result.pending_paths:
+            raise RuntimeError("managed deprovision success result contains failure state")
+    elif not result.errors:
+        raise RuntimeError("managed deprovision failure result is missing its operation error")
+
+
+def _uninstall_exit_code_from_result(result: DistributionProcessResult) -> int:
+    """Map the typed service status to the stable public uninstall exit code."""
+
+    return {
+        "planned": 0,
+        "completed": 0,
+        "blocked": 1,
+        "recovery_required": 1,
+        "error": 2,
+    }[result.status]
+
+
+def _summarize_uninstall_outcomes(result: DistributionProcessResult) -> dict[str, int]:
+    summary = {
+        "would_remove": 0,
+        "removed": 0,
+        "already_removed": 0,
+        "preserved": 0,
+        "failed": 0,
+        "pending": 0,
+        "empty_dir_removed": 0,
+    }
+    for outcome in result.action_outcomes:
+        summary[outcome.status] += 1
+    return summary
+
+
+def _uninstall_guidance_from_result(
+    result: DistributionProcessResult,
+    *,
+    apply: bool,
+) -> list[str]:
+    if result.retry_policy == "manual-recovery":
+        primary = {
+            "legacy-marker-unconvertible": (
+                "manual recovery required: legacy installer state does not prove its root, specs mode, or checkpoint"
+            ),
+            "legacy-marker-invalid": (
+                "manual recovery required: invalid legacy installer state does not prove its root, specs mode, or checkpoint"
+            ),
+            "dual-recovery-state": (
+                "manual recovery required: conflicting legacy and schema-2 recovery states prove no single plan or checkpoint"
+            ),
+        }.get(
+            result.reason or "",
+            "manual recovery required: managed recovery evidence cannot prove one safe plan or checkpoint",
+        )
+    elif result.retry_policy == "same-keep-command" and apply:
+        primary = "retry removal with installer CLI: spec-dock uninstall <target> --apply --keep-specs"
+    elif result.retry_policy == "same-keep-command":
+        primary = "dry-run only; pass --apply --keep-specs to mutate managed distribution artifacts"
+    else:
+        primary = "automatic uninstall retry is unavailable; inspect the managed distribution result"
+    return [
+        primary,
+        "reinstall or refresh with installer CLI: spec-dock init <target> or spec-dock update <target>",
+    ]
+
+
+def _uninstall_payload_from_result(
+    result: DistributionProcessResult,
+    *,
+    target_root: Path,
+    apply: bool,
+    specs_mode: str | None,
+) -> dict[str, Any]:
+    """Map one fully populated deprovision result plus static request context."""
+
+    if specs_mode not in {None, "keep"}:
+        raise RuntimeError("managed deprovision presentation accepts only keep-specs authority")
+    _validate_uninstall_process_result(result)
+    public_status = {
+        "planned": "planned",
+        "completed": "completed",
+        "blocked": "blocked",
+        "recovery_required": "partial_failure",
+        "error": "error",
+    }[result.status]
+    safe_target_label = _safe_retry_target_label(target_root)
+    sanitized_failure = public_status in {"blocked", "partial_failure"}
+    retry_command = None
+    if result.retry_policy == "same-keep-command" and specs_mode == "keep" and safe_target_label is not None:
+        retry_command = _uninstall_retry_command("keep", target_label=safe_target_label)
+    return {
+        "schema_version": 1,
+        "target": (safe_target_label or "unavailable") if sanitized_failure else str(target_root),
+        "mode": "apply" if apply else "dry-run",
+        "apply": apply,
+        "specs_mode": specs_mode,
+        "status": public_status,
+        "phase": result.phase,
+        "last_completed_phase": result.last_completed_phase,
+        "retry_command": retry_command,
+        "failed_paths": list(result.failed_paths),
+        "pending_paths": list(result.pending_paths),
+        "summary": _summarize_uninstall_outcomes(result),
+        "actions": [
+            {
+                "path": outcome.path,
+                "category": outcome.category,
+                "status": outcome.status,
+                "reason": outcome.reason,
+                "error": outcome.error,
+            }
+            for outcome in result.action_outcomes
+        ],
+        "guidance": _uninstall_guidance_from_result(result, apply=apply),
+        "errors": [error.message for error in result.errors],
+    }
+
+
 def _emit_uninstall_preflight_error(
     target_root: Path,
     *,
@@ -4931,13 +5008,127 @@ def _render_uninstall_text(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _run_uninstall_unlocked(
+def _deprovision_request_error_result(message: str) -> DistributionProcessResult:
+    return DistributionProcessResult(
+        status="error",
+        intent="deprovision",
+        actions=(),
+        phase="preflight",
+        last_completed_phase="not-started",
+        errors=(
+            DistributionProcessError(
+                code="deprovision-preflight-failed",
+                message=message,
+            ),
+        ),
+        retry_policy="same-keep-command",
+    )
+
+
+def _emit_uninstall_deprovision_result(
+    result: DistributionProcessResult,
+    *,
+    target_root: Path,
+    apply: bool,
+    specs_mode: str | None,
+    json_requested: bool,
+) -> int:
+    payload = _uninstall_payload_from_result(
+        result,
+        target_root=target_root,
+        apply=apply,
+        specs_mode=specs_mode,
+    )
+    if json_requested:
+        print(json.dumps(payload, sort_keys=True))
+    elif result.status == "error":
+        message = result.errors[0].message if result.errors else "Managed distribution deprovision failed."
+        print(f"error: {message}", file=sys.stderr)
+    else:
+        print(_render_uninstall_text(payload))
+    return _uninstall_exit_code_from_result(result)
+
+
+def _run_uninstall_deprovision(
     target_root: Path,
     ns: argparse.Namespace,
     *,
+    specs_mode: str | None,
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> int:
-    specs_mode = _uninstall_specs_mode(ns)
+    """Adapt default/keep uninstall requests to the managed deprovision service."""
+
+    if specs_mode not in {None, "keep"}:
+        raise RuntimeError("deprovision route received non-keep specs authority")
+    apply_requested = bool(ns.apply)
+    json_requested = bool(ns.json)
+    if not target_root.exists() or not target_root.is_dir():
+        result = _deprovision_request_error_result(f"target path is not a directory: {target_root}")
+        return _emit_uninstall_deprovision_result(
+            result,
+            target_root=target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+        )
+    if apply_requested and specs_mode is None:
+        result = _deprovision_request_error_result(
+            "uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs"
+        )
+        return _emit_uninstall_deprovision_result(
+            result,
+            target_root=target_root,
+            apply=True,
+            specs_mode=None,
+            json_requested=json_requested,
+        )
+    try:
+        _require_retry_target_label(target_root)
+    except RuntimeError:
+        result = _deprovision_request_error_result(
+            "retry target cannot be represented safely from the current working directory"
+        )
+        return _emit_uninstall_deprovision_result(
+            result,
+            target_root=target_root,
+            apply=apply_requested,
+            specs_mode=specs_mode,
+            json_requested=json_requested,
+        )
+    try:
+        with _assets_dir() as packaged_assets_dir:
+            assets_dir = packaged_assets_dir.resolve()
+            result = execute_deprovision_distribution(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                package_version=_tool_version(),
+                apply=apply_requested,
+                expected_root_identity=expected_root_identity,
+            )
+    except (OSError, RuntimeError):
+        result = _deprovision_request_error_result("Managed distribution deprovision preflight failed.")
+    return _emit_uninstall_deprovision_result(
+        result,
+        target_root=target_root,
+        apply=apply_requested,
+        specs_mode=specs_mode,
+        json_requested=json_requested,
+    )
+
+
+def _run_uninstall_remove_specs_compatibility(
+    target_root: Path,
+    ns: argparse.Namespace,
+    *,
+    specs_mode: str,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> int:
+    """Retain the D4 purge-compatible owner until Issue 371 replaces this route."""
+
+    if specs_mode != "remove":
+        raise RuntimeError("remove-specs compatibility route requires remove authority")
     apply_requested = bool(ns.apply)
     json_requested = bool(ns.json)
     phase = "preflight"
@@ -5173,20 +5364,51 @@ def _run_uninstall_unlocked(
 
 
 def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
-    if not bool(ns.apply):
-        return _run_uninstall_unlocked(target_root, ns)
+    specs_mode = _uninstall_specs_mode(ns)
+    apply_requested = bool(ns.apply)
+    if specs_mode != "remove" and (
+        not apply_requested or specs_mode is None or not target_root.exists() or not target_root.is_dir()
+    ):
+        return _run_uninstall_deprovision(
+            target_root,
+            ns,
+            specs_mode=specs_mode,
+        )
+    if specs_mode == "remove" and not apply_requested:
+        return _run_uninstall_remove_specs_compatibility(
+            target_root,
+            ns,
+            specs_mode=specs_mode,
+        )
     try:
         with _exclusive_distribution_operation(target_root) as locked_root_identity:
-            return _run_uninstall_unlocked(
+            if specs_mode == "remove":
+                return _run_uninstall_remove_specs_compatibility(
+                    target_root,
+                    ns,
+                    specs_mode=specs_mode,
+                    expected_root_identity=locked_root_identity,
+                )
+            return _run_uninstall_deprovision(
                 target_root,
                 ns,
+                specs_mode=specs_mode,
                 expected_root_identity=locked_root_identity,
             )
     except (OSError, RuntimeError) as exc:
+        if specs_mode != "remove":
+            result = _deprovision_request_error_result("Managed distribution deprovision preflight failed.")
+            return _emit_uninstall_deprovision_result(
+                result,
+                target_root=target_root,
+                apply=True,
+                specs_mode=specs_mode,
+                json_requested=bool(ns.json),
+            )
         return _emit_uninstall_preflight_error(
             target_root,
             apply=True,
-            specs_mode=_uninstall_specs_mode(ns),
+            specs_mode=specs_mode,
             json_requested=bool(ns.json),
             message=str(exc),
         )

@@ -37,9 +37,11 @@ spec-dock uninstall /path/to/project --apply --keep-specs
 spec-dock init /path/to/project
 ```
 
-`--remove-specs` は仕様履歴を削除する明示操作です。実行前に `--keep-specs` で残すデータと unknown content を確認してください。uninstall の部分失敗では `.uninstall-retry.json` が post-verify まで残り、同じ対象へ再実行して forward recovery します。
+default / `--keep-specs` uninstall は managed distribution deprovision として完全な read-only assessment を先に行います。apply は `.distribution-retry.json` schema 2 forward guard と `.distribution-journal.json` protocol 2 journal を使い、同じ root・intent・authority・contract・plan・protocol と semantic sourceが一致する同一または compatible newer packageだけがsame-plan forward recoveryできます。journalは `prepared → executing → verifying → completed` の順に進み、directoryはexact immediate-child evidenceがpublishedかつexpected-absentになってからだけ削除します。
 
-成功した `--remove-specs` uninstall は、再初期化の境界として空の `spec-dock/` ディレクトリを残すことがあります。空境界には利用者データがないため、同じ対象で `spec-dock init /path/to/project` を実行して現行配布面を再作成できます。部分失敗のJSON / text診断に表示されるretry commandは、元の対象を失わないよう現在の作業ディレクトリからの相対パスを使います。同じ作業ディレクトリで、表示されたコマンドをそのまま再実行してください。
+`--remove-specs` は仕様履歴を削除する別の明示操作で、Issue 371 が所有するcompatibility routeです。実行前に `--keep-specs` で残すspec history、Workbench、unknown / modified contentを確認してください。legacy `.uninstall-retry.json` はroot、keep/remove mode、plan、checkpointを証明しないため自動変換しないで保持します。legacy markerとnew guard/journalが併存する場合もどちらかへ推測統合せず、manual recovery診断で停止します。
+
+成功した `--remove-specs` uninstall は、再初期化の境界として空の `spec-dock/` ディレクトリを残すことがあります。空境界には利用者データがないため、同じ対象で `spec-dock init /path/to/project` を実行して現行配布面を再作成できます。通常のkeep recoveryでJSON / text診断に表示されるretry commandは、元の対象を失わないよう現在の作業ディレクトリからの相対パスを使います。同じ作業ディレクトリで表示されたsame-keep commandを再実行してください。legacy markerはunsafeなretry commandを返さず、delete / rename / convertを自動案内しません。
 
 ## 4. Artifact の取り込み
 
