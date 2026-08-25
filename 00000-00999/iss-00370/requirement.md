@@ -29,7 +29,7 @@ ID: "iss-00370"
 
 ## 背景と exact implementation baseline
 
-実装事実の基準は repository `chemitaro/spec-dock`、branch `iss-00370-managed-distribution-deprovision`、exact commit `7301800263eae1a78ea710ff1935ab4ce0f138e7` である。
+実装事実の基準は repository `chemitaro/spec-dock`、branch `iss-00370-managed-distribution-deprovision`、exact commit `5d25f393dba95d1a71c5582714de43c82fa094f4` である。
 
 この exact commit では、`src/spec_dock/managed_distribution.py` に次が存在する。
 
@@ -98,7 +98,12 @@ ID: "iss-00370"
 | current generated entry | fixed SHAのruntime producerが現在生成する予約pathであり、Designに定めるexact kind、schema/discriminator、cross-reference、single-link/mode条件を満たすentry。観測bytesまたはlink textはsemantic validation後にexact identityとして束縛する。 |
 | legacy generated entry |過去に生成された可能性があるが、current producerのexact identity predicateを満たさないentry。exact historical identity catalogで別途ownershipを証明できる場合を除き、pathnameだけでは削除せず`preserve` + `block`とする。 |
 | preservation witness | mutation対象外tree/pathのno-follow observation、content digest、type、mode、link topology、root/parent bindingを固定したread-only evidence。journal actionではなくplan/journalのimmutable witnessである。 |
-| collapsed absence witness | proven-owned ancestorがassessment時点で既にabsentであることを、nearest existing bound ancestor、missing suffix、owned subtree digestへ束縛したread-only evidence。その配下のdescendant mutation actionを発行しない。 |
+| collapsed absence witness | proven-owned ancestorがassessment時点で既にabsentであることを、operation中に削除されないsurviving bound ancestor、そこからのmissing suffix、owned subtree semantic digestへ束縛したread-only evidence。その配下のdescendant mutation actionを発行しない。 |
+| surviving absence anchor | collapsed absence witnessを再検証するためoperation完了までpathnameとdirectory objectが存続するbound real directory。nearest existing ancestorがplan内の`remove-empty-directory`対象なら、そのancestorをanchorにせず、削除closure外の最も近い上位directoryへcanonicalにre-anchorする。target rootは最終surviving anchorである。 |
+| immediate child evidence | `remove-empty-directory`が参照できる唯一のdependency evidence。leaf childは対応leaf actionの`published` checkpointとexact absent、directory childは対応directory actionの`published` checkpointとそのdirectory path absentで充足する。published directory actionは配下subtreeのdescendant evidenceをdurably subsumeする。 |
+| directory child semantic projection | directory namespace digestへ入れるtype-specific record。directory childではpath/name、kind、device、inode、mode、classification、owner sourceを含み、authorized child mutationで変わるdirectory `ctime_ns`と`link_count`を除外する。full descriptor snapshotは別のruntime TOCTOU guardである。 |
+| semantic source projection | durable contract、plan、guard、journal equalityに使用するprovider source identity。canonical source path、asset kind、SHA-256、mode、symlink target、schema/protocol等だけを含み、device/inode/ctime/mtime等のphysical identityを含めない。 |
+| invocation source snapshot | current `DistributionSourceSnapshot`相当のdevice/inode/ctime/mtime/size/modeを含むfull physical observation。一invocation内のcapture/read/apply TOCTOU guardだけに使い、durable digestまたはcompatible newer equalityへ保存しない。 |
 | mutating action | journal checkpointを持つ`prune`または`remove-empty-directory`。`preserve`、`block`、preservation witness、collapsed absence witnessはjournal actionではない。 |
 | bounded child set | contractが列挙したmanaged root内で、assessment時にdescriptor-relativeに観測し、各childをremove/preserve/block/collapsed-absentのいずれかへ完全分類した集合。 |
 | published checkpoint | mutating actionのexpected postconditionをfilesystemでexact再観測し、journalへdurableに記録した状態。directory dependencyはprior childの`published`とexact expected-absent postconditionを要求し、`verified`を要求しない。 |
@@ -195,12 +200,12 @@ Current generated entryがmissingであること自体はblockerではない。p
 
 | Observation | Classification | Action emission | Witness / postcondition |
 |---|---|---|---|
-| contract-owned ancestorが存在し、descendant leafだけmissing |既存ancestor bindingからleaf-level absenceを分類 | public diagnosticは`already_removed`、mutating action 0 | nearest existing parentとmissing leafをleaf-level collapsed absence witnessへ束縛。 |
-| contract-owned ancestorそのものがassessment時点でabsent |そのancestor配下のcontract-owned descendantsを一つのcollapsed absenceへ集約 | ancestor、descendant、directoryのmutating actionを発行しない | nearest existing bound ancestor、missing suffix、owned subtree digestを`DistributionCollapsedAbsenceWitness`へ記録。 |
-| missing componentがcontract-owned ancestorより上位、またはnearest existing ancestorをsafeに束縛できない | unproven namespace gap | actionなし、operation blocker | write 0。 |
+| contract-owned ancestorが存在し、descendant leafだけmissing | surviving anchor selectionを実行してleaf-level absenceを分類 | public diagnosticは`already_removed`、mutating action 0 | 最も近いexisting parentが削除closure外ならそのbinding、削除対象なら上位surviving ancestorへre-anchorし、anchorからmissing leafまでをcollapsed absence witnessへ束縛する。 |
+| contract-owned ancestorそのものがassessment時点でabsent | そのancestor配下のcontract-owned descendantsを一つのcollapsed absenceへ集約 | ancestor、descendant、directoryのmutating actionを発行しない | deletion closure外のnearest surviving bound ancestor、そのanchorからのmissing suffix、owned subtree semantic digestを`DistributionCollapsedAbsenceWitness`へ記録する。 |
+| nearest existing ancestorが同じplanで削除対象 |そのdirectoryはwitness anchorとして不適格 | descendant actionは増やさない | parentへ一段ずつ上がり、mutating actionもcollapsed subtreeも含まない最初のsurviving real directoryへcanonical re-anchorする。target rootまで到達した場合はrootをanchorにする。 |
+| missing componentがcontract-owned ancestorより上位、またはsurviving ancestorをsafeに束縛できない | unproven namespace gap | actionなし、operation blocker | write 0。 |
 | collapsed ancestorがassessment後またはresume前にappearance | witness mismatch | appearanceしたentryを削除するactionを新規発行しない | mutation開始前ならblocked、journal開始後ならrecovery required。 |
 |全managed subtreeがcollapsed absentで、preservation witnessがvalid | completed no-op | mutating action 0 | guard、journal、legacy marker、stage、target syscall 0。 |
-
 ## 観測可能な要件
 
 ### Functional requirements
@@ -215,7 +220,7 @@ Current generated entryがmissingであること自体はblockerではない。p
 | I370-F06 | blockerが一件でもあればoperation全体をwrite 0で停止し、safe subsetを適用しない。 | removable owned assetとunknown/modified blockerのmixed fixtureで、owned assetを含むtree全体、guard、journal、stageが不変である。 |
 | I370-F07 | deprovisionはspec history purge authorityを作成・推測・実行しない。 | deprovision plan/journal/guardに`remove-specs`、purge intent、purge authorityが存在せず、initiatives pathにmutating actionがない。 |
 | I370-F08 | successは全mutating actionとpreservation/collapsed-absence witnessのpost-assessment成功後だけ返す。 | removed path absenceだけでなくspec history witness、absence witness、root/parent binding、unknown closed setを再検証し、任意のmismatchでcompletedにならない。 |
-| I370-F09 | proven-owned ancestorが既にabsentなら、その配下のowned descendantsをcanonicalにcollapseし、mutating actionを発行しない。assessment後のappearanceは新規削除authorityを得ない。 | nearest existing bound ancestorからのabsence witness、descendant action 0、appearance時のblocked/recovery-required、entire managed subtree absentのprotocol metadata write 0を`I370-T-NOOP-001`で確認する。 |
+| I370-F09 | proven-owned ancestorが既にabsentなら、その配下のowned descendantsをcanonicalにcollapseし、mutating actionを発行しない。witness anchorはoperation中に削除されないnearest surviving bound ancestorとし、nearest existing ancestorが削除対象なら上位surviving ancestorへcanonical re-anchorする。assessment後のappearanceは新規削除authorityを得ない。 | 3階層以上のnested treeでanchor re-selection、descendant action 0、appearance時のblocked/recovery-required、entire managed subtree absentのprotocol metadata write 0を`I370-T-NOOP-001`で確認する。 |
 | I370-F10 | `--remove-specs` dry-run/applyはIssue 371 compatibility routeに明示的に隔離される。 | source/AST testでdefault/keep routeからremove-specs compatibility entrypointへのcall edgeが0、逆方向も0である。 |
 
 ### Safety requirements
@@ -229,10 +234,10 @@ Current generated entryがmissingであること自体はblockerではない。p
 | I370-S05 | special fileとunsafe hardlinkはfail closedとする。 | FIFO/socket/device/multi-link fixtureでguard/journal/target write 0。 |
 | I370-S06 | managed root membership、generated root membership、予約filenameだけでchild ownershipを推測しない。 | `spec-dock/docs`、`spec-dock/active`、`spec-dock/.agent`のunknown/modified/legacy-unproven childがrootごと削除されずoperation全体をblockする。 |
 | I370-S07 | mutation前に全bounded child setをdeterministicに列挙し、remove/preserve/block/collapsed-absentへ完全分類する。 | duplicate、unclassified child、unsafe name/type、enumeration errorがplan発行を拒否する。 |
-| I370-S08 | directory cleanupはplanに列挙した`remove-empty-directory`だけで行い、その実行条件は全prior child mutating actionが`published`かつcurrent childがexact expected-absentであることとする。`verified`をdependencyに使わない。 | parser、digest、kernel、crash-window testsが同じdependency規則を固定し、executing中の最初のdirectory actionへ到達できる。汎用recursive cleanupへのcall edgeは0。 |
-| I370-S09 | each mutation直前にroot/parent/target/directory binding、published child postcondition、expected remaining child setを再検証する。authorized prior child deletionに伴うparent ctime/link-count変化はsame device/inode/type/modeとexpected child digestが一致する場合だけ受理し、その他の変化を外部mutationとして扱う。 | assessment後のunknown child appearance、target replacement、parent replacement、parent modeまたはunexplained child-set変化で次のmutationを行わない。authorized prior actionだけで説明できるparent変化はsame-plan実行・resumeで収束する。 |
+| I370-S08 | directory cleanupはplanに列挙した`remove-empty-directory`だけで行い、dependencyを全descendantではなくimmediate child evidenceへ限定する。leaf childは対応leaf actionの`published` + exact absent、directory childは対応directory actionの`published` + directory path absentで充足する。published directory actionは配下subtree evidenceをdurably subsumeし、ancestor action、verifying、crash resumeはremoved subtree内pathを再openしない。`verified`をdependencyに使わない。 | `I370-T-DIR-001`と`I370-T-REC-001`が3階層以上のnested tree、各directory publish直後crash、ancestor resume、verifyingを同じimmediate-child/subsumption規則で固定し、removed subtree内のdescendant open/list/stat callが0である。汎用recursive cleanupへのcall edgeは0。 |
+| I370-S09 | each mutation直前にroot/parent/target/directory binding、immediate child checkpoint、expected remaining namespaceを再検証する。directory child digestはtype-specific semantic projectionを使い、directory childからauthorized mutationで変わる`ctime_ns`と`link_count`を除外する。visible pathとheld descriptorのfull device/inode/type/mode/ctime/link comparisonは別のruntime TOCTOU guardとして維持し、digestへ暗黙rebindしない。 | `I370-T-DIR-001`がleaf removalによるparent ctime/link count変化でもsame-plan実行・resumeが収束することを確認する。directory inode/type/mode replacement、unknown child appearance、unexplained namespace changeは次のmutation前にfail closedとなる。 |
 | I370-S10 | preservation witnessとcollapsed absence witnessはjournal actionではなくplan/journal immutable metadataとして束縛し、post-assessmentでexact一致を要求する。 | witnessにcheckpointがなく、initiatives bytes/mode/child set/symlink textまたはabsence appearanceを変更するとcompletedにならない。 |
-| I370-S11 | provider contract/manifest/scaffold source identityがassessment後に変化した場合はapplyを開始・継続しない。 | source bytes/mode/identity mutation injectionでtarget write 0またはjournal保持のrecovery requiredとなる。 |
+| I370-S11 | full physical `DistributionSourceSnapshot`は各invocation内のcapture/read/apply TOCTOU guardだけに使う。durable contract identity、plan digest、forward guard、journal equalityはcanonical source path、asset kind、SHA-256、mode、symlink target、schema/protocol等のsemantic source projectionだけへ束縛し、device/inode/ctime/mtimeを含めない。compatible newer packageは自身のfull snapshotを再captureし、stored semantic projectionとexact一致した場合だけresumeする。 | `I370-T-SRC-001`が別physical install rootでsemantic source同一のsame-plan resumeを確認する。source path/kind/bytes/mode/link target/schema driftはwrite 0でblockし、same invocation中のsource replacementはfull snapshot mismatchでtarget mutation前または次boundaryに停止する。 |
 | I370-S12 | blocker planからforward guardまたはjournalを作らない。 | blocker fixtureで`.distribution-retry.json`、`.distribution-journal.json`、private stageが不存在。 |
 | I370-S13 | repository外pathとcleanup boundary外sentinelはmutation syscallのtargetにしない。 | external symlink targetとoutside sentinelのidentity/bytesが全failure matrixで不変。 |
 | I370-S14 | apply中の失敗後もunknown/replacement/appeared entryをcleanup authorityへ昇格しない。 | stage-like unknown、replacement inode、unknown child、collapsed ancestor appearanceを保持してjournal/guardを残す。 |
@@ -259,13 +264,13 @@ Current generated entryがmissingであること自体はblockerではない。p
 |---|---|---|
 | I370-R01 | first target mutationより前にschema-2 deprovision forward guardとprotocol-2 journalをdurable publishする。 | syscall/failure injectionでguard/journal publish失敗時のmanaged target mutationが0。 |
 | I370-R02 | new guardは`operation="deprovision"`、`purpose="deprovision-journal-forward-only"`、journalは`intent="deprovision"`、`authority="managed-distribution-deprovision"`へexact bindingする。 | forged purpose/intent/authority pairをparserとresumeの双方で拒否する。 |
-| I370-R03 | resumeはsame root、same intent、same exact authority、same contract、same canonical plan digest、compatible protocol、exact action pre/postcondition、exact witnessesだけを許可する。 |各field/witnessの単独mismatch fixtureがwrite 0でstable reasonを返す。 |
-| I370-R04 | deprovision journal state machineはreachableな一表へ固定する。`prepared`は全action`pending`、`executing`は`pending\|published`だけ、全mutating action`published`後に`verifying`、`verifying`は全action`published`のみ、full post-assessment成功後の一回のatomic publicationで全action`verified`かつ`completed`とする。このvalidatorは`intent="deprovision"`へ限定し、fresh/recognized journalの成立済みparser semanticsを変更しない。 | parserがstatus/checkpointの不正組合せを拒否し、leaf publish、directory publish、executing-all-published、verifying、verified、completedの各crash windowからsame-plan retryが収束する。existing fresh/recognized protocol fixtureは変更なしで通る。 |
-| I370-R05 | guard-only、guard+journal、completed journal+guard、completed journal-onlyを区別し、説明可能なstateだけをforwardする。 | crash-window matrixがmutation重複、authority再発行、早期cleanupを起こさない。 |
+| I370-R03 | resumeはsame root、same intent、same exact authority、same durable contract、same canonical plan digest、compatible protocol、exact action pre/postcondition、exact witnesses、exact semantic source projectionだけを許可する。physical provider inode/device/ctime/mtimeの一致はcross-invocation条件にせず、各invocationが新しくcaptureしたfull source snapshotをそのinvocation中のTOCTOU guardとして使う。 | `I370-T-SRC-001`と`I370-T-REC-001`でsemantic-equalな別physical install rootからのcompatible newer resumeが成功し、各field/witness/semantic sourceの単独mismatchとsame-invocation source replacementがwrite 0または次boundary停止になることを確認する。 |
+| I370-R04 | deprovision journal state machineはreachableな一表へ固定する。`prepared`は全action`pending`、`executing`は`pending\|published`だけ、全mutating action`published`後に`verifying`、`verifying`は全action`published`のみ、full post-assessment成功後の一回のatomic publicationで全action`verified`かつ`completed`とする。directory actionのimmutable immediate-child evidenceはleaf/directory kindをlosslessに持ち、published directory actionはそのsubtreeをsubsumedとする。このvalidatorは`intent="deprovision"`へ限定する。 | `I370-T-DIR-001`、`I370-T-JRN-001`、`I370-T-REC-001`がstatus/checkpoint/dependency kind/subsumptionの不正組合せを拒否し、3階層nested leaf publish、各directory publish、executing-all-published、verifying、completedの各crash windowからdescendant再openなしでsame-plan retryが収束することを確認する。existing fresh/recognized fixtureは変更なしで通る。 |
+| I370-R05 | guard-only、guard+journal、各nested directory `published`直後、completed journal+guard、completed journal-onlyを区別し、説明可能なstateだけをforwardする。published directoryのsubtree evidenceはjournalから再構成し、removed subtree内descendantを再観測してauthorityを再取得しない。 | 3階層crash-window matrixがmutation重複、removed descendant reopen、authority再発行、早期cleanupを起こさない。 |
 | I370-R06 | journal/guard/root/plan/authority/witness mismatch時にmarker、journal、stage、targetを推測修復しない。 | malformed/self-rehashed/dual/missing guard/unknown lease/witness mismatch fixtureでevidenceが不変。 |
 | I370-R07 | legacy `.uninstall-retry.json` は自動変換しない。 | valid marker-onlyとcopied markerはmarker bytes/identityとtarget不変でreason=`legacy-marker-unconvertible`、public `partial_failure`/exit 1。malformed/symlink/hardlink/special markerはevidence不変でreason=`legacy-marker-invalid`、public `error`/exit 2。legacy markerとnew guard/journalの併存はreason=`dual-recovery-state`、public `partial_failure`/exit 1。 |
 | I370-R08 | deprovision retryからpurgeへ、purge invocationからdeprovisionへauthorityを切り替えない。 | deprovision journalに`--remove-specs`を実行、legacy purge markerに`--keep-specs`を実行するfixtureがcheckpointを進めない。 |
-| I370-R09 | terminal successは全mutating action`published`、`verifying`、witnessを含むfull post-assessment、全action`verified`、journal`completed`、guard exact cleanup、journal exact cleanupの順とし、cleanup後にfallible workspace mutationを行わない。 | directory actionがprior child`published`から実行され、preservation witnessはpost-assessmentでのみ検証される。cleanup failureではcompleted evidenceを保持してretry可能。 |
+| I370-R09 | terminal successは全mutating action`published`、`verifying`、witnessを含むfull post-assessment、全action`verified`、journal`completed`、guard exact cleanup、journal exact cleanupの順とする。verifyingはpublished directory actionをsubtree absenceのdurable summaryとして扱い、removed subtree内descendant pathを再openしない。cleanup後にfallible workspace mutationを行わない。 | 3階層directory actionがimmediate child evidenceから順次実行され、各publish直後crashから収束する。verifyingでdescendant filesystem accessが0、preservation witnessはpost-assessmentで検証され、cleanup failureではcompleted evidenceを保持する。 |
 | I370-R10 | serviceは各return pathでtyped phase、last-completed、failed/pending/action error/top-level error/retry policyを確定し、manual recovery guidanceはlegacy information不足、mismatch reason、same-plan retry条件を区別する。 | durable state population tableの全行が`I370-T-RESULT-001`とJSON/text goldenへ一対一対応し、秘密情報を含まない。 |
 
 ### Operability and performance requirements
@@ -273,7 +278,7 @@ Current generated entryがmissingであること自体はblockerではない。p
 | ID | 要件 | 検証可能な受け入れ条件 |
 |---|---|---|
 | I370-O01 | assessmentはrepository全体をscanせず、contractで列挙したmanaged rootsとpreservation rootsだけを一度ずつbounded traversalする。 | observation counter testで対象外large treeのentry数に比例せず、対象bounded child数に対して線形である。 |
-| I370-O02 | action order、child enumeration、canonical digest、absence collapse、public action orderはplatform間でdeterministicである。 |同一fixtureを作成順だけ変えてもplan digest、collapsed witness、JSON action orderが一致する。 |
+| I370-O02 | action order、child enumeration、type-specific directory semantic projection、immediate child evidence、subsumption、semantic source projection、surviving-anchor selection、canonical digest、public action orderはplatform/physical install root間でdeterministicである。 | `I370-T-DIR-001`、`I370-T-SRC-001`、`I370-T-OPS-001`で同一fixtureを作成順だけ変えた場合とsemantic-equal sourceを別physical rootへ配置した場合にcontract/plan digest、collapsed witness、JSON action orderが一致する。directory ctime/link-countだけの変化ではdigest不変、inode/type/modeまたはsemantic source driftでは不一致となる。 |
 | I370-O03 | required no-follow/directory-descriptor capabilityがないplatformはfirst write前にstable diagnosticで停止する。Windows supportは追加しない。 | capability monkeypatch testでwrite 0。Linux/Darwinのexisting kernel branchesをfocused testで検証する。 |
 | I370-O04 | completed/blocked/recovery/error stateはtyped resultとdurable journal evidenceから監査でき、remote telemetryを追加しない。 | result/journalにrelative path、reason、phase、checkpoint、digestがあり、absolute path/content/credentialがない。 |
 
@@ -285,14 +290,15 @@ Current generated entryがmissingであること自体はblockerではない。p
 | generated contract | `build_deprovision_generated_state_contract()`をexactly once呼び、current slot、semantic identity、legacy/unrecognized entry、conflictを分類する。deprovision assessmentへ独立`generated_assets`引数を渡す経路は存在しない。 |
 | assessment | full owned/removal set、preservation witness、collapsed absence witness、bounded child set、blockerを作る。legacy marker、guard、journal、stage、targetを変更しない。 |
 | executable plan issuance | blockerが0で、intent/authority/contract/root/mutating action/pre-postcondition/witnessが完全な場合だけ発行する。`preserve`/`block`/witnessをjournal actionへ変換しない。 |
-| apply preparation | root lock内でsourceとtargetを再検証する。recovery metadataがなくmutating action 0ならprotocol metadataを作らずread-only post-assessmentへ進む。mutating actionがある場合だけforward guard、journalの順にdurable publishし、ここまでtarget mutation 0。 |
+| apply preparation | root lock内でprovider sourceを再captureし、stored semantic source projectionとの一致を確認する。full physical snapshotはこのinvocationのTOCTOU guardとして保持する。recovery metadataがなくmutating action 0ならprotocol metadataを作らずread-only post-assessmentへ進む。mutating actionがある場合だけforward guard、journalの順にdurable publishし、ここまでtarget mutation 0。 |
 | leaf apply (`executing`) | `prune`をdeterministic orderで実行し、exact postconditionを再観測して`published`へ進める。`verified` checkpointは許可しない。 |
-| directory apply (`executing`) | 各`remove-empty-directory`は全dependency childが`published`で現在exact absentであることを確認してから実行する。preservation witnessはdependencyではない。directoryを再観測してabsentなら`published`へ進める。 |
-| verifying | 全mutating actionが`published`であることをparser/serviceが確認してからstatusを`verifying`へ進める。no pending action、no new target mutation。full post-assessmentでmutating postcondition、preservation witness、absence witness、root/parent binding、unknown closed setを検証する。成功後の一回のatomic publicationで全actionを`verified`かつjournalを`completed`へ進める。 |
+| directory apply (`executing`) | 各`remove-empty-directory`はimmediate child evidenceだけを読む。leaf childはleaf action`published` + exact absent、directory childはdirectory action`published` + child directory path absentを要求する。published directory childは配下subtreeをsubsumedとし、descendantを再openしない。current directory semantic child digestがexpected empty projectionと一致した場合だけrmdirし、absence確認後にdirectory actionを`published`へ進める。 |
+| verifying | 全mutating actionが`published`であることを確認してstatusを`verifying`へ進める。no pending action、no new target mutation。published directory actionをsubtree absence summaryとして用い、removed subtree内descendantを再openせず、top-level mutating postcondition、preservation witness、surviving-anchor absence witness、root/remaining parent binding、unknown closed setを検証する。成功後の一回のatomic publicationで全actionを`verified`かつjournalを`completed`へ進める。 |
 | completed | 全journal actionが`verified`である場合だけjournal statusを`completed`にする。target actionを再実行しない。 |
 | partial failure | failureをtyped action/top-level errorへ変換し、journal/guardを保持する。published actionをrollbackしない。 |
-| resume | existing journalがある場合はjournal plan/actionがcanonicalであり、新規assessmentのabsence collapseでaction setを置換しない。pending actionはexact precondition、published actionはexact postconditionを要求する。ambiguous stateは停止する。 |
-| collapsed absence | recovery metadataなしのfresh assessmentでだけtop-down collapseを作る。nearest existing bound ancestorからmissing suffixを再検証する。appearanceは新規actionへ変換せずblocked/recovery required。 |
+| resume | existing journalがある場合はjournal plan/action、immediate child evidence、subsumption、semantic source projectionがcanonicalであることを要求し、新規assessmentのcollapseでaction setを置換しない。pending actionはexact precondition、published leafはexact absent、published directoryはdirectory path absentを要求する。published directory配下のdescendantを再openしない。compatible newer packageは自身のfull source snapshotをcaptureし、stored semantic projection一致時だけ進む。 |
+| compatible newer source admission | stored durable semantic source projectionをcurrent packageのcanonical producerから再構成する。exact一致ならcurrent invocationのfull physical snapshotを新規captureして進み、semantic driftまたはsame-invocation physical replacementではwrite 0/recovery required。physical install rootのdevice/inode/ctime/mtime差だけでは拒否しない。 |
+| collapsed absence | recovery metadataなしのfresh assessmentでだけtop-down collapseを作る。anchor候補が削除closure内なら上位へre-anchorし、operation中に存続するsurviving bound ancestorからmissing suffixを再検証する。appearanceは新規actionへ変換せずblocked/recovery required。 |
 | legacy marker | validであっても自動変換せず、markerを保持してrecovery-requiredを返す。marker bytesをroot/intent/authority evidenceとして扱わない。 |
 | finalization | completed journalのpostconditionを再確認し、guard、journalをexact cleanupする。finalization後にworkspace cleanupを実行しない。 |
 | presentation | serviceはreturn前にtyped resultを完成させる。CLIはresultとrequest contextだけからJSON/text/exitを生成し、journal pathをopenしない。 |
@@ -428,10 +434,10 @@ Issue 372 は、本 Issue で削除すべきdeprovision legacy call edgeを後�
 4. generated stateはsingle canonical producerからのみcontract化され、active/.agentのcurrent positive、legacy、unknown、conflict matrixが`I370-T-OWN-001`で固定される。
 5. `spec-dock/initiatives`のbyte-preservation、unknown/modified preservation、outside sentinel不変がnegative testsで確認される。
 6. mixed safe/unsafe planはguard/journal/stage/target write 0でblockする。
-7. `remove-empty-directory`はprior child `published` + exact absentから到達でき、executing/verifying/verified/completedのparser、digest、crash windowが同じstate tableへ一致する。
-8. proven-owned ancestor absenceはdescendant actionなしのcollapsed witnessとなり、entire managed subtree absent applyはprotocol metadata/target syscall 0でcompletedになる。assessment後appearanceは削除されない。
-9. unknown child appearance、root/parent rebind、same-content replacement、unsafe hardlink、special file、symlink traversalをfail closedで拒否する。
-10. partial failureのsame-plan retryが収束し、intent/authority/root/contract/plan/protocol/pre-postcondition/witness mismatchはwrite 0で停止する。
+7. `remove-empty-directory`はimmediate child evidenceだけから到達でき、leaf `published` + absent、directory `published` + path absent、published directoryによるsubtree subsumption、executing/verifying/completedのparser・digest・crash windowが一つのstate tableへ一致する。3階層以上のnested cleanupで各directory publish直後からresumeでき、removed subtree内descendantを再openしない。
+8. proven-owned ancestor absenceはdescendant actionなしのcollapsed witnessとなり、anchor候補が削除対象なら上位surviving ancestorへcanonical re-anchorする。entire managed subtree absent applyはprotocol metadata/target syscall 0でcompletedになり、assessment後appearanceは削除されない。
+9. directory child semantic projectionはdirectory `ctime_ns`/`link_count`を除外し、authorized child removal後のparent ctime変化を正常に受理する一方、directory inode/type/mode replacement、unknown child appearance、root/parent rebind、same-content replacement、unsafe hardlink、special file、symlink traversalをfail closedで拒否する。
+10. partial failureのsame-plan retryが収束する。別physical install rootのcompatible newer packageはsemantic source projectionがexact一致する場合だけresumeでき、bytes/mode/link target/canonical source path/schema driftはwrite 0で停止する。同一invocation中のsource replacementはfull snapshot guardで拒否する。intent/authority/root/contract/plan/protocol/pre-postcondition/witness mismatchもwrite 0で停止する。
 11. legacy `.uninstall-retry.json`は自動変換されず、marker bytesとtargetを保持する。
 12. public JSON schema version 1、exactly one stdout object、text section、exit mapping、status別target contract、keep-only retry guidanceがgolden testsに一致する。
 13. `DistributionProcessResult`または同等のtyped inputだけでphase、last completed、failed/pending paths、action errors、top-level errors、retry policyを生成でき、pending pathが`failed_paths`と`pending_paths`の双方へ現れるcurrent contractと、planned/completed/blocked/recovery/errorのretry nullabilityを`I370-T-RESULT-001`で証明し、CLIにjournal interpretationがない。
@@ -441,10 +447,11 @@ Issue 372 は、本 Issue で削除すべきdeprovision legacy call edgeを後�
 
 ## 制約・前提
 
-- exact implementation factと現行canonical文書の基準はcommit `7301800263eae1a78ea710ff1935ab4ce0f138e7` とする。
+- exact implementation factと現行canonical文書の基準はcommit `5d25f393dba95d1a71c5582714de43c82fa094f4` とする。
 - parent Epic `E365-R01`〜`E365-R14`、accepted unified reconciliation / forward recovery decisionを継承する。
 - public compatibilityはCLI、data preservation、JSON schema semantics、text/exit behaviorに適用する。private Python symbolとlegacy marker schemaは恒久互換対象ではない。
 - current generated-state path/schema contractはfixed SHAの`active_store.py`、`artifact_writer.py`、`json_state.py`、`reference_sync.md`から導出する。pathnameだけでlegacy ownershipを推測しない。
+- provider sourceのdurable equalityはsemantic source projectionを正本とし、`DistributionSourceSnapshot`のphysical fieldsは一invocation内TOCTOU guardに限定する。compatible newer recoveryをphysical install-root identityへ束縛しない。
 - root operation lockは協調するSpecDock writerを直列化するadvisory authorityである。非協調same-UID processに対するdelete-by-inode相当のkernel guaranteeは約束しないが、各mutation境界で観測できたreplacement/rebind/unknown childは必ず拒否する。
 - current legacy `.uninstall-retry.json`に存在しないroot、intent、authority、plan、checkpointをfixtureまたはmigrationで捏造しない。
 - `--remove-specs` purge、Issue 372 parity/closure、Windows、generic recursive deletion、new dependency、Full Regression repairは本Issueへ追加しない。
