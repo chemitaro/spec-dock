@@ -8,6 +8,7 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tarfile
@@ -38,6 +39,446 @@ _REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS = tuple(
     for profile in ("lite", "standard", "strict", "critical")
     for artifact in ("design", "plan")
 )
+
+
+def _i370_public_tree_evidence(root: Path) -> dict[str, tuple[object, ...]]:
+    evidence: dict[str, tuple[object, ...]] = {}
+    for path in (root, *root.rglob("*")):
+        info = path.lstat()
+        if stat.S_ISREG(info.st_mode):
+            payload: bytes | str | None = path.read_bytes()
+        elif stat.S_ISLNK(info.st_mode):
+            payload = str(path.readlink())
+        else:
+            payload = None
+        relative = "." if path == root else path.relative_to(root).as_posix()
+        evidence[relative] = (
+            info.st_dev,
+            info.st_ino,
+            info.st_ctime_ns,
+            info.st_mode,
+            info.st_nlink,
+            info.st_size,
+            payload,
+        )
+    return evidence
+
+
+def test_i370_real_initialized_workspace_generated_and_preserve_contract_is_blocker_free(
+    tmp_path: Path,
+) -> None:
+    """I370-T-OWN-001/I370-T-PRES-001: real provider output satisfies P2 contract."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    target = tmp_path / "target"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    initiative_note = target / "spec-dock" / "initiatives" / "keep.txt"
+    initiative_note.write_bytes(b"preserve initiatives\n")
+    workbench_note = target / "spec-dock" / ".workbench" / "keep.txt"
+    workbench_note.parent.mkdir(exist_ok=True)
+    workbench_note.write_bytes(b"preserve workbench\n")
+    outside = target / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    root_info = target.stat()
+
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        repo_root / "src/spec_dock/assets/install_root",
+        manifest_path=repo_root / "src/spec_dock/assets/managed_distribution.json",
+        scaffold_root=repo_root / "src/spec_dock/assets/spec_dock",
+        target_root=target,
+        expected_root_identity=managed_distribution.DistributionRootIdentity(
+            device=root_info.st_dev,
+            inode=root_info.st_ino,
+        ),
+    )
+
+    assert assessment.blockers == ()
+    assert {witness.relative_root for witness in assessment.preservation_witnesses} == {
+        "spec-dock/initiatives",
+        "spec-dock/.workbench",
+    }
+    assert all(action.path != "outside-sentinel.txt" for action in assessment.actions)
+
+
+def test_i370_uninstall_cli_maps_six_typed_deprovision_rows_and_one_remove_route(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    """I370-T-CLI-001/I370-T-JSON-001: seven public rows have one typed route owner."""
+
+    target = tmp_path / "consumer"
+    target.mkdir()
+    operation_error = managed_distribution.DistributionProcessError(
+        code="deprovision-safe-error",
+        message="Managed distribution deprovision could not continue safely.",
+    )
+    rows = (
+        (
+            ["uninstall", str(target), "--json"],
+            managed_distribution.DistributionProcessResult(
+                status="planned",
+                intent="deprovision",
+                actions=(),
+                phase="preflight",
+                last_completed_phase="preflight-complete",
+                retry_policy="same-keep-command",
+            ),
+            "planned",
+            0,
+            False,
+        ),
+        (
+            ["uninstall", str(target), "--keep-specs", "--json"],
+            managed_distribution.DistributionProcessResult(
+                status="planned",
+                intent="deprovision",
+                actions=(),
+                phase="preflight",
+                last_completed_phase="preflight-complete",
+                retry_policy="same-keep-command",
+            ),
+            "planned",
+            0,
+            True,
+        ),
+        (
+            ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+            managed_distribution.DistributionProcessResult(
+                status="completed",
+                intent="deprovision",
+                actions=(),
+                phase="complete",
+                last_completed_phase="post-verified",
+                retry_policy="same-keep-command",
+            ),
+            "completed",
+            0,
+            True,
+        ),
+        (
+            ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+            managed_distribution.DistributionProcessResult(
+                status="blocked",
+                intent="deprovision",
+                actions=(),
+                phase="preflight",
+                last_completed_phase="preflight-complete",
+                failed_paths=("spec-dock/docs/unknown.txt",),
+                errors=(operation_error,),
+                retry_policy="same-keep-command",
+            ),
+            "blocked",
+            1,
+            True,
+        ),
+        (
+            ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+            managed_distribution.DistributionProcessResult(
+                status="recovery_required",
+                intent="deprovision",
+                actions=(),
+                phase="uninstall-apply",
+                last_completed_phase="marker-written",
+                failed_paths=("spec-dock/docs/README.md",),
+                pending_paths=("spec-dock/docs/README.md",),
+                errors=(operation_error,),
+                retry_policy="same-keep-command",
+            ),
+            "partial_failure",
+            1,
+            True,
+        ),
+        (
+            ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+            managed_distribution.DistributionProcessResult(
+                status="error",
+                intent="deprovision",
+                actions=(),
+                phase="preflight",
+                last_completed_phase="not-started",
+                errors=(operation_error,),
+                retry_policy="same-keep-command",
+            ),
+            "error",
+            2,
+            True,
+        ),
+    )
+    active_result = rows[0][1]
+    service_calls: list[dict[str, object]] = []
+
+    def fake_service(install_root: Path, **kwargs: object) -> managed_distribution.DistributionProcessResult:
+        service_calls.append({"install_root": install_root, **kwargs})
+        return active_result
+
+    monkeypatch.setattr(cli, "execute_deprovision_distribution", fake_service)
+    for args, result, public_status, expected_exit, expect_retry in rows:
+        active_result = result
+        before_calls = len(service_calls)
+
+        assert main(args) == expected_exit
+
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert captured.out.count("\n") == 1
+        payload = json.loads(captured.out)
+        assert payload["schema_version"] == 1
+        assert payload["status"] == public_status
+        assert payload["phase"] == result.phase
+        assert payload["last_completed_phase"] == result.last_completed_phase
+        assert payload["failed_paths"] == list(result.failed_paths)
+        assert payload["pending_paths"] == list(result.pending_paths)
+        assert len(service_calls) == before_calls + 1
+        if public_status in {"blocked", "partial_failure"}:
+            assert payload["target"] != str(target.resolve())
+            assert not Path(payload["target"]).is_absolute()
+        else:
+            assert payload["target"] == str(target.resolve())
+        if expect_retry:
+            assert shlex.split(payload["retry_command"]) == [
+                "spec-dock",
+                "uninstall",
+                "--apply",
+                "--keep-specs",
+                os.path.relpath(target.resolve(), Path.cwd()),
+            ]
+        else:
+            assert payload["retry_command"] is None
+
+    compatibility_calls: list[str] = []
+
+    def fake_remove_compatibility(
+        _target_root: Path,
+        _ns: object,
+        *,
+        specs_mode: str,
+        expected_root_identity: object = None,
+    ) -> int:
+        del expected_root_identity
+        compatibility_calls.append(specs_mode)
+        return 0
+
+    monkeypatch.setattr(cli, "_run_uninstall_remove_specs_compatibility", fake_remove_compatibility)
+    before_calls = len(service_calls)
+    assert main(["uninstall", str(target), "--apply", "--remove-specs", "--json"]) == 0
+    assert compatibility_calls == ["remove"]
+    assert len(service_calls) == before_calls
+
+
+def test_i370_uninstall_deprovision_cli_has_no_legacy_or_journal_interpretation() -> None:
+    """I370-T-RESULT-001/I370-T-ABS-001: CLI is a typed adapter with no hidden fallback."""
+
+    route_source = inspect.getsource(cli._run_uninstall_deprovision)
+    mapper_source = inspect.getsource(cli._uninstall_payload_from_result)
+    for forbidden in (
+        "_UninstallAction",
+        "_build_uninstall_plan",
+        "_apply_uninstall_plan",
+        "_verify_uninstall_postcondition",
+        "_write_uninstall_retry_marker",
+        "_run_uninstall_remove_specs_compatibility",
+        "OperationJournalStore",
+        "checkpoint",
+        ".distribution-journal",
+        ".distribution-retry",
+    ):
+        assert forbidden not in route_source
+        assert forbidden not in mapper_source
+    assert route_source.count("execute_deprovision_distribution(") == 1
+
+
+def test_i370_legacy_marker_public_mapping_is_manual_and_write_free(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    """I370-T-LEG-001/I370-T-TEXT-001: valid legacy state has no inferred retry."""
+
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    marker = target / "spec-dock" / ".uninstall-retry.json"
+    marker.write_bytes(b'{"managed_by": "spec-dock", "purpose": "uninstall-rerun", "schema_version": 1}\n')
+    before = _i370_public_tree_evidence(target)
+
+    requests = (
+        ["uninstall", str(target), "--json"],
+        ["uninstall", str(target), "--keep-specs", "--json"],
+        ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+    )
+    for request in requests:
+        assert main(request) == 1
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert captured.out.count("\n") == 1
+        payload = json.loads(captured.out)
+        assert payload["schema_version"] == 1
+        assert payload["status"] == "partial_failure"
+        assert payload["phase"] == "preflight"
+        assert payload["last_completed_phase"] == "not-started"
+        assert payload["retry_command"] is None
+        assert payload["failed_paths"] == ["spec-dock/.uninstall-retry.json"]
+        assert payload["pending_paths"] == []
+        assert payload["errors"] == ["Legacy uninstall recovery requires manual review."]
+        assert payload["guidance"][0] == (
+            "manual recovery required: legacy installer state does not prove its root, specs mode, or checkpoint"
+        )
+        assert not Path(payload["target"]).is_absolute()
+        assert _i370_public_tree_evidence(target) == before
+
+
+def test_i370_legacy_marker_invalid_public_mapping_is_error_and_write_free(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    """I370-T-LEG-001/I370-T-TEXT-001: invalid legacy evidence exits 2 without a retry."""
+
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    marker = target / "spec-dock" / ".uninstall-retry.json"
+    marker.write_bytes(b'{"schema_version":')
+    before = _i370_public_tree_evidence(target)
+
+    for request in (
+        ["uninstall", str(target), "--json"],
+        ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+    ):
+        assert main(request) == 2
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        payload = json.loads(captured.out)
+        assert payload["status"] == "error"
+        assert payload["phase"] == "preflight"
+        assert payload["last_completed_phase"] == "not-started"
+        assert payload["retry_command"] is None
+        assert payload["failed_paths"] == ["spec-dock/.uninstall-retry.json"]
+        assert payload["errors"] == ["Legacy uninstall recovery evidence is invalid."]
+        assert payload["guidance"][0] == (
+            "manual recovery required: invalid legacy installer state does not prove its root, specs mode, or checkpoint"
+        )
+        assert payload["target"] == str(target.resolve())
+        assert _i370_public_tree_evidence(target) == before
+
+
+def test_i370_legacy_marker_and_deprovision_journal_never_cross_authority_routes(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    """I370-T-LEG-001/I370-T-AUTH-001: dual state advances neither keep nor purge."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    root_info = target.stat()
+    root_identity = managed_distribution.DistributionRootIdentity(
+        device=root_info.st_dev,
+        inode=root_info.st_ino,
+    )
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        repo_root / "src/spec_dock/assets/install_root",
+        manifest_path=repo_root / "src/spec_dock/assets/managed_distribution.json",
+        scaffold_root=repo_root / "src/spec_dock/assets/spec_dock",
+        target_root=target,
+        expected_root_identity=root_identity,
+    )
+    executable = managed_distribution.build_executable_mutation_plan(assessment)
+    store = managed_distribution.OperationJournalStore(target)
+    guard = store.prepare_legacy_guard(executable, package_version=_expected_spec_dock_version())
+    store.bind_forward_guard(guard)
+    journal = store.prepare(executable, package_version=_expected_spec_dock_version())
+    assert journal.status == "prepared"
+    marker = target / "spec-dock" / ".uninstall-retry.json"
+    marker.write_bytes(b'{"managed_by": "spec-dock", "purpose": "uninstall-rerun", "schema_version": 1}\n')
+    before = _i370_public_tree_evidence(target)
+    expected_failed = sorted(
+        (
+            "spec-dock/.distribution-journal.json",
+            "spec-dock/.distribution-retry.json",
+            "spec-dock/.uninstall-retry.json",
+        ),
+        key=os.fsencode,
+    )
+
+    for request in (
+        ["uninstall", str(target), "--keep-specs", "--json"],
+        ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+    ):
+        assert main(request) == 1
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        payload = json.loads(captured.out)
+        assert payload["status"] == "partial_failure"
+        assert payload["failed_paths"] == expected_failed
+        assert payload["retry_command"] is None
+        assert payload["errors"] == ["Conflicting uninstall recovery evidence requires manual review."]
+        assert payload["guidance"][0] == (
+            "manual recovery required: conflicting legacy and schema-2 recovery states prove no single plan or checkpoint"
+        )
+        assert _i370_public_tree_evidence(target) == before
+
+    assert main(["uninstall", str(target), "--apply", "--remove-specs", "--json"]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    purge_payload = json.loads(captured.out)
+    assert purge_payload["status"] == "error"
+    assert _i370_public_tree_evidence(target) == before
+
+
+def test_i370_docs_describe_deprovision_authority_recovery_and_parity() -> None:
+    """I370-T-DOC-001: shipped and dogfood docs match the managed deprovision contract."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    provider_readme = repo_root / "src/spec_dock/assets/spec_dock/docs/README.md"
+    dogfood_readme = repo_root / "spec-dock/docs/README.md"
+    provider_migration = repo_root / "src/spec_dock/assets/spec_dock/docs/migration.md"
+    dogfood_migration = repo_root / "spec-dock/docs/migration.md"
+    assert provider_readme.read_bytes() == dogfood_readme.read_bytes()
+    assert provider_migration.read_bytes() == dogfood_migration.read_bytes()
+
+    japanese_docs = provider_readme.read_text(encoding="utf-8") + provider_migration.read_text(encoding="utf-8")
+    for literal in (
+        "build_deprovision_generated_state_contract()",
+        "single canonical producer",
+        "spec-dock/active",
+        "spec-dock/.agent",
+        "collapsed absence witness",
+        "surviving anchor",
+        "immediate-child",
+        "ctime_ns",
+        "link_count",
+        "canonical source path",
+        "compatible newer package",
+        ".distribution-retry.json",
+        "schema 2",
+        ".distribution-journal.json",
+        "prepared → executing → verifying → completed",
+        "DistributionProcessResult",
+        ".uninstall-retry.json",
+        "自動変換しない",
+        "--keep-specs",
+        "--remove-specs",
+        "Issue 371",
+        "root・intent・authority・contract・plan・protocol",
+        "unknown / modified",
+    ):
+        assert literal in japanese_docs
+
+    root_readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    for literal in (
+        "Managed distribution deprovision",
+        "schema-2 forward guard",
+        "protocol-2 journal",
+        "typed `DistributionProcessResult`",
+        "legacy `.uninstall-retry.json` is never converted automatically",
+        "`--remove-specs` remains a separate compatibility authority for Issue 371",
+    ):
+        assert literal in root_readme
 
 
 def test_issue_368_recognized_handler_has_single_service_route() -> None:
@@ -6130,6 +6571,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 assert legacy_symlink.readlink() == Path("initiative/current")
 
     def test_uninstall_dry_run_prints_plan_and_mutates_no_files(self) -> None:
+        """I370-T-CHAR-001: current public text plan remains characterized."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -6146,25 +6589,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert stderr == ""
             assert self._relative_file_snapshot(target) == before
 
-    def test_uninstall_dry_run_classifies_fresh_root_workbench_readme_as_scaffold_managed_exact_match(
+    def test_uninstall_dry_run_classifies_fresh_root_workbench_as_preservation_witness(
         self,
     ) -> None:
+        """I370-T-PRES-002: Workbench is one immutable witness, never a removable leaf."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
             payload = self._uninstall_json_payload(target)
-            readme_actions = [
-                action
-                for action in payload["actions"]  # type: ignore[index]
-                if action["path"] == "spec-dock/.workbench/README.md"
-            ]
+            actions = self._actions_by_path(payload)
 
-            assert len(readme_actions) == 1
-            readme_action = readme_actions[0]
-            assert readme_action["category"] == "scaffold_managed"
-            assert readme_action["status"] == "would_remove"
-            assert readme_action["reason"] == "current shipped asset exact match"
+            assert "spec-dock/.workbench/README.md" not in actions
+            assert actions["spec-dock/.workbench"] == {
+                "category": "scaffold_managed",
+                "error": None,
+                "path": "spec-dock/.workbench",
+                "reason": "preserved-root",
+                "status": "preserved",
+            }
 
     def test_uninstall_apply_remove_specs_removes_unchanged_root_workbench_readme_and_empty_workbench_dir(
         self,
@@ -6336,7 +6780,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
             assert payload["status"] == "error"
-            assert "symlink" in payload["errors"][0]
+            assert payload["errors"] == ["Managed distribution deprovision preflight failed."]
             assert (target / "spec-dock").is_symlink()
             assert outside_script.is_file()
             assert outside_specdock.is_dir()
@@ -6362,7 +6806,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
             assert payload["status"] == "error"
-            assert "symlinked SpecDock uninstall retry marker" in payload["errors"][0]
+            assert payload["errors"] == ["Legacy uninstall recovery evidence is invalid."]
             assert retry_marker.is_symlink()
             assert outside_file.read_text(encoding="utf-8") == "outside\n"
 
@@ -6387,6 +6831,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert user_file.is_file()
 
     def test_uninstall_apply_bounded_cleanup_respects_preserved_files_and_roots(self) -> None:
+        """I370-T-TREE-001: historical parent chains bound unknown children and block all writes."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "repo"
             target.mkdir()
@@ -6398,6 +6844,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             preserved = target / ".codex" / "notes" / "product.md"
             preserved.parent.mkdir(parents=True, exist_ok=True)
             preserved.write_text("preserve\n", encoding="utf-8")
+            before = self._relative_file_snapshot(target)
+
+            dry_run = self._uninstall_json_payload(target)
+            dry_run_actions = self._actions_by_path(dry_run)
+
+            assert dry_run_actions[".codex/notes"] == {
+                "category": "unmanaged",
+                "error": None,
+                "path": ".codex/notes",
+                "reason": "unknown-managed-entry",
+                "status": "preserved",
+            }
 
             payload = self._uninstall_json_payload(
                 target,
@@ -6412,6 +6870,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert parent_sentinel.is_file()
             assert preserved.is_file()
             assert preserved.parent.is_dir()
+            assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_apply_rerun_reports_already_removed_and_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -6425,12 +6884,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 target,
                 "--apply",
                 "--keep-specs",
-                expected_exit_code=2,
             )
+            second_actions = self._actions_by_path(second_payload)
 
             assert first_payload["status"] == "completed"
-            assert second_payload["status"] == "error"
-            assert "spec-dock/spec-dock.version" in second_payload["errors"][0]
+            assert second_payload["status"] == "completed"
+            assert second_payload["errors"] == []
+            assert second_payload["summary"]["removed"] == 0  # type: ignore[index]
+            assert second_actions[".agents"]["status"] == "already_removed"
+            assert second_actions[".agents"]["reason"] == "owned-subtree-already-absent"
+            assert second_actions["spec-dock/initiatives"]["status"] == "preserved"
+            assert marker.read_text(encoding="utf-8") == "keep\n"
 
     def test_uninstall_apply_remove_specs_rerun_blocks_markerless_empty_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -6550,6 +7014,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_json_is_one_parseable_object(self) -> None:
+        """I370-T-CHAR-001: current JSON action and summary fields remain characterized."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -6656,6 +7122,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert target.read_text(encoding="utf-8") == before
 
     def test_uninstall_accepts_recovery_target_when_scripts_are_missing(self) -> None:
+        """I370-T-NOOP-001: a proven-owned missing subtree is a dry-run absence witness."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -6664,11 +7132,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json"])
 
-            assert exit_code == 2, stderr
+            assert exit_code == 0, stderr
             assert stderr == ""
             payload = json.loads(stdout)
-            assert payload["status"] == "error"
-            assert "version anchor" in payload["errors"][0]
+            assert payload["status"] == "planned"
+            actions = self._actions_by_path(payload)
+            assert actions["spec-dock/scripts"]["status"] == "already_removed"
+            assert actions["spec-dock/scripts"]["reason"] == "owned-subtree-already-absent"
             assert payload["target"] == str(target.resolve())
             assert self._relative_file_snapshot(target) == before
 
@@ -6689,15 +7159,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_preserves_unknown_files_under_managed_roots(self) -> None:
+        """I370-T-TREE-001: immediate unknown children block the whole bounded operation."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
-            unknown_paths = [
-                target / ".agents" / "skills" / "custom-product-agent" / "SKILL.md",
-                target / ".codex" / "notes" / "product.md",
-                target / ".github" / "ISSUE_TEMPLATE" / "bug.md",
-                target / "spec-dock" / "custom" / "notes.md",
-            ]
+            unknown_paths = {
+                target / ".agents" / "skills" / "custom-product-agent" / "SKILL.md": (
+                    ".agents/skills/custom-product-agent",
+                    "agent_skill",
+                ),
+                target / ".codex" / "notes" / "product.md": (".codex/notes", "unmanaged"),
+                target / ".github" / "ISSUE_TEMPLATE" / "bug.md": (
+                    ".github/ISSUE_TEMPLATE",
+                    "unmanaged",
+                ),
+                target / "spec-dock" / "custom" / "notes.md": (
+                    "spec-dock/custom",
+                    "scaffold_managed",
+                ),
+            }
             for path in unknown_paths:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("user content\n", encoding="utf-8")
@@ -6705,16 +7186,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             actions = self._uninstall_json_actions(target)
 
-            for path in unknown_paths:
-                rel = path.relative_to(target).as_posix()
-                with _case(rel=rel):
-                    action = actions[rel]
-                    assert action["category"] == "unmanaged"
+            for leaf, (bounded_child, category) in unknown_paths.items():
+                with _case(leaf=leaf.relative_to(target).as_posix()):
+                    action = actions[bounded_child]
+                    assert action["category"] == category
                     assert action["status"] == "preserved"
-                    assert "unmanaged" in action["reason"]
+                    assert action["reason"] == "unknown-managed-entry"
             assert self._relative_file_snapshot(target) == before
 
-    def test_uninstall_dry_run_scaffold_managed_roots_remove_recursively(self) -> None:
+            apply_payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=1,
+            )
+            assert apply_payload["status"] == "blocked"
+            assert self._relative_file_snapshot(target) == before
+
+    def test_uninstall_dry_run_never_removes_modified_scaffold_tree_recursively(self) -> None:
+        """I370-T-PRES-002: one modified owned leaf blocks every safe-subset mutation."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -6724,13 +7215,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             actions = self._uninstall_json_actions(target)
 
-            for rel in ("spec-dock/docs", "spec-dock/scripts", "spec-dock/system", "spec-dock/templates"):
+            edited_action = actions["spec-dock/docs/guide.md"]
+            assert edited_action["category"] == "scaffold_managed"
+            assert edited_action["status"] == "preserved"
+            assert edited_action["reason"] == "unknown-current-collision"
+            assert "spec-dock/docs" not in actions
+            for rel in ("spec-dock/scripts", "spec-dock/system", "spec-dock/templates"):
                 with _case(rel=rel):
                     action = actions[rel]
-                    assert action["category"] == "scaffold_managed"
+                    assert action["category"] == "empty_dir"
                     assert action["status"] == "would_remove"
-                    assert "managed scaffold tree" in action["reason"]
-            assert "spec-dock/docs/guide.md" not in actions
+                    assert action["reason"] == "owned-directory-empty-after-prune"
+            assert self._relative_file_snapshot(target) == before
+
+            apply_payload = self._uninstall_json_payload(
+                target,
+                "--apply",
+                "--keep-specs",
+                expected_exit_code=1,
+            )
+            assert apply_payload["status"] == "blocked"
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_blocks_unrecognized_specdock_version(self) -> None:
@@ -6747,19 +7251,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert stderr == ""
             payload = json.loads(stdout)
             assert payload["status"] == "error"
-            assert "unknown-version" in payload["errors"][0]
+            assert payload["errors"] == ["Managed distribution deprovision preflight failed."]
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_spec_shortcut_only_removes_matching_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             cases = (
-                ("matching", "symlink", "spec-dock/scripts/spec-dock", "would_remove"),
-                ("raw-normalizes-to-matching", "symlink", "spec-dock//scripts/spec-dock", "preserved"),
-                ("nonmatching", "symlink", "scripts/spec", "preserved"),
-                ("file", "file", None, "preserved"),
-                ("directory", "directory", None, "preserved"),
+                ("matching", "symlink", "spec-dock/scripts/spec-dock", "would_remove", "current-identity-match"),
+                (
+                    "raw-normalizes-to-matching",
+                    "symlink",
+                    "spec-dock//scripts/spec-dock",
+                    "preserved",
+                    "unknown-current-collision",
+                ),
+                ("nonmatching", "symlink", "scripts/spec", "preserved", "unknown-current-collision"),
+                ("file", "file", None, "preserved", "exact-path-type"),
+                ("directory", "directory", None, "preserved", "exact-path-directory"),
             )
-            for name, kind, link_target, expected_status in cases:
+            for name, kind, link_target, expected_status, expected_reason in cases:
                 with _case(name=name):
                     target = Path(tmp) / name
                     target.mkdir()
@@ -6786,10 +7296,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     action = actions["spec"]
                     assert action["category"] == "shortcut"
                     assert action["status"] == expected_status
-                    if expected_status == "would_remove":
-                        assert "spec-dock/scripts/spec-dock" in action["reason"]
-                    else:
-                        assert "not spec-dock shortcut" in action["reason"]
+                    assert action["reason"] == expected_reason
                     assert self._relative_file_snapshot(target) == before
 
     def _clear_active_entrypoints(self, target: Path) -> Path:
