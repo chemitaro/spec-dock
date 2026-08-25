@@ -29,7 +29,7 @@ ID: "iss-00370"
 
 ## 背景と exact implementation baseline
 
-実装事実の基準は repository `chemitaro/spec-dock`、branch `iss-00370-managed-distribution-deprovision`、exact commit `fc02e1215d2b9e056a2c18bd1411fe489efdf2f2` である。
+実装事実の基準は repository `chemitaro/spec-dock`、branch `iss-00370-managed-distribution-deprovision`、exact commit `7301800263eae1a78ea710ff1935ab4ce0f138e7` である。
 
 この exact commit では、`src/spec_dock/managed_distribution.py` に次が存在する。
 
@@ -90,13 +90,20 @@ ID: "iss-00370"
 
 | 用語 | 本 Issue での意味 |
 |---|---|
-| requested operation | public command `uninstall`。CLI surface と output wording に使用する。 |
-| effective intent | internal journal intent `deprovision`。spec history purge を含まない。 |
-| deprovision authority | exact authority string `managed-distribution-deprovision`。current/historical ownership が証明された tooling/generated/managed asset と、計画に列挙された owned empty directory だけを削除できる。 |
-| purge authority | Issue 371 が所有する `--remove-specs` 専用 authority。本 Issue では作成、推測、再開、昇格しない。 |
-| preservation witness | mutation 対象外 tree/path の no-follow observation、content digest、type、mode、link topology、root/parent bindingを固定した read-only evidence。 |
-| bounded child set | contract が列挙した managed root 内で、assessment 時に descriptor-relative に観測し、各 child を remove/preserve/block のいずれかへ完全分類した集合。 |
-| forward recovery | operation 全体を元に戻すのではなく、同一 plan の exact checkpoint と pre/postconditionから安全に前進する回復。 |
+| requested operation | public command `uninstall`。CLI surface、target label、output wordingに使用する。 |
+| effective intent | internal journal intent `deprovision`。spec history purgeを含まない。 |
+| deprovision authority | exact authority string `managed-distribution-deprovision`。current/historical ownership、current generated-state producer contract、またはexact shortcut contractのいずれかで証明されたpathと、計画済みowned empty directoryだけを削除できる。 |
+| purge authority | Issue 371が所有する`--remove-specs`専用authority。本Issueでは作成、推測、再開、昇格しない。 |
+| canonical generated-state producer | `build_deprovision_generated_state_contract()`。`spec-dock/active`と`spec-dock/.agent`の許可slot、kind、semantic identity、current/legacy境界を一度だけ構築する。deprovision assessmentはこのproducer以外からgenerated assetsを受け取らず、独立`generated_assets`入力はdeprovision call graphから到達不能である。 |
+| current generated entry | fixed SHAのruntime producerが現在生成する予約pathであり、Designに定めるexact kind、schema/discriminator、cross-reference、single-link/mode条件を満たすentry。観測bytesまたはlink textはsemantic validation後にexact identityとして束縛する。 |
+| legacy generated entry |過去に生成された可能性があるが、current producerのexact identity predicateを満たさないentry。exact historical identity catalogで別途ownershipを証明できる場合を除き、pathnameだけでは削除せず`preserve` + `block`とする。 |
+| preservation witness | mutation対象外tree/pathのno-follow observation、content digest、type、mode、link topology、root/parent bindingを固定したread-only evidence。journal actionではなくplan/journalのimmutable witnessである。 |
+| collapsed absence witness | proven-owned ancestorがassessment時点で既にabsentであることを、nearest existing bound ancestor、missing suffix、owned subtree digestへ束縛したread-only evidence。その配下のdescendant mutation actionを発行しない。 |
+| mutating action | journal checkpointを持つ`prune`または`remove-empty-directory`。`preserve`、`block`、preservation witness、collapsed absence witnessはjournal actionではない。 |
+| bounded child set | contractが列挙したmanaged root内で、assessment時にdescriptor-relativeに観測し、各childをremove/preserve/block/collapsed-absentのいずれかへ完全分類した集合。 |
+| published checkpoint | mutating actionのexpected postconditionをfilesystemでexact再観測し、journalへdurableに記録した状態。directory dependencyはprior childの`published`とexact expected-absent postconditionを要求し、`verified`を要求しない。 |
+| forward recovery | operation全体を元に戻すのではなく、同一planのexact checkpoint、witness、pre/postconditionから安全に前進する回復。 |
+| typed mapper input | serviceが返す`DistributionProcessResult`とそのtyped action/error records。CLI mapperはこれとstatic request contextだけを読み、journal/guardを再解釈しない。 |
 
 ## スコープ
 
@@ -145,28 +152,54 @@ ID: "iss-00370"
 
 ## Ownership / preservation / action authority matrix
 
-| Observation | Ownership / authority | Deprovision action | Apply可否 | 必須postcondition |
+### Managed distribution と preservation
+
+| Observation | Ownership / authority | Deprovision disposition | Apply可否 | 必須postcondition |
 |---|---|---|---|---|
 | current regular assetがbytes、mode、type、single-link identityまでexact | current package ownership | `prune` | 可 | path absent。 |
 | historical catalog assetがexact historical SHA/mode/type/single-link identity | historical ownership | `prune` | 可 | path absent。catalog indexではなくexact SHAを使用。 |
-| owned assetが既にabsent | ownershipはcontractで証明、targetはmissing | `prune` with missing precondition | 可、mutationなし | path absent、public statusは`already_removed`。 |
-| current bytesだがmode mismatch | removal対象としてcontent ownershipは証明できるが、exact current identityではない | `block` | 不可 | target不変、operation write 0。 |
-| modified regular file | ownershipを現在状態へ拡張できない | `preserve` + `block` | 不可 | bytes/mode/path不変。 |
-| unknown file/dirがmanaged boundary内に存在 | authority外 | `preserve` + `block` | 不可 | entry不変、他のsafe subsetも削除しない。 |
 | exact current/historical managed symlink | link targetとno-follow identityがcontract一致 | `prune` | 可 | symlink pathname absent。targetはfollowしない。 |
-| unknown/rebound symlink | authority不明 | `block` | 不可 | linkとlink targetの外部contentを変更しない。 |
-| removal対象regular fileの`st_nlink != 1` | unsafe hardlink topology | `block` | 不可 | 全link不変。 |
-| preservation tree内のunproven hardlink | outside aliasを一意に証明できない | `block` | 不可 | tree不変。 |
-| socket/device/FIFO等special file | mutation・preservation検証不能 | `block` | 不可 | entry不変。 |
 | exact root shortcut `spec -> spec-dock/scripts/spec-dock` | current managed shortcut | `prune` | 可 | shortcutだけabsent。targetはfollowしない。 |
-| generated `spec-dock/active` / `.agent` entryがcurrent generated contract一致 | generated authority | `prune` | 可 | entry absent。 |
-| `spec-dock/initiatives` tree | explicit keep-preservation authority | `preserve`、non-mutating witness | 可 | path、child set、regular bytes、mode、symlink text、link topologyがpreflight witnessと一致。 |
-| `spec-dock/.workbench` tree | known user-owned preserved root | `preserve`、non-mutating witness | 可 | preflight witnessと一致。 |
-| repository rootのcleanup boundary外sentinel | authority外・scan対象外 | actionなし | 可 | path/bytes/type不変。mutation syscallのtargetにならない。 |
-| managed directory whose all children are planned absent and child set is closed | directory ownership + exact binding | `remove-empty-directory` | 可 | same bound directoryがemptyであることを再検証後、path absent。 |
-| directoryにunknown childがpreflight時に存在 | child set not fully authorized | `block` | 不可 | directoryと全child不変。 |
-| directoryにunknown childがassessment後に出現 | plan precondition mismatch | recovery required | 追加mutation不可 | unknown childを削除せずjournal/guard保持。 |
+| current bytesだがmode mismatch | current identity全体は不一致 | `preserve` + `block` | 不可 | target不変、operation write 0。 |
+| modified regular file、unknown file/dir | current/historical/generated authorityなし | `preserve` + `block` | 不可 | entry不変、safe subsetも適用しない。 |
+| removal対象regular fileの`st_nlink != 1` | unsafe hardlink topology | `block` | 不可 | 全link不変。 |
+| unknown/rebound symlink、socket/device/FIFO | authorityまたは安全なidentityなし | `block` | 不可 | entryと外部target不変。 |
+| `spec-dock/initiatives` tree | explicit keep-preservation authority | preservation witness | 可 | path、child set、regular bytes、mode、symlink text、link topologyがpreflight witnessと一致。 |
+| `spec-dock/.workbench` tree | known user-owned preserved root | preservation witness | 可 | preflight witnessと一致。 |
+| repository rootのcleanup boundary外sentinel | authority外・scan対象外 | disposition/actionなし | 可 | mutation syscallのtargetにならず、identity/bytes/type不変。 |
+| managed directory whose removable children are all`published` and exact absent、preserved childが0、child setがclosed | directory ownership + exact binding | `remove-empty-directory` | 可 | same bound directoryがemptyであることを再検証後、path absent。 |
+| directoryにunknown/preserved childが存在 | directory removalのclosed setを満たさない | `preserve` + `block`、directory actionなし | 不可 | directoryと全child不変。 |
+| directoryにunknown childがassessment後に出現 | plan/witness mismatch | recovery required | 追加mutation不可 | unknown childを削除せずjournal/guard保持。 |
 | valid legacy `.uninstall-retry.json` | root/intent/authority/plan/checkpoint不明 | recovery blocker | 自動変換不可 | marker bytes/identity不変、target write 0。 |
+
+### Current generated-state authority
+
+`build_deprovision_generated_state_contract()`だけが次のcurrent slotをgenerated authorityへ変換する。各present entryはDesignのexact predicateを満たし、観測したbytes/link textを含むno-follow identityへ束縛されなければならない。
+
+| Root | Current removable slot | Required kind / identity boundary | Conflict / legacy handling |
+|---|---|---|---|
+| `spec-dock/active` | layerごとの`initiative` / `epic` / `issue` symlink、または対応する`*.path` regular fallbackのexactly one | symlinkはsingle-linkでnormalized relative targetを持ち、valid active selectionまたは`spec-dock/system/active-none/<layer>`へrepository内解決する。path fileはsingle-link regular、UTF-8一行のnormalized relative targetで同じ解決先を指す。 | 同一layerでsymlinkと`.path`が併存、absolute/out-of-root target、wrong kind/content、unknown siblingは`block`。 |
+| `spec-dock/active` | `context-pack.md` | single-link regular、validated active selectionからcurrent rendererが生成するexact bytes。 | `current-runbook.json`、`current-runbook.md`はfixed SHAのcurrent producerが出力しないlegacy slotであり、historical exact identityがなければ`preserve` + `block`。 |
+| `spec-dock/.agent` | `active.json` | single-link regular、exact top-level field `schema_version` / `updated_at` / `initiative` / `epic` / `issue`、schema `2`。`updated_at`はtimezone offset付きsecond-precision ISO-8601。各layerは`null`またはexact `id` / `path` objectで、canonical layer IDと`spec-dock/initiatives`配下のnormalized repository-relative existing node pathを指し、initiative→epic→issue hierarchyが成立する。semantic validation後のobserved SHAをpreconditionにする。 | malformed、extra field、invalid timestamp/id/path/hierarchy、wrong kind/hardlinkは`block`。 |
+| `spec-dock/.agent` | `index-all.json` | single-link regular、schema `2`、projection `full-history`、current index renderer contractを満たすJSON。 | schema/projection/shape不一致は`block`。 |
+| `spec-dock/.agent` | `tree-all.json` | single-link regular、schema `2`、exact full-tree renderer field set（`generated_at`、`active`、`warnings`、`root`、`deps`、`tree`）を満たし、unsupported `projection`を持たないJSON。 | field/shape不一致は`block`。 |
+| `spec-dock/.agent` | `index.json` | single-link regular、schema `2`、projection `current-future`、current index renderer contractを満たすJSON。 | schema/projection/shape不一致は`block`。 |
+| `spec-dock/.agent` | `tree.json` | single-link regular、schema `2`、exact todo-tree renderer field set（`generated_at`、`active`、`warnings`、`root`、`deps`、`tree`）を満たし、unsupported `projection`を持たないJSON。 | field/shape不一致は`block`。 |
+| `spec-dock/.agent` | `deps-issues.json` | single-link regular、schema `2`、projection `issue-readiness-with-dependency-context`。valid resultとdocumented fail-closed placeholderの双方をcurrent predicateとして扱う。 | unknown schema/projection/shapeは`block`。 |
+| `spec-dock/.agent` | `deps.json`、`deps.puml`、`deps.todo.puml` | current producerではなくlegacy v1 name | exact historical identity catalogが一致する場合だけhistorical `prune`。name/typeだけではauthorityを得ず、それ以外は`preserve` + `block`。 |
+| `spec-dock/.agent` / `spec-dock/active` | 上記以外のchild | authorityなし | unknown contentとして`preserve` + `block`。root全体をrecursive deleteしない。 |
+
+Current generated entryがmissingであること自体はblockerではない。present entry同士が同一logical slotを競合する場合、active manifest・pointer/path fallback・context pack・index/tree `active` fieldが同じselectionを表さない場合、同一sync batchのpresent artifactsで`generated_at`またはindex/tree node集合が矛盾する場合、またはcurrent/legacy identityが曖昧な場合は、operation全体をwrite 0でblockする。runtime writerはdynamic generated filesへcanonical chmodを強制しないため、生成ownershipのsemantic predicateに固定mode値を置かない。ただしassessmentで観測したexact modeはpreconditionへ含め、assessment後のmode変更はidentity mismatchとして拒否する。
+
+### Proven-owned ancestor absence
+
+| Observation | Classification | Action emission | Witness / postcondition |
+|---|---|---|---|
+| contract-owned ancestorが存在し、descendant leafだけmissing |既存ancestor bindingからleaf-level absenceを分類 | public diagnosticは`already_removed`、mutating action 0 | nearest existing parentとmissing leafをleaf-level collapsed absence witnessへ束縛。 |
+| contract-owned ancestorそのものがassessment時点でabsent |そのancestor配下のcontract-owned descendantsを一つのcollapsed absenceへ集約 | ancestor、descendant、directoryのmutating actionを発行しない | nearest existing bound ancestor、missing suffix、owned subtree digestを`DistributionCollapsedAbsenceWitness`へ記録。 |
+| missing componentがcontract-owned ancestorより上位、またはnearest existing ancestorをsafeに束縛できない | unproven namespace gap | actionなし、operation blocker | write 0。 |
+| collapsed ancestorがassessment後またはresume前にappearance | witness mismatch | appearanceしたentryを削除するactionを新規発行しない | mutation開始前ならblocked、journal開始後ならrecovery required。 |
+|全managed subtreeがcollapsed absentで、preservation witnessがvalid | completed no-op | mutating action 0 | guard、journal、legacy marker、stage、target syscall 0。 |
 
 ## 観測可能な要件
 
@@ -174,15 +207,15 @@ ID: "iss-00370"
 
 | ID | 要件 | 検証可能な受け入れ条件 |
 |---|---|---|
-| I370-F01 | default/`--keep-specs` dry-runと`--apply --keep-specs`は同じ `deprovision` assessment、contract、action grammarを使用する。 | 同一workspaceで二つのdry-runのaction path/reasonがspecs mode表示以外で一致し、applyのjournal actionsがdry-runのmutating actionsとcanonicalに一致する。 |
+| I370-F01 | default/`--keep-specs` dry-runと`--apply --keep-specs`は同じ`deprovision` assessment、contract、action grammarを使用する。 |同一workspaceで二つのdry-runのdiagnostic path/reasonがspecs mode表示以外で一致し、applyのjournal actionsがdry-runのmutating actionsとcanonicalに一致する。 |
 | I370-F02 | dry-runはcomplete read-only assessmentを返し、apply authorityを発行しない。 | filesystem snapshot、guard、journal、legacy marker、stage inventoryがbefore/afterで完全一致する。 |
-| I370-F03 | deprovision removal setはcurrent/historical exact managed assets、generated state、exact shortcut、proven-owned obsolete asset、明示的owned empty directoryだけである。 | inventory fixtureの全owned pathが`prune`/`remove-empty-directory`へ分類され、authority sourceのないpathは含まれない。 |
+| I370-F03 | deprovision removal setはcurrent/historical exact managed assets、単一canonical producerが証明したcurrent generated entries、exact shortcut、proven-owned obsolete asset、明示的owned empty directoryだけである。 | `I370-T-OWN-001`がcurrent generated slotのpositive/negative/legacy/conflict matrixを固定し、deprovision assessmentへgenerated stateを二系統で渡せないことをtype/signature/source testで確認する。 |
 | I370-F04 | `spec-dock/initiatives`以下をbyte-identicalに保持する。 | nested regular files、empty dirs、safe symlinkを含むtree witnessがapply前後で一致し、reinit後も同じbytesを読める。 |
 | I370-F05 | known preserved Workbenchとauthority外contentを保持する。 | `.workbench` payload、cleanup boundary外sentinel、非対象rootがbefore/afterで一致する。 |
 | I370-F06 | blockerが一件でもあればoperation全体をwrite 0で停止し、safe subsetを適用しない。 | removable owned assetとunknown/modified blockerのmixed fixtureで、owned assetを含むtree全体、guard、journal、stageが不変である。 |
 | I370-F07 | deprovisionはspec history purge authorityを作成・推測・実行しない。 | deprovision plan/journal/guardに`remove-specs`、purge intent、purge authorityが存在せず、initiatives pathにmutating actionがない。 |
-| I370-F08 | successは全mutating actionとpreservation witnessのpost-assessment成功後だけ返す。 | path absenceだけでなくspec history witness、root/parent binding、unknown closed setを再検証し、任意のmismatchでcompletedにならない。 |
-| I370-F09 | already-absent owned assetはidempotentに成功し、unproven appearanceは失敗する。 | missing precondition fixtureは`already_removed`、assessment後appearance fixtureはtargetを保持してrecovery requiredとなる。 |
+| I370-F08 | successは全mutating actionとpreservation/collapsed-absence witnessのpost-assessment成功後だけ返す。 | removed path absenceだけでなくspec history witness、absence witness、root/parent binding、unknown closed setを再検証し、任意のmismatchでcompletedにならない。 |
+| I370-F09 | proven-owned ancestorが既にabsentなら、その配下のowned descendantsをcanonicalにcollapseし、mutating actionを発行しない。assessment後のappearanceは新規削除authorityを得ない。 | nearest existing bound ancestorからのabsence witness、descendant action 0、appearance時のblocked/recovery-required、entire managed subtree absentのprotocol metadata write 0を`I370-T-NOOP-001`で確認する。 |
 | I370-F10 | `--remove-specs` dry-run/applyはIssue 371 compatibility routeに明示的に隔離される。 | source/AST testでdefault/keep routeからremove-specs compatibility entrypointへのcall edgeが0、逆方向も0である。 |
 
 ### Safety requirements
@@ -192,32 +225,33 @@ ID: "iss-00370"
 | I370-S01 | applyはroot operation lockを保持し、root device/inodeへoperation全体を束縛する。 | cooperating concurrent invocationが直列化され、root rebind injectionは最初のmutation前または次のmutation境界で停止する。 |
 | I370-S02 | root、parent、target、directory childはdescriptor-relative / no-followで観測・変更する。 | parent/target symlink、visible path rebind、held descriptor mismatchで外部targetが不変のまま停止する。 |
 | I370-S03 | regular removalはexact type、device、inode、ctime、mode、size、SHA-256、link countを用途に応じて検証する。 | same-content別inode、mode drift、hardlink、ctime/identity差し替えを拒否する。 |
-| I370-S04 | symlink removalはexact managed link targetとno-follow identityだけをauthorityとする。 | external symlink、link target変更、symlink replacementをfollowせず保持する。 |
+| I370-S04 | symlink removalはexact managed link target、no-follow identity、`link_count == 1`だけをauthorityとする。 | external symlink、link target変更、multi-link symlink、symlink replacementをfollowせず保持する。 |
 | I370-S05 | special fileとunsafe hardlinkはfail closedとする。 | FIFO/socket/device/multi-link fixtureでguard/journal/target write 0。 |
-| I370-S06 | managed root membershipだけでchild ownershipを推測しない。 | `spec-dock/docs`等にunknown/modified childを置いたfixtureがrootごと削除されず、operation全体をblockする。 |
-| I370-S07 | mutation前に全bounded child setをdeterministicに列挙し、remove/preserve/blockへ完全分類する。 | duplicate、unclassified child、unsafe name/type、enumeration errorがplan発行を拒否する。 |
-| I370-S08 | directory cleanupはplanに列挙した`remove-empty-directory` actionだけで行い、汎用recursive cleanupを実行しない。 | hidden cleanup helperやpost-journal recursive scanへのcall edgeがなく、unknown empty directoryが残る。 |
-| I370-S09 | each mutation直前にroot/parent/target/directory bindingとexpected remaining child setを再検証する。 | assessment後のunknown child appearance、target replacement、parent replacementで次のmutationを行わない。 |
-| I370-S10 | preservation witnessはapply前にjournal planへ束縛し、post-assessmentでexact一致を要求する。 | initiatives bytes、mode、child set、symlink textのいずれかをconcurrent変更するとcompletedにならない。 |
+| I370-S06 | managed root membership、generated root membership、予約filenameだけでchild ownershipを推測しない。 | `spec-dock/docs`、`spec-dock/active`、`spec-dock/.agent`のunknown/modified/legacy-unproven childがrootごと削除されずoperation全体をblockする。 |
+| I370-S07 | mutation前に全bounded child setをdeterministicに列挙し、remove/preserve/block/collapsed-absentへ完全分類する。 | duplicate、unclassified child、unsafe name/type、enumeration errorがplan発行を拒否する。 |
+| I370-S08 | directory cleanupはplanに列挙した`remove-empty-directory`だけで行い、その実行条件は全prior child mutating actionが`published`かつcurrent childがexact expected-absentであることとする。`verified`をdependencyに使わない。 | parser、digest、kernel、crash-window testsが同じdependency規則を固定し、executing中の最初のdirectory actionへ到達できる。汎用recursive cleanupへのcall edgeは0。 |
+| I370-S09 | each mutation直前にroot/parent/target/directory binding、published child postcondition、expected remaining child setを再検証する。authorized prior child deletionに伴うparent ctime/link-count変化はsame device/inode/type/modeとexpected child digestが一致する場合だけ受理し、その他の変化を外部mutationとして扱う。 | assessment後のunknown child appearance、target replacement、parent replacement、parent modeまたはunexplained child-set変化で次のmutationを行わない。authorized prior actionだけで説明できるparent変化はsame-plan実行・resumeで収束する。 |
+| I370-S10 | preservation witnessとcollapsed absence witnessはjournal actionではなくplan/journal immutable metadataとして束縛し、post-assessmentでexact一致を要求する。 | witnessにcheckpointがなく、initiatives bytes/mode/child set/symlink textまたはabsence appearanceを変更するとcompletedにならない。 |
 | I370-S11 | provider contract/manifest/scaffold source identityがassessment後に変化した場合はapplyを開始・継続しない。 | source bytes/mode/identity mutation injectionでtarget write 0またはjournal保持のrecovery requiredとなる。 |
 | I370-S12 | blocker planからforward guardまたはjournalを作らない。 | blocker fixtureで`.distribution-retry.json`、`.distribution-journal.json`、private stageが不存在。 |
 | I370-S13 | repository外pathとcleanup boundary外sentinelはmutation syscallのtargetにしない。 | external symlink targetとoutside sentinelのidentity/bytesが全failure matrixで不変。 |
-| I370-S14 | apply中の失敗後もunknown/replacement entryをcleanup authorityへ昇格しない。 | stage-like unknown、replacement inode、unknown childを保持してjournal/guardを残す。 |
-| I370-S15 | mutation開始後のwhole-operation rollbackを保証・試行しない。 | partial fixtureでcompleted checkpointは戻さず、未完了actionだけsame-plan recovery対象になる。 |
-| I370-S16 | recovery metadataが存在せず、全removal targetが既にabsentで、preservation witnessとroot/parent identityがvalidなno-op applyは、forward guard、journal、legacy marker、stage、target mutationを作らずread-only post-assessment後に`completed`を返す。 | all-owned paths already absent fixtureでtarget syscall 0かつ`.distribution-retry.json`、`.distribution-journal.json`、`.uninstall-retry.json`、private stageがbefore/after同一で、public resultが`completed`/exit 0となる。 |
+| I370-S14 | apply中の失敗後もunknown/replacement/appeared entryをcleanup authorityへ昇格しない。 | stage-like unknown、replacement inode、unknown child、collapsed ancestor appearanceを保持してjournal/guardを残す。 |
+| I370-S15 | mutation開始後のwhole-operation rollbackを保証・試行しない。 | partial fixtureでpublished checkpointは戻さず、未完了actionだけsame-plan recovery対象になる。 |
+| I370-S16 | recovery metadataが存在せず、全removal targetが既にabsentまたはcollapsed absenceで説明され、preservation witnessとroot/nearest-existing-parent identityがvalidなno-op applyは、protocol metadataとtarget mutationを作らずread-only post-assessment後に`completed`を返す。 | all-owned paths/subtrees already absent fixtureでtarget syscall 0かつguard、journal、legacy marker、private stageがbefore/after同一。public resultは`completed`/exit 0で、typed phase ruleもgoldenに一致する。 |
 
 ### Compatibility requirements
 
 | ID | 要件 | 検証可能な受け入れ条件 |
 |---|---|---|
 | I370-C01 | public command、flags、mutually-exclusive parser contractを変更しない。 | existing parser testsとhelp goldenが一致する。 |
-| I370-C02 | public uninstall JSONは`schema_version: 1`と既存top-level field meaningを維持する。 | key set、types、nullability、summary/action field setのgolden testが一致する。 |
+| I370-C02 | public uninstall JSONは`schema_version: 1`、既存top-level/action/summary field meaningを維持する。 | key set、types、nullability、summary/action field setのgolden testが一致する。 |
 | I370-C03 | `--json`はstdoutへexactly one JSON objectを出し、diagnostic fragmentを前後に出さない。 | success/planned/blocked/recovery/errorの各caseを`json.loads(stdout)`一回で読め、stderr contractも既存どおりである。 |
 | I370-C04 | text outputはheader、specs mode、status、phase、last completed phase、retry、failed paths、summary、actions、errors、guidanceの意味と順序を維持する。 | text goldenが既存section orderとstable labelsを固定する。 |
 | I370-C05 | exit mappingはsuccess/planned=0、blocked/partial recovery=1、parser/preflight error=2を維持する。 | CLI matrix全行のexit code testが一致する。 |
-| I370-C06 | blocked/partial failure diagnosticはrepository-relative pathとstable sanitized messageだけを公開する。 | token、absolute source path、file contentを注入してもJSON/textに現れない。 |
-| I370-C07 | retry guidanceはsame target、`--apply --keep-specs`、shell-safe relative targetを示し、authorityを`--remove-specs`へ昇格しない。 | leading-hyphen/spaceを含むtargetのretry commandが`shlex.split`後に同じkeep invocationとなる。legacy ambiguous markerではunsafeな自動retry commandを出さない。 |
-| I370-C08 | shipped README/migrationとdogfooding copyはcurrent journal、legacy marker fail-closed、keep/remove owner境界を説明する。 | packaged assetとrepository copyのcontent parity test、doc assertion、SpecDock validateが成功する。 |
+| I370-C06 | public `target`は現行schema-v1規則を維持する。`blocked`/`partial_failure`だけはshell-safeなrelative target labelまたは`unavailable`へsanitizationし、`planned`/`completed`/`error`は既存どおりresolved target文字列を返す。action/top-level errorとdiagnostic pathはstatusにかかわらずallowlisted stable messageとrepository-relative pathへ限定し、provider source path、file content、credentialを公開しない。 | status別target goldenとtoken/source/content injection testが一致し、`blocked`/`partial_failure`にabsolute targetが出ず、preflight `error`を含む全error messageにsecret/raw exceptionが出ない。 |
+| I370-C07 | normal deprovision resultのretry policyは`same-keep-command`とし、static specs modeが`keep`であるplanned/completed/blocked/recovery/errorでは現行どおりsame targetの`--apply --keep-specs` shell-safe commandを返す。default dry-runのspecs mode `null`とlegacy ambiguous/invalid markerの`manual-recovery`は`retry_command: null`とし、authorityを`--remove-specs`へ昇格しない。 | default dry-run、keep dry-run、keep success、blocked、partial recovery、preflight error、legacy markerをgolden化する。leading-hyphen/spaceを含むtargetのnon-null commandは`shlex.split`後に同じkeep invocationとなり、legacy markerではmanual guidanceだけを返す。 |
+| I370-C08 | shipped README/migrationとdogfooding copyはcurrent journal、legacy marker fail-closed、generated identity boundary、keep/remove owner境界を説明する。 | packaged assetとrepository copyのcontent parity test、doc assertion、SpecDock validateが成功する。 |
+| I370-C09 | CLI mapperはstatic request contextとone typed `DistributionProcessResult`だけから`status`、`phase`、`last_completed_phase`、`failed_paths`、`pending_paths`、per-action `error`、top-level `errors`、retry policyを決定する。CLIがjournal/guard/storeを読んで補完してはならない。 | `I370-T-RESULT-001`が全durable state fixtureをtyped resultへ変換し、mapperのjournal accessを禁止するsource/monkeypatch testとJSON/text goldenを通す。 |
 
 ### Recovery requirements
 
@@ -225,38 +259,43 @@ ID: "iss-00370"
 |---|---|---|
 | I370-R01 | first target mutationより前にschema-2 deprovision forward guardとprotocol-2 journalをdurable publishする。 | syscall/failure injectionでguard/journal publish失敗時のmanaged target mutationが0。 |
 | I370-R02 | new guardは`operation="deprovision"`、`purpose="deprovision-journal-forward-only"`、journalは`intent="deprovision"`、`authority="managed-distribution-deprovision"`へexact bindingする。 | forged purpose/intent/authority pairをparserとresumeの双方で拒否する。 |
-| I370-R03 | resumeはsame root、same intent、same exact authority、same contract、same canonical plan digest、compatible protocol、exact action pre/postconditionだけを許可する。 |各fieldの単独mismatch fixtureがwrite 0でstable reasonを返す。 |
-| I370-R04 | action checkpointは`pending`→`published`→`verified`の単調遷移とし、partial failureでjournal/guardを保持する。 | publish/checkpoint/postverify/finalization各停止点からsame-plan retryが収束する。 |
+| I370-R03 | resumeはsame root、same intent、same exact authority、same contract、same canonical plan digest、compatible protocol、exact action pre/postcondition、exact witnessesだけを許可する。 |各field/witnessの単独mismatch fixtureがwrite 0でstable reasonを返す。 |
+| I370-R04 | deprovision journal state machineはreachableな一表へ固定する。`prepared`は全action`pending`、`executing`は`pending\|published`だけ、全mutating action`published`後に`verifying`、`verifying`は全action`published`のみ、full post-assessment成功後の一回のatomic publicationで全action`verified`かつ`completed`とする。このvalidatorは`intent="deprovision"`へ限定し、fresh/recognized journalの成立済みparser semanticsを変更しない。 | parserがstatus/checkpointの不正組合せを拒否し、leaf publish、directory publish、executing-all-published、verifying、verified、completedの各crash windowからsame-plan retryが収束する。existing fresh/recognized protocol fixtureは変更なしで通る。 |
 | I370-R05 | guard-only、guard+journal、completed journal+guard、completed journal-onlyを区別し、説明可能なstateだけをforwardする。 | crash-window matrixがmutation重複、authority再発行、早期cleanupを起こさない。 |
-| I370-R06 | journal/guard/root/plan/authority mismatch時にmarker、journal、stage、targetを推測修復しない。 | malformed/self-rehashed/dual/missing guard/unknown lease fixtureでevidenceが不変。 |
+| I370-R06 | journal/guard/root/plan/authority/witness mismatch時にmarker、journal、stage、targetを推測修復しない。 | malformed/self-rehashed/dual/missing guard/unknown lease/witness mismatch fixtureでevidenceが不変。 |
 | I370-R07 | legacy `.uninstall-retry.json` は自動変換しない。 | valid marker-onlyとcopied markerはmarker bytes/identityとtarget不変でreason=`legacy-marker-unconvertible`、public `partial_failure`/exit 1。malformed/symlink/hardlink/special markerはevidence不変でreason=`legacy-marker-invalid`、public `error`/exit 2。legacy markerとnew guard/journalの併存はreason=`dual-recovery-state`、public `partial_failure`/exit 1。 |
 | I370-R08 | deprovision retryからpurgeへ、purge invocationからdeprovisionへauthorityを切り替えない。 | deprovision journalに`--remove-specs`を実行、legacy purge markerに`--keep-specs`を実行するfixtureがcheckpointを進めない。 |
-| I370-R09 | terminal successはpost-assessment、mark verified/completed、guard exact cleanup、journal exact cleanupの順とし、cleanup後にfallible workspace mutationを行わない。 | marker/journal removal後のrmdir/unlink injection hookが呼ばれず、cleanup failureではcompleted evidenceを保持してretry可能。 |
-| I370-R10 | manual recovery guidanceはlegacy information不足、mismatch reason、same-plan retry条件を区別し、秘密情報を含まない。 | JSON/text goldenがlegacy marker、plan mismatch、postcondition mismatchを区別する。 |
+| I370-R09 | terminal successは全mutating action`published`、`verifying`、witnessを含むfull post-assessment、全action`verified`、journal`completed`、guard exact cleanup、journal exact cleanupの順とし、cleanup後にfallible workspace mutationを行わない。 | directory actionがprior child`published`から実行され、preservation witnessはpost-assessmentでのみ検証される。cleanup failureではcompleted evidenceを保持してretry可能。 |
+| I370-R10 | serviceは各return pathでtyped phase、last-completed、failed/pending/action error/top-level error/retry policyを確定し、manual recovery guidanceはlegacy information不足、mismatch reason、same-plan retry条件を区別する。 | durable state population tableの全行が`I370-T-RESULT-001`とJSON/text goldenへ一対一対応し、秘密情報を含まない。 |
 
 ### Operability and performance requirements
 
 | ID | 要件 | 検証可能な受け入れ条件 |
 |---|---|---|
 | I370-O01 | assessmentはrepository全体をscanせず、contractで列挙したmanaged rootsとpreservation rootsだけを一度ずつbounded traversalする。 | observation counter testで対象外large treeのentry数に比例せず、対象bounded child数に対して線形である。 |
-| I370-O02 | action order、child enumeration、canonical digest、public action orderはplatform間でdeterministicである。 |同一fixtureを順序を変えて生成してもplan digestとJSON action orderが一致する。 |
+| I370-O02 | action order、child enumeration、canonical digest、absence collapse、public action orderはplatform間でdeterministicである。 |同一fixtureを作成順だけ変えてもplan digest、collapsed witness、JSON action orderが一致する。 |
 | I370-O03 | required no-follow/directory-descriptor capabilityがないplatformはfirst write前にstable diagnosticで停止する。Windows supportは追加しない。 | capability monkeypatch testでwrite 0。Linux/Darwinのexisting kernel branchesをfocused testで検証する。 |
-| I370-O04 | completed/blocked/recovery stateはpublic outputとdurable journal evidenceから監査でき、remote telemetryを追加しない。 | result/journalにrelative path、reason、checkpoint、digestがあり、absolute path/content/credentialがない。 |
+| I370-O04 | completed/blocked/recovery/error stateはtyped resultとdurable journal evidenceから監査でき、remote telemetryを追加しない。 | result/journalにrelative path、reason、phase、checkpoint、digestがあり、absolute path/content/credentialがない。 |
 
 ## Lifecycle boundary conditions
 
 | Boundary | 必須挙動 |
 |---|---|
-| eligibility / preflight | target directory、managed workspace evidence、root binding、recovery-state exclusivity、package contract、platform capabilityをread-onlyに検証する。失敗はexit 2またはtyped recoveryでwrite 0。 |
-| assessment | full owned/removal set、preservation witness、bounded child set、blockerを作る。legacy marker、guard、journal、stage、targetを変更しない。 |
-| executable plan issuance | blockerが0で、intent/authority/contract/root/action/pre-postcondition/preservation witnessが完全な場合だけ発行する。 |
+| eligibility / preflight | target directory、managed workspace evidence、root binding、recovery-state exclusivity、package contract、platform capabilityをread-onlyに検証する。失敗はtyped `error`または`recovery_required`でwrite 0。 |
+| generated contract | `build_deprovision_generated_state_contract()`をexactly once呼び、current slot、semantic identity、legacy/unrecognized entry、conflictを分類する。deprovision assessmentへ独立`generated_assets`引数を渡す経路は存在しない。 |
+| assessment | full owned/removal set、preservation witness、collapsed absence witness、bounded child set、blockerを作る。legacy marker、guard、journal、stage、targetを変更しない。 |
+| executable plan issuance | blockerが0で、intent/authority/contract/root/mutating action/pre-postcondition/witnessが完全な場合だけ発行する。`preserve`/`block`/witnessをjournal actionへ変換しない。 |
 | apply preparation | root lock内でsourceとtargetを再検証する。recovery metadataがなくmutating action 0ならprotocol metadataを作らずread-only post-assessmentへ進む。mutating actionがある場合だけforward guard、journalの順にdurable publishし、ここまでtarget mutation 0。 |
-| action apply | deterministic orderでexact `prune`、次にdeepest-first `remove-empty-directory`を実行し、各actionをjournal checkpointへ反映する。preserve/blockにmutation handlerを持たせない。 |
-| partial failure |失敗actionと未実行actionを区別し、journal/guardを保持する。already completed actionをrollbackしない。 |
-| resume | guard/journal/current treeからsame canonical planを再構成し、pre/postの一方だけにexact一致するactionを前進させる。ambiguous stateは停止する。 |
+| leaf apply (`executing`) | `prune`をdeterministic orderで実行し、exact postconditionを再観測して`published`へ進める。`verified` checkpointは許可しない。 |
+| directory apply (`executing`) | 各`remove-empty-directory`は全dependency childが`published`で現在exact absentであることを確認してから実行する。preservation witnessはdependencyではない。directoryを再観測してabsentなら`published`へ進める。 |
+| verifying | 全mutating actionが`published`であることをparser/serviceが確認してからstatusを`verifying`へ進める。no pending action、no new target mutation。full post-assessmentでmutating postcondition、preservation witness、absence witness、root/parent binding、unknown closed setを検証する。成功後の一回のatomic publicationで全actionを`verified`かつjournalを`completed`へ進める。 |
+| completed | 全journal actionが`verified`である場合だけjournal statusを`completed`にする。target actionを再実行しない。 |
+| partial failure | failureをtyped action/top-level errorへ変換し、journal/guardを保持する。published actionをrollbackしない。 |
+| resume | existing journalがある場合はjournal plan/actionがcanonicalであり、新規assessmentのabsence collapseでaction setを置換しない。pending actionはexact precondition、published actionはexact postconditionを要求する。ambiguous stateは停止する。 |
+| collapsed absence | recovery metadataなしのfresh assessmentでだけtop-down collapseを作る。nearest existing bound ancestorからmissing suffixを再検証する。appearanceは新規actionへ変換せずblocked/recovery required。 |
 | legacy marker | validであっても自動変換せず、markerを保持してrecovery-requiredを返す。marker bytesをroot/intent/authority evidenceとして扱わない。 |
-| postcondition | removed path absence、preserved tree exact witness、root/parent binding、unknown closed set、journal action coverageを再評価する。 |
-| finalization | mark verified/completed後にguard、journalをexact cleanupする。finalization後にworkspace cleanupを実行しない。 |
+| finalization | completed journalのpostconditionを再確認し、guard、journalをexact cleanupする。finalization後にworkspace cleanupを実行しない。 |
+| presentation | serviceはreturn前にtyped resultを完成させる。CLIはresultとrequest contextだけからJSON/text/exitを生成し、journal pathをopenしない。 |
 
 ## Legacy marker conversion decision
 
@@ -287,8 +326,8 @@ schema version 1 のtop-level fieldは次を維持する。
 - `phase`
 - `last_completed_phase`
 - `retry_command`
-- `failed_paths`
-- `pending_paths`
+- `failed_paths`（action-specific failure、blocker/witness diagnostic、および全`pending_paths`のcanonical union。pending pathは両fieldへ現れる）
+- `pending_paths`（checkpoint `pending`のmutating action pathだけ）
 - `summary`
 - `actions`
 - `guidance`
@@ -312,7 +351,46 @@ summary key setは次のexisting keyをexactに維持する。
 - `pending`
 - `empty_dir_removed`
 
-internal status `recovery_required` はpublic `partial_failure`へmappingする。internal action grammarやjournal schemaをpublic JSONへ露出しない。
+internal status `recovery_required` はpublic `partial_failure`へmappingする。internal `error`はpublic `error`へmappingする。internal action grammar、witness schema、journal schemaをpublic JSONへ露出しない。
+
+### Typed mapper input completeness
+
+`DistributionProcessResult`または同等のone typed mapper inputは、少なくとも次を保持する。
+
+- internal `status`
+- public-compatible `phase`
+- `last_completed_phase`
+- ordered typed action outcomes（path、category、status、reason、sanitized error）
+- `failed_paths`（action-specific failure、blocker/witness diagnostic、および全`pending_paths`のcanonical union。pending pathは両fieldへ現れる）
+- `pending_paths`（checkpoint `pending`のmutating action pathだけ）
+- ordered top-level sanitized errors
+- retry policy（same keep retry / manual recovery / none）
+- `plan_digest`とstable reason
+
+service/journal adapterはdurable stateをこのtyped inputへ変換してからCLIへ返す。CLIはjournal status/checkpoint、guard purpose、legacy marker bytesを直接読まず、static request context（target label、apply、specs mode、JSON選択）だけを追加してschema-v1 payloadとtextを生成する。
+
+### Durable stateからtyped fieldへの最低規則
+
+| Durable/service state | `phase` | `last_completed_phase` | failed / pending / errors |
+|---|---|---|---|
+| eligibility開始前error | `preflight` | `not-started` | operation errorのみ。 |
+| planned dry-run（blocker diagnosticを含む） | `preflight` | `preflight-complete` | ordered action outcomeへ`preserved` reasonを含めるが、`failed_paths`、`pending_paths`、top-level errorsは空。dry-runはoverall `planned`/exit 0。 |
+| blocked apply | `preflight` | `preflight-complete` | blocker pathを`failed_paths`、action outcomeを`preserved`とし、現行failure semanticsどおりallowlisted top-level operation errorを一件以上返す。overall `blocked`/exit 1。 |
+| valid legacy marker-only | `preflight` | `not-started` | top-level `legacy-marker-unconvertible` operation error、retry policy=`manual-recovery`、target action pendingなし。 |
+| guard-only | `marker-write` | `marker-written` | journal planから全mutating pathsを`pending_paths`へ入れ、同じpathsとjournal pathを`failed_paths`に含め、allowlisted recovery errorを返す。 |
+| journal `prepared` | `uninstall-apply` | `marker-written` | checkpoint `pending` pathsを`pending_paths`と`failed_paths`の双方へ入れ、allowlisted recovery errorを返す。 |
+| journal `executing`、leaf未完了 | `uninstall-apply` | `marker-written` | action failure pathとcheckpoint `pending` pathを`failed_paths`へ、checkpoint `pending`を`pending_paths`へ入れ、allowlisted recovery errorを返す。 |
+| leaf全て`published`、directory未完了 | `root-cleanup` | `uninstall-applied` | pending directory pathsを`pending_paths`と`failed_paths`の双方へ入れ、allowlisted recovery errorを返す。 |
+| journal `executing`、全mutating action `published` | `post-verify` | `uninstall-applied` | final action checkpoint後・status transition前のcrash window。target pendingなし、allowlisted recovery errorを返し、target action再実行0でpost-assessmentだけを再開する。 |
+| journal `verifying` | `post-verify` | `uninstall-applied` | target mutation pendingなし。witness/postcondition pathを`failed_paths`、対応するallowlisted recovery errorをtop-level errorsへ。 |
+| journal `completed` + guard | `marker-finalization` | `post-verified` | target pendingなし。guard pathを`failed_paths`、guard cleanup errorをtop-level errorsへ。 |
+| completed journal-only | `marker-finalization` | `marker-finalized` | target pendingなし。journal pathを`failed_paths`、journal cleanup errorをtop-level errorsへ。 |
+| mutating success | `complete` | `marker-finalized` | failed/pending/errors空。 |
+| protocol-metadata-free no-op success | `complete` | `post-verified` | failed/pending/errors空。`marker-finalized`と偽装しない。 |
+
+全行に共通して、normal deprovision resultは`retry_policy="same-keep-command"`を保持する。CLI mapperはstatic specs modeが`keep`のときだけcurrent-compatible retry commandを生成し、default dry-runの`specs_mode=null`では`null`とする。legacy markerの`manual-recovery`と明示的`none`では`null`とする。
+
+詳細なfield-level mappingとaction error populationはDesignを正本とする。
 
 ## Issue boundary and handoff
 
@@ -344,25 +422,30 @@ Issue 372 は、本 Issue で削除すべきdeprovision legacy call edgeを後�
 
 ## 受け入れ条件
 
-1. `I370-F01`〜`I370-O04` の各要件が、Planのstepとtest IDへtraceされる。
+1. `I370-F01`〜`I370-O04`の49要件が、Design element、Plan step、stable test IDへtraceされる。
 2. default/`--keep-specs` dry-runはread-onlyで同一deprovision assessmentを表示する。
 3. `--apply --keep-specs`はnew forward guard、common journal、common kernel、post-assessmentをend-to-end使用する。
-4. `spec-dock/initiatives`のbyte-preservation、unknown/modified preservation、outside sentinel不変がnegative testsで確認される。
-5. mixed safe/unsafe planはguard/journal/stage/target write 0でblockする。
-6. unknown child appearance、root/parent rebind、same-content replacement、unsafe hardlink、special file、symlink traversalをfail closedで拒否する。
-7. partial failureのsame-plan retryが収束し、intent/authority/root/contract/plan/protocol/pre-postcondition mismatchはwrite 0で停止する。
-8. legacy `.uninstall-retry.json` は自動変換されず、marker bytesとtargetを保持する。
-9. public JSON schema version 1、exactly one stdout object、text section、exit mapping、sanitization、keep-only retry guidanceがgolden testsに一致する。
-10. deprovision routeから `_UninstallAction` plan/apply/postverify/legacy marker writerへのcall edgeがなく、hidden fallbackがない。
-11. `--remove-specs` dry-run/applyはIssue 371 compatibility routeから変更されず、deprovision journal/authorityへ接続されない。
-12.実装candidate自身でfocused tests、fast tests、lint、SpecDock validate、必要なFull Regression evidenceを取得し、未実行testをsuccessとしてReportへ記録しない。
+4. generated stateはsingle canonical producerからのみcontract化され、active/.agentのcurrent positive、legacy、unknown、conflict matrixが`I370-T-OWN-001`で固定される。
+5. `spec-dock/initiatives`のbyte-preservation、unknown/modified preservation、outside sentinel不変がnegative testsで確認される。
+6. mixed safe/unsafe planはguard/journal/stage/target write 0でblockする。
+7. `remove-empty-directory`はprior child `published` + exact absentから到達でき、executing/verifying/verified/completedのparser、digest、crash windowが同じstate tableへ一致する。
+8. proven-owned ancestor absenceはdescendant actionなしのcollapsed witnessとなり、entire managed subtree absent applyはprotocol metadata/target syscall 0でcompletedになる。assessment後appearanceは削除されない。
+9. unknown child appearance、root/parent rebind、same-content replacement、unsafe hardlink、special file、symlink traversalをfail closedで拒否する。
+10. partial failureのsame-plan retryが収束し、intent/authority/root/contract/plan/protocol/pre-postcondition/witness mismatchはwrite 0で停止する。
+11. legacy `.uninstall-retry.json`は自動変換されず、marker bytesとtargetを保持する。
+12. public JSON schema version 1、exactly one stdout object、text section、exit mapping、status別target contract、keep-only retry guidanceがgolden testsに一致する。
+13. `DistributionProcessResult`または同等のtyped inputだけでphase、last completed、failed/pending paths、action errors、top-level errors、retry policyを生成でき、pending pathが`failed_paths`と`pending_paths`の双方へ現れるcurrent contractと、planned/completed/blocked/recovery/errorのretry nullabilityを`I370-T-RESULT-001`で証明し、CLIにjournal interpretationがない。
+14. deprovision routeから`_UninstallAction` plan/apply/postverify/legacy marker writerへのcall edgeがなく、hidden fallbackがない。
+15. `--remove-specs` dry-run/applyはIssue 371 compatibility routeから変更されず、deprovision journal/authorityへ接続されない。
+16.実装candidate自身でfocused tests、fast tests、lint、SpecDock validate、必要なFull Regression evidenceを取得し、未実行testをsuccessとしてReportへ記録しない。
 
 ## 制約・前提
 
-- exact implementation fact は commit `fc02e1215d2b9e056a2c18bd1411fe489efdf2f2` を基準とする。
-- parent Epic `E365-R01`〜`E365-R13`、accepted unified reconciliation / forward recovery decisionを継承する。
+- exact implementation factと現行canonical文書の基準はcommit `7301800263eae1a78ea710ff1935ab4ce0f138e7` とする。
+- parent Epic `E365-R01`〜`E365-R14`、accepted unified reconciliation / forward recovery decisionを継承する。
 - public compatibilityはCLI、data preservation、JSON schema semantics、text/exit behaviorに適用する。private Python symbolとlegacy marker schemaは恒久互換対象ではない。
+- current generated-state path/schema contractはfixed SHAの`active_store.py`、`artifact_writer.py`、`json_state.py`、`reference_sync.md`から導出する。pathnameだけでlegacy ownershipを推測しない。
 - root operation lockは協調するSpecDock writerを直列化するadvisory authorityである。非協調same-UID processに対するdelete-by-inode相当のkernel guaranteeは約束しないが、各mutation境界で観測できたreplacement/rebind/unknown childは必ず拒否する。
-- no-follow / directory descriptor / exact identity capabilityがない場合はwrite前に停止する。
--新しい依存関係、Windows、generic transaction/deletion framework、purge、Full Regression repairを追加しない。
-- material decisionは本書とDesignで固定済みである。実装中に本契約では一意に決められないauthority、preservation、wire compatibility、crash-stateが見つかった場合、coderは推測実装せずPlanのdecision gateで停止する。
+- current legacy `.uninstall-retry.json`に存在しないroot、intent、authority、plan、checkpointをfixtureまたはmigrationで捏造しない。
+- `--remove-specs` purge、Issue 372 parity/closure、Windows、generic recursive deletion、new dependency、Full Regression repairは本Issueへ追加しない。
+- production code、commit、push、PR、Issue stateは本仕様改訂作業では変更しない。
