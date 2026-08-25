@@ -86,7 +86,7 @@ coderの禁止事項:
 
 - repository: `chemitaro/spec-dock`
 - branch: `iss-00370-managed-distribution-deprovision`
-- exact SHA: `7301800263eae1a78ea710ff1935ab4ce0f138e7`
+- exact SHA: `5d25f393dba95d1a71c5582714de43c82fa094f4`
 
 開始前に同じSHAまたはその明示的descendantであることを確認し、別branch、default branch、別revisionのsymbolを黙って採用しない。
 
@@ -148,7 +148,7 @@ runtime generated-state filesはcurrent path/schema producer contractのevidence
 | I370-T-DRY-001 | default/keep dry-runの同一assessmentとzero-write | `test_init_update.py` |
 | I370-T-DOM-001 | `deprovision` intent、`uninstall` mapping、action allowlist | `test_managed_distribution.py` |
 | I370-T-OWN-001 | single generated producer、active/.agent current slot/kind/schema identity、active selection/generated_at/index-tree cross-consistency、legacy/conflict/unknown blocker、current/historical/obsolete ownership | `test_managed_distribution.py`, `test_init_update.py` |
-| I370-T-TREE-001 | bounded traversal、complete classification、top-down absence collapse、deterministic digest | `test_managed_distribution.py` |
+| I370-T-TREE-001 | bounded traversal、complete classification、surviving-anchor collapse/re-anchor、type-specific namespace digest、deterministic plan | `test_managed_distribution.py` |
 | I370-T-PRES-001 | initiatives byte identity、empty dir、safe symlink、mode/link topology | `test_managed_distribution.py`, `test_init_update.py` |
 | I370-T-PRES-002 | Workbenchとoutside sentinelのpreservation | `test_init_update.py`, `test_distribution_cutover.py` |
 | I370-T-BLK-001 | unknown/modified/generated conflictとmixed safe/unsafeのwhole-operation write zero | `test_init_update.py`, `test_distribution_cutover.py` |
@@ -156,9 +156,11 @@ runtime generated-state filesはcurrent path/schema producer contractのevidence
 | I370-T-RACE-001 | root lockとroot/parent/target/child/source/absence-witness appearance race | `test_managed_distribution.py` |
 | I370-T-PLAN-001 | mutating-only executable plan、directory dependencies、witness completeness、canonical digest、forged grammar rejection | `test_managed_distribution.py` |
 | I370-T-JRN-001 | guard purpose、intent、authority、schema/protocol、witness/dependency parser、reachable status/checkpoint table | `test_managed_distribution.py` |
-| I370-T-KRN-001 | exact `prune`、prior child published+absentからの`remove-empty-directory`、no recursion | `test_managed_distribution.py` |
+| I370-T-KRN-001 | exact `prune`、immediate child evidenceからの`remove-empty-directory`、published directory subtree subsumption、no recursion/reopen | `test_managed_distribution.py` |
 | I370-T-NOOP-001 | owned-ancestor collapse、descendant action 0、entire managed subtree absentのprotocol metadata/target write zero | `test_init_update.py`, `test_managed_distribution.py` |
-| I370-T-REC-001 | leaf/directory publish、verifying、atomic verified+completed、terminal cleanupのcrash windowsとsame-plan resume | `test_managed_distribution.py`, `test_distribution_cutover.py` |
+| I370-T-REC-001 | 3階層nested leaf/各directory publish、subtree subsumption、verifying、atomic verified+completed、terminal cleanupのcrash windowsとsame-plan resume | `test_managed_distribution.py`, `test_distribution_cutover.py` |
+| I370-T-DIR-001 | immediate leaf/directory child evidence、directory semantic projection、parent ctime変化、directory replacement、removed descendant reopen 0 | `test_managed_distribution.py` |
+| I370-T-SRC-001 | durable semantic source projection、semantic-equal別physical install root recovery、semantic drift、same-invocation full-snapshot replacement | `test_managed_distribution.py`, `test_distribution_cutover.py` |
 | I370-T-RESULT-001 | durable stateからtyped phase/last/failed/pending/action errors/top errors/retry policyを一意生成し、pending pathのfailed/pending重複とnormal keep/legacy retry ruleを固定し、CLI journal access 0 | `test_managed_distribution.py`, `test_init_update.py`, `test_distribution_cutover.py` |
 | I370-T-AUTH-001 | deprovision/purge authority non-switching | `test_managed_distribution.py`, `test_init_update.py` |
 | I370-T-LEG-001 | legacy marker non-conversion、dual/malformed/copied marker | `test_managed_distribution.py`, `test_init_update.py` |
@@ -173,9 +175,9 @@ runtime generated-state filesはcurrent path/schema producer contractのevidence
 ```text
 P0 Characterization / exact producer inventory / result gap
  -> P1 Intent / grammar / authority
- -> P2 Single generated contract / bounded observation / witnesses / absence collapse
- -> P3 Mutating plan / dependency / digest / strict journal parser
- -> P4 Descriptor-bound prune / dependency-bound rmdir kernel
+ -> P2 Single generated/source contract / bounded observation / witnesses / surviving-anchor collapse
+ -> P3 Mutating plan / immediate-child evidence / semantic digest / strict journal parser
+ -> P4 Descriptor-bound prune / immediate-child-bound rmdir kernel
  -> P5 Read-only service / metadata-free no-op
  -> P6 Reachable journal state machine / recovery / typed result builder
  -> P7 CLI typed mapper / route split
@@ -276,7 +278,7 @@ uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (int
 - fresh/recognized intentの既存authority mappingに差分がない。
 - deprovisionからpurgeへのtype/call edgeがない。
 
-## Step P2 — Single generated contract、bounded observation、preservation / absence witness
+## Step P2 — Single generated/source contract、bounded observation、preservation / surviving-anchor absence witness
 
 ### dependency
 
@@ -289,7 +291,10 @@ P1 complete。
   - `DistributionGeneratedStateContract`
   - `build_deprovision_generated_state_contract()`
   - `_render_context_pack()`（current CLI helperをbehavior unchangedで移動・共有）
+  - `DistributionSourceSemanticIdentity`
+  - existing `DistributionSourceSnapshot` invocation-local usage
   - `DistributionTreeEntrySnapshot`
+  - `DistributionImmediateChildEvidence`
   - `DistributionDirectoryMutationSnapshot`
   - `DistributionPreservationWitness`
   - `DistributionCollapsedAbsenceWitness`
@@ -301,44 +306,49 @@ P1 complete。
 
 ### red tests first
 
-1. deprovision assessmentが`contract.generated_state`と独立`generated_assets`を同時に受け取れるcurrent/future signatureを拒否するsource/type test。
+1. deprovision assessmentが`contract.generated_state`と独立`generated_assets`を同時に受け取れるsignature/call graphを拒否する。
 2. real current active symlink、path fallback、context pack、active manifest、index/tree/deps outputsがcurrent generated ownershipになるpositive matrix。
 3. active symlink + `.path`併存、out-of-root target、wrong kind/content、malformed/extra JSON、hardlink、unknown child、active selection不一致、present artifactの`generated_at`不一致、index/tree node集合不一致がwhole-operation blockerになるnegative matrix。
-4. active current-runbook、legacy `.agent/deps*`、`.work/*`がpathnameだけではownedにならず、historical exact identityがなければblockするmatrix。
-5. `spec-dock/initiatives`と`.workbench`のbyte/mode/link topology witness。
-6. proven-owned ancestor absent時にone collapsed witnessを発行しdescendant actionを0にするmatrix。
-7. unproven parent gap、nearest ancestor symlink/rebind、collapsed root appearanceをblockするmatrix。
-8. bounded traversal外large treeをscanしないcounter test。
+4. active current-runbook、legacy `.agent/deps*`、`.work/*`がpathnameだけではownedにならず、historical exact identityがなければblockする。
+5. current physical sourceを二つの異なるinstall root/device/inode/mtimeへ配置し、canonical source path、kind、SHA-256、mode、link target、schema/protocolが同じなら`DistributionSourceSemanticIdentity`とcontract digestが一致する。
+6. source bytes、mode、symlink target、canonical source path、asset kind、schema/protocolの各driftでsemantic projectionが不一致になる。
+7. same invocationでsource capture後にinode/ctime/mtime/size/modeを差し替えるfixtureはfull `DistributionSourceSnapshot` mismatchになる。
+8. `spec-dock/initiatives`と`.workbench`のbyte/mode/link topology witness。
+9. 3階層以上のowned pathでancestor absent時にone collapsed witnessを発行しdescendant actionを0にする。
+10. nearest existing ancestorが同じplanのdirectory removal対象なら、上位surviving ancestorへcanonical re-anchorする。target root fallbackも固定する。
+11. unproven parent gap、surviving anchor symlink/rebind、collapsed root appearanceをblockする。
+12. bounded traversal外large treeをscanしないcounter test。
 
 ### implementation
 
 1. generated producerを`managed_distribution.py`へ一つだけ実装する。
 2. current CLI `_render_context_pack()`を`managed_distribution.py`へbehavior unchangedで移し、fresh/recognized generated asset builderとdeprovision producerが同じhelperを使用する。shipped runtime rendererとのreal-fixture byte parityを固定する。
 3. `.agent/active.json`を先にsemantic validationし、active logical slotsのallowed targetを一意に解決する。
-4. current JSONはschema/discriminator/exact top-level field set/shapeをvalidateした後、observed exact SHA/modeとdevice/inode/ctime/type/link countを含むsingle no-follow snapshotへ束縛する。
-5. current symlink/path fallbackはXOR、normalized relative in-root target、exact kind/contentを検証する。fixed modeはownership条件にせず、観測modeをsame no-follow snapshotへ束縛する。
-6. active manifest、pointer/path fallback、context pack、index/tree `active` fieldをone normalized selectionへcross-validateする。present sync artifactsはsame `generated_at`、index/tree counterpartはsame node集合でなければblockする。
-7. legacy/unrecognized entryはhistorical exact identityがない限りblockする。root membershipでpruneしない。
-8. deprovision専用assessment wrapperからproducerをexactly once呼び、generic `generated_assets` routeをdeprovisionから到達不能にする。
-9. managed path treeをtop-down観測し、最初のmissing contract-owned ancestorでcollapseする。collapse配下をenumerateせず、contract descendant digestを作る。
-10. preservation/absence witnessをassessment/contract identityへ含める。
-11. current journal resumeではfresh collapseでjournal action setを置換しない。
+4. generated current JSON/symlinkをsemantic validation後のexact target snapshotへ束縛し、legacy/unrecognized entryはhistorical exact identityがない限りblockする。
+5. provider regular/symlink sourceごとにcanonical `DistributionSourceSemanticIdentity`を構築する。absolute extraction/cache pathとdevice/inode/ctime/mtimeをdurable projectionへ入れない。
+6. existing `DistributionSourceSnapshot`はcurrent invocation内memory-only evidenceとしてcaptureし、source read前後、plan発行前、first mutation前に再検証する。journal/guard/plan serializationへ入れない。
+7. deprovision専用assessment wrapperからgenerated producerをexactly once呼び、generic `generated_assets` routeをdeprovisionから到達不能にする。
+8. managed path treeをtop-down観測し、最初のmissing contract-owned ancestorでcollapse rootを決める。
+9. action closureを確定後、candidate anchorがdirectory-removal closure内ならparentへ上がり、削除されないnearest surviving bound ancestorへre-anchorする。
+10. collapse配下をenumerateせず、surviving anchor path/binding、missing suffix、contract descendant semantic digestをwitness化する。
+11. preservation/absence witnessとsemantic source projectionをassessment/contract identityへ含める。
+12. current journal resumeではfresh collapseまたはphysical source locationでjournal action set/digestを置換しない。
 
 ### focused verification
 
 ```bash
-uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (ownership or generated or tree or preserve or absence)"
-uv run pytest -q --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -k "i370 and (generated or preserve or absent)"
+uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (ownership or generated or source or tree or preserve or absence or anchor)"
+uv run pytest -q --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -k "i370 and (generated or preserve or absent or source)"
 ```
 
 ### step exit
 
 - `I370-T-OWN-001`のcurrent/legacy/conflict matrixがpassする。
 - deprovision assessmentへgenerated stateを二系統で渡せない。
-- initiatives/Workbench witnessとcollapsed absence witnessがdeterministicである。
+- durable source identityがphysical install-root identityから独立し、same-invocation full snapshot guardを失っていない。
+- initiatives/Workbench witnessとsurviving-anchor collapsed witnessがdeterministicである。
 - unknown/legacy/generated conflictがblockerになりsafe subsetを適用しない。
-
-## Step P3 — Mutating-only plan、directory dependency、digest、strict journal parser
+## Step P3 — Mutating-only plan、immediate child evidence、semantic digest、strict journal parser
 
 ### dependency
 
@@ -349,8 +359,10 @@ P2 complete。
 - `src/spec_dock/managed_distribution.py`
   - `WorkspaceAssessment`
   - `ExecutableMutationPlan`
-  - plan serializer/digest helpers
-  - `OperationJournal` deprovision witness fields
+  - `DistributionImmediateChildEvidence`
+  - type-specific child semantic projection helpers
+  - semantic source serializer/digest helpers
+  - `OperationJournal` deprovision witness/source fields
   - `OperationJournalAction` condition schema
   - journal parser/contract assertions
 - `tests/unit/infra/test_managed_distribution.py`
@@ -358,44 +370,50 @@ P2 complete。
 ### red tests first
 
 1. deprovision executable planに`preserve` / `block` / already-absent diagnosticを混入すると拒否。
-2. generated contract digest、preservation witness、absence witnessの欠落/改変/順序変更でdigest mismatch。
-3. directory dependencyがfuture action、unknown action、preserve witness、またはselfを参照すると拒否。
-4. directory actionがprior child `verified`を要求する旧conditionを拒否し、prior child `published` + expected absentを要求する。
-5. parser state matrix:
+2. generated contract、semantic source projection、preservation witness、surviving-anchor absence witnessの欠落/改変/順序変更でdigest mismatch。
+3. directory evidenceが対象directoryのimmediate childではない、future action、self、unknown action、preserve witness、またはdescendant actionを直接参照すると拒否。
+4. leaf evidenceはleaf `prune` action、directory evidenceはchild `remove-empty-directory` actionへexact対応し、required checkpointは`published`だけを許可する。
+5. directory child semantic recordから`ctime_ns`/`link_count`を除外する。directoryの両fieldだけを変えたfixtureではdigest不変、inode/type/modeを変えたfixtureではdigest mismatch。
+6. regular/symlink childのexact identity/content/link fieldsを欠落・改変するとdigest mismatch。
+7. parser state matrix:
    - prepared=all pending
    - executing=pending/published only
    - verifying=all published
    - completed=all verified
-6. executing+verified、verifying+pending/verified、completed+published、directory published+dependency pendingを拒否。
-7. deprovision validator追加後もexisting fresh/recognized protocol-2 journalsのcurrent valid state fixtureを変更せず受理する。
-8. witnessをjournal actionとしてcheckpoint化したfixtureを拒否。
-9. self-rehashed field omission、parent chain omission、dependency/postcondition改変を拒否。
+8. executing+verified、verifying+pending/verified、completed+published、parent directory published+immediate child pending、directory child kind/subsumption欠落を拒否。
+9. published child directoryのdescendant evidenceをparent preconditionへ直接列挙したjournalを拒否。
+10. durable source fieldへdevice/inode/ctime/mtime/absolute extraction pathを混入したjournal/guardを拒否。
+11. deprovision validator追加後もexisting fresh/recognized protocol-2 journalsのcurrent valid fixtureを変更せず受理する。
+12. witnessをjournal actionとしてcheckpoint化したfixture、self-rehashed field/parent/evidence omissionを拒否。
 
 ### implementation
 
 1. deprovision `ExecutableMutationPlan.actions`をpresent targetの`prune`とexisting directoryの`remove-empty-directory`だけにする。
-2. already-absent pathはdiagnostic outcome/absence witnessとして残しmutating actionにしない。
-3. deterministic action orderとdirectory dependency tupleを作る。
-4. plan digestへgenerated contract、dependencies、preservation/absence witnessesを追加する。
-5. protocol-2 deprovision journalへimmutable witness fieldsを追加しstrict parseする。
-6. directory dependencyをpreconditionへ保存し、published child exact-absent ruleをparser/plan validatorへ実装する。
-7. status/checkpoint combination validatorをintent-specific helperへ集約し、deprovisionのprepare/write/load/resume全boundaryで呼ぶ。fresh/recognizedはexisting validator/semanticsを維持する。
-8. verifyingからcompletedは一回のatomic publicationでall published -> all verified/status completedとする。
+2. already-absent pathはdiagnostic outcome/surviving-anchor absence witnessとして残しmutating actionにしない。
+3. each directory actionへimmediate child evidenceをcanonical orderで作る。leaf childはleaf action、directory childはchild directory actionだけを参照する。
+4. directory child published checkpointをsubtree subsumption evidenceとしてjournal schemaへlosslessに保存する。
+5. type-specific child semantic projectionを実装し、directory recordからctime/link countを除外する。runtime full snapshot typeとは分離する。
+6. plan/contract digestへgenerated contract、semantic source projection、immediate child evidence、preservation/absence witnessesを追加する。
+7. physical `DistributionSourceSnapshot` fieldをdurable serializer/digestから排除する。
+8. protocol-2 deprovision journalへimmutable witness/source fieldsを追加しstrict parseする。
+9. status/checkpoint/dependency/subsumption validatorをintent-specific helperへ集約し、prepare/write/load/resume全boundaryで呼ぶ。fresh/recognizedはexisting semanticsを維持する。
+10. verifyingからcompletedは一回のatomic publicationでall published -> all verified/status completedとする。
 
 ### focused verification
 
 ```bash
-uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (plan or digest or journal or parser or checkpoint or witness)"
+uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (plan or digest or semantic or source or journal or parser or checkpoint or witness or immediate_child)"
 ```
 
 ### step exit
 
-- first directory actionへ正規sequenceから到達できる。
-- parser、digest、plan validatorが同じpublished dependency/state tableを使う。
+- first nested directory actionへ正規sequenceから到達できる。
+- parser、digest、plan validatorが同じimmediate-child/subsumption/state tableを使う。
+- directory parent ctime/link-countのauthorized変化でdigestを失わず、inode/type/mode replacementを拒否する。
+- durable plan equalityがphysical install-root identityに依存しない。
 - preserve/block/witnessに到達不能checkpointがない。
 - no-op planはmutating action 0で表現できる。
-
-## Step P4 — Descriptor-bound `prune` / dependency-bound exact empty-directory kernel
+## Step P4 — Descriptor-bound `prune` / immediate-child-bound exact empty-directory kernel
 
 ### dependency
 
@@ -406,6 +424,7 @@ P3 complete。
 - `src/spec_dock/managed_distribution.py`
   - existing exact remove/quarantine helpers
   - `_remove_distribution_directory_if_bound()`
+  - type-specific immediate child observer/digest helper
   - apply dispatch/intent allowlist
 - `tests/unit/infra/test_managed_distribution.py`
 
@@ -413,38 +432,41 @@ P3 complete。
 
 1. current/historical/generated regular/symlink prune success。
 2. same-content different inode、mode drift、regular/symlink hardlink、special、symlink target changeを拒否。
-3. directory dependency child pendingでrmdir handlerが呼ばれない。
-4. child publishedだがfilesystem target present/replacedならrmdirしない。
-5. child published + exact absent + empty digestでdirectory actionが成功する。
-6. authorized prior child removalによるparent ctime/link-count変化はdevice/inode/type/mode + expected child digestで受理し、unexplained child-set/mode changeは拒否する。
-7. unknown child appearance、parent/root rebind、directory replacementを保持して停止。
-8. rmdir後checkpoint failureからexact absenceでpublishedへ収束。
-9. recursive function、pathname `shutil.rmtree`、boundary-wide scanへのcall edgeがない。
+3. 3階層以上の`root/a/b/file` cleanupを構築し、`file` leaf -> `b` directory -> `a` directory -> `root` directoryのimmediate-child chainだけを持つ。
+4. leaf child pendingで`b` rmdirが呼ばれない。
+5. leaf publishedだがleaf path present/replacedなら`b`を削除しない。
+6. `b` publishedだが`b` path presentなら`a`を削除しない。`b` absentなら`a`は`b`配下descendantをopen/list/statせず進める。
+7. each directory rmdir直後・checkpoint publish前crashからexact path absenceでそのdirectoryをpublishedへ再構成し、ancestorへ進む。
+8. leaf removalでparent directory ctime/link countが変化してもsemantic child digestはexpected値へ収束する。
+9. directory childのinode/type/mode replacement、unknown child appearance、parent/root rebindを保持して停止する。
+10. runtime held descriptorとvisible directoryのfull snapshot mismatchを拒否する。
+11. recursive function、pathname `shutil.rmtree`、boundary-wide scanへのcall edgeがない。
 
 ### implementation
 
 1. leaf pruneはexisting descriptor-bound exact helpersを再利用する。
-2. directory helperはjournal dependency checkpointをserviceで確認した後、各dependency expected absenceをdescriptor-relativeに再観測する。
-3. prior published action setから各parentのexpected child digestを再構成し、device/inode/type/modeのstable bindingとともに確認する。authorized child mutationに伴うctime/link-count変化だけを許容する。
-4. held directory identity、visible path、empty digest、parent/root bindingを確認する。
-5. exact one `rmdir(..., dir_fd=...)`後にpath absenceを再観測する。
-6. callerがabsence確認後だけdirectory checkpointをpublishedへ進める。
-7. EEXIST/ENOTEMPTY、unknown child、identity mismatchはcleanup retryせずrecovery required。
-8. platform capability不足をfirst write前にtyped errorへする。
+2. directory helper前にservice/parserがimmediate child evidenceを検証する。
+3. leaf evidenceはleaf exact absence、directory evidenceはchild directory path absenceだけをdescriptor-relativeに確認する。published child directory配下を再openしない。
+4. held target directoryとvisible pathのfull identityをruntime TOCTOU guardとして比較する。
+5. current immediate child setをtype-specific semantic projectionでdigest化する。directory recordのctime/link countを除外し、inode/type/modeを含める。
+6. expected empty digest、parent/root bindingを確認してexact one `rmdir(..., dir_fd=...)`を実行する。
+7. path absence確認後だけdirectory checkpointをpublishedへ進め、そのcheckpointをsubtree subsumption evidenceとする。
+8. EEXIST/ENOTEMPTY、unknown child、identity mismatchはcleanup retryせずrecovery required。
+9. platform capability不足をfirst write前にtyped errorへする。
 
 ### focused verification
 
 ```bash
-uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (kernel or prune or empty_directory or dependency or race)"
+uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (kernel or prune or empty_directory or immediate_child or nested or subsumption or ctime or race)"
 ```
 
 ### step exit
 
 - regular/symlink/directory mutationがroot descriptorとexact planへ束縛される。
-- directory actionはprior child published+absentから実行可能で、verifiedを待たない。
-- unknown/replacement/outside entryを削除しない。
+- 3階層以上のnested directoryがimmediate child evidenceだけでbottom-upに収束する。
+- published directory checkpoint後にancestor/resumeがremoved subtree descendantを再openしない。
+- parent ctime/link-countのauthorized変化を受理し、directory replacement/unknown childを拒否する。
 - generic recursive deletionを追加していない。
-
 ## Step P5 — Deprovision serviceのdry-runとmetadata-free no-op apply
 
 ### dependency
@@ -495,7 +517,7 @@ uv run pytest -q --run-full-regression --full-regression-shard tests/unit/infra/
 - absence appearanceとunproven parent gapを安全に拒否する。
 - result fieldsがCLI journal accessなしで完成している。
 
-## Step P6 — Reachable journal state machine、partial failure、forward recovery、typed result builder
+## Step P6 — Reachable journal state machine、nested forward recovery、semantic-source admission、typed result builder
 
 ### dependency
 
@@ -507,7 +529,9 @@ P3〜P5 complete。
   - `OperationJournalStore`
   - deprovision guard/journal preparation
   - action publish/recovery
+  - immediate child/subsumption validator
   - verifying/atomic completed transition
+  - semantic source admission + invocation full-snapshot guard
   - additive defaulted fields on `DistributionProcessResult`
   - `_distribution_process_result_from_state()`
   - `execute_deprovision_distribution(..., apply=True)`
@@ -516,45 +540,53 @@ P3〜P5 complete。
 ### red tests first
 
 1. first mutationより前にguard+journalがdurableである。
-2. guard-only、prepared、executing leaf、root-cleanup directory、journal `executing`・全mutating action `published`、verifying、completed+guard、completed-onlyを個別fixture化する。
-3. planned dry-run（blocker diagnostic有無）、blocked apply、各durable fixtureからexact phase、last completed、failed/pending paths、action errors、top-level errors、retry policyを期待する。planned dry-runのblockerは`failed_paths`へ入れず、blocked applyだけがblocker pathを`failed_paths`へ入れる。checkpoint `pending` pathは`pending_paths`と`failed_paths`の双方へ入る。`blocked`/`recovery_required`/`error`はallowlisted top-level errorが非空、`planned`/`completed`は空であることを全fixtureで固定する。
-4. executingでverified checkpoint、verifyingでpending/verified、completedでpublishedをrejectする。
-5. child unlink後checkpoint failure、directory rmdir後checkpoint failureをexact postconditionからpublishedへ再構成する。
-6. all published後verifying crashではtarget actionを再実行せずpost-assessmentだけ再実行する。
+2. guard-only、prepared、executing leaf、3階層各directory published直後、executing all-published、verifying、completed+guard、completed-onlyを個別fixture化する。
+3. leaf unlink後、each directory rmdir後のcheckpoint failureをexact postconditionからpublishedへ再構成する。
+4. published directory checkpointがsubtree evidenceをsubsumesし、ancestor action、resume、verifyingでそのdirectory配下のopen/list/stat/readlink hookが0である。
+5. executingでverified checkpoint、verifyingでpending/verified、completedでpublished、parent published+child pending、invalid child kind/subsumptionをrejectする。
+6. all published後verifying crashではtarget actionを再実行せず、published directory summariesとremaining witnessesだけを再検証する。
 7. post-assessment後atomic completed publicationのbefore/after crashがverifying-all-publishedまたはcompleted-all-verifiedのどちらかだけになる。
-8. preservation/absence witness mismatch、absence appearance、unknown childをrecovery requiredにし、entryを保持する。
-9. cleanup failureでtarget action再実行0。
-10. result errorsにraw absolute path/content/nonce/tokenが漏れない。
-11. fresh/recognized existing `DistributionProcessResult` constructor/behavior testsが追加default fieldsにより変化しない。
+8. separate temporary install roots A/Bへsemantic-equal package assetsを配置する。Aでguard/journalを作り、compatible newer Bで同じsemantic projection/plan digestを再構成してresumeする。
+9. Bのcanonical source path、kind、bytes、mode、symlink target、schema/protocolいずれかをdriftさせるとwrite 0でplan mismatch。
+10. same invocation中にsource capture後にinode/ctime/mtime/size/modeを差し替えるとfull snapshot mismatchで次target mutation 0。
+11. surviving absence anchorがdeletion closure外であること、appearance/witness mismatch、preservation mismatch、unknown childをrecovery requiredにする。
+12. planned dry-run、blocked apply、各durable fixtureからexact phase、last completed、failed/pending paths、action errors、top-level errors、retry policyを期待する。pending pathはfailed/pending両fieldへ一回ずつ入る。
+13. cleanup failureでtarget action再実行0。
+14. result errorsにraw absolute path/content/nonce/tokenが漏れない。
+15. fresh/recognized existing `DistributionProcessResult` constructor/behavior testsが追加default fieldsにより変化しない。
 
 ### implementation
 
 1. mutating operationだけguard、prepared journalを作る。
-2. status/checkpoint validatorを全journal read/write/transitionへ適用する。
-3. executing中はpending->publishedだけを許可する。
-4. leaf全published後、directory dependenciesをpublished+exact absentで実行する。
-5.全action published後だけverifyingへ進める。
-6. verifyingではtarget mutationせず、全postcondition/witness/closed setを再検証する。
-7.成功時に一回のatomic writeで全action verified + status completedへ進める。
-8. guard、journalの順にexact cleanupする。
-9. `DistributionProcessResult`へdefault付きpresentation fieldsを末尾追加し、fresh/recognized existing constructorsとresult semanticsを維持する。deprovision returnだけphase/last/action outcomes/failed/pending/errors/retryを必須validateする。
-10. private result builderがdurable state population tableをone placeで実装し、全return/exception pathをtyped resultへ変換する。
-11. same-plan resumeはjournal action/witnessを正本としcurrent absence collapseでaction setを変更しない。
+2. guard/journalのdurable equalityはsemantic source projectionを使用し、physical source snapshotを直列化しない。
+3. new/compatible invocationはcurrent full source snapshotを新規captureし、stored semantic projection一致後にsame-plan admissionする。current invocation中はfull snapshotをmutation boundaryまで再検証する。
+4. status/checkpoint/immediate-child/subsumption validatorを全journal read/write/transitionへ適用する。
+5. executing中はpending->publishedだけを許可する。
+6. leaf後、directoryをdeepest-firstにimmediate child evidenceから実行する。directory published checkpointをsubtree summaryとする。
+7. crash resumeはpublished directory配下descendantを再openせず、child directory path absenceだけを確認してancestorへ進む。
+8.全action published後だけverifyingへ進める。
+9. verifyingではtarget mutationせず、published directory summaries、top-level postconditions、preservation/surviving-anchor witnesses、remaining namespaceを再検証する。
+10.成功時に一回のatomic writeで全action verified + status completedへ進める。
+11. guard、journalの順にexact cleanupする。
+12. `DistributionProcessResult`へdefault付きpresentation fieldsを末尾追加し、deprovision returnだけcomplete populationを必須validateする。
+13. private result builderがdurable state population tableをone placeで実装し、全return/exception pathをtyped resultへ変換する。
+14. same-plan resumeはjournal action/witness/semantic source projectionを正本とし、current absence collapseまたはphysical install-root差でaction set/digestを変更しない。
 
 ### focused verification
 
 ```bash
-uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (recovery or checkpoint or verifying or completed or result)"
-uv run pytest -q --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py -k "i370 and (partial or retry or result)"
+uv run pytest -q tests/unit/infra/test_managed_distribution.py -k "i370 and (recovery or checkpoint or nested or subsumption or verifying or completed or source or compatible or result)"
+uv run pytest -q --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py -k "i370 and (partial or retry or nested or source or result)"
 ```
 
 ### step exit
 
 - reachable state tableの全行とforbidden combinationがtestされる。
-- directory dependency P1が解消され、same-plan retryが収束する。
+- 3階層nested cleanupの各directory publish直後からsame-plan retryが収束する。
+- removed subtree descendantのreopenがancestor/resume/verifyingで0である。
+- semantic-equal別physical install rootのcompatible newer resumeとsemantic drift rejectionが証明される。
+- same-invocation full source snapshot TOCTOU safetyを維持する。
 - typed resultだけでpublic mapperの全dynamic fieldを決められる。
-- cleanup-only stateでtarget actionを再実行しない。
-
 ## Step P7 — CLI adapter、typed public mapper、default/keep hard cutover
 
 ### dependency
@@ -689,7 +721,7 @@ P8完了。
 - `I370-T-ABS-001`: CLI mapperが`OperationJournalStore`、`.distribution-journal.json`、forward guard、checkpointを読まず、`DistributionProcessResult`とstatic request contextだけを入力にする。
 - `I370-T-ABS-001`: remove-specs compatibility routeだけがD4-owned legacy helperを参照する。shared helperの削除はcall graphでunusedを証明した場合だけ行う。
 - `I370-T-DOC-001`: provider docsとdogfood docsのbytes/meaning parity。
-- `I370-T-DOC-001`: docsがsingle generated-state authority、current/legacy境界、collapsed absence no-op、reachable journal state machine、typed result-only mapper、legacy marker fail-closed、keep/remove owner boundary、same-plan retryを記載。
+- `I370-T-DOC-001`: docsがsingle generated-state authority、current/legacy境界、surviving-anchor collapsed no-op、immediate-child directory subsumption、type-specific directory semantic digest、semantic source compatible recovery、reachable journal state machine、typed result-only mapper、legacy marker fail-closed、keep/remove owner boundary、same-plan retryを記載。
 
 ### implementation
 
@@ -850,6 +882,15 @@ Issue 369 Reportの27 approved failures、件数、時間をcurrent resultとし
 | N50 | default dry-run、keep planned/completed/blocked/partial/error、legacy marker | current-compatible retry nullability/commandをexactに維持しpurgeへ昇格しない | I370-T-RESULT-001, I370-T-TEXT-001 |
 | N51 | planned/completed/error vs blocked/partial target |前者はresolved target、後者だけrelative/unavailableへsanitization | I370-T-JSON-001, I370-T-TEXT-001 |
 | N52 | planned/completed vs blocked/recovery/error |前者のtop-level errorsは空、後者はallowlisted errorが一件以上でraw exceptionを含まない | I370-T-RESULT-001, I370-T-JSON-001, I370-T-TEXT-001 |
+| N53 | 3階層nested tree、leaf後に最深directory published | next ancestorはimmediate directory child published+path absentだけを使用し、descendant reopen 0 | I370-T-DIR-001, I370-T-REC-001 |
+| N54 |各directory rmdir直後checkpoint crash | exact path absenceからそのdirectoryをpublishedへ再構成し、subtree subsumptionを維持してancestorへ収束 | I370-T-DIR-001, I370-T-REC-001 |
+| N55 | leaf removalでparent directory ctime/link count変化 | directory semantic digestは再現可能、same-plan resume成功 | I370-T-DIR-001, I370-T-KRN-001 |
+| N56 | directory child inode/type/mode replacement | semantic digest/full runtime binding mismatch、next mutation 0 | I370-T-DIR-001, I370-T-RACE-001 |
+| N57 | nearest existing absence ancestorがplan内削除対象 | deletion closure外の上位surviving anchorへcanonical re-anchor | I370-T-NOOP-001, I370-T-TREE-001 |
+| N58 | package A/Bが別physical install rootだがsemantic assets同一 | same contract/plan digest、Bのnew full snapshotでcompatible resume | I370-T-SRC-001, I370-T-REC-001 |
+| N59 | source path/kind/bytes/mode/link target/schema drift | semantic mismatch、guard/journal/target write 0 | I370-T-SRC-001 |
+| N60 | same invocation source capture後replacement | full source snapshot mismatch、次target mutation 0 | I370-T-SRC-001, I370-T-RACE-001 |
+| N61 | verifyingでpublished directory配下descendant accessをtrap | trap未発火、directory summaryとremaining witnessesだけでcompletedへ進む | I370-T-DIR-001, I370-T-REC-001 |
 
 ## Requirement / Step / Test traceability
 
@@ -863,7 +904,7 @@ Issue 369 Reportの27 approved failures、件数、時間をcurrent resultとし
 | I370-F06 | D370-ASSESS, D370-PLAN, D370-SERVICE | P0, P2, P5 | I370-T-BLK-001 |
 | I370-F07 | D370-INT, D370-CONTRACT, D370-LEGACY | P1, P3, P7 | I370-T-AUTH-001 |
 | I370-F08 | D370-DATA, D370-SERVICE, D370-JOURNAL | P2, P3, P6 | I370-T-PRES-001, I370-T-NOOP-001, I370-T-REC-001 |
-| I370-F09 | D370-DATA, D370-ASSESS, D370-PLAN, D370-SERVICE | P2, P3, P5, P6 | I370-T-NOOP-001, I370-T-TREE-001, I370-T-RACE-001 |
+| I370-F09 | D370-DATA, D370-ASSESS, D370-PLAN, D370-SERVICE | P2, P3, P5, P6 | I370-T-NOOP-001, I370-T-TREE-001, I370-T-RACE-001, I370-T-DIR-001 |
 | I370-F10 | D370-CLI, D370-MIG | P0, P7, P9 | I370-T-CLI-001, I370-T-ABS-001 |
 | I370-S01 | D370-CLI, D370-SERVICE, D370-KERNEL | P4, P6 | I370-T-RACE-001 |
 | I370-S02 | D370-DATA, D370-KERNEL | P2, P4 | I370-T-ID-001, I370-T-RACE-001 |
@@ -872,10 +913,10 @@ Issue 369 Reportの27 approved failures、件数、時間をcurrent resultとし
 | I370-S05 | D370-DATA, D370-ASSESS | P2, P4 | I370-T-ID-001 |
 | I370-S06 | D370-CONTRACT, D370-ASSESS | P0, P2 | I370-T-OWN-001, I370-T-BLK-001 |
 | I370-S07 | D370-CONTRACT, D370-ASSESS, D370-PLAN | P2, P3 | I370-T-TREE-001, I370-T-PLAN-001 |
-| I370-S08 | D370-PLAN, D370-JOURNAL, D370-KERNEL, D370-MIG | P3, P4, P9 | I370-T-JRN-001, I370-T-KRN-001, I370-T-ABS-001 |
-| I370-S09 | D370-KERNEL, D370-JOURNAL | P4, P6 | I370-T-KRN-001, I370-T-RACE-001, I370-T-REC-001 |
+| I370-S08 | D370-PLAN, D370-JOURNAL, D370-KERNEL, D370-MIG | P3, P4, P6, P9 | I370-T-JRN-001, I370-T-KRN-001, I370-T-DIR-001, I370-T-REC-001, I370-T-ABS-001 |
+| I370-S09 | D370-DATA, D370-KERNEL, D370-JOURNAL | P2, P3, P4, P6 | I370-T-DIR-001, I370-T-KRN-001, I370-T-RACE-001, I370-T-REC-001 |
 | I370-S10 | D370-DATA, D370-PLAN, D370-JOURNAL, D370-SERVICE | P2, P3, P6 | I370-T-PRES-001, I370-T-NOOP-001, I370-T-JRN-001 |
-| I370-S11 | D370-CONTRACT, D370-SERVICE, D370-JOURNAL | P2, P6 | I370-T-RACE-001 |
+| I370-S11 | D370-CONTRACT, D370-PLAN, D370-SERVICE, D370-JOURNAL | P2, P3, P6 | I370-T-SRC-001, I370-T-RACE-001, I370-T-REC-001 |
 | I370-S12 | D370-ASSESS, D370-SERVICE | P2, P5 | I370-T-BLK-001, I370-T-DRY-001 |
 | I370-S13 | D370-CONTRACT, D370-KERNEL | P2, P4, P6 | I370-T-PRES-002, I370-T-ID-001 |
 | I370-S14 | D370-DATA, D370-KERNEL, D370-JOURNAL | P2, P4, P6 | I370-T-NOOP-001, I370-T-RACE-001, I370-T-REC-001 |
@@ -892,16 +933,16 @@ Issue 369 Reportの27 approved failures、件数、時間をcurrent resultとし
 | I370-C09 | D370-RESULT, D370-MAP, D370-CLI | P0, P6, P7 | I370-T-RESULT-001, I370-T-ABS-001, I370-T-JSON-001, I370-T-TEXT-001 |
 | I370-R01 | D370-JOURNAL, D370-SERVICE | P3, P6 | I370-T-JRN-001, I370-T-REC-001 |
 | I370-R02 | D370-INT, D370-JOURNAL | P1, P3, P6 | I370-T-JRN-001 |
-| I370-R03 | D370-DATA, D370-JOURNAL | P3, P6 | I370-T-JRN-001, I370-T-AUTH-001, I370-T-REC-001 |
-| I370-R04 | D370-JOURNAL | P3, P6 | I370-T-JRN-001, I370-T-REC-001 |
-| I370-R05 | D370-JOURNAL, D370-RESULT | P6 | I370-T-REC-001, I370-T-RESULT-001 |
+| I370-R03 | D370-DATA, D370-CONTRACT, D370-JOURNAL | P2, P3, P6 | I370-T-SRC-001, I370-T-JRN-001, I370-T-AUTH-001, I370-T-REC-001 |
+| I370-R04 | D370-JOURNAL, D370-DATA | P3, P4, P6 | I370-T-JRN-001, I370-T-DIR-001, I370-T-REC-001 |
+| I370-R05 | D370-JOURNAL, D370-RESULT | P6 | I370-T-DIR-001, I370-T-REC-001, I370-T-RESULT-001 |
 | I370-R06 | D370-DATA, D370-JOURNAL, D370-LEGACY | P3, P6 | I370-T-JRN-001, I370-T-REC-001 |
 | I370-R07 | D370-LEGACY, D370-RESULT | P0, P8 | I370-T-LEG-001, I370-T-RESULT-001 |
 | I370-R08 | D370-INT, D370-CLI, D370-LEGACY | P1, P7, P8 | I370-T-AUTH-001 |
-| I370-R09 | D370-JOURNAL, D370-SERVICE | P3, P4, P6 | I370-T-JRN-001, I370-T-KRN-001, I370-T-REC-001 |
+| I370-R09 | D370-JOURNAL, D370-SERVICE, D370-KERNEL | P3, P4, P6 | I370-T-JRN-001, I370-T-KRN-001, I370-T-DIR-001, I370-T-REC-001 |
 | I370-R10 | D370-RESULT, D370-MAP, D370-LEGACY | P6, P7, P8 | I370-T-RESULT-001, I370-T-TEXT-001, I370-T-LEG-001 |
 | I370-O01 | D370-CONTRACT, D370-ASSESS | P2 | I370-T-OPS-001 |
-| I370-O02 | D370-DATA, D370-PLAN, D370-MAP | P2, P3, P7 | I370-T-TREE-001, I370-T-OPS-001, I370-T-JSON-001 |
+| I370-O02 | D370-DATA, D370-CONTRACT, D370-PLAN, D370-MAP | P2, P3, P7 | I370-T-TREE-001, I370-T-DIR-001, I370-T-SRC-001, I370-T-OPS-001, I370-T-JSON-001 |
 | I370-O03 | D370-PLAT, D370-KERNEL | P4, P5, P10 | I370-T-OPS-001, Linux/Darwin focused evidence |
 | I370-O04 | D370-JOURNAL, D370-RESULT, D370-MAP, D370-PLAT | P3, P6, P7, P10 | I370-T-JRN-001, I370-T-RESULT-001, I370-T-JSON-001, I370-T-TEXT-001 |
 
@@ -958,14 +999,15 @@ runtime toggleまたは長期dual modeは作らない。rollout sequenceは次�
 | DG-02 Generated identity | current generated JSONをsemanticに証明できずpathnameだけで削除する必要がある | observed bytes/schema、validator gap、historical evidence有無 |
 | DG-03 Ownership | unknown/modified/legacy-unproven entryを削除しなければacceptanceを満たせない | exact path、observation、authority source、preservation impact |
 | DG-04 Journal witness | protocol-2 schemaへpreservation/absence witnessまたはdependencyをlosslessに保存できない | current parser/serializer fields、round-trip counterexample |
-| DG-05 State reachability | prior child published+exact absentからdirectory actionを安全に実行できずverified dependencyへ戻す必要がある | exact crash state、parser result、kernel precondition |
-| DG-06 Absence proof | nearest existing bound ancestorからowned subtree absenceを証明できずunproven parent gapをtrustする必要がある | path tree、contract ownership、binding failure |
-| DG-07 Typed result | resultだけからphase/last/failed/pending/action/top errors/retryを一意に生成できない | missing field、durable states with same result、public compatibility impact |
-| DG-08 Legacy conversion | `.uninstall-retry.json`自動変換が必要 | exact marker bytes、injectivity proof、negative counterexample |
-| DG-09 Purge boundary | remove-specs behavior/authorityを変更しなければroute splitできない | caller graph、current public behavior、Issue 371 impact |
-| DG-10 Public compatibility | schema key/version/exit/text order変更が必要 | exact golden conflict、consumer impact |
-| DG-11 Platform | Linux/Darwinの一方でwrite-before-capability-checkが避けられない | platform、capability、first-write trace |
-| DG-12 Hidden fallback | default/keep routeからlegacy writer/remove helperまたはCLI journal interpretationを除去できない | exact caller/callee、remaining ownership、D4 boundary |
+| DG-05 State reachability | immediate child evidenceとpublished directory subtree subsumptionからnested directory actionを安全に実行できず、descendant再openまたはverified dependencyへ戻す必要がある | exact 3階層crash state、parser result、kernel precondition、descendant access trace |
+| DG-06 Absence proof | deletion closure外のsurviving bound ancestorへcanonical re-anchorしてowned subtree absenceを証明できず、削除対象anchorまたはunproven gapをtrustする必要がある | path tree、action closure、anchor candidates、binding failure |
+| DG-07 Source identity | durable semantic source projectionだけではsame-plan compatible newer recoveryを再構成できず、physical device/inode/ctime/mtimeをguard/journal equalityへ保存する必要がある | semantic counterexample、package A/B fixture、current source snapshot behavior |
+| DG-08 Typed result | resultだけからphase/last/failed/pending/action/top errors/retryを一意に生成できない | missing field、durable states with same result、public compatibility impact |
+| DG-09 Legacy conversion | `.uninstall-retry.json`自動変換が必要 | exact marker bytes、injectivity proof、negative counterexample |
+| DG-10 Purge boundary | remove-specs behavior/authorityを変更しなければroute splitできない | caller graph、current public behavior、Issue 371 impact |
+| DG-11 Public compatibility | schema key/version/exit/text order変更が必要 | exact golden conflict、consumer impact |
+| DG-12 Platform | Linux/Darwinの一方でwrite-before-capability-checkが避けられない | platform、capability、first-write trace |
+| DG-13 Hidden fallback | default/keep routeからlegacy writer/remove helperまたはCLI journal interpretationを除去できない | exact caller/callee、remaining ownership、D4 boundary |
 
 Decision Gateをtemporary workaround、compatibility fallback、test expectation緩和、legacy pathname ownership、Issue 371/372への責務先送りで通過してはならない。
 
@@ -984,8 +1026,10 @@ new deprovision guard/journalをconsumerで作成していないcandidateは、n
 - same canonical plan digest
 - compatible protocol
 - exact pre/postcondition
+- stored durable semantic source projectionとcurrent packageから再構成したsemantic projectionのexact一致
+- current invocation内で新規captureしたfull source snapshotの安定性
 
-を全て満たすcompatible newer packageだけがcheckpointを進める。completed actionをrollbackしない。mismatch、unknown child、replacement、legacy marker、purge invocationはwrite 0で停止する。
+を全て満たすcompatible newer packageだけがcheckpointを進める。physical install-rootのdevice/inode/ctime/mtime差だけでは拒否しない。completed actionをrollbackしない。mismatch、unknown child、replacement、legacy marker、purge invocationはwrite 0で停止する。
 
 ### terminal cleanup failure
 
@@ -1025,17 +1069,18 @@ Issue 372はdefault/keep legacy writerを後から削除するownerではない�
 3. default/keep dry-runがsingle generated-state producerを含むread-only new assessmentを使用する。
 4. active/.agentのcurrent positive、legacy、unknown、conflict matrixがexact runtime producer fixtureでpassする。
 5. mutating keep applyがschema-2 guard、protocol-2 journal、common kernel、post-assessmentを使用する。
-6. directory actionがprior child published+exact absentから到達し、prepared/executing/verifying/completed parser tableと全crash windowがpassする。
+6. 3階層以上のdirectory actionがimmediate child evidenceから到達し、leaf/directory child kind、published directory subtree subsumption、prepared/executing/verifying/completed parser table、各directory publish直後crash windowがpassする。
 7. preserve/blockはjournal actionでなくimmutable witness/diagnosticであり、到達不能checkpointがない。
-8. proven-owned ancestor absenceがdescendant actionなしでcollapseされ、entire managed subtree absent applyがprotocol metadata/target write 0でcompletedになる。
-9. absence witness後のappearance、unknown child、same-content replacement、root/parent/source raceをfail closedで保持する。
-10. initiatives byte identity、Workbench、outside sentinel、unknown/modified/generated conflictが保持される。
-11. legacy markerを自動変換せず、marker/targetを保持する。
-12. deprovision/purge authority switchが全routeで拒否される。
-13. typed `DistributionProcessResult`または同等inputだけでphase、last completed、failed/pending paths、per-action error、top-level errors、retry policyを生成でき、pending pathのfailed/pending両field出現を含めてCLI journal interpretationがsource/monkeypatch testで0である。
-14. public schema v1、one stdout object、text、exit、status別target sanitization、normal keep/legacy retry nullabilityがgoldenに一致する。
-15. default/keep routeからlegacy plan/apply/postverify/marker/remove fallbackが物理的に除去される。
-16. focused、fast、lint、validate、diff check、candidate full regressionが所定条件を満たす。
-17.未実行test、policy skip、Issue 369 evidenceをIssue 370 successとしてReportへ記録しない。
-18. coderがDecision Gateを推測で通過していない。
-19. Issue 371 purgeとIssue 372 parity/closureの責務を本Issueへ混入させていない。
+8. proven-owned ancestor absenceがdescendant actionなしでcollapseされ、削除対象anchorは上位surviving ancestorへre-anchorされ、entire managed subtree absent applyがprotocol metadata/target write 0でcompletedになる。
+9. directory semantic projectionがauthorized parent ctime/link-count変化で再現でき、directory inode/type/mode replacement、absence appearance、unknown child、same-content replacement、root/parent raceをfail closedで保持する。
+10. durable source equalityがsemantic projectionへ限定され、semantic-equalな別physical install rootのcompatible newer resume、semantic drift rejection、same-invocation full snapshot replacement rejectionがpassする。
+11. initiatives byte identity、Workbench、outside sentinel、unknown/modified/generated conflictが保持される。
+12. legacy markerを自動変換せず、marker/targetを保持する。
+13. deprovision/purge authority switchが全routeで拒否される。
+14. typed `DistributionProcessResult`または同等inputだけでphase、last completed、failed/pending paths、per-action error、top-level errors、retry policyを生成でき、pending pathのfailed/pending両field出現を含めてCLI journal interpretationがsource/monkeypatch testで0である。
+15. public schema v1、one stdout object、text、exit、status別target sanitization、normal keep/legacy retry nullabilityがgoldenに一致する。
+16. default/keep routeからlegacy plan/apply/postverify/marker/remove fallbackが物理的に除去される。
+17. focused、fast、lint、validate、diff check、candidate full regressionが所定条件を満たす。
+18. 未実行test、policy skip、Issue 369 evidenceをIssue 370 successとしてReportへ記録しない。
+19. coderがDecision Gateを推測で通過していない。
+20. Issue 371 purgeとIssue 372 parity/closureの責務を本Issueへ混入させていない。

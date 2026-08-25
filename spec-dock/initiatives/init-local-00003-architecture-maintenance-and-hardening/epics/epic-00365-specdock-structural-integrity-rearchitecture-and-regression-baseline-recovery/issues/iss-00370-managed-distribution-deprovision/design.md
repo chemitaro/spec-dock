@@ -37,7 +37,7 @@ CLI Adapter
 
 ### Current: exact SHAで確認した実装事実
 
-基準commitは `7301800263eae1a78ea710ff1935ab4ce0f138e7` である。
+基準commitは `5d25f393dba95d1a71c5582714de43c82fa094f4` である。
 
 #### `src/spec_dock/managed_distribution.py`
 
@@ -170,10 +170,10 @@ root、specs mode、intent、authority、contract、plan、checkpointを持た�
 |---|---|---|
 | D370-CLI | CLI parse、root lock/binding、default/keepとremove routeの一回限りのdispatch | `src/spec_dock/cli.py` |
 | D370-INT | `deprovision` intent、`uninstall` plan mapping、action allowlist、authority、guard purpose | Intent、authority、action grammar |
-| D370-DATA | tree entry、directory mutation snapshot、preservation witness、collapsed absence witnessのimmutable model | Proposed data model |
-| D370-CONTRACT | physical/historical/generated/preserved contract、single generated-state producer、current/legacy境界 | Distribution Contract |
+| D370-DATA | tree entry、type-specific directory semantic projection、immediate child evidence、preservation witness、surviving-anchor collapsed absence witnessのimmutable model | Proposed data model |
+| D370-CONTRACT | physical/historical/generated/preserved contract、single generated-state producer、durable semantic source projection、current/legacy境界 | Distribution Contract |
 | D370-ASSESS | no-follow observation、top-down absence collapse、complete classification、blocker gate | Deprovision assessment algorithm |
-| D370-PLAN | mutating-only executable plan、dependency、pre/postcondition、canonical digest | Executable plan |
+| D370-PLAN | mutating-only executable plan、immediate child dependency/subsumption、semantic source/namespace projection、pre/postcondition、canonical digest | Executable plan |
 | D370-JOURNAL | schema-2 guard、protocol-2 journal、witness metadata、reachable checkpoint/status state machine、resume、terminal cleanup | Journal / guard design |
 | D370-KERNEL | exact regular/symlink pruneとbound empty-directory removal | Filesystem kernel |
 | D370-SERVICE | dry-run、metadata-free no-op、journaled apply、post-assessment、durable-state-to-result conversion | Service / flows |
@@ -383,43 +383,83 @@ Invariants:
 - mutation対象regularは`link_count == 1`必須。
 - preservation対象regularのunproven multi-linkもblockerとする。
 
-### Directory mutation snapshot
+### Durable source semantic projection and invocation snapshot
+
+current implementationの`DistributionSourceSnapshot`はdevice、inode、ctime、mtime、size、modeを持つ。このfull physical snapshotは一invocation内のprovider source capture/read/apply TOCTOU guardとして維持するが、contract identity、plan digest、forward guard、journal equalityへ直列化しない。
 
 ```python
+DistributionSourceSemanticKind = Literal["regular", "symlink"]
+
+@dataclass(frozen=True)
+class DistributionSourceSemanticIdentity:
+    canonical_source_path: str
+    kind: DistributionSourceSemanticKind
+    sha256: str | None = None
+    mode: int | None = None
+    link_target: str | None = None
+    contract_schema_version: int = 1
+```
+
+Invariants:
+
+- `canonical_source_path`はpackage contract内のnormalized POSIX pathで、absolute extraction pathではない。
+- regularはSHA-256とmodeを必須とし、link targetを持たない。
+- symlinkはnormalized link targetを必須とし、SHA-256を持たない。modeをsemantic equalityへ含める場合はexisting symlink contractと同じ扱いに固定する。
+- contract/journal protocol discriminatorとasset kindをcanonical serializationへ含める。
+- device、inode、ctime、mtime、temporary extraction root、wheel cache pathを含めない。
+
+new invocationまたはcompatible newer packageは自身のphysical sourceからfull `DistributionSourceSnapshot`を新規captureし、そのsnapshotでbytes/mode/link textを読み、`DistributionSourceSemanticIdentity`を再構成する。stored semantic projectionとexact一致した場合だけsame-plan resumeできる。そのinvocation中にvisible sourceまたはopened sourceのfull snapshotが変化した場合は、semantic bytesが偶然同じでもTOCTOU mismatchとして停止する。
+
+### Directory mutation snapshot and immediate child evidence
+
+```python
+DistributionDirectoryChildKind = Literal["leaf", "directory"]
+
+@dataclass(frozen=True)
+class DistributionImmediateChildEvidence:
+    child_path: str
+    child_kind: DistributionDirectoryChildKind
+    action_path: str
+    required_checkpoint: Literal["published"]
+    expected_postcondition: dict[str, object]
+
 @dataclass(frozen=True)
 class DistributionDirectoryMutationSnapshot:
     relative_path: str
     binding: PathIdentitySnapshot
     initial_entries: tuple[DistributionTreeEntrySnapshot, ...]
     initial_child_digest: str
-    dependency_paths: tuple[str, ...]
+    immediate_child_evidence: tuple[DistributionImmediateChildEvidence, ...]
     expected_remaining_child_digest: str
 ```
 
-`binding`のstable comparisonはdevice/inode/type/modeを使用する。authorized child mutationはdirectory ctimeとlink countを変更し得るため、後続mutationのbinding comparisonへinitial ctime/link count exactを要求しない。initial ctime/link countはaudit evidenceとして保持し、visible pathとheld descriptorが同じdevice/inode/type/modeを指すことを各mutation境界で再検証する。namespace変化は後述のexpected child digestで別途検証する。
+`binding`のruntime full comparisonはvisible pathとheld descriptorのdevice/inode/type/mode/ctime/link countをmutation境界で照合するTOCTOU guardである。一方、authorized child mutationはdirectory ctime/link countを変更し得るため、durable namespace equalityとexpected child digestではdirectory childの`ctime_ns`と`link_count`を使わない。この二つを同じ比較へ混在させない。
 
-`dependency_paths`はそのdirectory直下またはdescendantを消すprior mutating action pathのcanonical tupleである。directory actionの実行条件は、全dependencyがjournal checkpoint `published`であり、各current targetがそのactionのexact expected-absent postconditionに一致することである。`verified`はdependency条件ではない。
+`immediate_child_evidence`は対象directoryの**直下child一件につき最大一件**であり、descendant actionを直接列挙しない。
 
-child digestは次のrecordをrelative-path byte orderでsortしたcanonical JSONのSHA-256とする。
+- leaf child: `child_kind="leaf"`。対応leaf `prune` actionが`published`で、leaf pathがそのactionのexact expected-absent postconditionに一致することを要求する。
+- directory child: `child_kind="directory"`。対応child `remove-empty-directory` actionが`published`で、child directory pathがabsentであることを要求する。child directoryのpublished checkpointは、そのdirectory action自身が検証済みimmediate childrenを前提に成立したdurable evidenceであり、配下subtreeのdescendant evidenceをsubsumesする。
+
+ancestor directory action、`verifying`、crash resumeはpublished directory childの配下pathをopen/list/stat/readlinkしない。child directory pathのabsenceとcheckpointだけを検証する。
+
+child digestはheld directoryの**immediate namespace**をrelative-path byte orderでsortしたcanonical JSONのSHA-256とし、record projectionをkind別に固定する。
 
 ```text
-format_version
-relative_path
-kind
-device
-inode
-ctime_ns
-mode
-link_count
-size-or-null
-sha256-or-null
-link_target-or-null
-classification
-owner_source
+directory child:
+  format_version, relative_path, kind, device, inode, mode,
+  classification, owner_source
+  # ctime_ns, link_count, size, sha256, link_target は含めない
+
+regular child:
+  format_version, relative_path, kind, device, inode, ctime_ns, mode,
+  link_count, size, sha256, classification, owner_source
+
+symlink child:
+  format_version, relative_path, kind, device, inode, ctime_ns, mode,
+  link_count, link_target, classification, owner_source
 ```
 
-absolute path、wall-clock timestamp、process ID、random nonceをdigest inputにしない。
-
+special fileはdigest recordを発行せずblockerにする。absolute path、wall-clock timestamp、process ID、random nonceをdigest inputにしない。directory childのinode/type/mode replacement、unknown childのappearance/disappearanceはsemantic digest mismatchとなる。authorized descendant mutationに伴うdirectory child ctime/link-count変化だけはdigestを変えない。
 ### Preservation witness
 
 ```python
@@ -441,13 +481,14 @@ preservation rootがmissingならmissing snapshotを保持する。apply中にap
 
 Preservation witnessは`DistributionAction`でも`OperationJournalAction`でもない。checkpointを持たず、plan/journal immutable metadataとしてpreflight、first mutation前、verifyingのfull post-assessmentで再検証する。
 
-### Collapsed absence witness
+### Collapsed absence witness and surviving anchor
 
 ```python
 @dataclass(frozen=True)
 class DistributionCollapsedAbsenceWitness:
     relative_root: str
-    nearest_existing_ancestor: PathIdentitySnapshot
+    anchor_path: str
+    surviving_anchor: PathIdentitySnapshot
     missing_suffix: tuple[str, ...]
     owned_descendant_paths_digest: str
     reason: Literal["owned-subtree-already-absent"]
@@ -456,12 +497,14 @@ class DistributionCollapsedAbsenceWitness:
 Invariants:
 
 - `relative_root`はcontract-owned pathである。
-- `nearest_existing_ancestor`はroot descriptorからno-followで開いたreal directoryである。
-- `missing_suffix`はancestorから`relative_root`までのnon-empty canonical path componentsであり、最初のmissing componentより下をfilesystemで列挙しない。
-- `owned_descendant_paths_digest`はcontract上の`relative_root`と全owned descendants、expected kinds、owner sourcesをcanonicalにhashする。
+- `anchor_path` / `surviving_anchor`はroot descriptorからno-followで開いたreal directoryで、device/inode/type/modeへ束縛する。
+- anchorは同じ`ExecutableMutationPlan`のmutating action、directory-removal closure、または別collapsed subtreeに含まれず、operation完了までpathnameが存続する。
+- top-down観測で最初に見つけたexisting ancestorが`remove-empty-directory`対象なら、そのancestorを採用せずparentへ上がる。削除closure外の最も近いexisting real directoryをcanonical anchorとし、target rootを最終fallbackとする。
+- `missing_suffix`はsurviving anchorから`relative_root`までのnon-empty canonical path componentsであり、最初のmissing componentより下をfilesystemで列挙しない。
+- `owned_descendant_paths_digest`はcontract上の`relative_root`と全owned descendants、expected kinds、owner sources、semantic source projectionをcanonicalにhashする。
 - witnessが存在するsubtreeのdescendantへmutating actionを発行しない。
-- recovery metadataがないfresh assessmentでだけcollapseを新規作成する。existing journal resumeではjournal action setをcurrent absenceに合わせて置換しない。
-
+- recovery metadataがないfresh assessmentでだけcollapseを新規作成する。existing journal resumeではjournal action set/witnessをcurrent absenceに合わせて置換しない。
+- first mutation前、no-op post-assessment、verifyingではsurviving anchorだけを再openし、missing suffixの先頭componentがabsentであることを確認する。removed subtree内pathを再openしない。
 ### Generated-state contract
 
 ```python
@@ -807,21 +850,24 @@ classificationされないentry、duplicate path、親子で競合するaction�
 ### 2. Package and generated contract capture
 
 - manifest/scaffold/install-root sourceをno-followでcaptureする。
-- regular source bytes、mode、device/inode/ctime/mtime/size、SHA-256をcurrent kernel contractに従って保持する。
+- each sourceについてfull `DistributionSourceSnapshot`をcurrent invocation内TOCTOU guardとしてcaptureし、opened sourceからbytes/mode/link textを読み、durable `DistributionSourceSemanticIdentity`を構築する。
+- physical device/inode/ctime/mtime/temporary extraction rootをcontract identityまたはplan digestへ入れない。
 - `build_deprovision_generated_state_contract()`をexactly once呼ぶ。
 - producer blockerが一件でもあればgenerated entryをpartial adoptionせずassessment blockerにする。
-- assessment後、plan発行直前とfirst mutation直前にsource identityとgenerated contract root bindingsを再検証する。
+- assessment後、plan発行直前、first mutation直前、各source-dependent mutation boundaryでcurrent invocationのfull source snapshotを再検証する。resumeではstored semantic source projectionとのexact一致を先に確認し、別physical install rootのsemantic-equal sourceを許可する。
 
 ### 3. Top-down owned-ancestor observation and collapse
 
 contract-owned path treeをtop-down canonical orderで観測する。
 
-1. nearest existing ancestorをroot fdからno-followでopenし、device/inode/typeへ束縛する。
+1. existing componentをroot fdからno-followでtop-down openし、device/inode/type/modeをcaptureする。
 2. next componentが存在する場合は通常のparent/target observationへ進む。
-3. next componentがmissingで、そのcomponentから下がcontract-owned subtreeである場合、その最上位owned pathへ一つの`DistributionCollapsedAbsenceWitness`を発行する。
-4. witness発行後はそのfilesystem subtreeを列挙せず、contract上のdescendant path digestだけを作る。
-5. witness配下のleaf/directory mutation actionは発行しない。
-6. missing componentがcontract-owned subtreeより上位、またはnearest existing ancestorをexact bindingできない場合は`unproven-parent-gap` blocker。
+3. next componentがmissingで、そのcomponentから下がcontract-owned subtreeである場合、その最上位owned pathをcollapse root候補とする。
+4. action candidate treeを先に完成させ、collapse rootから上へ辿る。nearest existing ancestorが同じplanの`remove-empty-directory`対象または削除closure内なら採用せず、さらに上位へ進む。
+5. deletion closure外の最も近いexisting real directoryを`surviving_anchor`とする。target rootまで到達した場合はrootをanchorにする。
+6. anchorからcollapse rootまでのmissing suffixとcontract descendant semantic digestを一つの`DistributionCollapsedAbsenceWitness`へ保存する。
+7. witness発行後はmissing filesystem subtreeを列挙せず、witness配下のleaf/directory mutation actionを発行しない。
+8. missing componentがcontract-owned subtreeより上位、surviving anchorをexact bindingできない、またはanchor selectionがaction closureと循環する場合は`unproven-parent-gap` blocker。
 
 Recovery metadataなしのassessmentだけがnew collapseを作る。journal resumeではjournal actions/witnessesを正本とし、現在absentだからという理由でactionを消さない。
 
@@ -852,14 +898,14 @@ Recovery metadataなしのassessmentだけがnew collapseを作る。journal res
 -各directoryのinitial child setをcaptureする。
 - unknown/modified/preserved/legacy-unproven childがあればそのdirectory actionを作らずoperation blocker。
 -全present owned childがmutating `prune`、already absent、またはcollapsed absenceで説明され、preserved childが0のexisting directoryだけ`remove-empty-directory`を作る。
-- directory actionはdeepest-firstで、dependency child actionより後に配置する。
+- directory actionはdeepest-firstで、immediate child actionより後に配置する。leaf childはleaf action、directory childはそのchild directory actionだけをevidenceとして参照し、descendant actionを直接dependencyへ列挙しない。
 
 ### 7. Preservation and absence witnesses
 
 - `spec-dock/initiatives`をno-follow recursive snapshotする。
 - `.workbench`が存在すれば同様にsnapshotする。
 - regular bytes SHA、mode、type、link topology、symlink text、directory child setをpreservation digestへ含める。
-- collapsed absenceはnearest existing ancestor binding、missing suffix、contract-owned descendant digestを保持する。
+- collapsed absenceはsurviving anchor path/binding、そこからのmissing suffix、contract-owned descendant semantic digestを保持する。
 - content bytes、absolute pathをjournalへ保存しない。
 - special file、unproven hardlink、root/parent symlinkはblocker。
 
@@ -887,15 +933,15 @@ mutating actionが0件でrecovery metadataもなければ、executable planはno
 - `intent="deprovision"`
 - `authority="managed-distribution-deprovision"`
 - contract identity
-- generated-state contract digest（各entryのsemantic contract、identity、no-follow `observed` snapshotを含む）
+- generated-state contract digest（各entryのsemantic contractとobserved target identityを含む）
 - ordered mutating actions
 - each action path/action/provenance/reason
 - complete root/parent/target pre/postcondition
 - each action parent-chain stable bindingsとprior published actionsから導出するexpected parent child digests
-- directory initial/expected child digestと`dependency_paths`
+- directory initial/expected child semantic digestとkind付き`immediate_child_evidence`
 - preservation witness canonical records/digests
 - collapsed absence witness canonical records/digests
-- source snapshot identity
+- durable source semantic projection（canonical source path、asset kind、SHA-256、mode、link target、schema/protocol）
 
 次を含めない。
 
@@ -903,6 +949,7 @@ mutating actionが0件でrecovery metadataもなければ、executable planはno
 - wall-clock timestamp
 - operation ID / nonce
 - current journal/guard file identity
+- provider sourceのdevice/inode/ctime/mtime、absolute extraction/cache path
 - public category/wording
 
 `preserve`/`block`をjournal actionから除外しても、witnessとdiagnostic disposition digestがcontract identityへ含まれるため、unknown/preserved stateをplan外にしない。
@@ -940,7 +987,7 @@ Postcondition: target absent。
 
 - assessment diagnosticは`already_removed`へmappingする。
 - `ExecutableMutationPlan.actions`とjournalには入れない。
-- leaf-level `DistributionCollapsedAbsenceWitness`でnearest existing parentとmissing suffixを束縛する。
+- leaf-level `DistributionCollapsedAbsenceWitness`もdeletion closure外のnearest surviving bound ancestorへcanonicalにre-anchorし、anchor path/bindingとmissing suffixを束縛する。
 - apply前/post-assessmentでappearanceした場合はblock/recovery required。
 
 #### Remove-empty-directory
@@ -948,25 +995,24 @@ Postcondition: target absent。
 Precondition:
 
 - root/parent chain
-- exact directory device/inode/type
-- initial child digest
-- ordered `dependency_paths`
+- exact directory device/inode/type/mode binding
+- initial immediate-child semantic digest
+- ordered `immediate_child_evidence`
 - expected remaining child digest = empty digest
--全dependency actionのexpected postcondition = target absent
 
-Execution admission:
+Immediate child admission:
 
 - journal status `executing`
 - directory action checkpoint `pending`
--各dependency checkpoint `published`
--各dependency pathがcurrent filesystemでexact absent
-- current directory child digestがexpected empty digest
+- leaf evidence: referenced leaf action checkpoint `published` and leaf path exact absent
+- directory evidence: referenced immediate child directory action checkpoint `published` and child directory path absent
+- directory evidenceのpublished checkpointはchild subtreeをdurably subsumeする。ancestorはchild directory配下のdescendant action/postconditionを再open・再検証しない
+- current directory immediate-child semantic digestがexpected empty digest
 
 Postcondition:
 
 - directory path absent
 - parent/root binding unchanged
-
 #### Preservation / collapsed absence
 
 journal actionではない。`OperationJournal.preservation_witnesses` / `absence_witnesses`へ保存し、first mutation前とverifyingでrevalidateする。
@@ -980,7 +1026,8 @@ journal actionではない。`OperationJournal.preservation_witnesses` / `absenc
 - `preserve` / `block` / already-absent actionがmutating action tupleに混入
 - generated contractがmissingまたは二系統input由来
 - duplicate/conflicting/ancestor-overlap action
-- directory dependencyがaction orderでpriorでない
+- immediate child evidenceが対象directoryの直下childでない、action orderでpriorでない、またはchild kindとaction kindが一致しない
+- directory child evidenceがpublished subtree subsumptionを表現せずdescendant actionを直接列挙する
 - dependency actionが`prune`/`remove-empty-directory`以外
 - incomplete parent chain/pre/postcondition
 - witness overlap/conflict
@@ -995,13 +1042,15 @@ journal actionではない。`OperationJournal.preservation_witnesses` / `absenc
 - `.distribution-retry.json` forward guard: schema version 2を維持。
 -新規purpose/authority pairを追加する。
 - protocol-2 deprovision journalへ`preservation_witnesses`、`absence_witnesses`をimmutable top-level metadataとして追加する。
-- directory dependencyは`OperationJournalAction.precondition["dependency_paths"]`とexpected child digestへ保存する。
+- directory dependencyは`OperationJournalAction.precondition["immediate_child_evidence"]`へchild kind、action path、required checkpoint、expected postconditionをlosslessに保存し、type-specific expected child semantic digestとともにplan digestへ束縛する。
 
 Parser rules:
 
 - deprovision journalは両witness fieldを必須とし、canonical sort/digest/relative path/typeをstrict validationする。
 - fresh/recognized journalでnon-empty deprovision witness fieldを拒否する。
 - `preserve`/`block` action recordをdeprovision journalで拒否する。
+- immediate child evidenceがdescendantを直接参照する、leaf/directory kindがaction kindと一致しない、directory child actionが未publishedなのにparentがpublished、またはpublished directoryのsubsumption recordが欠落するjournalを拒否する。
+- durable source semantic projectionをstrict parseし、physical source snapshot fieldがjournal/guardに混入したpayloadを拒否する。
 - action/witness/condition field omissionをself-rehashしてもplan mismatchとして拒否する。
 
 ### Deprovision guard
@@ -1026,8 +1075,8 @@ journal_digest = absent before journal, exact after journal binding
 | Journal status | Allowed checkpoints | Required invariant | Next durable transition |
 |---|---|---|---|
 | `prepared` | all `pending` | target mutation 0。action order、dependencies、witnesses、plan digest valid。 | status=`executing`。 |
-| `executing` | each action `pending` or `published`; `verified`は0 | published actionはexact postcondition一致。published setはdeterministic action orderのprefix/topological closure。directoryをpublishedにする前に全dependencyがpublished + exact absent。 | all actions published後だけstatus=`verifying`。 |
-| `verifying` | all actions `published` | pending/verifiedは0。target mutationを新規実行しない。full post-assessmentで全action postcondition、preservation witness、absence witness、root/parent/unknown closed setを確認する。 |一回のatomic journal publicationで全action=`verified`かつstatus=`completed`。 |
+| `executing` | each action `pending` or `published`; `verified`は0 | published actionはexact postcondition一致。published setはdeterministic action orderのprefix/topological closure。directoryをpublishedにする前に全immediate child evidenceが充足する。published directory actionはそのsubtreeをsubsumedとし、ancestor validationでdescendant pathを再openしない。 | all actions published後だけstatus=`verifying`。 |
+| `verifying` | all actions `published` | pending/verifiedは0。target mutationを新規実行しない。full post-assessmentでtop-level published action postcondition、published directory subtree summaries、preservation witness、surviving-anchor absence witness、root/remaining parent/unknown closed setを確認する。removed subtree内descendantを再openしない。 |一回のatomic journal publicationで全action=`verified`かつstatus=`completed`。 |
 | `completed` | all actions `verified` | full post-assessment成功済み。target action再実行不可。 | guard cleanup、journal cleanup。 |
 
 Forbidden examples:
@@ -1035,8 +1084,10 @@ Forbidden examples:
 - `executing` + any `verified`
 - `verifying` + any `pending` or `verified`
 - `completed` + any non-`verified`
-- directory `published` while dependency `pending`
-- dependency `published` but target not exact absent
+- directory `published` while any immediate child evidence is unfulfilled
+- leaf evidence `published` but leaf target not exact absent
+- directory evidence `published` but child directory path present
+- parent directory evidence that directly enumerates a published child directory's descendants
 - preservation witness represented ascheckpointed action
 
 ### State transition
@@ -1076,7 +1127,7 @@ mutating actionがあるoperationのfirst target mutationはguardとjournalがdu
 - target unlink直前にheld descriptor、visible path、preconditionを再検証する。
 - unlink/rmdir後にexpected absenceを再観測してからactionを`published`へ進める。
 - checkpoint publish failure後はcurrent targetを再観測し、exact preまたはexact postの一方だけに一致する場合だけ`pending`/`published`を再構成する。
-- `remove-empty-directory`は全dependency `published` + exact absentをjournalとfilesystemの両方で確認する。
+- `remove-empty-directory`はimmediate child evidenceだけを確認する。leaf evidenceはpublished+exact absent、directory evidenceはpublished+child directory path absentとする。directory evidence配下のdescendantは再openしない。
 - unknown replacement、appeared absence witness、unknown childを削除せずfail closedにする。
 - preservation/absence witnessはexecuting中にcheckpointを進めず、first mutation前とverifyingで再評価する。
 
@@ -1089,7 +1140,7 @@ def _remove_distribution_directory_if_bound(
     *,
     expected_root_identity: DistributionRootIdentity,
     expected_directory_binding: PathIdentitySnapshot,
-    dependency_postconditions: tuple[tuple[str, dict[str, object]], ...],
+    immediate_child_evidence: tuple[DistributionImmediateChildEvidence, ...],
     expected_remaining_child_digest: str,
 ) -> None:
     ...
@@ -1097,18 +1148,18 @@ def _remove_distribution_directory_if_bound(
 
 必須順序:
 
-1. journal parser/serviceでdependency checkpointが全て`published`であることを確認。
+1. journal parser/serviceで全immediate child evidenceのcheckpointが`published`であることを確認。
 2. root/parent descriptor chainをno-follow open。
-3.各dependency targetをdescriptor-relativeに再観測し、exact expected-absentを確認。
-4. visible directory pathとheld fdのdevice/inode/type一致。
-5. current child setをheld fdから列挙し、expected empty digestとexact一致。
-6. parent/root identityを再検証。
-7. `rmdir(..., dir_fd=parent_fd)`。
-8. parent/root identityとpath absenceを再検証。
-9. callerがjournal actionを`published`へdurable更新。
+3. leaf child evidenceはleaf pathのexact absenceを確認する。
+4. directory child evidenceはchild directory pathのabsenceだけを確認する。published child directoryの配下descendantをopen/list/statしない。
+5. visible target directory pathとheld fdのfull device/inode/type/mode/ctime/link identityをruntime TOCTOU guardとして再照合する。
+6. held target directoryのcurrent immediate child setをtype-specific semantic projectionで列挙し、expected empty digestとexact一致させる。directory child recordではctime/link countをdigestへ入れない。
+7. parent/root identityを再検証。
+8. `rmdir(..., dir_fd=parent_fd)`。
+9. parent/root identityとtarget directory path absenceを再検証。
+10. callerがjournal actionを`published`へdurable更新し、そのcheckpointがsubtree evidenceをsubsumesする。
 
 recursive callを持たない。
-
 ## Dry-run flow
 
 ```text
@@ -1149,14 +1200,15 @@ blockerはtyped action outcomes/reasonsに表示する。normal blocker inventor
 10. journalをprepareし、全action`pending`、witness metadata、dependencyをdurable bindする。
 11. journalを`executing`へ進め、source/root/parent/witnessをfirst mutation直前に再検証する。
 12. leaf `prune`を実行し、exact absence後に各actionを`published`へ進める。
-13.各directory actionについてdependency childが全て`published`かつexact absentであることを確認し、empty digest一致後にrmdirし、directoryを`published`へ進める。
-14. 全mutating actionが`published`であることを確認してjournalを`verifying`へ進める。
-15. target mutationなしでfull post-assessmentを行い、removed paths、preservation witnesses、absence witnesses、root/parent、unknown closed setをverifyする。
-16.一回のatomic journal publicationで全actionを`verified`、statusを`completed`へ進める。
-17. forward guardをexact cleanupする。
-18. completed journalをexact cleanupする。
-19. 追加のworkspace cleanupを行わずtyped `completed` resultを返す。
-20.任意のfailure return前にprivate result builderがphase、last completed、action outcomes、failed/pending paths、errors、retry policyを確定する。CLIへjournal interpretationを委ねない。
+13. directory actionをdeepest-firstに処理する。各actionはimmediate child evidenceだけを確認し、leaf childはpublished+absent、directory childはpublished+directory path absentを要求する。empty semantic digest一致後にrmdirし、directoryを`published`へ進める。published directory checkpointは配下subtreeをsubsumesする。
+14. child directoryがpublishedになった後、ancestor action、crash resume、verifyingはそのremoved subtree内descendantを再openしない。
+15. 全mutating actionが`published`であることを確認してjournalを`verifying`へ進める。
+16. target mutationなしでfull post-assessmentを行い、published directory subtree summaries、top-level removed paths、preservation witnesses、surviving-anchor absence witnesses、root/remaining parent、unknown closed setをverifyする。removed subtree内descendantを再openしない。
+17.一回のatomic journal publicationで全actionを`verified`、statusを`completed`へ進める。
+18. forward guardをexact cleanupする。
+19. completed journalをexact cleanupする。
+20. 追加のworkspace cleanupを行わずtyped `completed` resultを返す。
+21.任意のfailure return前にprivate result builderがphase、last completed、action outcomes、failed/pending paths、errors、retry policyを確定する。CLIへjournal interpretationを委ねない。
 
 ## Root / parent / child identity algorithm
 
@@ -1167,32 +1219,37 @@ blockerはtyped action outcomes/reasonsに表示する。normal blocker inventor
 -各mutation boundaryでvisible rootとheld root fdを再照合する。
 - root replacement/rebindは追加mutationを停止する。
 
-### Parent chain and absence collapse
+### Parent chain, immediate namespace, and directory subsumption
 
-通常のmutating actionはrootからtarget parentまでのordered `PathIdentitySnapshot`をpreconditionに持つ。ただしauthorized earlier actionがancestor directoryのctime/link countを変えるため、execution時のstable parent bindingはdevice/inode/type/modeで比較し、namespaceはprior `published` actionから導出したexpected child digestで比較する。
+通常のmutating actionはrootからtarget parentまでのordered `PathIdentitySnapshot`をpreconditionに持つ。runtime mutation boundaryではvisible pathとheld descriptorのfull identityを比較する。durable namespace equalityはtype-specific semantic child projectionとpublished immediate child evidenceで別に再構成する。
 
-- existing parent: directory、device、inode、type、modeを固定。initial ctime/link countはaudit evidenceであり、authorized prior child mutation後のidentity equality条件にしない。
-- executorはactionごとに`current_parent_bindings` / expected child digestを更新する。更新可能なのは直前までのjournal `published` actionのexact postconditionだけであり、plan/journal authorityを変更しない。
-- crash resumeはjournalのpublished setからsame expected parent child digestを再構成し、filesystemと一致する場合だけ前進する。同じinodeでもunknown appearance/disappearance、mode change、unexplained child setはblockする。
+- existing parent: directory device/inode/type/modeをdurable stable fieldsとする。full ctime/link countはcurrent invocationのruntime TOCTOU guardへ保持するが、authorized child mutation後のdurable equality条件へ使わない。
+- executorはjournalのpublished setから各existing directoryのexpected immediate child semantic digestを再構成する。更新可能なのはそのdirectory直下のpublished child actionだけである。
+- leaf child publishedはそのleaf recordをexpected namespaceから除去する。
+- directory child publishedはchild directory recordをexpected namespaceから除去し、child actionがsubtree evidenceをsubsumesする。ancestor expected stateを導出する際にchild subtreeのdescendant actionを読まない。
+- crash resumeはjournalのpublished immediate child setから同じexpected digestを再構成する。published child directory配下のpathを再openしない。
+- same inodeでもunknown child appearance/disappearance、directory inode/type/mode replacement、unexplained namespace changeはblockする。
 - deprovisionはmissing parentを作成しない。
-- top-down observationでcontract-owned ancestorがmissingなら、最初のmissing owned ancestorへcollapseし、nearest existing parent bindingとmissing suffixをwitness化する。
+- top-down observationでcontract-owned ancestorがmissingならcollapseし、anchor候補がdeletion closure内の場合は上位surviving ancestorへre-anchorする。
 - collapse配下のdescendant parent snapshot/actionを生成しない。
-- contract-owned ancestorより上位のmissing component、unbound nearest ancestor、symlink/special parentはblock。
+- contract-owned ancestorより上位のmissing component、unbound/symlink/special anchorはblock。
 - assessment後のcollapsed root appearanceはnew actionへ再分類せず、journal前はblocked、journal後はrecovery required。
-- existing journal resumeではjournalのfull parent chain/pre/postconditionを使い、新規collapseでactionを消さない。
+- existing journal resumeではjournalのfull parent/action/evidenceを使い、新規collapseでactionを消さない。
 - journal fieldを欠落・並べ替えたself-rehashed recordをplan mismatchとして拒否する。
 
-### Directory child digest and dependency
+### Directory child semantic digest
 
-- held directory fdから`listdir(fd)`する。
+- held directory fdからimmediate child namesだけを`listdir(fd)`する。
 - childを`stat(..., follow_symlinks=False)`する。
-- regular contentはheld fdからhashする。
-- symlinkはreadlinkする。
+- regular contentはheld fdからhashし、full regular identityをsemantic recordへ含める。
+- symlinkはreadlinkし、full no-follow symlink identityをsemantic recordへ含める。
+- directory recordはrelative path、kind、device、inode、mode、classification、owner sourceだけを含め、ctime/link countを除外する。
+- runtimeではdirectory childのvisible pathとheld descriptorのfull device/inode/type/mode/ctime/link countを別途比較し、same-invocation replacementを拒否する。
 - child recordをcanonical sortする。
-- assessmentのinitial digest、各directory actionのexpected remaining digest、ordered dependency pathsをplan/journalへ記録する。
-- action間のexpected changeはprior child actionが`published`で、current targetがそのexact expected-absent postconditionに一致する場合だけ導出する。
+- assessmentのinitial digest、各directory actionのexpected remaining digest、ordered immediate child evidenceをplan/journalへ記録する。
+- action間のexpected changeは対象directoryのimmediate child actionが`published`で、そのchild kind固有postconditionに一致する場合だけ導出する。
 - `verified` checkpointをdirectory execution dependencyに使用しない。
-- unknown child appearance、owned child unexpected disappearance、same-content inode replacement、type/mode/link topology変化はmismatch。
+- unknown child appearance、owned child unexpected disappearance、same-content inode replacement、directory type/mode/inode replacementはmismatch。
 
 ### Preservation tree digest
 
@@ -1204,10 +1261,19 @@ blockerはtyped action outcomes/reasonsに表示する。normal blocker inventor
 
 ### Collapsed absence digest
 
-- nearest existing ancestorのdevice/inode/type、missing suffix、owned descendant contract digestをhashする。
+- surviving anchor pathとdevice/inode/type/mode、そこからのmissing suffix、owned descendant semantic contract digestをhashする。
 - missing subtreeをfilesystem traversalしない。
-- no-op post-assessment、first mutation前、verifyingでmissing suffixが依然absentであることをnearest existing held ancestorから再検証する。
+- no-op post-assessment、first mutation前、verifyingでmissing suffixの先頭componentが依然absentであることをsurviving anchorから再検証する。anchor候補がplan削除対象にならないことも再検証する。
 - appearanceしたpathのcontent/typeをownershipへ昇格しない。
+
+### Source semantic compatibility and full-snapshot TOCTOU
+
+- guard/journal/planに保存するsource equalityは`DistributionSourceSemanticIdentity`だけである。
+- current invocationはsemantic projectionを生成したfull `DistributionSourceSnapshot`をmemory-only evidenceとして保持し、source read前後、plan発行直前、first target mutation前、source-dependent boundaryでexact比較する。
+- compatible newer packageは自身のinstall rootからfull snapshotを新規captureする。canonical source path、kind、SHA-256、mode、link target、schema/protocolがstored semantic projectionとexact一致すれば、physical device/inode/ctime/mtimeやcache/extraction rootが異なってもsame planを再構成できる。
+- semantic path、kind、bytes、mode、link target、schema/protocolのいずれかが異なる場合はplan mismatchでwrite 0。
+- same invocation中にsource inode/ctime/mtime/size/modeが変化した場合は、再計算semantic bytesが同じでもTOCTOU mismatchとして停止する。
+- guard-only stateもsemantic projectionからsame contract/plan digestを再構成できる場合だけjournal prepareへ進む。physical snapshotをstored valueとして要求しない。
 
 ## Legacy marker / new journal admission matrix
 
@@ -1381,16 +1447,19 @@ text rendererも同じpayload/resultを使用し、header、mode、status、phas
 | assessment failure | none | write 0、`error/preflight/not-started`。 |
 | blocker found | none | write 0、planned dry-runまたはblocked apply、`preflight-complete`。 |
 | generated-state conflict / legacy-unproven | none | all target write 0。conflicting entriesを保持。 |
+| compatible newer / semantic-equal source at different physical install root | existing guard/journal | current packageのfull snapshotを新規captureし、stored semantic projection一致後にsame-plan resume。physical inode/device/mtime差は許容。 |
+| source semantic drift or same-invocation source replacement | none or journal retained | semantic driftはplan mismatch、same-invocation replacementはfull snapshot mismatch。追加target mutation 0。 |
 | collapsed absence appearance before guard | none | appeared entryを削除せずblocked。 |
 | guard publish failure | noneまたはrestored predecessor | target write 0、typed error/recovery。 |
 | guard published / journal absent | guard only | same-plan reconstruction後journal prepare。mismatch/absence appearanceは停止。 |
 | journal publish failure | guard retained | target write 0、same-plan retry。 |
 | leaf action before unlink failure | journal executing / action pending | exact precondition一致時だけretry。 |
 | unlink後checkpoint failure | target may be absent | pre/post一方だけにexact一致すればpending/publishedを再構成。 |
-| child published / directory pending | executing | child exact absentを再確認してdirectoryへ進む。verifiedを待たない。 |
-| directory rmdir後checkpoint failure | directory absent / checkpoint pending | exact postconditionからdirectoryをpublishedへ再構成。 |
+| immediate leaf child published / directory pending | executing | leaf exact absentを確認してparent directoryへ進む。verifiedを待たない。 |
+| child directory published / parent directory pending | executing | child directory path absentとpublished checkpointだけを確認し、subtree descendantを再openせずparentへ進む。 |
+|各nested directory rmdir後checkpoint failure | directory absent / checkpoint pending | exact directory-path absenceからそのdirectory actionをpublishedへ再構成し、そのcheckpointでsubtreeをsubsumedとする。ancestor resumeはdescendantを再openしない。 |
 | all published / verifying transition failure | executing or verifying | atomic predecessor stateを読み、all publishedならverifyingへ。 |
-| verifying中crash | verifying / all published | target mutationを再実行せずfull post-assessmentを再実行。 |
+| verifying中crash | verifying / all published | target mutationを再実行せず、published directory summaries、surviving-anchor/preservation witnesses、remaining namespaceだけを再検証する。removed subtree descendantを再openしない。 |
 | atomic completed publication failure | verifying or completed | verifyingならall published、completedならall verified。mixed stateはparser拒否。 |
 | unknown replacement/child/absence appearance after journal | journal retained | entryを削除せずrecovery required。 |
 | preservation tree change | journal retained | completedにせずwitness mismatch。 |
@@ -1466,7 +1535,7 @@ return _run_uninstall_deprovision(...)
 - hardlink/special file
 - managed root unknown child
 - initiatives/workbench witness
-- deterministic child digest/action order
+- deterministic type-specific child semantic digest/action order
 - blockerからplan発行不可
 
 ### Journal tests
@@ -1483,13 +1552,20 @@ return _run_uninstall_deprovision(...)
 ### Kernel tests
 
 - exact regular/symlink prune
-- exact empty directory removal
+- `I370-T-DIR-001`: 3階層以上のnested exact empty-directory removal、immediate child evidence、published directory subtree subsumption
 - unknown child appearance
 - directory/parent/root rebind
 - same-content inode replacement
 - hardlink/special file
-- rmdir failure/checkpoint failure
+-各nested directory rmdir直後のcheckpoint failure、ancestor resume、verifying descendant reopen 0
 - no generic recursive path
+
+### Source compatibility tests
+
+- `I370-T-SRC-001`: semantic-equal assetsを別physical install root/device/inode/mtimeから供給するcompatible newer resume
+- canonical source path、kind、bytes SHA、mode、symlink target、schema/protocol driftのwrite-zero rejection
+- same invocation中のsource inode/ctime/mtime/size/mode replacement rejection
+- guard-only stateからsemantic projectionだけでsame digestを再構成し、physical snapshot equalityを要求しないこと
 
 ### CLI tests
 
@@ -1524,10 +1600,10 @@ return _run_uninstall_deprovision(...)
 | I370-S05 | D370-DATA, D370-ASSESS |
 | I370-S06 | D370-CONTRACT, D370-ASSESS |
 | I370-S07 | D370-CONTRACT, D370-ASSESS, D370-PLAN |
-| I370-S08 | D370-PLAN, D370-JOURNAL, D370-KERNEL, D370-MIG |
-| I370-S09 | D370-KERNEL, D370-JOURNAL |
+| I370-S08 | D370-DATA, D370-PLAN, D370-JOURNAL, D370-KERNEL, D370-MIG |
+| I370-S09 | D370-DATA, D370-PLAN, D370-KERNEL, D370-JOURNAL |
 | I370-S10 | D370-DATA, D370-PLAN, D370-JOURNAL, D370-SERVICE |
-| I370-S11 | D370-CONTRACT, D370-SERVICE, D370-JOURNAL |
+| I370-S11 | D370-CONTRACT, D370-PLAN, D370-SERVICE, D370-JOURNAL |
 | I370-S12 | D370-ASSESS, D370-SERVICE |
 | I370-S13 | D370-CONTRACT, D370-KERNEL |
 | I370-S14 | D370-DATA, D370-KERNEL, D370-JOURNAL |
@@ -1544,16 +1620,16 @@ return _run_uninstall_deprovision(...)
 | I370-C09 | D370-RESULT, D370-MAP, D370-CLI |
 | I370-R01 | D370-JOURNAL, D370-SERVICE |
 | I370-R02 | D370-INT, D370-JOURNAL |
-| I370-R03 | D370-DATA, D370-JOURNAL |
-| I370-R04 | D370-JOURNAL |
-| I370-R05 | D370-JOURNAL, D370-RESULT |
+| I370-R03 | D370-DATA, D370-CONTRACT, D370-PLAN, D370-JOURNAL |
+| I370-R04 | D370-DATA, D370-JOURNAL, D370-KERNEL |
+| I370-R05 | D370-JOURNAL, D370-KERNEL, D370-RESULT |
 | I370-R06 | D370-DATA, D370-JOURNAL, D370-LEGACY |
 | I370-R07 | D370-LEGACY, D370-RESULT |
 | I370-R08 | D370-INT, D370-CLI, D370-LEGACY |
-| I370-R09 | D370-JOURNAL, D370-SERVICE |
+| I370-R09 | D370-JOURNAL, D370-KERNEL, D370-SERVICE |
 | I370-R10 | D370-RESULT, D370-MAP, D370-LEGACY |
 | I370-O01 | D370-CONTRACT, D370-ASSESS |
-| I370-O02 | D370-DATA, D370-PLAN, D370-MAP |
+| I370-O02 | D370-DATA, D370-CONTRACT, D370-PLAN, D370-MAP |
 | I370-O03 | D370-PLAT, D370-KERNEL |
 | I370-O04 | D370-JOURNAL, D370-RESULT, D370-MAP, D370-PLAT |
 
@@ -1564,13 +1640,14 @@ return _run_uninstall_deprovision(...)
 | active/.agent membershipからunknownを誤削除 | single generated producer、exact slot/kind/schema/semantic predicate、unknown/legacy conflict blocker |
 | contract.generated stateとcaller generated assetsがdiverge | deprovision専用assessment wrapper、generic generated-assets inputをtype/call graphで禁止 |
 | preserved spec historyのconcurrent mutationをsuccess扱い | pre/first-write/verifying preservation witness |
-| already-absent subtreeでmissing parentをunsafe扱い、またはdescendant actionを大量発行 | top-down owned-ancestor collapse、nearest existing binding、one root outcome、no mutating action |
+| already-absent subtreeでmissing parentをunsafe扱い、anchorを後で削除、またはdescendant actionを大量発行 | top-down owned-ancestor collapse、deletion closure外surviving anchorへのcanonical re-anchor、one root outcome、no mutating action |
 | absence witness後にexternal entryがappearance | new authorityを発行せずblocked/recovery required |
-| directory actionがunreachable verified dependencyを要求 | dependencyをprior `published` + exact absentに固定、reachable parser table、crash tests |
+| directory actionが全descendant evidenceを要求し、child directory削除後に証拠を再openできない | immediate child evidence、published directory subtree subsumption、removed subtree reopen禁止、3階層crash tests |
 | preserve recordに到達不能checkpointを持たせる | preserve/blockはjournal actionではなくimmutable witness/diagnostic |
 | journal authorityからpurgeへ昇格 | explicit `deprovision` intent/authority、remove route隔離、mismatch test |
 | legacy markerをcurrent invocationへ誤帰属 | automatic conversion禁止、marker保持 |
-| directory ctimeを誤ってstable bindingに使用 | directory bindingとmutation snapshotを分離 |
+| directory ctime/link countをsemantic child digestへ入れauthorized mutation後に再現不能 | type-specific child projectionからdirectory ctime/link countを除外し、full descriptor identityをruntime TOCTOU guardへ分離 |
+| physical provider snapshotをdurable plan equalityへ入れcompatible newer recoveryを阻害 | durable semantic source projectionとinvocation-local full snapshotを分離し、semantic-equal別physical root testを固定 |
 | action後checkpoint失敗で二重削除 | exact pre/post一意判定、pending/published再構成 |
 | CLIがjournalを再解釈しJSON/textでdrift | fully-populated typed result、mapper source/monkeypatch test、single payload boundary |
 | D4 compatibilityがhidden fallbackになる | explicit entrypoint、source/AST call-edge tests、no feature flag |
@@ -1584,13 +1661,14 @@ return _run_uninstall_deprovision(...)
 2. current generated JSONをsemanticに検証できず、pathnameだけで削除する必要が生じる。
 3. deprovision assessmentへcanonical producer以外のgenerated inputを渡さなければ既存fresh/recognized routeを維持できない。
 4. protocol-2 journalへpreservation/absence witness、directory dependencyをlosslessに保存できず、preserveをcheckpointed actionへ戻す必要が生じる。
-5. prior child `published` + exact absentではdirectory actionを安全に実行できず、`verified`をexecuting dependencyに戻す必要が生じる。
-6. owned ancestor absenceをnearest existing bound ancestorから証明できず、unproven missing parentをtrustedとして扱う必要が生じる。
+5. immediate child evidenceとpublished directory subtree subsumptionではnested directory actionを安全に実行できず、descendant path再openまたは`verified` dependencyへ戻す必要が生じる。
+6. owned ancestor absenceをdeletion closure外のsurviving bound ancestorへre-anchorして証明できず、削除対象anchorまたはunproven missing parentをtrustedとして扱う必要が生じる。
 7. unknown/modified childを削除しなければcurrent public keep behaviorを維持できない。
 8. legacy `.uninstall-retry.json`を変換しなければnew routeを開始できない。
 9. `--remove-specs` behaviorまたはauthorityを変更しなければroute splitできない。
 10. `DistributionProcessResult`または同等のtyped inputだけからphase、last completed、failed/pending paths、action/top-level errors、retry policyを一意に生成できない。
-11. public schema version、key set、exit mappingを変更しなければtyped resultをmappingできない。
-12. required POSIX capabilityなしでmutationを続けるfallbackが必要になる。
+11. durable semantic source projectionだけではcompatible newer same-plan recoveryを再構成できず、physical device/inode/ctime/mtimeをguard/journal equalityへ保存する必要が生じる。
+12. public schema version、key set、exit mappingを変更しなければtyped resultをmappingできない。
+13. required POSIX capabilityなしでmutationを続けるfallbackが必要になる。
 
 これらはcoderが推測で解消してはならない。Issue 371 purgeまたはIssue 372 parity/closureへ責務を移してIssue 370を見かけ上完了させることも禁止する。
