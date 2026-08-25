@@ -111,6 +111,7 @@ class DistributionAsset:
     source_semantic_identity: DistributionSourceSemanticIdentity | None = None
     generated_content: bytes | None = None
     refreshable_existing_identities: tuple[DistributionIdentity, ...] | None = None
+    generated_observed_target: PathIdentitySnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -2334,10 +2335,42 @@ def _read_generated_regular_bytes(
     )
     if entry is None:
         return None
-    try:
-        raw = (target_root / path).read_bytes()
-    except OSError:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
         return None
+    parent_fds: tuple[int, ...] = ()
+    file_fd: int | None = None
+    try:
+        parent_fds = _open_distribution_parent_chain(target_root, path)
+        file_fd = os.open(
+            PurePosixPath(path).name,
+            os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fds[-1],
+        )
+        _assert_regular_fd_safe(file_fd, entry.observed, path, exact=True)
+        before = os.fstat(file_fd)
+        if stat.S_IMODE(before.st_mode) != entry.observed.mode or before.st_size != entry.observed.size:
+            return None
+        raw = _read_fd_bytes(file_fd)
+        after = os.fstat(file_fd)
+        visible = os.stat(
+            PurePosixPath(path).name,
+            dir_fd=parent_fds[-1],
+            follow_symlinks=False,
+        )
+        if (
+            _stat_identity_tuple(before) != _stat_identity_tuple(after)
+            or not _same_stat_identity(visible, entry.observed)
+            or stat.S_IMODE(visible.st_mode) != entry.observed.mode
+            or visible.st_size != entry.observed.size
+        ):
+            return None
+    except (DistributionApplyError, OSError):
+        return None
+    finally:
+        if file_fd is not None:
+            os.close(file_fd)
+        _close_distribution_parent_chain(parent_fds)
     if hashlib.sha256(raw).hexdigest() != entry.identity.sha256:
         return None
     return raw, entry
@@ -3791,7 +3824,14 @@ def build_deprovision_workspace_assessment(
         and asset.source_semantic_identity.canonical_source_path.startswith("spec-dock-scaffold/")
     )
     generated_assets = (
-        tuple(DistributionAsset(path=entry.path, identity=entry.identity) for entry in contract.generated_state.entries)
+        tuple(
+            DistributionAsset(
+                path=entry.path,
+                identity=entry.identity,
+                generated_observed_target=entry.observed,
+            )
+            for entry in contract.generated_state.entries
+        )
         + contract.target_only_assets
     )
     classified_actions, target_snapshots = _classify_target(
@@ -4158,6 +4198,24 @@ def _classify_required_directory(
     return _blocked_action(path, operation, reason, action="preserve")
 
 
+def _same_exact_path_snapshot(
+    actual: PathIdentitySnapshot,
+    expected: PathIdentitySnapshot,
+) -> bool:
+    return (
+        actual.relative_path == expected.relative_path
+        and actual.exists == expected.exists
+        and actual.device == expected.device
+        and actual.inode == expected.inode
+        and actual.ctime_ns == expected.ctime_ns
+        and actual.file_type == expected.file_type
+        and actual.link_count == expected.link_count
+        and actual.mode == expected.mode
+        and actual.size == expected.size
+        and actual.identity == expected.identity
+    )
+
+
 def _classify_target(
     *,
     target_root: Path,
@@ -4186,6 +4244,22 @@ def _classify_target(
     for path, expected in sorted(specs.items()):
         observation = _observe_target(target_root, path)
         observations[path] = observation
+        generated_asset = generated_assets.get(path)
+        producer_observation = generated_asset.generated_observed_target if generated_asset is not None else None
+        classified_observation = observation.snapshot.target if observation.snapshot is not None else None
+        if producer_observation is not None and (
+            classified_observation is None
+            or not _same_exact_path_snapshot(classified_observation, producer_observation)
+        ):
+            actions.append(
+                _blocked_action(
+                    path,
+                    operation,
+                    "generated-state-invalid",
+                    action="preserve",
+                )
+            )
+            continue
         actions.append(
             _classify_current_target(
                 target_root=target_root,
@@ -12186,7 +12260,14 @@ def _build_deprovision_recovery_contract_assessment(
         and asset.source_semantic_identity.canonical_source_path.startswith("spec-dock-scaffold/")
     )
     generated_assets = (
-        tuple(DistributionAsset(path=entry.path, identity=entry.identity) for entry in contract.generated_state.entries)
+        tuple(
+            DistributionAsset(
+                path=entry.path,
+                identity=entry.identity,
+                generated_observed_target=entry.observed,
+            )
+            for entry in contract.generated_state.entries
+        )
         + contract.target_only_assets
     )
     current_plan = DistributionPlan(

@@ -3605,6 +3605,123 @@ def test_i370_typed_uninstall_mapper_preserves_schema_status_and_retry_contract(
     assert ".distribution-retry" not in mapper_source
 
 
+def test_i370_typed_uninstall_mapper_allowlists_operation_and_action_errors(
+    tmp_path: Path,
+) -> None:
+    """I370-T-RESULT-001/I370-T-JSON-001: raw typed error text is never public."""
+
+    failure_path = "spec-dock/docs/README.md"
+    injected = "credential=should-not-leak at /private/provider/source"
+    result = managed_distribution.DistributionProcessResult(
+        status="recovery_required",
+        intent="deprovision",
+        actions=(),
+        action_outcomes=(
+            managed_distribution.DistributionActionOutcome(
+                path=failure_path,
+                category="scaffold_managed",
+                status="failed",
+                reason="internal-unrecognized-reason",
+                error=injected,
+            ),
+        ),
+        phase="uninstall-apply",
+        last_completed_phase="marker-written",
+        failed_paths=(failure_path,),
+        errors=(
+            managed_distribution.DistributionProcessError(
+                code="internal-unrecognized-error",
+                message=injected,
+            ),
+        ),
+        retry_policy="same-keep-command",
+    )
+
+    payload = cli._uninstall_payload_from_result(
+        result,
+        target_root=(tmp_path / "consumer").resolve(),
+        apply=True,
+        specs_mode="keep",
+    )
+
+    assert payload["errors"] == ["Managed distribution deprovision failed."]
+    assert payload["actions"][0]["error"] == "Managed distribution deprovision action failed."
+    assert injected not in json.dumps(payload, sort_keys=True)
+
+
+@pytest.mark.parametrize(
+    ("case_name", "target_token", "create_file"),
+    (
+        ("missing", "missing-target", False),
+        ("file", "file-target.txt", True),
+        ("leading-hyphen", "-leading-target", False),
+        ("space", "space target", False),
+    ),
+)
+@pytest.mark.parametrize("json_requested", (True, False), ids=("json", "text"))
+def test_i370_uninstall_non_directory_target_error_is_stable_and_path_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    case_name: str,
+    target_token: str,
+    create_file: bool,
+    json_requested: bool,
+) -> None:
+    """I370-T-JSON-001/I370-T-TEXT-001: target stays a field, never error text."""
+
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / target_token
+    if create_file:
+        target.write_bytes(b"user-owned\n")
+    args = ["uninstall"]
+    if json_requested:
+        args.append("--json")
+    else:
+        args.append("--keep-specs")
+    args.extend(("--", target_token))
+
+    assert main(args) == 2, case_name
+    captured = capsys.readouterr()
+    expected_error = "target path is not a directory"
+    if json_requested:
+        assert captured.err == ""
+        assert captured.out.count("\n") == 1
+        assert json.loads(captured.out) == {
+            "schema_version": 1,
+            "target": str(target.resolve()),
+            "mode": "dry-run",
+            "apply": False,
+            "specs_mode": None,
+            "status": "error",
+            "phase": "preflight",
+            "last_completed_phase": "not-started",
+            "retry_command": None,
+            "failed_paths": [],
+            "pending_paths": [],
+            "summary": {
+                "would_remove": 0,
+                "removed": 0,
+                "already_removed": 0,
+                "preserved": 0,
+                "failed": 0,
+                "pending": 0,
+                "empty_dir_removed": 0,
+            },
+            "actions": [],
+            "guidance": [
+                "dry-run only; pass --apply --keep-specs to mutate managed distribution artifacts",
+                "reinstall or refresh with installer CLI: spec-dock init <target> or spec-dock update <target>",
+            ],
+            "errors": [expected_error],
+        }
+    else:
+        assert captured.out == ""
+        assert captured.err == f"error: {expected_error}\n"
+    if create_file:
+        assert target.read_bytes() == b"user-owned\n"
+
+
 def test_i370_uninstall_text_uses_typed_payload_section_order(tmp_path: Path) -> None:
     """I370-T-TEXT-001: text renders the one typed payload in the public order."""
 

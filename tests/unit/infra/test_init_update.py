@@ -7088,6 +7088,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert self._relative_file_snapshot(unmanaged) == unmanaged_before
 
     def test_uninstall_json_missing_target_path_returns_json_error(self) -> None:
+        """I370-T-JSON-001: missing target path appears only in the target field."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "missing"
 
@@ -7098,11 +7100,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             payload = json.loads(stdout)
             assert stdout.count("\n") == 1
             assert payload["status"] == "error"
-            assert "target path is not a directory" in payload["errors"][0]
-            assert str(target.resolve()) in payload["errors"][0]
+            assert payload["target"] == str(target.resolve())
+            assert payload["errors"] == ["target path is not a directory"]
             assert payload["actions"] == []
 
     def test_uninstall_json_file_target_returns_json_error_without_mutation(self) -> None:
+        """I370-T-JSON-001: file target path appears only in the target field."""
+
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "target.txt"
             target.write_text("user content\n", encoding="utf-8")
@@ -7115,8 +7119,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             payload = json.loads(stdout)
             assert stdout.count("\n") == 1
             assert payload["status"] == "error"
-            assert "target path is not a directory" in payload["errors"][0]
-            assert str(target.resolve()) in payload["errors"][0]
+            assert payload["target"] == str(target.resolve())
+            assert payload["errors"] == ["target path is not a directory"]
             assert payload["actions"] == []
             assert target.is_file()
             assert target.read_text(encoding="utf-8") == before
