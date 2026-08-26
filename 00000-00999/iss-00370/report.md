@@ -25,19 +25,19 @@ Issue 370のmanaged distribution deprovision実装を完了した。配布元同
 - `git diff --check`: pass
 - Issue 370 focused tests: `64 passed, 349 deselected`
 - 通常の `uv run pytest -q`: `1366 passed, 1139 skipped`（再実行結果）
-- candidate-wide Full Regression command（verified candidate SHA `45541940053d99c96ba44a0967b211f99ead64cf`）:
+- candidate-wide Full Regression command（verified candidate SHA `1abf6f3de614c7264ab63a3cf93f5a1841d8cf80`）:
 
   ```bash
   uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py \
     --timeout-seconds 1200 --max-total-seconds 1800 --shards 4 \
-    --artifact-dir /private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-45541940
+    --artifact-dir /private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-1abf6f3d-rerun
   ```
 
 - 通常の `uv run pytest -q` は初回に既存の Full Regression 制御テストが1件失敗したが、直後の再実行で `1366 passed, 1139 skipped in 49.95s` となった。
-- 最終候補 SHA: `45541940053d99c96ba44a0967b211f99ead64cf`。
-- 最終候補実行結果（`20260826T104224.092258Z/result.json`）は `status=verified`、candidate-wide 2505 nodes、approved failure signatures 27件 exact一致、`unexpected_errors=[]`、`missing_failures=[]`、`signature_mismatches=[]`、`slo_status=pass`、`total_elapsed_seconds=696.71`。
+- 最終候補 SHA: `1abf6f3de614c7264ab63a3cf93f5a1841d8cf80`。
+- 最終候補実行結果（`20260826T110851.930434Z/result.json`）は `status=verified`、candidate-wide 2505 nodes、approved failure signatures 27件 exact一致、`unexpected_errors=[]`、`missing_failures=[]`、`signature_mismatches=[]`、`slo_status=pass`、`total_elapsed_seconds=666.474`。
 - 同一候補で先行実行に発生した既存 provider lane の `os.killpg(...): PermissionError` は再実行では発生せず、Issue 370 attributable failureもない。ハーネス・baseline ledgerは変更していない。
-- Full Regression artifactは上記 `--artifact-dir/20260826T104224.092258Z/` 配下の `result.json`、shard JUnit、pytest logを正本とする。
+- Full Regression artifactは上記 `--artifact-dir/20260826T110851.930434Z/` 配下の `result.json`、shard JUnit、pytest logを正本とする。
 
 ## Residual Risks / Follow-ups
 
