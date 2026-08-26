@@ -307,6 +307,18 @@ GeneratedStateOrigin = Literal[
     "current-agent-producer",
     "historical-exact",
 ]
+ActiveSelectionLayer = Literal["initiative", "epic", "issue"]
+ActiveSelectionRepresentation = Literal["symlink", "path", "absent"]
+
+
+@dataclass(frozen=True)
+class DistributionActiveSelectionWitness:
+    """Immutable active-slot semantics captured before deprovision mutation."""
+
+    layer: ActiveSelectionLayer
+    selection: tuple[str, str] | None
+    representation: ActiveSelectionRepresentation
+    target: str | None
 
 
 @dataclass(frozen=True)
@@ -330,6 +342,7 @@ class DistributionGeneratedStateContract:
     legacy_unproven_paths: tuple[str, ...]
     blockers: tuple[DistributionAction, ...]
     contract_digest: str
+    active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -415,6 +428,7 @@ class ExecutableMutationPlan:
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = ()
     generated_state_contract_digest: str | None = None
+    active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
 
 
 JournalCheckpoint = Literal["pending", "published", "verified"]
@@ -451,6 +465,7 @@ class OperationJournal:
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = ()
     generated_state_contract_digest: str | None = None
+    active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
     staging_leases: tuple[DistributionStageOwnership, ...] = ()
     created_parent_bindings: tuple[PathIdentitySnapshot, ...] = ()
     source_snapshot: PathIdentitySnapshot | None = field(default=None, compare=False, repr=False)
@@ -2440,96 +2455,101 @@ def _active_selection_from_recovery_pointers(
     target_root: Path,
     journal: OperationJournal,
 ) -> dict[str, tuple[str, str] | None] | None:
-    """Reconstruct an active selection while its manifest is already published away.
+    """Reconstruct active selection from immutable journal witnesses.
 
-    The journal action identities are used only to bind a pointer that is
-    missing after its own removal.  Any pointer that is still present must
-    match that immutable identity before it can participate in recovery.
+    A pending target may already be absent after its namespace mutation but
+    before its checkpoint.  In that window the journal witness remains the
+    only trusted representation of the selection; the current filesystem is
+    consulted only for still-pending identities and parent bindings.
     """
 
+    witnesses = journal.active_selection_witnesses
+    if tuple(witness.layer for witness in witnesses) != _DEPROVISION_ACTIVE_LAYERS:
+        return None
     records = {record.path: record for record in journal.actions}
     selection: dict[str, tuple[str, str] | None] = {}
-    for layer in _DEPROVISION_ACTIVE_LAYERS:
+    for layer, witness in zip(_DEPROVISION_ACTIVE_LAYERS, witnesses, strict=True):
         pointer_path = f"spec-dock/active/{layer}"
         path_path = f"{pointer_path}.path"
         candidate_paths = (pointer_path, path_path)
-        present: list[tuple[str, _TargetObservation]] = []
-        for candidate in candidate_paths:
-            record = records.get(candidate)
-            if record is not None and record.checkpoint in {"published", "verified"}:
-                # A published generated entry is already durable journal
-                # state.  Do not reopen it while reconstructing the active
-                # selection; the terminal summary checks its absence later.
-                continue
-            observation = _observe_target(target_root, candidate)
-            if observation.state == "missing":
-                continue
-            if observation.state not in {"regular", "symlink"}:
-                return None
-            present.append((candidate, observation))
         action_records = [record for candidate in candidate_paths if (record := records.get(candidate)) is not None]
-        if len(action_records) > 1 or len(present) > 1:
+        if len(action_records) > 1:
             return None
-        if not action_records:
-            if present:
-                return None
-            selection[layer] = None
-            continue
-        record = action_records[0]
-        if record.action != "prune" or record.provenance != "current" or record.reason != "current-identity-match":
-            return None
-        expected_identity = _deprovision_recovery_record_identity(record)
-        expected_kind = "symlink" if record.path == pointer_path else "regular"
-        if expected_identity.kind != expected_kind:
-            return None
-        raw_target: str | None = None
-        if present:
-            candidate, observation = present[0]
-            if observation.identity is None or not _deprovision_recovery_identity_matches(
-                observation.identity,
-                expected_identity,
-            ):
-                return None
-            if record.checkpoint != "pending":
-                return None
-            if candidate == pointer_path:
-                raw_target = observation.identity.target
-            else:
-                loaded = _read_generated_regular_bytes(target_root, candidate)
-                if loaded is None:
-                    return None
-                try:
-                    raw = loaded[0].decode("utf-8")
-                except UnicodeDecodeError:
-                    return None
-                raw_target = raw[:-1] if raw.endswith("\n") and "\n" not in raw[:-1] else None
-        elif expected_identity.kind == "symlink" and record.checkpoint in {"pending", "published", "verified"}:
-            raw_target = expected_identity.target
-        if raw_target is None:
-            return None
-        normalized = _lexical_generated_target(record.path, raw_target)
-        if normalized is None:
-            return None
-        meta = _read_generated_regular_bytes(target_root, f"{normalized}/.meta.json")
-        if meta is None:
-            return None
-        try:
-            meta_payload = json.loads(meta[0].decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return None
-        if not isinstance(meta_payload, dict):
-            return None
-        node_id = meta_payload.get("id")
-        if not isinstance(node_id, str):
-            return None
-        selected = _canonical_active_path(
-            target_root,
-            layer,
-            {"id": node_id, "path": normalized},
-        )
-        if selected is None:
+        selected = witness.selection
+        if (
+            selected is not None
+            and _canonical_active_path(
+                target_root,
+                layer,
+                {"id": selected[0], "path": selected[1]},
+            )
+            != selected
+        ):
             return None
         selection[layer] = selected
+
+        if witness.representation == "absent":
+            if action_records:
+                return None
+            for candidate in candidate_paths:
+                if _observe_target(target_root, candidate).state != "missing":
+                    return None
+            continue
+
+        expected_path = pointer_path if witness.representation == "symlink" else path_path
+        if len(action_records) != 1 or action_records[0].path != expected_path:
+            return None
+        record = action_records[0]
+        if (
+            record.action != "prune"
+            or record.provenance != "current"
+            or record.reason != "current-identity-match"
+            or record.checkpoint not in {"pending", "published", "verified"}
+        ):
+            return None
+        expected_identity = _deprovision_recovery_record_identity(record)
+        expected_kind = "symlink" if witness.representation == "symlink" else "regular"
+        if expected_identity.kind != expected_kind:
+            return None
+        expected_target = selected[1] if selected is not None else f"spec-dock/system/active-none/{layer}"
+        if witness.target is None or _lexical_generated_target(expected_path, witness.target) != expected_target:
+            return None
+        if record.checkpoint == "pending":
+            observation = _observe_target(target_root, expected_path)
+            if observation.snapshot is None:
+                return None
+            if not observation.snapshot.target.exists:
+                if not _deprovision_pending_snapshot_is_exact_absence(observation.snapshot, record):
+                    return None
+            else:
+                if (
+                    observation.state != expected_kind
+                    or observation.identity is None
+                    or not _deprovision_recovery_identity_matches(observation.identity, expected_identity)
+                ):
+                    return None
+                if witness.representation == "symlink":
+                    if observation.identity.target != witness.target:
+                        return None
+                else:
+                    loaded = _read_generated_regular_bytes(target_root, expected_path)
+                    if loaded is None:
+                        return None
+                    try:
+                        raw = loaded[0].decode("utf-8")
+                    except UnicodeDecodeError:
+                        return None
+                    line_target = raw[:-1] if raw.endswith("\n") and "\n" not in raw[:-1] else None
+                    if line_target != witness.target:
+                        return None
+
+        # A paired pointer/path slot is never valid.  For published records,
+        # do not reopen the counterpart: the checkpoint is the durable proof
+        # that this generated subtree was already consumed.
+        if record.checkpoint == "pending":
+            counterpart = path_path if expected_path == pointer_path else pointer_path
+            if _observe_target(target_root, counterpart).state != "missing":
+                return None
     if selection["issue"] is not None and (selection["epic"] is None or selection["initiative"] is None):
         return None
     if selection["epic"] is not None and selection["initiative"] is None:
@@ -2563,6 +2583,11 @@ def _active_selection_from_manifest(
         if recovery_journal is not None
         else None
     )
+    recovered_selection: dict[str, tuple[str, str] | None] | None = None
+    if recovery_journal is not None:
+        recovered_selection = _active_selection_from_recovery_pointers(target_root, recovery_journal)
+        if recovered_selection is None:
+            return None, None
     if active_record is not None and active_record.checkpoint in {"published", "verified"}:
         if (
             active_record.action != "prune"
@@ -2571,13 +2596,12 @@ def _active_selection_from_manifest(
             or _deprovision_recovery_record_identity(active_record).kind != "regular"
         ):
             return None, None
-        assert recovery_journal is not None
-        recovered = _active_selection_from_recovery_pointers(target_root, recovery_journal)
-        if recovered is None:
-            return None, None
-        return recovered, None
+        assert recovered_selection is not None
+        return recovered_selection, None
     observation = _observe_target(target_root, path)
     if observation.state == "missing":
+        if recovered_selection is not None:
+            return recovered_selection, None
         return dict.fromkeys(_DEPROVISION_ACTIVE_LAYERS), None
     loaded = _read_generated_regular_bytes(target_root, path)
     if loaded is None:
@@ -2633,6 +2657,8 @@ def _active_selection_from_manifest(
         and PurePosixPath(selection["issue"][1]).parent.parent != PurePosixPath(selection["epic"][1])
     ):
         return None, None
+    if recovered_selection is not None and selection != recovered_selection:
+        return None, None
     return selection, replace(entry, semantic_contract="active-manifest-schema-2")
 
 
@@ -2664,7 +2690,6 @@ def _deprovision_recovery_generated_entry(
         record.action != "prune"
         or record.provenance != "current"
         or record.reason != "current-identity-match"
-        or record.checkpoint == "pending"
         or record.path not in _DEPROVISION_GENERATED_CURRENT_SLOTS
     ):
         raise DistributionApplyError("journal-plan-mismatch")
@@ -2736,6 +2761,7 @@ def _generated_contract_digest(
     entries: tuple[DistributionGeneratedStateEntry, ...],
     legacy_paths: tuple[str, ...],
     blockers: tuple[DistributionAction, ...],
+    active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = (),
 ) -> str:
     payload = {
         "format_version": 1,
@@ -2753,6 +2779,9 @@ def _generated_contract_digest(
         "current_slots": list(_DEPROVISION_GENERATED_CURRENT_SLOTS),
         "legacy_unproven_paths": list(legacy_paths),
         "blockers": [action.diagnostic() for action in blockers],
+        "active_selection_witnesses": [
+            _active_selection_witness_payload(witness) for witness in active_selection_witnesses
+        ],
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
@@ -3470,6 +3499,41 @@ def _deprovision_recovery_directory_is_published(
     )
 
 
+def _deprovision_recovery_stage_names(
+    target_root: Path,
+    journal: OperationJournal | None,
+    relative_root: str,
+    names: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return only exact journal-owned transition entries under one root."""
+
+    if journal is None:
+        return names
+    owned: set[str] = set()
+    for lease in journal.staging_leases:
+        parent = PurePosixPath(lease.path).parent.as_posix()
+        if parent != relative_root or lease.stage_name not in names:
+            continue
+        observation = _observe_target(target_root, f"{relative_root}/{lease.stage_name}")
+        snapshot = observation.snapshot
+        if snapshot is None or not snapshot.target.exists or observation.state != lease.file_type:
+            continue
+        target = snapshot.target
+        if lease.device == lease.inode == lease.ctime_ns == 0:
+            if target.link_count == 1:
+                owned.add(lease.stage_name)
+            continue
+        if (
+            target.device == lease.device
+            and target.inode == lease.inode
+            and target.ctime_ns == lease.ctime_ns
+            and target.file_type == lease.file_type
+            and target.link_count == 1
+        ):
+            owned.add(lease.stage_name)
+    return tuple(name for name in names if name not in owned)
+
+
 def build_deprovision_generated_state_contract(
     target_root: Path,
     *,
@@ -3484,6 +3548,7 @@ def build_deprovision_generated_state_contract(
     entries: list[DistributionGeneratedStateEntry] = []
     blockers: list[DistributionAction] = []
     legacy_paths: list[str] = []
+    active_selection_witnesses: dict[str, DistributionActiveSelectionWitness] = {}
 
     selection, active_manifest_entry = _active_selection_from_manifest(
         target_root,
@@ -3505,6 +3570,12 @@ def build_deprovision_generated_state_contract(
         blockers.append(_generated_state_blocker("spec-dock/active", active_error))
         active_names = ()
     assert active_names is not None
+    active_names = _deprovision_recovery_stage_names(
+        target_root,
+        recovery_journal,
+        "spec-dock/active",
+        active_names,
+    )
     allowed_active_names = {
         *(layer for layer in _DEPROVISION_ACTIVE_LAYERS),
         *(f"{layer}.path" for layer in _DEPROVISION_ACTIVE_LAYERS),
@@ -3524,12 +3595,24 @@ def build_deprovision_generated_state_contract(
         path_name = f"{layer}.path"
         pointer_present = pointer_name in active_names
         path_present = path_name in active_names
+        selected = selection[layer]
         if pointer_present and path_present:
             blockers.append(_generated_state_blocker(f"spec-dock/active/{layer}", "generated-state-slot-conflict"))
+            active_selection_witnesses[layer] = DistributionActiveSelectionWitness(
+                layer=cast("ActiveSelectionLayer", layer),
+                selection=selected,
+                representation="absent",
+                target=None,
+            )
             continue
         if not pointer_present and not path_present:
+            active_selection_witnesses[layer] = DistributionActiveSelectionWitness(
+                layer=cast("ActiveSelectionLayer", layer),
+                selection=selected,
+                representation="absent",
+                target=None,
+            )
             continue
-        selected = selection[layer]
         expected_target = selected[1] if selected is not None else f"spec-dock/system/active-none/{layer}"
         if pointer_present:
             path = f"spec-dock/active/{layer}"
@@ -3543,8 +3626,21 @@ def build_deprovision_generated_state_contract(
             actual_target = _lexical_generated_target(path, entry.identity.target or "") if entry is not None else None
             if entry is None or actual_target != expected_target:
                 blockers.append(_generated_state_blocker(path, "generated-state-invalid"))
+                active_selection_witnesses[layer] = DistributionActiveSelectionWitness(
+                    layer=cast("ActiveSelectionLayer", layer),
+                    selection=selected,
+                    representation="symlink",
+                    target=entry.identity.target if entry is not None else None,
+                )
             else:
                 entries.append(entry)
+                assert entry.identity.target is not None
+                active_selection_witnesses[layer] = DistributionActiveSelectionWitness(
+                    layer=cast("ActiveSelectionLayer", layer),
+                    selection=selected,
+                    representation="symlink",
+                    target=entry.identity.target,
+                )
         else:
             path = f"spec-dock/active/{layer}.path"
             loaded = _read_generated_regular_bytes(target_root, path)
@@ -3556,8 +3652,20 @@ def build_deprovision_generated_state_contract(
             actual_target = _lexical_generated_target(path, line_target)
             if loaded is None or not line_target or actual_target != expected_target:
                 blockers.append(_generated_state_blocker(path, "generated-state-invalid"))
+                active_selection_witnesses[layer] = DistributionActiveSelectionWitness(
+                    layer=cast("ActiveSelectionLayer", layer),
+                    selection=selected,
+                    representation="path",
+                    target=line_target or None,
+                )
             else:
                 entries.append(replace(loaded[1], semantic_contract=f"active-{layer}-path-v1"))
+                active_selection_witnesses[layer] = DistributionActiveSelectionWitness(
+                    layer=cast("ActiveSelectionLayer", layer),
+                    selection=selected,
+                    representation="path",
+                    target=line_target,
+                )
 
     if "context-pack.md" in active_names:
         path = "spec-dock/active/context-pack.md"
@@ -3582,6 +3690,12 @@ def build_deprovision_generated_state_contract(
         blockers.append(_generated_state_blocker("spec-dock/.agent", agent_error))
         agent_names = ()
     assert agent_names is not None
+    agent_names = _deprovision_recovery_stage_names(
+        target_root,
+        recovery_journal,
+        "spec-dock/.agent",
+        agent_names,
+    )
     allowed_agent_names = _DEPROVISION_AGENT_CURRENT_FILES | _DEPROVISION_AGENT_LEGACY_FILES
     for name in agent_names:
         if name not in allowed_agent_names:
@@ -3734,14 +3848,29 @@ def build_deprovision_generated_state_contract(
                 blockers.append(_generated_state_blocker(f"spec-dock/.agent/{name}", "generated-state-invalid"))
 
     if recovery_journal is not None:
+        if (
+            tuple(witness.layer for witness in recovery_journal.active_selection_witnesses)
+            != _DEPROVISION_ACTIVE_LAYERS
+        ):
+            blockers.append(_generated_state_blocker("spec-dock/.agent/active.json", "journal-protocol-incompatible"))
+            recovery_active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
+        else:
+            recovery_active_selection_witnesses = recovery_journal.active_selection_witnesses
         entry_paths = {entry.path for entry in entries}
         for record in recovery_journal.actions:
             if record.path not in _DEPROVISION_GENERATED_CURRENT_SLOTS or record.path in entry_paths:
                 continue
-            if record.checkpoint == "pending":
+            if record.checkpoint == "pending" and not _deprovision_recovery_pending_target_is_exact_absent(
+                target_root,
+                record,
+            ):
                 continue
             entries.append(_deprovision_recovery_generated_entry(record))
             entry_paths.add(record.path)
+    else:
+        recovery_active_selection_witnesses = tuple(
+            active_selection_witnesses[layer] for layer in _DEPROVISION_ACTIVE_LAYERS
+        )
 
     ordered_entries = tuple(sorted(entries, key=lambda entry: entry.path))
     ordered_legacy = tuple(sorted(set(legacy_paths)))
@@ -3751,7 +3880,13 @@ def build_deprovision_generated_state_contract(
         current_slots=_DEPROVISION_GENERATED_CURRENT_SLOTS,
         legacy_unproven_paths=ordered_legacy,
         blockers=ordered_blockers,
-        contract_digest=_generated_contract_digest(ordered_entries, ordered_legacy, ordered_blockers),
+        contract_digest=_generated_contract_digest(
+            ordered_entries,
+            ordered_legacy,
+            ordered_blockers,
+            recovery_active_selection_witnesses,
+        ),
+        active_selection_witnesses=recovery_active_selection_witnesses,
     )
 
 
@@ -3942,6 +4077,7 @@ def _adopt_historical_generated_entries(
             ordered_entries,
             generated.legacy_unproven_paths,
             ordered_blockers,
+            generated.active_selection_witnesses,
         ),
     )
 
@@ -5868,6 +6004,20 @@ def _absence_witness_payload(
     }
 
 
+def _active_selection_witness_payload(
+    witness: DistributionActiveSelectionWitness,
+) -> dict[str, object]:
+    selection: dict[str, str] | None = None
+    if witness.selection is not None:
+        selection = {"id": witness.selection[0], "path": witness.selection[1]}
+    return {
+        "layer": witness.layer,
+        "selection": selection,
+        "representation": witness.representation,
+        "target": witness.target,
+    }
+
+
 def _durable_absence_witness(
     witness: DistributionCollapsedAbsenceWitness,
 ) -> DistributionCollapsedAbsenceWitness:
@@ -5897,6 +6047,7 @@ def _distribution_plan_digest(
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = (),
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = (),
     generated_state_contract_digest: str | None = None,
+    active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = (),
     legacy_adopt_postconditions: bool = False,
     legacy_adopt_fixed_link_count: bool = False,
     legacy_create_upgrade_fixed_link_count: bool = False,
@@ -5960,6 +6111,9 @@ def _distribution_plan_digest(
             "digest_format_version": 2,
             "authority": "managed-distribution-deprovision",
             "generated_state_contract_digest": generated_state_contract_digest,
+            "active_selection_witnesses": [
+                _active_selection_witness_payload(witness) for witness in active_selection_witnesses
+            ],
             "directory_snapshots": [_directory_snapshot_digest_payload(snapshot) for snapshot in directory_snapshots],
             "preservation_witnesses": [_preservation_witness_payload(witness) for witness in preservation_witnesses],
             "absence_witnesses": [_absence_witness_payload(witness) for witness in absence_witnesses],
@@ -5997,6 +6151,11 @@ def _mutation_plan_digest(
             if assessment.deprovision_contract is not None
             else None
         ),
+        active_selection_witnesses=(
+            assessment.deprovision_contract.generated_state.active_selection_witnesses
+            if assessment.deprovision_contract is not None
+            else ()
+        ),
         legacy_adopt_postconditions=legacy_adopt_postconditions,
         legacy_adopt_fixed_link_count=legacy_adopt_fixed_link_count,
         legacy_create_upgrade_fixed_link_count=legacy_create_upgrade_fixed_link_count,
@@ -6021,6 +6180,7 @@ def _executable_plan_digest(
         absence_witnesses=plan.absence_witnesses,
         source_semantic_identities=plan.source_semantic_identities,
         generated_state_contract_digest=plan.generated_state_contract_digest,
+        active_selection_witnesses=plan.active_selection_witnesses,
         legacy_adopt_postconditions=legacy_adopt_postconditions,
         legacy_adopt_fixed_link_count=legacy_adopt_fixed_link_count,
         legacy_create_upgrade_fixed_link_count=legacy_create_upgrade_fixed_link_count,
@@ -6138,6 +6298,9 @@ def _deprovision_journal_plan_digest(journal: OperationJournal) -> str:
         "digest_format_version": 2,
         "authority": "managed-distribution-deprovision",
         "generated_state_contract_digest": journal.generated_state_contract_digest,
+        "active_selection_witnesses": [
+            _active_selection_witness_payload(witness) for witness in journal.active_selection_witnesses
+        ],
         "directory_snapshots": directory_snapshots,
         "preservation_witnesses": [
             _preservation_witness_payload(witness) for witness in journal.preservation_witnesses
@@ -6504,6 +6667,11 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
                 if assessment.deprovision_contract is not None
                 else None
             ),
+            active_selection_witnesses=(
+                assessment.deprovision_contract.generated_state.active_selection_witnesses
+                if assessment.deprovision_contract is not None
+                else ()
+            ),
         ),
         distribution_plan=assessment.distribution_plan,
         actions=executable_actions,
@@ -6519,6 +6687,11 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
             assessment.deprovision_contract.generated_state.contract_digest
             if assessment.deprovision_contract is not None
             else None
+        ),
+        active_selection_witnesses=(
+            assessment.deprovision_contract.generated_state.active_selection_witnesses
+            if assessment.deprovision_contract is not None
+            else ()
         ),
     )
 
@@ -6641,6 +6814,9 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
                 _source_semantic_payload(identity) for identity in journal.source_semantic_identities
             ],
             "generated_state_contract_digest": journal.generated_state_contract_digest,
+            "active_selection_witnesses": [
+                _active_selection_witness_payload(witness) for witness in journal.active_selection_witnesses
+            ],
         })
     return payload
 
@@ -6935,6 +7111,84 @@ def _parse_absence_witnesses(
     return canonical
 
 
+def _parse_active_selection_witnesses(
+    raw_witnesses: object,
+) -> tuple[DistributionActiveSelectionWitness, ...]:
+    if not isinstance(raw_witnesses, list) or len(raw_witnesses) != len(_DEPROVISION_ACTIVE_LAYERS):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    witnesses: list[DistributionActiveSelectionWitness] = []
+    for raw_witness, expected_layer in zip(raw_witnesses, _DEPROVISION_ACTIVE_LAYERS, strict=True):
+        if (
+            not isinstance(raw_witness, dict)
+            or set(raw_witness) != {"layer", "selection", "representation", "target"}
+            or raw_witness["layer"] != expected_layer
+            or raw_witness["representation"] not in {"symlink", "path", "absent"}
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        raw_selection = raw_witness["selection"]
+        selection: tuple[str, str] | None
+        if raw_selection is None:
+            selection = None
+        else:
+            if (
+                not isinstance(raw_selection, dict)
+                or set(raw_selection) != {"id", "path"}
+                or not isinstance(raw_selection["id"], str)
+                or _ACTIVE_LAYER_ID_RE[expected_layer].fullmatch(raw_selection["id"]) is None
+                or not isinstance(raw_selection["path"], str)
+            ):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            try:
+                normalized_path = _exact_relative_path(
+                    raw_selection["path"],
+                    field_name="journal active selection path",
+                ).as_posix()
+            except DistributionManifestError as exc:
+                raise DistributionApplyError("journal-protocol-incompatible") from exc
+            if normalized_path != raw_selection["path"] or not normalized_path.startswith("spec-dock/initiatives/"):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            selection = (raw_selection["id"], normalized_path)
+
+        representation = cast("ActiveSelectionRepresentation", raw_witness["representation"])
+        target = raw_witness["target"]
+        if representation == "absent":
+            if target is not None:
+                raise DistributionApplyError("journal-protocol-incompatible")
+        else:
+            if (
+                not isinstance(target, str)
+                or not target
+                or "\x00" in target
+                or "\n" in target
+                or "\r" in target
+                or "\\" in target
+                or target.startswith("/")
+                or _DRIVE_RE.match(target)
+                or PurePosixPath(target).as_posix() != target
+            ):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            pointer_path = f"spec-dock/active/{expected_layer}"
+            expected_target = (
+                selection[1] if selection is not None else f"spec-dock/system/active-none/{expected_layer}"
+            )
+            if (
+                _lexical_generated_target(
+                    pointer_path if representation == "symlink" else f"{pointer_path}.path", target
+                )
+                != expected_target
+            ):
+                raise DistributionApplyError("journal-protocol-incompatible")
+        witnesses.append(
+            DistributionActiveSelectionWitness(
+                layer=cast("ActiveSelectionLayer", expected_layer),
+                selection=selection,
+                representation=representation,
+                target=target if isinstance(target, str) else None,
+            )
+        )
+    return tuple(witnesses)
+
+
 def _valid_journal_identity_payload(value: object, *, expected_kind: str) -> bool:
     if not isinstance(value, dict) or set(value) != {"kind", "sha256", "mode", "target"}:
         return False
@@ -7188,6 +7442,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
             "absence_witnesses",
             "source_semantic_identities",
             "generated_state_contract_digest",
+            "active_selection_witnesses",
         })
     workspace_fields = {
         "relative_path",
@@ -7249,11 +7504,13 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = ()
     generated_state_contract_digest: str | None = None
+    active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
     if is_deprovision:
         preservation_witnesses = _parse_preservation_witnesses(payload["preservation_witnesses"])
         absence_witnesses = _parse_absence_witnesses(payload["absence_witnesses"])
         source_semantic_identities = _parse_source_semantic_identities(payload["source_semantic_identities"])
         generated_state_contract_digest = _journal_sha256(payload["generated_state_contract_digest"])
+        active_selection_witnesses = _parse_active_selection_witnesses(payload["active_selection_witnesses"])
     parsed_actions: list[OperationJournalAction] = []
     for item in actions:
         if (
@@ -7471,6 +7728,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         absence_witnesses=absence_witnesses,
         source_semantic_identities=source_semantic_identities,
         generated_state_contract_digest=generated_state_contract_digest,
+        active_selection_witnesses=active_selection_witnesses,
         staging_leases=tuple(leases),
         created_parent_bindings=tuple(created_parent_bindings),
     )
@@ -8116,6 +8374,7 @@ class OperationJournalStore:
             absence_witnesses=tuple(_durable_absence_witness(witness) for witness in plan.absence_witnesses),
             source_semantic_identities=plan.source_semantic_identities,
             generated_state_contract_digest=plan.generated_state_contract_digest,
+            active_selection_witnesses=plan.active_selection_witnesses,
             created_parent_bindings=tuple(
                 _missing_snapshot(path)
                 for path in sorted({
@@ -11280,6 +11539,11 @@ def _resume_executable_plan(
         plan_digest=journal.plan_digest,
         distribution_plan=pending_plan,
         actions=tuple(original_actions),
+        preservation_witnesses=journal.preservation_witnesses,
+        absence_witnesses=journal.absence_witnesses,
+        source_semantic_identities=journal.source_semantic_identities,
+        generated_state_contract_digest=journal.generated_state_contract_digest,
+        active_selection_witnesses=journal.active_selection_witnesses,
     )
 
 
@@ -13442,6 +13706,43 @@ def _assert_deprovision_pending_parent_chain_matches(
         raise DistributionApplyError("journal-precondition-mismatch")
 
 
+def _deprovision_pending_snapshot_is_exact_absence(
+    snapshot: DistributionTargetSnapshot,
+    record: OperationJournalAction,
+) -> bool:
+    """Accept only the journaled postcondition after a pre-checkpoint unlink."""
+
+    if record.action not in {"prune", "remove-empty-directory"} or snapshot.target.exists:
+        return False
+    precondition = record.precondition
+    postcondition = record.postcondition
+    if (
+        precondition.get("exists") is not True
+        or set(postcondition) != {"root", "parents", "exists", "identity"}
+        or postcondition.get("exists") is not False
+        or postcondition.get("identity") is not None
+        or postcondition.get("root") != precondition.get("root")
+        or postcondition.get("parents") != precondition.get("parents")
+    ):
+        return False
+    try:
+        _assert_deprovision_pending_parent_chain_matches(snapshot, record)
+    except DistributionApplyError:
+        return False
+    return True
+
+
+def _deprovision_recovery_pending_target_is_exact_absent(
+    target_root: Path,
+    record: OperationJournalAction,
+) -> bool:
+    observation = _observe_target(target_root, record.path)
+    return observation.snapshot is not None and _deprovision_pending_snapshot_is_exact_absence(
+        observation.snapshot,
+        record,
+    )
+
+
 def _assert_deprovision_pending_record_matches(
     target_root: Path,
     record: OperationJournalAction,
@@ -13450,9 +13751,14 @@ def _assert_deprovision_pending_record_matches(
     if observation.snapshot is None:
         raise DistributionApplyError("journal-precondition-mismatch")
     snapshot = observation.snapshot
+    if _deprovision_pending_snapshot_is_exact_absence(snapshot, record):
+        return snapshot
+    if not snapshot.target.exists:
+        raise DistributionApplyError("journal-precondition-mismatch")
     if record.action == "prune":
         if not _snapshot_matches_condition(snapshot, record.precondition, ()):
             raise DistributionApplyError("journal-precondition-mismatch")
+        _assert_deprovision_pending_parent_chain_matches(snapshot, record)
         return snapshot
     target = snapshot.target
     if (
@@ -13797,10 +14103,7 @@ def _validate_deprovision_recovery_contract_before_reconciliation(
     for record in journal.actions:
         if record.checkpoint != "pending":
             continue
-        observation = _observe_target(target_root, record.path)
-        if observation.snapshot is None:
-            raise DistributionApplyError("journal-precondition-mismatch")
-        _assert_deprovision_pending_parent_chain_matches(observation.snapshot, record)
+        _assert_deprovision_pending_record_matches(target_root, record)
 
 
 def _build_deprovision_recovery_assessment(
@@ -13872,6 +14175,7 @@ def _build_deprovision_recovery_assessment(
         absence_witnesses=journal.absence_witnesses,
         source_semantic_identities=journal.source_semantic_identities,
         generated_state_contract_digest=journal.generated_state_contract_digest,
+        active_selection_witnesses=journal.active_selection_witnesses,
     )
     return assessment, executable
 
@@ -13957,13 +14261,9 @@ def _reconcile_deprovision_pending_actions(
     for record in active.actions:
         if record.checkpoint != "pending":
             continue
-        observation = _observe_target(store.target_root, record.path)
-        if observation.snapshot is None:
-            raise DistributionApplyError("journal-precondition-mismatch")
-        if observation.state != "missing":
-            _assert_deprovision_pending_record_matches(store.target_root, record)
+        snapshot = _assert_deprovision_pending_record_matches(store.target_root, record)
+        if snapshot.target.exists:
             continue
-        _assert_deprovision_pending_parent_chain_matches(observation.snapshot, record)
         if record.action == "remove-empty-directory":
             _assert_deprovision_directory_dependencies_published(active, record)
         completed = (*completed, record.path)
