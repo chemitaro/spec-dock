@@ -2710,6 +2710,7 @@ def _valid_generated_node_payload(
     allowed = set(required) | {"github"}
     if kind == "issue":
         required.update(_GENERATED_ISSUE_FIELDS)
+        allowed.update(_GENERATED_ISSUE_FIELDS)
     else:
         allowed.add("progress")
     if include_dependency_audit:
@@ -2740,6 +2741,8 @@ def _valid_generated_node_payload(
         return False
     if kind == "issue":
         if any(not isinstance(payload[key], str) for key in ("status", "authority", "effective_status", "source")):
+            return False
+        if payload["status"] != payload["effective_status"]:
             return False
         if not isinstance(payload["stale"], bool) or (
             payload["last_sync_at"] is not None and not isinstance(payload["last_sync_at"], str)
@@ -3638,6 +3641,54 @@ def _deprovision_version_asset(
     return (DistributionAsset(path=path, identity=identity),)
 
 
+def _deprovision_contract_digest(
+    *,
+    physical_assets: tuple[DistributionAsset, ...],
+    shortcuts: tuple[DistributionAsset, ...],
+    target_only_assets: tuple[DistributionAsset, ...],
+    managed_roots: tuple[str, ...],
+    preserved_roots: tuple[str, ...],
+    generated_state_digest: str,
+    manifest: DistributionManifest,
+) -> str:
+    """Hash the static ownership catalog plus a bound generated-state digest."""
+
+    payload = {
+        "format_version": 1,
+        "journal_schema_version": 2,
+        "journal_protocol_version": 2,
+        "managed_roots": list(managed_roots),
+        "preserved_roots": list(preserved_roots),
+        "assets": [
+            {
+                "path": asset.path,
+                "identity": _distribution_identity_payload(asset.identity),
+                "source": _source_semantic_payload(
+                    cast("DistributionSourceSemanticIdentity", asset.source_semantic_identity)
+                ),
+            }
+            for asset in physical_assets
+        ],
+        "shortcuts": [
+            {"path": asset.path, "identity": _distribution_identity_payload(asset.identity)} for asset in shortcuts
+        ],
+        "target_only_assets": [
+            {"path": asset.path, "identity": _distribution_identity_payload(asset.identity)}
+            for asset in target_only_assets
+        ],
+        "generated_state_digest": generated_state_digest,
+        "manifest": {
+            "schema_version": manifest.schema_version,
+            "recognized_workspace_versions": manifest.recognized_workspace_versions,
+            "historical_current_identities": manifest.historical_current_identities,
+            "trusted_consumer_manifests": manifest.trusted_consumer_manifests,
+            "obsolete_exact_files": manifest.obsolete_exact_files,
+            "historical_shortcuts": manifest.historical_shortcuts,
+        },
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def build_deprovision_contract(
     install_root: Path,
     *,
@@ -3706,42 +3757,15 @@ def build_deprovision_contract(
         manifest,
     )
     preserved_roots = ("spec-dock/initiatives", "spec-dock/.workbench")
-    payload = {
-        "format_version": 1,
-        "journal_schema_version": 2,
-        "journal_protocol_version": 2,
-        "managed_roots": list(managed_roots),
-        "preserved_roots": list(preserved_roots),
-        "assets": [
-            {
-                "path": asset.path,
-                "identity": _distribution_identity_payload(asset.identity),
-                "source": _source_semantic_payload(
-                    cast("DistributionSourceSemanticIdentity", asset.source_semantic_identity)
-                ),
-            }
-            for asset in physical_assets
-        ],
-        "shortcuts": [
-            {"path": asset.path, "identity": _distribution_identity_payload(asset.identity)} for asset in shortcuts
-        ],
-        "target_only_assets": [
-            {"path": asset.path, "identity": _distribution_identity_payload(asset.identity)}
-            for asset in target_only_assets
-        ],
-        "generated_state_digest": generated_state.contract_digest,
-        "manifest": {
-            "schema_version": manifest.schema_version,
-            "recognized_workspace_versions": manifest.recognized_workspace_versions,
-            "historical_current_identities": manifest.historical_current_identities,
-            "trusted_consumer_manifests": manifest.trusted_consumer_manifests,
-            "obsolete_exact_files": manifest.obsolete_exact_files,
-            "historical_shortcuts": manifest.historical_shortcuts,
-        },
-    }
-    contract_digest = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    contract_digest = _deprovision_contract_digest(
+        physical_assets=physical_assets,
+        shortcuts=shortcuts,
+        target_only_assets=target_only_assets,
+        managed_roots=managed_roots,
+        preserved_roots=preserved_roots,
+        generated_state_digest=generated_state.contract_digest,
+        manifest=manifest,
+    )
     return DistributionDeprovisionContract(
         managed_roots=managed_roots,
         preserved_roots=preserved_roots,
@@ -4207,6 +4231,7 @@ def _augment_deprovision_tree(
     owned_leaf_paths = set(actions_by_path)
     owned_leaf_paths.update(entry.path for entry in contract.generated_state.entries)
     owned_leaf_paths.update(asset.path for asset in contract.removable_shortcuts)
+    owned_leaf_paths.update(asset.path for asset in contract.target_only_assets)
     known_directories: set[str] = {
         root for root in contract.managed_roots if root not in owned_leaf_paths and root != "spec"
     }
@@ -4229,6 +4254,17 @@ def _augment_deprovision_tree(
             existing_directories.append(path)
         else:
             tree_blockers.append(_generated_state_blocker(path, "managed-directory-boundary-unsafe"))
+
+    # A missing owned leaf is still part of the assessed namespace.  Keep a
+    # durable witness for it even when it has no directory subtree to
+    # collapse; otherwise an assessment-time absence at the repository root
+    # could reappear between mutation and post-verification unnoticed.
+    collapsed_leaf_paths = [
+        path
+        for path in sorted(owned_leaf_paths)
+        if not any(_is_same_or_descendant(path, root) for root in collapsed_roots)
+        and _observe_target(target_root, path).state == "missing"
+    ]
 
     filtered_actions = tuple(
         action
@@ -4360,7 +4396,7 @@ def _augment_deprovision_tree(
 
     absence_witnesses: list[DistributionCollapsedAbsenceWitness] = []
     root_info = os.lstat(target_root)
-    for relative_root in sorted(collapsed_roots):
+    for relative_root in sorted({*collapsed_roots, *collapsed_leaf_paths}):
         parent = PurePosixPath(relative_root).parent
         anchor_path = "." if parent == PurePosixPath() else parent.as_posix()
         while anchor_path in removable_directories:
@@ -12194,6 +12230,7 @@ def _deprovision_assessment_outcomes(
                 reason=action.reason,
             )
         )
+    action_paths = {action.path for action in assessment.actions}
     outcomes.extend(
         DistributionActionOutcome(
             path=witness.relative_root,
@@ -12202,6 +12239,7 @@ def _deprovision_assessment_outcomes(
             reason=witness.reason,
         )
         for witness in assessment.absence_witnesses
+        if witness.relative_root not in action_paths
     )
     outcomes.extend(
         DistributionActionOutcome(
@@ -12773,6 +12811,66 @@ def _assert_deprovision_published_summaries(
             raise DistributionApplyError("journal-precondition-mismatch")
 
 
+def _deprovision_recovery_target_only_assets(
+    journal: OperationJournal,
+) -> tuple[DistributionAsset, ...]:
+    """Recover target-only identity from the immutable journal precondition."""
+
+    records = tuple(record for record in journal.actions if record.path == "spec-dock/spec-dock.version")
+    if not records:
+        return ()
+    if len(records) != 1 or records[0].action != "prune":
+        raise DistributionApplyError("journal-contract-mismatch")
+    precondition = records[0].precondition
+    if precondition.get("exists") is not True:
+        raise DistributionApplyError("journal-contract-mismatch")
+    raw_identity = precondition.get("identity")
+    if (
+        not isinstance(raw_identity, dict)
+        or set(raw_identity) != {"kind", "sha256", "mode", "target"}
+        or raw_identity.get("kind") != "regular"
+        or not isinstance(raw_identity.get("sha256"), str)
+        or _SHA256_RE.fullmatch(raw_identity["sha256"]) is None
+        or not isinstance(raw_identity.get("mode"), int)
+        or isinstance(raw_identity["mode"], bool)
+        or raw_identity["mode"] < 0
+        or raw_identity.get("target") is not None
+    ):
+        raise DistributionApplyError("journal-contract-mismatch")
+    return (
+        DistributionAsset(
+            path="spec-dock/spec-dock.version",
+            identity=DistributionIdentity(
+                kind="regular",
+                sha256=raw_identity["sha256"],
+                mode=raw_identity["mode"],
+            ),
+        ),
+    )
+
+
+def _assert_deprovision_recovery_contract_identity(
+    contract: DistributionDeprovisionContract,
+    journal: OperationJournal,
+) -> None:
+    """Reject manifest/catalog drift while tolerating target-side progress."""
+
+    if contract.manifest is None or journal.generated_state_contract_digest is None:
+        raise DistributionApplyError("journal-contract-mismatch")
+    target_only_assets = _deprovision_recovery_target_only_assets(journal)
+    digest = _deprovision_contract_digest(
+        physical_assets=contract.managed_assets,
+        shortcuts=contract.removable_shortcuts,
+        target_only_assets=target_only_assets,
+        managed_roots=contract.managed_roots,
+        preserved_roots=contract.preserved_roots,
+        generated_state_digest=journal.generated_state_contract_digest,
+        manifest=contract.manifest,
+    )
+    if digest != journal.contract_identity:
+        raise DistributionApplyError("journal-contract-mismatch")
+
+
 def _build_deprovision_recovery_assessment(
     current: WorkspaceAssessment,
     journal: OperationJournal,
@@ -12785,6 +12883,7 @@ def _build_deprovision_recovery_assessment(
         raise DistributionApplyError("journal-contract-mismatch")
     if journal.generated_state_contract_digest is None:
         raise DistributionApplyError("journal-protocol-incompatible")
+    _assert_deprovision_recovery_contract_identity(contract, journal)
     original_actions = tuple(
         DistributionAction(
             path=record.path,
@@ -12996,6 +13095,7 @@ def _assert_deprovision_postconditions(
     )
     if contract.generated_state.blockers or contract.source_semantic_identities != journal.source_semantic_identities:
         raise DistributionApplyError("deprovision-postcondition-mismatch")
+    _assert_deprovision_recovery_contract_identity(contract, journal)
     _assert_deprovision_published_summaries(plan.target_root, journal)
     _assert_deprovision_remaining_namespace(plan.target_root, journal)
     _assert_deprovision_preservation_witnesses(

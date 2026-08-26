@@ -7126,7 +7126,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert target.read_text(encoding="utf-8") == before
 
     def test_uninstall_accepts_recovery_target_when_scripts_are_missing(self) -> None:
-        """I370-T-NOOP-001: a proven-owned missing subtree is a dry-run absence witness."""
+        """I370-T-NOOP-001/I370-T-DRY-001: a proven-owned missing subtree is a dry-run absence witness."""
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -7163,7 +7163,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert self._relative_file_snapshot(target) == before
 
     def test_uninstall_dry_run_preserves_unknown_files_under_managed_roots(self) -> None:
-        """I370-T-TREE-001: immediate unknown children block the whole bounded operation."""
+        """I370-T-TREE-001/I370-T-BLK-001: immediate unknown children block the whole bounded operation."""
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

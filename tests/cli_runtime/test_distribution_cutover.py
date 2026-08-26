@@ -3199,7 +3199,7 @@ def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
     tmp_path: Path,
     capsys,
 ) -> None:
-    """I370-T-PRES-002: an unknown empty child blocks all cleanup, including safe subsets."""
+    """I370-T-PRES-002/I370-T-BLK-001: an unknown empty child blocks all cleanup, including safe subsets."""
 
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
