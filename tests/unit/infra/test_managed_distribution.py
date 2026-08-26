@@ -1300,6 +1300,90 @@ def test_i370_generated_state_rejects_impossible_issue_status_pair(
     )
 
 
+def test_i370_deps_issues_rejects_impossible_issue_status_pair_without_writes(
+    tmp_path: Path,
+) -> None:
+    """I370-T-OWN-001/I370-T-BLK-001: deps-issues keeps producer status authority narrow."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    deps_path = target_root / "spec-dock" / ".agent" / "deps-issues.json"
+    deps_path.parent.mkdir(parents=True)
+    issue_node: dict[str, object] = {
+        "id": "iss-00001",
+        "type": "issue",
+        "title": "Issue",
+        "parent_id": None,
+        "initiative_id": None,
+        "epic_id": None,
+        "status": "open",
+        "authority": "github",
+        "effective_status": "open",
+        "source": "github",
+        "stale": False,
+        "last_sync_at": None,
+        "ready": True,
+        "depends_on": [],
+        "issue_blockers": [],
+        "node_blockers": [],
+        "state": "open",
+    }
+    payload = {
+        "schema_version": 2,
+        "generated_at": "2026-08-25T12:00:00+09:00",
+        "projection": "issue-readiness-with-dependency-context",
+        "source": {"sync_state": "readiness_evaluation", "schema_version": 2},
+        "deps": {"valid": True, "error": None},
+        "nodes": {"iss-00001": issue_node},
+        "edges": [],
+        "dependency_contexts": [],
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+    deps_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    valid = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=root_identity,
+    )
+    assert "spec-dock/.agent/deps-issues.json" in {entry.path for entry in valid.entries}
+    issue_node["effective_status"] = "done"
+    deps_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    before = _i370_tree_evidence(target_root)
+
+    blocked = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=root_identity,
+    )
+    assert {
+        (action.path, action.reason)
+        for action in blocked.blockers
+        if action.path == "spec-dock/.agent/deps-issues.json"
+    } == {("spec-dock/.agent/deps-issues.json", "generated-state-invalid")}
+    assert "spec-dock/.agent/deps-issues.json" not in {entry.path for entry in blocked.entries}
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+    assert result.status == "blocked"
+    assert result.reason == "deprovision-preflight-blocked"
+    assert "spec-dock/.agent/deps-issues.json" in result.failed_paths
+    assert _i370_tree_evidence(target_root) == before
+    assert not (target_root / "spec-dock" / ".distribution-retry.json").exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
 def test_i370_generated_state_producer_rejects_malformed_nested_node_shape(
     tmp_path: Path,
 ) -> None:
@@ -2627,6 +2711,53 @@ def test_i370_missing_root_shortcut_appearance_blocks_completion(
     assert (target_root / "spec").is_symlink()
     assert (target_root / "spec-dock" / ".distribution-retry.json").exists()
     assert (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
+def test_i370_missing_leaf_appearance_between_classification_and_witness_blocks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """I370-T-RACE-001/I370-T-NOOP-001: first missing observation remains authoritative."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    (target_root / "spec-dock").mkdir()
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_augment = managed_distribution._augment_deprovision_tree
+    injected = False
+
+    def appear_before_witness(*args, **kwargs):
+        nonlocal injected
+        if not injected:
+            (target_root / "spec").symlink_to("spec-dock")
+            injected = True
+        return original_augment(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_augment_deprovision_tree", appear_before_witness)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    witness = next(witness for witness in assessment.absence_witnesses if witness.relative_root == "spec")
+    assert witness.anchor_path == "."
+    assert witness.missing_suffix == ("spec",)
+    with pytest.raises(DistributionApplyError, match="deprovision-absence-witness-mismatch"):
+        managed_distribution._assert_deprovision_invocation_state(assessment)
+    assert managed.read_bytes() == b"managed\n"
+    assert (target_root / "spec").is_symlink()
+    assert not (target_root / "spec-dock" / ".distribution-retry.json").exists()
+    assert not (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
 def test_i370_deprovision_service_journals_nested_prune_and_completes(

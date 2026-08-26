@@ -3105,6 +3105,8 @@ def _validate_deps_issues_payload(payload: dict[str, object]) -> bool:
         if kind == "issue":
             if any(not isinstance(node[key], str) for key in ("status", "authority", "effective_status", "source")):
                 return False
+            if node["status"] != node["effective_status"]:
+                return False
             if not isinstance(node["stale"], bool) or (
                 node["last_sync_at"] is not None and not isinstance(node["last_sync_at"], str)
             ):
@@ -4259,11 +4261,21 @@ def _augment_deprovision_tree(
     # durable witness for it even when it has no directory subtree to
     # collapse; otherwise an assessment-time absence at the repository root
     # could reappear between mutation and post-verification unnoticed.
+    classified_snapshots = dict(target_snapshots)
+    classified_missing_leaf_paths = {
+        path
+        for path, snapshot in classified_snapshots.items()
+        if path in owned_leaf_paths
+        and not snapshot.target.exists
+        and (action := actions_by_path.get(path)) is not None
+        and action.action == "prune"
+        and action.provenance == "missing"
+    }
     collapsed_leaf_paths = [
         path
         for path in sorted(owned_leaf_paths)
-        if not any(_is_same_or_descendant(path, root) for root in collapsed_roots)
-        and _observe_target(target_root, path).state == "missing"
+        if path in classified_missing_leaf_paths
+        and not any(_is_same_or_descendant(path, root) for root in collapsed_roots)
     ]
 
     filtered_actions = tuple(
