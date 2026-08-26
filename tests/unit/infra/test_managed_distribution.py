@@ -3631,13 +3631,14 @@ def test_i370_deprovision_same_invocation_source_replacement_stops_before_target
     target_before = managed.stat()
     source = install_root / ".github" / "workflows" / "ci.yml"
     source_before = source.stat()
+    displaced_source = source.with_suffix(".yml.displaced")
     original_mark_executing = OperationJournalStore.mark_executing
     replaced = False
 
     def replace_source_after_journal(self, journal):
         nonlocal replaced
         executing = original_mark_executing(self, journal)
-        source.unlink()
+        source.rename(displaced_source)
         source.write_bytes(b"managed\n")
         replaced = True
         return executing
@@ -3668,6 +3669,7 @@ def test_i370_deprovision_same_invocation_source_replacement_stops_before_target
     assert first.phase == "uninstall-apply"
     assert managed.stat().st_ino == target_before.st_ino
     assert managed.read_bytes() == b"managed\n"
+    displaced_source.unlink()
     retry = managed_distribution.execute_deprovision_distribution(
         install_root,
         manifest_path=manifest_path,
