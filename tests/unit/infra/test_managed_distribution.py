@@ -3300,6 +3300,200 @@ def test_i370_deprovision_verifying_resume_never_reopens_removed_descendants(
     assert not any(path.startswith(".github/") for path in observed)
 
 
+def test_i370_deprovision_retry_reuses_published_generated_contract_after_active_manifest_removal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """I370-T-KRN-001/I370-T-REC-001: published generated state is durable recovery evidence."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path / "manifest",
+        _manifest_with(
+            recognized_workspace_versions=[
+                {"version": "1.2.3", "anchors": [_regular_record("legacy-anchor", b"legacy\n")]},
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    spec_dock = target_root / "spec-dock"
+    active_dir = spec_dock / "active"
+    agent_dir = spec_dock / ".agent"
+    active_dir.mkdir(parents=True)
+    agent_dir.mkdir()
+    (spec_dock / "spec-dock.version").write_text("1.2.3\n", encoding="ascii")
+
+    node_paths = {
+        "initiative": "spec-dock/initiatives/init-local-00001-active",
+        "epic": "spec-dock/initiatives/init-local-00001-active/epics/epic-00001-active",
+        "issue": ("spec-dock/initiatives/init-local-00001-active/epics/epic-00001-active/issues/iss-00001-active"),
+    }
+    node_ids = {
+        "initiative": "init-local-00001",
+        "epic": "epic-00001",
+        "issue": "iss-00001",
+    }
+    for layer, node_path in node_paths.items():
+        node = target_root / node_path
+        node.mkdir(parents=True)
+        (node / ".meta.json").write_text(
+            json.dumps({"id": node_ids[layer], "type": layer}) + "\n",
+            encoding="utf-8",
+        )
+        relative_target = os.path.relpath(node, active_dir)
+        (active_dir / layer).symlink_to(relative_target)
+    (agent_dir / "active.json").write_text(
+        json.dumps({
+            "schema_version": 2,
+            "updated_at": "2026-08-25T12:00:00+09:00",
+            **{layer: {"id": node_ids[layer], "path": node_paths[layer]} for layer in ("initiative", "epic", "issue")},
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    interrupted = False
+
+    def interrupt_after_active_manifest_publish(self, journal, completed_paths):
+        nonlocal interrupted
+        published = original_checkpoint(self, journal, completed_paths)
+        if not interrupted and "spec-dock/.agent/active.json" in completed_paths:
+            interrupted = True
+            raise DistributionApplyError("injected active manifest publish interruption")
+        return published
+
+    monkeypatch.setattr(
+        OperationJournalStore,
+        "checkpoint_published",
+        interrupt_after_active_manifest_publish,
+    )
+    first = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert interrupted is True, first.reason
+    assert first.status == "recovery_required"
+    journal_payload = json.loads((spec_dock / ".distribution-journal.json").read_text(encoding="utf-8"))
+    assert (
+        next(
+            action["checkpoint"]
+            for action in journal_payload["actions"]
+            if action["path"] == "spec-dock/.agent/active.json"
+        )
+        == "published"
+    )
+    assert not (agent_dir / "active.json").exists()
+    assert (active_dir / "initiative").is_symlink()
+
+    retry = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert retry.status == "completed", retry.reason
+    assert not active_dir.exists()
+    assert not agent_dir.exists()
+    assert not (spec_dock / ".distribution-retry.json").exists()
+    assert not (spec_dock / ".distribution-journal.json").exists()
+
+
+def test_i370_deprovision_recovery_does_not_list_published_generated_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """I370-T-KRN-001: published generated roots subsume descendants durably."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    spec_dock = target_root / "spec-dock"
+    (spec_dock / "active").mkdir(parents=True)
+    (spec_dock / ".agent").mkdir()
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    interrupted = False
+
+    def interrupt_after_agent_root_publish(self, journal, completed_paths):
+        nonlocal interrupted
+        published = original_checkpoint(self, journal, completed_paths)
+        if not interrupted and "spec-dock/.agent" in completed_paths:
+            interrupted = True
+            raise DistributionApplyError("injected generated root publish interruption")
+        return published
+
+    monkeypatch.setattr(
+        OperationJournalStore,
+        "checkpoint_published",
+        interrupt_after_agent_root_publish,
+    )
+    first = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+
+    assert interrupted is True
+    assert first.status == "recovery_required"
+    journal_payload = json.loads((spec_dock / ".distribution-journal.json").read_text(encoding="utf-8"))
+    assert (
+        next(action["checkpoint"] for action in journal_payload["actions"] if action["path"] == "spec-dock/.agent")
+        == "published"
+    )
+    assert not (spec_dock / ".agent").exists()
+
+    original_list = managed_distribution._list_generated_root
+    listed: list[str] = []
+
+    def reject_published_root(target: Path, relative_root: str):
+        listed.append(relative_root)
+        if relative_root == "spec-dock/.agent":
+            raise AssertionError("recovery reopened a published generated root")
+        return original_list(target, relative_root)
+
+    monkeypatch.setattr(managed_distribution, "_list_generated_root", reject_published_root)
+    retry = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert retry.status == "completed", retry.reason
+    assert "spec-dock/.agent" not in listed
+    assert not (spec_dock / ".distribution-retry.json").exists()
+    assert not (spec_dock / ".distribution-journal.json").exists()
+
+
 def test_i370_deprovision_completed_with_guard_retries_cleanup_without_target_replay(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

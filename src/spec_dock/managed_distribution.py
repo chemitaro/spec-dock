@@ -2436,10 +2436,146 @@ def _canonical_active_path(target_root: Path, layer: str, entry: object) -> tupl
     return node_id, path
 
 
+def _active_selection_from_recovery_pointers(
+    target_root: Path,
+    journal: OperationJournal,
+) -> dict[str, tuple[str, str] | None] | None:
+    """Reconstruct an active selection while its manifest is already published away.
+
+    The journal action identities are used only to bind a pointer that is
+    missing after its own removal.  Any pointer that is still present must
+    match that immutable identity before it can participate in recovery.
+    """
+
+    records = {record.path: record for record in journal.actions}
+    selection: dict[str, tuple[str, str] | None] = {}
+    for layer in _DEPROVISION_ACTIVE_LAYERS:
+        pointer_path = f"spec-dock/active/{layer}"
+        path_path = f"{pointer_path}.path"
+        candidate_paths = (pointer_path, path_path)
+        present: list[tuple[str, _TargetObservation]] = []
+        for candidate in candidate_paths:
+            record = records.get(candidate)
+            if record is not None and record.checkpoint in {"published", "verified"}:
+                # A published generated entry is already durable journal
+                # state.  Do not reopen it while reconstructing the active
+                # selection; the terminal summary checks its absence later.
+                continue
+            observation = _observe_target(target_root, candidate)
+            if observation.state == "missing":
+                continue
+            if observation.state not in {"regular", "symlink"}:
+                return None
+            present.append((candidate, observation))
+        action_records = [record for candidate in candidate_paths if (record := records.get(candidate)) is not None]
+        if len(action_records) > 1 or len(present) > 1:
+            return None
+        if not action_records:
+            if present:
+                return None
+            selection[layer] = None
+            continue
+        record = action_records[0]
+        if record.action != "prune" or record.provenance != "current" or record.reason != "current-identity-match":
+            return None
+        expected_identity = _deprovision_recovery_record_identity(record)
+        expected_kind = "symlink" if record.path == pointer_path else "regular"
+        if expected_identity.kind != expected_kind:
+            return None
+        raw_target: str | None = None
+        if present:
+            candidate, observation = present[0]
+            if observation.identity is None or not _deprovision_recovery_identity_matches(
+                observation.identity,
+                expected_identity,
+            ):
+                return None
+            if record.checkpoint != "pending":
+                return None
+            if candidate == pointer_path:
+                raw_target = observation.identity.target
+            else:
+                loaded = _read_generated_regular_bytes(target_root, candidate)
+                if loaded is None:
+                    return None
+                try:
+                    raw = loaded[0].decode("utf-8")
+                except UnicodeDecodeError:
+                    return None
+                raw_target = raw[:-1] if raw.endswith("\n") and "\n" not in raw[:-1] else None
+        elif expected_identity.kind == "symlink" and record.checkpoint in {"pending", "published", "verified"}:
+            raw_target = expected_identity.target
+        if raw_target is None:
+            return None
+        normalized = _lexical_generated_target(record.path, raw_target)
+        if normalized is None:
+            return None
+        meta = _read_generated_regular_bytes(target_root, f"{normalized}/.meta.json")
+        if meta is None:
+            return None
+        try:
+            meta_payload = json.loads(meta[0].decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if not isinstance(meta_payload, dict):
+            return None
+        node_id = meta_payload.get("id")
+        if not isinstance(node_id, str):
+            return None
+        selected = _canonical_active_path(
+            target_root,
+            layer,
+            {"id": node_id, "path": normalized},
+        )
+        if selected is None:
+            return None
+        selection[layer] = selected
+    if selection["issue"] is not None and (selection["epic"] is None or selection["initiative"] is None):
+        return None
+    if selection["epic"] is not None and selection["initiative"] is None:
+        return None
+    if (
+        selection["epic"] is not None
+        and selection["initiative"] is not None
+        and PurePosixPath(selection["epic"][1]).parent.parent != PurePosixPath(selection["initiative"][1])
+    ):
+        return None
+    if (
+        selection["issue"] is not None
+        and selection["epic"] is not None
+        and PurePosixPath(selection["issue"][1]).parent.parent != PurePosixPath(selection["epic"][1])
+    ):
+        return None
+    return selection
+
+
 def _active_selection_from_manifest(
     target_root: Path,
+    *,
+    recovery_journal: OperationJournal | None = None,
 ) -> tuple[dict[str, tuple[str, str] | None] | None, DistributionGeneratedStateEntry | None]:
     path = "spec-dock/.agent/active.json"
+    active_record = (
+        next(
+            (item for item in recovery_journal.actions if item.path == path),
+            None,
+        )
+        if recovery_journal is not None
+        else None
+    )
+    if active_record is not None and active_record.checkpoint in {"published", "verified"}:
+        if (
+            active_record.action != "prune"
+            or active_record.provenance != "current"
+            or active_record.reason != "current-identity-match"
+            or _deprovision_recovery_record_identity(active_record).kind != "regular"
+        ):
+            return None, None
+        assert recovery_journal is not None
+        recovered = _active_selection_from_recovery_pointers(target_root, recovery_journal)
+        if recovered is None:
+            return None, None
+        return recovered, None
     observation = _observe_target(target_root, path)
     if observation.state == "missing":
         return dict.fromkeys(_DEPROVISION_ACTIVE_LAYERS), None
@@ -2517,6 +2653,83 @@ def _lexical_generated_target(path: str, target: str) -> str | None:
         return None
     normalized = PurePosixPath(*parts).as_posix()
     return normalized if not normalized.startswith("../") else None
+
+
+def _deprovision_recovery_generated_entry(
+    record: OperationJournalAction,
+) -> DistributionGeneratedStateEntry:
+    """Reconstruct one published generated entry from its journal witness."""
+
+    if (
+        record.action != "prune"
+        or record.provenance != "current"
+        or record.reason != "current-identity-match"
+        or record.checkpoint == "pending"
+        or record.path not in _DEPROVISION_GENERATED_CURRENT_SLOTS
+    ):
+        raise DistributionApplyError("journal-plan-mismatch")
+    if record.path.startswith("spec-dock/active/"):
+        name = record.path.removeprefix("spec-dock/active/")
+        origin: GeneratedStateOrigin = "current-active-producer"
+        if name == "context-pack.md":
+            expected_kind: Literal["regular", "symlink"] = "regular"
+            semantic_contract = "context-pack-v1"
+        elif name in _DEPROVISION_ACTIVE_LAYERS:
+            expected_kind = "symlink"
+            semantic_contract = f"active-{name}-pointer-v1"
+        elif name in {f"{layer}.path" for layer in _DEPROVISION_ACTIVE_LAYERS}:
+            expected_kind = "regular"
+            semantic_contract = f"active-{name.removesuffix('.path')}-path-v1"
+        else:
+            raise DistributionApplyError("journal-plan-mismatch")
+    else:
+        name = record.path.removeprefix("spec-dock/.agent/")
+        if name not in _DEPROVISION_AGENT_CURRENT_FILES:
+            raise DistributionApplyError("journal-plan-mismatch")
+        origin = "current-agent-producer"
+        expected_kind = "regular"
+        semantic_contract = f"{name}-schema-2" if name != "active.json" else "active-manifest-schema-2"
+
+    precondition = record.precondition
+    if precondition.get("exists") is not True or precondition.get("file_type") != expected_kind:
+        raise DistributionApplyError("journal-plan-mismatch")
+    identity = _deprovision_recovery_record_identity(record)
+    if identity.kind != expected_kind:
+        raise DistributionApplyError("journal-plan-mismatch")
+    structural_fields = ("device", "inode", "ctime_ns", "link_count", "mode")
+    if any(
+        not isinstance(precondition.get(field), int) or isinstance(precondition.get(field), bool)
+        for field in structural_fields
+    ):
+        raise DistributionApplyError("journal-plan-mismatch")
+    size = precondition.get("size")
+    if expected_kind == "regular":
+        if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+            raise DistributionApplyError("journal-plan-mismatch")
+        if identity.mode != precondition.get("mode"):
+            raise DistributionApplyError("journal-plan-mismatch")
+    elif size is not None:
+        raise DistributionApplyError("journal-plan-mismatch")
+    observed = PathIdentitySnapshot(
+        relative_path=record.path,
+        exists=True,
+        device=cast("int", precondition["device"]),
+        inode=cast("int", precondition["inode"]),
+        ctime_ns=cast("int", precondition["ctime_ns"]),
+        file_type=expected_kind,
+        link_count=cast("int", precondition["link_count"]),
+        mode=cast("int", precondition["mode"]),
+        size=cast("int | None", size),
+        identity=identity,
+    )
+    return DistributionGeneratedStateEntry(
+        path=record.path,
+        origin=origin,
+        expected_kind=expected_kind,
+        identity=identity,
+        observed=observed,
+        semantic_contract=semantic_contract,
+    )
 
 
 def _generated_contract_digest(
@@ -3245,10 +3458,23 @@ def _validate_deps_issues_payload(payload: dict[str, object]) -> bool:
     return isinstance(contexts, list) and all(_valid_deps_issue_context(item) for item in contexts)
 
 
+def _deprovision_recovery_directory_is_published(
+    journal: OperationJournal | None,
+    path: str,
+) -> bool:
+    return journal is not None and any(
+        record.path == path
+        and record.action == "remove-empty-directory"
+        and record.checkpoint in {"published", "verified"}
+        for record in journal.actions
+    )
+
+
 def build_deprovision_generated_state_contract(
     target_root: Path,
     *,
     expected_root_identity: DistributionRootIdentity,
+    recovery_journal: OperationJournal | None = None,
 ) -> DistributionGeneratedStateContract:
     """Build the only generated-state ownership contract for deprovision."""
 
@@ -3259,14 +3485,22 @@ def build_deprovision_generated_state_contract(
     blockers: list[DistributionAction] = []
     legacy_paths: list[str] = []
 
-    selection, active_manifest_entry = _active_selection_from_manifest(target_root)
+    selection, active_manifest_entry = _active_selection_from_manifest(
+        target_root,
+        recovery_journal=recovery_journal,
+    )
     if selection is None:
         blockers.append(_generated_state_blocker("spec-dock/.agent/active.json", "generated-state-invalid"))
         selection = dict.fromkeys(_DEPROVISION_ACTIVE_LAYERS)
     elif active_manifest_entry is not None:
         entries.append(active_manifest_entry)
 
-    active_names, active_error = _list_generated_root(target_root, "spec-dock/active")
+    active_names: tuple[str, ...] | None
+    active_error: str | None
+    if _deprovision_recovery_directory_is_published(recovery_journal, "spec-dock/active"):
+        active_names, active_error = (), None
+    else:
+        active_names, active_error = _list_generated_root(target_root, "spec-dock/active")
     if active_error is not None:
         blockers.append(_generated_state_blocker("spec-dock/active", active_error))
         active_names = ()
@@ -3338,7 +3572,12 @@ def build_deprovision_generated_state_contract(
         else:
             entries.append(replace(loaded[1], semantic_contract="context-pack-v1"))
 
-    agent_names, agent_error = _list_generated_root(target_root, "spec-dock/.agent")
+    agent_names: tuple[str, ...] | None
+    agent_error: str | None
+    if _deprovision_recovery_directory_is_published(recovery_journal, "spec-dock/.agent"):
+        agent_names, agent_error = (), None
+    else:
+        agent_names, agent_error = _list_generated_root(target_root, "spec-dock/.agent")
     if agent_error is not None:
         blockers.append(_generated_state_blocker("spec-dock/.agent", agent_error))
         agent_names = ()
@@ -3493,6 +3732,16 @@ def build_deprovision_generated_state_contract(
         if _validate_generated_tree(tree_payload.get("tree"), index_nodes) is None:
             for name in (index_name, tree_name):
                 blockers.append(_generated_state_blocker(f"spec-dock/.agent/{name}", "generated-state-invalid"))
+
+    if recovery_journal is not None:
+        entry_paths = {entry.path for entry in entries}
+        for record in recovery_journal.actions:
+            if record.path not in _DEPROVISION_GENERATED_CURRENT_SLOTS or record.path in entry_paths:
+                continue
+            if record.checkpoint == "pending":
+                continue
+            entries.append(_deprovision_recovery_generated_entry(record))
+            entry_paths.add(record.path)
 
     ordered_entries = tuple(sorted(entries, key=lambda entry: entry.path))
     ordered_legacy = tuple(sorted(set(legacy_paths)))
@@ -3839,6 +4088,7 @@ def build_deprovision_contract(
     scaffold_root: Path,
     target_root: Path,
     expected_root_identity: DistributionRootIdentity,
+    recovery_journal: OperationJournal | None = None,
 ) -> DistributionDeprovisionContract:
     """Capture one physical/generated deprovision contract without target mutation."""
 
@@ -3882,6 +4132,7 @@ def build_deprovision_contract(
     generated_state = build_deprovision_generated_state_contract(
         target_root,
         expected_root_identity=expected_root_identity,
+        recovery_journal=recovery_journal,
     )
     generated_state = _adopt_historical_generated_entries(target_root, manifest, generated_state)
     target_only_assets = _deprovision_version_asset(target_root, manifest)
@@ -13344,6 +13595,8 @@ def _assert_deprovision_recovery_contract_identity(
 
     if contract.manifest is None or journal.generated_state_contract_digest is None:
         raise DistributionApplyError("journal-contract-mismatch")
+    if contract.generated_state.contract_digest != journal.generated_state_contract_digest:
+        raise DistributionApplyError("journal-contract-mismatch")
     target_only_assets = _deprovision_recovery_target_only_assets(journal)
     digest = _deprovision_contract_digest(
         physical_assets=contract.managed_assets,
@@ -13531,6 +13784,7 @@ def _validate_deprovision_recovery_contract_before_reconciliation(
         scaffold_root=scaffold_root,
         target_root=target_root,
         expected_root_identity=expected_root_identity,
+        recovery_journal=journal,
     )
     if contract.manifest is None or contract.generated_state.blockers:
         raise DistributionApplyError("journal-contract-mismatch")
@@ -13639,6 +13893,7 @@ def _build_deprovision_recovery_contract_assessment(
         scaffold_root=scaffold_root,
         target_root=target_root,
         expected_root_identity=expected_root_identity,
+        recovery_journal=journal,
     )
     if contract.manifest is None or contract.generated_state.blockers:
         raise DistributionApplyError("journal-contract-mismatch")
@@ -13693,6 +13948,10 @@ def _reconcile_deprovision_pending_actions(
     store: OperationJournalStore,
     journal: OperationJournal,
 ) -> OperationJournal:
+    # Validate all already-published paths before reconciling any pending
+    # action.  This keeps a rebound published directory from allowing an
+    # unrelated pending mutation to advance first.
+    _assert_deprovision_published_summaries(store.target_root, journal)
     active = journal
     completed = tuple(record.path for record in active.actions if record.checkpoint == "published")
     for record in active.actions:
@@ -13771,6 +14030,7 @@ def _assert_deprovision_postconditions(
         scaffold_root=plan.scaffold_root,
         target_root=plan.target_root,
         expected_root_identity=assessment.root_identity,
+        recovery_journal=journal,
     )
     if contract.generated_state.blockers or contract.source_semantic_identities != journal.source_semantic_identities:
         raise DistributionApplyError("deprovision-postcondition-mismatch")
