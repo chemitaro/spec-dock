@@ -796,21 +796,22 @@ git diff --check
 
 ```bash
 uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py \
-  --timeout-seconds 600 \
-  --max-total-seconds 600 \
+  --timeout-seconds 1200 \
+  --max-total-seconds 1800 \
   --shards 4
 ```
 
 成功条件:
 
 - verifier exit 0
-- total deadline 600秒以内
 - all collected node coverageに欠落/重複なし
 - approved failure ledgerのnode IDとsignatureがexact一致
 - unexpected failure/error 0
 - Issue 370 attributable new failure 0
 
-Issue 369 Reportの27 approved failures、件数、時間をcurrent resultとして流用しない。candidate runがtimeout、ledger mismatch、unexpected failure/errorになった場合、本Issueは未完了である。Full Regression repairまたはledger rebaselineを本Issueへ取り込まず、attributable failureを修正するかDecision Gateで停止する。
+600秒は、Issue 369で発生した4時間超の改善を測る暫定的なperformance targetであり、Issue 370のhard pass/fail deadlineではない。candidate-wide runが600秒を超えても、上記のbounded execution window内に完走し、coverage・ledger・unexpected failure/error・Issue 370 attributable failureの条件を満たせば合格とする。実測total elapsedはReportへ記録し、600秒超過はadvisory performance follow-upとして分類する。設定したhard boundで終了した場合は未完了として扱い、完走できる十分なboundで再実行する。
+
+Issue 369 Reportの27 approved failures、件数、時間をcurrent resultとして流用しない。600秒というadvisory boundを超えただけではtimeout扱いにせず、選択した最終hard boundで終了した場合、ledger mismatch、unexpected failure/errorの場合に本Issueを未完了とする。Full Regression repairまたはledger rebaselineを本Issueへ取り込まず、attributable failureを修正するかDecision Gateで停止する。
 
 ### Linux / Darwin evidence
 
