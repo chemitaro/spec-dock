@@ -1,0 +1,1333 @@
+[   123.0s] ..s..sssss..............s.s............................................. [ 11%]
+[   364.0s] ...........................................s...F...F.................... [ 23%]
+[   472.8s] ..................F..F...F....s..F.......................s.....s........ [ 34%]
+[   487.8s] ........................................................................ [ 46%]
+[   492.1s] ........................................................................ [ 57%]
+[   510.4s] ........................................................................ [ 69%]
+[   618.7s] ........................................................................ [ 80%]
+[   623.6s] ........................................................................ [ 92%]
+[   624.6s] .................................................                        [100%]
+[   624.6s] =================================== FAILURES ===================================
+[   624.6s] _ TestRuntimeActiveS05.test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal _
+[   624.6s] 
+[   624.6s] self = <tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05 object at 0x10756df10>
+[   624.6s] 
+[   624.6s]     def test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal(self) -> None:
+[   624.6s]         _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = (
+[   624.6s]             _runtime_modules()
+[   624.6s]         )
+[   624.6s]         with tempfile.TemporaryDirectory() as tmp:
+[   624.6s]             repo_root = Path(tmp)
+[   624.6s]             issue_rel = Path("spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-local-00001")
+[   624.6s]             issue_dir = repo_root / issue_rel
+[   624.6s]             issue_dir.mkdir(parents=True)
+[   624.6s]             (issue_dir / "report.md").write_text(
+[   624.6s]                 "\n".join([
+[   624.6s]                     "# Report",
+[   624.6s]                     "",
+[   624.6s]                     "## Evidence Adoption Ledger",
+[   624.6s]                     "",
+[   624.6s]                     "| ID | adoption_status | target_artifact | next_action |",
+[   624.6s]                     "|---|---|---|---|",
+[   624.6s]                     "| EAL-030 | blocked | plan.md | resolve plan evidence |",
+[   624.6s]                     "",
+[   624.6s]                 ]),
+[   624.6s]                 encoding="utf-8",
+[   624.6s]             )
+[   624.6s]             manifest = infra_contracts.ActiveManifest(
+[   624.6s]                 initiative=None,
+[   624.6s]                 epic=None,
+[   624.6s] >               issue=infra_contracts.ActiveManifestEntry(
+[   624.6s]                     id="iss-local-00001",
+[   624.6s]                     path=issue_rel.as_posix(),
+[   624.6s]                     authority="approved",
+[   624.6s]                     grants=("implementation_start", "issue_finish"),
+[   624.6s]                     promotion_record={
+[   624.6s]                         "status": "approved",
+[   624.6s]                         "authority": "approved",
+[   624.6s]                         "source_revision": "active:iss-local-00001",
+[   624.6s]                         "approved_revision": "active:iss-local-00001",
+[   624.6s]                         "approved_hash": "active:iss-local-00001",
+[   624.6s]                         "reviewer_target_hash": "active:iss-local-00001",
+[   624.6s]                         "promotion_decision": "main_orchestrator_promotion",
+[   624.6s]                     },
+[   624.6s]                 ),
+[   624.6s]             )
+[   624.6s] E           TypeError: ActiveManifestEntry.__init__() got an unexpected keyword argument 'authority'
+[   624.6s] 
+[   624.6s] tests/cli_runtime/test_runtime_active_s05.py:163: TypeError
+[   624.6s] _ TestRuntimeActiveS06.test_set_active_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key _
+[   624.6s] 
+[   624.6s] self = <tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06 object at 0x1075b0a70>
+[   624.6s] 
+[   624.6s]     def test_set_active_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key(self) -> None:
+[   624.6s]         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
+[   624.6s]         records = [
+[   624.6s]             _record(
+[   624.6s]                 infra_contracts,
+[   624.6s]                 kind="initiative",
+[   624.6s]                 node_id="init-local-00001",
+[   624.6s]                 parent_id=None,
+[   624.6s]                 initiative_id=None,
+[   624.6s]                 epic_id=None,
+[   624.6s]                 github_issue_number=None,
+[   624.6s]             ),
+[   624.6s]             _record(
+[   624.6s]                 infra_contracts,
+[   624.6s]                 kind="epic",
+[   624.6s]                 node_id="epic-local-00001",
+[   624.6s]                 parent_id="init-local-00001",
+[   624.6s]                 initiative_id="init-local-00001",
+[   624.6s]                 epic_id=None,
+[   624.6s]                 github_issue_number=None,
+[   624.6s]             ),
+[   624.6s]             _record(
+[   624.6s]                 infra_contracts,
+[   624.6s]                 kind="issue",
+[   624.6s]                 node_id="iss-local-00001",
+[   624.6s]                 parent_id="epic-local-00001",
+[   624.6s]                 initiative_id="init-local-00001",
+[   624.6s]                 epic_id="epic-local-00001",
+[   624.6s]                 github_issue_number=123,
+[   624.6s]                 github_repo_owner="current",
+[   624.6s]                 github_repo_name="repo",
+[   624.6s]             ),
+[   624.6s]             _record(
+[   624.6s]                 infra_contracts,
+[   624.6s]                 kind="issue",
+[   624.6s]                 node_id="iss-local-00002",
+[   624.6s]                 parent_id="epic-local-00001",
+[   624.6s]                 initiative_id="init-local-00001",
+[   624.6s]                 epic_id="epic-local-00001",
+[   624.6s]                 github_issue_number=None,
+[   624.6s]             ),
+[   624.6s]         ]
+[   624.6s]         issue_gateway = _StubIssueGateway(
+[   624.6s]             snapshots=[
+[   624.6s]                 SimpleNamespace(
+[   624.6s]                     issue_number=123,
+[   624.6s]                     state="OPEN",
+[   624.6s]                     title="current #123",
+[   624.6s]                     labels=[],
+[   624.6s]                     updated_at="2026-03-19T00:00:00Z",
+[   624.6s]                     url="https://github.com/current/repo/issues/123",
+[   624.6s]                     repo_owner="current",
+[   624.6s]                     repo_name="repo",
+[   624.6s]                 )
+[   624.6s]             ],
+[   624.6s]             foreign_snapshots={},
+[   624.6s]         )
+[   624.6s]         ports = self._ports(
+[   624.6s]             issue_depends_on_map={"iss-local-00001": [], "iss-local-00002": []},
+[   624.6s]             statuses={},
+[   624.6s]             issue_gateway=issue_gateway,
+[   624.6s]             git_gateway=_StubGitGateway(origin_repo_slug="current/repo"),
+[   624.6s]             records=records,
+[   624.6s]         )
+[   624.6s]         req = app_contracts.SetActiveRequest(
+[   624.6s]             target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None),
+[   624.6s]             force=False,
+[   624.6s]             checkout=False,
+[   624.6s]             use_github=True,
+[   624.6s]             issue_limit=10000,
+[   624.6s]         )
+[   624.6s]         result = app_set_active.set_active(req, ports)
+[   624.6s]         assert result.manifest_written
+[   624.6s]         assert result.selection.issue_id == "iss-local-00001"
+[   624.6s] >       assert issue_gateway.calls == [("/repo", 10000)]
+[   624.6s] E       AssertionError: assert [] == [('/repo', 10000)]
+[   624.6s] E         
+[   624.6s] E         Right contains one more item: ('/repo', 10000)
+[   624.6s] E         Use -v to get more diff
+[   624.6s] 
+[   624.6s] tests/cli_runtime/test_runtime_active_s06.py:535: AssertionError
+[   624.6s] _______ TestRuntimeImportS10.test_load_active_manifest_chain_regression ________
+[   624.6s] 
+[   624.6s] plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00456', title='Imported issue', slug='imported-issue', path='/v...itiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00456-imported-issue/.meta.json')])
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f257f0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
+[   624.6s]         node_repo = _resolve_node_repo(ports)
+[   624.6s]         template_scaffolder = _resolve_template_scaffolder(ports)
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]     
+[   624.6s]         collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+[   624.6s]         if collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {collisions[0]}")
+[   624.6s]     
+[   624.6s]         template_dir = _resolve_template_dir(plan)
+[   624.6s]         rules_scaffold_specs = _rules_scaffold_specs(
+[   624.6s]             kind=plan.meta.kind,
+[   624.6s]             dest_dir=plan.dest_dir,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]         )
+[   624.6s]         for link_path, target_path in rules_scaffold_specs:
+[   624.6s]             _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+[   624.6s]         if os.path.lexists(plan.dest_dir):
+[   624.6s]             raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+[   624.6s]         _require_node_tree_no_replace_rename_capability()
+[   624.6s]         _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+[   624.6s]     
+[   624.6s]         destination_parent_fd: int | None = None
+[   624.6s]         destination_parent_identity: tuple[int, int] | None = None
+[   624.6s]         outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+[   624.6s]         outer_created = False
+[   624.6s]         outer_fd: int | None = None
+[   624.6s]         outer_identity: tuple[int, int] | None = None
+[   624.6s]         payload_created = False
+[   624.6s]         payload_fd: int | None = None
+[   624.6s]         payload_identity: tuple[int, int] | None = None
+[   624.6s]         committed = False
+[   624.6s]         try:
+[   624.6s]             plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+[   624.6s]             destination_parent_fd = os.open(
+[   624.6s]                 plan.dest_dir.parent,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]             )
+[   624.6s]             parent_stat = os.fstat(destination_parent_fd)
+[   624.6s]             destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+[   624.6s]             os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+[   624.6s]             outer_created = True
+[   624.6s]             outer_fd = os.open(
+[   624.6s]                 outer_name,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=destination_parent_fd,
+[   624.6s]             )
+[   624.6s]             outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+[   624.6s]             os.fchmod(outer_fd, 0o700)
+[   624.6s]             os.mkdir("payload", dir_fd=outer_fd)
+[   624.6s]             payload_created = True
+[   624.6s]             payload_fd = os.open(
+[   624.6s]                 "payload",
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=outer_fd,
+[   624.6s]             )
+[   624.6s]             payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+[   624.6s] >           created_paths = template_scaffolder.copy_scaffolded_tree_at(
+[   624.6s]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[   624.6s]                 src_dir=template_dir,
+[   624.6s]                 dest_dir=plan.dest_dir,
+[   624.6s]                 dest_dir_fd=payload_fd,
+[   624.6s]                 replacements=plan.replacements,
+[   624.6s]             )
+[   624.6s] E           AttributeError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'. Did you mean: 'copy_scaffolded_tree'?
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1150: AttributeError
+[   624.6s] 
+[   624.6s] The above exception was the direct cause of the following exception:
+[   624.6s] 
+[   624.6s] req = ImportNodeRequest(issue_number=456, title='Imported issue', slug='imported-issue', parent_id=None, target_repo_owner=None, target_repo_name=None, allow_foreign_url=False)
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f257f0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def import_node_core(
+[   624.6s]         req: ImportNodeRequest,
+[   624.6s]         ports: Ports,
+[   624.6s]         *,
+[   624.6s]         kind: Literal["initiative", "epic", "issue"],
+[   624.6s]     ) -> ImportNodeResult:
+[   624.6s]         title, slug = resolve_input_title_and_slug(req.title, req.slug)
+[   624.6s]         req = replace(req, title=title, slug=slug)
+[   624.6s]     
+[   624.6s]         current_repo_slug = resolve_current_repo_slug(ports)
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             report = validate_graph_and_deps(
+[   624.6s]                 graph,
+[   624.6s]                 repo_root=_resolve_repo_root(ports),
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]                 enforce_github_mandatory_linkage=False,
+[   624.6s]             )
+[   624.6s]             if report.errors:
+[   624.6s]                 raise RuntimeError(report.errors[0])
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]         try:
+[   624.6s]             validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]     
+[   624.6s]         issue_number = int(req.issue_number)
+[   624.6s]         _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+[   624.6s]         _require_numeric_import_repo_scope(
+[   624.6s]             req,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+[   624.6s]         guard_github_issue_uniqueness(
+[   624.6s]             graph,
+[   624.6s]             issue_number,
+[   624.6s]             github_repo_owner=req.target_repo_owner,
+[   624.6s]             github_repo_name=req.target_repo_name,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]         precheck_req = build_linked_create_request(
+[   624.6s]             req,
+[   624.6s]             precheck_parent_id,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_plan = plan_node_creation(
+[   624.6s]             precheck_req,
+[   624.6s]             graph,
+[   624.6s]             kind=kind,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]             today=today,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+[   624.6s]         if precheck_collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+[   624.6s]     
+[   624.6s]         issue_gateway = _resolve_issue_gateway(ports)
+[   624.6s]         imported_issue = issue_gateway.issue_view_minimal(
+[   624.6s]             _resolve_repo_root(ports),
+[   624.6s]             issue_number,
+[   624.6s]             repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
+[   624.6s]         )
+[   624.6s]         lock_path, lock_token = _acquire_create_lock(specdock_dir)
+[   624.6s]         result_node: SpecNode | None = None
+[   624.6s]         body_error: Exception | None = None
+[   624.6s]         local_write_phase: CreateWritePhase = "none"
+[   624.6s]         local_node_id: str | None = None
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             guard_github_issue_uniqueness(
+[   624.6s]                 graph,
+[   624.6s]                 issue_number,
+[   624.6s]                 github_repo_owner=req.target_repo_owner,
+[   624.6s]                 github_repo_name=req.target_repo_name,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]             create_req = build_linked_create_request(
+[   624.6s]                 req,
+[   624.6s]                 locked_parent_id,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             plan = plan_node_creation(
+[   624.6s]                 create_req,
+[   624.6s]                 graph,
+[   624.6s]                 kind=kind,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 today=today,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             local_node_id = plan.meta.id
+[   624.6s] >           execute_create_plan(plan, ports)
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:397: 
+[   624.6s] _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+[   624.6s] 
+[   624.6s] plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00456', title='Imported issue', slug='imported-issue', path='/v...itiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00456-imported-issue/.meta.json')])
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f257f0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
+[   624.6s]         node_repo = _resolve_node_repo(ports)
+[   624.6s]         template_scaffolder = _resolve_template_scaffolder(ports)
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]     
+[   624.6s]         collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+[   624.6s]         if collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {collisions[0]}")
+[   624.6s]     
+[   624.6s]         template_dir = _resolve_template_dir(plan)
+[   624.6s]         rules_scaffold_specs = _rules_scaffold_specs(
+[   624.6s]             kind=plan.meta.kind,
+[   624.6s]             dest_dir=plan.dest_dir,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]         )
+[   624.6s]         for link_path, target_path in rules_scaffold_specs:
+[   624.6s]             _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+[   624.6s]         if os.path.lexists(plan.dest_dir):
+[   624.6s]             raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+[   624.6s]         _require_node_tree_no_replace_rename_capability()
+[   624.6s]         _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+[   624.6s]     
+[   624.6s]         destination_parent_fd: int | None = None
+[   624.6s]         destination_parent_identity: tuple[int, int] | None = None
+[   624.6s]         outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+[   624.6s]         outer_created = False
+[   624.6s]         outer_fd: int | None = None
+[   624.6s]         outer_identity: tuple[int, int] | None = None
+[   624.6s]         payload_created = False
+[   624.6s]         payload_fd: int | None = None
+[   624.6s]         payload_identity: tuple[int, int] | None = None
+[   624.6s]         committed = False
+[   624.6s]         try:
+[   624.6s]             plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+[   624.6s]             destination_parent_fd = os.open(
+[   624.6s]                 plan.dest_dir.parent,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]             )
+[   624.6s]             parent_stat = os.fstat(destination_parent_fd)
+[   624.6s]             destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+[   624.6s]             os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+[   624.6s]             outer_created = True
+[   624.6s]             outer_fd = os.open(
+[   624.6s]                 outer_name,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=destination_parent_fd,
+[   624.6s]             )
+[   624.6s]             outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+[   624.6s]             os.fchmod(outer_fd, 0o700)
+[   624.6s]             os.mkdir("payload", dir_fd=outer_fd)
+[   624.6s]             payload_created = True
+[   624.6s]             payload_fd = os.open(
+[   624.6s]                 "payload",
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=outer_fd,
+[   624.6s]             )
+[   624.6s]             payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+[   624.6s]             created_paths = template_scaffolder.copy_scaffolded_tree_at(
+[   624.6s]                 src_dir=template_dir,
+[   624.6s]                 dest_dir=plan.dest_dir,
+[   624.6s]                 dest_dir_fd=payload_fd,
+[   624.6s]                 replacements=plan.replacements,
+[   624.6s]             )
+[   624.6s]             created_rule_links: list[Path] = []
+[   624.6s]             for link_path, target_path in rules_scaffold_specs:
+[   624.6s]                 _create_relative_symlink_at(
+[   624.6s]                     payload_fd,
+[   624.6s]                     node_dir=plan.dest_dir,
+[   624.6s]                     link_path=link_path,
+[   624.6s]                     target_path=target_path,
+[   624.6s]                 )
+[   624.6s]                 created_rule_links.append(link_path)
+[   624.6s]             node_repo.write_meta_at(payload_fd, plan.meta)
+[   624.6s]             if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
+[   624.6s]                 raise RuntimeError(f"Destination parent identity changed before publication: {plan.dest_dir.parent}")
+[   624.6s]             _verified_directory_identity_at(
+[   624.6s]                 destination_parent_fd,
+[   624.6s]                 outer_name,
+[   624.6s]                 outer_fd,
+[   624.6s]                 expected_identity=outer_identity,
+[   624.6s]             )
+[   624.6s]             _verified_directory_identity_at(
+[   624.6s]                 outer_fd,
+[   624.6s]                 "payload",
+[   624.6s]                 payload_fd,
+[   624.6s]                 expected_identity=payload_identity,
+[   624.6s]             )
+[   624.6s]             _rename_node_tree_no_replace_between_at(
+[   624.6s]                 outer_fd,
+[   624.6s]                 "payload",
+[   624.6s]                 destination_parent_fd,
+[   624.6s]                 plan.dest_dir.name,
+[   624.6s]             )
+[   624.6s]             committed = True
+[   624.6s]             with contextlib.suppress(OSError, RuntimeError):
+[   624.6s]                 _cleanup_committed_outer_transaction(
+[   624.6s]                     parent_fd=destination_parent_fd,
+[   624.6s]                     outer_name=outer_name,
+[   624.6s]                     outer_identity=outer_identity,
+[   624.6s]                 )
+[   624.6s]         except Exception as exc:
+[   624.6s]             if not committed and destination_parent_fd is not None:
+[   624.6s]                 try:
+[   624.6s]                     _cleanup_node_tree_transaction(
+[   624.6s]                         parent_fd=destination_parent_fd,
+[   624.6s]                         outer_name=outer_name,
+[   624.6s]                         outer_created=outer_created,
+[   624.6s]                         outer_fd=outer_fd,
+[   624.6s]                         outer_identity=outer_identity,
+[   624.6s]                         payload_created=payload_created,
+[   624.6s]                         payload_fd=payload_fd,
+[   624.6s]                         payload_identity=payload_identity,
+[   624.6s]                     )
+[   624.6s]                 except Exception as cleanup_exc:
+[   624.6s]                     raise CreatePlanExecutionError(
+[   624.6s]                         phase="scaffold_copied",
+[   624.6s]                         message=f"{exc}; node scaffold rollback failed: {cleanup_exc}",
+[   624.6s]                     ) from exc
+[   624.6s] >           raise CreatePlanExecutionError(phase="none", message=str(exc)) from exc
+[   624.6s] E           spec_dock_runtime.application.create_node.CreatePlanExecutionError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1211: CreatePlanExecutionError
+[   624.6s] 
+[   624.6s] The above exception was the direct cause of the following exception:
+[   624.6s] 
+[   624.6s] self = <tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10 object at 0x1076aa6f0>
+[   624.6s] 
+[   624.6s]     def test_load_active_manifest_chain_regression(self) -> None:
+[   624.6s]         (
+[   624.6s]             _runtime_app,
+[   624.6s]             app_contracts,
+[   624.6s]             app_import_node,
+[   624.6s]             app_ports,
+[   624.6s]             domain_models,
+[   624.6s]             _infra_artifact_writer,
+[   624.6s]             infra_contracts,
+[   624.6s]             _presentation_cli_text,
+[   624.6s]         ) = _runtime_modules()
+[   624.6s]         with tempfile.TemporaryDirectory() as tmp:
+[   624.6s]             specdock_dir = Path(tmp) / "spec-dock"
+[   624.6s]             self._prepare_templates(specdock_dir)
+[   624.6s]             records = self._base_records(infra_contracts, specdock_dir)
+[   624.6s]             issue_dir = Path(records[1].path) / "issues" / "iss-local-00009-refresh-token"
+[   624.6s]             records.append(
+[   624.6s]                 _record(
+[   624.6s]                     infra_contracts,
+[   624.6s]                     kind="issue",
+[   624.6s]                     node_id="iss-local-00009",
+[   624.6s]                     title="Refresh token",
+[   624.6s]                     path=issue_dir,
+[   624.6s]                     parent_id="epic-local-00001",
+[   624.6s]                     initiative_id="init-local-00001",
+[   624.6s]                     epic_id="epic-local-00001",
+[   624.6s]                     github_issue_number=None,
+[   624.6s]                 )
+[   624.6s]             )
+[   624.6s]             store = _NodeStore(records)
+[   624.6s]             manifest = self._active_manifest(infra_contracts, issue_id="iss-local-00009")
+[   624.6s]             ports = self._ports(
+[   624.6s]                 app_ports,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 store=store,
+[   624.6s]                 domain_models=domain_models,
+[   624.6s]                 infra_contracts=infra_contracts,
+[   624.6s]                 active_manifest=manifest,
+[   624.6s]                 artifact_writer=_FailingArtifactWriter(),
+[   624.6s]             )
+[   624.6s]     
+[   624.6s]             captured = {}
+[   624.6s]             original_resolve = app_import_node.resolve_parent_from_active
+[   624.6s]             original_sync = app_import_node.sync_after_import
+[   624.6s]     
+[   624.6s]             def _fake_resolve(graph, child_kind, active):
+[   624.6s]                 del graph
+[   624.6s]                 captured["child_kind"] = child_kind
+[   624.6s]                 captured["active"] = active
+[   624.6s]                 return "epic-local-00001"
+[   624.6s]     
+[   624.6s]             app_import_node.resolve_parent_from_active = _fake_resolve
+[   624.6s]             app_import_node.sync_after_import = lambda _ports: self._dummy_sync_result(app_contracts, domain_models)
+[   624.6s]             try:
+[   624.6s] >               result = app_import_node.import_issue(
+[   624.6s]                     app_contracts.ImportNodeRequest(
+[   624.6s]                         issue_number=456,
+[   624.6s]                         title="Imported issue",
+[   624.6s]                         slug=None,
+[   624.6s]                         parent_id=None,
+[   624.6s]                     ),
+[   624.6s]                     ports,
+[   624.6s]                 )
+[   624.6s] 
+[   624.6s] tests/cli_runtime/test_runtime_import_s10.py:559: 
+[   624.6s] _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:456: in import_issue
+[   624.6s]     return import_node_core(req, ports, kind="issue")
+[   624.6s]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[   624.6s] _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+[   624.6s] 
+[   624.6s] req = ImportNodeRequest(issue_number=456, title='Imported issue', slug='imported-issue', parent_id=None, target_repo_owner=None, target_repo_name=None, allow_foreign_url=False)
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f257f0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def import_node_core(
+[   624.6s]         req: ImportNodeRequest,
+[   624.6s]         ports: Ports,
+[   624.6s]         *,
+[   624.6s]         kind: Literal["initiative", "epic", "issue"],
+[   624.6s]     ) -> ImportNodeResult:
+[   624.6s]         title, slug = resolve_input_title_and_slug(req.title, req.slug)
+[   624.6s]         req = replace(req, title=title, slug=slug)
+[   624.6s]     
+[   624.6s]         current_repo_slug = resolve_current_repo_slug(ports)
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             report = validate_graph_and_deps(
+[   624.6s]                 graph,
+[   624.6s]                 repo_root=_resolve_repo_root(ports),
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]                 enforce_github_mandatory_linkage=False,
+[   624.6s]             )
+[   624.6s]             if report.errors:
+[   624.6s]                 raise RuntimeError(report.errors[0])
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]         try:
+[   624.6s]             validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]     
+[   624.6s]         issue_number = int(req.issue_number)
+[   624.6s]         _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+[   624.6s]         _require_numeric_import_repo_scope(
+[   624.6s]             req,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+[   624.6s]         guard_github_issue_uniqueness(
+[   624.6s]             graph,
+[   624.6s]             issue_number,
+[   624.6s]             github_repo_owner=req.target_repo_owner,
+[   624.6s]             github_repo_name=req.target_repo_name,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]         precheck_req = build_linked_create_request(
+[   624.6s]             req,
+[   624.6s]             precheck_parent_id,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_plan = plan_node_creation(
+[   624.6s]             precheck_req,
+[   624.6s]             graph,
+[   624.6s]             kind=kind,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]             today=today,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+[   624.6s]         if precheck_collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+[   624.6s]     
+[   624.6s]         issue_gateway = _resolve_issue_gateway(ports)
+[   624.6s]         imported_issue = issue_gateway.issue_view_minimal(
+[   624.6s]             _resolve_repo_root(ports),
+[   624.6s]             issue_number,
+[   624.6s]             repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
+[   624.6s]         )
+[   624.6s]         lock_path, lock_token = _acquire_create_lock(specdock_dir)
+[   624.6s]         result_node: SpecNode | None = None
+[   624.6s]         body_error: Exception | None = None
+[   624.6s]         local_write_phase: CreateWritePhase = "none"
+[   624.6s]         local_node_id: str | None = None
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             guard_github_issue_uniqueness(
+[   624.6s]                 graph,
+[   624.6s]                 issue_number,
+[   624.6s]                 github_repo_owner=req.target_repo_owner,
+[   624.6s]                 github_repo_name=req.target_repo_name,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]             create_req = build_linked_create_request(
+[   624.6s]                 req,
+[   624.6s]                 locked_parent_id,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             plan = plan_node_creation(
+[   624.6s]                 create_req,
+[   624.6s]                 graph,
+[   624.6s]                 kind=kind,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 today=today,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             local_node_id = plan.meta.id
+[   624.6s]             execute_create_plan(plan, ports)
+[   624.6s]             local_write_phase = "meta_written"
+[   624.6s]             _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+[   624.6s]             local_write_phase = "post_write_verified"
+[   624.6s]             result_node = _to_spec_node(plan.meta)
+[   624.6s]         except Exception as exc:
+[   624.6s]             body_error = exc
+[   624.6s]             local_write_phase = resolve_create_write_phase(exc, default=local_write_phase)
+[   624.6s]         finally:
+[   624.6s]             release_error: Exception | None = None
+[   624.6s]             try:
+[   624.6s]                 _release_create_lock(lock_path, lock_token)
+[   624.6s]             except Exception as exc:
+[   624.6s]                 release_error = exc
+[   624.6s]     
+[   624.6s]             wrapped_outcome_error = _build_post_import_failure(
+[   624.6s]                 local_error=body_error,
+[   624.6s]                 release_error=release_error,
+[   624.6s]                 kind=kind,
+[   624.6s]                 req=req,
+[   624.6s]                 title=title,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 local_write_phase=local_write_phase,
+[   624.6s]                 local_node_id=local_node_id if create_write_phase_has_local_writes(local_write_phase) else None,
+[   624.6s]             )
+[   624.6s]             if wrapped_outcome_error is not None:
+[   624.6s]                 cause = body_error if body_error is not None else release_error
+[   624.6s]                 if cause is not None:
+[   624.6s] >                   raise wrapped_outcome_error from cause
+[   624.6s] E                   RuntimeError: Outcome: import_local_write_fail. '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at' Recovery: rerun `/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmpglm97cme/spec-dock/scripts/spec-dock import issue 456 --title 'Imported issue'`.
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:425: RuntimeError
+[   624.6s] _ TestRuntimeImportS10.test_import_then_sync_artifact_path_name_content_regression _
+[   624.6s] 
+[   624.6s] plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00321', title='Import then sync', slug='import-then-sync', path...iatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00321-import-then-sync/.meta.json')])
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107973ad0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
+[   624.6s]         node_repo = _resolve_node_repo(ports)
+[   624.6s]         template_scaffolder = _resolve_template_scaffolder(ports)
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]     
+[   624.6s]         collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+[   624.6s]         if collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {collisions[0]}")
+[   624.6s]     
+[   624.6s]         template_dir = _resolve_template_dir(plan)
+[   624.6s]         rules_scaffold_specs = _rules_scaffold_specs(
+[   624.6s]             kind=plan.meta.kind,
+[   624.6s]             dest_dir=plan.dest_dir,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]         )
+[   624.6s]         for link_path, target_path in rules_scaffold_specs:
+[   624.6s]             _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+[   624.6s]         if os.path.lexists(plan.dest_dir):
+[   624.6s]             raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+[   624.6s]         _require_node_tree_no_replace_rename_capability()
+[   624.6s]         _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+[   624.6s]     
+[   624.6s]         destination_parent_fd: int | None = None
+[   624.6s]         destination_parent_identity: tuple[int, int] | None = None
+[   624.6s]         outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+[   624.6s]         outer_created = False
+[   624.6s]         outer_fd: int | None = None
+[   624.6s]         outer_identity: tuple[int, int] | None = None
+[   624.6s]         payload_created = False
+[   624.6s]         payload_fd: int | None = None
+[   624.6s]         payload_identity: tuple[int, int] | None = None
+[   624.6s]         committed = False
+[   624.6s]         try:
+[   624.6s]             plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+[   624.6s]             destination_parent_fd = os.open(
+[   624.6s]                 plan.dest_dir.parent,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]             )
+[   624.6s]             parent_stat = os.fstat(destination_parent_fd)
+[   624.6s]             destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+[   624.6s]             os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+[   624.6s]             outer_created = True
+[   624.6s]             outer_fd = os.open(
+[   624.6s]                 outer_name,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=destination_parent_fd,
+[   624.6s]             )
+[   624.6s]             outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+[   624.6s]             os.fchmod(outer_fd, 0o700)
+[   624.6s]             os.mkdir("payload", dir_fd=outer_fd)
+[   624.6s]             payload_created = True
+[   624.6s]             payload_fd = os.open(
+[   624.6s]                 "payload",
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=outer_fd,
+[   624.6s]             )
+[   624.6s]             payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+[   624.6s] >           created_paths = template_scaffolder.copy_scaffolded_tree_at(
+[   624.6s]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[   624.6s]                 src_dir=template_dir,
+[   624.6s]                 dest_dir=plan.dest_dir,
+[   624.6s]                 dest_dir_fd=payload_fd,
+[   624.6s]                 replacements=plan.replacements,
+[   624.6s]             )
+[   624.6s] E           AttributeError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'. Did you mean: 'copy_scaffolded_tree'?
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1150: AttributeError
+[   624.6s] 
+[   624.6s] The above exception was the direct cause of the following exception:
+[   624.6s] 
+[   624.6s] req = ImportNodeRequest(issue_number=321, title='Import then sync', slug='import-then-sync', parent_id='epic-local-00001', target_repo_owner=None, target_repo_name=None, allow_foreign_url=False)
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107973ad0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def import_node_core(
+[   624.6s]         req: ImportNodeRequest,
+[   624.6s]         ports: Ports,
+[   624.6s]         *,
+[   624.6s]         kind: Literal["initiative", "epic", "issue"],
+[   624.6s]     ) -> ImportNodeResult:
+[   624.6s]         title, slug = resolve_input_title_and_slug(req.title, req.slug)
+[   624.6s]         req = replace(req, title=title, slug=slug)
+[   624.6s]     
+[   624.6s]         current_repo_slug = resolve_current_repo_slug(ports)
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             report = validate_graph_and_deps(
+[   624.6s]                 graph,
+[   624.6s]                 repo_root=_resolve_repo_root(ports),
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]                 enforce_github_mandatory_linkage=False,
+[   624.6s]             )
+[   624.6s]             if report.errors:
+[   624.6s]                 raise RuntimeError(report.errors[0])
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]         try:
+[   624.6s]             validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]     
+[   624.6s]         issue_number = int(req.issue_number)
+[   624.6s]         _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+[   624.6s]         _require_numeric_import_repo_scope(
+[   624.6s]             req,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+[   624.6s]         guard_github_issue_uniqueness(
+[   624.6s]             graph,
+[   624.6s]             issue_number,
+[   624.6s]             github_repo_owner=req.target_repo_owner,
+[   624.6s]             github_repo_name=req.target_repo_name,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]         precheck_req = build_linked_create_request(
+[   624.6s]             req,
+[   624.6s]             precheck_parent_id,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_plan = plan_node_creation(
+[   624.6s]             precheck_req,
+[   624.6s]             graph,
+[   624.6s]             kind=kind,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]             today=today,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+[   624.6s]         if precheck_collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+[   624.6s]     
+[   624.6s]         issue_gateway = _resolve_issue_gateway(ports)
+[   624.6s]         imported_issue = issue_gateway.issue_view_minimal(
+[   624.6s]             _resolve_repo_root(ports),
+[   624.6s]             issue_number,
+[   624.6s]             repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
+[   624.6s]         )
+[   624.6s]         lock_path, lock_token = _acquire_create_lock(specdock_dir)
+[   624.6s]         result_node: SpecNode | None = None
+[   624.6s]         body_error: Exception | None = None
+[   624.6s]         local_write_phase: CreateWritePhase = "none"
+[   624.6s]         local_node_id: str | None = None
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             guard_github_issue_uniqueness(
+[   624.6s]                 graph,
+[   624.6s]                 issue_number,
+[   624.6s]                 github_repo_owner=req.target_repo_owner,
+[   624.6s]                 github_repo_name=req.target_repo_name,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]             create_req = build_linked_create_request(
+[   624.6s]                 req,
+[   624.6s]                 locked_parent_id,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             plan = plan_node_creation(
+[   624.6s]                 create_req,
+[   624.6s]                 graph,
+[   624.6s]                 kind=kind,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 today=today,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             local_node_id = plan.meta.id
+[   624.6s] >           execute_create_plan(plan, ports)
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:397: 
+[   624.6s] _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+[   624.6s] 
+[   624.6s] plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00321', title='Import then sync', slug='import-then-sync', path...iatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00321-import-then-sync/.meta.json')])
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107973ad0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
+[   624.6s]         node_repo = _resolve_node_repo(ports)
+[   624.6s]         template_scaffolder = _resolve_template_scaffolder(ports)
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]     
+[   624.6s]         collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+[   624.6s]         if collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {collisions[0]}")
+[   624.6s]     
+[   624.6s]         template_dir = _resolve_template_dir(plan)
+[   624.6s]         rules_scaffold_specs = _rules_scaffold_specs(
+[   624.6s]             kind=plan.meta.kind,
+[   624.6s]             dest_dir=plan.dest_dir,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]         )
+[   624.6s]         for link_path, target_path in rules_scaffold_specs:
+[   624.6s]             _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+[   624.6s]         if os.path.lexists(plan.dest_dir):
+[   624.6s]             raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+[   624.6s]         _require_node_tree_no_replace_rename_capability()
+[   624.6s]         _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+[   624.6s]     
+[   624.6s]         destination_parent_fd: int | None = None
+[   624.6s]         destination_parent_identity: tuple[int, int] | None = None
+[   624.6s]         outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+[   624.6s]         outer_created = False
+[   624.6s]         outer_fd: int | None = None
+[   624.6s]         outer_identity: tuple[int, int] | None = None
+[   624.6s]         payload_created = False
+[   624.6s]         payload_fd: int | None = None
+[   624.6s]         payload_identity: tuple[int, int] | None = None
+[   624.6s]         committed = False
+[   624.6s]         try:
+[   624.6s]             plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+[   624.6s]             destination_parent_fd = os.open(
+[   624.6s]                 plan.dest_dir.parent,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]             )
+[   624.6s]             parent_stat = os.fstat(destination_parent_fd)
+[   624.6s]             destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+[   624.6s]             os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+[   624.6s]             outer_created = True
+[   624.6s]             outer_fd = os.open(
+[   624.6s]                 outer_name,
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=destination_parent_fd,
+[   624.6s]             )
+[   624.6s]             outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+[   624.6s]             os.fchmod(outer_fd, 0o700)
+[   624.6s]             os.mkdir("payload", dir_fd=outer_fd)
+[   624.6s]             payload_created = True
+[   624.6s]             payload_fd = os.open(
+[   624.6s]                 "payload",
+[   624.6s]                 os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+[   624.6s]                 dir_fd=outer_fd,
+[   624.6s]             )
+[   624.6s]             payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+[   624.6s]             created_paths = template_scaffolder.copy_scaffolded_tree_at(
+[   624.6s]                 src_dir=template_dir,
+[   624.6s]                 dest_dir=plan.dest_dir,
+[   624.6s]                 dest_dir_fd=payload_fd,
+[   624.6s]                 replacements=plan.replacements,
+[   624.6s]             )
+[   624.6s]             created_rule_links: list[Path] = []
+[   624.6s]             for link_path, target_path in rules_scaffold_specs:
+[   624.6s]                 _create_relative_symlink_at(
+[   624.6s]                     payload_fd,
+[   624.6s]                     node_dir=plan.dest_dir,
+[   624.6s]                     link_path=link_path,
+[   624.6s]                     target_path=target_path,
+[   624.6s]                 )
+[   624.6s]                 created_rule_links.append(link_path)
+[   624.6s]             node_repo.write_meta_at(payload_fd, plan.meta)
+[   624.6s]             if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
+[   624.6s]                 raise RuntimeError(f"Destination parent identity changed before publication: {plan.dest_dir.parent}")
+[   624.6s]             _verified_directory_identity_at(
+[   624.6s]                 destination_parent_fd,
+[   624.6s]                 outer_name,
+[   624.6s]                 outer_fd,
+[   624.6s]                 expected_identity=outer_identity,
+[   624.6s]             )
+[   624.6s]             _verified_directory_identity_at(
+[   624.6s]                 outer_fd,
+[   624.6s]                 "payload",
+[   624.6s]                 payload_fd,
+[   624.6s]                 expected_identity=payload_identity,
+[   624.6s]             )
+[   624.6s]             _rename_node_tree_no_replace_between_at(
+[   624.6s]                 outer_fd,
+[   624.6s]                 "payload",
+[   624.6s]                 destination_parent_fd,
+[   624.6s]                 plan.dest_dir.name,
+[   624.6s]             )
+[   624.6s]             committed = True
+[   624.6s]             with contextlib.suppress(OSError, RuntimeError):
+[   624.6s]                 _cleanup_committed_outer_transaction(
+[   624.6s]                     parent_fd=destination_parent_fd,
+[   624.6s]                     outer_name=outer_name,
+[   624.6s]                     outer_identity=outer_identity,
+[   624.6s]                 )
+[   624.6s]         except Exception as exc:
+[   624.6s]             if not committed and destination_parent_fd is not None:
+[   624.6s]                 try:
+[   624.6s]                     _cleanup_node_tree_transaction(
+[   624.6s]                         parent_fd=destination_parent_fd,
+[   624.6s]                         outer_name=outer_name,
+[   624.6s]                         outer_created=outer_created,
+[   624.6s]                         outer_fd=outer_fd,
+[   624.6s]                         outer_identity=outer_identity,
+[   624.6s]                         payload_created=payload_created,
+[   624.6s]                         payload_fd=payload_fd,
+[   624.6s]                         payload_identity=payload_identity,
+[   624.6s]                     )
+[   624.6s]                 except Exception as cleanup_exc:
+[   624.6s]                     raise CreatePlanExecutionError(
+[   624.6s]                         phase="scaffold_copied",
+[   624.6s]                         message=f"{exc}; node scaffold rollback failed: {cleanup_exc}",
+[   624.6s]                     ) from exc
+[   624.6s] >           raise CreatePlanExecutionError(phase="none", message=str(exc)) from exc
+[   624.6s] E           spec_dock_runtime.application.create_node.CreatePlanExecutionError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1211: CreatePlanExecutionError
+[   624.6s] 
+[   624.6s] The above exception was the direct cause of the following exception:
+[   624.6s] 
+[   624.6s] self = <tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10 object at 0x107677260>
+[   624.6s] 
+[   624.6s]     def test_import_then_sync_artifact_path_name_content_regression(self) -> None:
+[   624.6s]         (
+[   624.6s]             _runtime_app,
+[   624.6s]             app_contracts,
+[   624.6s]             app_import_node,
+[   624.6s]             app_ports,
+[   624.6s]             domain_models,
+[   624.6s]             infra_artifact_writer,
+[   624.6s]             infra_contracts,
+[   624.6s]             _presentation_cli_text,
+[   624.6s]         ) = _runtime_modules()
+[   624.6s]         with tempfile.TemporaryDirectory() as tmp:
+[   624.6s]             repo_root = Path(tmp)
+[   624.6s]             specdock_dir = repo_root / "spec-dock"
+[   624.6s]             self._prepare_templates(specdock_dir)
+[   624.6s]             store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+[   624.6s]             ports = self._ports(
+[   624.6s]                 app_ports,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 store=store,
+[   624.6s]                 domain_models=domain_models,
+[   624.6s]                 infra_contracts=infra_contracts,
+[   624.6s]                 active_manifest=self._active_manifest(infra_contracts),
+[   624.6s]                 artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+[   624.6s]             )
+[   624.6s]     
+[   624.6s] >           result = app_import_node.import_issue(
+[   624.6s]                 app_contracts.ImportNodeRequest(
+[   624.6s]                     issue_number=321,
+[   624.6s]                     title="Import then sync",
+[   624.6s]                     slug=None,
+[   624.6s]                     parent_id="epic-local-00001",
+[   624.6s]                 ),
+[   624.6s]                 ports,
+[   624.6s]             )
+[   624.6s] 
+[   624.6s] tests/cli_runtime/test_runtime_import_s10.py:1359: 
+[   624.6s] _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:456: in import_issue
+[   624.6s]     return import_node_core(req, ports, kind="issue")
+[   624.6s]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[   624.6s] _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+[   624.6s] 
+[   624.6s] req = ImportNodeRequest(issue_number=321, title='Import then sync', slug='import-then-sync', parent_id='epic-local-00001', target_repo_owner=None, target_repo_name=None, allow_foreign_url=False)
+[   624.6s] ports = Ports(node_reader=<tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107973ad0>, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+[   624.6s] 
+[   624.6s]     def import_node_core(
+[   624.6s]         req: ImportNodeRequest,
+[   624.6s]         ports: Ports,
+[   624.6s]         *,
+[   624.6s]         kind: Literal["initiative", "epic", "issue"],
+[   624.6s]     ) -> ImportNodeResult:
+[   624.6s]         title, slug = resolve_input_title_and_slug(req.title, req.slug)
+[   624.6s]         req = replace(req, title=title, slug=slug)
+[   624.6s]     
+[   624.6s]         current_repo_slug = resolve_current_repo_slug(ports)
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             report = validate_graph_and_deps(
+[   624.6s]                 graph,
+[   624.6s]                 repo_root=_resolve_repo_root(ports),
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]                 enforce_github_mandatory_linkage=False,
+[   624.6s]             )
+[   624.6s]             if report.errors:
+[   624.6s]                 raise RuntimeError(report.errors[0])
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]         try:
+[   624.6s]             validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+[   624.6s]         except RuntimeError as error:
+[   624.6s]             raise RuntimeError(f"preflight validate failed: {error}") from error
+[   624.6s]     
+[   624.6s]         issue_number = int(req.issue_number)
+[   624.6s]         _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+[   624.6s]         _require_numeric_import_repo_scope(
+[   624.6s]             req,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         specdock_dir = _resolve_specdock_dir(ports)
+[   624.6s]         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+[   624.6s]         guard_github_issue_uniqueness(
+[   624.6s]             graph,
+[   624.6s]             issue_number,
+[   624.6s]             github_repo_owner=req.target_repo_owner,
+[   624.6s]             github_repo_name=req.target_repo_name,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]         precheck_req = build_linked_create_request(
+[   624.6s]             req,
+[   624.6s]             precheck_parent_id,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_plan = plan_node_creation(
+[   624.6s]             precheck_req,
+[   624.6s]             graph,
+[   624.6s]             kind=kind,
+[   624.6s]             specdock_dir=specdock_dir,
+[   624.6s]             today=today,
+[   624.6s]             current_repo_slug=current_repo_slug,
+[   624.6s]         )
+[   624.6s]         precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+[   624.6s]         if precheck_collisions:
+[   624.6s]             raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+[   624.6s]     
+[   624.6s]         issue_gateway = _resolve_issue_gateway(ports)
+[   624.6s]         imported_issue = issue_gateway.issue_view_minimal(
+[   624.6s]             _resolve_repo_root(ports),
+[   624.6s]             issue_number,
+[   624.6s]             repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
+[   624.6s]         )
+[   624.6s]         lock_path, lock_token = _acquire_create_lock(specdock_dir)
+[   624.6s]         result_node: SpecNode | None = None
+[   624.6s]         body_error: Exception | None = None
+[   624.6s]         local_write_phase: CreateWritePhase = "none"
+[   624.6s]         local_node_id: str | None = None
+[   624.6s]         try:
+[   624.6s]             graph = load_graph(ports, validate=False)
+[   624.6s]             guard_github_issue_uniqueness(
+[   624.6s]                 graph,
+[   624.6s]                 issue_number,
+[   624.6s]                 github_repo_owner=req.target_repo_owner,
+[   624.6s]                 github_repo_name=req.target_repo_name,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+[   624.6s]             create_req = build_linked_create_request(
+[   624.6s]                 req,
+[   624.6s]                 locked_parent_id,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             plan = plan_node_creation(
+[   624.6s]                 create_req,
+[   624.6s]                 graph,
+[   624.6s]                 kind=kind,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 today=today,
+[   624.6s]                 current_repo_slug=current_repo_slug,
+[   624.6s]             )
+[   624.6s]             local_node_id = plan.meta.id
+[   624.6s]             execute_create_plan(plan, ports)
+[   624.6s]             local_write_phase = "meta_written"
+[   624.6s]             _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+[   624.6s]             local_write_phase = "post_write_verified"
+[   624.6s]             result_node = _to_spec_node(plan.meta)
+[   624.6s]         except Exception as exc:
+[   624.6s]             body_error = exc
+[   624.6s]             local_write_phase = resolve_create_write_phase(exc, default=local_write_phase)
+[   624.6s]         finally:
+[   624.6s]             release_error: Exception | None = None
+[   624.6s]             try:
+[   624.6s]                 _release_create_lock(lock_path, lock_token)
+[   624.6s]             except Exception as exc:
+[   624.6s]                 release_error = exc
+[   624.6s]     
+[   624.6s]             wrapped_outcome_error = _build_post_import_failure(
+[   624.6s]                 local_error=body_error,
+[   624.6s]                 release_error=release_error,
+[   624.6s]                 kind=kind,
+[   624.6s]                 req=req,
+[   624.6s]                 title=title,
+[   624.6s]                 specdock_dir=specdock_dir,
+[   624.6s]                 local_write_phase=local_write_phase,
+[   624.6s]                 local_node_id=local_node_id if create_write_phase_has_local_writes(local_write_phase) else None,
+[   624.6s]             )
+[   624.6s]             if wrapped_outcome_error is not None:
+[   624.6s]                 cause = body_error if body_error is not None else release_error
+[   624.6s]                 if cause is not None:
+[   624.6s] >                   raise wrapped_outcome_error from cause
+[   624.6s] E                   RuntimeError: Outcome: import_local_write_fail. '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at' Recovery: rerun `/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmpye076hhd/spec-dock/scripts/spec-dock import issue 321 --title 'Import then sync' --epic epic-local-00001`.
+[   624.6s] 
+[   624.6s] src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:425: RuntimeError
+[   624.6s] ____ TestRuntimeShellS11.test_final_api_call_site_and_structural_regression ____
+[   624.6s] 
+[   624.6s] self = <tests.cli_runtime.test_runtime_shell_s11.TestRuntimeShellS11 object at 0x1076ea060>
+[   624.6s] 
+[   624.6s]     def test_final_api_call_site_and_structural_regression(self) -> None:
+[   624.6s]         (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
+[   624.6s]             _runtime_modules()
+[   624.6s]         )
+[   624.6s]     
+[   624.6s]         app_source_path = Path(runtime_app.__file__)
+[   624.6s]         app_source = app_source_path.read_text(encoding="utf-8")
+[   624.6s]         app_tree = ast.parse(app_source)
+[   624.6s]         main_node = next(
+[   624.6s]             (node for node in app_tree.body if isinstance(node, ast.FunctionDef) and node.name == "main"),
+[   624.6s]             None,
+[   624.6s]         )
+[   624.6s]         assert main_node is not None, "main() not found in app.py"
+[   624.6s]     
+[   624.6s]         call_names: set[str] = set()
+[   624.6s]         for node in ast.walk(main_node):
+[   624.6s]             if not isinstance(node, ast.Call):
+[   624.6s]                 continue
+[   624.6s]             if isinstance(node.func, ast.Name):
+[   624.6s]                 call_names.add(node.func.id)
+[   624.6s]             elif isinstance(node.func, ast.Attribute):
+[   624.6s]                 call_names.add(node.func.attr)
+[   624.6s]     
+[   624.6s]         assert "_cli_build_registry" in call_names
+[   624.6s]         assert "_cli_build_parser" in call_names
+[   624.6s]         assert "_cli_build_runtime" in call_names
+[   624.6s]         assert "_cli_dispatch" in call_names
+[   624.6s]     
+[   624.6s]         legacy_helper_calls = {
+[   624.6s]             "_new_initiative",
+[   624.6s]             "_new_epic",
+[   624.6s]             "_new_issue",
+[   624.6s]             "_new_doc",
+[   624.6s]             "_active_set",
+[   624.6s]             "_active_show",
+[   624.6s]             "_active_clear",
+[   624.6s]             "_sync",
+[   624.6s]             "_deps_check",
+[   624.6s]             "_import_initiative",
+[   624.6s]             "_import_epic",
+[   624.6s]             "_import_issue",
+[   624.6s]             "_validate",
+[   624.6s]         }
+[   624.6s]         assert call_names.isdisjoint(legacy_helper_calls)
+[   624.6s]     
+[   624.6s]         runtime_root = app_source_path.parent
+[   624.6s]         layer_dirs = ("commands", "application", "infra", "presentation", "cli")
+[   624.6s]         for layer_dir in layer_dirs:
+[   624.6s]             for module_path in sorted((runtime_root / layer_dir).glob("*.py")):
+[   624.6s]                 if module_path.name == "__init__.py":
+[   624.6s]                     continue
+[   624.6s]                 tree = ast.parse(module_path.read_text(encoding="utf-8"))
+[   624.6s]                 for imported in _iter_import_modules(tree):
+[   624.6s]                     root = _import_root(imported)
+[   624.6s]                     assert root not in _LEGACY_HELPER_MODULES, (
+[   624.6s]                         f"legacy helper direct import in {module_path}: {imported}"
+[   624.6s]                     )
+[   624.6s]     
+[   624.6s]         # commands/* must stay as thin shell layer: no direct domain/infra/app imports.
+[   624.6s]         commands_dir = app_source_path.parent / "commands"
+[   624.6s]         for module_path in sorted(commands_dir.glob("*.py")):
+[   624.6s]             if module_path.name == "__init__.py":
+[   624.6s]                 continue
+[   624.6s]             tree = ast.parse(module_path.read_text(encoding="utf-8"))
+[   624.6s]             for imported in _iter_import_modules(tree):
+[   624.6s]                 root = _import_root(imported)
+[   624.6s] >               assert root not in {"domain", "infra", "app"}, f"forbidden import in {module_path}: {imported}"
+[   624.6s] E               AssertionError: forbidden import in /Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py: spec_dock_runtime.domain.artifacts
+[   624.6s] E               assert 'domain' not in {'app', 'domain', 'infra'}
+[   624.6s] 
+[   624.6s] tests/cli_runtime/test_runtime_shell_s11.py:541: AssertionError
+[   624.6s] _____ TestCliSync.test_sync_emits_tree_puml_ready_board_at_spec_dock_root ______
+[   624.6s] 
+[   624.6s] self = <tests.cli_runtime.test_sync.TestCliSync object at 0x10770fcb0>
+[   624.6s] 
+[   624.6s]     def test_sync_emits_tree_puml_ready_board_at_spec_dock_root(self) -> None:
+[   624.6s]         if os.name == "nt":
+[   624.6s]             pytest.skip("This test uses a bash stub for gh; skip on Windows.")
+[   624.6s]     
+[   624.6s]         with tempfile.TemporaryDirectory() as tmp:
+[   624.6s]             target = Path(tmp)
+[   624.6s]             assert main(["init", str(target)]) == 0
+[   624.6s]             self._init_origin_repo(target)
+[   624.6s]     
+[   624.6s]             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+[   624.6s]             self._run_runtime(
+[   624.6s]                 target,
+[   624.6s]                 ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+[   624.6s]             )
+[   624.6s]             self._run_runtime(
+[   624.6s]                 target,
+[   624.6s]                 ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Done issue"],
+[   624.6s]             )
+[   624.6s]             self._run_runtime(
+[   624.6s]                 target,
+[   624.6s]                 ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Blocked issue"],
+[   624.6s]             )
+[   624.6s]             self._run_runtime(
+[   624.6s]                 target,
+[   624.6s]                 ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Ready issue"],
+[   624.6s]             )
+[   624.6s]             self._run_runtime(
+[   624.6s]                 target,
+[   624.6s]                 ["new", "issue", "--epic", "201", "--github-issue", "304", "--title", "Ready second"],
+[   624.6s]             )
+[   624.6s]             self._run_runtime(
+[   624.6s]                 target,
+[   624.7s]                 ["new", "issue", "--epic", "201", "--github-issue", "305", "--title", "Doing issue"],
+[   624.7s]             )
+[   624.7s]             self._run_runtime(
+[   624.7s]                 target,
+[   624.7s]                 ["new", "issue", "--epic", "201", "--github-issue", "306", "--title", "Unknown issue"],
+[   624.7s]             )
+[   624.7s]     
+[   624.7s]             issues_root = (
+[   624.7s]                 target
+[   624.7s]                 / "spec-dock"
+[   624.7s]                 / "initiatives"
+[   624.7s]                 / "init-00101-auth-platform"
+[   624.7s]                 / "epics"
+[   624.7s]                 / "epic-00201-jwt-auth"
+[   624.7s]                 / "issues"
+[   624.7s]             )
+[   624.7s]             self._set_meta_depends_on(issues_root / "iss-00302-blocked-issue", [303])
+[   624.7s]             self._set_meta_depends_on(issues_root / "iss-00304-ready-second", [301])
+[   624.7s]     
+[   624.7s]             p_active = self._run_runtime_capture(target, ["active", "set", "305", "--force", "--no-checkout"])
+[   624.7s] >           assert p_active.returncode == 0, p_active.stdout + p_active.stderr
+[   624.7s] E           AssertionError: usage: spec-dock/scripts/spec-dock [-h]
+[   624.7s] E                                                {new,artifact,active,delete,close,update,uninstall,issue,worktree,workbench,sync,deps,import,validate,doctor}
+[   624.7s] E                                                ...
+[   624.7s] E             spec-dock/scripts/spec-dock: error: unrecognized arguments: --force --no-checkout
+[   624.7s] E             
+[   624.7s] E           assert 2 == 0
+[   624.7s] E            +  where 2 = CompletedProcess(args=['/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/.venv/bin/python3', '/va...                             ...\nspec-dock/scripts/spec-dock: error: unrecognized arguments: --force --no-checkout\n').returncode
+[   624.7s] 
+[   624.7s] tests/cli_runtime/test_sync.py:1249: AssertionError
+[   624.7s] ============================= slowest 50 durations =============================
+[   624.7s] 61.65s call     tests/cli_runtime/test_distribution_cutover.py::test_s70_preserved_specs_workspace_blocks_update_without_writes
+[   624.7s] 55.95s call     tests/cli_runtime/test_distribution_cutover.py::test_s70_uninstall_marker_is_removed_last_after_success
+[   624.7s] 54.72s call     tests/cli_runtime/test_distribution_cutover.py::test_s70_uninstall_keep_and_remove_specs_preserve_boundary
+[   624.7s] 50.71s call     tests/cli_runtime/test_validate.py::TestCliValidate::test_validate_rejects_malformed_discussion_doc_candidates
+[   624.7s] 49.42s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_uninstall_apply_rerun_reports_already_removed_and_succeeds
+[   624.7s] 10.39s call     tests/cli_runtime/test_distribution_cutover.py::test_s60_root_rebind_preserves_replacement_and_original_retry_marker
+[   624.7s] 9.48s call     tests/cli_runtime/test_distribution_cutover.py::test_s70_uninstall_empty_boundary_allows_fresh_reinit_and_blocks_markerless_rerun
+[   624.7s] 7.68s call     tests/cli_runtime/test_issue_lifecycle.py::TestCliIssueLifecycle::test_core_operations_legacy_evidence_mutation_invariance[planning_level]
+[   624.7s] 6.83s call     tests/cli_runtime/test_distribution_cutover.py::test_s50_update_restores_missing_current_asset_and_preserves_user_data
+[   624.7s] 5.85s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_mixed_entrypoints_keep_healthy_real_and_rebuild_placeholder_layers
+[   624.7s] 5.77s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_rewrites_stale_context_pack_when_rebuilding_active_entrypoints
+[   624.7s] 5.64s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_rebuilds_placeholder_pathfile_entrypoints_from_persisted_manifest
+[   624.7s] 5.62s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale
+[   624.7s] 5.44s call     tests/cli_runtime/test_distribution_cutover.py::test_s60_root_rebind_during_marker_publication
+[   624.7s] 5.39s call     tests/cli_runtime/test_distribution_cutover.py::test_s60_root_rebind_during_scaffold_mutation
+[   624.7s] 5.28s call     tests/cli_runtime/test_storage_core_cli.py::TestStorageCoreCli::test_root_help_registry_and_leaf_help_match_storage_core_inventory
+[   624.7s] 5.28s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack
+[   624.7s] 5.21s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_recognized_reconciliation_restores_missing_placeholder_directory_hierarchy[missing_relative1-command1]
+[   624.7s] 5.09s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_bootstraps_active_path_files_when_active_symlink_creation_fails
+[   624.7s] 5.09s call     tests/cli_runtime/test_distribution_cutover.py::test_s55_unproven_legacy_root_entrypoint_is_preserved_and_blocks_zero_write[spec-dock/current-initiative.path-regular-init-force]
+[   624.7s] 5.08s call     tests/cli_runtime/test_distribution_cutover.py::test_s55_unproven_legacy_root_entrypoint_is_preserved_and_blocks_zero_write[spec-dock/current-initiative.path-regular-update]
+[   624.7s] 4.97s setup    tests/cli_runtime/test_active.py::TestCliActive::test_active_set_rejects_legacy_flags
+[   624.7s] 4.85s call     tests/integration/test_epic_00343_distribution.py::test_tc_346_s03_003_actual_cross_filesystem_source
+[   624.7s] 4.83s call     tests/unit/infra/test_init_update.py::test_i370_legacy_marker_and_deprovision_journal_never_cross_authority_routes
+[   624.7s] 4.82s call     tests/cli_runtime/test_distribution_cutover.py::test_s40b_only_runtime_wrapper_is_executable_across_current_surfaces
+[   624.7s] 4.64s call     tests/cli_runtime/test_distribution_cutover.py::test_s40b_fresh_init_materializes_only_current_external_catalog
+[   624.7s] 4.55s call     tests/cli_runtime/test_distribution_cutover.py::test_s55_unproven_legacy_root_entrypoint_is_preserved_and_blocks_zero_write[spec-dock/current-initiative-symlink-update]
+[   624.7s] 4.55s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_init_does_not_seed_legacy_node_deps_json_templates
+[   624.7s] 4.54s call     tests/cli_runtime/test_distribution_cutover.py::test_s55_legacy_root_entrypoint_directory_collision_blocks_zero_write[spec-dock/current-issue.path]
+[   624.7s] 4.49s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_provider_only_workflow_is_not_shipped_via_install_root
+[   624.7s] 4.43s call     tests/cli_runtime/test_distribution_cutover.py::test_s60_retry_marker_phase_allowlist_rejects_unknown_phase_without_writes
+[   624.7s] 4.34s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_init_and_update_ship_root_artifact_rules_and_import_links_them_safely[update]
+[   624.7s] 4.33s call     tests/unit/infra/test_init_update.py::test_issue_334_update_preserves_unmanaged_content
+[   624.7s] 4.25s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_78_init_allows_install_when_legacy_hidden_workspace_exists
+[   624.7s] 4.20s setup    tests/unit/infra/test_active_store.py::TestActiveStoreInfra::test_write_manifest_serializes_exact_minimal_schema_v2
+[   624.7s] 3.61s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_workbench_readme_distribution_inventory_and_bytes_match_all_surfaces
+[   624.7s] 3.55s setup    tests/integration/test_epic_00343_distribution.py::test_tc_346_s01_001_candidate_wheel_receipt
+[   624.7s] 3.48s call     tests/cli_runtime/test_validate.py::TestCliValidate::test_validate_accepts_old_new_and_mixed_document_surfaces
+[   624.7s] 3.41s call     tests/cli_runtime/test_doctor.py::TestDoctorHistoricalConsumerInvariance::test_validate_and_doctor_legacy_evidence_mutation_invariance[assurance]
+[   624.7s] 3.33s call     tests/cli_runtime/test_doctor.py::TestDoctorHistoricalConsumerInvariance::test_validate_and_doctor_legacy_evidence_mutation_invariance[planning_level]
+[   624.7s] 3.30s call     tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_remove_mixed_kind_direct_dependency_updates_meta_json_and_returns_updated[issue-to-unrelated-epic]
+[   624.7s] 3.12s call     tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_tree_puml_ready_board_at_spec_dock_root
+[   624.7s] 3.10s call     tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_scoped_ref_forms_resolve_current_repo_scope_to_unscoped_current_node[owner-repo-number]
+[   624.7s] 2.94s call     tests/cli_runtime/test_doctor.py::TestDoctorHistoricalConsumerInvariance::test_validate_and_doctor_legacy_evidence_mutation_invariance[heavy_report]
+[   624.7s] 2.93s call     tests/unit/infra/test_init_update.py::TestInitUpdate::test_distribution_wheel_build_prunes_seeded_stale_wrapper_era_outputs
+[   624.7s] 2.86s call     tests/cli_runtime/test_deps.py::TestCliDeps::test_deps_add_duplicate_epic_shorthand_direct_ref_returns_unchanged_without_duplicate_storage
+[   624.7s] 2.81s call     tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_dashboard_md_at_spec_dock_root
+[   624.7s] 2.74s call     tests/cli_runtime/test_sync.py::TestCliSync::test_sync_deps_issues_marks_empty_closed_epic_dependency_satisfied
+[   624.7s] 2.70s call     tests/cli_runtime/test_issue_lifecycle.py::TestCliIssueLifecycle::test_issue_finish_after_issue_start_then_finish_closes_open_issue_and_clears_active
+[   624.7s] 2.66s call     tests/cli_runtime/test_issue_lifecycle.py::TestCliIssueLifecycle::test_issue_start_from_main_still_blocks_different_open_active_but_same_issue_restarts
+[   624.7s] =========================== short test summary info ============================
+[   624.7s] FAILED tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal
+[   624.7s] FAILED tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key
+[   624.7s] FAILED tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_load_active_manifest_chain_regression
+[   624.7s] FAILED tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_then_sync_artifact_path_name_content_regression
+[   624.7s] FAILED tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression
+[   624.7s] FAILED tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_tree_puml_ready_board_at_spec_dock_root
+[   624.7s] 6 failed, 607 passed, 12 skipped in 624.53s (0:10:24)

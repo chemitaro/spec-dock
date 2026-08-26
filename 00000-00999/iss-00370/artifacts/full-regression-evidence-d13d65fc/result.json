@@ -1,0 +1,28 @@
+{
+  "status": "verified",
+  "candidate_sha": "d13d65fc76a30f212e88e925026fd35b3448e8ac",
+  "approved_failure_count": 27,
+  "shards": [
+    {
+      "junit_path": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-1.xml",
+      "pytest_log": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-1.log"
+    },
+    {
+      "junit_path": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-2.xml",
+      "pytest_log": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-2.log"
+    },
+    {
+      "junit_path": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-3.xml",
+      "pytest_log": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-3.log"
+    },
+    {
+      "junit_path": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-4.xml",
+      "pytest_log": "/private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2/20260826T131033.536208Z/shard-4.log"
+    }
+  ],
+  "collection_seconds": 0.329,
+  "shard_elapsed_seconds": 624.714,
+  "total_elapsed_seconds": 625.085,
+  "slo_seconds": 1800.0,
+  "slo_status": "pass"
+}

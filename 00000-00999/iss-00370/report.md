@@ -22,22 +22,21 @@ Issue 370のmanaged distribution deprovision実装を完了した。配布元同
 
 - `make lint`: pass（ruff check、ruff format、mypy 174 source files）
 - `./spec-dock/scripts/spec-dock validate`: pass（nodes=227）
-- `git diff --check`: pass
-- Issue 370 focused tests: `64 passed, 349 deselected`
-- 通常の `uv run pytest -q`: `1366 passed, 1139 skipped`（再実行結果）
-- candidate-wide Full Regression command（verified candidate SHA `1abf6f3de614c7264ab63a3cf93f5a1841d8cf80`）:
+- source変更の `git diff --check`: pass（raw verifier log/XMLは実行時空白を保持）
+- Issue 370 focused tests: `66 passed, 349 deselected`
+- 通常の `uv run pytest -q`: `1368 passed, 1139 skipped`
+- candidate-wide Full Regression command（verified candidate SHA `d13d65fc76a30f212e88e925026fd35b3448e8ac`）:
 
   ```bash
   uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py \
     --timeout-seconds 1200 --max-total-seconds 1800 --shards 4 \
-    --artifact-dir /private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-1abf6f3d-rerun
+    --artifact-dir /private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release-d13d65fc-rerun2
   ```
 
-- 通常の `uv run pytest -q` は初回に既存の Full Regression 制御テストが1件失敗したが、直後の再実行で `1366 passed, 1139 skipped in 49.95s` となった。
-- 最終候補 SHA: `1abf6f3de614c7264ab63a3cf93f5a1841d8cf80`。
-- 最終候補実行結果（`20260826T110851.930434Z/result.json`）は `status=verified`、candidate-wide 2505 nodes、approved failure signatures 27件 exact一致、`unexpected_errors=[]`、`missing_failures=[]`、`signature_mismatches=[]`、`slo_status=pass`、`total_elapsed_seconds=666.474`。
-- 同一候補で先行実行に発生した既存 provider lane の `os.killpg(...): PermissionError` は再実行では発生せず、Issue 370 attributable failureもない。ハーネス・baseline ledgerは変更していない。
-- Full Regression artifactは上記 `--artifact-dir/20260826T110851.930434Z/` 配下の `result.json`、shard JUnit、pytest logを正本とする。
+- 最終実装候補 SHA: `d13d65fc76a30f212e88e925026fd35b3448e8ac`。
+- 最終候補実行結果（`20260826T131033.536208Z/result.json`）は `status=verified`、candidate-wide 2507 nodes、approved failure signatures 27件 exact一致、`unexpected_errors=[]`、`missing_failures=[]`、`signature_mismatches=[]`、`slo_status=pass`、`total_elapsed_seconds=625.085`。
+- 先行実行は未追跡の証跡ディレクトリを候補wheelが検出したため `ledger-mismatch` となった。証跡を退避したclean worktreeで再実行し、上記verified結果を得た。既存provider laneの承認済みfailure以外にIssue 370 attributable failureはない。
+- Full Regressionのraw `result.json`、2507件のcollection inventory、4シャードのJUnit/pytest logは、`artifacts/full-regression-evidence-d13d65fc/` にtracked copyとして公開している。ハーネス・baseline ledgerは変更していない。
 
 ## Residual Risks / Follow-ups
 
