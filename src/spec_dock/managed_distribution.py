@@ -25,7 +25,7 @@ import time
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 
 class DistributionManifestError(ValueError):
@@ -2578,6 +2578,559 @@ def _flatten_tree_node_ids(tree: object) -> frozenset[str] | None:
     return frozenset(node_ids)
 
 
+_GENERATED_NODE_BASE_FIELDS = frozenset({
+    "id",
+    "type",
+    "title",
+    "path",
+    "document_surfaces",
+    "parent_id",
+    "initiative_id",
+    "epic_id",
+    "children",
+})
+_GENERATED_ISSUE_FIELDS = frozenset({
+    "status",
+    "authority",
+    "effective_status",
+    "source",
+    "stale",
+    "last_sync_at",
+    "deps",
+})
+_GENERATED_DEPENDENCY_SUMMARY_FIELDS = frozenset({
+    "valid",
+    "error",
+    "issue_edges",
+    "edge_direction",
+})
+_GENERATED_DEPENDENCY_EDGE_DIRECTION = "depends_on (dependent -> prerequisite)"
+_GENERATED_NODE_KINDS = frozenset({"initiative", "epic", "issue"})
+
+
+def _valid_generated_relative_path(value: object, *, prefix: str = "spec-dock/") -> bool:
+    if not isinstance(value, str) or not value.startswith(prefix) or value.startswith("/"):
+        return False
+    parts = PurePosixPath(value).parts
+    return bool(parts) and all(part not in {"", ".", ".."} for part in parts)
+
+
+def _valid_generated_active(value: object) -> bool:
+    if value is None:
+        return True
+    if not isinstance(value, dict) or set(value) != set(_DEPROVISION_ACTIVE_LAYERS):
+        return False
+    for layer in _DEPROVISION_ACTIVE_LAYERS:
+        selected = value[layer]
+        if selected is None:
+            continue
+        if not isinstance(selected, dict) or set(selected) != {"id"} or not isinstance(selected["id"], str):
+            return False
+        if _ACTIVE_LAYER_ID_RE[layer].fullmatch(selected["id"]) is None:
+            return False
+    return True
+
+
+def _valid_generated_document_surfaces(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {"canonical_docs", "future_artifacts", "legacy_discussions"}:
+        return False
+    canonical_docs = value["canonical_docs"]
+    if not isinstance(canonical_docs, list) or len(canonical_docs) != 4:
+        return False
+    expected_kinds = ("requirement", "design", "plan", "report")
+    for document, expected_kind in zip(canonical_docs, expected_kinds, strict=True):
+        if not isinstance(document, dict) or set(document) != {"kind", "path", "present"}:
+            return False
+        if document["kind"] != expected_kind:
+            return False
+        if not _valid_generated_relative_path(document["path"]):
+            return False
+        if not isinstance(document["present"], bool):
+            return False
+    for name in ("future_artifacts", "legacy_discussions"):
+        surface = value[name]
+        if not isinstance(surface, dict) or set(surface) != {"path", "present"}:
+            return False
+        if not _valid_generated_relative_path(surface["path"]):
+            return False
+        if not isinstance(surface["present"], bool):
+            return False
+    return True
+
+
+def _valid_generated_progress(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {"total", "done", "open", "unknown"}:
+        return False
+    return all(isinstance(value[key], int) and not isinstance(value[key], bool) and value[key] >= 0 for key in value)
+
+
+def _valid_generated_github(value: object) -> bool:
+    if not isinstance(value, dict) or "issue_number" not in value:
+        return False
+    allowed = {"issue_number", "repo_owner", "repo_name", "state", "url", "updated_at", "labels"}
+    if set(value) - allowed:
+        return False
+    if not isinstance(value["issue_number"], int) or isinstance(value["issue_number"], bool):
+        return False
+    for key in ("repo_owner", "repo_name", "state", "url", "updated_at"):
+        if key in value and not isinstance(value[key], str):
+            return False
+    return "labels" not in value or (
+        isinstance(value["labels"], list) and all(isinstance(label, str) for label in value["labels"])
+    )
+
+
+def _valid_generated_issue_deps(value: object, node_ids: set[str]) -> bool:
+    if value is None:
+        return True
+    if not isinstance(value, dict) or set(value) != {"ready", "depends_on", "blockers_top"}:
+        return False
+    if not isinstance(value["ready"], bool):
+        return False
+    for key in ("depends_on", "blockers_top"):
+        values = value[key]
+        if not isinstance(values, list) or not all(isinstance(item, str) and item in node_ids for item in values):
+            return False
+    return len(set(value["depends_on"])) == len(value["depends_on"])
+
+
+def _valid_generated_node_payload(
+    node_id: str,
+    payload: object,
+    *,
+    include_dependency_audit: bool,
+    node_ids: set[str],
+) -> bool:
+    if not isinstance(payload, dict) or payload.get("id") != node_id:
+        return False
+    kind = payload.get("type")
+    if kind not in _GENERATED_NODE_KINDS or not isinstance(kind, str):
+        return False
+    required = set(_GENERATED_NODE_BASE_FIELDS)
+    allowed = set(required) | {"github"}
+    if kind == "issue":
+        required.update(_GENERATED_ISSUE_FIELDS)
+    else:
+        allowed.add("progress")
+    if include_dependency_audit:
+        required.add("depends_on")
+        allowed.add("depends_on")
+    if set(payload) - allowed or required - set(payload):
+        return False
+    if not isinstance(payload["title"], str) or not _valid_generated_relative_path(
+        payload["path"], prefix="spec-dock/"
+    ):
+        return False
+    if not _valid_generated_document_surfaces(payload["document_surfaces"]):
+        return False
+    parent_id = payload["parent_id"]
+    initiative_id = payload["initiative_id"]
+    epic_id = payload["epic_id"]
+    if any(
+        value is not None and (not isinstance(value, str) or value not in node_ids)
+        for value in (parent_id, initiative_id, epic_id)
+    ):
+        return False
+    children = payload["children"]
+    if not isinstance(children, list) or not all(isinstance(child, str) and child in node_ids for child in children):
+        return False
+    if len(set(children)) != len(children):
+        return False
+    if "github" in payload and not _valid_generated_github(payload["github"]):
+        return False
+    if kind == "issue":
+        if any(not isinstance(payload[key], str) for key in ("status", "authority", "effective_status", "source")):
+            return False
+        if not isinstance(payload["stale"], bool) or (
+            payload["last_sync_at"] is not None and not isinstance(payload["last_sync_at"], str)
+        ):
+            return False
+        if not _valid_generated_issue_deps(payload["deps"], node_ids):
+            return False
+    elif "progress" in payload and not _valid_generated_progress(payload["progress"]):
+        return False
+    if include_dependency_audit:
+        depends_on = payload["depends_on"]
+        if not isinstance(depends_on, list) or not all(
+            isinstance(item, str) and item in node_ids for item in depends_on
+        ):
+            return False
+        if len(set(depends_on)) != len(depends_on):
+            return False
+    return True
+
+
+def _valid_generated_dependency_summary(value: object, *, allow_issue_edges: bool = True) -> bool:
+    if not isinstance(value, dict) or set(value) != _GENERATED_DEPENDENCY_SUMMARY_FIELDS:
+        return False
+    if not isinstance(value["valid"], bool) or (value["error"] is not None and not isinstance(value["error"], str)):
+        return False
+    if value["edge_direction"] != _GENERATED_DEPENDENCY_EDGE_DIRECTION:
+        return False
+    edges = value["issue_edges"]
+    if not allow_issue_edges and edges != []:
+        return False
+    if not isinstance(edges, list):
+        return False
+    for edge in edges:
+        if not isinstance(edge, dict) or set(edge) not in ({"from", "to"}, {"from", "to", "kind"}):
+            return False
+        if not isinstance(edge["from"], str) or not isinstance(edge["to"], str):
+            return False
+        if "kind" in edge and edge["kind"] != "depends_on":
+            return False
+    return True
+
+
+def _valid_generated_projection_base(
+    payload: dict[str, object],
+    *,
+    expected_fields: frozenset[str],
+    projection: str | None,
+) -> bool:
+    if set(payload) != expected_fields:
+        return False
+    if payload.get("schema_version") != 2 or not _valid_generated_timestamp(payload.get("generated_at")):
+        return False
+    if not _valid_generated_active(payload.get("active")):
+        return False
+    warnings = payload.get("warnings")
+    if not isinstance(warnings, list) or not all(isinstance(item, str) for item in warnings):
+        return False
+    if payload.get("root") != "spec-dock/initiatives":
+        return False
+    if projection is not None and payload.get("projection") != projection:
+        return False
+    if projection is None and "projection" in payload:
+        return False
+    return _valid_generated_dependency_summary(payload.get("deps"))
+
+
+def _validate_generated_node_graph(nodes: Mapping[str, object], *, include_dependency_audit: bool) -> bool:
+    node_ids = set(nodes)
+    if not all(isinstance(node_id, str) for node_id in node_ids):
+        return False
+    if not all(
+        _valid_generated_node_payload(
+            node_id,
+            payload,
+            include_dependency_audit=include_dependency_audit,
+            node_ids=node_ids,
+        )
+        for node_id, payload in nodes.items()
+    ):
+        return False
+    child_parent: dict[str, str] = {}
+    for node_id, payload in nodes.items():
+        assert isinstance(payload, dict)
+        kind = cast("str", payload["type"])
+        parent_id = payload["parent_id"]
+        if kind == "initiative" and (
+            parent_id is not None or payload["initiative_id"] is not None or payload["epic_id"] is not None
+        ):
+            return False
+        if kind == "epic" and (
+            not isinstance(parent_id, str) or payload["initiative_id"] != parent_id or payload["epic_id"] is not None
+        ):
+            return False
+        if kind == "issue" and (not isinstance(parent_id, str) or payload["epic_id"] != parent_id):
+            return False
+        for child_id in payload["children"]:
+            if child_id == node_id or child_id in child_parent:
+                return False
+            child_parent[child_id] = node_id
+    for node_id, payload in nodes.items():
+        assert isinstance(payload, dict)
+        if payload["parent_id"] != child_parent.get(node_id):
+            return False
+        if payload["type"] == "issue":
+            parent_id = cast("str", payload["parent_id"])
+            parent = nodes.get(parent_id)
+            if not isinstance(parent, dict) or parent.get("type") != "epic":
+                return False
+            if payload["initiative_id"] != parent.get("initiative_id"):
+                return False
+        elif payload["type"] == "epic":
+            parent_id = cast("str", payload["parent_id"])
+            parent = nodes.get(parent_id)
+            if not isinstance(parent, dict) or parent.get("type") != "initiative":
+                return False
+    return all(
+        set(payload["children"]) == {child_id for child_id, parent_id in child_parent.items() if parent_id == node_id}
+        for node_id, payload in nodes.items()
+        if isinstance(payload, dict)
+    )
+
+
+def _validate_generated_tree(
+    tree: object,
+    nodes: dict[str, object] | None,
+) -> frozenset[str] | None:
+    if not isinstance(tree, list):
+        return None
+    flattened: dict[str, dict[str, object]] = {}
+
+    def visit(item: object, expected_kind: str) -> bool:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            return False
+        node_id = cast("str", item["id"])
+        if node_id in flattened:
+            return False
+        nested_name = "epics" if expected_kind == "initiative" else "issues" if expected_kind == "epic" else None
+        nested = item.get(nested_name) if nested_name is not None else None
+        if expected_kind != "issue" and not isinstance(nested, list):
+            return False
+        if expected_kind == "issue" and ("epics" in item or "issues" in item):
+            return False
+        base = dict(item)
+        if nested_name is not None:
+            base.pop(nested_name, None)
+        if base.get("type") != expected_kind or set(base) - (
+            _GENERATED_NODE_BASE_FIELDS | _GENERATED_ISSUE_FIELDS | {"github", "progress"}
+        ):
+            return False
+        if not isinstance(base.get("title"), str) or not _valid_generated_relative_path(base.get("path")):
+            return False
+        if not _valid_generated_document_surfaces(base.get("document_surfaces")):
+            return False
+        if not isinstance(base.get("parent_id"), (str, type(None))) or not isinstance(base.get("children"), list):
+            return False
+        flattened[node_id] = base
+        if nested_name is not None:
+            assert isinstance(nested, list)
+            nested_items = cast("list[object]", nested)
+            child_kind = "epic" if expected_kind == "initiative" else "issue"
+            for child in nested_items:
+                if not visit(child, child_kind):
+                    return False
+            child_ids = [cast("dict[str, object]", child)["id"] for child in nested_items if isinstance(child, dict)]
+            if base.get("children") != child_ids:
+                return False
+        elif base.get("children") != []:
+            return False
+        return True
+
+    if not all(visit(item, "initiative") for item in tree):
+        return None
+    if not all(
+        _valid_generated_node_payload(
+            node_id,
+            payload,
+            include_dependency_audit=False,
+            node_ids=set(flattened),
+        )
+        for node_id, payload in flattened.items()
+    ) or not _validate_generated_node_graph(flattened, include_dependency_audit=False):
+        return None
+    if nodes is None:
+        return frozenset(flattened)
+    include_dependency_audit = any(
+        isinstance(expected, dict) and "depends_on" in expected for expected in nodes.values()
+    )
+    if set(flattened) != set(nodes) or not _validate_generated_node_graph(
+        nodes,
+        include_dependency_audit=include_dependency_audit,
+    ):
+        return None
+    for node_id, expected in nodes.items():
+        actual = flattened.get(node_id)
+        if not isinstance(expected, dict) or actual is None:
+            return None
+        expected_without_audit = {key: value for key, value in expected.items() if key != "depends_on"}
+        if actual != expected_without_audit:
+            return None
+    return frozenset(flattened)
+
+
+def _validate_generated_projection_payload(
+    name: str,
+    payload: dict[str, object],
+    *,
+    expected_fields: frozenset[str],
+    projection: str | None,
+) -> frozenset[str] | None:
+    if not _valid_generated_projection_base(payload, expected_fields=expected_fields, projection=projection):
+        return None
+    if name in {"index-all.json", "index.json"}:
+        nodes = payload.get("nodes")
+        if not isinstance(nodes, dict) or not _validate_generated_node_graph(
+            nodes,
+            include_dependency_audit=name == "index-all.json",
+        ):
+            return None
+        edges = cast("dict[str, object]", payload["deps"])["issue_edges"]
+        if not all(
+            isinstance(edge, dict) and edge["from"] in nodes and edge["to"] in nodes
+            for edge in cast("list[object]", edges)
+        ):
+            return None
+        return frozenset(nodes)
+    if name in {"tree-all.json", "tree.json"}:
+        return _validate_generated_tree(payload.get("tree"), None)
+    return None
+
+
+def _valid_deps_issue_context(value: object) -> bool:
+    fields = {
+        "source_node_id",
+        "source_issue_id",
+        "target_node_id",
+        "target_node_kind",
+        "target_issue_ids",
+        "expansion",
+        "lifecycle_state",
+        "lifecycle_source",
+        "dependency_disposition",
+        "disposition_basis",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        return False
+    if not all(
+        isinstance(value[key], str)
+        for key in ("source_node_id", "source_issue_id", "target_node_id", "target_node_kind", "expansion")
+    ):
+        return False
+    if value["target_node_kind"] not in (*_GENERATED_NODE_KINDS, "unknown") or value["expansion"] not in {
+        "issue",
+        "expanded",
+        "empty",
+    }:
+        return False
+    if not isinstance(value["target_issue_ids"], list) or not all(
+        isinstance(item, str) for item in value["target_issue_ids"]
+    ):
+        return False
+    return all(
+        value[key] is None or isinstance(value[key], str)
+        for key in ("lifecycle_state", "lifecycle_source", "dependency_disposition", "disposition_basis")
+    )
+
+
+def _valid_deps_issue_node_blocker(value: object) -> bool:
+    fields = {
+        "node_id",
+        "reason",
+        "state",
+        "state_source",
+        "source_issue_id",
+        "lifecycle_state",
+        "lifecycle_source",
+        "dependency_disposition",
+        "disposition_basis",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        return False
+    if not all(
+        isinstance(value[key], str) for key in ("node_id", "reason", "state", "state_source", "source_issue_id")
+    ):
+        return False
+    return all(
+        value[key] is None or isinstance(value[key], str)
+        for key in ("lifecycle_state", "lifecycle_source", "dependency_disposition", "disposition_basis")
+    )
+
+
+def _validate_deps_issues_payload(payload: dict[str, object]) -> bool:
+    expected_fields = {
+        "schema_version",
+        "generated_at",
+        "projection",
+        "source",
+        "deps",
+        "nodes",
+        "edges",
+        "dependency_contexts",
+        "edge_direction",
+    }
+    if set(payload) != expected_fields or payload.get("schema_version") != 2:
+        return False
+    if not _valid_generated_timestamp(payload.get("generated_at")):
+        return False
+    if payload.get("projection") != "issue-readiness-with-dependency-context":
+        return False
+    if payload.get("source") != {"sync_state": "readiness_evaluation", "schema_version": 2}:
+        return False
+    if payload.get("edge_direction") != _GENERATED_DEPENDENCY_EDGE_DIRECTION:
+        return False
+    deps = payload.get("deps")
+    if not isinstance(deps, dict) or set(deps) != {"valid", "error"} or not isinstance(deps.get("valid"), bool):
+        return False
+    if deps["valid"]:
+        if deps.get("error") is not None:
+            return False
+    elif (
+        not isinstance(deps.get("error"), str)
+        or payload.get("nodes") != {}
+        or payload.get("edges") != []
+        or payload.get("dependency_contexts") != []
+    ):
+        return False
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, dict):
+        return False
+    for node_id, node in nodes.items():
+        if not isinstance(node_id, str) or not isinstance(node, dict) or node.get("id") != node_id:
+            return False
+        kind = node.get("type")
+        common = {"id", "type", "title", "parent_id", "initiative_id", "epic_id"}
+        required = common | (
+            {"state", "state_source", "ready"}
+            if kind != "issue"
+            else {
+                "status",
+                "authority",
+                "effective_status",
+                "source",
+                "stale",
+                "last_sync_at",
+                "ready",
+                "depends_on",
+                "issue_blockers",
+                "node_blockers",
+                "state",
+            }
+        )
+        if kind not in _GENERATED_NODE_KINDS or set(node) != required:
+            return False
+        if not isinstance(node["title"], str) or any(
+            value is not None and not isinstance(value, str)
+            for value in (node["parent_id"], node["initiative_id"], node["epic_id"])
+        ):
+            return False
+        if not isinstance(node["ready"], bool) or not isinstance(node["state"], str):
+            return False
+        if kind == "issue":
+            if any(not isinstance(node[key], str) for key in ("status", "authority", "effective_status", "source")):
+                return False
+            if not isinstance(node["stale"], bool) or (
+                node["last_sync_at"] is not None and not isinstance(node["last_sync_at"], str)
+            ):
+                return False
+            if not all(
+                isinstance(node[key], list) and all(isinstance(item, str) for item in node[key])
+                for key in ("depends_on", "issue_blockers")
+            ):
+                return False
+            if not isinstance(node["node_blockers"], list) or not all(
+                _valid_deps_issue_node_blocker(item) for item in node["node_blockers"]
+            ):
+                return False
+        elif not isinstance(node["state_source"], str):
+            return False
+    edges = payload.get("edges")
+    if not isinstance(edges, list) or not all(
+        isinstance(edge, dict)
+        and set(edge) == {"from", "to", "state", "relation", "source"}
+        and all(isinstance(edge[key], str) for key in edge)
+        and edge["from"] in nodes
+        and edge["to"] in nodes
+        for edge in edges
+    ):
+        return False
+    contexts = payload.get("dependency_contexts")
+    return isinstance(contexts, list) and all(_valid_deps_issue_context(item) for item in contexts)
+
+
 def build_deprovision_generated_state_contract(
     target_root: Path,
     *,
@@ -2736,33 +3289,25 @@ def build_deprovision_generated_state_contract(
         expected_fields, projection = projection_specs[name]
         if (
             not isinstance(payload, dict)
-            or set(payload) != expected_fields
-            or not _valid_generated_timestamp(payload.get("generated_at"))
-            or payload.get("schema_version") != 2
-            or payload.get("root", "spec-dock/initiatives") != "spec-dock/initiatives"
-            or (projection is not None and payload.get("projection") != projection)
-            or (projection is None and "projection" in payload)
-            or (
-                name == "deps-issues.json"
-                and payload.get("source")
-                != {
-                    "sync_state": "readiness_evaluation",
-                    "schema_version": 2,
-                }
-            )
-            or (
-                name == "deps-issues.json" and payload.get("edge_direction") != "depends_on (dependent -> prerequisite)"
-            )
+            or (name == "deps-issues.json" and not _validate_deps_issues_payload(payload))
             or (
                 name != "deps-issues.json"
                 and (
-                    payload.get("active") != _artifact_active_selection(selection)
-                    or not isinstance(payload.get("warnings"), list)
-                    or not isinstance(payload.get("deps"), dict)
+                    not _valid_generated_projection_base(
+                        payload,
+                        expected_fields=expected_fields,
+                        projection=projection,
+                    )
+                    or payload.get("active") != _artifact_active_selection(selection)
+                    or _validate_generated_projection_payload(
+                        name,
+                        payload,
+                        expected_fields=expected_fields,
+                        projection=projection,
+                    )
+                    is None
                 )
             )
-            or (name in {"index-all.json", "index.json"} and not isinstance(payload.get("nodes"), dict))
-            or (name in {"tree-all.json", "tree.json"} and _flatten_tree_node_ids(payload.get("tree")) is None)
         ):
             valid = False
         if not valid or loaded is None or not isinstance(payload, dict):
@@ -2791,10 +3336,15 @@ def build_deprovision_generated_state_contract(
         tree_payload = projection_payloads.get(tree_name)
         if index_payload is None or tree_payload is None:
             continue
-        nodes = index_payload.get("nodes")
-        tree_nodes = _flatten_tree_node_ids(tree_payload.get("tree"))
-        assert isinstance(nodes, dict) and tree_nodes is not None
-        if frozenset(nodes) != tree_nodes:
+        index_nodes = index_payload.get("nodes")
+        if not isinstance(index_nodes, dict):
+            continue
+        tree_ids = _validate_generated_tree(tree_payload.get("tree"), None)
+        if tree_ids is None:
+            for name in (index_name, tree_name):
+                blockers.append(_generated_state_blocker(f"spec-dock/.agent/{name}", "generated-state-invalid"))
+            continue
+        if tree_ids != frozenset(index_nodes):
             for name in (index_name, tree_name):
                 blockers.append(
                     _generated_state_blocker(
@@ -2802,6 +3352,10 @@ def build_deprovision_generated_state_contract(
                         "generated-state-node-set-conflict",
                     )
                 )
+            continue
+        if _validate_generated_tree(tree_payload.get("tree"), index_nodes) is None:
+            for name in (index_name, tree_name):
+                blockers.append(_generated_state_blocker(f"spec-dock/.agent/{name}", "generated-state-invalid"))
 
     ordered_entries = tuple(sorted(entries, key=lambda entry: entry.path))
     ordered_legacy = tuple(sorted(set(legacy_paths)))
@@ -2997,18 +3551,82 @@ def _adopt_historical_generated_entries(
     )
 
 
+def _read_target_regular_bytes(
+    target_root: Path,
+    relative_path: str,
+) -> tuple[bytes, DistributionIdentity] | None:
+    """Read one target regular file while keeping identity and bytes descriptor-bound."""
+
+    path = target_root / relative_path
+    try:
+        visible = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise DistributionPlanError("managed workspace version identity is unsafe") from exc
+    if stat.S_ISLNK(visible.st_mode) or not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1:
+        raise DistributionPlanError("managed workspace version identity is unsafe")
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int):
+        raise DistributionPlanError("managed workspace version identity is unsafe")
+    parent_fds: tuple[int, ...] = ()
+    file_fd: int | None = None
+    try:
+        parent_fds = _open_distribution_parent_chain(target_root, relative_path)
+        file_fd = os.open(
+            PurePosixPath(relative_path).name,
+            os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fds[-1],
+        )
+        before = os.fstat(file_fd)
+        visible_before = os.stat(
+            PurePosixPath(relative_path).name,
+            dir_fd=parent_fds[-1],
+            follow_symlinks=False,
+        )
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or not _same_observed_node(visible_before, before):
+            raise DistributionPlanError("managed workspace version identity changed during admission")
+        raw = _read_fd_bytes(file_fd)
+        after = os.fstat(file_fd)
+        visible_after = os.stat(
+            PurePosixPath(relative_path).name,
+            dir_fd=parent_fds[-1],
+            follow_symlinks=False,
+        )
+        if (
+            not _same_observed_node(before, after)
+            or before.st_nlink != after.st_nlink
+            or not _same_observed_node(after, visible_after)
+            or stat.S_IMODE(before.st_mode) != stat.S_IMODE(after.st_mode)
+            or before.st_size != after.st_size
+        ):
+            raise DistributionPlanError("managed workspace version identity changed during admission")
+        identity = DistributionIdentity(
+            kind="regular",
+            sha256=hashlib.sha256(raw).hexdigest(),
+            mode=stat.S_IMODE(after.st_mode),
+        )
+        return raw, identity
+    except DistributionPlanError:
+        raise
+    except (DistributionApplyError, OSError) as exc:
+        raise DistributionPlanError("managed workspace version identity is unsafe") from exc
+    finally:
+        if file_fd is not None:
+            os.close(file_fd)
+        _close_distribution_parent_chain(parent_fds)
+
+
 def _deprovision_version_asset(
     target_root: Path,
     manifest: DistributionManifest,
 ) -> tuple[DistributionAsset, ...]:
     path = "spec-dock/spec-dock.version"
-    observation = _observe_target(target_root, path)
-    if observation.state == "missing":
+    loaded = _read_target_regular_bytes(target_root, path)
+    if loaded is None:
         return ()
-    if observation.state != "regular" or observation.identity is None or observation.link_count != 1:
-        raise DistributionPlanError("managed workspace version identity is unsafe")
+    raw, identity = loaded
     try:
-        raw = (target_root / path).read_bytes()
         version_text = raw.decode("ascii")
     except (OSError, UnicodeDecodeError) as exc:
         raise DistributionPlanError("managed workspace version identity is invalid") from exc
@@ -3017,7 +3635,7 @@ def _deprovision_version_asset(
     recognized = [item for item in manifest.recognized_workspace_versions if item["version"] == version_text[:-1]]
     if len(recognized) != 1:
         raise DistributionPlanError("managed workspace version is not recognized")
-    return (DistributionAsset(path=path, identity=observation.identity),)
+    return (DistributionAsset(path=path, identity=identity),)
 
 
 def build_deprovision_contract(

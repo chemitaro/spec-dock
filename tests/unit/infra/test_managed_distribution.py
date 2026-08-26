@@ -1123,7 +1123,12 @@ def test_i370_generated_state_producer_blocks_cross_artifact_batch_conflict(
         "active": None,
         "warnings": [],
         "root": "spec-dock/initiatives",
-        "deps": {"valid": True, "error": None, "issue_edges": [], "edge_direction": "depends_on"},
+        "deps": {
+            "valid": True,
+            "error": None,
+            "issue_edges": [],
+            "edge_direction": "depends_on (dependent -> prerequisite)",
+        },
     }
     (agent_dir / "index-all.json").write_text(
         json.dumps({**common, "generated_at": "2026-08-25T12:00:00+09:00", "projection": "full-history", "nodes": {}})
@@ -1146,6 +1151,87 @@ def test_i370_generated_state_producer_blocks_cross_artifact_batch_conflict(
         "spec-dock/.agent/index-all.json",
         "spec-dock/.agent/tree-all.json",
     }
+
+
+def test_i370_generated_state_producer_rejects_malformed_nested_node_shape(
+    tmp_path: Path,
+) -> None:
+    """I370-T-OWN-001: a top-level discriminator cannot prove malformed nested state."""
+
+    target_root = tmp_path / "consumer"
+    agent_dir = target_root / "spec-dock" / ".agent"
+    agent_dir.mkdir(parents=True)
+    (agent_dir / "index-all.json").write_text(
+        json.dumps({
+            "schema_version": 2,
+            "generated_at": "2026-08-25T12:00:00+09:00",
+            "active": None,
+            "warnings": [],
+            "root": "spec-dock/initiatives",
+            "projection": "full-history",
+            "deps": {
+                "valid": True,
+                "error": None,
+                "issue_edges": [],
+                "edge_direction": "depends_on (dependent -> prerequisite)",
+            },
+            "nodes": {
+                "init-local-00001": None,
+            },
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    root_info = target_root.stat()
+
+    contract = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert all(entry.path != "spec-dock/.agent/index-all.json" for entry in contract.entries)
+    assert any(
+        action.path == "spec-dock/.agent/index-all.json" and action.reason == "generated-state-invalid"
+        for action in contract.blockers
+    )
+
+
+def test_i370_version_marker_read_rejects_observation_to_read_rebind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """I370-T-RACE-001: version bytes remain bound to the observed filesystem object."""
+
+    target_root = tmp_path / "consumer"
+    version_path = target_root / "spec-dock" / "spec-dock.version"
+    version_path.parent.mkdir(parents=True)
+    version_path.write_text("9.9.9\n", encoding="ascii")
+    manifest = managed_distribution.DistributionManifest(
+        schema_version=1,
+        recognized_workspace_versions=({"version": "0.2.3"},),
+        historical_current_identities=(),
+        trusted_consumer_manifests=(),
+        obsolete_exact_files=(),
+        historical_shortcuts=(),
+    )
+    original_read_fd_bytes = managed_distribution._read_fd_bytes
+    switched = False
+
+    def replace_before_read(fd: int) -> bytes:
+        nonlocal switched
+        if not switched:
+            switched = True
+            replacement = version_path.with_name("spec-dock.version.replacement")
+            replacement.write_text("0.2.3\n", encoding="ascii")
+            replacement.replace(version_path)
+        return original_read_fd_bytes(fd)
+
+    monkeypatch.setattr(managed_distribution, "_read_fd_bytes", replace_before_read)
+
+    with pytest.raises(managed_distribution.DistributionPlanError, match="identity"):
+        managed_distribution._deprovision_version_asset(target_root, manifest)
+
+    assert switched
 
 
 def test_i370_generated_state_producer_blocks_index_tree_node_set_conflict(
@@ -1179,13 +1265,49 @@ def test_i370_generated_state_producer_blocks_index_tree_node_set_conflict(
         "active": None,
         "warnings": [],
         "root": "spec-dock/initiatives",
-        "deps": {"valid": True, "error": None, "issue_edges": [], "edge_direction": "depends_on"},
+        "deps": {
+            "valid": True,
+            "error": None,
+            "issue_edges": [],
+            "edge_direction": "depends_on (dependent -> prerequisite)",
+        },
     }
     (agent_dir / "index-all.json").write_text(
         json.dumps({
             **common,
             "projection": "full-history",
-            "nodes": {"init-local-00001": {"id": "init-local-00001", "type": "initiative"}},
+            "nodes": {
+                "init-local-00001": {
+                    "id": "init-local-00001",
+                    "type": "initiative",
+                    "title": "Test initiative",
+                    "path": "spec-dock/initiatives/init-local-00001-test-initiative",
+                    "document_surfaces": {
+                        "canonical_docs": [
+                            {
+                                "kind": kind,
+                                "path": f"spec-dock/initiatives/init-local-00001-test-initiative/{kind}.md",
+                                "present": True,
+                            }
+                            for kind in ("requirement", "design", "plan", "report")
+                        ],
+                        "future_artifacts": {
+                            "path": "spec-dock/initiatives/init-local-00001-test-initiative/artifacts",
+                            "present": True,
+                        },
+                        "legacy_discussions": {
+                            "path": "spec-dock/initiatives/init-local-00001-test-initiative/discussions",
+                            "present": False,
+                        },
+                    },
+                    "parent_id": None,
+                    "initiative_id": None,
+                    "epic_id": None,
+                    "children": [],
+                    "progress": {"total": 0, "done": 0, "open": 0, "unknown": 0},
+                    "depends_on": [],
+                }
+            },
         })
         + "\n",
         encoding="utf-8",

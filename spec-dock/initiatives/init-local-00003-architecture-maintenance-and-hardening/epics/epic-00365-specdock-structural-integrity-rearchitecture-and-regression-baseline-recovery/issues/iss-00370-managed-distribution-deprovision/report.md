@@ -33,8 +33,8 @@ Issue 370のmanaged distribution deprovision実装を完了した。配布元同
     --artifact-dir /private/tmp/codex-agent-work/501/session-20260826t013921z-issue-370-baseline-regression-a5a295e5/issue370-combined-full-regression-release
   ```
 
-- clean candidate run result: `status=verified`、candidate-wide 2500 nodes、approved failure signatures 27件 exact一致、unexpected failure/error 0、missing/signature mismatch 0、`slo_status=pass`。実測は約682秒で、600秒超過はadvisory follow-upとして扱う。
-- Full Regression artifactは上記 `--artifact-dir` 配下の `result.json`、shard JUnit、pytest logを正本とする。
+- final candidate run result (`20260826T065404.405997Z/result.json`): `status=verified`、candidate-wide 2500 nodes、approved failure signatures 27件 exact一致、unexpected failure/error 0、missing/signature mismatch 0、`slo_status=pass`。`total_elapsed_seconds=654.352`で、600秒超過はadvisory follow-upとして扱う。
+- Full Regression artifactは上記 `--artifact-dir/20260826T065404.405997Z/` 配下の `result.json`、shard JUnit、pytest logを正本とする。
 
 ## Residual Risks / Follow-ups
 
