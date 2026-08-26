@@ -18,23 +18,23 @@
   },
   "current_head_verification": {
     "working_tree_sha": "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2",
-    "failed": 29,
-    "passed": 2342,
-    "skipped": 50,
-    "duration": "8m26.227s",
+    "failed": 27,
+    "passed": 2346,
+    "skipped": 48,
+    "duration": "8m13.945s",
     "runtime_signature_verification": {
-      "verified_failure_signatures": 29,
+      "verified_failure_signatures": 27,
       "unexpected_failures": 0,
       "unexpected_errors": 0,
       "verifier_exit_code": 0
     }
   },
   "subset_comparison": {
-    "current_failure_paths": 29,
+    "current_failure_paths": 27,
     "fixed_point_failure_paths": 27,
     "same_failure_behavior": 27,
     "expected_retirement_paths": 0,
-    "comparison_incomplete_paths": 2,
+    "comparison_incomplete_paths": 0,
     "fixed_point_subset_total": 27
   },
   "classification_policy": {
@@ -287,27 +287,9 @@
       "fixed_point_signature_sha256": "20d53420c38ab501c64346e6e22a0b309b2358191fe74a54ed9c20717ddb09b9",
       "current_signature_sha256": "20d53420c38ab501c64346e6e22a0b309b2358191fe74a54ed9c20717ddb09b9",
       "failure_signature_match": true
-    },
-    {
-      "nodeid": "tests/integration/test_epic_00343_distribution.py::test_tc_346_s01_001_candidate_wheel_receipt",
-      "current_status": "failed",
-      "fixed_point_status": "failed",
-      "disposition": "approved-no-op",
-      "fixed_point_signature_sha256": "0c1dd383345d0e71723b72f21ece3385f2cf9f2728fe8bacf52344b6ed2073a1",
-      "current_signature_sha256": "0c1dd383345d0e71723b72f21ece3385f2cf9f2728fe8bacf52344b6ed2073a1",
-      "failure_signature_match": true
-    },
-    {
-      "nodeid": "tests/unit/test_provider_test_lanes.py::test_full_regression_leader_exit_checks_group_after_pipe_eof",
-      "current_status": "failed",
-      "fixed_point_status": "failed",
-      "disposition": "approved-no-op",
-      "fixed_point_signature_sha256": "bc5cb4ff811fe704303d045803255639525994719cb58de06a52c4ac34641f50",
-      "current_signature_sha256": "bc5cb4ff811fe704303d045803255639525994719cb58de06a52c4ac34641f50",
-      "failure_signature_match": true
     }
   ],
-  "conclusion": "現行mainのclean baselineで確認された29件（Issue 368 fixed pointの旧27件と同一基線で確認された2件）をapproved-no-opとして記録した。Issue 368では既存27件を修復せず、追加2件もcandidate固有のnew failureとは分類しない",
+  "conclusion": "現行mainのclean baselineでfixed-pointと同一の27件をapproved-no-opとして記録し、Full Regression failure repairは行わない",
   "failure_signature_comparison": {
     "kind": "issue368_full_regression_failure_signature_comparison",
     "scope": {
