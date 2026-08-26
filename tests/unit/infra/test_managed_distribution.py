@@ -1299,6 +1299,208 @@ def test_i370_generated_state_rejects_impossible_issue_status_pair(
         for entry in blocked.entries
     )
 
+    issue["status"] = "open"
+    issue["effective_status"] = "open"
+    (agent_dir / "index-all.json").write_text(
+        json.dumps({
+            **common,
+            "projection": "full-history",
+            "nodes": {node_id: {**payload, "depends_on": []} for node_id, payload in nodes.items()},
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    (agent_dir / "tree-all.json").write_text(
+        json.dumps({
+            **common,
+            "tree": [
+                {
+                    **initiative,
+                    "epics": [{**epic, "issues": [issue]}],
+                }
+            ],
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    current_nodes = {
+        node_id: {key: value for key, value in payload.items() if key != "depends_on"}
+        for node_id, payload in nodes.items()
+    }
+    (agent_dir / "index.json").write_text(
+        json.dumps({
+            **common,
+            "projection": "current-future",
+            "nodes": current_nodes,
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    (agent_dir / "tree.json").write_text(
+        json.dumps({
+            **common,
+            "tree": [
+                {
+                    **initiative,
+                    "epics": [{**epic, "issues": [issue]}],
+                }
+            ],
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+
+    valid_current_pair = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+    assert not any(
+        blocker.path in {"spec-dock/.agent/index.json", "spec-dock/.agent/tree.json"}
+        for blocker in valid_current_pair.blockers
+    )
+
+    tree_issue = {
+        **issue,
+        "status": "done",
+        "effective_status": "done",
+    }
+    (agent_dir / "tree.json").write_text(
+        json.dumps({
+            **common,
+            "tree": [
+                {
+                    **initiative,
+                    "epics": [{**epic, "issues": [tree_issue]}],
+                }
+            ],
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    mismatched_tree = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+    assert any(
+        blocker.path == "spec-dock/.agent/tree.json" and blocker.reason == "generated-state-invalid"
+        for blocker in mismatched_tree.blockers
+    )
+    assert all(entry.path != "spec-dock/.agent/tree.json" for entry in mismatched_tree.entries)
+
+    issue["status"] = "done"
+    issue["effective_status"] = "done"
+    current_nodes["iss-00001"] = {
+        **current_nodes["iss-00001"],
+        "status": "done",
+        "effective_status": "done",
+    }
+    (agent_dir / "index.json").write_text(
+        json.dumps({
+            **common,
+            "projection": "current-future",
+            "nodes": current_nodes,
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+
+    impossible_pair = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+    assert any(
+        blocker.path == "spec-dock/.agent/index.json" and blocker.reason == "generated-state-invalid"
+        for blocker in impossible_pair.blockers
+    )
+    assert all(entry.path != "spec-dock/.agent/index.json" for entry in impossible_pair.entries)
+
+    issue["status"] = "open"
+    issue["effective_status"] = "open"
+    current_nodes["iss-00001"] = {
+        **current_nodes["iss-00001"],
+        "status": "open",
+        "effective_status": "open",
+    }
+    (agent_dir / "index-all.json").unlink()
+    (agent_dir / "tree-all.json").unlink()
+    (agent_dir / "index.json").write_text(
+        json.dumps({
+            **common,
+            "projection": "current-future",
+            "nodes": current_nodes,
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    (agent_dir / "tree.json").write_text(
+        json.dumps({
+            **common,
+            "tree": [
+                {
+                    **initiative,
+                    "epics": [{**epic, "issues": [issue]}],
+                }
+            ],
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    current_only = managed_distribution.build_deprovision_generated_state_contract(
+        target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+    assert not any(
+        blocker.path in {"spec-dock/.agent/index.json", "spec-dock/.agent/tree.json"}
+        for blocker in current_only.blockers
+    )
+
+
+def test_i370_current_future_deps_include_only_todo_issue_endpoints() -> None:
+    full_nodes: dict[str, dict[str, object]] = {
+        "iss-open": {
+            "type": "issue",
+            "status": "open",
+            "parent_id": None,
+            "children": [],
+            "depends_on": [],
+        },
+        "iss-done": {
+            "type": "issue",
+            "status": "done",
+            "parent_id": None,
+            "children": [],
+            "depends_on": [],
+        },
+    }
+    full_deps: dict[str, object] = {
+        "valid": True,
+        "error": None,
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+        "issue_edges": [
+            {"from": "iss-open", "to": "iss-open"},
+            {"from": "iss-open", "to": "iss-done"},
+        ],
+    }
+    full: dict[str, object] = {"nodes": full_nodes, "deps": full_deps}
+    current_deps: dict[str, object] = {
+        **full_deps,
+        "issue_edges": [{"from": "iss-open", "to": "iss-open"}],
+    }
+    current: dict[str, object] = {
+        "nodes": {"iss-open": {key: value for key, value in full_nodes["iss-open"].items() if key != "depends_on"}},
+        "deps": current_deps,
+    }
+
+    assert managed_distribution._generated_current_future_matches_full_history(full, current)
+    current_with_done_edge: dict[str, object] = {
+        **current,
+        "deps": {
+            **current_deps,
+            "issue_edges": full_deps["issue_edges"],
+        },
+    }
+    assert not managed_distribution._generated_current_future_matches_full_history(full, current_with_done_edge)
+
 
 def test_i370_deps_issues_rejects_impossible_issue_status_pair_without_writes(
     tmp_path: Path,
@@ -1661,6 +1863,95 @@ def test_i370_contract_adopts_legacy_generated_entry_only_by_historical_exact_id
     assert all(action.path != "spec-dock/.agent/deps.json" for action in contract.generated_state.blockers)
     adopted = next(entry for entry in contract.generated_state.entries if entry.path == "spec-dock/.agent/deps.json")
     assert adopted.origin == "historical-exact"
+
+
+def test_i370_historical_generated_trusted_claim_requires_envelope_mode_authority(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    legacy_bytes = b'{"schema_version":1}\n'
+    manifest_bytes = b'{"managed":true}\n'
+    trusted_manifest = _regular_record(".agents/host-adapters/meta.json", manifest_bytes)
+    trusted_manifest["claims"] = [
+        _regular_record("spec-dock/.agent/deps.json", legacy_bytes, mode=0o644),
+    ]
+    manifest_path = _write_manifest(
+        tmp_path / "manifest",
+        _manifest_with(trusted_consumer_manifests=[trusted_manifest]),
+    )
+    target_root = tmp_path / "consumer"
+    manifest_target = target_root / ".agents" / "host-adapters" / "meta.json"
+    manifest_target.parent.mkdir(parents=True)
+    manifest_target.write_bytes(manifest_bytes)
+    legacy_path = target_root / "spec-dock" / ".agent" / "deps.json"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_bytes(legacy_bytes)
+    legacy_path.chmod(0o644)
+    root_info = target_root.stat()
+
+    contract = managed_distribution.build_deprovision_contract(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert all(entry.path != "spec-dock/.agent/deps.json" for entry in contract.generated_state.entries)
+    assert any(
+        blocker.path == "spec-dock/.agent/deps.json" and blocker.reason == "legacy-generated-identity-unproven"
+        for blocker in contract.generated_state.blockers
+    )
+
+
+@pytest.mark.parametrize("historical_mode", [None, 0o600])
+def test_i370_historical_generated_adoption_requires_mode_authority(
+    tmp_path: Path,
+    historical_mode: int | None,
+) -> None:
+    install_root = _minimal_install_root(tmp_path)
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    legacy_bytes = b'{"schema_version":1}\n'
+    manifest_path = _write_manifest(
+        tmp_path / "manifest",
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": "spec-dock/.agent/deps.json",
+                    "surface": "legacy-generated-state",
+                    "identities": [
+                        _regular_record(
+                            "spec-dock/.agent/deps.json",
+                            legacy_bytes,
+                            mode=historical_mode,
+                        )
+                    ],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    legacy_path = target_root / "spec-dock" / ".agent" / "deps.json"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_bytes(legacy_bytes)
+    legacy_path.chmod(0o644)
+    root_info = target_root.stat()
+
+    contract = managed_distribution.build_deprovision_contract(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert all(entry.path != "spec-dock/.agent/deps.json" for entry in contract.generated_state.entries)
+    assert any(
+        blocker.path == "spec-dock/.agent/deps.json" and blocker.reason == "legacy-generated-identity-unproven"
+        for blocker in contract.generated_state.blockers
+    )
 
 
 def test_i370_context_pack_has_one_provider_renderer_with_cli_byte_parity() -> None:
@@ -2244,6 +2535,33 @@ def test_i370_empty_directory_kernel_is_bottom_up_bound_and_fail_closed(
         expected_remaining_child_digest=empty_digest,
     )
     assert not (target_root / "managed").exists()
+
+    rebound_parent = target_root / "rebound"
+    rebound_target = rebound_parent / "child"
+    rebound_target.mkdir(parents=True)
+    rebound_parent_binding = managed_distribution._capture_immediate_directory_entries(
+        target_root,
+        "rebound",
+    )[0]
+    rebound_target_binding = managed_distribution._capture_immediate_directory_entries(
+        target_root,
+        "rebound/child",
+    )[0]
+    rebound_parent.rename(target_root / "rebound-original")
+    rebound_target.parent.mkdir()
+    rebound_target.mkdir()
+    with pytest.raises(DistributionApplyError, match="managed directory"):
+        managed_distribution._remove_distribution_directory_if_bound(
+            target_root,
+            Path("rebound/child"),
+            expected_root_identity=root_identity,
+            expected_parent_bindings=(rebound_parent_binding,),
+            expected_directory_binding=rebound_target_binding,
+            immediate_child_evidence=(),
+            expected_remaining_child_digest=empty_digest,
+        )
+    assert rebound_target.exists()
+    assert (target_root / "rebound-original" / "child").is_dir()
 
     appeared = target_root / "appeared"
     appeared.mkdir()
@@ -3269,6 +3587,88 @@ def test_i370_deprovision_post_verify_rejects_witness_drift(
     assert (target_root / "spec-dock" / ".distribution-journal.json").exists()
 
 
+@pytest.mark.parametrize("binding_path", [".", "spec-dock"])
+def test_i370_deprovision_post_verify_rejects_remaining_binding_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    binding_path: str,
+) -> None:
+    """I370-T-RACE-001: terminal root and surviving parent bindings stay exact."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path / "manifest",
+        _manifest_with(
+            recognized_workspace_versions=[
+                {"version": "1.2.3", "anchors": [_regular_record("legacy-anchor", b"legacy\n")]},
+            ],
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    version = target_root / "spec-dock" / "spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("1.2.3\n", encoding="ascii")
+    for relative_path in (
+        "spec-dock/active",
+        "spec-dock/.agent",
+        "spec-dock/docs",
+        "spec-dock/templates",
+        "spec-dock/scripts",
+        "spec-dock/system",
+    ):
+        (target_root / relative_path).mkdir(parents=True, exist_ok=True)
+    (target_root / "spec").symlink_to("spec-dock/scripts/spec-dock")
+    (target_root / "spec-dock" / ".gitignore").write_text(".agent/\n", encoding="utf-8")
+    runtime_target = target_root / "spec-dock" / "scripts" / "spec-dock"
+    runtime_target.write_text("#!/bin/sh\n", encoding="utf-8")
+    runtime_target.chmod(0o755)
+    workbench_seed = target_root / "spec-dock" / "templates" / "root" / ".workbench" / "README.md"
+    workbench_seed.parent.mkdir(parents=True, exist_ok=True)
+    workbench_seed.write_text("workbench\n", encoding="utf-8")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_mark_verified = OperationJournalStore.mark_verified
+    original_mark_completed = OperationJournalStore.mark_completed
+    completed_calls = 0
+
+    def drift_after_verifying(self, journal):
+        verifying = original_mark_verified(self, journal)
+        path = target_root if binding_path == "." else target_root / binding_path
+        mode = stat.S_IMODE(path.stat().st_mode)
+        path.chmod(mode ^ 0o1)
+        return verifying
+
+    def count_completed(self, journal):
+        nonlocal completed_calls
+        completed_calls += 1
+        return original_mark_completed(self, journal)
+
+    monkeypatch.setattr(OperationJournalStore, "mark_verified", drift_after_verifying)
+    monkeypatch.setattr(OperationJournalStore, "mark_completed", count_completed)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.phase == "post-verify"
+    assert result.last_completed_phase == "uninstall-applied"
+    assert result.pending_paths == ()
+    assert result.failed_paths == (binding_path,), result.errors
+    assert completed_calls == 0
+    assert (target_root / "spec-dock" / ".distribution-retry.json").exists()
+    assert (target_root / "spec-dock" / ".distribution-journal.json").exists()
+
+
 @pytest.mark.parametrize(
     "crash_path",
     [".github/workflows/ci.yml", ".github/workflows", ".github"],
@@ -3409,6 +3809,281 @@ def test_i370_recovery_rejects_manifest_contract_drift_without_target_mutation(
         )
 
     assert (managed.read_bytes(), version.read_bytes()) == before
+
+
+def test_i370_recovery_contract_drift_precedes_checkpoint_reconciliation(
+    tmp_path: Path,
+) -> None:
+    """I370-T-REC-001: source drift is rejected before pending absence is checkpointed."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    journal = store.prepare(executable, package_version="1.2.3")
+    journal = store.mark_executing(journal)
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    journal_before = journal_path.read_bytes()
+
+    # This is the state after the target mutation but before its durable
+    # checkpoint: the pending target is absent while the journal is executing.
+    managed.unlink()
+    manifest_path.write_text(
+        json.dumps(
+            _manifest_with(
+                recognized_workspace_versions=[
+                    {
+                        "version": "1.2.3",
+                        "anchors": [_regular_record("legacy-anchor", b"legacy\n")],
+                    }
+                ]
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-mismatch"
+    assert journal_path.read_bytes() == journal_before
+
+
+@pytest.mark.parametrize("rehash", [False, True], ids=["stale-digest", "self-rehashed"])
+def test_i370_deprovision_resume_rejects_journal_action_drift_against_canonical_plan(
+    tmp_path: Path,
+    rehash: bool,
+) -> None:
+    """I370-T-REC-001: journal action metadata must remain same-plan exact."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    forged_action = next(record for record in journal.actions if record.action == "prune")
+    forged = replace(
+        journal,
+        actions=tuple(
+            replace(record, reason="forged-action-reason") if record.path == forged_action.path else record
+            for record in journal.actions
+        ),
+    )
+    if rehash:
+        forged = replace(
+            forged,
+            plan_digest=managed_distribution._deprovision_journal_plan_digest(forged),
+        )
+        marker = managed_distribution._read_distribution_retry_marker(target_root)
+        assert marker is not None
+        rebound_marker = store.prepare_legacy_guard(
+            None,
+            package_version="1.2.3",
+            replace_marker=marker,
+            plan_digest_override=forged.plan_digest,
+            stage_ownership=marker.stage_ownership,
+        )
+        store.bind_forward_guard(rebound_marker)
+    store.write(forged, predecessor=journal)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-mismatch"
+    assert managed.read_bytes() == b"managed\n"
+
+
+def test_i370_deprovision_parent_rebind_fails_closed_before_target_write(
+    tmp_path: Path,
+) -> None:
+    """I370-T-REC-001: a rebound directory parent cannot inherit prune authority."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    store.prepare(executable, package_version="1.2.3")
+
+    rebound = target_root / ".github.rebound"
+    (target_root / ".github").rename(rebound)
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-mismatch"
+    assert managed.read_bytes() == b"managed\n"
+    assert rebound.is_dir()
+
+
+def test_i370_recovery_absent_target_parent_rebind_fails_before_checkpoint(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    journal = store.mark_executing(store.prepare(executable, package_version="1.2.3"))
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    journal_before = journal_path.read_bytes()
+
+    managed.unlink()
+    rebound = target_root / ".github.rebound"
+    (target_root / ".github").rename(rebound)
+    managed.parent.mkdir(parents=True)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-mismatch"
+    assert journal_path.read_bytes() == journal_before
+    assert rebound.is_dir()
+    assert managed.parent.is_dir()
+    assert journal.status == "executing"
+
+
+def test_i370_deprovision_parent_mode_drift_fails_closed_before_target_write(
+    tmp_path: Path,
+) -> None:
+    """I370-T-REC-001: parent mode drift is part of the immutable prune binding."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    managed.parent.chmod(0o755)
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    store.prepare(executable, package_version="1.2.3")
+
+    managed.parent.chmod(0o700)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-mismatch"
+    assert managed.read_bytes() == b"managed\n"
 
 
 def test_i370_deprovision_guard_only_resumes_from_semantic_equal_physical_root(
@@ -6169,7 +6844,7 @@ def test_i368_terminal_journal_finalizes_after_completed_prune_disappears_from_a
                 {
                     "path": ".codex/config.toml",
                     "surface": "legacy-codex-surface",
-                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "identities": [_regular_record(".codex/config.toml", old, mode=0o644)],
                     "on_unknown": "preserve-and-block",
                 }
             ]
@@ -8446,7 +9121,7 @@ def test_i368_retry_removes_reserved_quarantine_after_abrupt_prune(tmp_path: Pat
                 {
                     "path": ".codex/config.toml",
                     "surface": "legacy-codex-surface",
-                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "identities": [_regular_record(".codex/config.toml", old, mode=0o644)],
                     "on_unknown": "preserve-and-block",
                 }
             ]
@@ -10244,7 +10919,7 @@ def test_s25_trusted_manifest_requires_manifest_and_claim_identity(tmp_path: Pat
     manifest_bytes = b'{"managed":true}\n'
     old_target = b"legacy\n"
     trusted_manifest = _regular_record(".agents/host-adapters/meta.json", manifest_bytes)
-    trusted_manifest["claims"] = [_regular_record(".codex/config.toml", old_target)]
+    trusted_manifest["claims"] = [_regular_record(".codex/config.toml", old_target, mode=0o644)]
     manifest_path = _write_manifest(
         tmp_path,
         _manifest_with(
@@ -10310,6 +10985,89 @@ def test_s25_trusted_manifest_can_prove_historical_current_path(tmp_path: Path) 
     assert action.action == "upgrade"
     assert action.provenance == "historical"
     assert action.reason == "trusted-manifest-identity-match"
+
+
+def test_s55_uninstall_trusted_manifest_requires_envelope_mode_authority(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    manifest_bytes = b'{"managed":true}\n'
+    old_target = b"legacy\n"
+    trusted_manifest = _regular_record(".agents/host-adapters/meta.json", manifest_bytes, mode=0o644)
+    trusted_manifest.pop("mode")
+    trusted_manifest["claims"] = [_regular_record(".codex/config.toml", old_target, mode=0o644)]
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            trusted_consumer_manifests=[trusted_manifest],
+            obsolete_exact_files=[
+                {
+                    "path": ".codex/config.toml",
+                    "surface": "legacy-test",
+                    "identities": [],
+                    "on_unknown": "preserve-and-block",
+                }
+            ],
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    manifest_target = target_root / ".agents" / "host-adapters" / "meta.json"
+    manifest_target.parent.mkdir(parents=True)
+    manifest_target.write_bytes(manifest_bytes)
+    claim_target = target_root / ".codex" / "config.toml"
+    claim_target.parent.mkdir(parents=True)
+    claim_target.write_bytes(old_target)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".codex/config.toml")
+    assert action.action == "preserve"
+    assert action.reason == "obsolete-identity-unknown"
+    assert action.blocked is True
+
+
+@pytest.mark.parametrize("operation", ["update", "init-force"])
+def test_s55_obsolete_legacy_identity_remains_compatible_for_non_uninstall(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    old_target = b"legacy\n"
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": "legacy-managed.md",
+                    "surface": "legacy-test-surface",
+                    "identities": [_regular_record("legacy-managed.md", old_target)],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / "legacy-managed.md"
+    target_root.mkdir()
+    target.write_bytes(old_target)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation=operation,  # type: ignore[arg-type]
+    )
+
+    action = next(item for item in plan.actions if item.path == "legacy-managed.md")
+    assert action.action == "prune"
+    assert action.provenance == "historical"
+    assert action.reason == "direct-obsolete-identity-match"
+    assert action.blocked is False
 
 
 @pytest.mark.parametrize(
@@ -10908,7 +11666,41 @@ def test_s25_update_repairs_mode_when_content_is_current(tmp_path: Path) -> None
     assert stat.S_IMODE(target.stat().st_mode) == 0o755
 
 
-def test_s55_obsolete_identity_ownership_ignores_mode_drift(tmp_path: Path) -> None:
+@pytest.mark.parametrize("historical_mode", [None, 0o644])
+def test_s55_uninstall_requires_historical_mode_authority(
+    tmp_path: Path,
+    historical_mode: int | None,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, content=b"current\n")
+    old = b"legacy\n"
+    record = _regular_record(".github/workflows/ci.yml", old, mode=historical_mode)
+    manifest_path = _write_manifest(
+        tmp_path,
+        _manifest_with(historical_current_identities=[record]),
+    )
+    target_root = tmp_path / "consumer"
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(old)
+    target.chmod(0o755)
+
+    plan = build_distribution_plan(
+        install_root,
+        manifest_path=manifest_path,
+        target_root=target_root,
+        operation="uninstall",
+    )
+
+    action = next(item for item in plan.actions if item.path == ".github/workflows/ci.yml")
+    assert action.action == "preserve"
+    assert action.reason == "unknown-current-collision"
+    assert action.blocked is True
+    with pytest.raises(DistributionApplyError, match="blocked"):
+        apply_distribution_plan(plan)
+    assert target.read_bytes() == old
+
+
+def test_s55_obsolete_identity_ownership_requires_mode_match(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, content=b"current\n")
     obsolete = tmp_path / "legacy-managed.md"
     obsolete.write_bytes(b"legacy\n")
@@ -10936,14 +11728,16 @@ def test_s55_obsolete_identity_ownership_ignores_mode_drift(tmp_path: Path) -> N
         install_root,
         manifest_path=manifest_path,
         target_root=target_root,
-        operation="update",
+        operation="uninstall",
     )
 
     action = next(item for item in plan.actions if item.path == "legacy-managed.md")
-    assert action.action == "prune"
-    assert action.reason == "direct-obsolete-identity-match"
-    assert apply_distribution_plan(plan).status == "complete"
-    assert not target.exists()
+    assert action.action == "preserve"
+    assert action.reason == "obsolete-identity-unknown"
+    assert action.blocked is True
+    with pytest.raises(DistributionApplyError, match="blocked"):
+        apply_distribution_plan(plan)
+    assert target.exists()
 
 
 def test_s30_apply_rejects_provider_mode_change_after_plan(
@@ -11748,7 +12542,7 @@ def test_s30_apply_prunes_historical_target_without_following_symlink(tmp_path: 
                 {
                     "path": ".agents/skills/legacy/SKILL.md",
                     "surface": "legacy-test",
-                    "identities": [_regular_record(".agents/skills/legacy/SKILL.md", old)],
+                    "identities": [_regular_record(".agents/skills/legacy/SKILL.md", old, mode=0o644)],
                     "on_unknown": "preserve-and-block",
                 }
             ]
@@ -11782,7 +12576,7 @@ def test_s55_apply_prunes_proven_obsolete_target_during_update(tmp_path: Path) -
                 {
                     "path": ".codex/config.toml",
                     "surface": "legacy-codex-surface",
-                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "identities": [_regular_record(".codex/config.toml", old, mode=0o644)],
                     "on_unknown": "preserve-and-block",
                 }
             ]
@@ -11825,7 +12619,7 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
                 {
                     "path": ".codex/config.toml",
                     "surface": "legacy-codex-surface",
-                    "identities": [_regular_record(".codex/config.toml", old)],
+                    "identities": [_regular_record(".codex/config.toml", old, mode=0o644)],
                     "on_unknown": "preserve-and-block",
                 }
             ]
