@@ -1,0 +1,1238 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="11" tests="628" time="597.662" timestamp="2026-08-26T22:10:33.989132+09:00" hostname="Mac-mini-261.local"><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_rejects_removed_readiness_and_checkout_flags" time="5.785" /><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_accepts_explicit_id_flag" time="1.041" /><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_repo_scoped_current_url_resolves_unscoped_current_node" time="1.480" /><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_github_issue_checkout_sets_active" time="0.000"><skipped type="pytest.skip" message="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_active.py:299: S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git</skipped></testcase><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_github_issue_target" time="0.000"><skipped type="pytest.skip" message="S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_active.py:513: S05: covered by TestSetActiveApplication.test_set_active_checkout_uses_git_gateway_branch_decision_without_cli_git</skipped></testcase><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_parses_hash_and_url_targets" time="0.000"><skipped type="pytest.skip" message="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_active.py:845: S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli</skipped></testcase><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_is_blocked_when_deps_not_ready" time="0.000"><skipped type="pytest.skip" message="S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_active.py:1105: S05: covered by TestSetActiveApplication.test_set_active_deps_guard_blocks_without_writing_and_force_writes_with_warning_without_cli</skipped></testcase><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_without_github_uses_index_snapshot_when_present" time="0.000"><skipped type="pytest.skip" message="S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_active.py:1486: S05: covered by TestSetActiveApplication.test_set_active_github_uses_live_issue_state_and_no_github_uses_cache_without_cli</skipped></testcase><testcase classname="tests.cli_runtime.test_active.TestCliActive" name="test_active_set_re_resolves_node_after_checkout_when_id_format_changes" time="0.000"><skipped type="pytest.skip" message="S01 removed active set checkout; issue start owns checkout and branch re-resolution">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_active.py:1764: S01 removed active set checkout; issue start owns checkout and branch re-resolution</skipped></testcase><testcase classname="tests.cli_runtime.test_artifact_import_file.TestArtifactImportFile" name="test_missing_or_kind_mismatched_target_is_rejected_without_setup_mutation" time="1.375" /><testcase classname="tests.cli_runtime.test_artifact_import_file.TestArtifactImportFile" name="test_root_initiative_epic_issue_target_matrix_preserves_opaque_source" time="1.675" /><testcase classname="tests.cli_runtime.test_artifact_import_file.TestArtifactImportFile" name="test_shared_slot_exhaustion_is_not_committed_and_preserves_existing_files" time="0.235" /><testcase classname="tests.cli_runtime.test_artifact_import_s04.TestArtifactImportS04" name="test_tc_346_s04_001_opaque_body_open_denial_matrix" time="3.245" /><testcase classname="tests.cli_runtime.test_close.TestCliClose" name="test_close_command_accepts_explicit_id_flag_and_keeps_local_tree" time="1.826" /><testcase classname="tests.cli_runtime.test_close.TestCliClose" name="test_close_command_accepts_canonical_url_target" time="1.551" /><testcase classname="tests.cli_runtime.test_close.TestCliClose" name="test_close_refreshes_github_backed_derived_state_without_manual_sync" time="1.595" /><testcase classname="tests.cli_runtime.test_close.TestCliClose" name="test_close_failure_does_not_run_post_sync" time="1.685" /><testcase classname="tests.cli_runtime.test_delete.TestCliDelete" name="test_delete_issue_post_sync_artifact_failure_returns_nonzero_with_recovery_guidance" time="2.716" /><testcase classname="tests.cli_runtime.test_delete.TestCliDelete" name="test_delete_issue_by_github_issue_flag_removes_local_leaf_and_closes_remote" time="1.616" /><testcase classname="tests.cli_runtime.test_delete.TestCliDelete" name="test_delete_issue_target_invalid_metadata_returns_structured_json" time="1.274" /><testcase classname="tests.cli_runtime.test_delete.TestCliDelete" name="test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active" time="3.695"><failure message="AssertionError: usage: spec-dock/scripts/spec-dock [-h]&#10;                                     {new,artifact,active,delete,close,update,uninstall,issue,worktree,workbench,sync,deps,import,validate,doctor}&#10;                                     ...&#10;  spec-dock/scripts/spec-dock: error: unrecognized arguments: --force&#10;  &#10;assert 2 == 0&#10; +  where 2 = CompletedProcess(args=['/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/.venv/bin/python3', '/va...octor}\n                                   ...\nspec-dock/scripts/spec-dock: error: unrecognized arguments: --force\n').returncode">self = &lt;tests.cli_runtime.test_delete.TestCliDelete object at 0x107417d10&gt;
+
+    def test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active(self) -&gt; None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+    
+        target, issue56_dir, state_path, env = self._setup_delete_target_repo(issue_number=56)
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "epic",
+                "--initiative",
+                "1",
+                "--title",
+                "Survivor epic",
+                "--github-issue",
+                "20",
+            ],
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "issue",
+                "--epic",
+                "20",
+                "--title",
+                "Survivor issue",
+                "--github-issue",
+                "58",
+            ],
+        )
+        self._run_runtime(target, ["deps", "add", "--from", "iss-00058", "--to", "iss-00056"])
+    
+        issue58_matches = list((target / "spec-dock" / "initiatives").rglob("iss-00058-*"))
+        assert len(issue58_matches) == 1
+        issue58_dir = issue58_matches[0]
+        issue58_meta_path = issue58_dir / ".meta.json"
+        assert "iss-00056" in [
+            str(item).lower()
+            for item in json.loads(issue58_meta_path.read_text(encoding="utf-8")).get("depends_on", [])
+        ]
+    
+        deleted = self._run_runtime_capture(
+            target,
+            ["delete", "--id", "iss-00056", "--force", "--yes", "--json"],
+            env=env,
+        )
+        assert deleted.returncode == 0, deleted.stdout + deleted.stderr
+        deleted_payload = json.loads(deleted.stdout)
+        assert deleted_payload["status"] == "ok"
+        assert deleted_payload["target_id"] == "iss-00056"
+        assert not issue56_dir.exists()
+    
+        scrubbed_meta = json.loads(issue58_meta_path.read_text(encoding="utf-8"))
+        assert "iss-00056" not in [str(item).lower() for item in scrubbed_meta.get("depends_on", [])]
+    
+        validated = self._run_runtime_capture(target, ["validate"], env=env)
+        assert validated.returncode == 0, validated.stdout + validated.stderr
+    
+        synced = self._run_runtime_capture(target, ["sync"], env=env)
+        assert synced.returncode == 0, synced.stdout + synced.stderr
+        deps_payload = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+        assert not any(
+            edge.get("from") == "iss-00058" and edge.get("to") == "iss-00056"
+            for edge in deps_payload.get("edges", [])
+            if isinstance(edge, dict)
+        )
+    
+        activated = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00058", "--force"], env=env)
+&gt;       assert activated.returncode == 0, activated.stdout + activated.stderr
+E       AssertionError: usage: spec-dock/scripts/spec-dock [-h]
+E                                            {new,artifact,active,delete,close,update,uninstall,issue,worktree,workbench,sync,deps,import,validate,doctor}
+E                                            ...
+E         spec-dock/scripts/spec-dock: error: unrecognized arguments: --force
+E         
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/.venv/bin/python3', '/va...octor}\n                                   ...\nspec-dock/scripts/spec-dock: error: unrecognized arguments: --force\n').returncode
+
+tests/cli_runtime/test_delete.py:533: AssertionError</failure></testcase><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_sync_deps_progress_aggregation_for_epic_and_initiative" time="2.598" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_check_no_deps_is_ready" time="1.163" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_check_repo_scoped_url_fails_closed_when_repo_scope_does_not_match" time="1.132" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_scoped_ref_forms_resolve_exact_repo_match[owner-repo-number]" time="1.703" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_scoped_ref_forms_resolve_exact_repo_match[github-url]" time="1.715" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_check_rejects_non_positive_github_issue_flag" time="0.224" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_check_json_reports_empty_open_epic_as_node_blocker" time="2.186" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_sync_index_all_preserves_satisfied_high_level_node_depends_on_without_github" time="2.098" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_check_accepts_github_number_forms_and_urls[number]" time="1.291" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_check_no_github_uses_synced_index_status" time="0.000"><skipped type="pytest.skip" message="S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_deps.py:1762: S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github</skipped></testcase><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_check_github_fetch_failure_warns_and_blocks" time="0.000"><skipped type="pytest.skip" message="S04: covered by TestCheckDepsApplication.test_github_fetch_failure_warns_and_blocks_on_unknown_dependency">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_deps.py:1990: S04: covered by TestCheckDepsApplication.test_github_fetch_failure_warns_and_blocks_on_unknown_dependency</skipped></testcase><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_materialize_local_compat_ids_assigns_authentic_per_kind_local_ids" time="1.342" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_meta_schema_rejects_object_dep_ref" time="1.173" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_meta_schema_version_rejects_boolean_true" time="1.368" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_effective_depends_on_merges_parents_and_dedups" time="0.000"><skipped type="pytest.skip" message="S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_parents_and_dedups_without_cli">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_deps.py:2505: S04: covered by TestCheckDepsApplication.test_effective_depends_on_merges_parents_and_dedups_without_cli</skipped></testcase><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_cycle_detected_in_reachable_graph" time="1.490" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_commands_do_not_mutate_meta_json" time="1.259" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_add_inherited_only_edge_adds_direct_dependency" time="2.500" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_remove_removes_shorthand_direct_refs_by_issue_id" time="2.887" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_add_broken_current_graph_fails_preflight_before_duplicate" time="2.035" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_remove_not_found_returns_edge_not_found_and_no_write" time="1.501" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_remove_initiative_direct_dependency_updates_meta_json_and_returns_updated" time="1.977" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_remove_unresolved_source_returns_edge_not_found_and_no_write" time="1.497" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_remove_write_failure_returns_write_failed_and_no_write" time="2.213" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_add_epic_direct_dependency_updates_meta_json_and_returns_updated" time="2.745" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_add_self_dependency_returns_invalid_add_self_dependency_and_no_write" time="1.252" /><testcase classname="tests.cli_runtime.test_deps.TestCliDeps" name="test_deps_add_invalid_node_candidate_returns_invalid_add_cycle_and_no_write[parent-to-child]" time="1.225" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s40b_provider_install_root_is_current_catalog_only" time="0.001" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_locked_root_identity_blocks_rebind_before_fresh_admission" time="0.004" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_i369_fresh_entrypoint_matrix_provisions_all_workspace_states[operation1-absent]" time="4.660" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_i369_fresh_entrypoint_matrix_provisions_all_workspace_states[operation1-empty]" time="5.090" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_i369_fresh_entrypoint_matrix_provisions_all_workspace_states[operation2-absent]" time="4.417" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s40b_retained_ci_and_gitignore_are_deterministic_assets" time="0.001" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s45_fresh_preserves_unrelated_and_obsolete_looking_external_paths" time="4.930" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s45_fresh_preserves_same_bytes_wrong_mode_current_asset" time="0.099" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s45_make_executable_rejects_symlink_without_external_chmod" time="0.002" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s45_force_init_on_empty_target_uses_fresh_distribution" time="5.015" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s50_update_blocks_unreadable_managed_scaffold_source_before_distribution_write" time="0.155" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s50_force_init_restores_missing_current_asset_and_preserves_user_data" time="11.558" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_fresh_pre_marker_rollback_preserves_replacement_workspace" time="0.073" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s50_update_scaffold_boundary_collision_is_zero_write[symlink-templates]" time="0.226" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s50_update_scaffold_boundary_collision_is_zero_write[non_directory-templates]" time="0.218" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s55_update_prunes_proven_historical_managed_file" time="6.404" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s55_update_preserves_modified_historical_managed_file_and_blocks" time="0.253" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s55_unproven_legacy_root_entrypoint_is_preserved_and_blocks_zero_write[spec-dock/current-epic.path-regular-init-force]" time="5.504" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s55_unproven_legacy_root_entrypoint_is_preserved_and_blocks_zero_write[spec-dock/current-issue.path-regular-init-force]" time="4.531" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s55_legacy_root_entrypoint_directory_collision_blocks_zero_write[spec-dock/current-initiative.path]" time="4.984" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_marker_removal_preserves_replacement_marker" time="0.002" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_active_pathfile_does_not_follow_dangling_symlink" time="0.001" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_distribution_apply_fault_keeps_marker_and_old_version" time="5.877" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_fresh_init_forward_retry_reuses_marker_and_converges" time="4.931" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_fresh_retry_adopts_provider_identical_hard_link_workbench_seed" time="5.316" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s60_fresh_retry_blocks_modified_scaffold_collision_before_refresh" time="0.400" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s65_uninstall_root_rebind_before_marker_write_is_zero_write" time="0.245" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_uninstall_cleanup_rechecks_empty_directory_identity_before_rmdir" time="0.001" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s65_uninstall_dry_run_preserves_modified_current_skill" time="0.196" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_empty_workspace_blocks_non_init_operations_without_writes[update-0]" time="4.627" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_empty_workspace_blocks_non_init_operations_without_writes[uninstall-0]" time="0.089" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_uninstall_apply_rejects_rewritten_target_after_plan" time="0.339" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_uninstall_apply_blocks_agent_symlink_before_marker_write" time="0.189" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s50_update_rejects_managed_directory_replacement_after_descriptor_open" time="1.124" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry" time="56.709" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_uninstall_marker_write_failure_is_retryable" time="55.210" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories" time="0.222" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_i370_typed_uninstall_mapper_allowlists_operation_and_action_errors" time="0.001" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_i370_uninstall_non_directory_target_error_is_stable_and_path_free[json-space-space target-False]" time="0.001" /><testcase classname="tests.cli_runtime.test_distribution_cutover" name="test_i370_uninstall_non_directory_target_error_is_stable_and_path_free[text-space-space target-False]" time="0.001" /><testcase classname="tests.cli_runtime.test_doctor.TestDoctorHistoricalConsumerInvariance" name="test_validate_and_doctor_legacy_evidence_mutation_invariance[thin_report]" time="3.579" /><testcase classname="tests.cli_runtime.test_doctor.TestDoctorHistoricalConsumerInvariance" name="test_validate_and_doctor_legacy_evidence_mutation_invariance[legacy_active_extra_fields]" time="3.353" /><testcase classname="tests.cli_runtime.test_doctor.TestDoctorHistoricalConsumerInvariance" name="test_validate_and_doctor_legacy_evidence_mutation_invariance[repair_artifact]" time="3.099" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_fails_preflight_on_legacy_meta_without_creating_nodes" time="1.404" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_accepts_number_hash_and_url_equivalently[123]" time="1.219" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_rejects_foreign_repo_url_even_with_opt_in" time="0.857" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_accepts_canonical_url_when_origin_is_ssh_remote" time="1.258" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_issue_requires_parent_when_no_epic_and_active_unavailable" time="0.885" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_rejects_same_repo_url_duplicate_when_existing_link_omits_repo_fields" time="1.556" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_numeric_target_rejects_when_current_repo_unknown_without_writes" time="1.520" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_rejects_invalid_title_before_gh_issue_view" time="0.882" /><testcase classname="tests.cli_runtime.test_import.TestCliImport" name="test_import_rejects_ambiguous_parent_id_shorthand_when_both_local_and_github_exist" time="0.634" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestIssueLifecycleApplication" name="test_issue_start_checkout_failure_does_not_write_active_or_sync" time="0.001" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestIssueLifecycleApplication" name="test_issue_finish_clear_failure_reports_confirmed_partial_state_and_skips_sync" time="0.001" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_direct_active_set_checkout_is_parser_error_without_writes" time="2.222" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_issue_start_blocks_when_active_issue_github_state_unknown" time="2.372" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_issue_start_force_bypasses_only_lifecycle_guard_not_dependency_guard" time="2.367" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_issue_start_rejects_legacy_force_short_options" time="0.457" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_issue_start_from_non_issue_branch_blocks_switching_open_active_issue" time="2.564" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_issue_start_from_detached_head_blocks_switching_open_active_issue" time="2.492" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_core_operations_legacy_evidence_mutation_invariance[evidence_adoption_ledger]" time="7.187" /><testcase classname="tests.cli_runtime.test_issue_lifecycle.TestCliIssueLifecycle" name="test_issue_finish_already_closed_clears_active" time="1.755" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_epic_auto_syncs_index_and_dashboard" time="0.932" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_node_id_option_is_parser_error" time="1.325" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_rejects_unsafe_slug" time="1.061" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_missing_rules_source_fails_before_gh_issue_create" time="0.000"><skipped type="pytest.skip" message="S06 replacement: tests.unit.commands.test_runtime_new_s08 covers missing-rules preflight before GitHub create.">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_new.py:621: S06 replacement: tests.unit.commands.test_runtime_new_s08 covers missing-rules preflight before GitHub create.</skipped></testcase><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_issue_359_grill_route_creates_exactly_one_artifact_without_scope_mutation[research-template: &quot;research&quot;-authority: &quot;evidence&quot;-## Question\n\n- Final question\n\n## Source\n\n- Final source\n\n## Findings\n\n- Final finding\n\n## Reflection\n\n- Final reflection\n]" time="1.282" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_issue_359_artifact_input_failures_are_zero_write[artifact_args0]" time="1.011" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_artifact_stdout_uses_slugless_id_and_artifacts_path" time="1.346" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_artifact_rejects_invalid_slug_before_setup" time="1.146" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_internal_issue_status_resolution_marks_cached_source" time="0.017" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_no_github_is_parser_error_for_initiative_epic_and_issue" time="1.397" /><testcase classname="tests.cli_runtime.test_new.TestCliNew" name="test_new_github_flags_are_mutually_exclusive" time="1.144" /><testcase classname="tests.cli_runtime.test_post_mutation_sync_s01.TestPostMutationSyncS01" name="test_tc_s01_001_success_outcome_preserves_sync_result" time="0.000" /><testcase classname="tests.cli_runtime.test_post_mutation_sync_s01.TestPostMutationSyncS01" name="test_tc_s01_005_gh_index_incomplete_warning_is_non_fatal" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05" name="test_render_context_pack_states_entry_default_and_escalation_contract" time="0.000"><failure message="AssertionError: assert '## Authority' in '# Context Pack (generated)\n\n## Active\n- initiative: init-local-00001\n- epic: epic-local-00001\n- issue: iss-local...l opt-out): `./spec-dock/scripts/spec-dock sync --no-github`\n- validate: `./spec-dock/scripts/spec-dock validate`\n\n'">self = &lt;tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05 object at 0x107631400&gt;
+
+    def test_render_context_pack_states_entry_default_and_escalation_contract(self) -&gt; None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            _app_set_active,
+            infra_active_store,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+    
+        manifest = infra_contracts.ActiveManifest(
+            initiative=infra_contracts.ActiveManifestEntry(
+                id="init-local-00001",
+                path="spec-dock/initiatives/init-local-00001-alpha",
+            ),
+            epic=infra_contracts.ActiveManifestEntry(
+                id="epic-local-00001",
+                path="spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta",
+            ),
+            issue=infra_contracts.ActiveManifestEntry(
+                id="iss-local-00001",
+                path=(
+                    "spec-dock/initiatives/init-local-00001-alpha/epics/"
+                    "epic-local-00001-beta/issues/iss-local-00001-gamma"
+                ),
+            ),
+        )
+    
+        text = infra_active_store._render_context_pack(manifest)
+    
+        assert "- entry: `spec-dock/.agent/active.json`" in text
+        assert "- default working set: `spec-dock/.agent/index.json`" in text
+        assert "- default dependency view: `spec-dock/.agent/deps-issues.json`" in text
+        assert "- escalation only: `spec-dock/.agent/index-all.json`" in text
+        assert "- Start with `spec-dock/.agent/active.json`." in text
+        assert "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`." in text
+        assert "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed." in text
+        assert "human guidance" in text
+        assert "not the sole source of truth" in text
+        assert "- `spec-dock/active/issue/report.md`" in text
+&gt;       assert "## Authority" in text
+E       AssertionError: assert '## Authority' in '# Context Pack (generated)\n\n## Active\n- initiative: init-local-00001\n- epic: epic-local-00001\n- issue: iss-local...l opt-out): `./spec-dock/scripts/spec-dock sync --no-github`\n- validate: `./spec-dock/scripts/spec-dock validate`\n\n'
+
+tests/cli_runtime/test_runtime_active_s05.py:99: AssertionError</failure></testcase><testcase classname="tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05" name="test_show_active_reads_agent_manifest_into_active_view_result" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05" name="test_legacy_absolute_agent_manifest_path_remaps_to_current_repo_when_possible" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05" name="test_active_show_main_uses_use_case_and_returns_zero" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06" name="test_set_active_absorbs_github_issue_index_failure_as_warning" time="0.000"><failure message="AssertionError: assert 'gh_fetch_failed' in []&#10; +  where [] = ActiveSetResult(selection=ActiveSelection(initiative_id='init-local-00001', epic_id='epic-local-00001', issue_id='iss-local-00001'), branch=None, manifest_written=True, pointer_updated=True, warnings=[]).warnings">self = &lt;tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06 object at 0x10761b200&gt;
+
+    def test_set_active_absorbs_github_issue_index_failure_as_warning(self) -&gt; None:
+        app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
+        issue_gateway = _StubIssueGateway(fail=True)
+        ports = self._ports(
+            issue_depends_on_map={"iss-local-00001": [], "iss-local-00002": []},
+            statuses={},
+            issue_gateway=issue_gateway,
+        )
+        req = app_contracts.SetActiveRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None),
+            force=True,
+            checkout=False,
+            use_github=True,
+            issue_limit=10000,
+        )
+        result = app_set_active.set_active(req, ports)
+        assert result.manifest_written
+        assert result.selection.issue_id == "iss-local-00001"
+&gt;       assert "gh_fetch_failed" in result.warnings
+E       AssertionError: assert 'gh_fetch_failed' in []
+E        +  where [] = ActiveSetResult(selection=ActiveSelection(initiative_id='init-local-00001', epic_id='epic-local-00001', issue_id='iss-local-00001'), branch=None, manifest_written=True, pointer_updated=True, warnings=[]).warnings
+
+tests/cli_runtime/test_runtime_active_s06.py:354: AssertionError</failure></testcase><testcase classname="tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06" name="test_set_active_falls_back_to_current_repo_view_for_unscoped_linked_initiative_when_index_missing_key" time="0.000"><failure message="AssertionError: assert [] == [('/repo', 10000)]&#10;  &#10;  Right contains one more item: ('/repo', 10000)&#10;  Use -v to get more diff">self = &lt;tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06 object at 0x107668c50&gt;
+
+    def test_set_active_falls_back_to_current_repo_view_for_unscoped_linked_initiative_when_index_missing_key(
+        self,
+    ) -&gt; None:
+        app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
+        records = [
+            _record(
+                infra_contracts,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=101,
+            ),
+            _record(
+                infra_contracts,
+                kind="epic",
+                node_id="epic-local-00001",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            ),
+        ]
+        issue_gateway = _StubIssueGateway(
+            snapshots=[],
+            foreign_snapshots={
+                ("current/repo", 101): SimpleNamespace(
+                    issue_number=101,
+                    state="OPEN",
+                    title="current #101",
+                    labels=[],
+                    updated_at="2026-03-23T00:00:00Z",
+                    url="https://github.com/current/repo/issues/101",
+                    repo_owner="current",
+                    repo_name="repo",
+                )
+            },
+        )
+        ports = self._ports(
+            issue_depends_on_map={"iss-local-00001": []},
+            statuses={},
+            issue_gateway=issue_gateway,
+            git_gateway=_StubGitGateway(origin_repo_slug="current/repo"),
+            records=records,
+        )
+        req = app_contracts.SetActiveRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="init-local-00001", github_issue_number=None),
+            force=False,
+            checkout=False,
+            use_github=True,
+            issue_limit=10000,
+        )
+        result = app_set_active.set_active(req, ports)
+        assert result.manifest_written
+        assert result.selection.initiative_id == "init-local-00001"
+&gt;       assert issue_gateway.calls == [("/repo", 10000)]
+E       AssertionError: assert [] == [('/repo', 10000)]
+E         
+E         Right contains one more item: ('/repo', 10000)
+E         Use -v to get more diff
+
+tests/cli_runtime/test_runtime_active_s06.py:682: AssertionError</failure></testcase><testcase classname="tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06" name="test_set_active_patch_failure_rolls_back" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_close_s12.TestRuntimeCloseS12" name="test_close_node_allows_explicit_issue_target_when_promotion_record_is_stale" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_close_s12.TestRuntimeCloseS12" name="test_close_node_read_after_close_race_returns_success_noop" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_close_s12.TestRuntimeCloseS12" name="test_close_node_github_issue_target_resolves_current_unscoped_node_with_repo_scope" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_close_s12.TestRuntimeCloseS12" name="test_bootstrap_issue_gateway_forwards_issue_close" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_selector_missing_returns_invalid_selector_combination" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_github_issue_selector_is_normalized" time="0.009" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_active_conflict" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_parent_dependency_conflict_without_force_stops_before_local_delete_mutation" time="0.010" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_missing_yes" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_would_match_target_invalid_metadata_returns_metadata_validation_failed" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_parent_recursive_delete_fails_with_subtree_metadata_validation_errors" time="0.012" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_recursive_delete_order_is_deepest_first_and_same_depth_lexical" time="0.011" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_forced_recursive_delete_scrubs_raw_ref_to_empty_deleted_container" time="0.009" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_recursive_delete_detects_empty_source_direct_raw_refs_to_deleted_subtree_nodes" time="0.023" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_forced_parent_delete_dependency_scrub_fails_closed_on_ambiguous_numeric_ref" time="0.010" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_issue_target_remote_close_failed_does_not_call_local_delete" time="0.010" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_forced_issue_delete_repairs_active_from_snapshot_when_clear_fails" time="0.011" /><testcase classname="tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13" name="test_delete_json_field_matrix_for_ok_status_with_ordering" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04" name="test_collect_sync_state_reads_shared_topology_map" time="0.005" /><testcase classname="tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04" name="test_status_context_source_selection" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04" name="test_check_deps_falls_back_to_same_repo_repo_scoped_view_when_index_missing_key" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04" name="test_deps_renderers" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04" name="test_legacy_deps_add_path_renders_unchanged_result" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04" name="test_fs_repo_atomic_replace_failure_preserves_original_meta_json_on_remove" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04" name="test_fs_repo_atomic_non_oserror_write_failure_maps_to_write_failed_and_restores_readonly" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_command_surface_rejects_raw_github_api_arguments" time="0.001" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_renders_targeted_github_permission_diagnostic_without_secret" time="0.003" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_renders_rate_transient_and_schema_statuses_distinctly" time="0.003" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_issue_222_s05_github_capability_cli_probes_actions_and_review_surfaces_without_checks_api" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_github_capability_cli_reports_missing_gh_as_auth_missing" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_detects_malformed_discussion_doc_filename" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_detects_raw_empty_container_dependency_cycle" time="0.004" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_detects_broken_meta_when_required_field_is_missing" time="0.003" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_detects_stale_active_pointer_when_manifest_path_points_to_file" time="0.003" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_doctor_detects_invalid_create_lock_metadata" time="0.004" /><testcase classname="tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04" name="test_issue_78_main_doctor_renders_cleanup_pending_warning_message" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10" name="test_release_create_lock_compat_for_import_old_call_signature" time="0.001" /><testcase classname="tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10" name="test_duplicate_guard_no_write_regression" time="0.008" /><testcase classname="tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10" name="test_import_numeric_target_rejects_when_current_repo_unknown_without_writes" time="0.021" /><testcase classname="tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10" name="test_import_issue_uses_target_repo_slug_for_same_repo_url_when_present" time="0.013"><failure message="RuntimeError: Outcome: import_local_write_fail. '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at' Recovery: rerun `/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmplk8nh5co/spec-dock/scripts/spec-dock import issue https://github.com/current/repo/issues/123 --title 'Imported issue' --epic epic-local-00001 --allow-foreign-url`.">plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00123', title='Imported issue', slug='imported-issue', path='/v...itiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00123-imported-issue/.meta.json')])
+ports = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f11f70&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def execute_create_plan(plan: CreatePlan, ports: Ports) -&gt; list[Path]:
+        node_repo = _resolve_node_repo(ports)
+        template_scaffolder = _resolve_template_scaffolder(ports)
+        specdock_dir = _resolve_specdock_dir(ports)
+    
+        collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+        if collisions:
+            raise RuntimeError(f"Destination already exists: {collisions[0]}")
+    
+        template_dir = _resolve_template_dir(plan)
+        rules_scaffold_specs = _rules_scaffold_specs(
+            kind=plan.meta.kind,
+            dest_dir=plan.dest_dir,
+            specdock_dir=specdock_dir,
+        )
+        for link_path, target_path in rules_scaffold_specs:
+            _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+        if os.path.lexists(plan.dest_dir):
+            raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+        _require_node_tree_no_replace_rename_capability()
+        _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+    
+        destination_parent_fd: int | None = None
+        destination_parent_identity: tuple[int, int] | None = None
+        outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+        outer_created = False
+        outer_fd: int | None = None
+        outer_identity: tuple[int, int] | None = None
+        payload_created = False
+        payload_fd: int | None = None
+        payload_identity: tuple[int, int] | None = None
+        committed = False
+        try:
+            plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+            destination_parent_fd = os.open(
+                plan.dest_dir.parent,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            )
+            parent_stat = os.fstat(destination_parent_fd)
+            destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+            os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+            outer_created = True
+            outer_fd = os.open(
+                outer_name,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=destination_parent_fd,
+            )
+            outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+            os.fchmod(outer_fd, 0o700)
+            os.mkdir("payload", dir_fd=outer_fd)
+            payload_created = True
+            payload_fd = os.open(
+                "payload",
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=outer_fd,
+            )
+            payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+&gt;           created_paths = template_scaffolder.copy_scaffolded_tree_at(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                src_dir=template_dir,
+                dest_dir=plan.dest_dir,
+                dest_dir_fd=payload_fd,
+                replacements=plan.replacements,
+            )
+E           AttributeError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'. Did you mean: 'copy_scaffolded_tree'?
+
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1150: AttributeError
+
+The above exception was the direct cause of the following exception:
+
+req = ImportNodeRequest(issue_number=123, title='Imported issue', slug='imported-issue', parent_id='epic-local-00001', target_repo_owner='current', target_repo_name='repo', allow_foreign_url=True)
+ports = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f11f70&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def import_node_core(
+        req: ImportNodeRequest,
+        ports: Ports,
+        *,
+        kind: Literal["initiative", "epic", "issue"],
+    ) -&gt; ImportNodeResult:
+        title, slug = resolve_input_title_and_slug(req.title, req.slug)
+        req = replace(req, title=title, slug=slug)
+    
+        current_repo_slug = resolve_current_repo_slug(ports)
+        try:
+            graph = load_graph(ports, validate=False)
+            report = validate_graph_and_deps(
+                graph,
+                repo_root=_resolve_repo_root(ports),
+                current_repo_slug=current_repo_slug,
+                enforce_github_mandatory_linkage=False,
+            )
+            if report.errors:
+                raise RuntimeError(report.errors[0])
+        except RuntimeError as error:
+            raise RuntimeError(f"preflight validate failed: {error}") from error
+        try:
+            validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+        except RuntimeError as error:
+            raise RuntimeError(f"preflight validate failed: {error}") from error
+    
+        issue_number = int(req.issue_number)
+        _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+        _require_numeric_import_repo_scope(
+            req,
+            current_repo_slug=current_repo_slug,
+        )
+        specdock_dir = _resolve_specdock_dir(ports)
+        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+        guard_github_issue_uniqueness(
+            graph,
+            issue_number,
+            github_repo_owner=req.target_repo_owner,
+            github_repo_name=req.target_repo_name,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+        precheck_req = build_linked_create_request(
+            req,
+            precheck_parent_id,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_plan = plan_node_creation(
+            precheck_req,
+            graph,
+            kind=kind,
+            specdock_dir=specdock_dir,
+            today=today,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+        if precheck_collisions:
+            raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+    
+        issue_gateway = _resolve_issue_gateway(ports)
+        imported_issue = issue_gateway.issue_view_minimal(
+            _resolve_repo_root(ports),
+            issue_number,
+            repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
+        )
+        lock_path, lock_token = _acquire_create_lock(specdock_dir)
+        result_node: SpecNode | None = None
+        body_error: Exception | None = None
+        local_write_phase: CreateWritePhase = "none"
+        local_node_id: str | None = None
+        try:
+            graph = load_graph(ports, validate=False)
+            guard_github_issue_uniqueness(
+                graph,
+                issue_number,
+                github_repo_owner=req.target_repo_owner,
+                github_repo_name=req.target_repo_name,
+                current_repo_slug=current_repo_slug,
+            )
+            locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+            create_req = build_linked_create_request(
+                req,
+                locked_parent_id,
+                current_repo_slug=current_repo_slug,
+            )
+            plan = plan_node_creation(
+                create_req,
+                graph,
+                kind=kind,
+                specdock_dir=specdock_dir,
+                today=today,
+                current_repo_slug=current_repo_slug,
+            )
+            local_node_id = plan.meta.id
+&gt;           execute_create_plan(plan, ports)
+
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:397: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00123', title='Imported issue', slug='imported-issue', path='/v...itiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00123-imported-issue/.meta.json')])
+ports = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f11f70&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def execute_create_plan(plan: CreatePlan, ports: Ports) -&gt; list[Path]:
+        node_repo = _resolve_node_repo(ports)
+        template_scaffolder = _resolve_template_scaffolder(ports)
+        specdock_dir = _resolve_specdock_dir(ports)
+    
+        collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+        if collisions:
+            raise RuntimeError(f"Destination already exists: {collisions[0]}")
+    
+        template_dir = _resolve_template_dir(plan)
+        rules_scaffold_specs = _rules_scaffold_specs(
+            kind=plan.meta.kind,
+            dest_dir=plan.dest_dir,
+            specdock_dir=specdock_dir,
+        )
+        for link_path, target_path in rules_scaffold_specs:
+            _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+        if os.path.lexists(plan.dest_dir):
+            raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+        _require_node_tree_no_replace_rename_capability()
+        _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+    
+        destination_parent_fd: int | None = None
+        destination_parent_identity: tuple[int, int] | None = None
+        outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+        outer_created = False
+        outer_fd: int | None = None
+        outer_identity: tuple[int, int] | None = None
+        payload_created = False
+        payload_fd: int | None = None
+        payload_identity: tuple[int, int] | None = None
+        committed = False
+        try:
+            plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+            destination_parent_fd = os.open(
+                plan.dest_dir.parent,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            )
+            parent_stat = os.fstat(destination_parent_fd)
+            destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+            os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+            outer_created = True
+            outer_fd = os.open(
+                outer_name,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=destination_parent_fd,
+            )
+            outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+            os.fchmod(outer_fd, 0o700)
+            os.mkdir("payload", dir_fd=outer_fd)
+            payload_created = True
+            payload_fd = os.open(
+                "payload",
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=outer_fd,
+            )
+            payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+            created_paths = template_scaffolder.copy_scaffolded_tree_at(
+                src_dir=template_dir,
+                dest_dir=plan.dest_dir,
+                dest_dir_fd=payload_fd,
+                replacements=plan.replacements,
+            )
+            created_rule_links: list[Path] = []
+            for link_path, target_path in rules_scaffold_specs:
+                _create_relative_symlink_at(
+                    payload_fd,
+                    node_dir=plan.dest_dir,
+                    link_path=link_path,
+                    target_path=target_path,
+                )
+                created_rule_links.append(link_path)
+            node_repo.write_meta_at(payload_fd, plan.meta)
+            if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
+                raise RuntimeError(f"Destination parent identity changed before publication: {plan.dest_dir.parent}")
+            _verified_directory_identity_at(
+                destination_parent_fd,
+                outer_name,
+                outer_fd,
+                expected_identity=outer_identity,
+            )
+            _verified_directory_identity_at(
+                outer_fd,
+                "payload",
+                payload_fd,
+                expected_identity=payload_identity,
+            )
+            _rename_node_tree_no_replace_between_at(
+                outer_fd,
+                "payload",
+                destination_parent_fd,
+                plan.dest_dir.name,
+            )
+            committed = True
+            with contextlib.suppress(OSError, RuntimeError):
+                _cleanup_committed_outer_transaction(
+                    parent_fd=destination_parent_fd,
+                    outer_name=outer_name,
+                    outer_identity=outer_identity,
+                )
+        except Exception as exc:
+            if not committed and destination_parent_fd is not None:
+                try:
+                    _cleanup_node_tree_transaction(
+                        parent_fd=destination_parent_fd,
+                        outer_name=outer_name,
+                        outer_created=outer_created,
+                        outer_fd=outer_fd,
+                        outer_identity=outer_identity,
+                        payload_created=payload_created,
+                        payload_fd=payload_fd,
+                        payload_identity=payload_identity,
+                    )
+                except Exception as cleanup_exc:
+                    raise CreatePlanExecutionError(
+                        phase="scaffold_copied",
+                        message=f"{exc}; node scaffold rollback failed: {cleanup_exc}",
+                    ) from exc
+&gt;           raise CreatePlanExecutionError(phase="none", message=str(exc)) from exc
+E           spec_dock_runtime.application.create_node.CreatePlanExecutionError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'
+
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1211: CreatePlanExecutionError
+
+The above exception was the direct cause of the following exception:
+
+self = &lt;tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10 object at 0x107750200&gt;
+
+    def test_import_issue_uses_target_repo_slug_for_same_repo_url_when_present(self) -&gt; None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+            issue_gateway = _StubIssueGateway(domain_models)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=self._active_manifest(infra_contracts),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                issue_gateway=issue_gateway,
+                git_gateway=_StubGitGateway("current/repo"),
+            )
+    
+&gt;           result = app_import_node.import_issue(
+                app_contracts.ImportNodeRequest(
+                    issue_number=123,
+                    title="Imported issue",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    target_repo_owner="current",
+                    target_repo_name="repo",
+                    allow_foreign_url=True,
+                ),
+                ports,
+            )
+
+tests/cli_runtime/test_runtime_import_s10.py:1265: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:456: in import_issue
+    return import_node_core(req, ports, kind="issue")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+req = ImportNodeRequest(issue_number=123, title='Imported issue', slug='imported-issue', parent_id='epic-local-00001', target_repo_owner='current', target_repo_name='repo', allow_foreign_url=True)
+ports = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f11f70&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def import_node_core(
+        req: ImportNodeRequest,
+        ports: Ports,
+        *,
+        kind: Literal["initiative", "epic", "issue"],
+    ) -&gt; ImportNodeResult:
+        title, slug = resolve_input_title_and_slug(req.title, req.slug)
+        req = replace(req, title=title, slug=slug)
+    
+        current_repo_slug = resolve_current_repo_slug(ports)
+        try:
+            graph = load_graph(ports, validate=False)
+            report = validate_graph_and_deps(
+                graph,
+                repo_root=_resolve_repo_root(ports),
+                current_repo_slug=current_repo_slug,
+                enforce_github_mandatory_linkage=False,
+            )
+            if report.errors:
+                raise RuntimeError(report.errors[0])
+        except RuntimeError as error:
+            raise RuntimeError(f"preflight validate failed: {error}") from error
+        try:
+            validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+        except RuntimeError as error:
+            raise RuntimeError(f"preflight validate failed: {error}") from error
+    
+        issue_number = int(req.issue_number)
+        _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+        _require_numeric_import_repo_scope(
+            req,
+            current_repo_slug=current_repo_slug,
+        )
+        specdock_dir = _resolve_specdock_dir(ports)
+        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+        guard_github_issue_uniqueness(
+            graph,
+            issue_number,
+            github_repo_owner=req.target_repo_owner,
+            github_repo_name=req.target_repo_name,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+        precheck_req = build_linked_create_request(
+            req,
+            precheck_parent_id,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_plan = plan_node_creation(
+            precheck_req,
+            graph,
+            kind=kind,
+            specdock_dir=specdock_dir,
+            today=today,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+        if precheck_collisions:
+            raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+    
+        issue_gateway = _resolve_issue_gateway(ports)
+        imported_issue = issue_gateway.issue_view_minimal(
+            _resolve_repo_root(ports),
+            issue_number,
+            repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
+        )
+        lock_path, lock_token = _acquire_create_lock(specdock_dir)
+        result_node: SpecNode | None = None
+        body_error: Exception | None = None
+        local_write_phase: CreateWritePhase = "none"
+        local_node_id: str | None = None
+        try:
+            graph = load_graph(ports, validate=False)
+            guard_github_issue_uniqueness(
+                graph,
+                issue_number,
+                github_repo_owner=req.target_repo_owner,
+                github_repo_name=req.target_repo_name,
+                current_repo_slug=current_repo_slug,
+            )
+            locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+            create_req = build_linked_create_request(
+                req,
+                locked_parent_id,
+                current_repo_slug=current_repo_slug,
+            )
+            plan = plan_node_creation(
+                create_req,
+                graph,
+                kind=kind,
+                specdock_dir=specdock_dir,
+                today=today,
+                current_repo_slug=current_repo_slug,
+            )
+            local_node_id = plan.meta.id
+            execute_create_plan(plan, ports)
+            local_write_phase = "meta_written"
+            _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+            local_write_phase = "post_write_verified"
+            result_node = _to_spec_node(plan.meta)
+        except Exception as exc:
+            body_error = exc
+            local_write_phase = resolve_create_write_phase(exc, default=local_write_phase)
+        finally:
+            release_error: Exception | None = None
+            try:
+                _release_create_lock(lock_path, lock_token)
+            except Exception as exc:
+                release_error = exc
+    
+            wrapped_outcome_error = _build_post_import_failure(
+                local_error=body_error,
+                release_error=release_error,
+                kind=kind,
+                req=req,
+                title=title,
+                specdock_dir=specdock_dir,
+                local_write_phase=local_write_phase,
+                local_node_id=local_node_id if create_write_phase_has_local_writes(local_write_phase) else None,
+            )
+            if wrapped_outcome_error is not None:
+                cause = body_error if body_error is not None else release_error
+                if cause is not None:
+&gt;                   raise wrapped_outcome_error from cause
+E                   RuntimeError: Outcome: import_local_write_fail. '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at' Recovery: rerun `/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmplk8nh5co/spec-dock/scripts/spec-dock import issue https://github.com/current/repo/issues/123 --title 'Imported issue' --epic epic-local-00001 --allow-foreign-url`.
+
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:425: RuntimeError</failure></testcase><testcase classname="tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10" name="test_execute_create_plan_reuse_seam" time="0.007"><failure message="RuntimeError: Outcome: import_local_write_fail. '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at' Recovery: rerun `/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmp9nu6p07l/spec-dock/scripts/spec-dock import issue 909 --title 'Reuse execute plan' --epic epic-local-00001`.">plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00909', title='Reuse execute plan', slug='reuse-execute-plan', ...tives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00909-reuse-execute-plan/.meta.json')])
+ports = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f133e0&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def execute_create_plan(plan: CreatePlan, ports: Ports) -&gt; list[Path]:
+        node_repo = _resolve_node_repo(ports)
+        template_scaffolder = _resolve_template_scaffolder(ports)
+        specdock_dir = _resolve_specdock_dir(ports)
+    
+        collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+        if collisions:
+            raise RuntimeError(f"Destination already exists: {collisions[0]}")
+    
+        template_dir = _resolve_template_dir(plan)
+        rules_scaffold_specs = _rules_scaffold_specs(
+            kind=plan.meta.kind,
+            dest_dir=plan.dest_dir,
+            specdock_dir=specdock_dir,
+        )
+        for link_path, target_path in rules_scaffold_specs:
+            _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+        if os.path.lexists(plan.dest_dir):
+            raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+        _require_node_tree_no_replace_rename_capability()
+        _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+    
+        destination_parent_fd: int | None = None
+        destination_parent_identity: tuple[int, int] | None = None
+        outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+        outer_created = False
+        outer_fd: int | None = None
+        outer_identity: tuple[int, int] | None = None
+        payload_created = False
+        payload_fd: int | None = None
+        payload_identity: tuple[int, int] | None = None
+        committed = False
+        try:
+            plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+            destination_parent_fd = os.open(
+                plan.dest_dir.parent,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            )
+            parent_stat = os.fstat(destination_parent_fd)
+            destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+            os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+            outer_created = True
+            outer_fd = os.open(
+                outer_name,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=destination_parent_fd,
+            )
+            outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+            os.fchmod(outer_fd, 0o700)
+            os.mkdir("payload", dir_fd=outer_fd)
+            payload_created = True
+            payload_fd = os.open(
+                "payload",
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=outer_fd,
+            )
+            payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+&gt;           created_paths = template_scaffolder.copy_scaffolded_tree_at(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                src_dir=template_dir,
+                dest_dir=plan.dest_dir,
+                dest_dir_fd=payload_fd,
+                replacements=plan.replacements,
+            )
+E           AttributeError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'. Did you mean: 'copy_scaffolded_tree'?
+
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1150: AttributeError
+
+The above exception was the direct cause of the following exception:
+
+plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00909', title='Reuse execute plan', slug='reuse-execute-plan', ...tives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00909-reuse-execute-plan/.meta.json')])
+ports_arg = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f133e0&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def _fake_execute(plan, ports_arg):
+        calls.append((plan.meta.id, ports_arg))
+&gt;       return original_execute(plan, ports_arg)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/cli_runtime/test_runtime_import_s10.py:1463: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+plan = CreatePlan(meta=StoredMetaRecord(kind='issue', id='iss-00909', title='Reuse execute plan', slug='reuse-execute-plan', ...tives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-00909-reuse-execute-plan/.meta.json')])
+ports = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f133e0&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def execute_create_plan(plan: CreatePlan, ports: Ports) -&gt; list[Path]:
+        node_repo = _resolve_node_repo(ports)
+        template_scaffolder = _resolve_template_scaffolder(ports)
+        specdock_dir = _resolve_specdock_dir(ports)
+    
+        collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+        if collisions:
+            raise RuntimeError(f"Destination already exists: {collisions[0]}")
+    
+        template_dir = _resolve_template_dir(plan)
+        rules_scaffold_specs = _rules_scaffold_specs(
+            kind=plan.meta.kind,
+            dest_dir=plan.dest_dir,
+            specdock_dir=specdock_dir,
+        )
+        for link_path, target_path in rules_scaffold_specs:
+            _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+        if os.path.lexists(plan.dest_dir):
+            raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+        _require_node_tree_no_replace_rename_capability()
+        _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+    
+        destination_parent_fd: int | None = None
+        destination_parent_identity: tuple[int, int] | None = None
+        outer_name = f".{plan.dest_dir.name}.transaction-{uuid.uuid4().hex}"
+        outer_created = False
+        outer_fd: int | None = None
+        outer_identity: tuple[int, int] | None = None
+        payload_created = False
+        payload_fd: int | None = None
+        payload_identity: tuple[int, int] | None = None
+        committed = False
+        try:
+            plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+            destination_parent_fd = os.open(
+                plan.dest_dir.parent,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            )
+            parent_stat = os.fstat(destination_parent_fd)
+            destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+            os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
+            outer_created = True
+            outer_fd = os.open(
+                outer_name,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=destination_parent_fd,
+            )
+            outer_identity = _verified_directory_identity_at(destination_parent_fd, outer_name, outer_fd)
+            os.fchmod(outer_fd, 0o700)
+            os.mkdir("payload", dir_fd=outer_fd)
+            payload_created = True
+            payload_fd = os.open(
+                "payload",
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=outer_fd,
+            )
+            payload_identity = _verified_directory_identity_at(outer_fd, "payload", payload_fd)
+            created_paths = template_scaffolder.copy_scaffolded_tree_at(
+                src_dir=template_dir,
+                dest_dir=plan.dest_dir,
+                dest_dir_fd=payload_fd,
+                replacements=plan.replacements,
+            )
+            created_rule_links: list[Path] = []
+            for link_path, target_path in rules_scaffold_specs:
+                _create_relative_symlink_at(
+                    payload_fd,
+                    node_dir=plan.dest_dir,
+                    link_path=link_path,
+                    target_path=target_path,
+                )
+                created_rule_links.append(link_path)
+            node_repo.write_meta_at(payload_fd, plan.meta)
+            if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
+                raise RuntimeError(f"Destination parent identity changed before publication: {plan.dest_dir.parent}")
+            _verified_directory_identity_at(
+                destination_parent_fd,
+                outer_name,
+                outer_fd,
+                expected_identity=outer_identity,
+            )
+            _verified_directory_identity_at(
+                outer_fd,
+                "payload",
+                payload_fd,
+                expected_identity=payload_identity,
+            )
+            _rename_node_tree_no_replace_between_at(
+                outer_fd,
+                "payload",
+                destination_parent_fd,
+                plan.dest_dir.name,
+            )
+            committed = True
+            with contextlib.suppress(OSError, RuntimeError):
+                _cleanup_committed_outer_transaction(
+                    parent_fd=destination_parent_fd,
+                    outer_name=outer_name,
+                    outer_identity=outer_identity,
+                )
+        except Exception as exc:
+            if not committed and destination_parent_fd is not None:
+                try:
+                    _cleanup_node_tree_transaction(
+                        parent_fd=destination_parent_fd,
+                        outer_name=outer_name,
+                        outer_created=outer_created,
+                        outer_fd=outer_fd,
+                        outer_identity=outer_identity,
+                        payload_created=payload_created,
+                        payload_fd=payload_fd,
+                        payload_identity=payload_identity,
+                    )
+                except Exception as cleanup_exc:
+                    raise CreatePlanExecutionError(
+                        phase="scaffold_copied",
+                        message=f"{exc}; node scaffold rollback failed: {cleanup_exc}",
+                    ) from exc
+&gt;           raise CreatePlanExecutionError(phase="none", message=str(exc)) from exc
+E           spec_dock_runtime.application.create_node.CreatePlanExecutionError: '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at'
+
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py:1211: CreatePlanExecutionError
+
+The above exception was the direct cause of the following exception:
+
+self = &lt;tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10 object at 0x1077660c0&gt;
+
+    def test_execute_create_plan_reuse_seam(self) -&gt; None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=self._active_manifest(infra_contracts),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+            )
+    
+            calls = []
+            original_execute = app_import_node.execute_create_plan
+            original_sync = app_import_node.sync_after_import
+    
+            def _fake_execute(plan, ports_arg):
+                calls.append((plan.meta.id, ports_arg))
+                return original_execute(plan, ports_arg)
+    
+            app_import_node.execute_create_plan = _fake_execute
+            app_import_node.sync_after_import = lambda _ports: self._dummy_sync_result(app_contracts, domain_models)
+            try:
+&gt;               result = app_import_node.import_issue(
+                    app_contracts.ImportNodeRequest(
+                        issue_number=909,
+                        title="Reuse execute plan",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                    ),
+                    ports,
+                )
+
+tests/cli_runtime/test_runtime_import_s10.py:1468: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:456: in import_issue
+    return import_node_core(req, ports, kind="issue")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+req = ImportNodeRequest(issue_number=909, title='Reuse execute plan', slug='reuse-execute-plan', parent_id='epic-local-00001', target_repo_owner=None, target_repo_name=None, allow_foreign_url=False)
+ports = Ports(node_reader=&lt;tests.cli_runtime.test_runtime_import_s10._StubNodeReader object at 0x107f133e0&gt;, repo_root=PosixPa...ironment_gateway=None, filesystem_gateway=None, explicit_file_source_guard=None, explicit_file_artifact_publisher=None)
+
+    def import_node_core(
+        req: ImportNodeRequest,
+        ports: Ports,
+        *,
+        kind: Literal["initiative", "epic", "issue"],
+    ) -&gt; ImportNodeResult:
+        title, slug = resolve_input_title_and_slug(req.title, req.slug)
+        req = replace(req, title=title, slug=slug)
+    
+        current_repo_slug = resolve_current_repo_slug(ports)
+        try:
+            graph = load_graph(ports, validate=False)
+            report = validate_graph_and_deps(
+                graph,
+                repo_root=_resolve_repo_root(ports),
+                current_repo_slug=current_repo_slug,
+                enforce_github_mandatory_linkage=False,
+            )
+            if report.errors:
+                raise RuntimeError(report.errors[0])
+        except RuntimeError as error:
+            raise RuntimeError(f"preflight validate failed: {error}") from error
+        try:
+            validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+        except RuntimeError as error:
+            raise RuntimeError(f"preflight validate failed: {error}") from error
+    
+        issue_number = int(req.issue_number)
+        _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+        _require_numeric_import_repo_scope(
+            req,
+            current_repo_slug=current_repo_slug,
+        )
+        specdock_dir = _resolve_specdock_dir(ports)
+        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+        guard_github_issue_uniqueness(
+            graph,
+            issue_number,
+            github_repo_owner=req.target_repo_owner,
+            github_repo_name=req.target_repo_name,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+        precheck_req = build_linked_create_request(
+            req,
+            precheck_parent_id,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_plan = plan_node_creation(
+            precheck_req,
+            graph,
+            kind=kind,
+            specdock_dir=specdock_dir,
+            today=today,
+            current_repo_slug=current_repo_slug,
+        )
+        precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+        if precheck_collisions:
+            raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+    
+        issue_gateway = _resolve_issue_gateway(ports)
+        imported_issue = issue_gateway.issue_view_minimal(
+            _resolve_repo_root(ports),
+            issue_number,
+            repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
+        )
+        lock_path, lock_token = _acquire_create_lock(specdock_dir)
+        result_node: SpecNode | None = None
+        body_error: Exception | None = None
+        local_write_phase: CreateWritePhase = "none"
+        local_node_id: str | None = None
+        try:
+            graph = load_graph(ports, validate=False)
+            guard_github_issue_uniqueness(
+                graph,
+                issue_number,
+                github_repo_owner=req.target_repo_owner,
+                github_repo_name=req.target_repo_name,
+                current_repo_slug=current_repo_slug,
+            )
+            locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+            create_req = build_linked_create_request(
+                req,
+                locked_parent_id,
+                current_repo_slug=current_repo_slug,
+            )
+            plan = plan_node_creation(
+                create_req,
+                graph,
+                kind=kind,
+                specdock_dir=specdock_dir,
+                today=today,
+                current_repo_slug=current_repo_slug,
+            )
+            local_node_id = plan.meta.id
+            execute_create_plan(plan, ports)
+            local_write_phase = "meta_written"
+            _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+            local_write_phase = "post_write_verified"
+            result_node = _to_spec_node(plan.meta)
+        except Exception as exc:
+            body_error = exc
+            local_write_phase = resolve_create_write_phase(exc, default=local_write_phase)
+        finally:
+            release_error: Exception | None = None
+            try:
+                _release_create_lock(lock_path, lock_token)
+            except Exception as exc:
+                release_error = exc
+    
+            wrapped_outcome_error = _build_post_import_failure(
+                local_error=body_error,
+                release_error=release_error,
+                kind=kind,
+                req=req,
+                title=title,
+                specdock_dir=specdock_dir,
+                local_write_phase=local_write_phase,
+                local_node_id=local_node_id if create_write_phase_has_local_writes(local_write_phase) else None,
+            )
+            if wrapped_outcome_error is not None:
+                cause = body_error if body_error is not None else release_error
+                if cause is not None:
+&gt;                   raise wrapped_outcome_error from cause
+E                   RuntimeError: Outcome: import_local_write_fail. '_StubTemplateScaffolder' object has no attribute 'copy_scaffolded_tree_at' Recovery: rerun `/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmp9nu6p07l/spec-dock/scripts/spec-dock import issue 909 --title 'Reuse execute plan' --epic epic-local-00001`.
+
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py:425: RuntimeError</failure></testcase><testcase classname="tests.cli_runtime.test_runtime_shell_s11.TestRuntimeShellS11" name="test_import_scan_detects_legacy_helper_import_styles" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_shell_s11.TestRuntimeShellS11" name="test_representative_command_wrapper_smoke" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_shell_s11.TestRuntimeShellS11" name="test_staged_delegation_path_regression" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02" name="test_validate_tree_use_case_returns_result_with_checked_node_count" time="0.002" /><testcase classname="tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02" name="test_app_minimal_validate_reader_seam" time="0.000" /><testcase classname="tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02" name="test_issue_78_validate_uses_current_specdock_even_when_legacy_hidden_workspace_exists" time="0.001" /><testcase classname="tests.cli_runtime.test_sync.TestCliSync" name="test_new_and_active_and_sync" time="1.140"><failure message="AssertionError: runtime command failed:&#10;- cmd: ['active', 'set', 'iss-00003', '--force']&#10;- stdout:&#10;&#10;- stderr:&#10;usage: spec-dock/scripts/spec-dock [-h]&#10;                                   {new,artifact,active,delete,close,update,uninstall,issue,worktree,workbench,sync,deps,import,validate,doctor}&#10;                                   ...&#10;spec-dock/scripts/spec-dock: error: unrecognized arguments: --force">self = &lt;tests.cli_runtime.test_sync.TestCliSync object at 0x1077b4e60&gt;
+
+    def test_new_and_active_and_sync(self) -&gt; None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+    
+            self._create_same_repo_linked_hierarchy(target)
+    
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            assert (issue_dir / "requirement.md").is_file()
+            assert (issue_dir / "design.md").is_file()
+            assert (issue_dir / "plan.md").is_file()
+            assert (issue_dir / "report.md").is_file()
+    
+            # Placeholders should be rendered in generated files.
+            requirement = (issue_dir / "requirement.md").read_text(encoding="utf-8")
+            assert "&lt;ISS_ID&gt;" not in requirement
+            assert "&lt;ISS_TITLE&gt;" not in requirement
+            assert "iss-00003" in requirement
+    
+            # Active pointers are set by a single target argument (node id or GitHub issue number).
+&gt;           self._run_runtime(target, ["active", "set", "iss-00003", "--force"])
+
+tests/cli_runtime/test_sync.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.cli_runtime.test_sync.TestCliSync object at 0x1077b4e60&gt;
+target = PosixPath('/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmp7byui3rr')
+args = ['active', 'set', 'iss-00003', '--force']
+
+    def _run_runtime(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -&gt; None:
+        script = target / "spec-dock" / "scripts" / "spec-dock"
+        _assert_is_file(script, f"runtime script missing: {script}")
+    
+        merged_env = self._runtime_env(target, env)
+    
+        p = subprocess.run(
+            [sys.executable, str(script), *args],
+            cwd=str(target),
+            env=merged_env,
+            capture_output=True,
+            text=True,
+        )
+        if p.returncode != 0:
+&gt;           raise AssertionError(
+                f"runtime command failed:\n- cmd: {args}\n- stdout:\n{p.stdout}\n- stderr:\n{p.stderr}\n"
+            )
+E           AssertionError: runtime command failed:
+E           - cmd: ['active', 'set', 'iss-00003', '--force']
+E           - stdout:
+E           
+E           - stderr:
+E           usage: spec-dock/scripts/spec-dock [-h]
+E                                              {new,artifact,active,delete,close,update,uninstall,issue,worktree,workbench,sync,deps,import,validate,doctor}
+E                                              ...
+E           spec-dock/scripts/spec-dock: error: unrecognized arguments: --force
+
+tests/cli_runtime/harness.py:192: AssertionError</failure></testcase><testcase classname="tests.cli_runtime.test_sync.TestCliSync" name="test_sync_compiles_shorthand_to_issue_edges" time="2.914" /><testcase classname="tests.cli_runtime.test_sync.TestCliSync" name="test_sync_fails_on_descendant_dependency" time="1.289" /><testcase classname="tests.cli_runtime.test_sync.TestCliSync" name="test_sync_updates_active_from_branch_id" time="1.283" /><testcase classname="tests.cli_runtime.test_uninstall.TestUninstallCommand" name="test_uninstall_help_describes_upstream_no_cache_and_default_target" time="0.222" /><testcase classname="tests.cli_runtime.test_uninstall.TestUninstallCommand" name="test_uninstall_forwards_remove_specs_flag" time="0.498" /><testcase classname="tests.cli_runtime.test_update.TestUpdateCommand" name="test_update_help_describes_upstream_no_cache_and_default_target" time="0.237" /><testcase classname="tests.cli_runtime.test_update.TestUpdateCommand" name="test_update_missing_uvx_fails_with_actionable_error" time="0.243" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_timestamp_intent_authoring_pack_directory_without_accept_all[None]" time="1.505" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_explicit_historical_catalog[artifacts-20260810t010101z-pr-repair-batch-review-fix.md]" time="1.558" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_explicit_historical_catalog[artifacts-20260810t010106z-note-handoff.md]" time="1.593" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_explicit_historical_catalog[artifacts-20260810t010107z--Report FINAL.PDF]" time="1.447" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_explicit_historical_catalog[artifacts-20260810t010111z-interview-hearing.md]" time="1.502" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_explicit_historical_catalog[artifacts-20260810t010117z-analysis-boundary-review.md]" time="1.389" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_explicit_historical_catalog[discussions-20260810t010115z-disc-legacy.md]" time="1.636" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_explicit_historical_catalog[discussions-003-research-legacy.md]" time="1.310" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_diagnose_only_explicit_malformed_artifact_controls_without_mutation[20260810t010101-adr-missing-z.md]" time="1.416" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_diagnose_only_explicit_malformed_artifact_controls_without_mutation[20261340t256199z-adr-impossible-time.md]" time="1.363" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_duplicate_artifacts_while_reporting_actionable_diagnostic[filenames0-Duplicate artifact id detected]" time="1.338" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_unsafe_artifact_paths_while_reporting_actionable_diagnostic[artifact-file-symlink]" time="1.461" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_and_doctor_preserve_unsafe_artifact_paths_while_reporting_actionable_diagnostic[dangling-artifacts-directory-symlink]" time="1.775" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_rejects_missing_or_invalid_required_meta_identity_fields" time="9.533" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_rejects_legacy_unscoped_issue_linkage" time="0.000"><skipped type="pytest.skip" message="S04: covered by TestValidateApplication.test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli">/Volumes/990p2t/workspace/worktrees/spec-dock/iss-00370-with-baseline/tests/cli_runtime/test_validate.py:505: S04: covered by TestValidateApplication.test_validate_graph_reports_linkage_and_parent_diagnostics_without_cli</skipped></testcase><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_detects_duplicate_github_issue_numbers_with_paths" time="1.145" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_accepts_mixed_same_timestamp_unsuffixed_and_suffixed_slots" time="1.158" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_rejects_symlinked_artifact_file_with_artifact_diagnostic" time="1.327" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_detects_duplicate_discussion_timestamp_suffix_slot" time="1.515" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_sync_and_doctor_classify_missing_meta_with_create_lock_in_progress" time="1.438" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_validate_sync_and_doctor_detect_missing_required_plan_artifact" time="1.726" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_sync_force_continues_when_tree_is_invalid" time="1.362" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_sync_github_no_backfill_path_does_not_emit_readonly_lock_warning" time="1.280" /><testcase classname="tests.cli_runtime.test_validate.TestCliValidate" name="test_issue_78_validate_ignores_legacy_hidden_workspace_contents" time="1.148" /><testcase classname="tests.cli_runtime.test_workbench.TestCliWorkbench" name="test_workbench_copy_rejects_unpublished_source_and_scope_routes[--root]" time="0.248" /><testcase classname="tests.cli_runtime.test_workbench.TestCliWorkbench" name="test_workbench_copy_uses_target_scope_record_and_keeps_output_content_free" time="1.567" /><testcase classname="tests.cli_runtime.test_workbench.TestCliWorkbench" name="test_workbench_copy_invalid_scope_uses_stable_content_free_shape" time="1.166" /><testcase classname="tests.cli_runtime.test_workbench.TestCliWorkbench" name="test_workbench_copy_rejects_malformed_roots_without_external_impact[target-file]" time="1.517" /><testcase classname="tests.cli_runtime.test_workbench.TestCliWorkbench" name="test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands" time="2.375"><failure message="FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmpdrorl37u/target-renamed/spec-dock/.agent/active.json'">self = &lt;tests.cli_runtime.test_workbench.TestCliWorkbench object at 0x107853830&gt;
+
+    def test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands(self) -&gt; None:
+        with tempfile.TemporaryDirectory() as tmp:
+            opaque_payloads = {
+                "fake-node/.meta.json": b"not valid node metadata\n",
+                "legacy/meta.json": b"not valid legacy metadata\n",
+                "decisions/adr-999.md": b"# fake ADR secret body\n",
+                "notes.md": b"# ordinary Markdown notes\n",
+                "dependency.yml": b"depends_on: [iss-99999]\n",
+                "binary.bin": b"\x00\x01\x02\xff",
+                "invalid-utf8.bin": b"\xff\xfe\x80",
+            }
+            source, target, scope_id, _, target_scope = self._prepare_linked_worktrees(
+                Path(tmp),
+                source_workbench_payloads=opaque_payloads,
+                rename_target_scope=False,
+            )
+    
+            def observe() -&gt; tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...], tuple[str, ...]]:
+                validate_result = self._run_runtime_capture(target, ["validate"])
+                sync_result = self._run_runtime_capture(target, ["sync"])
+                deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", scope_id, "--no-github"])
+                active_result = self._run_runtime_capture(target, ["active", "set", "--id", scope_id, "--force"])
+                active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+                active_fields = tuple(
+                    (key, active[key][field]) for key in ("initiative", "epic", "issue") for field in ("id", "path")
+                )
+                index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+                return (
+                    (
+                        validate_result.returncode,
+                        sync_result.returncode,
+                        deps_result.returncode,
+                        active_result.returncode,
+                    ),
+                    active_fields,
+                    tuple(sorted(index_all["nodes"])),
+                )
+    
+&gt;           baseline = observe()
+                       ^^^^^^^^^
+
+tests/cli_runtime/test_workbench.py:335: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/cli_runtime/test_workbench.py:319: in observe
+    active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/iwasawayuuta/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmpdrorl37u/target-renamed/spec-dock/.agent/active.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+&gt;       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/tmpdrorl37u/target-renamed/spec-dock/.agent/active.json'
+
+/Users/iwasawayuuta/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/pathlib.py:1013: FileNotFoundError</failure></testcase><testcase classname="tests.cli_runtime.test_workbench.TestCliWorkbench" name="test_linked_worktree_checkout_and_manual_copy_preserve_identical_readme_and_move_only_ignored_payload" time="1.512" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_create_rejects_blank_env_without_side_effects" time="0.469" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_create_rejects_relative_root_without_side_effects" time="0.444" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_create_help_exposes_optional_label" time="0.447" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_create_runs_make_init_when_available" time="4.931" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_create_keeps_worktree_when_make_init_fails" time="5.058" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_create_fails_outside_git_repo" time="0.286" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_create_normalizes_container_from_linked_worktree" time="1.117" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_json_commands_report_unavailable_classification_for_invalid_root_variants" time="3.106" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_remove_untracked_default_removes_directory_and_keeps_branch" time="0.742" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_remove_rejects_branch_target_and_invalid_root_without_side_effects" time="0.948" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_remove_git_failure_does_not_cleanup_target" time="0.002" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file" time="0.001" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_remove_re_resolves_target_after_final_git_refresh" time="0.003" /><testcase classname="tests.cli_runtime.test_worktree.TestCliWorktree" name="test_worktree_inventory_reports_stale_records_and_duplicate_ids" time="0.004" /><testcase classname="tests.cli_runtime.test_wrappers.TestCliRulesContract" name="test_new_artifact_numbering_and_validate_ignore_issue_artifact_rules_symlink" time="1.439" /><testcase classname="tests.integration.test_discovery.TestIntegrationDiscoverySmoke" name="test_integration_package_markers_exist[integration/git_remote]" time="0.000" /><testcase classname="tests.integration.test_epic_00343_distribution" name="test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import" time="10.593" /><testcase classname="tests.integration.test_epic_00343_distribution" name="test_tc_346_s02_002_existing_consumer_update_preserves_data_without_backfill" time="6.434" /><testcase classname="tests.integration.test_epic_00343_distribution" name="test_tc_346_s04_004_disposable_exact_dogfood_update_keeps_epic_00343_unbackfilled" time="15.563" /><testcase classname="tests.integration.test_epic_00343_distribution" name="test_tc_346_s04_005_disposable_dogfood_future_shell_and_generic_import" time="25.795" /><testcase classname="tests.unit.application.test_binary_artifact_import_ports" name="test_explicit_file_guard_and_publisher_use_separate_narrow_ports" time="0.002" /><testcase classname="tests.unit.application.test_check_deps.TestCheckDepsApplication" name="test_repo_scoped_target_resolution_matches_set_active_without_ports[missing-foreign-repo-None-No node found]" time="0.000" /><testcase classname="tests.unit.application.test_check_deps.TestCheckDepsApplication" name="test_effective_depends_on_merges_epic_and_initiative_without_cli" time="0.001" /><testcase classname="tests.unit.application.test_check_deps.TestCheckDepsApplication" name="test_no_github_missing_cache_defaults_to_unknown_and_blocks" time="0.000" /><testcase classname="tests.unit.application.test_check_deps.TestCheckDepsApplication" name="test_deps_check_passes_empty_open_high_level_context_to_readiness" time="0.000" /><testcase classname="tests.unit.application.test_check_deps.TestCheckDepsApplication" name="test_github_linked_empty_high_level_dependency_without_cache_fails_unknown" time="0.000" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_source_guard_failure_precedes_root_artifact_setup" time="0.001" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_missing_or_kind_mismatched_target_precedes_source_guard_and_setup[999-nodes0]" time="0.001" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_publication_warning_maps_to_committed_retry_not_needed[warning_codes1-committed_with_warning]" time="0.002" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_known_precommit_os_faults_are_runtime_failed_and_safe_to_retry[artifact_setup]" time="0.001" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_shared_slot_exhaustion_is_not_committed_and_does_not_call_publisher" time="0.012" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_fresh_target_same_name_max_identity_replacement_fails_before_publisher[target]" time="0.001" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_fresh_rules_link_replacement_fails_closed_without_deleting_replacement[broken-during_create]" time="0.001" /><testcase classname="tests.unit.application.test_import_file_artifact" name="test_rules_link_rollback_preserves_reused_inode_replacement_with_new_ctime" time="0.001" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_set_active_all_selectors_avoid_readiness_github_and_git_ports[github_issue]" time="0.000" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_repo_scoped_github_target_reports_not_found_or_ambiguous_without_writing[2]" time="0.000" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_every_write_phase_to_legacy_snapshot[crlf_files-True-pointers]" time="0.004" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_every_write_phase_to_legacy_snapshot[crlf_files-False-managed]" time="0.004" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_every_write_phase_to_legacy_snapshot[symlinks-False-manifest]" time="0.003" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_agent_manifest_verbatim[crlf_file-pointers]" time="0.002" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_agent_manifest_verbatim[symlink-managed]" time="0.003" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_accepts_single_link_managed_json[single_link_file]" time="0.003" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_root_symlink_and_external_projection[managed]" time="0.003" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_all_managed_agent_files_verbatim[dangling_symlinks-manifest]" time="0.003" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_all_managed_agent_files_verbatim[existing_symlinks-pointers]" time="0.004" /><testcase classname="tests.unit.application.test_set_active.TestSetActiveApplication" name="test_commit_active_state_rolls_back_directory_path_trees_verbatim[managed]" time="0.008" /><testcase classname="tests.unit.application.test_validate.TestValidateApplication" name="test_validate_tree_reports_missing_required_meta_without_cli" time="0.008" /><testcase classname="tests.unit.application.test_validate.TestValidateApplication" name="test_validate_tree_legacy_evidence_invariance_does_not_read_content[delegated_authority-design.md----\nstatus: draft\nauthority: proposed\ngrants: [implementation_start]\napproval: pending-main-promotion\n---\n# Design\n]" time="0.003" /><testcase classname="tests.unit.application.test_validate.TestValidateApplication" name="test_validate_tree_legacy_evidence_invariance_does_not_read_content[repair_artifact-artifacts/20260810t010102z-pr-repair-batch-historical.md-# Historical repair batch\n\nreviewer: blocked\n]" time="0.003" /><testcase classname="tests.unit.application.test_workbench" name="test_invalid_scope_identifier_is_stable_and_precedes_inventory[init-local-00003]" time="0.001" /><testcase classname="tests.unit.application.test_workbench" name="test_scope_failure_is_side_specific_and_precedes_copy[target-records_override1-None]" time="0.001" /><testcase classname="tests.unit.application.test_workbench" name="test_scope_failure_is_side_specific_and_precedes_copy[target-None-malformed metadata body]" time="0.001" /><testcase classname="tests.unit.application.test_workbench" name="test_missing_source_workbench_is_no_source_without_target_mutation[missing]" time="0.001" /><testcase classname="tests.unit.application.test_workbench" name="test_malformed_workbench_root_fails_before_copy[source-symlink]" time="0.001" /><testcase classname="tests.unit.application.test_workbench" name="test_scope_ancestor_symlink_is_rejected_before_external_metadata_reader_runs[initiative]" time="0.001" /><testcase classname="tests.unit.application.test_workbench" name="test_unexpected_metadata_symlink_is_rejected_before_external_reader_runs[unexpected-directory]" time="0.001" /><testcase classname="tests.unit.application.test_workbench" name="test_scope_outside_its_worktree_is_rejected_before_scope_path_inspection[target]" time="0.001" /><testcase classname="tests.unit.commands.test_artifact_import_file" name="test_artifact_import_file_help_and_minimal_parser_contract" time="0.003" /><testcase classname="tests.unit.commands.test_artifact_import_file" name="test_artifact_import_file_rejects_missing_or_ambiguous_target[argv3]" time="0.002" /><testcase classname="tests.unit.commands.test_artifact_import_file" name="test_unknown_command_fault_is_redacted_without_fabricating_publication_state" time="0.000" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_two_layer_transaction_publishes_payload_between_held_directories" time="0.005" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_two_layer_transaction_failure_matrix[outer_fstatat-True]" time="0.003" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_two_layer_transaction_failure_matrix[payload_fstatat-True]" time="0.003" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_two_layer_transaction_failure_matrix[rename-False]" time="0.004" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_concurrent_same_canonical_plan_publishes_one_complete_tree" time="0.008" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_full_candidate_set_no_write_preflight_collision" time="0.003" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_missing_rules_source_is_no_write" time="0.003" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_parallel_create_initiative_allocates_unique_github_ids" time="0.107" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_github_issue_create_pre_lock_window_rerevalidates_parent_state" time="0.004" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_issue_create_partial_copy_failure_rolls_back_and_reports_retry_link_guidance" time="0.005" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_node_reader_fallback_without_fd_writer_fails_content_free" time="0.004" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_identity_bound_writes_preserve_competitor_tree_on_path_replacement[parent-rules]" time="0.005" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_identity_bound_writes_preserve_competitor_tree_on_path_replacement[destination-meta]" time="0.005" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_issue_create_body_and_cleanup_failure_keeps_outcome_guidance" time="0.004" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_issue_create_repo_scope_precheck_failures_happen_before_github_create_or_local_write" time="0.003" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_issue_link_existing_rejects_explicit_cross_repo_target" time="0.003" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_github_create_local_parent_path_collision_fails_before_github_create" time="0.009" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_initiative_and_epic_post_create_failures_report_retry_link_guidance" time="0.030" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_create_fails_when_release_unlink_fails" time="0.006" /><testcase classname="tests.unit.commands.test_runtime_new_s08.TestRuntimeNewS08" name="test_command_new_initiative_smoke" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_current_creatable_artifact_catalog_is_exact" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_existing_timestamp_typed_historical_catalog_is_recognized_without_becoming_creatable[20260810t010104z-draft-plan-plan.md-draft-plan]" time="0.001" /><testcase classname="tests.unit.domain.test_artifacts" name="test_existing_sequential_historical_catalog_is_explicitly_recognized[002-disc-api-options.md-disc]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_existing_catalog_rejects_timestamp_intent_and_sequential_controls[20260810T010101z-adr-upper-t.md]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_existing_catalog_rejects_timestamp_intent_and_sequential_controls[20260810t010101z-.md]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_existing_catalog_rejects_timestamp_intent_and_sequential_controls[20260810t010101z-100-note-bad-slot.md]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_existing_timestamp_markdown_with_unknown_type_like_label_is_accepted_as_untyped[20260811t113200z-analysis-existing-projection-uow-reuse.md]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_historical_tokens_are_not_misclassified_as_blank_slugs" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_invalid_generic_import_intent_is_malformed_independent_of_extension[20260810t010101z-00--capture.bin]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_invalid_generic_import_intent_is_malformed_independent_of_extension[20260810t010101z--unsafe\u200bname.html]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_generic_parser_round_trips_without_changing_typed_blank_grammar" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_safe_generic_basename_is_preserved_exactly[.env]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_safe_generic_basename_is_preserved_exactly[case.txt]" time="0.000" /><testcase classname="tests.unit.domain.test_artifacts" name="test_overlong_basename_preserves_longest_extension_chain_that_fits_with_stem" time="0.000" /><testcase classname="tests.unit.domain.test_deps.TestDepsDomain" name="test_effective_deps_merge_issue_epic_and_initiative_edges_without_cli" time="0.000" /><testcase classname="tests.unit.domain.test_deps.TestDepsDomain" name="test_evaluate_readiness_fails_closed_for_empty_unknown_high_level_dependency" time="0.000" /><testcase classname="tests.unit.domain.test_deps.TestDepsDomain" name="test_evaluate_readiness_suppresses_descendant_blockers_for_closed_high_level_dependency" time="0.000" /><testcase classname="tests.unit.domain.test_deps.TestDepsDomain" name="test_evaluate_readiness_uses_unknown_descendant_as_blocker_surface_for_unknown_high_level" time="0.000" /><testcase classname="tests.unit.domain.test_deps.TestDepsDomain" name="test_raw_node_dependency_future_cycle_through_target_descendant_is_rejected" time="0.000" /><testcase classname="tests.unit.domain.test_deps.TestDepsDomain" name="test_raw_node_dependency_candidate_rejects_self_dependency" time="0.000" /><testcase classname="tests.unit.domain.test_runtime_domain_s01.TestRuntimeDomainS01" name="test_build_graph_from_node_seeds" time="0.000" /><testcase classname="tests.unit.domain.test_runtime_domain_s01.TestRuntimeDomainS01" name="test_app_validate_github_issue_numbers_unique_delegates_to_domain_validation" time="0.000" /><testcase classname="tests.unit.domain.test_runtime_domain_s03.TestRuntimeDomainS03" name="test_validate_graph_rejects_partially_scoped_issue_linkage" time="0.000" /><testcase classname="tests.unit.domain.test_runtime_domain_s03.TestRuntimeDomainS03" name="test_infer_active_node_from_branch_keeps_fail_closed_when_current_repo_unknown" time="0.000" /><testcase classname="tests.unit.domain.test_runtime_domain_s03.TestRuntimeDomainS03" name="test_resolve_issue_statuses_selects_source" time="0.000" /><testcase classname="tests.unit.domain.test_runtime_domain_s03.TestRuntimeDomainS03" name="test_evaluate_readiness_uses_explicit_issue_depends_on_map" time="0.000" /><testcase classname="tests.unit.domain.test_runtime_domain_s03.TestRuntimeDomainS03" name="test_domain_modules_have_no_shell_io_imports" time="0.010" /><testcase classname="tests.unit.infra.test_active_store.TestActiveStoreInfra" name="test_write_manifest_prefers_agent_active_and_prunes_legacy_work_files" time="4.343" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_current_artifact_templates_exist_are_nonempty_and_match_dogfood[blank]" time="0.001" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_current_artifact_templates_exist_are_nonempty_and_match_dogfood[decision-candidate]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_current_artifact_templates_distinguish_type_semantics[research-expected_tokens1]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_current_artifact_templates_distinguish_type_semantics[adr-expected_tokens5]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_non_adr_artifacts_route_adopted_content_to_durable_authority[interview]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_artifact_guide_fixes_type_meanings_and_research_disc_boundary" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_draft_document_state_and_adr_draft_authority_are_not_historical_routes" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_mandatory_workflow_detector_rejects_required_tools[\u6307\u5b9a reviewer workflow \u3092\u4f7f\u3063\u3066\u304f\u3060\u3055\u3044\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_mandatory_workflow_detector_rejects_required_tools[ChatGPT must be used.]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_mandatory_workflow_detector_rejects_required_tools[ChatGPT\u3092\u5fc5\u305a\u4f7f\u7528\u3059\u308b\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_mandatory_workflow_detector_allows_explicitly_optional_tools[EAL schema \u306f\u5fc5\u9808\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_mandatory_workflow_detector_allows_explicitly_optional_tools[model \u306e\u5229\u7528\u306f optional \u3067\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_relative_links_in_artifact_guide_resolve_when_present[root0]" time="0.000" /><testcase classname="tests.unit.infra.test_artifact_templates" name="test_current_issue_artifact_rules_keep_profile_routes_historical_only" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s07_parity_detector_rejects_byte_drift" time="0.001" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s08_preservation_fixture_has_exact_explicit_baseline_matrix" time="0.001" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s08_preservation_delta_detects_exact_intentional_mutation" time="0.006" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_mandatory_workflow_patterns_reject_required_tools[\u7279\u5b9a\u306e model \u3092\u524d\u63d0\u3068\u3057\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_mandatory_workflow_patterns_reject_required_tools[ChatGPT \u3092\u5fc5\u9808\u3068\u3057\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_mandatory_workflow_patterns_allow_optional_tools[\u5fc5\u8981\u306b\u5fdc\u3058\u3066\u4efb\u610f\u306e model \u3084 provider \u3092\u9078\u3079\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_roots_link_to_authoring_overview[guide.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_first_read_destination_detector_rejects_non_allowlisted_mutations[[external workflow](https://example.com/workflow_issue.md)]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_first_read_destination_detector_rejects_non_allowlisted_mutations[&lt;ftp://example.com/current-authoring&gt;]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_authoring_overview_navigation_links_to_all_current_guides" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_no_live_link_detector_rejects_absolute_external_and_relative_mutations[[Current recommendation](../overview.md)]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_no_live_link_detector_rejects_absolute_external_and_relative_mutations[&lt;ftp://example.com/current-authoring&gt;]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_relative_link_resolver_includes_reference_style_destination" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_excludes_legacy_authoring_contracts[docs/authoring/overview.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_rejects_legacy_mutations[phase \u306e\u9806\u5e8f\u306b\u5f93\u3044\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_rejects_legacy_mutations[Codex \u3092\u5fc5\u9808\u3068\u3057\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_rejects_legacy_mutations[phase_gate \u3092\u901a\u3057\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_rejects_legacy_mutations[assurance_level \u3092\u8a18\u9332\u3057\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_rejects_legacy_mutations[promotion_route \u3092\u4f7f\u3044\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_rejects_legacy_mutations[delegated_authoring_route \u3092\u4f7f\u3044\u307e\u3059\u3002]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_allows_ascii_word_infixes[assurances]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_allows_ascii_word_infixes[delegated authoringx]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_navigation_vocabulary_detector_allows_ascii_word_infixes[reassurance]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_historical_navigation_is_a_positive_control_outside_current_vocabulary_scan" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s06_navigation_asset_relative_links_resolve[docs/guide.md-scaffold_root1]" time="0.001" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s06_navigation_asset_relative_links_resolve[docs/authoring/overview.md-scaffold_root1]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s06_navigation_asset_relative_links_resolve[docs/authoring/historical.md-scaffold_root1]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s06_navigation_assets_match_dogfood_projection[docs/authoring/overview.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s01_authoring_docs_match_dogfood_projection[guide.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s01_authoring_docs_match_dogfood_projection[authoring/issue-plan.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_all_relative_markdown_links_in_authoring_foundation_resolve[requirement.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_all_relative_markdown_links_in_authoring_foundation_resolve[scope-layering.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_authoring_overview_and_document_guides_have_major_headings[issue-plan.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_document_guides_distinguish_owned_and_unowned_content[design.md-responsibility1]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_document_guides_route_plan_authoring_by_scope[design.md-routing_tokens1]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_authoring_foundation_does_not_require_a_specific_workflow[README.md]" time="0.001" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_current_authoring_foundation_does_not_require_a_specific_workflow[authoring/design.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_scope_markdown_catalog_is_exact[initiative-template_root0]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_scope_markdown_catalog_is_exact[issue-template_root0]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_scope_catalog_rejects_extra_rdp_like_alias[design-v2.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_frontmatter_uses_exact_minimal_fields_and_placeholders[initiative-plan]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_frontmatter_uses_exact_minimal_fields_and_placeholders[issue-requirement]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_has_exact_headings_and_one_concise_prompt_per_section[initiative-design]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_has_exact_headings_and_one_concise_prompt_per_section[epic-plan]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_guide_link_resolves_from_rendered_node_location[initiative-requirement]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_guide_link_resolves_from_rendered_node_location[epic-design]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_guide_link_resolves_from_rendered_node_location[issue-plan]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_excludes_legacy_workflow_and_quality_gate_contracts[initiative-plan]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_excludes_legacy_workflow_and_quality_gate_contracts[issue-requirement]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_forbidden_patterns_reject_snake_case_variants[phase_gate]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_forbidden_patterns_allow_unrelated_terms[deployment phase]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_assets_match_dogfood_projection[README.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_assets_match_dogfood_projection[epic/requirement.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_template_rdp_assets_match_dogfood_projection[issue/design.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_each_scope_has_exactly_one_canonical_report_template[epic-template_root0]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_frontmatter_uses_exact_minimal_fields_and_placeholders[initiative]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_has_exact_result_summary_shape_with_empty_required_bodies[epic]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_guide_link_resolves_from_rendered_node_location[epic]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_templates_match_dogfood_projection[issue]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_templates_exclude_heavy_and_generic_workflow_contracts[path2]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_guides_exclude_heavy_and_generic_workflow_contracts[path0]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_template_forbidden_contract_detector_rejects_generic_variants[Assurance]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_template_forbidden_contract_detector_rejects_generic_variants[PR status]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_guide_forbidden_contract_detector_rejects_generic_variants[Assurance]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_guide_forbidden_contract_detector_rejects_generic_variants[PR status]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_report_guide_is_non_gating_and_routes_durable_decisions_elsewhere" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_each_completion_guide_is_independent_and_links_only_the_base[light]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_each_completion_guide_contains_level_appropriate_completion_contract[light]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_critical_planning_level_limits_na_to_migration_and_requires_recovery" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s03_planning_guides_match_dogfood_projection[authoring/issue-plan-levels/strict.md]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_planning_level_is_docs_only_and_does_not_own_runtime_metadata" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s09_contract_input_binds_to_canonical_design_section" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s09_design_binding_rejects_canonical_contract_mutations[content / Guide / heading mismatch\u306f358\u3078-content mismatch\u306fruntime\u3078]" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s09_artifact_and_one_plan_catalogs_are_exact[scaffold_root0]" time="0.001" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s09_contract_rejects_missing_scope_path_mutation" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s09_contract_rejects_duplicate_scope_path_mutation" time="0.000" /><testcase classname="tests.unit.infra.test_authoring_kit_assets" name="test_s09_contract_rejects_planning_level_runtime_coupling_mutations[parser_symbols-coupling_value1]" time="0.000" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_source_path_forms_are_repo_root_based_and_privacy_classified[relative_external]" time="0.003" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_source_rejects_ineligible_leaf_without_blocking_or_destination_mutation[fifo]" time="0.001" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_source_regular_to_fifo_race_is_nonblocking_and_rejected" time="0.002" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_source_mutation_or_ancestor_retarget_fails_before_commit[unlink]" time="0.002" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_linux_explicit_import_uses_anonymous_staging_without_visible_probe_or_unlink" time="0.002" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_linux_missing_anonymous_staging_capability_fails_closed_without_named_fallback" time="0.001" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_capability_probe_never_unlinks_replacement_after_existing_check" time="0.001" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_cleanup_identity_or_type_uncertainty_retains_without_unlink[descriptor_type]" time="0.001" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_cleanup_replacement_after_reopen_is_detected_by_final_path_check" time="0.001" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_nonrace_publication_failure_is_precommit_and_no_formal_destination" time="0.002" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_precommit_faults_are_content_free_and_leave_no_formal_destination[hash-hash_failed-removed]" time="0.002" /><testcase classname="tests.unit.infra.test_binary_artifact_publisher" name="test_explicit_postcommit_faults_return_exact_warning_and_committed_identity[directory_fsync-directory_fsync_failed-removed]" time="0.002" /><testcase classname="tests.unit.infra.test_deps_reader_topology" name="test_load_issue_depends_on_map_expands_non_empty_epic_and_keeps_raw_context" time="0.009" /><testcase classname="tests.unit.infra.test_fake_gh_harness.TestFakeGhHarness" name="test_state_variations_use_minimal_fixture" time="0.294" /><testcase classname="tests.unit.infra.test_init_update" name="test_i370_legacy_marker_public_mapping_is_manual_and_write_free" time="4.384" /><testcase classname="tests.unit.infra.test_init_update" name="test_issue_368_recognized_handler_has_single_service_route" time="0.001" /><testcase classname="tests.unit.infra.test_init_update" name="test_issue_334_init_and_update_install_current_target_catalog_byte_exact" time="4.467" /><testcase classname="tests.unit.infra.test_init_update" name="test_issue_360_spec_dock_guidance_is_agent_first_and_not_present_only" time="0.001" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_fresh_init_creates_only_tracked_root_workbench_readme" time="4.344" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_init_prunes_legacy_node_deps_json_templates_from_stale_assets" time="4.415" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_blocks_modified_managed_content_before_pruning_legacy_artifacts" time="0.165" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs" time="2.884" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_active_none_reports_match_provider_assets" time="0.002" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_import_release_lock_backward_compat_parity" time="0.065" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity" time="0.071" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity" time="0.097" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_keeps_numeric_branch_current_repo_overlap_parity" time="0.087" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_issue_360_readme_catalog_excludes_historical_artifact_routes" time="0.001" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_init_fails_without_force_when_spec_dock_exists" time="4.482" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_keeps_initiatives_by_default" time="0.203" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_uninstall_apply_remove_specs_removes_empty_generated_roots_and_keeps_workspace_boundary" time="0.120" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_uninstall_apply_keep_specs_removes_tooling_and_preserves_spec_history" time="50.017" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_uninstall_apply_rejects_unmanaged_initiatives_only_target_before_mutation" time="0.003" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_uninstall_apply_partial_rmtree_failure_reports_failed_spec_history_separately" time="0.096" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_uninstall_dry_run_json_is_one_parseable_object" time="0.196" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_uninstall_accepts_recovery_target_when_scripts_are_missing" time="0.179" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_uninstall_blocks_unrecognized_specdock_version" time="0.162" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity" time="0.523" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_subprocess_keeps_readonly_lone_unscoped_without_backfill_parity" time="0.463" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_subprocess_import_partial_write_doctor_first_parity" time="0.400" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity" time="0.982" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_rebuilds_active_entrypoints_from_absolute_in_repository_manifest_paths" time="5.989" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken" time="6.084" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_falls_back_to_placeholder_when_persisted_path_points_to_same_layer_wrong_id" time="5.921" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty" time="5.587" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_regenerates_context_pack_from_persisted_active_manifest" time="5.478" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_symlinked_preserved_boundary_before_read[.agent-command0]" time="0.103" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_symlinked_preserved_boundary_before_read[initiatives-command0]" time="0.103" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_lexically_escaping_active_symlink_before_resolution[command0]" time="0.103" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_restores_missing_placeholder_directory_hierarchy[missing_relative1-command0]" time="5.757" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_symlinked_placeholder_boundary_before_reads[unsafe_relative0-command0]" time="0.099" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_symlinked_placeholder_boundary_before_reads[unsafe_relative2-command0]" time="0.115" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_revalidates_preserved_boundary_before_first_service_mutation[.work-command0]" time="0.201" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_revalidates_preserved_boundary_before_first_service_mutation[initiatives-command0]" time="0.197" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_revalidates_preserved_child_inventory_before_first_service_mutation[metadata-child-command0]" time="0.213" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_persisted_issue_path_through_initiatives_symlink_before_writes[direct-nested-in-repository-relative-command0]" time="0.113" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_persisted_issue_path_through_initiatives_symlink_before_writes[direct-escaping-relative-command0]" time="0.135" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_persisted_issue_path_through_initiatives_symlink_before_writes[alias-dotdot-nested-in-repository-relative-command0]" time="0.110" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_blocks_persisted_issue_path_through_initiatives_symlink_before_writes[alias-dotdot-escaping-relative-command0]" time="0.117" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_recognized_reconciliation_allows_untraversed_initiative_symlink[command0]" time="5.355" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails" time="5.536" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_blocks_unknown_active_path_files_even_with_valid_persisted_targets" time="0.190" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_prefers_real_pathfile_entrypoint_over_placeholder_symlink_when_manifest_is_stale" time="6.211" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_blocks_unknown_dangling_active_symlink_entrypoint" time="0.157" /><testcase classname="tests.unit.infra.test_init_update.TestInitUpdate" name="test_update_blocks_active_pointer_rebind_after_generated_asset_capture" time="0.052" /><testcase classname="tests.unit.infra.test_installer_workbench_resolver_opacity" name="test_manifest_target_accepts_direct_persisted_near_name_candidate" time="0.001" /><testcase classname="tests.unit.infra.test_issue_359_skill_helpers" name="test_issue_359_finalizer_rejects_parent_moved_after_open_without_external_write" time="0.026" /><testcase classname="tests.unit.infra.test_issue_359_skill_helpers" name="test_issue_359_identity_rejects_symlinked_artifacts_directory" time="0.025" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s20_current_catalog_bytes_are_not_duplicated_in_historical_manifest" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_blocked_assessment_cannot_issue_executable_authority" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_fresh_action_grammar_is_enforced_at_every_mutation_boundary[prune]" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_journal_prepare_records_bound_actions_before_target_mutation" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_journal_accepts_independent_nonprefix_leaf_progress" time="0.009" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_generated_state_replacement_before_classification_blocks_apply" time="0.005" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_generated_state_producer_rejects_malformed_nested_node_shape" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_contract_adopts_legacy_generated_entry_only_by_historical_exact_identity" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_assessment_has_no_independent_generated_asset_edge" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_preserve_hardlink_blocks_without_witness_or_safe_subset_authority" time="0.005" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_plan_rejects_forged_witness_and_digest_binds_semantic_metadata" time="0.005" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_no_op_apply_collapses_absence_without_protocol_metadata" time="0.006" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_missing_root_shortcut_appearance_blocks_completion" time="0.100" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_retry_resumes_each_nested_publish_checkpoint[.github/workflows-root-cleanup-expected_pending1]" time="0.109" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_completed_only_retries_journal_cleanup_without_target_replay" time="0.113" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_retry_reconstructs_publish_from_exact_absence[.github/workflows/ci.yml]" time="0.109" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_guard_only_resumes_from_semantic_equal_physical_root" time="0.117" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_deprovision_same_invocation_source_replacement_stops_before_target_write" time="0.118" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_legacy_marker_invalid_evidence_fails_closed_before_write[symlink-dry-run]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i370_legacy_marker_invalid_evidence_fails_closed_before_write[fifo-dry-run]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_standalone_directory_closed_set_rejects_unknown_child_after_checkpoint" time="0.054" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_journal_resume_rejects_binding_mismatch_without_rewrite[protocol_version-999-journal-protocol-incompatible]" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_target_identity[missing_fields0]" time="0.008" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_journal_resume_rejects_recomputed_digest_with_incomplete_post_parent_chain" time="0.008" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_created_parent_held_descriptor_rejects_unknown_child_before_target_write[regular]" time="0.016" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_preserved_validator_repeats_until_first_operation_owned_parent_mutation" time="0.150" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_journal_guard_is_rejected_by_the_legacy_marker_contract" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_journal_resume_requires_exact_schema_2_forward_guard[replaced]" time="0.004" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_forward_guard_publish_restores_raced_legacy_marker" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_fresh_completed_journal_does_not_reenter_for_newer_package" time="0.142" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_completed_journal_rejects_pending_actions" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_recognized_noop_does_not_prepare_a_journal" time="0.150" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_legacy_marker_conversion_is_limited_to_prewrite_state[managed-scaffold-refreshed-recovery_required]" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_admission_allows_only_terminal_journal_without_guard" time="0.154" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_legacy_conversion_failure_leaves_forward_only_guard_for_newer_retry" time="0.154" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_journal_publish_revalidates_exact_forward_guard" time="0.006" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_terminal_journal_finalizes_after_completed_prune_disappears_from_assessment" time="0.212" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_legacy_marker_quarantine_fsync_failure_restores_marker" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_published_recognized_upgrade_rejects_same_semantics_new_inode" time="0.085" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_fresh_workbench_retry_binds_exact_external_seed_identity[hard-link]" time="0.029" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_protocol1_completed_journal_only_cleans_up_semantic_state" time="0.142" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_zero_reserved_created_parent_stage_crash_recovery[mismatch-regular]" time="0.021" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_pending_create_stale_cleanup_roles_resume_before_action[backup-reserved-regular]" time="0.233" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_pending_create_stale_cleanup_roles_resume_before_action[backup-only-reserved-regular]" time="0.237" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_pending_create_stale_cleanup_roles_resume_before_action[gc-reserved-regular]" time="0.237" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_multi_name_gc_checkpoint_retry_converges[second-reservation-regular]" time="0.266" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_multi_name_gc_checkpoint_retry_converges[first-unlink-regular]" time="0.261" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_retained_gc_transition_graph_resumes_without_name_ordering[retained-rename-regular]" time="0.263" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_retained_gc_transition_graph_resumes_without_name_ordering[first-data-gc-unlink-regular]" time="0.265" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_gc_graph_forgery_is_rejected_before_namespace_mutation[duplicate-ordinal]" time="0.009" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_gc_graph_forgery_is_rejected_before_namespace_mutation[canonical-stage]" time="0.009" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_reserved_companion_requires_exact_named_predecessor[ordinal-two-unrelated-backup]" time="0.009" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_gc_backup_source_ambiguity_is_rejected_before_earlier_path_mutation" time="0.010" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_stale_cleanup_final_backup_unlink_revalidates_held_created_parent[regular]" time="0.056" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_abrupt_swap_requires_exact_post_swap_successor_lease" time="0.214" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_guard_write_ahead_crash_accepts_exact_journal_predecessor" time="0.008" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_digestless_prepared_journal_rejects_guard_inherited_lease_mismatch[regular]" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_digestless_schema_2_guard_rejects_executing_zero_lease_without_writes" time="0.010" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_digestless_guard_accepts_initial_inventory_after_owned_parent_mkdir_crash" time="0.005" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_roleless_backup_fixture_promotes_and_resumes[backup-only-stale-ctime]" time="0.190" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s20_invalid_historical_record_is_rejected[record3]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s20_invalid_historical_record_is_rejected[record7]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s20_invalid_historical_record_is_rejected[record11]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s20_protected_workspace_overlap_is_rejected[spec-dock/active/issue/requirement.md]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s20_nested_historical_records_cannot_overlap_current_or_each_other" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_fresh_required_directories_are_top_down_and_non_destructive" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_created_fresh_workspace_rejects_foreign_root_child_before_journal" time="0.011" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_protocol1_adopt_postcondition_guard_only_migrates_compatibility" time="0.152" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_fresh_legacy_later_phase_reassesses_and_converts_without_checkpoint_skip[current-external-materialized]" time="0.157" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_fresh_schema1_marker_rejects_newer_package_conversion" time="0.004" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s25_uninstall_missing_current_target_is_already_absent" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s25_update_upgrades_direct_historical_identity" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s25_trusted_manifest_can_prove_historical_current_path" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s25_historical_hard_link_is_blocked_for_mutation" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s25_current_hard_link_is_blocked_for_mutation[uninstall]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s25_current_hard_linked_shortcut_is_blocked_for_mutation[update-adopt]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_recognized_adopt_rejects_same_semantics_new_inode" time="0.046" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s25_historical_shortcut_record_proves_canonical_shortcut" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i369_fresh_checkpoints_are_bounded_by_phase_count" time="0.150" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_apply_rejects_provider_mode_change_after_plan" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_apply_recovers_when_rebind_record_and_cleanup_both_fail" time="0.006" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_historical_stage_identities_include_recognized_anchor" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_apply_upgrade_keeps_target_unchanged_when_staging_write_fails" time="0.004" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_apply_prunes_historical_target_without_following_symlink" time="0.005" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s55_unknown_or_unsafe_obsolete_target_blocks_before_mutation[modified-obsolete-identity-unknown]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_apply_blocks_root_rebind_after_preflight_before_parent_creation" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_apply_blocks_destination_appearance_without_overwrite" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_apply_upgrades_canonical_shortcut_with_no_replace_publish" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s30_symlink_upgrade_blocks_before_unlink_without_no_replace_support" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s35_admission_rejects_noncanonical_version_before_mutation[1.2.3\r\n-invalid-version]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s35_admission_rejects_anchor_mismatch_and_symlink_version" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_s35_retry_marker_authority_precedes_empty_workspace_fast_path" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_published_successor_rejects_same_byte_replacement_before_return[journal]" time="0.003" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_finalization_rejects_replacement_before_authority_reacquisition[False-journal]" time="0.006" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_checkpoint_rejects_same_bytes_different_inode_create_successor" time="0.009" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_displaced_quarantine_write_ahead_crash_retry_converges[reservation-after-symlink]" time="0.222" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_displaced_quarantine_write_ahead_crash_retry_converges[exact-before-symlink]" time="0.221" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_displaced_quarantine_write_ahead_crash_retry_converges[backup-link-after-symlink]" time="0.222" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_displaced_quarantine_write_ahead_crash_retry_converges[quarantine-unlink-after-symlink]" time="0.217" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_displaced_cleanup_revalidates_both_namespace_entries[regular]" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_quarantine_backup_preserves_replacement_and_restores_predecessor[post-unlink-canonical-regular]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_final_gc_preserves_exact_source_across_delete_interposition[unknown-child-regular]" time="0.001" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_final_retained_witness_is_not_unlinked_after_authority_interposition[unknown-child-regular]" time="0.002" /><testcase classname="tests.unit.infra.test_managed_distribution" name="test_i368_guard_conversion_failure_retains_legacy_predecessor" time="0.002" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_copies_broken_and_external_symlinks_as_link_objects" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_rejects_destination_directory_identity_swap_without_external_write" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_nested_mkdir_stays_in_held_parent_after_visible_parent_swap" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_rejects_source_child_directory_swap_before_destination_mutation" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_fails_closed_before_mutation_when_descriptor_capability_is_unavailable[_WORKBENCH_DIR_FD_SUPPORTED]" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_rejects_nested_destination_leaf_swap_before_unlink" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_regular_file_rejects_symlink_inserted_before_exclusive_create" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_type_collision_fails_without_removing_destination_data[directory]" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_guard_workbench_ancestry_rejects_each_symlink_component_without_touching_external[repo]" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_guard_workbench_ancestry_rejects_lexical_escape_before_external_inspection" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_mid_copy_fault_reports_mutation_started_without_rollback" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_cli_workbench" name="test_copy_workbench_failed_symlink_creation_reports_no_mutation" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_fs_repo_workbench_opacity" name="test_current_metadata_outside_workbench_remains_strict" time="0.001" /><testcase classname="tests.unit.infra.test_runtime_template_scaffolder" name="test_copy_scaffolded_tree_uses_exact_copy_for_unchanged_utf8_bytes" time="0.001" /><testcase classname="tests.unit.presentation.test_artifact_import_file" name="test_file_import_success_json_uses_exact_public_allowlist" time="0.000" /><testcase classname="tests.unit.presentation.test_deps_raw_puml" name="test_tc_s02_001_issue_to_issue_edge_with_ancestors" time="0.000" /><testcase classname="tests.unit.presentation.test_deps_raw_puml" name="test_tc_s04_003_high_level_participant_state_comes_from_payload" time="0.000" /><testcase classname="tests.unit.presentation.test_deps_raw_puml" name="test_tc_s04_004_done_dependency_is_omitted_from_active_raw_view" time="0.000" /><testcase classname="tests.unit.presentation.test_deps_raw_puml" name="test_tc_s04_008_satisfied_high_level_source_dependency_with_raw_context_only_renders_active_edge" time="0.000" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_tc_s04_001_003_adr_collection_never_opens_generic_artifact_body" time="0.006" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_builds_flat_adr_mirror_symlinks_on_success" time="0.011" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_symlink_probe_preserves_existing_repo_files_with_legacy_probe_name" time="0.009" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_uses_specdock_dir_for_probe_when_existing_adrs_dir_is_not_probe_writable" time="0.009" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_active_update_probe_failure_is_non_atomic" time="0.005" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_deps_cycle_fail_fast_regression" time="0.003" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key" time="0.008" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage[missing_repo_owner-force_false]" time="0.003" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage[blank_repo_name-force_false]" time="0.003" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_does_not_mix_snapshots_when_current_and_foreign_share_same_issue_number" time="0.009" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_does_not_fallback_to_same_number_other_repo_snapshot_in_json" time="0.009" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_prewrite_render_failure_keeps_symlink_warning_in_failed_before_write_result" time="0.007" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_exit_behavior_regression" time="0.006" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_tc_s06_002_deps_fatal_github_warning_is_post_sync_failure_guidance" time="0.000" /><testcase classname="tests.unit.presentation.test_runtime_sync_s07.TestRuntimeSyncS07" name="test_sync_github_keeps_foreign_coexistence_only_legacy_unscoped_without_backfill" time="0.006" /><testcase classname="tests.unit.presentation.test_workbench" name="test_workbench_copy_failure_output_is_content_free_and_noncanonical" time="0.000" /><testcase classname="tests.unit.test_provider_test_lanes" name="test_full_regression_phase_budget_cannot_extend_the_total_deadline" time="0.000" /><testcase classname="tests.unit.test_provider_test_lanes" name="test_full_regression_leader_exit_cannot_leave_stdout_descendant[silent]" time="0.274" /><testcase classname="tests.unit.test_provider_test_lanes" name="test_full_regression_weighted_shards_spread_known_slow_nodes" time="0.001" /><testcase classname="tests.unit.test_provider_test_lanes" name="test_focused_collection_does_not_require_global_inventory" time="0.098" /><testcase classname="tests.unit.test_provider_test_lanes" name="test_dynamic_lane_markers_are_visible_to_marker_selection" time="0.193" /><testcase classname="tests.unit.test_provider_test_lanes" name="test_full_permission_preserves_legitimate_outcomes_and_heavy_failure" time="0.404" /><testcase classname="tests.unit.test_static_analysis_script" name="test_static_analysis_script_summarizes_failure_and_runs_later_phases" time="0.314" /></testsuite></testsuites>
