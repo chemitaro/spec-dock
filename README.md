@@ -174,9 +174,27 @@ Notes:
   the marker and stage are preserved for manual diagnosis. Malformed, later-phase, cross-root,
   different-operation, downgrade, incompatible-package, unknown-stage, or dual recovery state is
   rejected without rewriting recovery authority.
-- `uninstall` is dry-run by default. `--apply` requires a complete ownership-safe plan; partial
-  failures retain `.uninstall-retry.json` until post-verification succeeds, and `--remove-specs` is
-  required before spec history is deleted. `--keep-specs` preserves initiatives and unknown content.
+- Managed distribution deprovision is the default/`--keep-specs` uninstall owner. Dry-run performs a
+  complete read-only assessment; apply uses a schema-2 forward guard in
+  `spec-dock/.distribution-retry.json` and a protocol-2 journal in
+  `spec-dock/.distribution-journal.json`. Recovery is forward-only and resumes only the same root,
+  intent, authority, contract, plan, and protocol with the same or a semantically compatible newer
+  package.
+- Generated `spec-dock/active` and `spec-dock/.agent` entries are removable only when the single
+  runtime-derived producer proves their current identity. Unknown, modified, legacy, conflicting,
+  hard-linked, or special entries block every mutation and remain preserved. Proven-owned absent
+  subtrees collapse to one surviving-ancestor witness; a completely absent managed subtree completes
+  without writing protocol metadata.
+- Directory publication is bottom-up and depends on exact immediate-child absence. The journal moves
+  through prepared, executing, verifying, and an atomic verified/completed terminal publication.
+  Public fields come only from the typed `DistributionProcessResult`; the CLI does not interpret
+  journal files. Those fields include phase, checkpoint, failed/pending paths, and action/top-level
+  errors.
+- A legacy `.uninstall-retry.json` is never converted automatically because it proves no root, specs
+  mode, plan, or checkpoint. It is preserved for manual recovery. `--keep-specs` preserves initiatives,
+  Workbench data, and unknown content. `--remove-specs` remains a separate compatibility authority for Issue 371
+  and is required before spec history is deleted; neither route upgrades recovery authority into the
+  other.
 - `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
   installer update command by running
   `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>`.
