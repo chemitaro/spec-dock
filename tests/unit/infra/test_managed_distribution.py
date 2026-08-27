@@ -4981,6 +4981,234 @@ def test_i370_leaf_prune_rejects_unknown_nested_parent_sibling_after_reservation
     assert checkpoint_calls == 0
 
 
+@pytest.mark.parametrize("sibling_kind", ["regular", "symlink"])
+def test_i370_leaf_prune_rejects_unknown_nonremovable_parent_sibling_after_reservation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    sibling_kind: str,
+) -> None:
+    """I370-T-RACE-001: a non-removable bounded parent still has a namespace witness."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(
+        tmp_path / "manifest",
+        _manifest_with(
+            recognized_workspace_versions=[{"version": "1.2.3", "anchors": []}],
+        ),
+    )
+    target_root = tmp_path / "consumer"
+    specdock = target_root / "spec-dock"
+    specdock.mkdir(parents=True)
+    target = specdock / "spec-dock.version"
+    target.write_text("1.2.3\n", encoding="ascii")
+    sibling = specdock / "external-sibling"
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    journal_path = specdock / ".distribution-journal.json"
+    marker_path = specdock / ".distribution-retry.json"
+    original_record = OperationJournalStore.record_staging_lease
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_remove = managed_distribution._remove_distribution_target_if_bound
+    original_unlink = managed_distribution.os.unlink
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    injected = False
+    post_reservation_state: tuple[bytes, bytes] | None = None
+    target_rename_calls = 0
+    leaf_parent_fd: int | None = None
+    leaf_unlink_calls = 0
+    checkpoint_calls = 0
+
+    def inject_unknown_sibling(self, journal, lease):
+        nonlocal injected, post_reservation_state
+        updated = original_record(self, journal, lease)
+        if (
+            not injected
+            and lease.path == "spec-dock/spec-dock.version"
+            and lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+        ):
+            injected = True
+            if sibling_kind == "regular":
+                sibling.write_bytes(b"user-owned\n")
+            else:
+                sibling.symlink_to("user-owned-target")
+            post_reservation_state = (journal_path.read_bytes(), marker_path.read_bytes())
+        return updated
+
+    def count_rename(*args, **kwargs):
+        nonlocal target_rename_calls
+        if args[1] == target.name and args[3] != target.name:
+            target_rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    def count_remove(*args, **kwargs):
+        nonlocal leaf_parent_fd
+        leaf_parent_fd = args[0]
+        return original_remove(*args, **kwargs)
+
+    def count_unlink(path, *args, **kwargs):
+        nonlocal leaf_unlink_calls
+        if kwargs.get("dir_fd") == leaf_parent_fd:
+            leaf_unlink_calls += 1
+        return original_unlink(path, *args, **kwargs)
+
+    def count_checkpoint(self, journal, completed_paths):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(self, journal, completed_paths)
+
+    target_before = (target.lstat(), target.read_bytes())
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", inject_unknown_sibling)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_rename)
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", count_remove)
+    monkeypatch.setattr(managed_distribution.os, "unlink", count_unlink)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert post_reservation_state is not None
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-required"
+    assert target.lstat() == target_before[0]
+    assert target.read_bytes() == target_before[1]
+    assert sibling.is_symlink() if sibling_kind == "symlink" else sibling.is_file()
+    assert (
+        sibling.readlink() == Path("user-owned-target")
+        if sibling_kind == "symlink"
+        else sibling.read_bytes() == b"user-owned\n"
+    )
+    assert "spec-dock" in result.failed_paths
+    assert journal_path.read_bytes() == post_reservation_state[0]
+    assert marker_path.read_bytes() == post_reservation_state[1]
+    assert target_rename_calls == 0
+    assert leaf_unlink_calls == 0
+    assert checkpoint_calls == 0
+
+
+@pytest.mark.parametrize("replacement_kind", ["regular", "symlink"])
+def test_i370_leaf_prune_rejects_known_sibling_identity_replacement_after_reservation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement_kind: str,
+) -> None:
+    """I370-T-RACE-001: an existing removable parent compares sibling identity, not names."""
+
+    install_root = _minimal_install_root(tmp_path, b"first-managed\n")
+    second_source = install_root / ".github" / "workflows" / "second.yml"
+    second_source.write_bytes(b"second-managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    target_parent = target_root / ".github" / "workflows"
+    target_parent.mkdir(parents=True)
+    target = target_parent / "ci.yml"
+    sibling = target_parent / "second.yml"
+    target.write_bytes(b"first-managed\n")
+    sibling.write_bytes(b"second-managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    original_record = OperationJournalStore.record_staging_lease
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_remove = managed_distribution._remove_distribution_target_if_bound
+    original_unlink = managed_distribution.os.unlink
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    injected = False
+    post_reservation_state: tuple[bytes, bytes] | None = None
+    target_rename_calls = 0
+    leaf_parent_fd: int | None = None
+    leaf_unlink_calls = 0
+    checkpoint_calls = 0
+
+    def replace_known_sibling(self, journal, lease):
+        nonlocal injected, post_reservation_state
+        updated = original_record(self, journal, lease)
+        if (
+            not injected
+            and lease.path == ".github/workflows/ci.yml"
+            and lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+        ):
+            injected = True
+            sibling.unlink()
+            if replacement_kind == "regular":
+                sibling.write_bytes(b"rebound-identity\n")
+            else:
+                sibling.symlink_to("external-target")
+            post_reservation_state = (journal_path.read_bytes(), marker_path.read_bytes())
+        return updated
+
+    def count_rename(*args, **kwargs):
+        nonlocal target_rename_calls
+        if args[1] == target.name and args[3] != target.name:
+            target_rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    def count_remove(*args, **kwargs):
+        nonlocal leaf_parent_fd
+        leaf_parent_fd = args[0]
+        return original_remove(*args, **kwargs)
+
+    def count_unlink(path, *args, **kwargs):
+        nonlocal leaf_unlink_calls
+        if kwargs.get("dir_fd") == leaf_parent_fd:
+            leaf_unlink_calls += 1
+        return original_unlink(path, *args, **kwargs)
+
+    def count_checkpoint(self, journal, completed_paths):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(self, journal, completed_paths)
+
+    target_before = (target.lstat(), target.read_bytes())
+    sibling_before = (sibling.lstat(), sibling.read_bytes())
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", replace_known_sibling)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_rename)
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", count_remove)
+    monkeypatch.setattr(managed_distribution.os, "unlink", count_unlink)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert post_reservation_state is not None
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-required"
+    assert target.lstat() == target_before[0]
+    assert target.read_bytes() == target_before[1]
+    if replacement_kind == "regular":
+        assert sibling.read_bytes() == b"rebound-identity\n"
+    else:
+        assert sibling.is_symlink()
+        assert sibling.readlink() == Path("external-target")
+    assert sibling.lstat() != sibling_before[0]
+    assert ".github/workflows" in result.failed_paths
+    assert journal_path.read_bytes() == post_reservation_state[0]
+    assert marker_path.read_bytes() == post_reservation_state[1]
+    assert target_rename_calls == 0
+    assert leaf_unlink_calls == 0
+    assert checkpoint_calls == 0
+
+
 def test_i370_deprovision_guard_only_resumes_from_semantic_equal_physical_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
