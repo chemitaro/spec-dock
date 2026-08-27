@@ -4457,11 +4457,11 @@ def test_i370_zero_predecessor_reservation_collision_is_not_operation_owned(
 
     assert injected is True
     assert first.status == "recovery_required"
-    target_stat = target.lstat()
     target_payload = target.read_bytes() if target_kind == "regular" else target.readlink()
+    target_stat = target.lstat()
     stage = next(target.parent.glob(".spec-dock-*"))
-    stage_stat = stage.lstat()
     stage_payload = stage.read_bytes() if target_kind == "regular" else stage.readlink()
+    stage_stat = stage.lstat()
     journal_path = target_root / "spec-dock" / ".distribution-journal.json"
     marker_path = target_root / "spec-dock" / ".distribution-retry.json"
     journal_before = journal_path.read_bytes()
@@ -4497,10 +4497,10 @@ def test_i370_zero_predecessor_reservation_collision_is_not_operation_owned(
 
     assert retry.status == "recovery_required"
     assert retry.reason == "deprovision-recovery-mismatch"
-    assert target.lstat() == target_stat
     assert (target.read_bytes() if target_kind == "regular" else target.readlink()) == target_payload
-    assert stage.lstat() == stage_stat
+    assert target.lstat() == target_stat
     assert (stage.read_bytes() if target_kind == "regular" else stage.readlink()) == stage_payload
+    assert stage.lstat() == stage_stat
     assert journal_path.read_bytes() == journal_before
     assert marker_path.read_bytes() == marker_before
     assert remove_calls == 0
