@@ -13,6 +13,7 @@ import ctypes
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 import errno
+from functools import partial
 import hashlib
 import json
 import os
@@ -10439,6 +10440,14 @@ class OperationJournalStore:
         journal: OperationJournal,
         lease: DistributionStageOwnership,
     ) -> OperationJournal:
+        # A retry re-emits the durable zero lease before its no-replace rename.
+        # Do not rewrite the journal/forward guard in that window.
+        if (
+            lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+            and lease in journal.staging_leases
+        ):
+            return journal
         backup_roles = {
             "backup-reserved",
             "backup-dual",
@@ -16608,6 +16617,28 @@ def _new_distribution_stage_name(path: str, identity: DistributionIdentity) -> s
     return f"{_distribution_stage_name(path, identity)}-{secrets.token_hex(16)}"
 
 
+def _reusable_predecessor_stage_name(
+    operation: DistributionOperation,
+    action: DistributionAction,
+    stage_ownership: tuple[DistributionStageOwnership, ...],
+) -> str | None:
+    """Reuse a deprovision prune's exact zero-identity reservation pathname."""
+
+    if operation != "uninstall" or action.action != "prune":
+        return None
+    path = action.path
+    leases = tuple(
+        lease
+        for lease in stage_ownership
+        if lease.path == path
+        and lease.role == "predecessor-quarantine"
+        and lease.device == lease.inode == lease.ctime_ns == 0
+    )
+    if len(leases) > 1:
+        raise DistributionApplyError("journal-precondition-mismatch")
+    return leases[0].stage_name if leases else None
+
+
 def _matches_distribution_stage_name(name: str, path: str, identity: DistributionIdentity) -> bool:
     prefix = _distribution_stage_name(path, identity)
     return name == prefix or name.startswith(f"{prefix}-")
@@ -17015,6 +17046,7 @@ def _apply_regular_action(
     before_mutation: Callable[[], None] | None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None,
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None,
+    reusable_predecessor_stage_name: str | None,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
@@ -17202,7 +17234,9 @@ def _apply_regular_action(
                     held_fd=fd,
                     identity_message=f"managed target identity changed for '{path}'",
                     transition_path=path,
-                    transition_name=_new_distribution_stage_name(path, target_identity),
+                    transition_name=(
+                        reusable_predecessor_stage_name or _new_distribution_stage_name(path, target_identity)
+                    ),
                     transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
                     mutation_validator=validate_held_namespace,
                 )
@@ -17469,6 +17503,7 @@ def _apply_symlink_action(
     before_mutation: Callable[[], None] | None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None,
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None,
+    reusable_predecessor_stage_name: str | None,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
@@ -17619,7 +17654,10 @@ def _apply_symlink_action(
                 latest_stat,
                 identity_message=f"managed target identity changed for '{action.path}'",
                 transition_path=action.path,
-                transition_name=_new_distribution_stage_name(action.path, snapshot.target.identity),
+                transition_name=(
+                    reusable_predecessor_stage_name
+                    or _new_distribution_stage_name(action.path, snapshot.target.identity)
+                ),
                 transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
                 mutation_validator=validate_held_namespace,
             )
@@ -17855,6 +17893,7 @@ def _apply_distribution_action(
     before_mutation: Callable[[], None] | None = None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None = None,
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None = None,
+    reusable_predecessor_stage_name: str | None = None,
 ) -> None:
     if action.action in {"adopt", "preserve"}:
         return
@@ -17960,6 +17999,7 @@ def _apply_distribution_action(
             before_mutation=before_mutation,
             held_parent_validator=held_parent_validator,
             first_target_mutation_validator=first_target_mutation_validator,
+            reusable_predecessor_stage_name=reusable_predecessor_stage_name,
         )
         return
     if expected is None and target_kind == "symlink":
@@ -17980,6 +18020,7 @@ def _apply_distribution_action(
             before_mutation=before_mutation,
             held_parent_validator=held_parent_validator,
             first_target_mutation_validator=first_target_mutation_validator,
+            reusable_predecessor_stage_name=reusable_predecessor_stage_name,
         )
         return
     if expected is None and target_kind != "regular":
@@ -17998,6 +18039,7 @@ def _apply_distribution_action(
         before_mutation=before_mutation,
         held_parent_validator=held_parent_validator,
         first_target_mutation_validator=first_target_mutation_validator,
+        reusable_predecessor_stage_name=reusable_predecessor_stage_name,
     )
 
 
@@ -18205,11 +18247,23 @@ def apply_distribution_plan(
                         created_parent_bindings_by_path,
                     )
                 if action.action not in {"adopt", "preserve"}:
+                    reusable_stage_name = _reusable_predecessor_stage_name(
+                        plan.operation,
+                        action,
+                        stage_ownership,
+                    )
+                    if reusable_stage_name is None:
+                        invoke_distribution_action = _apply_distribution_action
+                    else:
+                        invoke_distribution_action = partial(
+                            _apply_distribution_action,
+                            reusable_predecessor_stage_name=reusable_stage_name,
+                        )
                     if before_mutation is not None:
                         before_mutation()
                     if stage_ownership_recorder is None and created_parent_recorder is None:
                         if before_mutation is None:
-                            _apply_distribution_action(
+                            invoke_distribution_action(
                                 plan,
                                 target_root,
                                 action,
@@ -18217,7 +18271,7 @@ def apply_distribution_plan(
                                 created_parent_bindings_by_path,
                             )
                         else:
-                            _apply_distribution_action(
+                            invoke_distribution_action(
                                 plan,
                                 target_root,
                                 action,
@@ -18229,7 +18283,7 @@ def apply_distribution_plan(
                             )
                     elif stage_ownership_recorder is None:
                         if before_mutation is None:
-                            _apply_distribution_action(
+                            invoke_distribution_action(
                                 plan,
                                 target_root,
                                 action,
@@ -18238,7 +18292,7 @@ def apply_distribution_plan(
                                 created_parent_recorder=created_parent_recorder,
                             )
                         else:
-                            _apply_distribution_action(
+                            invoke_distribution_action(
                                 plan,
                                 target_root,
                                 action,
@@ -18250,7 +18304,7 @@ def apply_distribution_plan(
                                 first_target_mutation_validator=first_target_mutation_validator,
                             )
                     elif before_mutation is None:
-                        _apply_distribution_action(
+                        invoke_distribution_action(
                             plan,
                             target_root,
                             action,
@@ -18261,7 +18315,7 @@ def apply_distribution_plan(
                             write_ahead_stage_reservations,
                         )
                     else:
-                        _apply_distribution_action(
+                        invoke_distribution_action(
                             plan,
                             target_root,
                             action,
