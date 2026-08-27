@@ -9438,9 +9438,16 @@ class OperationJournalStore:
         self._anchor_digestless_initial_journal(journal, plan)
         self._assert_guard_anchors_journal(journal)
         journal = self._migrate_legacy_protocol_journal(journal, plan.distribution_plan)
+        if journal.intent == "deprovision":
+            self._leaf_mutation_validator = _deprovision_recovery_leaf_mutation_validator(
+                self,
+                journal,
+                forward_guard=self._forward_guard,
+            )
         journal = self._resume_displaced_quarantine_cleanup(
             journal,
             {action.path for action in journal.actions if action.checkpoint != "pending"},
+            leaf_mutation_validator=self._leaf_mutation_validator,
         )
         return journal
 
@@ -9485,9 +9492,16 @@ class OperationJournalStore:
                     _resume_executable_plan(assessment, journal),
                 )
             self._assert_guard_anchors_journal(journal)
+            if journal.intent == "deprovision":
+                self._leaf_mutation_validator = _deprovision_recovery_leaf_mutation_validator(
+                    self,
+                    journal,
+                    forward_guard=self._forward_guard,
+                )
             journal = self._resume_displaced_quarantine_cleanup(
                 journal,
                 {action.path for action in journal.actions if action.checkpoint != "pending"},
+                leaf_mutation_validator=self._leaf_mutation_validator,
             )
         journal = self._migrate_legacy_protocol_journal(journal, assessment.distribution_plan)
         return journal
@@ -9598,6 +9612,10 @@ class OperationJournalStore:
         completed_paths: tuple[str, ...],
     ) -> OperationJournal:
         leaf_mutation_validator = self._leaf_mutation_validator
+        if journal.intent == "deprovision" and leaf_mutation_validator is None:
+            raise DistributionApplyError("journal-precondition-mismatch")
+        if journal.intent == "deprovision":
+            _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
         completed = set(completed_paths)
         persisted = self._read(journal.root_identity)
         self._assert_guard_anchors_journal(persisted)
@@ -9607,11 +9625,46 @@ class OperationJournalStore:
             or persisted.plan_digest != journal.plan_digest
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
+
+        def validate_pending_checkpoint_boundaries(active: OperationJournal) -> None:
+            if leaf_mutation_validator is None:
+                return
+            directory_mutation_validator = _deprovision_recovery_directory_mutation_validator(
+                self,
+                active,
+                forward_guard=self._forward_guard,
+            )
+            for record in active.actions:
+                if record.checkpoint != "pending" or record.path not in completed:
+                    continue
+                try:
+                    parent_chain = _open_distribution_parent_chain(
+                        self.target_root,
+                        record.path,
+                        create_missing=False,
+                    )
+                except DistributionApplyError as exc:
+                    raise DistributionApplyError(
+                        "deprovision-visible-parent-chain-mismatch",
+                        failed_paths=(PurePosixPath(record.path).parent.as_posix(),),
+                    ) from exc
+                try:
+                    validator = (
+                        directory_mutation_validator
+                        if record.action == "remove-empty-directory"
+                        else leaf_mutation_validator
+                    )
+                    validator(record.path, parent_chain)
+                finally:
+                    _close_distribution_parent_chain(parent_chain)
+
+        validate_pending_checkpoint_boundaries(persisted)
         active = self._resume_displaced_quarantine_cleanup(
             persisted,
             completed,
             leaf_mutation_validator=leaf_mutation_validator,
         )
+        validate_pending_checkpoint_boundaries(active)
         records = {record.path: record for record in journal.actions}
         cleanup_transitions: dict[
             str,
@@ -9795,6 +9848,17 @@ class OperationJournalStore:
                     nonlocal active
                     active = self.record_staging_lease(active, updated)
 
+                cleanup_leaf_validator: Callable[[], None] | None = None
+                if leaf_mutation_validator is not None:
+
+                    def validate_cleanup_leaf(
+                        bound_path: str = lease.path,
+                        bound_chain: tuple[int, ...] = parent_chain,
+                    ) -> None:
+                        leaf_mutation_validator(bound_path, bound_chain)
+
+                    cleanup_leaf_validator = validate_cleanup_leaf
+
                 _remove_distribution_stage_if_owned(
                     parent_chain[-1],
                     lease.stage_name,
@@ -9810,6 +9874,8 @@ class OperationJournalStore:
                     ),
                     stage_condition=(cleanup_transitions[lease.path][1] if lease.path in cleanup_transitions else None),
                     transition_recorder=(record_cleanup_transition if lease.path in cleanup_transitions else None),
+                    mutation_validator=cleanup_leaf_validator,
+                    post_link_mutation_validator=cleanup_leaf_validator,
                 )
             finally:
                 _close_distribution_parent_chain(parent_chain)
@@ -9859,7 +9925,11 @@ class OperationJournalStore:
                     def validate_prune_backup_gc(
                         bound_parent_fd: int = parent_fd,
                         bound_target_name: str = target_name,
+                        bound_path: str = lease.path,
+                        bound_parent_chain: tuple[int, ...] = parent_chain,
                     ) -> None:
+                        if leaf_mutation_validator is not None:
+                            leaf_mutation_validator(bound_path, bound_parent_chain)
                         if _stat_optional_no_follow(bound_parent_fd, bound_target_name) is not None:
                             raise DistributionApplyError("managed staging cleanup failed")
 
@@ -9883,9 +9953,12 @@ class OperationJournalStore:
                         bound_parent_fd: int = parent_fd,
                         bound_target_name: str = target_name,
                         bound_path: str = lease.path,
+                        bound_parent_chain: tuple[int, ...] = parent_chain,
                         bound_successor: DistributionStageOwnership = successors[0],
                         bound_postcondition: dict[str, object] = bound_postcondition,
                     ) -> None:
+                        if leaf_mutation_validator is not None:
+                            leaf_mutation_validator(bound_path, bound_parent_chain)
                         self._assert_exact_canonical_successor(
                             bound_parent_fd,
                             bound_target_name,
@@ -9906,6 +9979,7 @@ class OperationJournalStore:
                     backup,
                     strict=True,
                     mutation_validator=validate_backup_gc,
+                    post_link_mutation_validator=(validate_backup_gc if leaf_mutation_validator is not None else None),
                     gc_path=lease.path,
                     gc_recorder=record_backup_gc,
                 )
@@ -9968,8 +10042,53 @@ class OperationJournalStore:
     ) -> OperationJournal:
         """Finish a write-ahead predecessor quarantine without losing its successor lease."""
 
+        if journal.intent == "deprovision" and leaf_mutation_validator is None:
+            raise DistributionApplyError("journal-precondition-mismatch")
+
+        def validate_roleless_backup_parents(active_journal: OperationJournal) -> None:
+            if active_journal.intent != "deprovision":
+                return
+            # Legacy roleless backup promotion writes a new journal lease.  It
+            # must be preceded by the same root/parent attachment proof as a
+            # leaf mutation so a rebound parent cannot first alter recovery
+            # metadata and only then fail at the next cleanup boundary.
+            for quarantine in tuple(
+                lease for lease in active_journal.staging_leases if lease.role == "predecessor-quarantine"
+            ):
+                backup_name = _distribution_quarantine_backup_name(quarantine.stage_name)
+                explicit_backups = tuple(
+                    lease
+                    for lease in active_journal.staging_leases
+                    if lease.path == quarantine.path
+                    and lease.stage_name == backup_name
+                    and lease.role in {"backup-reserved", "backup-dual", "backup-only-reserved", "backup-only"}
+                )
+                if explicit_backups:
+                    continue
+                parent_chain = _open_distribution_parent_chain(
+                    self.target_root,
+                    quarantine.path,
+                    create_missing=False,
+                )
+                try:
+                    if _stat_optional_no_follow(parent_chain[-1], backup_name) is not None:
+                        _assert_deprovision_recovery_parent_attachment(
+                            self,
+                            active_journal,
+                            quarantine.path,
+                            parent_chain,
+                            forward_guard=self._forward_guard,
+                        )
+                finally:
+                    _close_distribution_parent_chain(parent_chain)
+
+        validate_roleless_backup_parents(journal)
         active = self._resume_gc_cleanup(journal, leaf_mutation_validator=leaf_mutation_validator)
-        active = self._promote_roleless_backup_leases(active)
+        validate_roleless_backup_parents(active)
+        active = self._promote_roleless_backup_leases(
+            active,
+            leaf_mutation_validator=leaf_mutation_validator,
+        )
         records = {record.path: record for record in active.actions}
         quarantine_leases = tuple(
             lease
@@ -10040,11 +10159,7 @@ class OperationJournalStore:
                     bound_parent_chain: tuple[int, ...] = parent_chain,
                 ) -> None:
                     if leaf_mutation_validator is not None:
-                        _assert_visible_distribution_chain_exactly_bound(
-                            self.target_root,
-                            bound_path,
-                            bound_parent_chain,
-                        )
+                        leaf_mutation_validator(bound_path, bound_parent_chain)
 
                 def validate_canonical_authority(
                     bound_record: OperationJournalAction = record,
@@ -10248,6 +10363,9 @@ class OperationJournalStore:
                             transition_recorder=record_transition,
                             canonical_validator=validate_canonical_authority,
                             mutation_validator=validate_leaf_boundary,
+                            post_link_mutation_validator=(
+                                validate_leaf_boundary if leaf_mutation_validator is not None else None
+                            ),
                         )
                     else:
                         assert successor is not None
@@ -10264,6 +10382,9 @@ class OperationJournalStore:
                             transition_name=quarantine_lease.stage_name,
                             transition_recorder=record_transition,
                             mutation_validator=validate_leaf_boundary,
+                            post_link_mutation_validator=(
+                                validate_leaf_boundary if leaf_mutation_validator is not None else None
+                            ),
                         )
                 elif quarantine_info is not None:
                     dual_backup = next(
@@ -10353,6 +10474,9 @@ class OperationJournalStore:
                         quarantine_info,
                         canonical_validator=validate_canonical_for_unlink,
                         mutation_validator=validate_leaf_boundary,
+                        post_link_mutation_validator=(
+                            validate_leaf_boundary if leaf_mutation_validator is not None else None
+                        ),
                         allow_existing_backup=True,
                         backup_recorder=record_transition,
                         transition_path=quarantine_lease.path,
@@ -10411,6 +10535,9 @@ class OperationJournalStore:
                         backup,
                         strict=True,
                         mutation_validator=validate_backup_gc,
+                        post_link_mutation_validator=(
+                            validate_backup_gc if leaf_mutation_validator is not None else None
+                        ),
                         gc_path=quarantine_lease.path,
                         gc_recorder=record_transition,
                     )
@@ -10452,6 +10579,8 @@ class OperationJournalStore:
     ) -> OperationJournal:
         """Finish journal-owned private-name GC before any target action resumes."""
 
+        if journal.intent == "deprovision" and leaf_mutation_validator is None:
+            raise DistributionApplyError("journal-precondition-mismatch")
         _assert_gc_transition_graph(journal)
         active = journal
         records = {record.path: record for record in active.actions}
@@ -10676,6 +10805,9 @@ class OperationJournalStore:
                         original,
                         strict=True,
                         mutation_validator=validate_gc_mutation,
+                        post_link_mutation_validator=(
+                            validate_gc_mutation if leaf_mutation_validator is not None else None
+                        ),
                         gc_path=gc_lease.path,
                         gc_recorder=record_gc,
                         gc_name=gc_lease.stage_name,
@@ -10908,7 +11040,12 @@ class OperationJournalStore:
             active = self.write(replace(active, staging_leases=retained), predecessor=active)
         return active
 
-    def _promote_roleless_backup_leases(self, journal: OperationJournal) -> OperationJournal:
+    def _promote_roleless_backup_leases(
+        self,
+        journal: OperationJournal,
+        *,
+        leaf_mutation_validator: Callable[[str, tuple[int, ...]], None] | None = None,
+    ) -> OperationJournal:
         """Upgrade prior roleless backup records only from their exact namespace state."""
 
         active = journal
@@ -10992,6 +11129,10 @@ class OperationJournalStore:
                     file_type=quarantine.file_type,
                     role=role,
                 )
+                if journal.intent == "deprovision":
+                    if leaf_mutation_validator is None:
+                        raise DistributionApplyError("journal-precondition-mismatch")
+                    leaf_mutation_validator(quarantine.path, parent_chain)
             finally:
                 _close_distribution_parent_chain(parent_chain)
             retained = tuple(item for item in active.staging_leases if not roleless or item is not legacy)
@@ -11006,6 +11147,8 @@ class OperationJournalStore:
         journal: OperationJournal,
         lease: DistributionStageOwnership,
     ) -> OperationJournal:
+        if journal.intent == "deprovision":
+            _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
         # A retry re-emits the durable zero lease before its no-replace rename.
         # Do not rewrite the journal/forward guard in that window.
         if (
@@ -11345,10 +11488,14 @@ class OperationJournalStore:
     def remove_legacy_marker(self, marker: DistributionRetryMarker) -> None:
         if marker.target_root != _root_identity_for_assessment(self.target_root):
             raise DistributionApplyError("journal-root-mismatch")
-        if marker.purpose in {
-            _DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
-            _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE,
-        }:
+        if (
+            marker.purpose
+            in {
+                _DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
+                _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE,
+            }
+            or marker.purpose == _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE
+        ):
             self._assert_current_forward_guard(marker)
         else:
             current = _read_distribution_retry_marker(self.target_root)
@@ -14330,6 +14477,7 @@ def _assert_deprovision_leaf_parent_namespace(
     forward_guard: DistributionRetryMarker | None = None,
     durably_quarantined_paths: frozenset[str] = frozenset(),
     owned_zero_predecessor_paths: frozenset[str] = frozenset(),
+    pending_absent_paths: frozenset[str] = frozenset(),
 ) -> None:
     """Reject any semantic immediate-child namespace change before a leaf mutation."""
 
@@ -14484,6 +14632,9 @@ def _assert_deprovision_leaf_parent_namespace(
     for quarantined_path in durably_quarantined_paths:
         if PurePosixPath(quarantined_path).parent.as_posix() == parent_path:
             expected_entries.pop(quarantined_path, None)
+    for absent_path in pending_absent_paths:
+        if PurePosixPath(absent_path).parent.as_posix() == parent_path:
+            expected_entries.pop(absent_path, None)
 
     expected_semantics = {
         relative_path: _directory_child_semantic_payload(
@@ -15051,6 +15202,287 @@ def _validate_deprovision_recovery_leaf_parent_namespaces(
             _close_distribution_parent_chain(parent_chain)
 
 
+def _assert_deprovision_recovery_marker_bound(
+    store: OperationJournalStore,
+    expected_guard: DistributionRetryMarker | None,
+) -> None:
+    """Require the live retry marker to remain the held deprovision guard."""
+
+    current_guard = store._forward_guard
+    if expected_guard is None or current_guard is None:
+        raise DistributionApplyError("dual-recovery-state")
+    if (
+        current_guard.operation != expected_guard.operation
+        or current_guard.operation_id != expected_guard.operation_id
+        or current_guard.target_root != expected_guard.target_root
+        or current_guard.contract_identity != expected_guard.contract_identity
+        or current_guard.plan_digest != expected_guard.plan_digest
+        or current_guard.purpose != expected_guard.purpose
+    ):
+        raise DistributionApplyError("dual-recovery-state")
+    store._assert_current_forward_guard(current_guard)
+
+
+def _assert_deprovision_recovery_parent_attachment(
+    store: OperationJournalStore,
+    journal: OperationJournal,
+    path: str,
+    parent_chain: tuple[int, ...],
+    *,
+    forward_guard: DistributionRetryMarker | None,
+) -> OperationJournal:
+    """Re-prove the immutable deprovision root-to-leaf-parent attachment."""
+
+    _assert_deprovision_recovery_marker_bound(store, forward_guard)
+    persisted = store._read(journal.root_identity)
+    store._assert_guard_anchors_journal(persisted)
+    if (
+        persisted.operation_id != journal.operation_id
+        or persisted.intent != "deprovision"
+        or persisted.authority != _journal_authority_for_intent("deprovision")
+        or persisted.contract_identity != journal.contract_identity
+        or persisted.plan_digest != journal.plan_digest
+    ):
+        raise DistributionApplyError(
+            "deprovision-visible-parent-chain-mismatch",
+            failed_paths=(PurePosixPath(path).parent.as_posix(),),
+        )
+    record = next((item for item in persisted.actions if item.path == path), None)
+    if record is None or record.action not in {"prune", "remove-empty-directory"}:
+        raise DistributionApplyError(
+            "journal-precondition-mismatch",
+            failed_paths=(PurePosixPath(path).parent.as_posix(),),
+        )
+    expected_root, expected_parents = _deprovision_record_parent_bindings(record)
+    expected_bindings = (expected_root, *expected_parents)
+    if len(parent_chain) != len(expected_bindings) or any(
+        not _same_stat_structure(os.fstat(fd), expected)
+        for fd, expected in zip(parent_chain, expected_bindings, strict=True)
+    ):
+        raise DistributionApplyError(
+            "deprovision-visible-parent-chain-mismatch",
+            failed_paths=(PurePosixPath(path).parent.as_posix(),),
+        )
+    _assert_visible_distribution_chain_exactly_bound(store.target_root, path, parent_chain)
+    return persisted
+
+
+def _deprovision_recovery_leaf_mutation_validator(
+    store: OperationJournalStore,
+    journal: OperationJournal,
+    *,
+    forward_guard: DistributionRetryMarker | None,
+) -> Callable[[str, tuple[int, ...]], None]:
+    """Bind recovery cleanup to the journal's immutable parent witnesses."""
+
+    if forward_guard is None:
+        raise DistributionApplyError("dual-recovery-state")
+
+    def validate(path: str, parent_chain: tuple[int, ...]) -> None:
+        persisted = _assert_deprovision_recovery_parent_attachment(
+            store,
+            journal,
+            path,
+            parent_chain,
+            forward_guard=forward_guard,
+        )
+        record = next((item for item in persisted.actions if item.path == path), None)
+        assert record is not None
+        if record.action != "prune":
+            return
+        witnesses = {item.relative_path: item for item in persisted.leaf_parent_namespace_witnesses}
+        durably_quarantined_paths = frozenset(
+            lease.path
+            for lease in persisted.staging_leases
+            if lease.role == "predecessor-quarantine" and lease.device > 0 and lease.inode > 0 and lease.ctime_ns > 0
+        )
+        owned_zero_predecessor_paths = frozenset(
+            lease.path
+            for lease in persisted.staging_leases
+            if (
+                lease.role == "predecessor-quarantine"
+                and lease.device == 0
+                and lease.inode == 0
+                and lease.ctime_ns == 0
+                and _deprovision_zero_predecessor_reservation_is_owned(store.target_root, persisted, lease)
+            )
+        )
+        _assert_deprovision_leaf_parent_namespace(
+            parent_chain[-1],
+            path,
+            leaf_parent_namespace_witnesses=witnesses,
+            journal=persisted,
+            forward_guard=store._forward_guard or forward_guard,
+            durably_quarantined_paths=durably_quarantined_paths,
+            owned_zero_predecessor_paths=owned_zero_predecessor_paths,
+            pending_absent_paths=frozenset(
+                item.path
+                for item in persisted.actions
+                if (
+                    item.checkpoint == "pending"
+                    and item.action == "prune"
+                    and _deprovision_recovery_pending_target_is_exact_absent(store.target_root, item)
+                )
+            ),
+        )
+
+    return validate
+
+
+def _deprovision_recovery_directory_mutation_validator(
+    store: OperationJournalStore,
+    journal: OperationJournal,
+    *,
+    forward_guard: DistributionRetryMarker | None,
+    require_absent: bool = True,
+) -> Callable[[str, tuple[int, ...]], None]:
+    """Bind directory recovery to its journaled binding and empty postcondition."""
+
+    if forward_guard is None:
+        raise DistributionApplyError("dual-recovery-state")
+
+    def validate(path: str, parent_chain: tuple[int, ...]) -> None:
+        _assert_deprovision_recovery_marker_bound(store, forward_guard)
+        persisted = store._read(journal.root_identity)
+        store._assert_guard_anchors_journal(persisted)
+        if (
+            persisted.operation_id != journal.operation_id
+            or persisted.intent != "deprovision"
+            or persisted.authority != _journal_authority_for_intent("deprovision")
+            or persisted.contract_identity != journal.contract_identity
+            or persisted.plan_digest != journal.plan_digest
+        ):
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            )
+        record = next((item for item in persisted.actions if item.path == path), None)
+        if record is None or record.action != "remove-empty-directory":
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            )
+        try:
+            directory_snapshot = _deprovision_directory_snapshot_from_record(record)
+            expected_root, expected_parents = _deprovision_record_parent_bindings(record)
+        except (DistributionApplyError, KeyError, TypeError, ValueError) as exc:
+            if isinstance(exc, DistributionApplyError):
+                raise
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            ) from exc
+        if (
+            directory_snapshot.relative_path != path
+            or directory_snapshot.binding.relative_path != path
+            or directory_snapshot.expected_remaining_child_digest != _directory_child_digest(())
+            or _SHA256_RE.fullmatch(directory_snapshot.initial_child_digest) is None
+            or any(
+                evidence.child_path != evidence.action_path
+                or PurePosixPath(evidence.child_path).parent.as_posix() != path
+                or evidence.child_kind not in {"leaf", "directory"}
+                or evidence.expected_postcondition != {"path": evidence.child_path, "exists": False}
+                for evidence in directory_snapshot.immediate_child_evidence
+            )
+            or tuple(evidence.child_path for evidence in directory_snapshot.immediate_child_evidence)
+            != tuple(
+                sorted(
+                    (evidence.child_path for evidence in directory_snapshot.immediate_child_evidence),
+                    key=os.fsencode,
+                )
+            )
+            or len({evidence.child_path for evidence in directory_snapshot.immediate_child_evidence})
+            != len(directory_snapshot.immediate_child_evidence)
+        ):
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            )
+        records = {item.path: item for item in persisted.actions}
+        if any(
+            evidence.action_path not in records
+            or records[evidence.action_path].action not in {"prune", "remove-empty-directory"}
+            or records[evidence.action_path].path != evidence.child_path
+            or records[evidence.action_path].postcondition.get("exists") is not False
+            or records[evidence.action_path].postcondition.get("identity") is not None
+            or (evidence.child_kind == "leaf" and records[evidence.action_path].action != "prune")
+            or (evidence.child_kind == "directory" and records[evidence.action_path].action != "remove-empty-directory")
+            for evidence in directory_snapshot.immediate_child_evidence
+        ):
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            )
+        expected_bindings = (expected_root, *expected_parents)
+        if len(parent_chain) != len(expected_bindings) or any(
+            not _same_stat_structure(os.fstat(fd), expected)
+            for fd, expected in zip(parent_chain, expected_bindings, strict=True)
+        ):
+            raise DistributionApplyError(
+                "deprovision-visible-parent-chain-mismatch",
+                failed_paths=(PurePosixPath(path).parent.as_posix(),),
+            )
+        _assert_visible_distribution_chain_exactly_bound(store.target_root, path, parent_chain)
+        observation = _observe_target(store.target_root, path)
+        snapshot = observation.snapshot
+        if snapshot is None:
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            )
+        if require_absent:
+            if not _deprovision_pending_snapshot_is_exact_absence(snapshot, record):
+                raise DistributionApplyError(
+                    "deprovision-directory-mismatch",
+                    failed_paths=(path,),
+                )
+            _assert_deprovision_directory_dependencies_published(persisted, record)
+            return
+        if (
+            not snapshot.target.exists
+            or snapshot.target.file_type != "directory"
+            or not _same_structure_identity(snapshot.target, directory_snapshot.binding)
+        ):
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            )
+        flags = _distribution_directory_flags()
+        target_fd: int | None = None
+        try:
+            target_name = PurePosixPath(path).name
+            visible_before = os.stat(target_name, dir_fd=parent_chain[-1], follow_symlinks=False)
+            if not stat.S_ISDIR(visible_before.st_mode):
+                raise DistributionApplyError(
+                    "deprovision-directory-mismatch",
+                    failed_paths=(path,),
+                )
+            target_fd = os.open(target_name, flags, dir_fd=parent_chain[-1])
+            opened = os.fstat(target_fd)
+            visible_after = os.stat(target_name, dir_fd=parent_chain[-1], follow_symlinks=False)
+            if (
+                _stat_identity_tuple(visible_before) != _stat_identity_tuple(opened)
+                or _stat_identity_tuple(opened) != _stat_identity_tuple(visible_after)
+                or not _same_stat_structure(opened, directory_snapshot.binding)
+            ):
+                raise DistributionApplyError(
+                    "deprovision-directory-mismatch",
+                    failed_paths=(path,),
+                )
+        except DistributionApplyError:
+            raise
+        except OSError as exc:
+            raise DistributionApplyError(
+                "deprovision-directory-mismatch",
+                failed_paths=(path,),
+            ) from exc
+        finally:
+            if target_fd is not None:
+                os.close(target_fd)
+
+    return validate
+
+
 def _validate_deprovision_recovery_contract_before_reconciliation(
     install_root: Path,
     *,
@@ -15240,6 +15672,13 @@ def _reconcile_deprovision_pending_actions(
     store: OperationJournalStore,
     journal: OperationJournal,
 ) -> OperationJournal:
+    _assert_deprovision_recovery_marker_bound(store, store._forward_guard)
+    if store._leaf_mutation_validator is None:
+        store._leaf_mutation_validator = _deprovision_recovery_leaf_mutation_validator(
+            store,
+            journal,
+            forward_guard=store._forward_guard,
+        )
     _assert_deprovision_zero_predecessor_reservations(store.target_root, journal)
     # Validate all already-published paths before reconciling any pending
     # action.  This keeps a rebound published directory from allowing an
@@ -15257,6 +15696,22 @@ def _reconcile_deprovision_pending_actions(
             continue
         snapshot = _assert_deprovision_pending_record_matches(store.target_root, record)
         if snapshot.target.exists:
+            if record.action == "remove-empty-directory":
+                directory_validator = _deprovision_recovery_directory_mutation_validator(
+                    store,
+                    active,
+                    forward_guard=store._forward_guard,
+                    require_absent=False,
+                )
+                parent_chain = _open_distribution_parent_chain(
+                    store.target_root,
+                    record.path,
+                    create_missing=False,
+                )
+                try:
+                    directory_validator(record.path, parent_chain)
+                finally:
+                    _close_distribution_parent_chain(parent_chain)
             continue
         if record.action == "remove-empty-directory":
             _assert_deprovision_directory_dependencies_published(active, record)
@@ -15265,6 +15720,24 @@ def _reconcile_deprovision_pending_actions(
             active,
             forward_guard=store._forward_guard,
         )
+        validator = store._leaf_mutation_validator
+        if validator is None:
+            raise DistributionApplyError("journal-precondition-mismatch")
+        if record.action == "remove-empty-directory":
+            validator = _deprovision_recovery_directory_mutation_validator(
+                store,
+                active,
+                forward_guard=store._forward_guard,
+            )
+        parent_chain = _open_distribution_parent_chain(
+            store.target_root,
+            record.path,
+            create_missing=False,
+        )
+        try:
+            validator(record.path, parent_chain)
+        finally:
+            _close_distribution_parent_chain(parent_chain)
         completed = (*completed, record.path)
         active = store.checkpoint_published(active, completed)
     _assert_deprovision_published_summaries(store.target_root, active)
@@ -15382,6 +15855,16 @@ def _execute_deprovision_journal_plan(
             else:
                 active_journal = journal
             journal = active_journal
+        if (
+            active_journal is not None
+            and active_journal.status in {"prepared", "executing"}
+            and store._leaf_mutation_validator is None
+        ):
+            store._leaf_mutation_validator = _deprovision_recovery_leaf_mutation_validator(
+                store,
+                active_journal,
+                forward_guard=store._forward_guard or guard,
+            )
         if active_journal is not None:
             durably_quarantined_paths.update(
                 lease.path
@@ -15395,6 +15878,7 @@ def _execute_deprovision_journal_plan(
             )
 
         def validate_mutation_boundary() -> None:
+            _assert_deprovision_recovery_marker_bound(store, store._forward_guard or guard)
             _assert_deprovision_invocation_state(assessment)
 
         def validate_first_target_mutation() -> Callable[[], None] | None:
@@ -15479,8 +15963,10 @@ def _execute_deprovision_journal_plan(
         def validate_leaf_mutation_boundary(path: str, parent_chain: tuple[int, ...]) -> None:
             if active_journal is None:
                 raise DistributionApplyError("journal-precondition-mismatch")
+            _assert_deprovision_recovery_marker_bound(store, store._forward_guard or guard)
             boundary_journal = active_journal
             persisted = store._read(active_journal.root_identity)
+            store._assert_guard_anchors_journal(persisted)
             if persisted.operation_id == active_journal.operation_id:
                 boundary_journal = persisted
             snapshot = target_snapshots.get(path)
@@ -15511,6 +15997,25 @@ def _execute_deprovision_journal_plan(
                     ),
                 }),
             )
+
+        def validate_directory_mutation_boundary(path: str) -> None:
+            if active_journal is None:
+                raise DistributionApplyError("journal-precondition-mismatch")
+            validator = _deprovision_recovery_directory_mutation_validator(
+                store,
+                active_journal,
+                forward_guard=store._forward_guard or guard,
+                require_absent=False,
+            )
+            parent_chain = _open_distribution_parent_chain(
+                target_root,
+                path,
+                create_missing=False,
+            )
+            try:
+                validator(path, parent_chain)
+            finally:
+                _close_distribution_parent_chain(parent_chain)
 
         records_by_path = {record.path: record for record in active_journal.actions}
         leaf_actions = tuple(
@@ -15547,6 +16052,11 @@ def _execute_deprovision_journal_plan(
                 active_journal,
                 record,
             )
+
+            def validate_directory_before_mutation(bound_path: str = record.path) -> None:
+                validate_mutation_boundary()
+                validate_directory_mutation_boundary(bound_path)
+
             _remove_distribution_directory_if_bound(
                 target_root,
                 Path(record.path),
@@ -15556,7 +16066,8 @@ def _execute_deprovision_journal_plan(
                 expected_directory_binding=snapshot.binding,
                 immediate_child_evidence=evidence,
                 expected_remaining_child_digest=snapshot.expected_remaining_child_digest,
-                before_mutation=validate_mutation_boundary,
+                before_mutation=validate_directory_before_mutation,
+                final_mutation_validator=validate_directory_before_mutation,
             )
             completed_paths = tuple(
                 item.path
@@ -15710,6 +16221,12 @@ def execute_deprovision_distribution(
                     store._assert_guard_anchors_journal(journal)
                 elif journal.status != "completed":
                     raise DistributionApplyError("dual-recovery-state")
+                if apply and journal.status in {"prepared", "executing"}:
+                    store._leaf_mutation_validator = _deprovision_recovery_leaf_mutation_validator(
+                        store,
+                        journal,
+                        forward_guard=store._forward_guard or guard,
+                    )
                 if apply and journal.status in {"prepared", "executing"}:
                     _validate_deprovision_recovery_contract_before_reconciliation(
                         install_root,
@@ -16390,6 +16907,7 @@ def _unlink_distribution_quarantine_with_backup(
     *,
     canonical_validator: Callable[[], None],
     mutation_validator: Callable[[], None] | None,
+    post_link_mutation_validator: Callable[[], None] | None = None,
     allow_existing_backup: bool = False,
     backup_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     transition_path: str | None = None,
@@ -16397,6 +16915,7 @@ def _unlink_distribution_quarantine_with_backup(
     """Unlink one exact quarantine while retaining a restorable hardlink."""
 
     backup_name = _distribution_quarantine_backup_name(quarantine_name)
+    created_backup = False
     if mutation_validator is not None:
         mutation_validator()
     try:
@@ -16424,6 +16943,7 @@ def _unlink_distribution_quarantine_with_backup(
                 dst_dir_fd=parent_fd,
                 follow_symlinks=False,
             )
+            created_backup = True
             os.fsync(parent_fd)
         backup = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
         visible = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -16451,6 +16971,8 @@ def _unlink_distribution_quarantine_with_backup(
                     role="backup-dual",
                 )
             )
+        if post_link_mutation_validator is not None:
+            post_link_mutation_validator()
         if mutation_validator is not None:
             mutation_validator()
         canonical_validator()
@@ -16525,7 +17047,7 @@ def _unlink_distribution_quarantine_with_backup(
         with suppress(OSError):
             visible = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
             retained = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
-            if visible.st_dev == retained.st_dev and visible.st_ino == retained.st_ino:
+            if created_backup and visible.st_dev == retained.st_dev and visible.st_ino == retained.st_ino:
                 os.unlink(backup_name, dir_fd=parent_fd)
                 os.fsync(parent_fd)
         if str(exc) == "deprovision-parent-namespace-mismatch":
@@ -16548,6 +17070,7 @@ def _remove_distribution_directory_if_bound(
     immediate_child_evidence: tuple[DistributionImmediateChildEvidence, ...],
     expected_remaining_child_digest: str,
     before_mutation: Callable[[], None] | None = None,
+    final_mutation_validator: Callable[[], None] | None = None,
 ) -> None:
     """Remove one exact empty directory without reopening removed descendants."""
 
@@ -16708,6 +17231,8 @@ def _remove_distribution_directory_if_bound(
             before_mutation()
         assert_root_and_chain_bound()
         assert_immediate_children_absent()
+        if final_mutation_validator is not None:
+            final_mutation_validator()
         os.rmdir(target_name, dir_fd=parent_fd)
         os.fsync(parent_fd)
         try:
@@ -16783,6 +17308,7 @@ def _remove_distribution_target_if_bound(
     transition_name: str | None = None,
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     mutation_validator: Callable[[], None] | None = None,
+    post_link_mutation_validator: Callable[[], None] | None = None,
     canonical_validator: Callable[[], None] | None = None,
 ) -> None:
     """Delete only the inode bound before the pathname mutation.
@@ -16867,6 +17393,7 @@ def _remove_distribution_target_if_bound(
                     moved,
                     canonical_validator=assert_pruned_canonical_absent,
                     mutation_validator=mutation_validator,
+                    post_link_mutation_validator=post_link_mutation_validator,
                     backup_recorder=transition_recorder,
                     transition_path=transition_path,
                 )
@@ -17040,6 +17567,7 @@ def _remove_distribution_stage_if_owned(
     transition_name: str | None = None,
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     mutation_validator: Callable[[], None] | None = None,
+    post_link_mutation_validator: Callable[[], None] | None = None,
     gc_path: str | None = None,
     gc_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     gc_name: str | None = None,
@@ -17325,6 +17853,8 @@ def _remove_distribution_stage_if_owned(
                         role="backup-reserved",
                     )
                 )
+            if mutation_validator is not None:
+                mutation_validator()
             os.link(
                 quarantine_name,
                 retained_name,
@@ -17366,6 +17896,8 @@ def _remove_distribution_stage_if_owned(
                         gc_ordinal=gc_ordinal,
                     )
                 )
+            if post_link_mutation_validator is not None:
+                post_link_mutation_validator()
             delete_name = f"{stage_name}.{secrets.token_hex(16)}.gc"
             if gc_recorder is not None:
                 assert gc_path is not None
@@ -17379,6 +17911,8 @@ def _remove_distribution_stage_if_owned(
                         gc_ordinal=2,
                     )
                 )
+            if mutation_validator is not None:
+                mutation_validator()
             _rename_distribution_no_replace(parent_fd, quarantine_name, parent_fd, delete_name)
             os.fsync(parent_fd)
             deleting = os.stat(delete_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -17431,6 +17965,8 @@ def _remove_distribution_stage_if_owned(
                         gc_ordinal=3,
                     )
                 )
+            if mutation_validator is not None:
+                mutation_validator()
             _rename_distribution_no_replace(
                 parent_fd,
                 retained_name,
@@ -17501,6 +18037,8 @@ def _remove_distribution_stage_if_owned(
                         gc_ordinal=3,
                     )
                 )
+            if post_link_mutation_validator is not None:
+                post_link_mutation_validator()
             os.unlink(retained_gc_name, dir_fd=parent_fd)
             os.fsync(parent_fd)
             return retained_gc_name
@@ -17842,6 +18380,9 @@ def _cleanup_stale_distribution_stages(
                     current,
                     strict=True,
                     mutation_validator=validate_cleanup_namespace,
+                    post_link_mutation_validator=(
+                        validate_cleanup_namespace if plan.operation == "uninstall" else None
+                    ),
                 )
                 cleaned = True
                 continue
@@ -17867,6 +18408,9 @@ def _cleanup_stale_distribution_stages(
                     transition_name=quarantine_name,
                     transition_recorder=stage_ownership_recorder,
                     mutation_validator=validate_cleanup_namespace,
+                    post_link_mutation_validator=(
+                        validate_cleanup_namespace if plan.operation == "uninstall" else None
+                    ),
                 )
             finally:
                 if held_fd is not None:
@@ -17880,6 +18424,7 @@ def _cleanup_stale_distribution_stages(
                 backup,
                 strict=True,
                 mutation_validator=validate_cleanup_namespace,
+                post_link_mutation_validator=(validate_cleanup_namespace if plan.operation == "uninstall" else None),
                 gc_path=owned.path,
                 gc_recorder=stage_ownership_recorder,
             )
@@ -18140,6 +18685,7 @@ def _apply_regular_action(
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None,
     reusable_predecessor_stage_name: str | None,
     held_parent_checkpoint_recorder: Callable[[str, tuple[int, ...]], None] | None,
+    deprovision_post_link_validation: bool,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
@@ -18275,6 +18821,9 @@ def _apply_regular_action(
                             stage_identity,
                             strict=True,
                             mutation_validator=validate_held_namespace,
+                            post_link_mutation_validator=(
+                                validate_held_namespace if deprovision_post_link_validation else None
+                            ),
                             gc_path=path,
                             gc_recorder=stage_ownership_recorder,
                             recovery_stage_recorder=stage_ownership_recorder,
@@ -18332,6 +18881,9 @@ def _apply_regular_action(
                     ),
                     transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
                     mutation_validator=validate_held_namespace,
+                    post_link_mutation_validator=(
+                        validate_held_namespace if deprovision_post_link_validation else None
+                    ),
                 )
                 if held_parent_checkpoint_recorder is not None:
                     held_parent_checkpoint_recorder(path, parent_chain)
@@ -18456,6 +19008,9 @@ def _apply_regular_action(
                                 stage_identity,
                                 strict=True,
                                 mutation_validator=validate_held_namespace,
+                                post_link_mutation_validator=(
+                                    validate_held_namespace if deprovision_post_link_validation else None
+                                ),
                                 gc_path=path,
                                 gc_recorder=stage_ownership_recorder,
                                 recovery_stage_recorder=stage_ownership_recorder,
@@ -18541,6 +19096,9 @@ def _apply_regular_action(
                                                 stage_ownership_recorder if write_ahead_stage_reservations else None
                                             ),
                                             mutation_validator=validate_held_namespace,
+                                            post_link_mutation_validator=(
+                                                validate_held_namespace if deprovision_post_link_validation else None
+                                            ),
                                         )
                                     except DistributionApplyError as cleanup_error:
                                         # Quarantine restoration changes ctime.  Do not
@@ -18570,6 +19128,9 @@ def _apply_regular_action(
                                     stage_ownership_recorder if write_ahead_stage_reservations else None
                                 ),
                                 mutation_validator=validate_held_namespace,
+                                post_link_mutation_validator=(
+                                    validate_held_namespace if deprovision_post_link_validation else None
+                                ),
                             )
                         else:
                             raise DistributionApplyError("managed staging identity changed")
@@ -18600,6 +19161,7 @@ def _apply_symlink_action(
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None,
     reusable_predecessor_stage_name: str | None,
     held_parent_checkpoint_recorder: Callable[[str, tuple[int, ...]], None] | None,
+    deprovision_post_link_validation: bool,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
@@ -18720,6 +19282,9 @@ def _apply_symlink_action(
                             staging_stat,
                             strict=True,
                             mutation_validator=validate_held_namespace,
+                            post_link_mutation_validator=(
+                                validate_held_namespace if deprovision_post_link_validation else None
+                            ),
                             gc_path=action.path,
                             gc_recorder=stage_ownership_recorder,
                             recovery_stage_recorder=stage_ownership_recorder,
@@ -18756,6 +19321,7 @@ def _apply_symlink_action(
                 ),
                 transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
                 mutation_validator=validate_held_namespace,
+                post_link_mutation_validator=(validate_held_namespace if deprovision_post_link_validation else None),
             )
             if held_parent_checkpoint_recorder is not None:
                 held_parent_checkpoint_recorder(action.path, parent_chain)
@@ -18853,6 +19419,9 @@ def _apply_symlink_action(
                             cleanup_stage_stat,
                             strict=True,
                             mutation_validator=validate_held_namespace,
+                            post_link_mutation_validator=(
+                                validate_held_namespace if deprovision_post_link_validation else None
+                            ),
                             gc_path=action.path,
                             gc_recorder=stage_ownership_recorder,
                             recovery_stage_recorder=stage_ownership_recorder,
@@ -18939,6 +19508,9 @@ def _apply_symlink_action(
                                                 stage_ownership_recorder if write_ahead_stage_reservations else None
                                             ),
                                             mutation_validator=validate_held_namespace,
+                                            post_link_mutation_validator=(
+                                                validate_held_namespace if deprovision_post_link_validation else None
+                                            ),
                                         )
                                     except DistributionApplyError as cleanup_error:
                                         # Restoration changes ctime; only a
@@ -18966,6 +19538,9 @@ def _apply_symlink_action(
                                     stage_ownership_recorder if write_ahead_stage_reservations else None
                                 ),
                                 mutation_validator=validate_held_namespace,
+                                post_link_mutation_validator=(
+                                    validate_held_namespace if deprovision_post_link_validation else None
+                                ),
                             )
                     except FileNotFoundError:
                         pass
@@ -19100,6 +19675,7 @@ def _apply_distribution_action(
             first_target_mutation_validator=first_target_mutation_validator,
             reusable_predecessor_stage_name=reusable_predecessor_stage_name,
             held_parent_checkpoint_recorder=held_parent_checkpoint_recorder,
+            deprovision_post_link_validation=plan.operation == "uninstall",
         )
         return
     if expected is None and target_kind == "symlink":
@@ -19122,6 +19698,7 @@ def _apply_distribution_action(
             first_target_mutation_validator=first_target_mutation_validator,
             reusable_predecessor_stage_name=reusable_predecessor_stage_name,
             held_parent_checkpoint_recorder=held_parent_checkpoint_recorder,
+            deprovision_post_link_validation=plan.operation == "uninstall",
         )
         return
     if expected is None and target_kind != "regular":
@@ -19142,6 +19719,7 @@ def _apply_distribution_action(
         first_target_mutation_validator=first_target_mutation_validator,
         reusable_predecessor_stage_name=reusable_predecessor_stage_name,
         held_parent_checkpoint_recorder=held_parent_checkpoint_recorder,
+        deprovision_post_link_validation=plan.operation == "uninstall",
     )
 
 

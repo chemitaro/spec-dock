@@ -2610,6 +2610,173 @@ def test_i370_empty_directory_kernel_is_bottom_up_bound_and_fail_closed(
     assert (target_root / "replaced-original").is_dir()
 
 
+def test_i370_directory_marker_replacement_is_checked_before_rmdir(
+    tmp_path: Path,
+) -> None:
+    """I370-T-RACE-001: deprovision rmdir rechecks its final marker boundary."""
+
+    target_root = tmp_path / "consumer"
+    directory = target_root / "managed"
+    directory.mkdir(parents=True)
+    marker = target_root / "marker"
+    marker.write_bytes(b"marker\n")
+    original_marker = marker.lstat()
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    binding = managed_distribution._capture_immediate_directory_entries(target_root, "managed")[0]
+    calls = 0
+
+    def replace_marker() -> None:
+        replacement = target_root / "marker-replacement"
+        replacement.write_bytes(b"marker\n")
+        marker.unlink()
+        replacement.rename(marker)
+
+    def validate_final_boundary() -> None:
+        nonlocal calls
+        calls += 1
+        if marker.lstat().st_ino != original_marker.st_ino:
+            raise DistributionApplyError("deprovision marker mismatch")
+
+    with pytest.raises(DistributionApplyError, match="deprovision marker mismatch"):
+        managed_distribution._remove_distribution_directory_if_bound(
+            target_root,
+            Path("managed"),
+            expected_root_identity=root_identity,
+            expected_directory_binding=binding,
+            immediate_child_evidence=(),
+            expected_remaining_child_digest=managed_distribution._directory_child_digest(()),
+            before_mutation=replace_marker,
+            final_mutation_validator=validate_final_boundary,
+        )
+
+    assert calls == 1
+    assert directory.is_dir()
+    assert marker.read_bytes() == b"marker\n"
+    assert marker.lstat().st_ino != original_marker.st_ino
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i370_existing_backup_is_retained_when_validator_fails(
+    tmp_path: Path,
+    kind: str,
+) -> None:
+    """I370-T-REC-001: failed cleanup cannot unlink a pre-existing backup."""
+
+    parent = tmp_path / kind
+    parent.mkdir()
+    quarantine = parent / "quarantine.remove"
+    if kind == "regular":
+        quarantine.write_bytes(b"managed\n")
+    else:
+        quarantine.symlink_to("managed-target")
+    backup_name = managed_distribution._distribution_quarantine_backup_name(quarantine.name)
+    backup = parent / backup_name
+    os.link(quarantine, backup, follow_symlinks=False)
+    expected = quarantine.lstat()
+    quarantine_before = (quarantine.lstat(), quarantine.read_bytes() if kind == "regular" else quarantine.readlink())
+    backup_before = (backup.lstat(), backup.read_bytes() if kind == "regular" else backup.readlink())
+    parent_fd = os.open(parent, os.O_RDONLY)
+    try:
+        with pytest.raises(DistributionApplyError, match="managed staging cleanup failed"):
+            managed_distribution._unlink_distribution_quarantine_with_backup(
+                parent_fd,
+                quarantine.name,
+                "stage",
+                expected,
+                canonical_validator=lambda: (_ for _ in ()).throw(DistributionApplyError("injected validator failure")),
+                mutation_validator=None,
+                allow_existing_backup=True,
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert quarantine.exists() or quarantine.is_symlink()
+    assert backup.exists() or backup.is_symlink()
+    assert (
+        quarantine.lstat(),
+        quarantine.read_bytes() if kind == "regular" else quarantine.readlink(),
+    ) == quarantine_before
+    assert (
+        backup.lstat(),
+        backup.read_bytes() if kind == "regular" else backup.readlink(),
+    ) == backup_before
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("rebind_ordinal", [2, 3])
+def test_i370_gc_ordinal_reservation_rechecks_before_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    rebind_ordinal: int,
+) -> None:
+    """I370-T-RACE-001: GC reservation writes cannot authorize a stale-FD rename."""
+
+    parent = tmp_path / f"{kind}-{rebind_ordinal}"
+    parent.mkdir()
+    stage = parent / "stage"
+    if kind == "regular":
+        stage.write_bytes(b"managed\n")
+    else:
+        stage.symlink_to("managed-target")
+    created = stage.lstat()
+    original_parent = parent.lstat()
+    displaced = parent.with_name(f"{parent.name}-displaced")
+    leases: list[DistributionStageOwnership] = []
+    reserved_names: dict[int, str] = {}
+    injected = False
+
+    def record_gc(lease: DistributionStageOwnership) -> None:
+        nonlocal injected
+        leases.append(lease)
+        if lease.role == "gc-reserved" and lease.gc_ordinal == rebind_ordinal and not injected:
+            reserved_names[rebind_ordinal] = lease.stage_name
+            parent.rename(displaced)
+            parent.mkdir()
+            injected = True
+
+    def validate_parent() -> None:
+        if parent.lstat().st_ino != original_parent.st_ino:
+            raise DistributionApplyError("deprovision-visible-parent-chain-mismatch")
+
+    original_rename = managed_distribution._rename_distribution_no_replace
+    ordinal_rename_calls = 0
+
+    def count_ordinal_rename(*args, **kwargs):
+        nonlocal ordinal_rename_calls
+        if args[3] in reserved_names.values():
+            ordinal_rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_ordinal_rename)
+    parent_fd = os.open(parent, os.O_RDONLY)
+    try:
+        with pytest.raises(DistributionApplyError, match="deprovision-visible-parent-chain-mismatch"):
+            managed_distribution._remove_distribution_stage_if_owned(
+                parent_fd,
+                stage.name,
+                created,
+                strict=True,
+                mutation_validator=validate_parent,
+                gc_path="managed/target",
+                gc_recorder=record_gc,
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert injected is True
+    assert any(lease.role == "gc-reserved" and lease.gc_ordinal == rebind_ordinal for lease in leases)
+    assert ordinal_rename_calls == 0
+    assert displaced.is_dir()
+    preserved_entries = tuple(displaced.iterdir())
+    assert preserved_entries
+    if kind == "regular":
+        assert any(entry.read_bytes() == b"managed\n" for entry in preserved_entries)
+    else:
+        assert any(entry.is_symlink() and entry.readlink() == Path("managed-target") for entry in preserved_entries)
+
+
 def test_i370_prune_kernel_removes_exact_regular_and_symlink_but_not_replacement(
     tmp_path: Path,
 ) -> None:
@@ -4334,6 +4501,906 @@ def test_i370_recovery_absent_target_parent_rebind_fails_before_checkpoint(
     assert rebound.is_dir()
     assert managed.parent.is_dir()
     assert journal.status == "executing"
+
+
+def test_i370_reconcile_pending_absence_rebind_fails_before_checkpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A parent rebind between reconciliation proof and checkpoint is not cleanup authority."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    journal = store.mark_executing(store.prepare(executable, package_version="1.2.3"))
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    interrupted = False
+
+    def interrupt_before_publish(self, active, completed_paths):
+        nonlocal interrupted
+        if not interrupted and ".github/workflows/ci.yml" in completed_paths:
+            interrupted = True
+            raise DistributionApplyError("injected pre-checkpoint interruption")
+        return original_checkpoint(self, active, completed_paths)
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", interrupt_before_publish)
+    first = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    assert interrupted is True
+    assert first.status == "recovery_required"
+    journal_before = journal_path.read_bytes()
+    marker_before = marker_path.read_bytes()
+    displaced = target_root / ".github" / "workflows-displaced"
+    original_validator = managed_distribution._validate_deprovision_recovery_leaf_parent_namespaces
+    validation_calls = 0
+    checkpoint_calls = 0
+    rebound = False
+
+    def rebind_after_reconcile_validation(*args, **kwargs):
+        nonlocal validation_calls, rebound
+        result = original_validator(*args, **kwargs)
+        validation_calls += 1
+        # The first call is the pre-reconciliation contract check, the second
+        # is reconciliation's initial summary, and the third is the pending
+        # action's immediate pre-checkpoint validation.
+        if validation_calls == 3:
+            managed.parent.rename(displaced)
+            managed.parent.mkdir(parents=True)
+            rebound = True
+        return result
+
+    def count_checkpoint(*args, **kwargs):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(*args, **kwargs)
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_validate_deprovision_recovery_leaf_parent_namespaces",
+        rebind_after_reconcile_validation,
+    )
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert rebound is True, (validation_calls, result.status, result.reason, result.errors, result.failed_paths)
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-mismatch"
+    assert journal_path.read_bytes() == journal_before
+    assert marker_path.read_bytes() == marker_before
+    assert checkpoint_calls == 0
+    assert displaced.is_dir()
+    assert managed.parent.is_dir()
+    assert not managed.exists()
+    assert journal.status == "executing"
+
+
+@pytest.mark.parametrize("replacement_kind", ["regular", "symlink"])
+def test_i370_marker_replacement_fails_before_leaf_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement_kind: str,
+) -> None:
+    """A retry-marker identity rebind cannot authorize a deprovision mutation."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    specdock = target_root / "spec-dock"
+    specdock.mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"managed\n")
+    outside = target_root / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    journal_path = specdock / ".distribution-journal.json"
+    marker_path = specdock / ".distribution-retry.json"
+    replacement = specdock / ".replacement-marker"
+    original_record = OperationJournalStore.record_staging_lease
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_remove = managed_distribution._remove_distribution_target_if_bound
+    original_unlink = managed_distribution.os.unlink
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    injected = False
+    post_reservation_state: tuple[bytes, bytes] | None = None
+    target_rename_calls = 0
+    leaf_parent_fd: int | None = None
+    leaf_unlink_calls = 0
+    checkpoint_calls = 0
+
+    def replace_marker_after_reservation(self, journal, lease):
+        nonlocal injected, post_reservation_state
+        updated = original_record(self, journal, lease)
+        if (
+            not injected
+            and lease.path == ".github/workflows/ci.yml"
+            and lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+        ):
+            injected = True
+            marker_bytes = marker_path.read_bytes()
+            replacement.write_bytes(marker_bytes)
+            marker_path.unlink()
+            if replacement_kind == "regular":
+                marker_path.write_bytes(marker_bytes)
+            else:
+                marker_path.symlink_to(replacement.name)
+            post_reservation_state = (journal_path.read_bytes(), marker_path.read_bytes())
+        return updated
+
+    def count_rename(*args, **kwargs):
+        nonlocal target_rename_calls
+        if args[1] == target.name and args[3] != target.name:
+            target_rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    def count_remove(*args, **kwargs):
+        nonlocal leaf_parent_fd
+        leaf_parent_fd = args[0]
+        return original_remove(*args, **kwargs)
+
+    def count_unlink(path, *args, **kwargs):
+        nonlocal leaf_unlink_calls
+        if kwargs.get("dir_fd") == leaf_parent_fd:
+            leaf_unlink_calls += 1
+        return original_unlink(path, *args, **kwargs)
+
+    def count_checkpoint(self, journal, completed_paths):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(self, journal, completed_paths)
+
+    target_before = (target.lstat(), target.read_bytes())
+    outside_before = outside.read_bytes()
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", replace_marker_after_reservation)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_rename)
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", count_remove)
+    monkeypatch.setattr(managed_distribution.os, "unlink", count_unlink)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert post_reservation_state is not None
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-required"
+    assert target.lstat() == target_before[0]
+    assert target.read_bytes() == target_before[1]
+    assert outside.read_bytes() == outside_before
+    assert journal_path.read_bytes() == post_reservation_state[0]
+    assert marker_path.read_bytes() == post_reservation_state[1]
+    assert marker_path.is_symlink() if replacement_kind == "symlink" else marker_path.is_file()
+    assert replacement.is_file()
+    assert target_rename_calls == 0
+    assert leaf_unlink_calls == 0
+    assert checkpoint_calls == 0
+
+
+def test_i370_roleless_backup_promotion_rejects_rebound_parent_before_journal_write(
+    tmp_path: Path,
+) -> None:
+    """Legacy backup promotion must not rewrite the journal after a parent rebind."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    specdock = target_root / "spec-dock"
+    specdock.mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    target_rel = ".github/workflows/ci.yml"
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, target_rel)
+    assert expected is not None
+    stage_name = managed_distribution._new_distribution_stage_name(target_rel, expected)
+    quarantine_name = f"{stage_name}.fixture.remove"
+    backup_name = managed_distribution._distribution_quarantine_backup_name(quarantine_name)
+    target.unlink()
+    displaced = target_root / ".github" / "workflows-displaced"
+    target.parent.rename(displaced)
+    target.parent.mkdir()
+    backup = target.parent / backup_name
+    backup.write_bytes(b"managed\n")
+    backup_info = backup.lstat()
+    quarantine = DistributionStageOwnership(
+        path=target_rel,
+        stage_name=quarantine_name,
+        device=backup_info.st_dev,
+        inode=backup_info.st_ino,
+        ctime_ns=backup_info.st_ctime_ns,
+        file_type="regular",
+        role="predecessor-quarantine",
+    )
+    roleless_backup = DistributionStageOwnership(
+        path=target_rel,
+        stage_name=backup_name,
+        device=backup_info.st_dev,
+        inode=backup_info.st_ino,
+        ctime_ns=backup_info.st_ctime_ns,
+        file_type="regular",
+        role="stage",
+    )
+    journal = store.write(
+        managed_distribution.replace(
+            journal,
+            actions=tuple(
+                managed_distribution.replace(action, checkpoint="published") if action.path == target_rel else action
+                for action in journal.actions
+            ),
+            staging_leases=(quarantine, roleless_backup),
+        ),
+        predecessor=journal,
+    )
+    journal_path = specdock / ".distribution-journal.json"
+    marker_path = specdock / ".distribution-retry.json"
+    journal_before = journal_path.read_bytes()
+    marker_before = marker_path.read_bytes()
+    validator = managed_distribution._deprovision_recovery_leaf_mutation_validator(
+        store,
+        journal,
+        forward_guard=store._forward_guard,
+    )
+
+    with pytest.raises(DistributionApplyError, match="deprovision-visible-parent-chain-mismatch"):
+        store._resume_displaced_quarantine_cleanup(
+            journal,
+            {target_rel},
+            leaf_mutation_validator=validator,
+        )
+
+    assert journal_path.read_bytes() == journal_before
+    assert marker_path.read_bytes() == marker_before
+    assert backup.read_bytes() == b"managed\n"
+    assert not target.exists()
+    assert displaced.is_dir()
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("replacement_kind", ["regular", "symlink"])
+@pytest.mark.parametrize("race", ["parent-rebind", "marker-replacement"])
+def test_i370_roleless_backup_promotion_rechecks_marker_before_journal_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    replacement_kind: str,
+    race: str,
+) -> None:
+    """I370-T-REC-001: roleless promotion binds current recovery state immediately before writing."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    target_root = tmp_path / "consumer"
+    specdock = target_root / "spec-dock"
+    specdock.mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    if kind == "regular":
+        target.write_bytes(b"managed\n")
+    else:
+        source.unlink()
+        source.symlink_to("managed-target")
+        target.symlink_to("managed-target")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    target_rel = ".github/workflows/ci.yml"
+    expected = managed_distribution._expected_target_identity(executable.distribution_plan, target_rel)
+    assert expected is not None
+    stage_name = managed_distribution._new_distribution_stage_name(target_rel, expected)
+    quarantine_name = f"{stage_name}.fixture.remove"
+    backup_name = managed_distribution._distribution_quarantine_backup_name(quarantine_name)
+    target.unlink()
+    if kind == "regular":
+        backup = target.parent / backup_name
+        backup.write_bytes(b"managed\n")
+    else:
+        backup = target.parent / backup_name
+        backup.symlink_to("managed-target")
+    backup_info = backup.lstat()
+    quarantine = DistributionStageOwnership(
+        path=target_rel,
+        stage_name=quarantine_name,
+        device=backup_info.st_dev,
+        inode=backup_info.st_ino,
+        ctime_ns=backup_info.st_ctime_ns,
+        file_type=("regular" if kind == "regular" else "symlink"),
+        role="predecessor-quarantine",
+    )
+    roleless_backup = DistributionStageOwnership(
+        path=target_rel,
+        stage_name=backup_name,
+        device=backup_info.st_dev,
+        inode=backup_info.st_ino,
+        ctime_ns=backup_info.st_ctime_ns,
+        file_type=("regular" if kind == "regular" else "symlink"),
+        role="stage",
+    )
+    journal = store.write(
+        managed_distribution.replace(
+            journal,
+            actions=tuple(
+                managed_distribution.replace(action, checkpoint="published") if action.path == target_rel else action
+                for action in journal.actions
+            ),
+            staging_leases=(quarantine, roleless_backup),
+        ),
+        predecessor=journal,
+    )
+    journal_path = specdock / ".distribution-journal.json"
+    marker_path = specdock / ".distribution-retry.json"
+    journal_before = journal_path.read_bytes()
+    marker_before = marker_path.read_bytes()
+    replacement = specdock / ".marker-replacement"
+    displaced = target_root / ".github" / "workflows-displaced"
+    injected = False
+    promotion_phase = False
+    original_promote = OperationJournalStore._promote_roleless_backup_leases
+
+    def mark_promotion(self, active, **kwargs):
+        nonlocal promotion_phase
+        promotion_phase = True
+        try:
+            return original_promote(self, active, **kwargs)
+        finally:
+            promotion_phase = False
+
+    actual_validator = managed_distribution._deprovision_recovery_leaf_mutation_validator
+
+    def validate_promotion_boundary(path: str, parent_chain: tuple[int, ...]) -> None:
+        nonlocal injected
+        if promotion_phase and not injected:
+            if race == "parent-rebind":
+                target.parent.rename(displaced)
+                target.parent.mkdir()
+            else:
+                replacement.write_bytes(marker_before)
+                marker_path.unlink()
+                if replacement_kind == "regular":
+                    replacement.rename(marker_path)
+                else:
+                    marker_path.symlink_to(replacement.name)
+            injected = True
+        actual_validator(store, journal, forward_guard=store._forward_guard)(path, parent_chain)
+
+    monkeypatch.setattr(OperationJournalStore, "_promote_roleless_backup_leases", mark_promotion)
+
+    with pytest.raises(DistributionApplyError):
+        store._resume_displaced_quarantine_cleanup(
+            journal,
+            {target_rel},
+            leaf_mutation_validator=validate_promotion_boundary,
+        )
+
+    assert injected is True
+    assert journal_path.read_bytes() == journal_before
+    assert marker_path.read_bytes() == marker_before
+    if race == "marker-replacement":
+        assert marker_path.is_symlink() if replacement_kind == "symlink" else marker_path.is_file()
+        assert backup.exists() or backup.is_symlink()
+    else:
+        assert displaced.is_dir()
+        assert (displaced / backup.name).exists() or (displaced / backup.name).is_symlink()
+    assert not target.exists() and not target.is_symlink()
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i370_resume_displaced_backup_only_marker_rebind_stops_before_gc(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    """Backup-only deprovision recovery validates the guard before GC cleanup."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    if kind == "regular":
+        target.write_bytes(b"managed\n")
+    else:
+        source.unlink()
+        source.symlink_to("managed-target")
+        target.symlink_to("managed-target")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+
+    class SimulatedProcessCrash(BaseException):
+        pass
+
+    original_record = OperationJournalStore.record_staging_lease
+    interrupted = False
+
+    def crash_after_backup_only(self, journal, lease):
+        nonlocal interrupted
+        updated = original_record(self, journal, lease)
+        if not interrupted and lease.role == "backup-only":
+            interrupted = True
+            raise SimulatedProcessCrash
+        return updated
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", crash_after_backup_only)
+    with pytest.raises(SimulatedProcessCrash):
+        managed_distribution.execute_deprovision_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            package_version="1.2.3",
+            apply=True,
+            expected_root_identity=root_identity,
+        )
+    assert interrupted is True
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", original_record)
+
+    target_rel = ".github/workflows/ci.yml"
+    specdock = target_root / "spec-dock"
+    journal_path = specdock / ".distribution-journal.json"
+    marker_path = specdock / ".distribution-retry.json"
+    journal_before = journal_path.read_bytes()
+    marker_before = marker_path.read_bytes()
+    payload = json.loads(journal_before)
+    backup_leases = [
+        lease for lease in payload["staging_leases"] if lease["path"] == target_rel and lease["role"] == "backup-only"
+    ]
+    assert len(backup_leases) == 1
+    backup = target.parent / backup_leases[0]["stage_name"]
+    assert backup.exists() or backup.is_symlink()
+    backup_before = backup.lstat()
+    backup_payload = backup.read_bytes() if kind == "regular" else backup.readlink()
+    outside = target_root / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    outside_before = (outside.lstat(), outside.read_bytes())
+
+    replacement = specdock / ".marker-replacement"
+    marker_rebound: os.stat_result | None = None
+    original_namespace_validator = managed_distribution._validate_deprovision_recovery_leaf_parent_namespaces
+    injected = False
+
+    def replace_marker_after_namespace_validation(*args, **kwargs):
+        nonlocal injected, marker_rebound
+        result = original_namespace_validator(*args, **kwargs)
+        if not injected:
+            replacement.write_bytes(marker_before)
+            marker_path.unlink()
+            replacement.rename(marker_path)
+            marker_rebound = marker_path.lstat()
+            injected = True
+        return result
+
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_unlink = managed_distribution.os.unlink
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    rename_calls = 0
+    unlink_calls = 0
+    checkpoint_calls = 0
+
+    def count_rename(*args, **kwargs):
+        nonlocal rename_calls
+        rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    def count_unlink(*args, **kwargs):
+        nonlocal unlink_calls
+        if kwargs.get("dir_fd") is not None:
+            unlink_calls += 1
+        return original_unlink(*args, **kwargs)
+
+    def count_checkpoint(*args, **kwargs):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_rename)
+    monkeypatch.setattr(managed_distribution.os, "unlink", count_unlink)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+    monkeypatch.setattr(
+        managed_distribution,
+        "_validate_deprovision_recovery_leaf_parent_namespaces",
+        replace_marker_after_namespace_validation,
+    )
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert marker_rebound is not None
+    assert result.status == "recovery_required"
+    assert result.reason in {"deprovision-recovery-required", "deprovision-recovery-mismatch"}
+    assert not target.exists() and not target.is_symlink()
+    assert backup.lstat() == backup_before
+    assert (backup.read_bytes() if kind == "regular" else backup.readlink()) == backup_payload
+    assert outside.lstat() == outside_before[0]
+    assert outside.read_bytes() == outside_before[1]
+    assert journal_path.read_bytes() == journal_before
+    assert marker_path.lstat() == marker_rebound
+    assert marker_path.read_bytes() == marker_before
+    assert rename_calls == 0
+    assert unlink_calls == 0
+    assert checkpoint_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("kind", "ordinal", "rebind"),
+    [(kind, ordinal, True) for kind in ("regular", "symlink") for ordinal in (1, 2, 3)]
+    + [("regular", 3, False), ("symlink", 3, False)],
+    ids=[
+        *(f"{kind}-ordinal-{ordinal}-rebind" for kind in ("regular", "symlink") for ordinal in (1, 2, 3)),
+        "regular-terminal-complete",
+        "symlink-terminal-complete",
+    ],
+)
+def test_i370_resume_gc_cleanup_deprovision_boundary_is_parent_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    ordinal: int,
+    rebind: bool,
+) -> None:
+    """GC ordinal transitions must use the deprovision attachment boundary."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    source = install_root / ".github" / "workflows" / "ci.yml"
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target = target_root / ".github" / "workflows" / "ci.yml"
+    target.parent.mkdir(parents=True)
+    if kind == "regular":
+        target.write_bytes(b"managed\n")
+    else:
+        source.unlink()
+        source.symlink_to("managed-target")
+        target.symlink_to("managed-target")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_deprovision_workspace_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = store.mark_executing(_prepare_guarded_journal(store, executable))
+    target_rel = ".github/workflows/ci.yml"
+    target.unlink()
+    parent = target.parent
+
+    def create_payload(path: Path) -> None:
+        if kind == "regular":
+            path.write_bytes(b"managed\n")
+        else:
+            path.symlink_to("managed-target")
+
+    def lease_for(
+        path: str,
+        info: os.stat_result,
+        *,
+        role: Literal[
+            "stage",
+            "predecessor-quarantine",
+            "backup-reserved",
+            "backup-dual",
+            "backup-only-reserved",
+            "backup-only",
+            "gc-reserved",
+            "gc-exact",
+        ],
+        predecessor: str | None = None,
+    ):
+        return DistributionStageOwnership(
+            path=target_rel,
+            stage_name=path,
+            device=info.st_dev,
+            inode=info.st_ino,
+            ctime_ns=info.st_ctime_ns,
+            file_type=("regular" if kind == "regular" else "symlink"),
+            role=role,
+            gc_predecessor_name=predecessor,
+            gc_ordinal=ordinal if predecessor is not None else None,
+        )
+
+    if ordinal == 1:
+        source_name = ".spec-dock-gc-source.remove"
+        gc_name = ".spec-dock-gc-ordinal-1.gc"
+        create_payload(parent / source_name)
+        os.link(parent / source_name, parent / gc_name, follow_symlinks=False)
+        source_info = (parent / source_name).lstat()
+        leases = (
+            lease_for(source_name, source_info, role="stage"),
+            lease_for(gc_name, source_info, role="gc-exact", predecessor=source_name),
+        )
+    elif ordinal == 2:
+        predecessor_name = ".spec-dock-gc-ordinal-1.gc"
+        backup_name = managed_distribution._distribution_quarantine_backup_name(predecessor_name)
+        gc_name = ".spec-dock-gc-ordinal-2.gc"
+        create_payload(parent / backup_name)
+        os.link(parent / backup_name, parent / gc_name, follow_symlinks=False)
+        backup_info = (parent / backup_name).lstat()
+        leases = (
+            lease_for(backup_name, backup_info, role="backup-dual"),
+            lease_for(gc_name, backup_info, role="gc-exact", predecessor=predecessor_name),
+        )
+    else:
+        predecessor_name = ".spec-dock-gc-terminal-backup"
+        gc_name = ".spec-dock-gc-ordinal-3.gc"
+        create_payload(parent / gc_name)
+        gc_info = (parent / gc_name).lstat()
+        leases = (
+            lease_for(predecessor_name, gc_info, role="backup-dual"),
+            lease_for(gc_name, gc_info, role="gc-exact", predecessor=predecessor_name),
+        )
+    journal = store.write(
+        managed_distribution.replace(journal, staging_leases=leases),
+        predecessor=journal,
+    )
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    journal_before = journal_path.read_bytes()
+    marker_before = marker_path.read_bytes()
+    outside = target_root / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    outside_before = (outside.lstat(), outside.read_bytes())
+    private_entries = {
+        path.name: (
+            path.lstat(),
+            path.read_bytes() if kind == "regular" else path.readlink(),
+        )
+        for path in parent.iterdir()
+    }
+    displaced = target_root / ".github" / "workflows-displaced"
+    injected = False
+
+    def validate_boundary(path: str, parent_chain: tuple[int, ...]) -> None:
+        nonlocal injected
+        managed_distribution._assert_deprovision_recovery_marker_bound(store, store._forward_guard)
+        if rebind and not injected:
+            parent.rename(displaced)
+            parent.mkdir()
+            injected = True
+        managed_distribution._assert_visible_distribution_chain_exactly_bound(target_root, path, parent_chain)
+
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_unlink = managed_distribution.os.unlink
+    rename_calls = 0
+    unlink_calls = 0
+
+    def count_rename(*args, **kwargs):
+        nonlocal rename_calls
+        rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    def count_unlink(*args, **kwargs):
+        nonlocal unlink_calls
+        if kwargs.get("dir_fd") is not None:
+            unlink_calls += 1
+        return original_unlink(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_rename)
+    monkeypatch.setattr(managed_distribution.os, "unlink", count_unlink)
+    if rebind:
+        with pytest.raises(DistributionApplyError, match="deprovision-visible-parent-chain-mismatch"):
+            store._resume_gc_cleanup(journal, leaf_mutation_validator=validate_boundary)
+        assert injected is True
+        assert journal_path.read_bytes() == journal_before
+        assert marker_path.read_bytes() == marker_before
+        assert target.exists() is False and target.is_symlink() is False
+        assert outside.lstat() == outside_before[0]
+        assert outside.read_bytes() == outside_before[1]
+        assert rename_calls == 0
+        assert unlink_calls == 0
+        assert {
+            path.name: (
+                path.lstat(),
+                path.read_bytes() if kind == "regular" else path.readlink(),
+            )
+            for path in displaced.iterdir()
+        } == private_entries
+    else:
+        completed = store._resume_gc_cleanup(journal, leaf_mutation_validator=validate_boundary)
+        assert completed.status == "executing"
+        assert not any((parent / name).exists() or (parent / name).is_symlink() for name in private_entries)
+        assert not target.exists() and not target.is_symlink()
+        if kind == "symlink":
+            assert private_entries[".spec-dock-gc-ordinal-3.gc"][1] == Path("managed-target")
+        current_marker = managed_distribution._read_distribution_retry_marker(target_root)
+        assert current_marker is not None
+        assert current_marker.operation == "deprovision"
+        assert current_marker.operation_id == completed.operation_id
+        assert current_marker.plan_digest == completed.plan_digest
+        assert current_marker.journal_digest == completed.source_sha256
+        assert journal_path.read_bytes() == managed_distribution._journal_bytes(completed)
+        assert not any(lease.path == target_rel for lease in completed.staging_leases)
+        assert rename_calls > 0
+        assert unlink_calls > 0
+
+
+def test_i370_pending_directory_reappearance_fails_before_checkpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pending directory rebind cannot be published by recovery reconciliation."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    store = OperationJournalStore(target_root)
+    executable = build_executable_mutation_plan(
+        managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    )
+    guard = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    store.bind_forward_guard(guard)
+    store.prepare(executable, package_version="1.2.3")
+    original_remove_directory = managed_distribution._remove_distribution_directory_if_bound
+    interrupted = False
+
+    def remove_directory_then_interrupt(*args, **kwargs):
+        nonlocal interrupted
+        result = original_remove_directory(*args, **kwargs)
+        if not interrupted and args[1].as_posix() == ".github/workflows":
+            interrupted = True
+            raise DistributionApplyError("injected after pending directory removal")
+        return result
+
+    monkeypatch.setattr(
+        managed_distribution, "_remove_distribution_directory_if_bound", remove_directory_then_interrupt
+    )
+    first = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+    assert interrupted is True
+    assert first.status == "recovery_required"
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_directory_if_bound", original_remove_directory)
+
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    journal_before = journal_path.read_bytes()
+    marker_before = marker_path.read_bytes()
+    original_validator = managed_distribution._validate_deprovision_recovery_leaf_parent_namespaces
+    validation_calls = 0
+    rebound = False
+    checkpoint_calls = 0
+    original_checkpoint = OperationJournalStore.checkpoint_published
+
+    def reappear_after_pending_validation(*args, **kwargs):
+        nonlocal validation_calls, rebound
+        result = original_validator(*args, **kwargs)
+        validation_calls += 1
+        if validation_calls == 3:
+            managed.parent.mkdir(parents=True)
+            rebound = True
+        return result
+
+    def count_checkpoint(*args, **kwargs):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(*args, **kwargs)
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_validate_deprovision_recovery_leaf_parent_namespaces",
+        reappear_after_pending_validation,
+    )
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert rebound is True, (validation_calls, result.status, result.reason, result.errors)
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-mismatch"
+    assert journal_path.read_bytes() == journal_before
+    assert marker_path.read_bytes() == marker_before
+    assert checkpoint_calls == 0
+    assert managed.parent.is_dir()
+    assert not managed.exists()
 
 
 def test_i370_deprovision_parent_mode_drift_fails_closed_before_target_write(
