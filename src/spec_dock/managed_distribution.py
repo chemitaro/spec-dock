@@ -285,6 +285,16 @@ class DistributionDirectoryMutationSnapshot:
 
 
 @dataclass(frozen=True)
+class DistributionLeafParentNamespaceWitness:
+    """Immutable immediate-child namespace evidence for a deprovision leaf."""
+
+    relative_path: str
+    binding: PathIdentitySnapshot
+    initial_entries: tuple[DistributionTreeEntrySnapshot, ...]
+    initial_namespace_digest: str
+
+
+@dataclass(frozen=True)
 class DistributionPreservationWitness:
     relative_root: str
     root_binding: PathIdentitySnapshot
@@ -405,6 +415,7 @@ class WorkspaceAssessment:
     actions: tuple[DistributionAction, ...]
     blockers: tuple[DistributionAction, ...]
     directory_snapshots: tuple[DistributionDirectoryMutationSnapshot, ...] = ()
+    leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...] = ()
     preservation_witnesses: tuple[DistributionPreservationWitness, ...] = ()
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
     deprovision_contract: DistributionDeprovisionContract | None = field(
@@ -425,6 +436,7 @@ class ExecutableMutationPlan:
     distribution_plan: DistributionPlan
     actions: tuple[DistributionAction, ...]
     directory_snapshots: tuple[DistributionDirectoryMutationSnapshot, ...] = ()
+    leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...] = ()
     preservation_witnesses: tuple[DistributionPreservationWitness, ...] = ()
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = ()
@@ -464,6 +476,7 @@ class OperationJournal:
     actions: tuple[OperationJournalAction, ...]
     preservation_witnesses: tuple[DistributionPreservationWitness, ...] = ()
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
+    leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...] = ()
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = ()
     generated_state_contract_digest: str | None = None
     active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
@@ -4634,88 +4647,97 @@ def _open_deprovision_directory(target_root: Path, relative_path: str) -> int:
         raise
 
 
-def _capture_immediate_directory_entries(
-    target_root: Path,
+def _capture_immediate_directory_entries_from_fd(
+    directory_fd: int,
     relative_path: str,
 ) -> tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...]]:
     """Capture one held directory's lossless immediate child inventory."""
 
-    directory_fd = _open_deprovision_directory(target_root, relative_path)
     entries: list[DistributionTreeEntrySnapshot] = []
     regular_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
-    try:
-        before = os.fstat(directory_fd)
-        for name in sorted(
-            os.listdir(directory_fd),  # noqa: PTH208 - descriptor-bound listing
-            key=os.fsencode,
-        ):
-            child_path = name if relative_path == "." else f"{relative_path}/{name}"
-            visible = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-            if stat.S_ISDIR(visible.st_mode):
-                entries.append(
-                    DistributionTreeEntrySnapshot(
-                        relative_path=child_path,
-                        kind="directory",
-                        device=visible.st_dev,
-                        inode=visible.st_ino,
-                        ctime_ns=visible.st_ctime_ns,
-                        mode=stat.S_IMODE(visible.st_mode),
-                        link_count=visible.st_nlink,
-                    )
+    before = os.fstat(directory_fd)
+    for name in sorted(
+        os.listdir(directory_fd),
+        key=os.fsencode,
+    ):
+        child_path = name if relative_path == "." else f"{relative_path}/{name}"
+        visible = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if stat.S_ISDIR(visible.st_mode):
+            entries.append(
+                DistributionTreeEntrySnapshot(
+                    relative_path=child_path,
+                    kind="directory",
+                    device=visible.st_dev,
+                    inode=visible.st_ino,
+                    ctime_ns=visible.st_ctime_ns,
+                    mode=stat.S_IMODE(visible.st_mode),
+                    link_count=visible.st_nlink,
                 )
-                continue
-            if stat.S_ISREG(visible.st_mode):
-                child_fd = os.open(name, regular_flags, dir_fd=directory_fd)
-                try:
-                    opened = os.fstat(child_fd)
-                    if not _same_observed_node(visible, opened) or not stat.S_ISREG(opened.st_mode):
-                        raise DistributionPlanError("deprovision child binding changed during observation")
-                    digest = _digest_open_file(child_fd)
-                    after = os.fstat(child_fd)
-                    if _source_snapshot(opened) != _source_snapshot(after):
-                        raise DistributionPlanError("deprovision child changed during observation")
-                    entries.append(
-                        DistributionTreeEntrySnapshot(
-                            relative_path=child_path,
-                            kind="regular",
-                            device=after.st_dev,
-                            inode=after.st_ino,
-                            ctime_ns=after.st_ctime_ns,
-                            mode=stat.S_IMODE(after.st_mode),
-                            link_count=after.st_nlink,
-                            size=after.st_size,
-                            sha256=digest,
-                        )
-                    )
-                finally:
-                    os.close(child_fd)
-                continue
-            if stat.S_ISLNK(visible.st_mode):
-                link_target = str(os.readlink(name, dir_fd=directory_fd))
-                after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-                if not _same_observed_node(visible, after) or not stat.S_ISLNK(after.st_mode):
+            )
+            continue
+        if stat.S_ISREG(visible.st_mode):
+            child_fd = os.open(name, regular_flags, dir_fd=directory_fd)
+            try:
+                opened = os.fstat(child_fd)
+                if not _same_observed_node(visible, opened) or not stat.S_ISREG(opened.st_mode):
+                    raise DistributionPlanError("deprovision child binding changed during observation")
+                digest = _digest_open_file(child_fd)
+                after = os.fstat(child_fd)
+                if _source_snapshot(opened) != _source_snapshot(after):
                     raise DistributionPlanError("deprovision child changed during observation")
                 entries.append(
                     DistributionTreeEntrySnapshot(
                         relative_path=child_path,
-                        kind="symlink",
+                        kind="regular",
                         device=after.st_dev,
                         inode=after.st_ino,
                         ctime_ns=after.st_ctime_ns,
                         mode=stat.S_IMODE(after.st_mode),
                         link_count=after.st_nlink,
-                        link_target=link_target,
+                        size=after.st_size,
+                        sha256=digest,
                     )
                 )
-                continue
-            raise _PreservationCaptureError(child_path, "special-managed-entry-unsafe")
-        after_directory = os.fstat(directory_fd)
-        if not _same_observed_node(before, after_directory):
-            raise DistributionPlanError("deprovision directory changed during observation")
-        binding = _snapshot_from_stat(relative_path, after_directory)
+            finally:
+                os.close(child_fd)
+            continue
+        if stat.S_ISLNK(visible.st_mode):
+            link_target = str(os.readlink(name, dir_fd=directory_fd))
+            after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if not _same_observed_node(visible, after) or not stat.S_ISLNK(after.st_mode):
+                raise DistributionPlanError("deprovision child changed during observation")
+            entries.append(
+                DistributionTreeEntrySnapshot(
+                    relative_path=child_path,
+                    kind="symlink",
+                    device=after.st_dev,
+                    inode=after.st_ino,
+                    ctime_ns=after.st_ctime_ns,
+                    mode=stat.S_IMODE(after.st_mode),
+                    link_count=after.st_nlink,
+                    link_target=link_target,
+                )
+            )
+            continue
+        raise _PreservationCaptureError(child_path, "special-managed-entry-unsafe")
+    after_directory = os.fstat(directory_fd)
+    if not _same_observed_node(before, after_directory):
+        raise DistributionPlanError("deprovision directory changed during observation")
+    binding = _snapshot_from_stat(relative_path, after_directory)
+    return binding, tuple(entries)
+
+
+def _capture_immediate_directory_entries(
+    target_root: Path,
+    relative_path: str,
+) -> tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...]]:
+    """Capture one directory through the shared descriptor-bound observer."""
+
+    directory_fd = _open_deprovision_directory(target_root, relative_path)
+    try:
+        return _capture_immediate_directory_entries_from_fd(directory_fd, relative_path)
     finally:
         os.close(directory_fd)
-    return binding, tuple(entries)
 
 
 def _is_same_or_descendant(path: str, root: str) -> bool:
@@ -4754,6 +4776,22 @@ def _directory_child_digest(
     payload = [
         _directory_child_semantic_payload(entry, classification=classification, owner_source=owner_source)
         for entry, classification, owner_source in sorted(records, key=lambda item: os.fsencode(item[0].relative_path))
+    ]
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def _leaf_parent_namespace_digest(
+    entries: tuple[DistributionTreeEntrySnapshot, ...],
+) -> str:
+    """Hash a lossless immediate namespace using type-specific semantics."""
+
+    payload = [
+        _directory_child_semantic_payload(
+            entry,
+            classification="namespace",
+            owner_source="leaf-parent-namespace",
+        )
+        for entry in sorted(entries, key=lambda item: os.fsencode(item.relative_path))
     ]
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
@@ -4832,6 +4870,7 @@ def _augment_deprovision_tree(
     tuple[DistributionAction, ...],
     tuple[tuple[str, DistributionTargetSnapshot], ...],
     tuple[DistributionDirectoryMutationSnapshot, ...],
+    tuple[DistributionLeafParentNamespaceWitness, ...],
     tuple[DistributionCollapsedAbsenceWitness, ...],
 ]:
     """Complete bounded classification, directory evidence, and absence collapse."""
@@ -4906,6 +4945,37 @@ def _augment_deprovision_tree(
             tree_blockers.append(_generated_state_blocker(exc.path, exc.reason))
         except (OSError, DistributionPlanError):
             tree_blockers.append(_generated_state_blocker(path, "managed-directory-observation-unsafe"))
+
+    leaf_parent_paths = {
+        PurePosixPath(action.path).parent.as_posix()
+        for action in filtered_actions
+        if action.action == "prune"
+        and not action.blocked
+        and classified_snapshots.get(action.path) is not None
+        and classified_snapshots[action.path].target.exists
+    }
+    leaf_parent_paths.discard(".")
+    protocol_paths = {
+        _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+        _DISTRIBUTION_JOURNAL_REL.as_posix(),
+        _UNINSTALL_RETRY_MARKER_REL.as_posix(),
+    }
+    leaf_parent_namespace_witnesses: list[DistributionLeafParentNamespaceWitness] = []
+    for parent_path in sorted(leaf_parent_paths, key=os.fsencode):
+        captured = captured_by_directory.get(parent_path)
+        if captured is None:
+            tree_blockers.append(_generated_state_blocker(parent_path, "leaf-parent-namespace-unavailable"))
+            continue
+        binding, captured_entries = captured
+        entries = tuple(entry for entry in captured_entries if entry.relative_path not in protocol_paths)
+        leaf_parent_namespace_witnesses.append(
+            DistributionLeafParentNamespaceWitness(
+                relative_path=parent_path,
+                binding=binding,
+                initial_entries=entries,
+                initial_namespace_digest=_leaf_parent_namespace_digest(entries),
+            )
+        )
 
     explained_protocol_paths = {
         "spec-dock/.distribution-retry.json",
@@ -5061,6 +5131,12 @@ def _augment_deprovision_tree(
                 key=lambda item: (-len(PurePosixPath(item.relative_path).parts), item.relative_path),
             )
         ),
+        tuple(
+            sorted(
+                leaf_parent_namespace_witnesses,
+                key=lambda item: os.fsencode(item.relative_path),
+            )
+        ),
         tuple(sorted(absence_witnesses, key=lambda item: item.relative_root)),
     )
 
@@ -5118,6 +5194,7 @@ def build_deprovision_workspace_assessment(
         tree_actions,
         target_snapshots,
         directory_snapshots,
+        leaf_parent_namespace_witnesses,
         absence_witnesses,
     ) = _augment_deprovision_tree(
         Path(target_root),
@@ -5163,6 +5240,7 @@ def build_deprovision_workspace_assessment(
         actions=actions,
         blockers=tuple(action for action in actions if action.blocked),
         directory_snapshots=directory_snapshots,
+        leaf_parent_namespace_witnesses=leaf_parent_namespace_witnesses,
         preservation_witnesses=tuple(preservation_witnesses),
         absence_witnesses=absence_witnesses,
         deprovision_contract=contract,
@@ -6055,6 +6133,34 @@ def _directory_snapshot_digest_payload(
     }
 
 
+def _leaf_parent_namespace_witness_payload(
+    witness: DistributionLeafParentNamespaceWitness,
+) -> dict[str, object]:
+    return {
+        "relative_path": witness.relative_path,
+        "binding": _semantic_path_binding_payload(witness.binding),
+        "initial_entries": [_tree_entry_payload(entry) for entry in witness.initial_entries],
+        "initial_namespace_digest": witness.initial_namespace_digest,
+    }
+
+
+def _durable_leaf_parent_namespace_witness(
+    witness: DistributionLeafParentNamespaceWitness,
+) -> DistributionLeafParentNamespaceWitness:
+    """Drop mutable directory metadata from persisted parent evidence."""
+
+    return replace(
+        witness,
+        binding=replace(
+            witness.binding,
+            ctime_ns=None,
+            link_count=None,
+            size=None,
+            identity=None,
+        ),
+    )
+
+
 def _preservation_witness_payload(
     witness: DistributionPreservationWitness,
 ) -> dict[str, object]:
@@ -6122,6 +6228,7 @@ def _distribution_plan_digest(
     plan: DistributionPlan,
     actions: tuple[DistributionAction, ...],
     directory_snapshots: tuple[DistributionDirectoryMutationSnapshot, ...] = (),
+    leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...] = (),
     preservation_witnesses: tuple[DistributionPreservationWitness, ...] = (),
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = (),
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = (),
@@ -6187,13 +6294,16 @@ def _distribution_plan_digest(
         if generated_state_contract_digest is None:
             raise DistributionPlanError("deprovision plan digest is missing generated state authority")
         payload.update({
-            "digest_format_version": 2,
+            "digest_format_version": 3,
             "authority": "managed-distribution-deprovision",
             "generated_state_contract_digest": generated_state_contract_digest,
             "active_selection_witnesses": [
                 _active_selection_witness_payload(witness) for witness in active_selection_witnesses
             ],
             "directory_snapshots": [_directory_snapshot_digest_payload(snapshot) for snapshot in directory_snapshots],
+            "leaf_parent_namespace_witnesses": [
+                _leaf_parent_namespace_witness_payload(witness) for witness in leaf_parent_namespace_witnesses
+            ],
             "preservation_witnesses": [_preservation_witness_payload(witness) for witness in preservation_witnesses],
             "absence_witnesses": [_absence_witness_payload(witness) for witness in absence_witnesses],
             "source_semantic_identities": [
@@ -6218,6 +6328,7 @@ def _mutation_plan_digest(
         plan=assessment.distribution_plan,
         actions=assessment.actions,
         directory_snapshots=assessment.directory_snapshots,
+        leaf_parent_namespace_witnesses=assessment.leaf_parent_namespace_witnesses,
         preservation_witnesses=assessment.preservation_witnesses,
         absence_witnesses=assessment.absence_witnesses,
         source_semantic_identities=(
@@ -6255,6 +6366,7 @@ def _executable_plan_digest(
         plan=plan.distribution_plan,
         actions=plan.actions,
         directory_snapshots=plan.directory_snapshots,
+        leaf_parent_namespace_witnesses=plan.leaf_parent_namespace_witnesses,
         preservation_witnesses=plan.preservation_witnesses,
         absence_witnesses=plan.absence_witnesses,
         source_semantic_identities=plan.source_semantic_identities,
@@ -6266,7 +6378,11 @@ def _executable_plan_digest(
     )
 
 
-def _deprovision_journal_plan_digest(journal: OperationJournal) -> str:
+def _deprovision_journal_plan_digest(
+    journal: OperationJournal,
+    *,
+    digest_format_version: int = 3,
+) -> str:
     """Recompute a deprovision digest from the immutable journal plan fields."""
 
     action_by_path = {action.path: action for action in journal.actions}
@@ -6374,7 +6490,7 @@ def _deprovision_journal_plan_digest(journal: OperationJournal) -> str:
             }
             for action in journal.actions
         ],
-        "digest_format_version": 2,
+        "digest_format_version": digest_format_version,
         "authority": "managed-distribution-deprovision",
         "generated_state_contract_digest": journal.generated_state_contract_digest,
         "active_selection_witnesses": [
@@ -6389,6 +6505,10 @@ def _deprovision_journal_plan_digest(journal: OperationJournal) -> str:
             _source_semantic_payload(identity) for identity in journal.source_semantic_identities
         ],
     }
+    if digest_format_version >= 3:
+        payload["leaf_parent_namespace_witnesses"] = [
+            _leaf_parent_namespace_witness_payload(witness) for witness in journal.leaf_parent_namespace_witnesses
+        ]
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -6514,6 +6634,14 @@ def _validate_deprovision_plan_metadata(
         raise DistributionPlanError("deprovision executable plan contains a non-mutating disposition")
     if actions != _ordered_deprovision_actions(actions):
         raise DistributionPlanError("deprovision executable action order is not canonical")
+    try:
+        _validate_leaf_parent_namespace_witness_coverage(
+            actions,
+            assessment.leaf_parent_namespace_witnesses,
+            target_snapshots=dict(assessment.distribution_plan.target_snapshots),
+        )
+    except DistributionApplyError as exc:
+        raise DistributionPlanError("deprovision leaf-parent namespace witness is not canonical") from exc
     if assessment.preservation_witnesses != tuple(
         sorted(assessment.preservation_witnesses, key=lambda witness: witness.relative_root)
     ):
@@ -6734,6 +6862,7 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
             plan=assessment.distribution_plan,
             actions=executable_actions,
             directory_snapshots=assessment.directory_snapshots,
+            leaf_parent_namespace_witnesses=assessment.leaf_parent_namespace_witnesses,
             preservation_witnesses=assessment.preservation_witnesses,
             absence_witnesses=assessment.absence_witnesses,
             source_semantic_identities=(
@@ -6755,6 +6884,7 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
         distribution_plan=assessment.distribution_plan,
         actions=executable_actions,
         directory_snapshots=assessment.directory_snapshots,
+        leaf_parent_namespace_witnesses=assessment.leaf_parent_namespace_witnesses,
         preservation_witnesses=assessment.preservation_witnesses,
         absence_witnesses=assessment.absence_witnesses,
         source_semantic_identities=(
@@ -6885,6 +7015,9 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
     }
     if journal.intent == "deprovision":
         payload.update({
+            "leaf_parent_namespace_witnesses": [
+                _leaf_parent_namespace_witness_payload(witness) for witness in journal.leaf_parent_namespace_witnesses
+            ],
             "preservation_witnesses": [
                 _preservation_witness_payload(witness) for witness in journal.preservation_witnesses
             ],
@@ -7047,6 +7180,73 @@ def _parse_tree_entry_snapshot(raw_entry: object) -> DistributionTreeEntrySnapsh
         sha256=sha256,
         link_target=link_target,
     )
+
+
+def _parse_leaf_parent_namespace_witnesses(
+    raw_witnesses: object,
+) -> tuple[DistributionLeafParentNamespaceWitness, ...]:
+    if not isinstance(raw_witnesses, list):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    witnesses: list[DistributionLeafParentNamespaceWitness] = []
+    binding_fields = {"relative_path", "exists", "device", "inode", "file_type", "mode"}
+    protocol_paths = {
+        _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+        _DISTRIBUTION_JOURNAL_REL.as_posix(),
+        _UNINSTALL_RETRY_MARKER_REL.as_posix(),
+    }
+    for raw_witness in raw_witnesses:
+        if (
+            not isinstance(raw_witness, dict)
+            or set(raw_witness) != {"relative_path", "binding", "initial_entries", "initial_namespace_digest"}
+            or not isinstance(raw_witness["binding"], dict)
+            or set(raw_witness["binding"]) != binding_fields
+            or not isinstance(raw_witness["initial_entries"], list)
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        relative_path = _journal_relative_path(raw_witness["relative_path"])
+        if relative_path == ".":
+            raise DistributionApplyError("journal-protocol-incompatible")
+        binding = raw_witness["binding"]
+        if (
+            binding["relative_path"] != relative_path
+            or binding["exists"] is not True
+            or binding["file_type"] != "directory"
+            or any(
+                isinstance(binding[field], bool) or not isinstance(binding[field], int)
+                for field in ("device", "inode", "mode")
+            )
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        entries = tuple(_parse_tree_entry_snapshot(item) for item in raw_witness["initial_entries"])
+        if (
+            entries != tuple(sorted(entries, key=lambda item: os.fsencode(item.relative_path)))
+            or len({entry.relative_path for entry in entries}) != len(entries)
+            or any(PurePosixPath(entry.relative_path).parent.as_posix() != relative_path for entry in entries)
+            or any(entry.relative_path in protocol_paths for entry in entries)
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        namespace_digest = _journal_sha256(raw_witness["initial_namespace_digest"])
+        if namespace_digest != _leaf_parent_namespace_digest(entries):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        witnesses.append(
+            DistributionLeafParentNamespaceWitness(
+                relative_path=relative_path,
+                binding=PathIdentitySnapshot(
+                    relative_path=relative_path,
+                    exists=True,
+                    device=binding["device"],
+                    inode=binding["inode"],
+                    file_type="directory",
+                    mode=binding["mode"],
+                ),
+                initial_entries=entries,
+                initial_namespace_digest=namespace_digest,
+            )
+        )
+    canonical = tuple(sorted(witnesses, key=lambda item: os.fsencode(item.relative_path)))
+    if tuple(witnesses) != canonical or len({item.relative_path for item in witnesses}) != len(witnesses):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    return canonical
 
 
 def _parse_preservation_witnesses(
@@ -7318,12 +7518,271 @@ def _validate_journal_path_condition(
         _journal_mode(value["mode"])
 
 
+def _validate_leaf_parent_namespace_witness_shape(
+    witnesses: tuple[DistributionLeafParentNamespaceWitness, ...],
+) -> dict[str, DistributionLeafParentNamespaceWitness]:
+    """Validate canonical, immutable shape of leaf-parent namespace evidence."""
+
+    canonical = tuple(sorted(witnesses, key=lambda item: os.fsencode(item.relative_path)))
+    if witnesses != canonical or len({item.relative_path for item in witnesses}) != len(witnesses):
+        raise DistributionApplyError("journal-protocol-incompatible")
+    result: dict[str, DistributionLeafParentNamespaceWitness] = {}
+    protocol_paths = {
+        _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+        _DISTRIBUTION_JOURNAL_REL.as_posix(),
+        _UNINSTALL_RETRY_MARKER_REL.as_posix(),
+    }
+    for witness in witnesses:
+        relative_path = _journal_relative_path(witness.relative_path)
+        binding_device = witness.binding.device
+        binding_inode = witness.binding.inode
+        binding_mode = witness.binding.mode
+        if (
+            relative_path == "."
+            or witness.binding.relative_path != relative_path
+            or not witness.binding.exists
+            or witness.binding.file_type != "directory"
+            or any(
+                value is None or isinstance(value, bool) or not isinstance(value, int)
+                for value in (binding_device, binding_inode, binding_mode)
+            )
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        assert binding_inode is not None
+        assert binding_mode is not None
+        if binding_inode < 1 or binding_mode < 0 or binding_mode > 0o777:
+            raise DistributionApplyError("journal-protocol-incompatible")
+        entries = witness.initial_entries
+        if entries != tuple(sorted(entries, key=lambda item: os.fsencode(item.relative_path))) or len({
+            entry.relative_path for entry in entries
+        }) != len(entries):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        for entry in entries:
+            if (
+                _journal_relative_path(entry.relative_path) == "."
+                or PurePosixPath(entry.relative_path).parent.as_posix() != relative_path
+                or entry.relative_path in protocol_paths
+                or entry.device < 0
+                or entry.inode < 1
+                or entry.ctime_ns < 1
+                or entry.mode < 0
+                or entry.mode > 0o777
+                or entry.link_count < 1
+            ):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            if entry.kind == "regular":
+                if (
+                    entry.size is None
+                    or entry.size < 0
+                    or not isinstance(entry.sha256, str)
+                    or _SHA256_RE.fullmatch(entry.sha256) is None
+                    or entry.link_target is not None
+                    or entry.link_count != 1
+                ):
+                    raise DistributionApplyError("journal-protocol-incompatible")
+            elif entry.kind == "symlink":
+                if (
+                    entry.size is not None
+                    or entry.sha256 is not None
+                    or not isinstance(entry.link_target, str)
+                    or "\x00" in entry.link_target
+                    or entry.link_count != 1
+                ):
+                    raise DistributionApplyError("journal-protocol-incompatible")
+            elif entry.kind == "directory":
+                if entry.size is not None or entry.sha256 is not None or entry.link_target is not None:
+                    raise DistributionApplyError("journal-protocol-incompatible")
+            else:
+                raise DistributionApplyError("journal-protocol-incompatible")
+        if _journal_sha256(witness.initial_namespace_digest) != _leaf_parent_namespace_digest(entries):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        result[relative_path] = witness
+    return result
+
+
+def _leaf_namespace_entry_matches_snapshot(
+    entry: DistributionTreeEntrySnapshot,
+    snapshot: PathIdentitySnapshot,
+) -> bool:
+    if (
+        not snapshot.exists
+        or entry.relative_path != snapshot.relative_path
+        or entry.kind != snapshot.file_type
+        or entry.device != snapshot.device
+        or entry.inode != snapshot.inode
+        or entry.ctime_ns != snapshot.ctime_ns
+        or entry.mode != snapshot.mode
+        or entry.link_count != snapshot.link_count
+    ):
+        return False
+    if entry.kind == "regular":
+        return (
+            entry.size == snapshot.size
+            and snapshot.identity is not None
+            and snapshot.identity.kind == "regular"
+            and entry.sha256 == snapshot.identity.sha256
+            and entry.link_target is None
+        )
+    if entry.kind == "symlink":
+        return (
+            entry.size is None
+            and entry.sha256 is None
+            and snapshot.identity is not None
+            and snapshot.identity.kind == "symlink"
+            and entry.link_target == snapshot.identity.target
+        )
+    return entry.size is None and entry.sha256 is None and entry.link_target is None
+
+
+def _same_structure_identity_snapshot(
+    left: PathIdentitySnapshot,
+    right: PathIdentitySnapshot,
+) -> bool:
+    return (
+        left.exists
+        and right.exists
+        and left.file_type == right.file_type == "directory"
+        and left.device == right.device
+        and left.inode == right.inode
+        and left.mode == right.mode
+    )
+
+
+def _leaf_namespace_entry_matches_precondition(
+    entry: DistributionTreeEntrySnapshot,
+    precondition: dict[str, object],
+) -> bool:
+    kind = precondition.get("file_type")
+    identity = precondition.get("identity")
+    if (
+        precondition.get("exists") is not True
+        or not isinstance(kind, str)
+        or entry.kind != kind
+        or entry.device != precondition.get("device")
+        or entry.inode != precondition.get("inode")
+        or entry.ctime_ns != precondition.get("ctime_ns")
+        or entry.mode != precondition.get("mode")
+        or entry.link_count != precondition.get("link_count")
+        or not isinstance(identity, dict)
+    ):
+        return False
+    if kind == "regular":
+        return (
+            entry.size == precondition.get("size")
+            and entry.sha256 == identity.get("sha256")
+            and entry.link_target is None
+        )
+    if kind == "symlink":
+        return entry.size is None and entry.sha256 is None and entry.link_target == identity.get("target")
+    return entry.size is None and entry.sha256 is None and entry.link_target is None
+
+
+def _leaf_namespace_entry_matches_precondition_semantic(
+    entry: DistributionTreeEntrySnapshot,
+    precondition: dict[str, object],
+) -> bool:
+    """Match a renamed predecessor while ignoring rename-mutated ctime."""
+
+    kind = precondition.get("file_type")
+    identity = precondition.get("identity")
+    if (
+        precondition.get("exists") is not True
+        or not isinstance(kind, str)
+        or entry.kind != kind
+        or entry.device != precondition.get("device")
+        or entry.inode != precondition.get("inode")
+        or entry.mode != precondition.get("mode")
+        or entry.link_count != precondition.get("link_count")
+        or not isinstance(identity, dict)
+    ):
+        return False
+    if kind == "regular":
+        return (
+            entry.size == precondition.get("size")
+            and entry.sha256 == identity.get("sha256")
+            and entry.link_target is None
+        )
+    if kind == "symlink":
+        return entry.size is None and entry.sha256 is None and entry.link_target == identity.get("target")
+    return entry.size is None and entry.sha256 is None and entry.link_target is None
+
+
+def _validate_leaf_parent_namespace_witness_coverage(
+    actions: tuple[OperationJournalAction, ...] | tuple[DistributionAction, ...],
+    witnesses: tuple[DistributionLeafParentNamespaceWitness, ...],
+    *,
+    target_snapshots: Mapping[str, DistributionTargetSnapshot] | None = None,
+) -> None:
+    witness_by_parent = _validate_leaf_parent_namespace_witness_shape(witnesses)
+    covered_parents: set[str] = set()
+    for action in actions:
+        if action.action != "prune":
+            continue
+        path = action.path
+        parent_path = PurePosixPath(path).parent.as_posix()
+        if parent_path == ".":
+            continue
+        witness = witness_by_parent.get(parent_path)
+        if target_snapshots is not None:
+            target_snapshot = target_snapshots.get(path)
+            if target_snapshot is None or not target_snapshot.target.exists:
+                continue
+            snapshot = target_snapshot
+        elif isinstance(action, OperationJournalAction) and action.precondition.get("exists") is not True:
+            continue
+        if witness is None:
+            raise DistributionApplyError("journal-plan-mismatch")
+        covered_parents.add(parent_path)
+        entries = {entry.relative_path: entry for entry in witness.initial_entries}
+        entry = entries.get(path)
+        if entry is None:
+            raise DistributionApplyError("journal-plan-mismatch")
+        if target_snapshots is not None:
+            if not _leaf_namespace_entry_matches_snapshot(entry, snapshot.target):
+                raise DistributionApplyError("journal-plan-mismatch")
+            parent_binding = next(
+                (parent for parent in snapshot.parents if parent.relative_path == parent_path),
+                None,
+            )
+            if parent_binding is None or not _same_structure_identity_snapshot(witness.binding, parent_binding):
+                raise DistributionApplyError("journal-plan-mismatch")
+        else:
+            assert isinstance(action, OperationJournalAction)
+            if not _leaf_namespace_entry_matches_precondition(entry, action.precondition):
+                raise DistributionApplyError("journal-plan-mismatch")
+            raw_parents = action.precondition.get("parents")
+            parent_condition = (
+                next(
+                    (
+                        item
+                        for item in raw_parents
+                        if isinstance(item, dict) and item.get("relative_path") == parent_path
+                    ),
+                    None,
+                )
+                if isinstance(raw_parents, list)
+                else None
+            )
+            if (
+                parent_condition is None
+                or parent_condition.get("file_type") != "directory"
+                or parent_condition.get("device") != witness.binding.device
+                or parent_condition.get("inode") != witness.binding.inode
+                or parent_condition.get("mode") != witness.binding.mode
+            ):
+                raise DistributionApplyError("journal-plan-mismatch")
+    if set(witness_by_parent) != covered_parents:
+        raise DistributionApplyError("journal-plan-mismatch")
+
+
 def _validate_deprovision_journal_actions(
     actions: tuple[OperationJournalAction, ...],
     *,
     status: JournalStatus,
+    leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...],
     preservation_witnesses: tuple[DistributionPreservationWitness, ...],
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...],
+    allow_witnessless_completed: bool = False,
 ) -> None:
     if not actions or len({action.path for action in actions}) != len(actions):
         raise DistributionApplyError("journal-protocol-incompatible")
@@ -7342,6 +7801,11 @@ def _validate_deprovision_journal_actions(
         for action in actions
     ):
         raise DistributionApplyError("journal-protocol-incompatible")
+    if allow_witnessless_completed:
+        if status != "completed" or leaf_parent_namespace_witnesses:
+            raise DistributionApplyError("journal-protocol-incompatible")
+    else:
+        _validate_leaf_parent_namespace_witness_coverage(actions, leaf_parent_namespace_witnesses)
     action_by_path = {action.path: action for action in actions}
     action_index = {action.path: index for index, action in enumerate(actions)}
     empty_digest = _directory_child_digest(())
@@ -7515,8 +7979,10 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         "created_parent_bindings_digest",
     }
     is_deprovision = payload.get("intent") == "deprovision"
+    legacy_witnessless_deprovision = False
     if is_deprovision:
         expected_fields.update({
+            "leaf_parent_namespace_witnesses",
             "preservation_witnesses",
             "absence_witnesses",
             "source_semantic_identities",
@@ -7532,7 +7998,18 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         "file_type",
         "link_count",
     } | ({"mode"} if is_deprovision else set())
-    if set(payload) != expected_fields:
+    if is_deprovision and set(payload) == expected_fields - {"leaf_parent_namespace_witnesses"}:
+        legacy_witnessless_deprovision = True
+        raw_actions = payload.get("actions")
+        raw_leases = payload.get("staging_leases")
+        if (
+            payload.get("status") != "completed"
+            or not isinstance(raw_actions, list)
+            or any(not isinstance(item, dict) or item.get("checkpoint") != "verified" for item in raw_actions)
+            or raw_leases != []
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+    elif set(payload) != expected_fields:
         raise DistributionApplyError("journal-protocol-incompatible")
     root = payload["root_binding"]
     workspace = payload["workspace_binding"]
@@ -7584,7 +8061,12 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     source_semantic_identities: tuple[DistributionSourceSemanticIdentity, ...] = ()
     generated_state_contract_digest: str | None = None
     active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
+    leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...] = ()
     if is_deprovision:
+        if not legacy_witnessless_deprovision:
+            leaf_parent_namespace_witnesses = _parse_leaf_parent_namespace_witnesses(
+                payload["leaf_parent_namespace_witnesses"]
+            )
         preservation_witnesses = _parse_preservation_witnesses(payload["preservation_witnesses"])
         absence_witnesses = _parse_absence_witnesses(payload["absence_witnesses"])
         source_semantic_identities = _parse_source_semantic_identities(payload["source_semantic_identities"])
@@ -7766,8 +8248,10 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         _validate_deprovision_journal_actions(
             tuple(parsed_actions),
             status=cast("JournalStatus", payload["status"]),
+            leaf_parent_namespace_witnesses=leaf_parent_namespace_witnesses,
             preservation_witnesses=preservation_witnesses,
             absence_witnesses=absence_witnesses,
+            allow_witnessless_completed=legacy_witnessless_deprovision,
         )
     elif (
         (payload["status"] == "prepared" and (checkpoints - {"pending"} or not prepared_leases_are_guard_inheritable))
@@ -7805,6 +8289,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         actions=tuple(parsed_actions),
         preservation_witnesses=preservation_witnesses,
         absence_witnesses=absence_witnesses,
+        leaf_parent_namespace_witnesses=leaf_parent_namespace_witnesses,
         source_semantic_identities=source_semantic_identities,
         generated_state_contract_digest=generated_state_contract_digest,
         active_selection_witnesses=active_selection_witnesses,
@@ -8451,6 +8936,9 @@ class OperationJournalStore:
             ),
             preservation_witnesses=plan.preservation_witnesses,
             absence_witnesses=tuple(_durable_absence_witness(witness) for witness in plan.absence_witnesses),
+            leaf_parent_namespace_witnesses=tuple(
+                _durable_leaf_parent_namespace_witness(witness) for witness in plan.leaf_parent_namespace_witnesses
+            ),
             source_semantic_identities=plan.source_semantic_identities,
             generated_state_contract_digest=plan.generated_state_contract_digest,
             active_selection_witnesses=plan.active_selection_witnesses,
@@ -11628,6 +12116,7 @@ def _resume_executable_plan(
         plan_digest=journal.plan_digest,
         distribution_plan=pending_plan,
         actions=tuple(original_actions),
+        leaf_parent_namespace_witnesses=journal.leaf_parent_namespace_witnesses,
         preservation_witnesses=journal.preservation_witnesses,
         absence_witnesses=journal.absence_witnesses,
         source_semantic_identities=journal.source_semantic_identities,
@@ -13688,39 +14177,220 @@ def _assert_deprovision_directory_dependencies_published(
     return tuple(evidence)
 
 
+def _leaf_namespace_entry_matches_protocol(
+    entry: DistributionTreeEntrySnapshot,
+    *,
+    expected_path: str,
+    expected_snapshot: DistributionSourceSnapshot | PathIdentitySnapshot | None,
+    expected_sha256: str | None,
+) -> bool:
+    return not (
+        expected_snapshot is None
+        or expected_sha256 is None
+        or entry.relative_path != expected_path
+        or entry.kind != "regular"
+        or entry.device != expected_snapshot.device
+        or entry.inode != expected_snapshot.inode
+        or entry.ctime_ns != expected_snapshot.ctime_ns
+        or entry.mode != expected_snapshot.mode
+        or entry.link_count != 1
+        or entry.size != expected_snapshot.size
+        or entry.sha256 != expected_sha256
+        or entry.link_target is not None
+    )
+
+
+def _leaf_namespace_entry_matches_lease(
+    entry: DistributionTreeEntrySnapshot,
+    *,
+    parent_path: str,
+    expected_entry: DistributionTreeEntrySnapshot | None,
+    lease: DistributionStageOwnership,
+) -> bool:
+    expected_path = f"{parent_path}/{lease.stage_name}"
+    if (
+        expected_entry is None
+        or entry.relative_path != expected_path
+        or entry.kind != lease.file_type
+        or entry.device != lease.device
+        or entry.inode != lease.inode
+        or entry.kind != expected_entry.kind
+        or entry.mode != expected_entry.mode
+    ):
+        return False
+    if lease.role == "backup-dual":
+        if entry.link_count != 2:
+            return False
+    elif lease.role == "backup-only":
+        if entry.link_count != 1:
+            return False
+    elif lease.role == "predecessor-quarantine":
+        # Creating the independent backup hardlink changes both ctime and
+        # link_count after the predecessor lease was durably recorded.  The
+        # inode and content identity remain exact, while the operation-owned
+        # transition may legitimately expose one or two links here.
+        if entry.link_count not in {1, 2}:
+            return False
+    elif entry.link_count != 1:
+        return False
+    if entry.kind == "regular":
+        return entry.size == expected_entry.size and entry.sha256 == expected_entry.sha256 and entry.link_target is None
+    return entry.size is None and entry.sha256 is None and entry.link_target == expected_entry.link_target
+
+
 def _assert_deprovision_leaf_parent_namespace(
     parent_fd: int,
     path: str,
     *,
-    directory_snapshots: dict[str, DistributionDirectoryMutationSnapshot],
+    leaf_parent_namespace_witnesses: dict[str, DistributionLeafParentNamespaceWitness],
     journal: OperationJournal,
+    forward_guard: DistributionRetryMarker | None = None,
+    durably_quarantined_paths: frozenset[str] = frozenset(),
+    owned_zero_predecessor_paths: frozenset[str] = frozenset(),
 ) -> None:
-    """Reject an unaccounted immediate sibling before a leaf is quarantined."""
+    """Reject any semantic immediate-child namespace change before a leaf mutation."""
 
     parent_path = PurePosixPath(path).parent.as_posix()
-    directory_snapshot = directory_snapshots.get(parent_path)
-    if directory_snapshot is None:
+    if parent_path == ".":
         return
-    expected_child_paths = {entry.relative_path for entry in directory_snapshot.initial_entries}
-    expected_child_paths.update(evidence.child_path for evidence in directory_snapshot.immediate_child_evidence)
-    published_paths = {record.path for record in journal.actions if record.checkpoint == "published"}
-    expected_child_paths.difference_update(published_paths)
-    allowed_names = {PurePosixPath(child_path).name for child_path in expected_child_paths}
-    allowed_names.update(
-        lease.stage_name
-        for lease in journal.staging_leases
-        if PurePosixPath(lease.path).parent.as_posix() == parent_path
-    )
-    try:
-        actual_names = set(os.listdir(parent_fd))
-    except OSError as exc:
-        raise DistributionApplyError("deprovision-parent-namespace-mismatch", failed_paths=(parent_path,)) from exc
-    unexpected_names = tuple(sorted(actual_names - allowed_names, key=os.fsencode))
-    if unexpected_names:
-        failed_paths = tuple(name if parent_path == "." else f"{parent_path}/{name}" for name in unexpected_names)
+    witness = leaf_parent_namespace_witnesses.get(parent_path)
+    if witness is None:
         raise DistributionApplyError(
             "deprovision-parent-namespace-mismatch",
-            failed_paths=failed_paths,
+            failed_paths=(parent_path,),
+        )
+    try:
+        held = os.fstat(parent_fd)
+        if (
+            not stat.S_ISDIR(held.st_mode)
+            or stat.S_ISLNK(held.st_mode)
+            or held.st_dev != witness.binding.device
+            or held.st_ino != witness.binding.inode
+            or stat.S_IMODE(held.st_mode) != witness.binding.mode
+        ):
+            raise DistributionApplyError(
+                "deprovision-parent-namespace-mismatch",
+                failed_paths=(parent_path,),
+            )
+        _binding, captured_entries = _capture_immediate_directory_entries_from_fd(parent_fd, parent_path)
+    except DistributionApplyError:
+        raise
+    except (_PreservationCaptureError, OSError, DistributionPlanError) as exc:
+        raise DistributionApplyError(
+            "deprovision-parent-namespace-mismatch",
+            failed_paths=(parent_path,),
+        ) from exc
+
+    expected_entries = {entry.relative_path: entry for entry in witness.initial_entries}
+    actual_entries = {entry.relative_path: entry for entry in captured_entries}
+
+    # Protocol entries are operation-owned metadata, not target namespace
+    # authority.  They must still match their held, content-bound identities.
+    if parent_path == "spec-dock":
+        protocol_records = (
+            (
+                _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+                forward_guard.source_snapshot if forward_guard is not None else None,
+                forward_guard.source_sha256 if forward_guard is not None else None,
+            ),
+            (
+                _DISTRIBUTION_JOURNAL_REL.as_posix(),
+                journal.source_snapshot,
+                journal.source_sha256,
+            ),
+        )
+        for protocol_path, source_snapshot, source_sha256 in protocol_records:
+            protocol_entry = actual_entries.pop(protocol_path, None)
+            if protocol_entry is None or not _leaf_namespace_entry_matches_protocol(
+                protocol_entry,
+                expected_path=protocol_path,
+                expected_snapshot=source_snapshot,
+                expected_sha256=source_sha256,
+            ):
+                raise DistributionApplyError(
+                    "deprovision-parent-namespace-mismatch",
+                    failed_paths=(parent_path,),
+                )
+            expected_entries.pop(protocol_path, None)
+
+    # A zero reservation is intentionally not a namespace allowlist entry.  A
+    # nonzero lease is accepted only when the exact leased stage is present.
+    leases = tuple(
+        lease for lease in journal.staging_leases if PurePosixPath(lease.path).parent.as_posix() == parent_path
+    )
+    for lease in leases:
+        stage_path = f"{parent_path}/{lease.stage_name}"
+        stage_entry = actual_entries.get(stage_path)
+        if lease.device == lease.inode == lease.ctime_ns == 0:
+            if stage_entry is not None:
+                if lease.path in owned_zero_predecessor_paths:
+                    record = next(
+                        (item for item in journal.actions if item.path == lease.path and item.action == "prune"),
+                        None,
+                    )
+                    if record is not None and _leaf_namespace_entry_matches_precondition_semantic(
+                        stage_entry,
+                        record.precondition,
+                    ):
+                        actual_entries.pop(stage_path, None)
+                        durably_quarantined_paths = frozenset((*durably_quarantined_paths, lease.path))
+                        continue
+                raise DistributionApplyError(
+                    "deprovision-parent-namespace-mismatch",
+                    failed_paths=(parent_path,),
+                )
+            continue
+        if stage_entry is None and lease.role == "predecessor-quarantine" and lease.path in durably_quarantined_paths:
+            # The predecessor may already have been durably unlinked after an
+            # exact backup was retained.  The invocation-local marker permits
+            # only that exact nonzero predecessor to be absent; it never
+            # authorizes an arbitrary sibling.
+            continue
+        expected_entry = expected_entries.get(lease.path)
+        if stage_entry is None or not _leaf_namespace_entry_matches_lease(
+            stage_entry,
+            parent_path=parent_path,
+            expected_entry=expected_entry,
+            lease=lease,
+        ):
+            raise DistributionApplyError(
+                "deprovision-parent-namespace-mismatch",
+                failed_paths=(parent_path,),
+            )
+        actual_entries.pop(stage_path, None)
+        expected_entries.pop(stage_path, None)
+
+    published_paths = {
+        record.path
+        for record in journal.actions
+        if record.checkpoint != "pending" and PurePosixPath(record.path).parent.as_posix() == parent_path
+    }
+    for published_path in published_paths:
+        expected_entries.pop(published_path, None)
+    for quarantined_path in durably_quarantined_paths:
+        if PurePosixPath(quarantined_path).parent.as_posix() == parent_path:
+            expected_entries.pop(quarantined_path, None)
+
+    expected_semantics = {
+        relative_path: _directory_child_semantic_payload(
+            entry,
+            classification="namespace",
+            owner_source="leaf-parent-namespace",
+        )
+        for relative_path, entry in expected_entries.items()
+    }
+    actual_semantics = {
+        relative_path: _directory_child_semantic_payload(
+            entry,
+            classification="namespace",
+            owner_source="leaf-parent-namespace",
+        )
+        for relative_path, entry in actual_entries.items()
+    }
+    if expected_semantics != actual_semantics:
+        raise DistributionApplyError(
+            "deprovision-parent-namespace-mismatch",
+            failed_paths=(parent_path,),
         )
 
 
@@ -14198,6 +14868,75 @@ def _validate_deprovision_recovery_action_semantics(
             raise DistributionApplyError("journal-plan-mismatch")
 
 
+def _validate_deprovision_recovery_leaf_parent_namespaces(
+    target_root: Path,
+    journal: OperationJournal,
+    *,
+    forward_guard: DistributionRetryMarker | None = None,
+) -> None:
+    """Re-prove every pending leaf parent before recovery can checkpoint it."""
+
+    witnesses = {witness.relative_path: witness for witness in journal.leaf_parent_namespace_witnesses}
+    durably_quarantined_paths = frozenset(
+        lease.path
+        for lease in journal.staging_leases
+        if (lease.role == "predecessor-quarantine" and lease.device > 0 and lease.inode > 0 and lease.ctime_ns > 0)
+    )
+    owned_zero_predecessor_paths = frozenset(
+        lease.path
+        for lease in journal.staging_leases
+        if (
+            lease.role == "predecessor-quarantine"
+            and lease.device == 0
+            and lease.inode == 0
+            and lease.ctime_ns == 0
+            and _deprovision_zero_predecessor_reservation_is_owned(target_root, journal, lease)
+        )
+    )
+    for record in journal.actions:
+        if record.checkpoint != "pending" or record.action != "prune":
+            continue
+        parent_path = PurePosixPath(record.path).parent.as_posix()
+        if parent_path == ".":
+            continue
+        # Assessment intentionally omits a witness for a leaf that was
+        # already absent.  There is no leaf mutation or checkpoint to
+        # reconcile for that journal record.
+        if record.precondition.get("exists") is not True:
+            continue
+        witness = witnesses.get(parent_path)
+        if witness is None:
+            raise DistributionApplyError(
+                "deprovision-parent-namespace-mismatch",
+                failed_paths=(parent_path,),
+            )
+        snapshot = _assert_deprovision_pending_record_matches(target_root, record)
+        parent_chain = _open_distribution_parent_chain(
+            target_root,
+            record.path,
+            create_missing=False,
+        )
+        try:
+            _assert_distribution_chain_bound(
+                parent_chain,
+                snapshot,
+                record.path,
+                exact=False,
+            )
+            _assert_visible_distribution_chain_bound(target_root, record.path, parent_chain)
+            _assert_deprovision_leaf_parent_namespace(
+                parent_chain[-1],
+                record.path,
+                leaf_parent_namespace_witnesses=witnesses,
+                journal=journal,
+                forward_guard=forward_guard,
+                durably_quarantined_paths=durably_quarantined_paths,
+                owned_zero_predecessor_paths=owned_zero_predecessor_paths,
+            )
+        finally:
+            _close_distribution_parent_chain(parent_chain)
+
+
 def _validate_deprovision_recovery_contract_before_reconciliation(
     install_root: Path,
     *,
@@ -14206,6 +14945,7 @@ def _validate_deprovision_recovery_contract_before_reconciliation(
     target_root: Path,
     expected_root_identity: DistributionRootIdentity,
     journal: OperationJournal,
+    forward_guard: DistributionRetryMarker | None = None,
 ) -> None:
     """Validate immutable authority before a missing target can advance a checkpoint."""
 
@@ -14230,6 +14970,11 @@ def _validate_deprovision_recovery_contract_before_reconciliation(
         if record.checkpoint != "pending":
             continue
         _assert_deprovision_pending_record_matches(target_root, record)
+    _validate_deprovision_recovery_leaf_parent_namespaces(
+        target_root,
+        journal,
+        forward_guard=forward_guard,
+    )
 
 
 def _build_deprovision_recovery_assessment(
@@ -14285,6 +15030,7 @@ def _build_deprovision_recovery_assessment(
         actions=original_actions,
         blockers=(),
         directory_snapshots=directory_snapshots,
+        leaf_parent_namespace_witnesses=journal.leaf_parent_namespace_witnesses,
         preservation_witnesses=journal.preservation_witnesses,
         absence_witnesses=journal.absence_witnesses,
         deprovision_contract=contract,
@@ -14297,6 +15043,7 @@ def _build_deprovision_recovery_assessment(
         distribution_plan=recovery_plan,
         actions=original_actions,
         directory_snapshots=directory_snapshots,
+        leaf_parent_namespace_witnesses=journal.leaf_parent_namespace_witnesses,
         preservation_witnesses=journal.preservation_witnesses,
         absence_witnesses=journal.absence_witnesses,
         source_semantic_identities=journal.source_semantic_identities,
@@ -14384,6 +15131,11 @@ def _reconcile_deprovision_pending_actions(
     # action.  This keeps a rebound published directory from allowing an
     # unrelated pending mutation to advance first.
     _assert_deprovision_published_summaries(store.target_root, journal)
+    _validate_deprovision_recovery_leaf_parent_namespaces(
+        store.target_root,
+        journal,
+        forward_guard=store._forward_guard,
+    )
     active = journal
     completed = tuple(record.path for record in active.actions if record.checkpoint == "published")
     for record in active.actions:
@@ -14394,6 +15146,11 @@ def _reconcile_deprovision_pending_actions(
             continue
         if record.action == "remove-empty-directory":
             _assert_deprovision_directory_dependencies_published(active, record)
+        _validate_deprovision_recovery_leaf_parent_namespaces(
+            store.target_root,
+            active,
+            forward_guard=store._forward_guard,
+        )
         completed = (*completed, record.path)
         active = store.checkpoint_published(active, completed)
     _assert_deprovision_published_summaries(store.target_root, active)
@@ -14493,6 +15250,7 @@ def _execute_deprovision_journal_plan(
     journal: OperationJournal | None = existing_journal
     active_journal: OperationJournal | None = None
     guard: DistributionRetryMarker | None = existing_guard
+    durably_quarantined_paths: set[str] = set()
     try:
         _assert_deprovision_invocation_state(assessment)
         if journal is None:
@@ -14510,6 +15268,17 @@ def _execute_deprovision_journal_plan(
             else:
                 active_journal = journal
             journal = active_journal
+        if active_journal is not None:
+            durably_quarantined_paths.update(
+                lease.path
+                for lease in active_journal.staging_leases
+                if (
+                    lease.role == "predecessor-quarantine"
+                    and lease.device > 0
+                    and lease.inode > 0
+                    and lease.ctime_ns > 0
+                )
+            )
 
         def validate_mutation_boundary() -> None:
             _assert_deprovision_invocation_state(assessment)
@@ -14525,6 +15294,8 @@ def _execute_deprovision_journal_plan(
             validate_mutation_boundary()
             active_journal = store.record_staging_lease(active_journal, lease)
             journal = active_journal
+            if lease.role == "predecessor-quarantine" and lease.device > 0 and lease.inode > 0 and lease.ctime_ns > 0:
+                durably_quarantined_paths.add(lease.path)
 
         def remove_staging_leases(path: str, stage_names: tuple[str, ...]) -> None:
             nonlocal active_journal, journal
@@ -14562,7 +15333,36 @@ def _execute_deprovision_journal_plan(
                 )
                 journal = active_journal
 
+        def checkpoint_leaf_published(path: str, parent_chain: tuple[int, ...]) -> None:
+            nonlocal active_journal, journal
+            if active_journal is None:
+                raise DistributionApplyError("journal-precondition-mismatch")
+            validate_mutation_boundary()
+            validate_held_parent_namespace(path, parent_chain)
+            target_name = PurePosixPath(path).name
+            try:
+                os.stat(target_name, dir_fd=parent_chain[-1], follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise DistributionApplyError(
+                    "deprovision-parent-namespace-mismatch",
+                    failed_paths=(PurePosixPath(path).parent.as_posix(),),
+                )
+            record = next((item for item in active_journal.actions if item.path == path), None)
+            if record is None or record.action != "prune" or record.checkpoint != "pending":
+                raise DistributionApplyError("journal-precondition-mismatch")
+            completed_paths = tuple(
+                item.path for item in active_journal.actions if item.checkpoint == "published" or item.path == path
+            )
+            active_journal = store.checkpoint_published(active_journal, completed_paths)
+            journal = active_journal
+            durably_quarantined_paths.discard(path)
+
         directory_snapshots = {snapshot.relative_path: snapshot for snapshot in executable.directory_snapshots}
+        leaf_parent_namespace_witnesses = {
+            witness.relative_path: witness for witness in executable.leaf_parent_namespace_witnesses
+        }
 
         def validate_held_parent_namespace(path: str, parent_chain: tuple[int, ...]) -> None:
             if active_journal is None:
@@ -14570,8 +15370,10 @@ def _execute_deprovision_journal_plan(
             _assert_deprovision_leaf_parent_namespace(
                 parent_chain[-1],
                 path,
-                directory_snapshots=directory_snapshots,
+                leaf_parent_namespace_witnesses=leaf_parent_namespace_witnesses,
                 journal=active_journal,
+                forward_guard=store._forward_guard or guard,
+                durably_quarantined_paths=frozenset(durably_quarantined_paths),
             )
 
         records_by_path = {record.path: record for record in active_journal.actions}
@@ -14592,6 +15394,7 @@ def _execute_deprovision_journal_plan(
                 before_mutation=validate_mutation_boundary,
                 held_parent_validator=validate_held_parent_namespace,
                 first_target_mutation_validator=validate_first_target_mutation,
+                held_parent_checkpoint_recorder=checkpoint_leaf_published,
             )
 
         for record in active_journal.actions:
@@ -14778,6 +15581,7 @@ def execute_deprovision_distribution(
                         target_root=target_root,
                         expected_root_identity=bound_root_identity,
                         journal=journal,
+                        forward_guard=store._forward_guard or guard,
                     )
                 if apply and journal.status == "executing":
                     journal = _reconcile_deprovision_pending_actions(store, journal)
@@ -15486,6 +16290,8 @@ def _unlink_distribution_quarantine_with_backup(
             if visible.st_dev == retained.st_dev and visible.st_ino == retained.st_ino:
                 os.unlink(backup_name, dir_fd=parent_fd)
                 os.fsync(parent_fd)
+        if str(exc) == "deprovision-parent-namespace-mismatch":
+            raise
         raise DistributionApplyError("managed staging cleanup failed") from exc
 
 
@@ -15833,6 +16639,8 @@ def _remove_distribution_target_if_bound(
                 target_name,
                 failure_message=identity_message,
             )
+            if str(exc) == "deprovision-parent-namespace-mismatch":
+                raise
             raise DistributionApplyError(identity_message) from exc
     except Exception:
         raise
@@ -17095,6 +17903,7 @@ def _apply_regular_action(
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None,
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None,
     reusable_predecessor_stage_name: str | None,
+    held_parent_checkpoint_recorder: Callable[[str, tuple[int, ...]], None] | None,
 ) -> None:
     path = action.path
     if action.action == "prune" and not snapshot.target.exists:
@@ -17288,6 +18097,8 @@ def _apply_regular_action(
                     transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
                     mutation_validator=validate_held_namespace,
                 )
+                if held_parent_checkpoint_recorder is not None:
+                    held_parent_checkpoint_recorder(path, parent_chain)
                 if commit_first_mutation is not None:
                     commit_first_mutation()
                 return
@@ -17552,6 +18363,7 @@ def _apply_symlink_action(
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None,
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None,
     reusable_predecessor_stage_name: str | None,
+    held_parent_checkpoint_recorder: Callable[[str, tuple[int, ...]], None] | None,
 ) -> None:
     if expected.target is None:
         raise DistributionApplyError(f"managed symlink identity has no target for '{action.path}'")
@@ -17709,6 +18521,8 @@ def _apply_symlink_action(
                 transition_recorder=(stage_ownership_recorder if write_ahead_stage_reservations else None),
                 mutation_validator=validate_held_namespace,
             )
+            if held_parent_checkpoint_recorder is not None:
+                held_parent_checkpoint_recorder(action.path, parent_chain)
             if commit_first_mutation is not None:
                 commit_first_mutation()
             return
@@ -17942,6 +18756,7 @@ def _apply_distribution_action(
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None = None,
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None = None,
     reusable_predecessor_stage_name: str | None = None,
+    held_parent_checkpoint_recorder: Callable[[str, tuple[int, ...]], None] | None = None,
 ) -> None:
     if action.action in {"adopt", "preserve"}:
         return
@@ -18048,6 +18863,7 @@ def _apply_distribution_action(
             held_parent_validator=held_parent_validator,
             first_target_mutation_validator=first_target_mutation_validator,
             reusable_predecessor_stage_name=reusable_predecessor_stage_name,
+            held_parent_checkpoint_recorder=held_parent_checkpoint_recorder,
         )
         return
     if expected is None and target_kind == "symlink":
@@ -18069,6 +18885,7 @@ def _apply_distribution_action(
             held_parent_validator=held_parent_validator,
             first_target_mutation_validator=first_target_mutation_validator,
             reusable_predecessor_stage_name=reusable_predecessor_stage_name,
+            held_parent_checkpoint_recorder=held_parent_checkpoint_recorder,
         )
         return
     if expected is None and target_kind != "regular":
@@ -18088,6 +18905,7 @@ def _apply_distribution_action(
         held_parent_validator=held_parent_validator,
         first_target_mutation_validator=first_target_mutation_validator,
         reusable_predecessor_stage_name=reusable_predecessor_stage_name,
+        held_parent_checkpoint_recorder=held_parent_checkpoint_recorder,
     )
 
 
@@ -18107,6 +18925,7 @@ def apply_distribution_plan(
     before_mutation: Callable[[], None] | None = None,
     held_parent_validator: Callable[[str, tuple[int, ...]], None] | None = None,
     first_target_mutation_validator: Callable[[], Callable[[], None] | None] | None = None,
+    held_parent_checkpoint_recorder: Callable[[str, tuple[int, ...]], None] | None = None,
 ) -> DistributionResult:
     """Apply a validated plan with no-follow identity checks at every action.
 
@@ -18307,6 +19126,11 @@ def apply_distribution_plan(
                             _apply_distribution_action,
                             reusable_predecessor_stage_name=reusable_stage_name,
                         )
+                    if held_parent_checkpoint_recorder is not None:
+                        invoke_distribution_action = partial(
+                            invoke_distribution_action,
+                            held_parent_checkpoint_recorder=held_parent_checkpoint_recorder,
+                        )
                     if before_mutation is not None:
                         before_mutation()
                     if stage_ownership_recorder is None and created_parent_recorder is None:
@@ -18411,6 +19235,7 @@ def apply_distribution_plan(
                     phase=phase,
                     applied_paths=tuple(applied_paths),
                     pending_paths=tuple(pending_paths),
+                    failed_paths=(exc.failed_paths if isinstance(exc, DistributionApplyError) else ()),
                 ) from exc
         if progress_recorder is not None:
             progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), True)

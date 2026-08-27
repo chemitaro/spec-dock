@@ -4994,7 +4994,9 @@ def test_i370_leaf_prune_rejects_unknown_nonremovable_parent_sibling_after_reser
     manifest_path = _write_manifest(
         tmp_path / "manifest",
         _manifest_with(
-            recognized_workspace_versions=[{"version": "1.2.3", "anchors": []}],
+            recognized_workspace_versions=[
+                {"version": "1.2.3", "anchors": [_regular_record("legacy-anchor", b"legacy\n")]}
+            ],
         ),
     )
     target_root = tmp_path / "consumer"
@@ -5109,6 +5111,7 @@ def test_i370_leaf_prune_rejects_known_sibling_identity_replacement_after_reserv
     scaffold_root = _minimal_scaffold_root(tmp_path)
     manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
     target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
     target_parent = target_root / ".github" / "workflows"
     target_parent.mkdir(parents=True)
     target = target_parent / "ci.yml"
