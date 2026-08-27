@@ -8327,6 +8327,7 @@ class OperationJournalStore:
         self.workspace_closed_set_validator = workspace_closed_set_validator
         self.require_journal_absent = False
         self._forward_guard: DistributionRetryMarker | None = None
+        self._leaf_mutation_validator: Callable[[str, tuple[int, ...]], None] | None = None
 
     def _validate_workspace_closed_set(self, extra_entries: tuple[str, ...] = ()) -> None:
         if self.require_journal_absent and _path_present_no_follow(self.path):
@@ -9596,6 +9597,7 @@ class OperationJournalStore:
         journal: OperationJournal,
         completed_paths: tuple[str, ...],
     ) -> OperationJournal:
+        leaf_mutation_validator = self._leaf_mutation_validator
         completed = set(completed_paths)
         persisted = self._read(journal.root_identity)
         self._assert_guard_anchors_journal(persisted)
@@ -9605,7 +9607,11 @@ class OperationJournalStore:
             or persisted.plan_digest != journal.plan_digest
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
-        active = self._resume_displaced_quarantine_cleanup(persisted, completed)
+        active = self._resume_displaced_quarantine_cleanup(
+            persisted,
+            completed,
+            leaf_mutation_validator=leaf_mutation_validator,
+        )
         records = {record.path: record for record in journal.actions}
         cleanup_transitions: dict[
             str,
@@ -9957,10 +9963,12 @@ class OperationJournalStore:
         self,
         journal: OperationJournal,
         completed: set[str],
+        *,
+        leaf_mutation_validator: Callable[[str, tuple[int, ...]], None] | None = None,
     ) -> OperationJournal:
         """Finish a write-ahead predecessor quarantine without losing its successor lease."""
 
-        active = self._resume_gc_cleanup(journal)
+        active = self._resume_gc_cleanup(journal, leaf_mutation_validator=leaf_mutation_validator)
         active = self._promote_roleless_backup_leases(active)
         records = {record.path: record for record in active.actions}
         quarantine_leases = tuple(
@@ -10020,6 +10028,24 @@ class OperationJournalStore:
                 parent_fd = parent_chain[-1]
                 target_name = PurePosixPath(quarantine_lease.path).name
 
+                def validate_leaf_boundary(
+                    bound_path: str = quarantine_lease.path,
+                    bound_parent_chain: tuple[int, ...] = parent_chain,
+                ) -> None:
+                    if leaf_mutation_validator is not None:
+                        leaf_mutation_validator(bound_path, bound_parent_chain)
+
+                def validate_leaf_attachment(
+                    bound_path: str = quarantine_lease.path,
+                    bound_parent_chain: tuple[int, ...] = parent_chain,
+                ) -> None:
+                    if leaf_mutation_validator is not None:
+                        _assert_visible_distribution_chain_exactly_bound(
+                            self.target_root,
+                            bound_path,
+                            bound_parent_chain,
+                        )
+
                 def validate_canonical_authority(
                     bound_record: OperationJournalAction = record,
                     bound_successor: DistributionStageOwnership | None = successor,
@@ -10047,6 +10073,7 @@ class OperationJournalStore:
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
 
+                validate_leaf_boundary()
                 validate_canonical_authority()
                 bound_postcondition = _journal_postcondition(record)
                 if successor is not None:
@@ -10063,9 +10090,21 @@ class OperationJournalStore:
                 backup_name = _distribution_quarantine_backup_name(quarantine_lease.stage_name)
                 backup_info = _stat_optional_no_follow(parent_fd, backup_name)
 
-                def record_transition(lease: DistributionStageOwnership) -> None:
+                def record_transition(
+                    lease: DistributionStageOwnership,
+                    bound_path: str = quarantine_lease.path,
+                    bound_parent_chain: tuple[int, ...] = parent_chain,
+                ) -> None:
                     nonlocal active
                     active = self.record_staging_lease(active, lease)
+                    if lease.role not in {"gc-reserved", "gc-exact"}:
+                        validate_leaf_boundary()
+                    elif leaf_mutation_validator is not None:
+                        _assert_visible_distribution_chain_exactly_bound(
+                            self.target_root,
+                            bound_path,
+                            bound_parent_chain,
+                        )
 
                 if backup_info is not None:
                     if original_info is not None:
@@ -10208,6 +10247,7 @@ class OperationJournalStore:
                             transition_name=quarantine_lease.stage_name,
                             transition_recorder=record_transition,
                             canonical_validator=validate_canonical_authority,
+                            mutation_validator=validate_leaf_boundary,
                         )
                     else:
                         assert successor is not None
@@ -10223,6 +10263,7 @@ class OperationJournalStore:
                             stage_condition=record.precondition,
                             transition_name=quarantine_lease.stage_name,
                             transition_recorder=record_transition,
+                            mutation_validator=validate_leaf_boundary,
                         )
                 elif quarantine_info is not None:
                     dual_backup = next(
@@ -10282,6 +10323,7 @@ class OperationJournalStore:
                                 role="predecessor-quarantine",
                             )
                         )
+                    validate_leaf_boundary()
                     validate_canonical_authority()
 
                     def validate_canonical_for_unlink(
@@ -10310,7 +10352,7 @@ class OperationJournalStore:
                         original_stage_name,
                         quarantine_info,
                         canonical_validator=validate_canonical_for_unlink,
-                        mutation_validator=None,
+                        mutation_validator=validate_leaf_boundary,
                         allow_existing_backup=True,
                         backup_recorder=record_transition,
                         transition_path=quarantine_lease.path,
@@ -10337,6 +10379,15 @@ class OperationJournalStore:
             )
             try:
                 parent_fd = parent_chain[-1]
+
+                def validate_backup_boundary(
+                    bound_path: str = quarantine_lease.path,
+                    bound_parent_chain: tuple[int, ...] = parent_chain,
+                ) -> None:
+                    if leaf_mutation_validator is not None:
+                        leaf_mutation_validator(bound_path, bound_parent_chain)
+
+                validate_backup_boundary()
                 validate_canonical_authority()
                 backup_name = retained_backup.stage_name
                 backup = _stat_optional_no_follow(parent_fd, backup_name)
@@ -10351,6 +10402,7 @@ class OperationJournalStore:
                         raise DistributionApplyError("managed staging cleanup failed")
 
                     def validate_backup_gc() -> None:
+                        validate_leaf_attachment()
                         validate_canonical_authority()
 
                     _remove_distribution_stage_if_owned(
@@ -10392,7 +10444,12 @@ class OperationJournalStore:
             active = self.write(replace(active, staging_leases=retained), predecessor=active)
         return active
 
-    def _resume_gc_cleanup(self, journal: OperationJournal) -> OperationJournal:
+    def _resume_gc_cleanup(
+        self,
+        journal: OperationJournal,
+        *,
+        leaf_mutation_validator: Callable[[str, tuple[int, ...]], None] | None = None,
+    ) -> OperationJournal:
         """Finish journal-owned private-name GC before any target action resumes."""
 
         _assert_gc_transition_graph(journal)
@@ -10507,6 +10564,14 @@ class OperationJournalStore:
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
 
+                def validate_gc_mutation(
+                    bound_path: str = gc_lease.path,
+                    bound_parent_chain: tuple[int, ...] = parent_chain,
+                ) -> None:
+                    if leaf_mutation_validator is not None:
+                        leaf_mutation_validator(bound_path, bound_parent_chain)
+                    validate_gc_authority()
+
                 original = _stat_optional_no_follow(parent_fd, original_name)
                 quarantined = _stat_optional_no_follow(parent_fd, gc_lease.stage_name)
                 successor_info = (
@@ -10519,9 +10584,19 @@ class OperationJournalStore:
                     _stat_optional_no_follow(parent_fd, backup_source.stage_name) if backup_source is not None else None
                 )
 
-                def record_gc(updated: DistributionStageOwnership) -> None:
+                def record_gc(
+                    updated: DistributionStageOwnership,
+                    bound_path: str = gc_lease.path,
+                    bound_parent_chain: tuple[int, ...] = parent_chain,
+                ) -> None:
                     nonlocal active
                     active = self.record_staging_lease(active, updated)
+                    if leaf_mutation_validator is not None:
+                        _assert_visible_distribution_chain_exactly_bound(
+                            self.target_root,
+                            bound_path,
+                            bound_parent_chain,
+                        )
 
                 if quarantined is None and (successor_info is not None or parallel_info is not None):
                     continuation_info = successor_info or parallel_info
@@ -10559,7 +10634,7 @@ class OperationJournalStore:
                             or original.st_nlink not in {1, 2}
                         ):
                             raise DistributionApplyError("managed staging cleanup failed")
-                        validate_gc_authority()
+                        validate_gc_mutation()
                         _rename_distribution_no_replace(
                             parent_fd,
                             original_name,
@@ -10567,6 +10642,7 @@ class OperationJournalStore:
                             gc_lease.stage_name,
                         )
                         os.fsync(parent_fd)
+                        validate_gc_mutation()
                         promoted = os.stat(gc_lease.stage_name, dir_fd=parent_fd, follow_symlinks=False)
                         if (
                             promoted.st_dev != source.device
@@ -10585,7 +10661,7 @@ class OperationJournalStore:
                                 gc_ordinal=gc_lease.gc_ordinal,
                             )
                         )
-                        return self._resume_gc_cleanup(active)
+                        return self._resume_gc_cleanup(active, leaf_mutation_validator=leaf_mutation_validator)
                     if (
                         original.st_dev != source.device
                         or original.st_ino != source.inode
@@ -10599,7 +10675,7 @@ class OperationJournalStore:
                         original_name,
                         original,
                         strict=True,
-                        mutation_validator=validate_gc_authority,
+                        mutation_validator=validate_gc_mutation,
                         gc_path=gc_lease.path,
                         gc_recorder=record_gc,
                         gc_name=gc_lease.stage_name,
@@ -10717,12 +10793,13 @@ class OperationJournalStore:
                         )
                     ):
                         raise DistributionApplyError("managed staging cleanup failed")
-                    validate_gc_authority()
+                    validate_gc_mutation()
                     verified = os.stat(gc_lease.stage_name, dir_fd=parent_fd, follow_symlinks=False)
                     if _stat_identity_tuple(verified) != _stat_identity_tuple(quarantined):
                         raise DistributionApplyError("managed staging cleanup failed")
                     os.unlink(gc_lease.stage_name, dir_fd=parent_fd)
                     os.fsync(parent_fd)
+                    validate_gc_mutation()
                     retained_peer_name = (
                         parallel_gc.stage_name if exact_peer_authority and parallel_gc is not None else None
                     )
@@ -10776,7 +10853,7 @@ class OperationJournalStore:
                             )
                         )
                         transition_continues = True
-                    validate_gc_authority()
+                    validate_gc_mutation()
                     if original is not None and successor_gc is None:
                         retained_source = os.stat(original_name, dir_fd=parent_fd, follow_symlinks=False)
                         if (
@@ -10787,6 +10864,7 @@ class OperationJournalStore:
                             raise DistributionApplyError("managed staging cleanup failed")
                         os.unlink(original_name, dir_fd=parent_fd)
                         os.fsync(parent_fd)
+                        validate_gc_mutation()
             finally:
                 _close_distribution_parent_chain(parent_chain)
             completed_quarantines = {
@@ -14231,6 +14309,11 @@ def _leaf_namespace_entry_matches_lease(
         # transition may legitimately expose one or two links here.
         if entry.link_count not in {1, 2}:
             return False
+    elif lease.role in {"gc-reserved", "gc-exact"}:
+        # GC may briefly retain a second operation-owned hardlink while the
+        # predecessor and its next private name are both journaled.
+        if entry.link_count not in {1, 2}:
+            return False
     elif entry.link_count != 1:
         return False
     if entry.kind == "regular":
@@ -14318,6 +14401,31 @@ def _assert_deprovision_leaf_parent_namespace(
     leases = tuple(
         lease for lease in journal.staging_leases if PurePosixPath(lease.path).parent.as_posix() == parent_path
     )
+
+    def has_exact_operation_replacement(
+        lease: DistributionStageOwnership,
+        expected_entry: DistributionTreeEntrySnapshot | None,
+    ) -> bool:
+        if expected_entry is None:
+            return False
+        for replacement in leases:
+            if (
+                replacement is lease
+                or replacement.device != lease.device
+                or replacement.inode != lease.inode
+                or replacement.file_type != lease.file_type
+            ):
+                continue
+            replacement_entry = actual_entries.get(f"{parent_path}/{replacement.stage_name}")
+            if replacement_entry is not None and _leaf_namespace_entry_matches_lease(
+                replacement_entry,
+                parent_path=parent_path,
+                expected_entry=expected_entry,
+                lease=replacement,
+            ):
+                return True
+        return False
+
     for lease in leases:
         stage_path = f"{parent_path}/{lease.stage_name}"
         stage_entry = actual_entries.get(stage_path)
@@ -14340,12 +14448,18 @@ def _assert_deprovision_leaf_parent_namespace(
                     failed_paths=(parent_path,),
                 )
             continue
-        if stage_entry is None and lease.role == "predecessor-quarantine" and lease.path in durably_quarantined_paths:
-            # The predecessor may already have been durably unlinked after an
-            # exact backup was retained.  The invocation-local marker permits
-            # only that exact nonzero predecessor to be absent; it never
-            # authorizes an arbitrary sibling.
-            continue
+        if stage_entry is None:
+            if lease.role == "predecessor-quarantine" and lease.path in durably_quarantined_paths:
+                # The predecessor may already have been durably unlinked after
+                # an exact backup was retained.  The invocation-local marker
+                # permits only that exact nonzero predecessor to be absent; it
+                # never authorizes an arbitrary sibling.
+                continue
+            if has_exact_operation_replacement(lease, expected_entries.get(lease.path)):
+                # GC moves an operation-owned backup through a private name
+                # while its prior lease remains durable.  Accept only the
+                # exact same no-follow inode under the recorded GC lease.
+                continue
         expected_entry = expected_entries.get(lease.path)
         if stage_entry is None or not _leaf_namespace_entry_matches_lease(
             stage_entry,
@@ -14923,7 +15037,7 @@ def _validate_deprovision_recovery_leaf_parent_namespaces(
                 record.path,
                 exact=False,
             )
-            _assert_visible_distribution_chain_bound(target_root, record.path, parent_chain)
+            _assert_visible_distribution_chain_exactly_bound(target_root, record.path, parent_chain)
             _assert_deprovision_leaf_parent_namespace(
                 parent_chain[-1],
                 record.path,
@@ -15327,10 +15441,7 @@ def _execute_deprovision_journal_plan(
             )
             completed_paths = tuple(dict.fromkeys((*already_published, *completed)))
             if completed_paths != already_published:
-                active_journal = store.checkpoint_published(
-                    active_journal,
-                    completed_paths,
-                )
+                active_journal = store.checkpoint_published(active_journal, completed_paths)
                 journal = active_journal
 
         def checkpoint_leaf_published(path: str, parent_chain: tuple[int, ...]) -> None:
@@ -15338,7 +15449,7 @@ def _execute_deprovision_journal_plan(
             if active_journal is None:
                 raise DistributionApplyError("journal-precondition-mismatch")
             validate_mutation_boundary()
-            validate_held_parent_namespace(path, parent_chain)
+            validate_leaf_mutation_boundary(path, parent_chain)
             target_name = PurePosixPath(path).name
             try:
                 os.stat(target_name, dir_fd=parent_chain[-1], follow_symlinks=False)
@@ -15360,20 +15471,45 @@ def _execute_deprovision_journal_plan(
             durably_quarantined_paths.discard(path)
 
         directory_snapshots = {snapshot.relative_path: snapshot for snapshot in executable.directory_snapshots}
+        target_snapshots = dict(executable.distribution_plan.target_snapshots)
         leaf_parent_namespace_witnesses = {
             witness.relative_path: witness for witness in executable.leaf_parent_namespace_witnesses
         }
 
-        def validate_held_parent_namespace(path: str, parent_chain: tuple[int, ...]) -> None:
+        def validate_leaf_mutation_boundary(path: str, parent_chain: tuple[int, ...]) -> None:
             if active_journal is None:
                 raise DistributionApplyError("journal-precondition-mismatch")
+            boundary_journal = active_journal
+            persisted = store._read(active_journal.root_identity)
+            if persisted.operation_id == active_journal.operation_id:
+                boundary_journal = persisted
+            snapshot = target_snapshots.get(path)
+            if snapshot is None:
+                raise DistributionApplyError(
+                    "journal-precondition-mismatch",
+                    failed_paths=(PurePosixPath(path).parent.as_posix(),),
+                )
+            _assert_distribution_chain_bound(parent_chain, snapshot, path, exact=False)
+            _assert_visible_distribution_chain_exactly_bound(target_root, path, parent_chain)
             _assert_deprovision_leaf_parent_namespace(
                 parent_chain[-1],
                 path,
                 leaf_parent_namespace_witnesses=leaf_parent_namespace_witnesses,
-                journal=active_journal,
+                journal=boundary_journal,
                 forward_guard=store._forward_guard or guard,
-                durably_quarantined_paths=frozenset(durably_quarantined_paths),
+                durably_quarantined_paths=frozenset({
+                    *durably_quarantined_paths,
+                    *(
+                        lease.path
+                        for lease in boundary_journal.staging_leases
+                        if (
+                            lease.role == "predecessor-quarantine"
+                            and lease.device > 0
+                            and lease.inode > 0
+                            and lease.ctime_ns > 0
+                        )
+                    ),
+                }),
             )
 
         records_by_path = {record.path: record for record in active_journal.actions}
@@ -15383,6 +15519,7 @@ def _execute_deprovision_journal_plan(
             if action.action == "prune" and records_by_path[action.path].checkpoint == "pending"
         )
         if active_journal.status == "executing" and leaf_actions:
+            store._leaf_mutation_validator = validate_leaf_mutation_boundary
             apply_distribution_plan(
                 replace(executable.distribution_plan, actions=leaf_actions),
                 allow_stale_stage_cleanup=bool(active_journal.staging_leases),
@@ -15392,7 +15529,7 @@ def _execute_deprovision_journal_plan(
                 write_ahead_stage_reservations=True,
                 progress_recorder=record_progress,
                 before_mutation=validate_mutation_boundary,
-                held_parent_validator=validate_held_parent_namespace,
+                held_parent_validator=validate_leaf_mutation_boundary,
                 first_target_mutation_validator=validate_first_target_mutation,
                 held_parent_checkpoint_recorder=checkpoint_leaf_published,
             )
@@ -15959,6 +16096,95 @@ def _assert_visible_distribution_chain_bound(
             raise DistributionApplyError(f"managed target identity changed for '{target_rel}'")
 
 
+def _visible_distribution_chain_identity_tuple(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        stat.S_IFMT(info.st_mode),
+        stat.S_IMODE(info.st_mode),
+        info.st_ctime_ns,
+        info.st_nlink,
+    )
+
+
+def _assert_visible_distribution_chain_exactly_bound(
+    target_root: Path,
+    target_rel: str,
+    held_fds: tuple[int, ...],
+) -> None:
+    """Re-open the visible root-to-parent chain and compare it with held fds."""
+
+    parts = PurePosixPath(target_rel).parts
+    expected_fd_count = max(1, len(parts))
+    if len(held_fds) != expected_fd_count:
+        raise DistributionApplyError(
+            "deprovision-visible-parent-chain-mismatch",
+            failed_paths=(PurePosixPath(target_rel).parent.as_posix(),),
+        )
+    flags = _distribution_directory_flags()
+    fresh_fds: list[int] = []
+
+    def mismatch(prefix_index: int) -> DistributionApplyError:
+        prefix = "." if prefix_index == 0 else "/".join(parts[:prefix_index])
+        return DistributionApplyError(
+            "deprovision-visible-parent-chain-mismatch",
+            failed_paths=(prefix,),
+        )
+
+    def exact_stat(left: os.stat_result, right: os.stat_result) -> bool:
+        return _visible_distribution_chain_identity_tuple(left) == _visible_distribution_chain_identity_tuple(right)
+
+    try:
+        visible_root_before = os.lstat(target_root)
+        root_fd = os.open(target_root, flags)
+        fresh_fds.append(root_fd)
+        opened_root = os.fstat(root_fd)
+        visible_root_after = os.lstat(target_root)
+        held_root_before = os.fstat(held_fds[0])
+        held_root_after = os.fstat(held_fds[0])
+        if (
+            not stat.S_ISDIR(visible_root_before.st_mode)
+            or stat.S_ISLNK(visible_root_before.st_mode)
+            or not exact_stat(visible_root_before, opened_root)
+            or not exact_stat(opened_root, visible_root_after)
+            or not exact_stat(held_root_before, held_root_after)
+            or not exact_stat(opened_root, held_root_after)
+        ):
+            raise mismatch(0)
+
+        for component_index, component in enumerate(parts[:-1], start=1):
+            parent_fd = fresh_fds[-1]
+            try:
+                visible_before = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+                if stat.S_ISLNK(visible_before.st_mode) or not stat.S_ISDIR(visible_before.st_mode):
+                    raise mismatch(component_index)
+                child_fd = os.open(component, flags, dir_fd=parent_fd)
+                fresh_fds.append(child_fd)
+                opened = os.fstat(child_fd)
+                visible_after = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+            except DistributionApplyError:
+                raise
+            except OSError as exc:
+                raise mismatch(component_index) from exc
+            held_before = os.fstat(held_fds[component_index])
+            held_after = os.fstat(held_fds[component_index])
+            if (
+                not exact_stat(visible_before, opened)
+                or not exact_stat(opened, visible_after)
+                or not exact_stat(held_before, held_after)
+                or not exact_stat(opened, held_after)
+            ):
+                raise mismatch(component_index)
+    except DistributionApplyError:
+        raise
+    except OSError as exc:
+        raise mismatch(0) from exc
+    finally:
+        for fd in reversed(fresh_fds):
+            with suppress(OSError):
+                os.close(fd)
+
+
 def _assert_regular_fd_safe(
     fd: int,
     snapshot: PathIdentitySnapshot,
@@ -16189,6 +16415,8 @@ def _unlink_distribution_quarantine_with_backup(
                         role="backup-reserved",
                     )
                 )
+            if mutation_validator is not None:
+                mutation_validator()
             os.link(
                 quarantine_name,
                 backup_name,
@@ -16223,6 +16451,8 @@ def _unlink_distribution_quarantine_with_backup(
                     role="backup-dual",
                 )
             )
+        if mutation_validator is not None:
+            mutation_validator()
         canonical_validator()
         # A second no-follow observation closes an interposition after the
         # first final stat.  The backup remains an independent exact reference.
@@ -16251,6 +16481,8 @@ def _unlink_distribution_quarantine_with_backup(
                     role="backup-only-reserved",
                 )
             )
+        if mutation_validator is not None:
+            mutation_validator()
         os.unlink(quarantine_name, dir_fd=parent_fd)
         os.fsync(parent_fd)
         try:
@@ -16280,9 +16512,15 @@ def _unlink_distribution_quarantine_with_backup(
                     role="backup-only",
                 )
             )
+            if mutation_validator is not None:
+                mutation_validator()
             return
+        if mutation_validator is not None:
+            mutation_validator()
         os.unlink(backup_name, dir_fd=parent_fd)
         os.fsync(parent_fd)
+        if mutation_validator is not None:
+            mutation_validator()
     except (OSError, DistributionApplyError) as exc:
         with suppress(OSError):
             visible = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -17263,8 +17501,6 @@ def _remove_distribution_stage_if_owned(
                         gc_ordinal=3,
                     )
                 )
-            if mutation_validator is not None and gc_recorder is not None:
-                mutation_validator()
             os.unlink(retained_gc_name, dir_fd=parent_fd)
             os.fsync(parent_fd)
             return retained_gc_name

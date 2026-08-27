@@ -5212,6 +5212,163 @@ def test_i370_leaf_prune_rejects_known_sibling_identity_replacement_after_reserv
     assert checkpoint_calls == 0
 
 
+@pytest.mark.parametrize("target_kind", ["regular", "symlink"])
+@pytest.mark.parametrize("rebind_kind", ["parent", "ancestor"])
+def test_i370_leaf_prune_rejects_visible_parent_rebind_after_reservation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+    rebind_kind: str,
+) -> None:
+    """I370-T-RACE-001: a held parent cannot authorize a rebound visible parent."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    if target_kind == "regular":
+        target_rel = ".github/workflows/ci.yml"
+        target = target_root / target_rel
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"managed\n")
+        manifest = _manifest_with()
+    else:
+        target_rel = ".github/workflows/legacy-shortcut"
+        target = target_root / target_rel
+        target.parent.mkdir(parents=True)
+        target.symlink_to("legacy-target")
+        manifest = _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": target_rel,
+                    "surface": "nested-legacy-shortcut",
+                    "identities": [
+                        {
+                            "path": target_rel,
+                            "kind": "symlink",
+                            "target": "legacy-target",
+                            "source": {"kind": "test-fixture", "ref": "issue-370-test"},
+                        }
+                    ],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        )
+    manifest_path = _write_manifest(tmp_path / "manifest", manifest)
+    outside = target_root / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    displaced = (
+        target_root / ".github" / "workflows-displaced"
+        if rebind_kind == "parent"
+        else target_root / ".github-displaced"
+    )
+    displaced_target = displaced / target.name if rebind_kind == "parent" else displaced / "workflows" / target.name
+    original_record = OperationJournalStore.record_staging_lease
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_remove = managed_distribution._remove_distribution_target_if_bound
+    original_unlink = managed_distribution.os.unlink
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    rebound = False
+    post_reservation_state: tuple[bytes, bytes] | None = None
+    rebound_target_state: tuple[os.stat_result, bytes | Path] | None = None
+    displaced_target_state: tuple[os.stat_result, bytes | Path] | None = None
+    target_rename_calls = 0
+    leaf_parent_fd: int | None = None
+    leaf_unlink_calls = 0
+    checkpoint_calls = 0
+
+    def rebind_visible_parent(self, journal, lease):
+        nonlocal rebound, post_reservation_state, rebound_target_state, displaced_target_state
+        updated = original_record(self, journal, lease)
+        if (
+            not rebound
+            and lease.path == target_rel
+            and lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+        ):
+            rebound = True
+            rebound_path = target.parent if rebind_kind == "parent" else target_root / ".github"
+            rebound_path.rename(displaced)
+            displaced_target_state = (
+                displaced_target.lstat(),
+                displaced_target.read_bytes() if target_kind == "regular" else displaced_target.readlink(),
+            )
+            target.parent.mkdir(parents=True)
+            if target_kind == "regular":
+                target.write_bytes(b"managed\n")
+            else:
+                target.symlink_to("legacy-target")
+            rebound_target_state = (
+                target.lstat(),
+                target.read_bytes() if target_kind == "regular" else target.readlink(),
+            )
+            post_reservation_state = (journal_path.read_bytes(), marker_path.read_bytes())
+        return updated
+
+    def count_rename(*args, **kwargs):
+        nonlocal target_rename_calls
+        if args[1] == target.name and args[3] != target.name:
+            target_rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    def count_remove(*args, **kwargs):
+        nonlocal leaf_parent_fd
+        leaf_parent_fd = args[0]
+        return original_remove(*args, **kwargs)
+
+    def count_unlink(path, *args, **kwargs):
+        nonlocal leaf_unlink_calls
+        if kwargs.get("dir_fd") == leaf_parent_fd:
+            leaf_unlink_calls += 1
+        return original_unlink(path, *args, **kwargs)
+
+    def count_checkpoint(self, journal, completed_paths):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(self, journal, completed_paths)
+
+    outside_before = outside.read_bytes()
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", rebind_visible_parent)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_rename)
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", count_remove)
+    monkeypatch.setattr(managed_distribution.os, "unlink", count_unlink)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert rebound is True
+    assert post_reservation_state is not None
+    assert rebound_target_state is not None
+    assert displaced_target_state is not None
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-required"
+    assert target_rename_calls == 0, target_rename_calls
+    assert target.lstat() == rebound_target_state[0]
+    assert (target.read_bytes() if target_kind == "regular" else target.readlink()) == rebound_target_state[1]
+    assert displaced_target.lstat() == displaced_target_state[0]
+    assert (displaced_target.read_bytes() if target_kind == "regular" else displaced_target.readlink()) == (
+        displaced_target_state[1]
+    )
+    assert outside.read_bytes() == outside_before
+    assert displaced.is_dir()
+    assert journal_path.read_bytes() == post_reservation_state[0]
+    assert marker_path.read_bytes() == post_reservation_state[1]
+    assert leaf_unlink_calls == 0
+    assert checkpoint_calls == 0
+
+
 def test_i370_deprovision_guard_only_resumes_from_semantic_equal_physical_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
