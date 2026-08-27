@@ -4596,6 +4596,103 @@ def test_i370_zero_predecessor_reservation_after_rename_remains_recoverable(
     assert not stage.exists()
 
 
+@pytest.mark.parametrize("target_kind", ["regular", "symlink"])
+def test_i370_zero_predecessor_reservation_before_rename_is_reusable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    """A durable zero lease before rename can be retried without a stage entry."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    if target_kind == "regular":
+        target_rel = ".github/workflows/ci.yml"
+        target = target_root / target_rel
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"managed\n")
+        manifest = _manifest_with()
+    else:
+        target_rel = "legacy-shortcut"
+        target = target_root / target_rel
+        target.symlink_to("legacy-target")
+        manifest = _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": target_rel,
+                    "surface": "legacy-shortcut",
+                    "identities": [
+                        {
+                            "path": target_rel,
+                            "kind": "symlink",
+                            "target": "legacy-target",
+                            "source": {"kind": "test-fixture", "ref": "issue-370-test"},
+                        }
+                    ],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        )
+    manifest_path = _write_manifest(tmp_path / "manifest", manifest)
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_record = OperationJournalStore.record_staging_lease
+    injected = False
+
+    def record_then_interrupt(self, journal, lease):
+        nonlocal injected
+        updated = original_record(self, journal, lease)
+        if (
+            not injected
+            and lease.path == target_rel
+            and lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+        ):
+            injected = True
+            raise OSError("injected pre-rename interruption")
+        return updated
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", record_then_interrupt)
+    first = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert first.status == "recovery_required"
+    assert target.exists() if target_kind == "regular" else target.is_symlink()
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    lease = next(item for item in journal_payload["staging_leases"] if item["path"] == target_rel)
+    assert lease["device"] == lease["inode"] == lease["ctime_ns"] == 0
+    stage = target.parent / lease["stage_name"]
+    assert not stage.exists() and not stage.is_symlink()
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", original_record)
+    retry = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert retry.status == "completed", retry.reason
+    assert not target.exists() and not target.is_symlink()
+    assert not stage.exists() and not stage.is_symlink()
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+
+
 def test_i370_deprovision_guard_only_resumes_from_semantic_equal_physical_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

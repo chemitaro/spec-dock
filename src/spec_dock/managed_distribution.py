@@ -3499,41 +3499,47 @@ def _deprovision_recovery_directory_is_published(
     )
 
 
-def _deprovision_zero_predecessor_reservation_is_owned(
+def _deprovision_zero_predecessor_reservation_state(
     target_root: Path,
     journal: OperationJournal,
     lease: DistributionStageOwnership,
-) -> bool:
-    """Recognize only an exact post-rename predecessor reservation.
+) -> Literal["owned", "reusable", "unknown"]:
+    """Classify a zero-identity predecessor reservation conservatively.
 
     A zero-identity lease is a write-ahead reservation, not ownership of the
-    pathname.  It becomes authoritative only after the canonical target has
-    been durably renamed away and the private entry matches the pending prune
-    action's immutable physical and semantic precondition.
+    pathname.  It is operation-owned only after the canonical target has been
+    durably renamed away and the private entry matches the pending prune
+    action's immutable physical and semantic precondition.  A reservation
+    published immediately before that rename is reusable only when the
+    canonical target is still the exact pending precondition and its reserved
+    stage pathname is absent.
     """
 
     if lease.role != "predecessor-quarantine" or lease.device != 0 or lease.inode != 0 or lease.ctime_ns != 0:
-        return False
-    record = next((item for item in journal.actions if item.path == lease.path), None)
-    if record is None or record.action != "prune" or record.checkpoint != "pending":
-        return False
-    canonical = _observe_target(target_root, lease.path)
-    if (
-        canonical.state != "missing"
-        or canonical.snapshot is None
-        or not _deprovision_pending_snapshot_is_exact_absence(
-            canonical.snapshot,
-            record,
-        )
-    ):
-        return False
+        return "unknown"
+    records = tuple(item for item in journal.actions if item.path == lease.path)
+    if len(records) != 1:
+        return "unknown"
+    record = records[0]
+    if record.action != "prune" or record.checkpoint != "pending":
+        return "unknown"
+    if lease.file_type != record.precondition.get("file_type"):
+        return "unknown"
+    try:
+        canonical = _assert_deprovision_pending_record_matches(target_root, record)
+    except DistributionApplyError:
+        return "unknown"
     stage_path = (PurePosixPath(lease.path).parent / lease.stage_name).as_posix()
     stage = _observe_target(target_root, stage_path)
+    if canonical.target.exists:
+        if stage.state == "missing" and stage.snapshot is not None and not stage.snapshot.target.exists:
+            return "reusable"
+        return "unknown"
     if stage.snapshot is None or not stage.snapshot.target.exists or stage.state != lease.file_type:
-        return False
+        return "unknown"
     stage_target = stage.snapshot.target
     precondition = record.precondition
-    return not (
+    if (
         stage_target.device != precondition.get("device")
         or stage_target.inode != precondition.get("inode")
         or stage_target.file_type != precondition.get("file_type")
@@ -3541,7 +3547,17 @@ def _deprovision_zero_predecessor_reservation_is_owned(
         or stage_target.mode != precondition.get("mode")
         or stage.identity is None
         or precondition.get("identity") != _distribution_identity_payload(stage.identity)
-    )
+    ):
+        return "unknown"
+    return "owned"
+
+
+def _deprovision_zero_predecessor_reservation_is_owned(
+    target_root: Path,
+    journal: OperationJournal,
+    lease: DistributionStageOwnership,
+) -> bool:
+    return _deprovision_zero_predecessor_reservation_state(target_root, journal, lease) == "owned"
 
 
 def _assert_deprovision_zero_predecessor_reservations(
@@ -3556,7 +3572,7 @@ def _assert_deprovision_zero_predecessor_reservations(
             and lease.device == 0
             and lease.inode == 0
             and lease.ctime_ns == 0
-            and not _deprovision_zero_predecessor_reservation_is_owned(target_root, journal, lease)
+            and _deprovision_zero_predecessor_reservation_state(target_root, journal, lease) == "unknown"
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
 
