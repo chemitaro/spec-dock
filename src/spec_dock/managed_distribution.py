@@ -3499,6 +3499,68 @@ def _deprovision_recovery_directory_is_published(
     )
 
 
+def _deprovision_zero_predecessor_reservation_is_owned(
+    target_root: Path,
+    journal: OperationJournal,
+    lease: DistributionStageOwnership,
+) -> bool:
+    """Recognize only an exact post-rename predecessor reservation.
+
+    A zero-identity lease is a write-ahead reservation, not ownership of the
+    pathname.  It becomes authoritative only after the canonical target has
+    been durably renamed away and the private entry matches the pending prune
+    action's immutable physical and semantic precondition.
+    """
+
+    if lease.role != "predecessor-quarantine" or lease.device != 0 or lease.inode != 0 or lease.ctime_ns != 0:
+        return False
+    record = next((item for item in journal.actions if item.path == lease.path), None)
+    if record is None or record.action != "prune" or record.checkpoint != "pending":
+        return False
+    canonical = _observe_target(target_root, lease.path)
+    if (
+        canonical.state != "missing"
+        or canonical.snapshot is None
+        or not _deprovision_pending_snapshot_is_exact_absence(
+            canonical.snapshot,
+            record,
+        )
+    ):
+        return False
+    stage_path = (PurePosixPath(lease.path).parent / lease.stage_name).as_posix()
+    stage = _observe_target(target_root, stage_path)
+    if stage.snapshot is None or not stage.snapshot.target.exists or stage.state != lease.file_type:
+        return False
+    stage_target = stage.snapshot.target
+    precondition = record.precondition
+    return not (
+        stage_target.device != precondition.get("device")
+        or stage_target.inode != precondition.get("inode")
+        or stage_target.file_type != precondition.get("file_type")
+        or stage_target.link_count != precondition.get("link_count")
+        or stage_target.mode != precondition.get("mode")
+        or stage.identity is None
+        or precondition.get("identity") != _distribution_identity_payload(stage.identity)
+    )
+
+
+def _assert_deprovision_zero_predecessor_reservations(
+    target_root: Path,
+    journal: OperationJournal,
+) -> None:
+    """Reject an unresolved zero lease before any recovery checkpoint write."""
+
+    for lease in journal.staging_leases:
+        if (
+            lease.role == "predecessor-quarantine"
+            and lease.device == 0
+            and lease.inode == 0
+            and lease.ctime_ns == 0
+            and not _deprovision_zero_predecessor_reservation_is_owned(target_root, journal, lease)
+        ):
+            raise DistributionApplyError("journal-precondition-mismatch")
+
+
 def _deprovision_recovery_stage_names(
     target_root: Path,
     journal: OperationJournal | None,
@@ -3520,7 +3582,7 @@ def _deprovision_recovery_stage_names(
             continue
         target = snapshot.target
         if lease.device == lease.inode == lease.ctime_ns == 0:
-            if target.link_count == 1:
+            if _deprovision_zero_predecessor_reservation_is_owned(target_root, journal, lease):
                 owned.add(lease.stage_name)
             continue
         if (
@@ -8908,6 +8970,8 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-protocol-incompatible")
         if journal.contract_identity != assessment.contract_identity:
             raise DistributionApplyError("journal-contract-mismatch")
+        if assessment.intent == "deprovision" and journal.status in {"prepared", "executing"}:
+            _assert_deprovision_zero_predecessor_reservations(self.target_root, journal)
         if require_guard:
             if self._forward_guard is not None and self._forward_guard.journal_digest is None:
                 self._anchor_digestless_initial_journal(
@@ -14084,6 +14148,7 @@ def _validate_deprovision_recovery_contract_before_reconciliation(
 ) -> None:
     """Validate immutable authority before a missing target can advance a checkpoint."""
 
+    _assert_deprovision_zero_predecessor_reservations(target_root, journal)
     contract = build_deprovision_contract(
         install_root,
         manifest_path=manifest_path,
@@ -14191,6 +14256,7 @@ def _build_deprovision_recovery_contract_assessment(
 ) -> tuple[WorkspaceAssessment, ExecutableMutationPlan]:
     """Rebind provider semantics without classifying removed journal descendants."""
 
+    _assert_deprovision_zero_predecessor_reservations(target_root, journal)
     contract = build_deprovision_contract(
         install_root,
         manifest_path=manifest_path,
@@ -14252,6 +14318,7 @@ def _reconcile_deprovision_pending_actions(
     store: OperationJournalStore,
     journal: OperationJournal,
 ) -> OperationJournal:
+    _assert_deprovision_zero_predecessor_reservations(store.target_root, journal)
     # Validate all already-published paths before reconciling any pending
     # action.  This keeps a rebound published directory from allowing an
     # unrelated pending mutation to advance first.

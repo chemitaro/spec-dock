@@ -4382,6 +4382,220 @@ def test_i370_deprovision_parent_mode_drift_fails_closed_before_target_write(
     assert managed.read_bytes() == b"managed\n"
 
 
+@pytest.mark.parametrize("target_kind", ["regular", "symlink"])
+def test_i370_zero_predecessor_reservation_collision_is_not_operation_owned(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    """A zero lease cannot hide an external same-name stage entry."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    if target_kind == "regular":
+        target_rel = ".github/workflows/ci.yml"
+        target = target_root / target_rel
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"managed\n")
+        manifest = _manifest_with()
+    else:
+        target_rel = "legacy-shortcut"
+        target = target_root / target_rel
+        target.symlink_to("legacy-target")
+        manifest = _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": target_rel,
+                    "surface": "legacy-shortcut",
+                    "identities": [
+                        {
+                            "path": target_rel,
+                            "kind": "symlink",
+                            "target": "legacy-target",
+                            "source": {"kind": "test-fixture", "ref": "issue-370-test"},
+                        }
+                    ],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        )
+    manifest_path = _write_manifest(tmp_path / "manifest", manifest)
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_record = OperationJournalStore.record_staging_lease
+    injected = False
+
+    def inject_external_stage(self, journal, lease):
+        nonlocal injected
+        updated = original_record(self, journal, lease)
+        if (
+            not injected
+            and lease.path == target_rel
+            and lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+        ):
+            injected = True
+            stage = target.parent / lease.stage_name
+            if target_kind == "regular":
+                stage.write_bytes(b"external\n")
+            else:
+                stage.symlink_to("external-target")
+        return updated
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", inject_external_stage)
+    first = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert first.status == "recovery_required"
+    target_stat = target.lstat()
+    target_payload = target.read_bytes() if target_kind == "regular" else target.readlink()
+    stage = next(target.parent.glob(".spec-dock-*"))
+    stage_stat = stage.lstat()
+    stage_payload = stage.read_bytes() if target_kind == "regular" else stage.readlink()
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    journal_before = journal_path.read_bytes()
+    marker_before = marker_path.read_bytes()
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", original_record)
+    original_remove = managed_distribution._remove_distribution_target_if_bound
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    remove_calls = 0
+    checkpoint_calls = 0
+
+    def count_remove(*args, **kwargs):
+        nonlocal remove_calls
+        remove_calls += 1
+        return original_remove(*args, **kwargs)
+
+    def count_checkpoint(*args, **kwargs):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", count_remove)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+    retry = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert retry.status == "recovery_required"
+    assert retry.reason == "deprovision-recovery-mismatch"
+    assert target.lstat() == target_stat
+    assert (target.read_bytes() if target_kind == "regular" else target.readlink()) == target_payload
+    assert stage.lstat() == stage_stat
+    assert (stage.read_bytes() if target_kind == "regular" else stage.readlink()) == stage_payload
+    assert journal_path.read_bytes() == journal_before
+    assert marker_path.read_bytes() == marker_before
+    assert remove_calls == 0
+    assert checkpoint_calls == 0
+
+
+@pytest.mark.parametrize("target_kind", ["regular", "symlink"])
+def test_i370_zero_predecessor_reservation_after_rename_remains_recoverable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    """A zero lease with the canonical target already absent may be resumed."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    if target_kind == "regular":
+        target_rel = ".github/workflows/ci.yml"
+        target = target_root / target_rel
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"managed\n")
+        manifest = _manifest_with()
+    else:
+        target_rel = "legacy-shortcut"
+        target = target_root / target_rel
+        target.symlink_to("legacy-target")
+        manifest = _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": target_rel,
+                    "surface": "legacy-shortcut",
+                    "identities": [
+                        {
+                            "path": target_rel,
+                            "kind": "symlink",
+                            "target": "legacy-target",
+                            "source": {"kind": "test-fixture", "ref": "issue-370-test"},
+                        }
+                    ],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        )
+    manifest_path = _write_manifest(tmp_path / "manifest", manifest)
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_rename = managed_distribution._rename_distribution_no_replace
+    crashed = False
+
+    def rename_then_interrupt(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal crashed
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if source_name == target.name and destination_name.startswith((".spec-dock-file-", ".spec-dock-symlink-")):
+            crashed = True
+            raise OSError("injected post-rename interruption")
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", rename_then_interrupt)
+    first = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert crashed is True
+    assert first.status == "recovery_required"
+    assert not target.exists()
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    journal_payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    lease = next(item for item in journal_payload["staging_leases"] if item["path"] == target_rel)
+    assert lease["device"] == lease["inode"] == lease["ctime_ns"] == 0
+    stage = target.parent / lease["stage_name"]
+    assert stage.exists() or stage.is_symlink()
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", original_rename)
+    retry = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert retry.status == "completed", retry.reason
+    assert not target.exists()
+    assert not stage.exists()
+
+
 def test_i370_deprovision_guard_only_resumes_from_semantic_equal_physical_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
