@@ -4841,6 +4841,146 @@ def test_i370_zero_predecessor_reservation_reissue_rejects_old_stage_appearance(
     assert checkpoint_calls == 0
 
 
+@pytest.mark.parametrize(
+    ("target_kind", "unknown_kind"),
+    [
+        ("regular", "regular"),
+        ("regular", "symlink"),
+        ("symlink", "regular"),
+        ("symlink", "symlink"),
+    ],
+)
+def test_i370_leaf_prune_rejects_unknown_nested_parent_sibling_after_reservation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+    unknown_kind: str,
+) -> None:
+    """I370-T-RACE-001: a new nested sibling cannot pass the prune lease boundary."""
+
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    target_rel = ".github/workflows/ci.yml" if target_kind == "regular" else ".github/workflows/legacy-shortcut"
+    target = target_root / target_rel
+    target.parent.mkdir(parents=True)
+    if target_kind == "regular":
+        target.write_bytes(b"managed\n")
+        manifest = _manifest_with()
+    else:
+        target.symlink_to("legacy-target")
+        manifest = _manifest_with(
+            obsolete_exact_files=[
+                {
+                    "path": target_rel,
+                    "surface": "nested-legacy-shortcut",
+                    "identities": [
+                        {
+                            "path": target_rel,
+                            "kind": "symlink",
+                            "target": "legacy-target",
+                            "source": {"kind": "test-fixture", "ref": "issue-370-test"},
+                        }
+                    ],
+                    "on_unknown": "preserve-and-block",
+                }
+            ]
+        )
+    manifest_path = _write_manifest(tmp_path / "manifest", manifest)
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    unknown = target.parent / "unexpected-sibling"
+    journal_path = target_root / "spec-dock" / ".distribution-journal.json"
+    marker_path = target_root / "spec-dock" / ".distribution-retry.json"
+    original_record = OperationJournalStore.record_staging_lease
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_remove = managed_distribution._remove_distribution_target_if_bound
+    original_unlink = managed_distribution.os.unlink
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    injected = False
+    post_reservation_state: tuple[bytes, bytes] | None = None
+    target_rename_calls = 0
+    leaf_parent_fd: int | None = None
+    leaf_unlink_calls = 0
+    checkpoint_calls = 0
+
+    def inject_unknown_sibling(self, journal, lease):
+        nonlocal injected, post_reservation_state
+        updated = original_record(self, journal, lease)
+        if (
+            not injected
+            and lease.path == target_rel
+            and lease.role == "predecessor-quarantine"
+            and lease.device == lease.inode == lease.ctime_ns == 0
+        ):
+            injected = True
+            if unknown_kind == "regular":
+                unknown.write_bytes(b"user-owned\n")
+            else:
+                unknown.symlink_to("user-owned-target")
+            post_reservation_state = (journal_path.read_bytes(), marker_path.read_bytes())
+        return updated
+
+    def count_rename(*args, **kwargs):
+        nonlocal target_rename_calls
+        if args[1] == target.name and args[3] != target.name:
+            target_rename_calls += 1
+        return original_rename(*args, **kwargs)
+
+    def count_remove(*args, **kwargs):
+        nonlocal leaf_parent_fd
+        leaf_parent_fd = args[0]
+        return original_remove(*args, **kwargs)
+
+    def count_unlink(path, *args, **kwargs):
+        nonlocal leaf_unlink_calls
+        if kwargs.get("dir_fd") == leaf_parent_fd:
+            leaf_unlink_calls += 1
+        return original_unlink(path, *args, **kwargs)
+
+    def count_checkpoint(self, journal, completed_paths):
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(self, journal, completed_paths)
+
+    monkeypatch.setattr(OperationJournalStore, "record_staging_lease", inject_unknown_sibling)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", count_rename)
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", count_remove)
+    monkeypatch.setattr(managed_distribution.os, "unlink", count_unlink)
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", count_checkpoint)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert post_reservation_state is not None
+    assert result.status == "recovery_required"
+    assert result.reason == "deprovision-recovery-required"
+    assert unknown.is_symlink() if unknown_kind == "symlink" else unknown.is_file()
+    assert target.is_symlink() if target_kind == "symlink" else target.is_file()
+    assert (
+        unknown.readlink() == Path("user-owned-target")
+        if unknown_kind == "symlink"
+        else unknown.read_bytes() == b"user-owned\n"
+    )
+    assert (
+        target.readlink() == Path("legacy-target") if target_kind == "symlink" else target.read_bytes() == b"managed\n"
+    )
+    assert target.parent.relative_to(target_root).as_posix() in result.failed_paths
+    assert journal_path.read_bytes() == post_reservation_state[0]
+    assert marker_path.read_bytes() == post_reservation_state[1]
+    assert target_rename_calls == 0
+    assert leaf_unlink_calls == 0
+    assert checkpoint_calls == 0
+
+
 def test_i370_deprovision_guard_only_resumes_from_semantic_equal_physical_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

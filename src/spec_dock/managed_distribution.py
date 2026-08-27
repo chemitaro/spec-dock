@@ -13688,6 +13688,42 @@ def _assert_deprovision_directory_dependencies_published(
     return tuple(evidence)
 
 
+def _assert_deprovision_leaf_parent_namespace(
+    parent_fd: int,
+    path: str,
+    *,
+    directory_snapshots: dict[str, DistributionDirectoryMutationSnapshot],
+    journal: OperationJournal,
+) -> None:
+    """Reject an unaccounted immediate sibling before a leaf is quarantined."""
+
+    parent_path = PurePosixPath(path).parent.as_posix()
+    directory_snapshot = directory_snapshots.get(parent_path)
+    if directory_snapshot is None:
+        return
+    expected_child_paths = {entry.relative_path for entry in directory_snapshot.initial_entries}
+    expected_child_paths.update(evidence.child_path for evidence in directory_snapshot.immediate_child_evidence)
+    published_paths = {record.path for record in journal.actions if record.checkpoint == "published"}
+    expected_child_paths.difference_update(published_paths)
+    allowed_names = {PurePosixPath(child_path).name for child_path in expected_child_paths}
+    allowed_names.update(
+        lease.stage_name
+        for lease in journal.staging_leases
+        if PurePosixPath(lease.path).parent.as_posix() == parent_path
+    )
+    try:
+        actual_names = set(os.listdir(parent_fd))
+    except OSError as exc:
+        raise DistributionApplyError("deprovision-parent-namespace-mismatch", failed_paths=(parent_path,)) from exc
+    unexpected_names = tuple(sorted(actual_names - allowed_names, key=os.fsencode))
+    if unexpected_names:
+        failed_paths = tuple(name if parent_path == "." else f"{parent_path}/{name}" for name in unexpected_names)
+        raise DistributionApplyError(
+            "deprovision-parent-namespace-mismatch",
+            failed_paths=failed_paths,
+        )
+
+
 def _deprovision_directory_snapshot_from_record(
     record: OperationJournalAction,
 ) -> DistributionDirectoryMutationSnapshot:
@@ -14526,6 +14562,18 @@ def _execute_deprovision_journal_plan(
                 )
                 journal = active_journal
 
+        directory_snapshots = {snapshot.relative_path: snapshot for snapshot in executable.directory_snapshots}
+
+        def validate_held_parent_namespace(path: str, parent_chain: tuple[int, ...]) -> None:
+            if active_journal is None:
+                raise DistributionApplyError("journal-precondition-mismatch")
+            _assert_deprovision_leaf_parent_namespace(
+                parent_chain[-1],
+                path,
+                directory_snapshots=directory_snapshots,
+                journal=active_journal,
+            )
+
         records_by_path = {record.path: record for record in active_journal.actions}
         leaf_actions = tuple(
             action
@@ -14542,10 +14590,10 @@ def _execute_deprovision_journal_plan(
                 write_ahead_stage_reservations=True,
                 progress_recorder=record_progress,
                 before_mutation=validate_mutation_boundary,
+                held_parent_validator=validate_held_parent_namespace,
                 first_target_mutation_validator=validate_first_target_mutation,
             )
 
-        directory_snapshots = {snapshot.relative_path: snapshot for snapshot in executable.directory_snapshots}
         for record in active_journal.actions:
             if active_journal.status != "executing":
                 break
