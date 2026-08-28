@@ -3515,7 +3515,12 @@ def _uninstall_payload_from_result(
     retry_mode = "remove" if result.intent == "purge" else "keep"
     retry_policy = "same-remove-command" if result.intent == "purge" else "same-keep-command"
     retry_authority_selected = specs_mode == ("remove" if result.intent == "purge" else "keep")
-    if result.retry_policy == retry_policy and safe_target_label is not None and retry_authority_selected:
+    if (
+        result.retry_policy == retry_policy
+        and safe_target_label is not None
+        and retry_authority_selected
+        and (result.intent != "purge" or apply)
+    ):
         retry_command = _uninstall_retry_command(retry_mode, target_label=safe_target_label)
     return {
         "schema_version": 1,

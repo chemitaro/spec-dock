@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -642,13 +642,18 @@ def test_i371_purge_forward_recovers_same_plan_after_history_checkpoint_failure(
 
 
 @pytest.mark.parametrize(
-    ("journal_intent", "request_intent"),
-    (("purge", "deprovision"), ("deprovision", "purge")),
+    ("journal_intent", "request_intent", "journal_authority"),
+    (
+        ("purge", "deprovision", "explicit-spec-history-purge"),
+        ("deprovision", "purge", "managed-distribution-deprovision"),
+        ("deprovision", "deprovision", "arbitrary-invalid-authority"),
+    ),
 )
 def test_i371_cross_intent_recovery_mismatch_is_manual_and_write_free(
     tmp_path: Path,
     journal_intent: str,
     request_intent: str,
+    journal_authority: str,
 ) -> None:
     install_root = _minimal_install_root(tmp_path, b"managed\n")
     scaffold_root = _minimal_scaffold_root(tmp_path)
@@ -683,6 +688,12 @@ def test_i371_cross_intent_recovery_mismatch_is_manual_and_write_free(
     store = OperationJournalStore(target_root)
     journal = _prepare_guarded_journal(store, executable)
     assert journal.intent == journal_intent
+    if journal_authority != managed_distribution._journal_authority_for_intent(
+        cast("managed_distribution.JournaledDistributionIntent", journal_intent)
+    ):
+        raw = json.loads(store.path.read_text(encoding="utf-8"))
+        raw["authority"] = journal_authority
+        store.path.write_text(json.dumps(raw, sort_keys=True), encoding="utf-8")
     journal_bytes = store.path.read_bytes()
     guard_path = target_root / "spec-dock/.distribution-retry.json"
     guard_bytes = guard_path.read_bytes()
@@ -717,6 +728,139 @@ def test_i371_cross_intent_recovery_mismatch_is_manual_and_write_free(
     assert _i370_tree_evidence(target_root) == before
     assert store.path.read_bytes() == journal_bytes
     assert guard_path.read_bytes() == guard_bytes
+
+
+@pytest.mark.parametrize("binding_field", ("root_binding", "workspace_binding"))
+def test_i371_cross_intent_journal_binding_mismatch_is_classified_before_binding_read(
+    tmp_path: Path,
+    binding_field: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    raw = json.loads(store.path.read_text(encoding="utf-8"))
+    if binding_field == "root_binding":
+        raw[binding_field] = {"device": root_info.st_dev, "inode": root_info.st_ino + 1}
+    else:
+        raw[binding_field]["inode"] += 1
+    store.path.write_text(json.dumps(raw, sort_keys=True), encoding="utf-8")
+    journal_bytes = store.path.read_bytes()
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    before = _i370_tree_evidence(target_root)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert journal.intent == "purge"
+    assert result.status == "recovery_required"
+    assert result.retry_policy == "manual-recovery"
+    assert _i370_tree_evidence(target_root) == before
+    assert store.path.read_bytes() == journal_bytes
+    assert guard_path.read_bytes() == guard_bytes
+
+
+def test_i371_canonical_cross_discriminator_precedes_malformed_journal_fields() -> None:
+    raw = {
+        "schema_version": 2,
+        "protocol_version": 2,
+        "intent": "purge",
+        "authority": "explicit-spec-history-purge",
+        "root_binding": "malformed-later-field",
+    }
+
+    with pytest.raises(DistributionApplyError) as raised:
+        managed_distribution._parse_operation_journal(
+            json.dumps(raw).encode("utf-8"),
+            expected_intent="deprovision",
+        )
+
+    assert raised.value.recovery_mismatch_kind == "intent-authority"
+
+
+def test_i371_unsupported_journal_intent_does_not_infer_authority_mismatch() -> None:
+    raw = {
+        "schema_version": 2,
+        "protocol_version": 2,
+        "intent": {"malformed": True},
+        "authority": "explicit-spec-history-purge",
+    }
+
+    with pytest.raises(DistributionApplyError) as raised:
+        managed_distribution._parse_operation_journal(json.dumps(raw).encode("utf-8"), expected_intent="deprovision")
+
+    assert raised.value.recovery_mismatch_kind is None
+
+
+def test_i371_cross_intent_guard_only_is_manual_without_journal_creation(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    marker = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    before = _i370_tree_evidence(target_root)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert marker.operation == "purge"
+    assert result.status == "recovery_required"
+    assert result.retry_policy == "manual-recovery"
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert guard_path.read_bytes() == guard_bytes
+    assert _i370_tree_evidence(target_root) == before
 
 
 def test_i368_forged_assessment_cannot_prune_outside_manifest_authority(tmp_path: Path) -> None:

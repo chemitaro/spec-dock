@@ -265,12 +265,53 @@ def test_i371_uninstall_cli_routes_deprovision_and_purge_to_typed_services(
         assert payload["schema_version"] == 1
         assert payload["status"] == ("planned" if result.status == "planned" else "completed")
         assert payload["specs_mode"] == "remove"
+        if args[2] != "--apply":
+            assert payload["retry_command"] is None
+            assert payload["guidance"][0] == (
+                "dry-run only; pass --apply --remove-specs to mutate managed distribution artifacts"
+            )
 
     assert len(deprovision_calls) == len(deprovision_rows)
     assert len(purge_calls) == 2
     assert purge_calls[0]["apply"] is False
     assert purge_calls[1]["apply"] is True
     assert purge_calls[1]["expected_root_identity"] is not None
+
+    target_label = cli._safe_retry_target_label(target)
+    assert target_label is not None
+    apply_payload = cli._uninstall_payload_from_result(
+        purge_results[0],
+        target_root=target,
+        apply=True,
+        specs_mode="remove",
+    )
+    assert apply_payload["retry_command"] == cli._uninstall_retry_command("remove", target_label=target_label)
+    assert shlex.split(apply_payload["retry_command"]) == [
+        "spec-dock",
+        "uninstall",
+        "--apply",
+        "--remove-specs",
+        target_label,
+    ]
+
+    recovery_payload = cli._uninstall_payload_from_result(
+        managed_distribution.DistributionProcessResult(
+            status="recovery_required",
+            intent="purge",
+            actions=(),
+            phase="uninstall-apply",
+            last_completed_phase="marker-written",
+            errors=(operation_error,),
+            retry_policy="same-remove-command",
+        ),
+        target_root=target,
+        apply=False,
+        specs_mode="remove",
+    )
+    assert recovery_payload["retry_command"] is None
+    assert recovery_payload["guidance"][0] == (
+        "dry-run only; pass --apply --remove-specs to mutate managed distribution artifacts"
+    )
 
 
 def test_i371_cross_intent_purge_journal_keep_route_is_manual_and_read_only(

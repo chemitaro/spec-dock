@@ -48,20 +48,29 @@ class DistributionApplyError(RuntimeError):
         applied_paths: tuple[str, ...] = (),
         pending_paths: tuple[str, ...] = (),
         failed_paths: tuple[str, ...] = (),
+        recovery_mismatch_kind: DistributionRecoveryMismatchKind | None = None,
     ) -> None:
         super().__init__(message)
         self.phase = phase
         self.applied_paths = applied_paths
         self.pending_paths = pending_paths
         self.failed_paths = failed_paths
+        self.recovery_mismatch_kind = recovery_mismatch_kind
 
 
 class DistributionAdmissionError(RuntimeError):
     """Raised when a consumer cannot safely enter a distribution operation."""
 
-    def __init__(self, message: str, *, reason: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str,
+        recovery_mismatch_kind: DistributionRecoveryMismatchKind | None = None,
+    ) -> None:
         super().__init__(message)
         self.reason = reason
+        self.recovery_mismatch_kind = recovery_mismatch_kind
 
 
 @dataclass(frozen=True)
@@ -124,6 +133,7 @@ class DistributionDirectoryRequirement:
 
 DistributionOperation = Literal["fresh", "update", "init-force", "uninstall"]
 JournaledDistributionIntent = Literal["fresh", "update", "init-force", "deprovision", "purge"]
+_SUPPORTED_JOURNALED_INTENTS = frozenset({"fresh", "update", "init-force", "deprovision", "purge"})
 DistributionActionName = Literal[
     "create",
     "adopt",
@@ -1067,8 +1077,17 @@ def _protected_workspace_paths(scaffold_assets: tuple[DistributionAsset, ...]) -
     return _PROTECTED_WORKSPACE_ROOTS | frozenset(asset.path for asset in scaffold_assets)
 
 
-def _admission_block(reason: str, detail: str) -> NoReturn:
-    raise DistributionAdmissionError(f"distribution admission blocked ({reason}): {detail}", reason=reason)
+def _admission_block(
+    reason: str,
+    detail: str,
+    *,
+    recovery_mismatch_kind: DistributionRecoveryMismatchKind | None = None,
+) -> NoReturn:
+    raise DistributionAdmissionError(
+        f"distribution admission blocked ({reason}): {detail}",
+        reason=reason,
+        recovery_mismatch_kind=recovery_mismatch_kind,
+    )
 
 
 def _parse_canonical_version(value: str, *, source: str) -> tuple[int, int, int]:
@@ -1239,7 +1258,11 @@ def _assert_real_parent_chain(target_root: Path, relative_path: str, *, label: s
     return True
 
 
-def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarker | None:
+def _read_distribution_retry_marker(
+    target_root: Path,
+    *,
+    expected_intent: JournaledDistributionIntent | None = None,
+) -> DistributionRetryMarker | None:
     path = target_root / _DISTRIBUTION_RETRY_MARKER_REL
     if not _path_present_no_follow(path):
         return None
@@ -1262,13 +1285,41 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
     }
     schema_version = raw.get("schema_version")
     purpose = raw.get("purpose")
-    supported_guard = schema_version == _DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION and purpose in {
-        _DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
-        _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE,
-        _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE,
-        _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE,
-    }
+    supported_guard = (
+        schema_version == _DISTRIBUTION_JOURNAL_GUARD_SCHEMA_VERSION
+        and isinstance(purpose, str)
+        and purpose
+        in {
+            _DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
+            _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE,
+            _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE,
+            _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE,
+        }
+    )
     supported_legacy = schema_version == _DISTRIBUTION_RETRY_SCHEMA_VERSION and purpose == _DISTRIBUTION_RETRY_PURPOSE
+    operation = raw.get("operation")
+    supported_operation = isinstance(operation, str) and operation in {
+        "fresh",
+        "update",
+        "init-force",
+        "deprovision",
+        "purge",
+    }
+    if supported_guard and supported_operation:
+        purpose_operation_matches = (
+            (purpose == _DISTRIBUTION_JOURNAL_GUARD_PURPOSE and operation in {"update", "init-force"})
+            or (purpose == _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE and operation == "fresh")
+            or (purpose == _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE and operation == "deprovision")
+            or (purpose == _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE and operation == "purge")
+        )
+        expected_intent_supported = isinstance(expected_intent, str) and expected_intent in _SUPPORTED_JOURNALED_INTENTS
+        request_operation_matches = not expected_intent_supported or operation == expected_intent
+        if not purpose_operation_matches or not request_operation_matches:
+            _admission_block(
+                "marker-invalid",
+                "distribution retry marker purpose and operation do not match",
+                recovery_mismatch_kind="intent-authority",
+            )
     expected_fields = (
         base_fields | {"operation_id", "contract_identity", "plan_digest"} if supported_guard else base_fields
     )
@@ -1287,9 +1338,10 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         _admission_block("marker-invalid", "distribution retry marker fields are invalid")
     if not supported_guard and not supported_legacy:
         _admission_block("marker-invalid", "distribution retry marker schema is unsupported")
-    operation = raw.get("operation")
-    if operation not in {"fresh", "update", "init-force", "deprovision", "purge"}:
+    if not supported_operation:
         _admission_block("marker-invalid", "distribution retry marker operation is unsupported")
+    assert isinstance(operation, str)
+    operation = cast("Literal['fresh', 'update', 'init-force', 'deprovision', 'purge']", operation)
     if supported_guard and (
         (purpose == _DISTRIBUTION_JOURNAL_GUARD_PURPOSE and operation not in {"update", "init-force"})
         or (purpose == _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE and operation != "fresh")
@@ -1537,6 +1589,18 @@ def _journal_authority_for_intent(intent: JournaledDistributionIntent) -> str:
     if intent == "purge":
         return "explicit-spec-history-purge"
     return "recognized-workspace-reconciliation"
+
+
+def _canonical_journal_authority_intents(authority: object) -> tuple[JournaledDistributionIntent, ...]:
+    """Return supported intents whose canonical journal authority matches."""
+
+    if not isinstance(authority, str):
+        return ()
+    return tuple(
+        intent
+        for intent in cast("tuple[JournaledDistributionIntent, ...]", tuple(_SUPPORTED_JOURNALED_INTENTS))
+        if _journal_authority_for_intent(intent) == authority
+    )
 
 
 def _journal_guard_purpose_for_intent(
@@ -8738,7 +8802,11 @@ def _validate_deprovision_journal_actions(
                 raise DistributionApplyError("journal-protocol-incompatible")
 
 
-def _parse_operation_journal(raw: bytes) -> OperationJournal:
+def _parse_operation_journal(
+    raw: bytes,
+    *,
+    expected_intent: JournaledDistributionIntent | None = None,
+) -> OperationJournal:
     try:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -8767,6 +8835,40 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     is_deprovision = payload.get("intent") == "deprovision"
     is_purge = payload.get("intent") == "purge"
     is_destructive = is_deprovision or is_purge
+    raw_intent = payload.get("intent")
+    journal_intent_supported = isinstance(raw_intent, str) and raw_intent in _SUPPORTED_JOURNALED_INTENTS
+    raw_authority = payload.get("authority")
+    journal_authority_supported = (
+        journal_intent_supported
+        and isinstance(raw_authority, str)
+        and raw_authority == _journal_authority_for_intent(cast("JournaledDistributionIntent", raw_intent))
+    )
+    canonical_authority_intents = _canonical_journal_authority_intents(raw_authority)
+    expected_intent_supported = isinstance(expected_intent, str) and expected_intent in _SUPPORTED_JOURNALED_INTENTS
+    authority_mismatch_kind: DistributionRecoveryMismatchKind | None = None
+    if journal_intent_supported and canonical_authority_intents:
+        if cast("JournaledDistributionIntent", raw_intent) not in canonical_authority_intents:
+            authority_mismatch_kind = "intent-authority"
+        if expected_intent_supported and (
+            raw_intent != expected_intent or expected_intent not in canonical_authority_intents
+        ):
+            authority_mismatch_kind = "intent-authority"
+    if journal_intent_supported and isinstance(raw_authority, str) and not journal_authority_supported:
+        authority_mismatch_kind = "intent-authority"
+        raise DistributionApplyError(
+            "journal-authority-mismatch",
+            recovery_mismatch_kind=authority_mismatch_kind,
+        )
+    if (
+        expected_intent_supported
+        and journal_intent_supported
+        and journal_authority_supported
+        and raw_intent != expected_intent
+    ):
+        raise DistributionApplyError(
+            "journal-authority-mismatch",
+            recovery_mismatch_kind="intent-authority",
+        )
     legacy_witnessless_deprovision = False
     if is_destructive:
         expected_fields.update({
@@ -8803,15 +8905,6 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     workspace = payload["workspace_binding"]
     actions = payload["actions"]
     journal_schema_supported = payload["schema_version"] == _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
-    journal_intent_supported = payload.get("intent") in {"fresh", "update", "init-force", "deprovision", "purge"}
-    journal_authority_supported = (
-        journal_intent_supported
-        and isinstance(payload.get("authority"), str)
-        and payload.get("authority")
-        == _journal_authority_for_intent(cast("JournaledDistributionIntent", payload["intent"]))
-    )
-    if journal_intent_supported and isinstance(payload.get("authority"), str) and not journal_authority_supported:
-        raise DistributionApplyError("journal-authority-mismatch")
     schema_intent_supported = payload["schema_version"] == _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
     if (
         not journal_schema_supported
@@ -9576,7 +9669,67 @@ class OperationJournalStore:
             os.close(parent_fd)
             os.close(root_fd)
 
-    def _read(self, expected_root: DistributionRootIdentity) -> OperationJournal:
+    def _read_unbound_journal_bytes(self) -> bytes | None:
+        """Read only enough journal evidence to classify a recovery intent."""
+
+        try:
+            directory_flags = _distribution_directory_flags()
+        except DistributionApplyError:
+            return None
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            return None
+        root_fd: int | None = None
+        parent_fd: int | None = None
+        journal_fd: int | None = None
+        try:
+            root_fd = os.open(self.target_root, directory_flags)
+            parent_fd = os.open("spec-dock", directory_flags, dir_fd=root_fd)
+            info = os.stat(_DISTRIBUTION_JOURNAL_REL.name, dir_fd=parent_fd, follow_symlinks=False)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                return None
+            journal_fd = os.open(
+                _DISTRIBUTION_JOURNAL_REL.name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+            opened = os.fstat(journal_fd)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or (opened.st_dev, opened.st_ino, opened.st_ctime_ns, opened.st_nlink)
+                != (info.st_dev, info.st_ino, info.st_ctime_ns, info.st_nlink)
+            ):
+                return None
+            raw = _read_fd_bytes(journal_fd)
+            after_read = os.fstat(journal_fd)
+            if len(raw) > 16 * 1024 * 1024 or _stat_identity_tuple(after_read) != _stat_identity_tuple(opened):
+                return None
+            return raw
+        except (OSError, DistributionApplyError):
+            return None
+        finally:
+            if journal_fd is not None:
+                os.close(journal_fd)
+            if parent_fd is not None:
+                os.close(parent_fd)
+            if root_fd is not None:
+                os.close(root_fd)
+
+    def _read(
+        self,
+        expected_root: DistributionRootIdentity,
+        *,
+        expected_intent: JournaledDistributionIntent | None = None,
+    ) -> OperationJournal:
+        if expected_intent is not None:
+            initial_raw = self._read_unbound_journal_bytes()
+            if initial_raw is not None:
+                try:
+                    _parse_operation_journal(initial_raw, expected_intent=expected_intent)
+                except DistributionApplyError as exc:
+                    if exc.recovery_mismatch_kind == "intent-authority":
+                        raise
         root_fd, parent_fd = self._open_parent(expected_root)
         try:
             nofollow = getattr(os, "O_NOFOLLOW", None)
@@ -9611,7 +9764,7 @@ class OperationJournalStore:
             finally:
                 os.close(fd)
             journal = replace(
-                _parse_operation_journal(raw),
+                _parse_operation_journal(raw, expected_intent=expected_intent),
                 source_snapshot=_snapshot_from_stat(_DISTRIBUTION_JOURNAL_REL.as_posix(), after_read),
                 source_sha256=hashlib.sha256(raw).hexdigest(),
             )
@@ -17313,7 +17466,7 @@ def _execute_destructive_distribution(
         guard_present = _DISTRIBUTION_RETRY_MARKER_REL.as_posix() in metadata_paths
         if journal_present:
             try:
-                journal = store._read(bound_root_identity)
+                journal = store._read(bound_root_identity, expected_intent=intent)
                 if journal.intent != intent or journal.authority != _journal_authority_for_intent(intent):
                     recovery_mismatch_kind = "intent-authority"
                     raise DistributionApplyError("journal-protocol-incompatible")
@@ -17324,7 +17477,7 @@ def _execute_destructive_distribution(
                     raise DistributionApplyError("journal-protocol-incompatible")
                 guard: DistributionRetryMarker | None = None
                 if guard_present:
-                    guard = _read_distribution_retry_marker(target_root)
+                    guard = _read_distribution_retry_marker(target_root, expected_intent=intent)
                     if (
                         guard is None
                         or guard.purpose != _journal_guard_purpose_for_intent(intent)
@@ -17371,7 +17524,9 @@ def _execute_destructive_distribution(
                     journal=journal,
                 )
                 _assert_deprovision_published_summaries(target_root, journal)
-            except (DistributionAdmissionError, DistributionApplyError, DistributionPlanError):
+            except (DistributionAdmissionError, DistributionApplyError, DistributionPlanError) as exc:
+                if getattr(exc, "recovery_mismatch_kind", None) == "intent-authority":
+                    recovery_mismatch_kind = "intent-authority"
                 return _distribution_process_result_from_state(
                     state="recovery-mismatch",
                     failure_paths=metadata_paths,
@@ -17427,7 +17582,7 @@ def _execute_destructive_distribution(
 
     if guard_only:
         try:
-            guard = _read_distribution_retry_marker(target_root)
+            guard = _read_distribution_retry_marker(target_root, expected_intent=intent)
             if (
                 guard is None
                 or guard.purpose != _journal_guard_purpose_for_intent(intent)
@@ -17453,7 +17608,9 @@ def _execute_destructive_distribution(
                 raise DistributionApplyError("journal-plan-mismatch")
             store = OperationJournalStore(target_root)
             store.bind_forward_guard(guard)
-        except (DistributionAdmissionError, DistributionApplyError, DistributionPlanError):
+        except (DistributionAdmissionError, DistributionApplyError, DistributionPlanError) as exc:
+            if getattr(exc, "recovery_mismatch_kind", None) == "intent-authority":
+                recovery_mismatch_kind = "intent-authority"
             return _distribution_process_result_from_state(
                 assessment,
                 state="recovery-mismatch",

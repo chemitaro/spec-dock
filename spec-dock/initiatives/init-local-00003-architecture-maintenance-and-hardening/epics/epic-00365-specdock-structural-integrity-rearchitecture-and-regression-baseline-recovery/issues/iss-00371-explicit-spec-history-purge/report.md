@@ -3,7 +3,7 @@
 ID: "iss-00371"
 タイトル: "Explicit Spec History Purge"
 関連GitHub: ["#371"]
-最終更新: "2026-08-28"
+最終更新: "2026-08-29"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00365", "init-local-00003"]
 ---
@@ -56,6 +56,24 @@ journal の intent/authority、または guard の operation/purpose が要求 i
 異なる場合だけ `manual-recovery` を返すようにした。これにより purge journal に
 対する keep/deprovision request、および deprovision journal に対する purge request
 は、retry command を公開せず、target と journal checkpoint を変更しない。
+
+### Final Quality Gate P1 remediation: parser/read boundary and dry-run projection
+
+Strict re-review の P1-A/P1-B を accepted contract 内で修正した。operation journal
+parser と retry guard reader は、supported canonical intent/authority または
+purpose/operation pair が認識できた時点で `intent-authority` metadata を typed
+exception に付加する。destructive recovery の journal 初回 read は descriptor-bound
+な no-follow capture を先に行い、root/parent/package の後段検証で cross-intent の
+分類を失わない。same-intent の malformed/package/plan mismatch は従来の
+`same-keep-command`（purge は `same-remove-command`/manual contract）を維持し、
+unsupported/malformed discriminator は authority を推測しない。guard-only の
+cross-intent は manual recovery とし、guard 不変・journal 未生成・checkpoint 0 を
+保つ。
+
+purge の dry-run は `same-remove-command` による apply guidance を維持しながら、
+public `retry_command` は `apply=True` の場合だけ生成する。apply 結果の exact
+`spec-dock uninstall --apply --remove-specs` command と deprovision keep の既存
+dry-run/retry projection、public schema/JSON/text/exit contract は変更していない。
 
 ## Verification
 
@@ -117,9 +135,16 @@ artifact: `.artifacts/iss-00371-full-regression/20260828T092613.495723Z/`
      failure。期待値を current contract の purge conflict
      (`exit=1`, `status=partial_failure`) へ同期し、単体 `1 passed` を確認した。
 
-ledger、verifier、Issue 370 evidence は変更していない。candidate が未commitの
-ため、wheel receipt failure を解消した、または Full Regression が成功したとは
-主張しない。
+ledger、verifier、Issue 370 evidence は変更していない。この結果は pre-commit
+candidate の historical evidence であり、final candidate の成否には使用しない。
+
+その後、clean exact SHA `6bd80c78a4b4ba4762eacaaea4e16af5ca3845f6`
+に対して外部 fresh artifact directory で verifier を再実行し、
+`status=verified`、`approved_failure_count=27`、candidate SHA exact match、
+total elapsed `1420.6s` を確認した。この SHA 後に parser/read boundary と purge
+dry-run projection の remediation を追加しているため、final frozen SHAでは同じ
+verifierをもう一度実行し、その外部 `result.json` を Final Quality Gate evidence
+とする。report-only commitによるSHA更新は行わない。
 
 ### Static/source contract evidence
 
@@ -173,10 +198,31 @@ managed regression は両 cross-intent 順序で target tree、journal bytes、g
 この修正は未commitのため、clean exact-SHA Full Regression verified evidence は
 primary の最終 gate で取得する。
 
+### Current parser and dry-run remediation checks
+
+- `uv run pytest tests/unit/infra/test_managed_distribution.py -k i371`: `13 passed`
+- `uv run pytest tests/unit/infra/test_managed_distribution.py`: `499 passed`
+- `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -k i371`: `2 passed`
+- `uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py -k i371`: `3 passed`
+- `uv run pytest`: `1449 passed, 1138 skipped`
+- `make lint`: ruff check/format、mypy ともに pass
+- `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=227`
+- `python3 -m py_compile src/spec_dock/managed_distribution.py src/spec_dock/cli.py`: pass
+- `git diff --check`: pass（whitespace error 0）
+
+P1-A regression は、canonical cross discriminator と arbitrary/noncanonical authority、
+後段 root/workspace malformed binding の順序、guard-only の journal 未生成、
+unsupported intent の generic classification を確認した。P1-B regression は purge dry-run の
+`retry_command=null`/apply guidance、apply 時の exact remove command、deprovision
+keep projection の維持を確認した。Full Regression の clean candidate SHA 検証は
+primary のプロセス gate として実施し、ledger/verifier は変更していない。
+
 ## Residual Risks / Follow-ups
 
-- Full Regression verifier は `ledger-mismatch` のため、clean candidate SHA での
-  wheel receipt を含む再検証が必要。ledger の変更や failure の隠蔽は行っていない。
+- parser/read boundary と dry-run projection remediation を含む final frozen SHAで、
+  clean Full Regression verifier の再検証が必要。直前の clean SHA
+  `6bd80c78a4b4ba4762eacaaea4e16af5ca3845f6` は `verified` であり、ledger、
+  verifier、approved failure signaturesは変更していない。
 - fast lane の visible-parent rebind race は既存挙動として残る。再実行で green
   だったが、根本修正は Issue 371 の scope 外。
 - init/update の再実行は重い既存ケースで中断したため、P1修正後の当該 selector
@@ -184,12 +230,15 @@ primary の最終 gate で取得する。
   suitesの修正後 greenを保全している。
 - `.artifacts/iss-00371-full-regression/20260828T092613.495723Z/` は verifier
   evidence として生成したが、現在の working tree には保持していない。
-- 初回実装 commit `d3690b0879dbcb2155ea11c6a249467b6ec51df2` は upstream へ
-  push 済みである。P1 remediation 後の `git status --short` は次のとおり。
+- cross-intent remediation commit `6bd80c78a4b4ba4762eacaaea4e16af5ca3845f6`
+  までは upstream へpush済みである。parser/read boundary と dry-run projection
+  remediation 後の `git status --short` は次のとおり。
 
 ```text
  M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00371-explicit-spec-history-purge/report.md
+ M src/spec_dock/cli.py
  M src/spec_dock/managed_distribution.py
+ M tests/unit/infra/test_init_update.py
  M tests/unit/infra/test_managed_distribution.py
 ```
 
