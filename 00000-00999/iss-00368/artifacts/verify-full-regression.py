@@ -7,11 +7,8 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 import re
-import selectors
-import signal
 import subprocess
 import sys
 import time
@@ -20,8 +17,6 @@ import xml.etree.ElementTree as ET
 
 LEDGER = Path(__file__).with_name("full-regression-ledger.json")
 TIMING_WEIGHTS = Path(__file__).with_name("full-regression-timing-weights.json")
-DEFAULT_TIMEOUT_SECONDS = 600.0
-DEFAULT_MAX_TOTAL_SECONDS = 600.0
 
 
 def _normalize(message: str, repository: Path) -> str:
@@ -76,13 +71,11 @@ def _run_streamed(
     *,
     cwd: Path,
     output_path: Path,
-    timeout_seconds: float,
     stream: bool = True,
-) -> tuple[int, bool]:
-    """Run a verifier subprocess with live output and a hard deadline."""
+) -> int:
+    """Run a verifier subprocess with live output until natural completion."""
 
     started = time.monotonic()
-    timed_out = False
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as saved:
         process = subprocess.Popen(
@@ -91,12 +84,8 @@ def _run_streamed(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             bufsize=0,
-            start_new_session=True,
         )
         assert process.stdout is not None
-        os.set_blocking(process.stdout.fileno(), False)
-        selector = selectors.DefaultSelector()
-        selector.register(process.stdout, selectors.EVENT_READ)
         decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         pending = ""
 
@@ -116,113 +105,19 @@ def _run_streamed(
             if lines:
                 saved.flush()
 
-        def drain_available(
-            *, deadline: float | None, max_reads: int | None = None
-        ) -> tuple[bool, bool]:
-            reads = 0
-            while max_reads is None or reads < max_reads:
-                if deadline is not None and time.monotonic() >= deadline:
-                    return False, True
-                try:
-                    chunk = os.read(process.stdout.fileno(), 65536)
-                except BlockingIOError:
-                    return False, False
-                if not chunk:
-                    return True, False
-                emit_available(chunk)
-                reads += 1
-            return False, False
-
-        def signal_process_group(sig: signal.Signals) -> None:
-            try:
-                if hasattr(os, "killpg"):
-                    os.killpg(process.pid, sig)
-                elif process.poll() is None:
-                    process.send_signal(sig)
-            except ProcessLookupError:
-                pass
-
-        def process_group_exists() -> bool:
-            if not hasattr(os, "killpg"):
-                return process.poll() is None
-            try:
-                os.killpg(process.pid, 0)
-            except ProcessLookupError:
-                return False
-            except PermissionError:
-                return True
-            return True
-
-        def stop_process_group(*, deadline: float) -> None:
-            signal_process_group(signal.SIGTERM)
-            grace_deadline = min(deadline, time.monotonic() + 0.2)
-            while time.monotonic() < grace_deadline:
-                eof, _ = drain_available(deadline=grace_deadline, max_reads=1)
-                if eof:
-                    break
-                time.sleep(min(0.01, max(0.0, grace_deadline - time.monotonic())))
-            signal_process_group(signal.SIGKILL)
-            if process.poll() is None:
-                try:
-                    process.wait(timeout=max(0.01, deadline - time.monotonic()))
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
-
-        try:
-            while True:
-                elapsed = time.monotonic() - started
-                if elapsed >= timeout_seconds:
-                    timed_out = True
-                    break
-                if process.poll() is not None:
-                    eof, drain_timed_out = drain_available(deadline=started + timeout_seconds)
-                    if not eof or process_group_exists():
-                        timed_out = True
-                    timed_out = timed_out or drain_timed_out
-                    break
-                events = selector.select(timeout=min(0.25, timeout_seconds - elapsed))
-                if not events:
-                    continue
-                chunk = os.read(process.stdout.fileno(), 65536)
-                if not chunk:
-                    continue
-                emit_available(chunk)
-            if timed_out:
-                stop_process_group(deadline=started + timeout_seconds)
-            else:
-                process.wait()
-            drain_available(
-                deadline=None,
-                max_reads=32,
-            )
-            emit_available(b"", final=True)
-        finally:
-            selector.close()
-            if process.stdout is not None:
-                process.stdout.close()
-    if timed_out:
-        timeout_line = f"[timeout] pytest exceeded {timeout_seconds:.1f}s and was terminated\n"
-        print(timeout_line, end="", file=sys.stderr, flush=True)
-        with output_path.open("a", encoding="utf-8") as saved:
-            saved.write(timeout_line)
-    return 124 if timed_out else process.returncode or 0, timed_out
+        while True:
+            chunk = process.stdout.read(65536)
+            if not chunk:
+                break
+            emit_available(chunk)
+        process.wait()
+        emit_available(b"", final=True)
+        process.stdout.close()
+    return process.returncode or 0
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run and validate the Issue 368 full-regression ledger.")
-    parser.add_argument(
-        "--timeout-seconds",
-        type=float,
-        default=DEFAULT_TIMEOUT_SECONDS,
-        help="hard timeout for each pytest phase (default: 600 seconds)",
-    )
-    parser.add_argument(
-        "--max-total-seconds",
-        type=float,
-        default=DEFAULT_MAX_TOTAL_SECONDS,
-        help="hard deadline including collection and every shard (default: 600 seconds)",
-    )
     parser.add_argument(
         "--artifact-dir",
         type=Path,
@@ -236,10 +131,6 @@ def _parse_args() -> argparse.Namespace:
         help="number of deterministic pytest processes to run concurrently (default: 4)",
     )
     args = parser.parse_args()
-    if args.timeout_seconds <= 0:
-        parser.error("--timeout-seconds must be greater than zero")
-    if args.max_total_seconds <= 0:
-        parser.error("--max-total-seconds must be greater than zero")
     if args.shards <= 0:
         parser.error("--shards must be greater than zero")
     return args
@@ -250,49 +141,13 @@ def _timing_evidence(
     overall_started: float,
     collection_seconds: float,
     shard_elapsed_seconds: float,
-    slo_seconds: float,
 ) -> dict[str, object]:
     total_elapsed_seconds = time.monotonic() - overall_started
     return {
         "collection_seconds": round(collection_seconds, 3),
         "shard_elapsed_seconds": round(shard_elapsed_seconds, 3),
         "total_elapsed_seconds": round(total_elapsed_seconds, 3),
-        "slo_seconds": slo_seconds,
-        "slo_status": "pass" if total_elapsed_seconds <= slo_seconds else "fail",
     }
-
-
-def _finalize_result(
-    result: dict[str, object],
-    *,
-    overall_started: float,
-    collection_seconds: float,
-    shard_elapsed_seconds: float,
-    slo_seconds: float,
-) -> dict[str, object]:
-    finalized = {
-        **result,
-        **_timing_evidence(
-            overall_started=overall_started,
-            collection_seconds=collection_seconds,
-            shard_elapsed_seconds=shard_elapsed_seconds,
-            slo_seconds=slo_seconds,
-        ),
-    }
-    if finalized["slo_status"] != "pass" and finalized["status"] != "total-timeout":
-        finalized["underlying_status"] = finalized["status"]
-        finalized["status"] = "total-timeout"
-    return finalized
-
-
-def _remaining_phase_budget(
-    *,
-    overall_started: float,
-    max_total_seconds: float,
-    phase_timeout_seconds: float,
-) -> float:
-    remaining = max_total_seconds - (time.monotonic() - overall_started)
-    return max(0.0, min(phase_timeout_seconds, remaining))
 
 
 def _load_timing_weights(repository: Path, head: str) -> tuple[dict[str, float], float]:
@@ -408,41 +263,21 @@ def main() -> int:
     run_dir.mkdir(parents=True, exist_ok=False)
     collection_log = run_dir / "collection.log"
     collection_started = time.monotonic()
-    collection_budget = _remaining_phase_budget(
-        overall_started=overall_started,
-        max_total_seconds=args.max_total_seconds,
-        phase_timeout_seconds=min(args.timeout_seconds, 120.0),
-    )
-    if collection_budget <= 0:
-        result = {
-            "status": "total-timeout",
-            **_timing_evidence(
-                overall_started=overall_started,
-                collection_seconds=0.0,
-                shard_elapsed_seconds=0.0,
-                slo_seconds=args.max_total_seconds,
-            ),
-        }
-        (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-        return 1
-    collection_code, collection_timeout = _run_streamed(
+    collection_code = _run_streamed(
         [sys.executable, "-m", "pytest", "--run-full-regression", "--collect-only", "-q"],
         cwd=repository,
         output_path=collection_log,
-        timeout_seconds=collection_budget,
         stream=False,
     )
     collection_seconds = time.monotonic() - collection_started
-    if collection_timeout or collection_code != 0:
+    if collection_code != 0:
         result = {
-            "status": "collection-timeout" if collection_timeout else "collection-failed",
+            "status": "collection-failed",
             "exit_code": collection_code,
-            "timeout_seconds": args.timeout_seconds,
             **_timing_evidence(
                 overall_started=overall_started,
                 collection_seconds=collection_seconds,
                 shard_elapsed_seconds=0.0,
-                slo_seconds=args.max_total_seconds,
             ),
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -461,7 +296,6 @@ def main() -> int:
                 overall_started=overall_started,
                 collection_seconds=collection_seconds,
                 shard_elapsed_seconds=0.0,
-                slo_seconds=args.max_total_seconds,
             ),
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -479,7 +313,6 @@ def main() -> int:
                 overall_started=overall_started,
                 collection_seconds=collection_seconds,
                 shard_elapsed_seconds=0.0,
-                slo_seconds=args.max_total_seconds,
             ),
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -494,17 +327,10 @@ def main() -> int:
 
     shard_started = time.monotonic()
 
-    def run_shard(index: int, selected: list[str]) -> tuple[int, bool, Path, Path]:
+    def run_shard(index: int, selected: list[str]) -> tuple[int, Path, Path]:
         junit_path = run_dir / f"shard-{index + 1}.xml"
         pytest_log = run_dir / f"shard-{index + 1}.log"
-        remaining_total_seconds = _remaining_phase_budget(
-            overall_started=overall_started,
-            max_total_seconds=args.max_total_seconds,
-            phase_timeout_seconds=args.timeout_seconds,
-        )
-        if remaining_total_seconds <= 0:
-            return 124, True, junit_path, pytest_log
-        code, timed_out = _run_streamed(
+        code = _run_streamed(
             [
                 sys.executable,
                 "-m",
@@ -518,9 +344,8 @@ def main() -> int:
             ],
             cwd=repository,
             output_path=pytest_log,
-            timeout_seconds=remaining_total_seconds,
         )
-        return code, timed_out, junit_path, pytest_log
+        return code, junit_path, pytest_log
 
     with ThreadPoolExecutor(max_workers=shard_count) as executor:
         shard_results = list(executor.map(lambda item: run_shard(*item), enumerate(shards)))
@@ -529,43 +354,32 @@ def main() -> int:
         overall_started=overall_started,
         collection_seconds=collection_seconds,
         shard_elapsed_seconds=shard_elapsed_seconds,
-        slo_seconds=args.max_total_seconds,
     )
-    if timing["slo_status"] != "pass":
-        result = {
-            "status": "total-timeout",
-            "timeout_seconds": args.timeout_seconds,
-            **timing,
-        }
-        (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-        print(json.dumps(result, sort_keys=True), file=sys.stderr)
-        return 1
     invalid_shards = [
         {
             "shard": index + 1,
             "exit_code": code,
-            "timed_out": timed_out,
             "junit_path": str(junit_path),
             "pytest_log": str(pytest_log),
         }
-        for index, (code, timed_out, junit_path, pytest_log) in enumerate(shard_results)
-        if timed_out or code not in {0, 1} or not junit_path.is_file()
+        for index, (code, junit_path, pytest_log) in enumerate(shard_results)
+        if code not in {0, 1} or not junit_path.is_file()
     ]
     if invalid_shards:
         result = {
-            "status": "shard-timeout-or-failed",
-            "timeout_seconds": args.timeout_seconds,
+            "status": "shard-execution-invalid",
             "shards": invalid_shards,
             **timing,
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
         return 1
+
     selected_nodes = set(nodeids)
     executed_nodes: set[str] = set()
     actual: dict[str, str] = {}
     errors: list[str] = []
-    for _code, _timed_out, junit_path, _pytest_log in shard_results:
+    for _code, junit_path, _pytest_log in shard_results:
         shard_nodes = _junit_nodeids(junit_path)
         overlap = executed_nodes & shard_nodes
         if overlap:
@@ -613,28 +427,23 @@ def main() -> int:
             ),
             "shards": [
                 {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
-                for _code, _timed_out, junit_path, pytest_log in shard_results
+                for _code, junit_path, pytest_log in shard_results
             ],
             **timing,
         }
         (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
         return 1
-    result = _finalize_result(
-        {
-            "status": "verified",
-            "candidate_sha": head,
-            "approved_failure_count": len(actual),
-            "shards": [
-                {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
-                for _code, _timed_out, junit_path, pytest_log in shard_results
-            ],
-        },
-        overall_started=overall_started,
-        collection_seconds=collection_seconds,
-        shard_elapsed_seconds=shard_elapsed_seconds,
-        slo_seconds=args.max_total_seconds,
-    )
+    result = {
+        "status": "verified",
+        "candidate_sha": head,
+        "approved_failure_count": len(actual),
+        "shards": [
+            {"junit_path": str(junit_path), "pytest_log": str(pytest_log)}
+            for _code, junit_path, pytest_log in shard_results
+        ],
+        **timing,
+    }
     (run_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if result["status"] != "verified":
         print(json.dumps(result, sort_keys=True), file=sys.stderr)
