@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 import subprocess
 import sys
-import time
 
 import pytest
 
@@ -77,7 +76,7 @@ def _load_full_regression_verifier():
     return module
 
 
-def test_full_regression_total_slo_evidence_includes_collection_and_shards(monkeypatch) -> None:
+def test_full_regression_timing_evidence_is_observation_only(monkeypatch) -> None:
     verifier = _load_full_regression_verifier()
     monkeypatch.setattr(verifier.time, "monotonic", lambda: 610.0)
 
@@ -85,168 +84,226 @@ def test_full_regression_total_slo_evidence_includes_collection_and_shards(monke
         overall_started=0.0,
         collection_seconds=110.0,
         shard_elapsed_seconds=500.0,
-        slo_seconds=600.0,
     )
 
     assert evidence == {
         "collection_seconds": 110.0,
         "shard_elapsed_seconds": 500.0,
         "total_elapsed_seconds": 610.0,
-        "slo_seconds": 600.0,
-        "slo_status": "fail",
     }
 
 
-def test_full_regression_phase_budget_cannot_extend_the_total_deadline(monkeypatch) -> None:
+@pytest.mark.parametrize("removed_flag", ["--timeout-seconds", "--max-total-seconds"])
+def test_full_regression_removed_budget_flags_are_rejected(monkeypatch, removed_flag: str) -> None:
     verifier = _load_full_regression_verifier()
-    now = 110.0
-    monkeypatch.setattr(verifier.time, "monotonic", lambda: now)
+    monkeypatch.setattr(verifier.sys, "argv", ["verify-full-regression.py", removed_flag, "1"])
 
-    assert (
-        abs(
-            verifier._remaining_phase_budget(
-                overall_started=0.0,
-                max_total_seconds=600.0,
-                phase_timeout_seconds=600.0,
-            )
-            - 490.0
-        )
-        < 1e-9
-    )
+    with pytest.raises(SystemExit) as exc_info:
+        verifier._parse_args()
 
-    now = 610.0
-    assert (
-        abs(
-            verifier._remaining_phase_budget(
-                overall_started=0.0,
-                max_total_seconds=600.0,
-                phase_timeout_seconds=600.0,
-            )
-        )
-        < 1e-9
-    )
+    assert exc_info.value.code == 2
 
 
-def test_full_regression_stream_timeout_survives_unterminated_output(tmp_path: Path) -> None:
+def test_full_regression_stream_waits_for_natural_completion_and_saves_unterminated_output(
+    tmp_path: Path,
+) -> None:
     verifier = _load_full_regression_verifier()
     output_path = tmp_path / "unterminated.log"
-    started = time.monotonic()
 
-    code, timed_out = verifier._run_streamed(
+    code = verifier._run_streamed(
         [
             sys.executable,
             "-c",
-            "import sys, time; sys.stdout.write('unterminated'); sys.stdout.flush(); time.sleep(2)",
+            (
+                "import sys, time; sys.stdout.write('unterminated'); sys.stdout.flush(); "
+                "time.sleep(0.1); raise SystemExit(7)"
+            ),
         ],
         cwd=tmp_path,
         output_path=output_path,
-        timeout_seconds=0.1,
         stream=False,
     )
 
-    assert timed_out is True
-    assert code != 0
-    assert time.monotonic() - started < 1.5
+    assert code == 7
     assert "unterminated" in output_path.read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize(
-    ("child_body", "expected_output"),
-    [
-        (
-            "import sys, time\n"
-            "while True:\n"
-            "    sys.stdout.write('continuous\\n')\n"
-            "    sys.stdout.flush()\n"
-            "    time.sleep(0.001)\n",
-            "continuous",
-        ),
-        (
-            "import sys, time\nsys.stdout.write('intermittent\\n')\nsys.stdout.flush()\ntime.sleep(5)\n",
-            "intermittent",
-        ),
-        ("import time\ntime.sleep(5)\n", None),
-    ],
-    ids=("continuous-write", "intermittent-write", "silent"),
-)
-def test_full_regression_leader_exit_cannot_leave_stdout_descendant(
+def test_full_regression_workflow_has_no_execution_time_caps() -> None:
+    workflow = (_repo_root() / ".github/workflows/provider-full-regression.yml").read_text(encoding="utf-8")
+
+    assert "timeout-minutes" not in workflow
+    assert "--timeout-seconds" not in workflow
+    assert "--max-total-seconds" not in workflow
+    assert "--shards 4" in workflow
+
+
+def test_full_regression_main_keeps_verified_status_after_long_observation(
+    monkeypatch,
     tmp_path: Path,
-    child_body: str,
-    expected_output: str | None,
 ) -> None:
     verifier = _load_full_regression_verifier()
-    child = tmp_path / "child.py"
-    parent = tmp_path / "parent.py"
-    output_path = tmp_path / "descendant.log"
-    child.write_text(child_body, encoding="utf-8")
-    parent.write_text(
-        "import subprocess, sys, time\nsubprocess.Popen([sys.executable, 'child.py'])\ntime.sleep(0.1)\n",
+    candidate_sha = "a" * 40
+    nodeid = "tests/sample.py::test_one"
+    artifact_root = tmp_path / "artifacts"
+    verifier.LEDGER = tmp_path / "ledger.json"
+    verifier.LEDGER.write_text(
+        json.dumps({
+            "current_head_sha": candidate_sha,
+            "failure_paths": [
+                {
+                    "nodeid": nodeid,
+                    "current_status": "failed",
+                    "fixed_point_status": "failed",
+                    "disposition": "approved-no-op",
+                    "failure_signature_match": True,
+                    "current_signature_sha256": "0" * 64,
+                    "fixed_point_signature_sha256": "0" * 64,
+                }
+            ],
+        }),
         encoding="utf-8",
     )
-    started = time.monotonic()
-
-    code, timed_out = verifier._run_streamed(
-        [sys.executable, str(parent)],
-        cwd=tmp_path,
-        output_path=output_path,
-        timeout_seconds=0.5,
-        stream=False,
+    verifier.TIMING_WEIGHTS = tmp_path / "timing-weights.json"
+    verifier.TIMING_WEIGHTS.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verifier.sys,
+        "argv",
+        [
+            "verify-full-regression.py",
+            "--artifact-dir",
+            str(artifact_root),
+            "--shards",
+            "1",
+        ],
     )
 
-    assert timed_out is True
-    assert code == 124
-    assert time.monotonic() - started < 1.5
-    if expected_output is not None:
-        assert expected_output in output_path.read_text(encoding="utf-8")
+    monotonic_calls = 0
+
+    def long_observation() -> float:
+        nonlocal monotonic_calls
+        monotonic_calls += 1
+        return 0.0 if monotonic_calls <= 2 else 601.0
+
+    monkeypatch.setattr(verifier.time, "monotonic", long_observation)
+
+    def fake_run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        output_path: Path,
+        stream: bool = True,
+    ) -> int:
+        del cwd, stream
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if "--collect-only" in argv:
+            output_path.write_text(f"[   0.0s] {nodeid}\n", encoding="utf-8")
+        else:
+            junit_path = Path(next(arg.split("=", 1)[1] for arg in argv if arg.startswith("--junitxml=")))
+            junit_path.write_text("<testsuite />", encoding="utf-8")
+            output_path.write_text("", encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(verifier, "_run_streamed", fake_run)
+    monkeypatch.setattr(verifier, "_load_timing_weights", lambda repository, head: ({}, 1.0))
+    monkeypatch.setattr(verifier, "_junit_nodeids", lambda junit_path: {nodeid})
+    monkeypatch.setattr(verifier, "_failure_signatures", lambda junit_path, repository: ({nodeid: "0" * 64}, []))
+
+    def fake_subprocess_run(argv, **kwargs):
+        if argv[:2] == ["git", "rev-parse"]:
+            return subprocess.CompletedProcess(argv, 0, stdout=f"{candidate_sha}\n")
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(verifier.subprocess, "run", fake_subprocess_run)
+
+    assert verifier.main() == 0
+    result_paths = list(artifact_root.glob("*/result.json"))
+    assert len(result_paths) == 1
+    result = json.loads(result_paths[0].read_text(encoding="utf-8"))
+    assert result["status"] == "verified"
+    assert abs(result["total_elapsed_seconds"] - 601.0) < 1e-9
 
 
-def test_full_regression_leader_exit_checks_group_after_pipe_eof(tmp_path: Path) -> None:
+def test_full_regression_main_collects_all_shards_before_invalid_execution_result(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     verifier = _load_full_regression_verifier()
-    child = tmp_path / "child.py"
-    parent = tmp_path / "parent.py"
-    output_path = tmp_path / "closed-descendant.log"
-    child.write_text("import time\ntime.sleep(5)\n", encoding="utf-8")
-    parent.write_text(
-        "import subprocess, sys, time\n"
-        "subprocess.Popen(\n"
-        "    [sys.executable, 'child.py'],\n"
-        "    stdout=subprocess.DEVNULL,\n"
-        "    stderr=subprocess.DEVNULL,\n"
-        ")\n"
-        "time.sleep(0.1)\n",
+    candidate_sha = "b" * 40
+    nodeids = ("tests/sample.py::test_one", "tests/sample.py::test_two")
+    artifact_root = tmp_path / "artifacts"
+    verifier.LEDGER = tmp_path / "ledger.json"
+    verifier.LEDGER.write_text(
+        json.dumps({
+            "current_head_sha": candidate_sha,
+            "failure_paths": [
+                {
+                    "nodeid": nodeids[0],
+                    "current_status": "failed",
+                    "fixed_point_status": "failed",
+                    "disposition": "approved-no-op",
+                    "failure_signature_match": True,
+                    "current_signature_sha256": "0" * 64,
+                    "fixed_point_signature_sha256": "0" * 64,
+                }
+            ],
+        }),
         encoding="utf-8",
     )
-    started = time.monotonic()
-
-    code, timed_out = verifier._run_streamed(
-        [sys.executable, str(parent)],
-        cwd=tmp_path,
-        output_path=output_path,
-        timeout_seconds=0.5,
-        stream=False,
+    verifier.TIMING_WEIGHTS = tmp_path / "timing-weights.json"
+    verifier.TIMING_WEIGHTS.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verifier.sys,
+        "argv",
+        [
+            "verify-full-regression.py",
+            "--artifact-dir",
+            str(artifact_root),
+            "--shards",
+            "2",
+        ],
     )
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 0.0)
 
-    assert timed_out is True
-    assert code == 124
-    assert time.monotonic() - started < 1.5
+    invocations: list[tuple[str, ...]] = []
 
+    def fake_run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        output_path: Path,
+        stream: bool = True,
+    ) -> int:
+        del cwd, stream
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if "--collect-only" in argv:
+            output_path.write_text("".join(f"[   0.0s] {nodeid}\n" for nodeid in nodeids), encoding="utf-8")
+            return 0
+        selected = tuple(arg for arg in argv if arg.startswith("tests/"))
+        invocations.append(selected)
+        junit_path = Path(next(arg.split("=", 1)[1] for arg in argv if arg.startswith("--junitxml=")))
+        junit_path.write_text("<testsuite />", encoding="utf-8")
+        output_path.write_text("", encoding="utf-8")
+        return 2 if selected == (nodeids[0],) else 0
 
-def test_full_regression_final_result_rechecks_deadline_after_postprocessing(monkeypatch) -> None:
-    verifier = _load_full_regression_verifier()
-    monkeypatch.setattr(verifier.time, "monotonic", lambda: 600.001)
+    monkeypatch.setattr(verifier, "_run_streamed", fake_run)
+    monkeypatch.setattr(verifier, "_load_timing_weights", lambda repository, head: ({}, 1.0))
 
-    result = verifier._finalize_result(
-        {"status": "verified", "candidate_sha": "a" * 40},
-        overall_started=0.0,
-        collection_seconds=0.25,
-        shard_elapsed_seconds=599.0,
-        slo_seconds=600.0,
-    )
+    def fake_subprocess_run(argv, **kwargs):
+        if argv[:2] == ["git", "rev-parse"]:
+            return subprocess.CompletedProcess(argv, 0, stdout=f"{candidate_sha}\n")
+        return subprocess.CompletedProcess(argv, 0)
 
-    assert result["status"] == "total-timeout"
-    assert result["underlying_status"] == "verified"
-    assert result["slo_status"] == "fail"
-    assert abs(result["total_elapsed_seconds"] - 600.001) < 1e-9
+    monkeypatch.setattr(verifier.subprocess, "run", fake_subprocess_run)
+
+    assert verifier.main() == 1
+    assert set(invocations) == {(nodeids[0],), (nodeids[1],)}
+    result_paths = list(artifact_root.glob("*/result.json"))
+    assert len(result_paths) == 1
+    result = json.loads(result_paths[0].read_text(encoding="utf-8"))
+    assert result["status"] == "shard-execution-invalid"
+    assert {shard["exit_code"] for shard in result["shards"]} == {2}
 
 
 def test_full_regression_weighted_shards_are_deterministic_and_preserve_collection_order() -> None:
@@ -302,13 +359,6 @@ def test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setu
     assert not _can_reuse_fresh_init_result(module, "test_i369_fresh_entrypoint_matrix")
     assert not _can_reuse_fresh_init_result(module, "test_s70_uninstall_allows_fresh_reinit")
     assert not _can_reuse_fresh_init_result(module, "test_s45_init_materializes_current_catalog")
-
-
-def test_full_regression_workflow_enforces_the_total_slo() -> None:
-    workflow = (_repo_root() / ".github/workflows/provider-full-regression.yml").read_text(encoding="utf-8")
-
-    assert "--timeout-seconds 600 --max-total-seconds 600 --shards 4" in workflow
-    assert "timeout-minutes: 12" in workflow
 
 
 def test_full_regression_shards_preserve_ledger_assertion_verbosity() -> None:
