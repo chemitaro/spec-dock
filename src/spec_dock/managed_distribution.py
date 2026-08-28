@@ -12737,12 +12737,18 @@ class OperationJournalStore:
             expected_sha256 = marker.source_sha256
             if expected_snapshot is None or expected_sha256 is None or not _same_stat_identity(info, expected_snapshot):
                 raise DistributionApplyError("legacy-marker-unconvertible")
+
+            def pre_delete_check() -> None:
+                if destructive_recovery:
+                    self._assert_destructive_recovery_metadata_bound(marker.target_root)
+
             self._quarantine_and_remove(
                 parent_fd,
                 name,
                 info,
                 expected_snapshot=expected_snapshot,
                 expected_sha256=expected_sha256,
+                pre_delete_check=pre_delete_check if destructive_recovery else None,
                 identity_error="legacy-marker-unconvertible",
                 failure_reason="legacy-marker-unconvertible",
             )
@@ -15327,21 +15333,14 @@ def _destructive_recovery_boundary_result(
     }.get(state_text)
     if state is None:
         return None
-    result = _distribution_process_result_from_state(
+    return _distribution_process_result_from_state(
         assessment,
+        journal,
         state=cast("DistributionDeprovisionServiceState", state),
         executable=executable,
         intent=intent,
         failure_paths=failure_paths,
     )
-    if journal is not None:
-        result = replace(
-            result,
-            plan_digest=journal.plan_digest,
-            applied_paths=tuple(record.path for record in journal.actions if record.checkpoint != "pending"),
-            pending_paths=tuple(record.path for record in journal.actions if record.checkpoint == "pending"),
-        )
-    return result
 
 
 def _deprovision_has_managed_workspace_evidence(assessment: WorkspaceAssessment) -> bool:
@@ -15498,7 +15497,13 @@ def _distribution_process_result_from_state(
     errors: tuple[DistributionProcessError, ...] = ()
     state_failed_paths: tuple[str, ...]
 
-    if state == "journal":
+    manual_recovery_states = {
+        "legacy-marker",
+        "legacy-marker-invalid",
+        "dual-recovery-state",
+    }
+    journal_progress_state = state == "journal" or (journal is not None and state in manual_recovery_states)
+    if journal_progress_state:
         if assessment is None or journal is None:
             raise DistributionPlanError(f"{operation_label} journal result state is incomplete")
         target_root = assessment.distribution_plan.target_root
@@ -15565,6 +15570,35 @@ def _distribution_process_result_from_state(
                 message=f"Managed distribution {operation_label} recovery is required.",
             ),
         )
+        if state in manual_recovery_states:
+            if state == "legacy-marker":
+                status = "recovery_required"
+                reason = "legacy-marker-unconvertible"
+                errors = (
+                    DistributionProcessError(
+                        code="legacy-marker-unconvertible",
+                        message="Legacy uninstall recovery requires manual review.",
+                    ),
+                )
+            elif state == "legacy-marker-invalid":
+                status = "error"
+                reason = "legacy-marker-invalid"
+                errors = (
+                    DistributionProcessError(
+                        code="legacy-marker-invalid",
+                        message="Legacy uninstall recovery evidence is invalid.",
+                    ),
+                )
+            else:
+                status = "recovery_required"
+                reason = "dual-recovery-state"
+                errors = (
+                    DistributionProcessError(
+                        code="dual-recovery-state",
+                        message="Conflicting uninstall recovery evidence requires manual review.",
+                    ),
+                )
+            retry_policy = "manual-recovery"
     elif state == "eligibility-error":
         status = "error"
         retry_policy = "none"

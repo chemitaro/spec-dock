@@ -361,6 +361,61 @@ def test_i371_cross_intent_purge_journal_keep_route_is_manual_and_read_only(
     assert guard_path.read_bytes() == guard_bytes
 
 
+@pytest.mark.parametrize("mode", ["keep-specs", "remove-specs"])
+def test_i371_cli_maps_journal_progress_dual_state_to_partial_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+    mode: str,
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    if mode == "remove-specs":
+        history_file = target / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True, exist_ok=True)
+        history_file.write_bytes(b"history\n")
+
+    guard_path = target / "spec-dock/.distribution-retry.json"
+    journal_path = target / "spec-dock/.distribution-journal.json"
+    legacy_path = target / "spec-dock/.uninstall-retry.json"
+    managed_path = target / ".github/workflows/ci.yml"
+    managed_bytes = managed_path.read_bytes()
+    legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
+    original_prepare = managed_distribution.OperationJournalStore.prepare
+    captured: dict[str, bytes] = {}
+
+    def prepare_with_late_legacy(self, plan, **kwargs):
+        journal = original_prepare(self, plan, **kwargs)
+        captured["guard"] = guard_path.read_bytes()
+        captured["journal"] = journal_path.read_bytes()
+        legacy_path.write_bytes(legacy_bytes)
+        return journal
+
+    monkeypatch.setattr(managed_distribution.OperationJournalStore, "prepare", prepare_with_late_legacy)
+    args = ["uninstall", str(target), "--apply", f"--{mode}", "--json"]
+    assert main(args) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "partial_failure"
+    assert payload["specs_mode"] == ("keep" if mode == "keep-specs" else "remove")
+    assert payload["phase"] == "uninstall-apply"
+    assert payload["last_completed_phase"] == "marker-written"
+    assert payload["retry_command"] is None
+    assert payload["pending_paths"]
+    assert set(payload["pending_paths"]).issubset(payload["failed_paths"])
+    assert any(action["status"] == "pending" for action in payload["actions"])
+    assert payload["errors"] == ["Conflicting uninstall recovery evidence requires manual review."]
+    assert payload["guidance"][0] == (
+        "manual recovery required: conflicting legacy and schema-2 recovery states prove no single plan or checkpoint"
+    )
+    assert managed_path.read_bytes() == managed_bytes
+    assert guard_path.read_bytes() == captured["guard"]
+    assert journal_path.read_bytes() == captured["journal"]
+    assert legacy_path.read_bytes() == legacy_bytes
+
+
 def test_i370_uninstall_deprovision_cli_has_no_legacy_or_journal_interpretation() -> None:
     """I370-T-RESULT-001/I370-T-ABS-001: CLI is a typed adapter with no hidden fallback."""
 
