@@ -206,6 +206,22 @@ def _i370_tree_evidence(root: Path) -> dict[str, tuple[object, ...]]:
     return evidence
 
 
+def _i371_late_legacy_fixture(tmp_path: Path):
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    legacy_path = target_root / "spec-dock" / ".uninstall-retry.json"
+    legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
+    return install_root, scaffold_root, manifest_path, target_root, managed, root_identity, legacy_path, legacy_bytes
+
+
 def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
     plan = build_distribution_plan(INSTALL_ROOT, manifest_path=MANIFEST_PATH)
 
@@ -639,6 +655,188 @@ def test_i371_purge_forward_recovers_same_plan_after_history_checkpoint_failure(
     assert workbench.read_bytes() == b"preserve\n"
     assert not (target_root / "spec-dock/.distribution-retry.json").exists()
     assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+def test_i371_late_legacy_before_guard_publish_is_manual_and_write_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = OperationJournalStore.prepare_legacy_guard
+    injected = False
+
+    def create_legacy_before_guard(self, plan, **kwargs):
+        nonlocal injected
+        legacy_path.write_bytes(legacy_bytes)
+        injected = True
+        return original(self, plan, **kwargs)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", create_legacy_before_guard)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "legacy-marker-unconvertible"
+    assert result.retry_policy == "manual-recovery"
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert managed.read_bytes() == b"managed\n"
+
+
+def test_i371_late_legacy_after_guard_publish_is_dual_and_journal_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = OperationJournalStore.prepare_legacy_guard
+    injected = False
+
+    def create_legacy_after_guard(self, plan, **kwargs):
+        nonlocal injected
+        marker = original(self, plan, **kwargs)
+        legacy_path.write_bytes(legacy_bytes)
+        injected = True
+        return marker
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", create_legacy_after_guard)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert managed.read_bytes() == b"managed\n"
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert (target_root / "spec-dock/.distribution-retry.json").is_file()
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+def test_i371_late_legacy_after_journal_prepare_preserves_prepared_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = OperationJournalStore.prepare
+    injected = False
+
+    def create_legacy_after_journal(self, plan, **kwargs):
+        nonlocal injected
+        journal = original(self, plan, **kwargs)
+        legacy_path.write_bytes(legacy_bytes)
+        injected = True
+        return journal
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", create_legacy_after_journal)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert managed.read_bytes() == b"managed\n"
+    assert legacy_path.read_bytes() == legacy_bytes
+    journal = OperationJournalStore(target_root)._read(root_identity)
+    assert journal.status == "prepared"
+    assert all(action.checkpoint == "pending" for action in journal.actions)
+
+
+def test_i371_late_legacy_after_target_unlink_leaves_action_pending(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = managed_distribution._remove_distribution_target_if_bound
+    injected = False
+
+    def create_legacy_after_unlink(*args, **kwargs):
+        nonlocal injected
+        result = original(*args, **kwargs)
+        if not injected and args[1] == managed.name:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return result
+
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", create_legacy_after_unlink)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert not managed.exists()
+    assert legacy_path.read_bytes() == legacy_bytes
+    journal = OperationJournalStore(target_root)._read(root_identity)
+    target_record = next(action for action in journal.actions if action.path == ".github/workflows/ci.yml")
+    assert target_record.checkpoint == "pending"
 
 
 @pytest.mark.parametrize(

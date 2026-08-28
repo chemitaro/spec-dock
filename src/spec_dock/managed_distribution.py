@@ -49,6 +49,7 @@ class DistributionApplyError(RuntimeError):
         pending_paths: tuple[str, ...] = (),
         failed_paths: tuple[str, ...] = (),
         recovery_mismatch_kind: DistributionRecoveryMismatchKind | None = None,
+        recovery_metadata_state: str | None = None,
     ) -> None:
         super().__init__(message)
         self.phase = phase
@@ -56,6 +57,7 @@ class DistributionApplyError(RuntimeError):
         self.pending_paths = pending_paths
         self.failed_paths = failed_paths
         self.recovery_mismatch_kind = recovery_mismatch_kind
+        self.recovery_metadata_state = recovery_metadata_state
 
 
 class DistributionAdmissionError(RuntimeError):
@@ -9218,6 +9220,196 @@ class OperationJournalStore:
             self.workspace_closed_set_validator(extra_entries)
 
     @staticmethod
+    def _recovery_metadata_identity(info: os.stat_result) -> tuple[int, int, int, int, int, int, int, int]:
+        return (
+            info.st_dev,
+            info.st_ino,
+            stat.S_IFMT(info.st_mode),
+            stat.S_IMODE(info.st_mode),
+            info.st_ctime_ns,
+            info.st_nlink,
+            info.st_size,
+            info.st_mtime_ns,
+        )
+
+    def _assert_recovery_metadata_parent_bound(
+        self,
+        root_fd: int,
+        parent_fd: int,
+        expected_root: DistributionRootIdentity,
+    ) -> None:
+        """Revalidate the held root/spec-dock descriptors without following links."""
+
+        try:
+            opened_root = os.fstat(root_fd)
+            visible_root = os.lstat(self.identity_path)
+            visible_parent = os.stat("spec-dock", dir_fd=root_fd, follow_symlinks=False)
+            opened_parent = os.fstat(parent_fd)
+        except OSError as exc:
+            raise DistributionApplyError("recovery metadata cannot be inspected safely") from exc
+        if (
+            not stat.S_ISDIR(opened_root.st_mode)
+            or stat.S_ISLNK(opened_root.st_mode)
+            or (opened_root.st_dev, opened_root.st_ino) != (expected_root.device, expected_root.inode)
+            or self._recovery_metadata_identity(visible_root) != self._recovery_metadata_identity(opened_root)
+            or not stat.S_ISDIR(visible_parent.st_mode)
+            or stat.S_ISLNK(visible_parent.st_mode)
+            or self._recovery_metadata_identity(visible_parent) != self._recovery_metadata_identity(opened_parent)
+        ):
+            raise DistributionApplyError("recovery metadata binding changed")
+
+    def _bound_destructive_recovery_metadata_paths(
+        self,
+        expected_root: DistributionRootIdentity,
+    ) -> tuple[str, ...]:
+        """Inventory destructive recovery metadata from one held workspace parent."""
+
+        try:
+            root_fd, parent_fd = self._open_parent(expected_root)
+        except FileNotFoundError:
+            # A target without spec-dock cannot contain recovery metadata.
+            return ()
+        except OSError as exc:
+            raise DistributionApplyError("recovery metadata cannot be inspected safely") from exc
+        names = (
+            _DISTRIBUTION_RETRY_MARKER_REL.name,
+            _DISTRIBUTION_JOURNAL_REL.name,
+            _UNINSTALL_RETRY_MARKER_REL.name,
+        )
+        try:
+            self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+            present: list[str] = []
+            for name in names:
+                try:
+                    os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                except OSError as exc:
+                    raise DistributionApplyError("recovery metadata cannot be inspected safely") from exc
+                present.append(f"spec-dock/{name}")
+            self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+            return tuple(present)
+        finally:
+            os.close(parent_fd)
+            os.close(root_fd)
+
+    def _read_bound_uninstall_retry_marker(
+        self,
+        expected_root: DistributionRootIdentity,
+    ) -> bool:
+        """Validate the legacy marker using held descriptors and no-follow I/O."""
+
+        try:
+            root_fd, parent_fd = self._open_parent(expected_root)
+        except FileNotFoundError:
+            return False
+        except OSError as exc:
+            raise DistributionApplyError(
+                "legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid"
+            ) from exc
+        name = _UNINSTALL_RETRY_MARKER_REL.name
+        marker_fd: int | None = None
+        max_bytes = 1024 * 1024
+        try:
+            self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+            try:
+                visible_before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+                return False
+            except OSError as exc:
+                raise DistributionApplyError(
+                    "legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid"
+                ) from exc
+            if not stat.S_ISREG(visible_before.st_mode) or visible_before.st_nlink != 1:
+                raise DistributionApplyError("legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid")
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid")
+            try:
+                marker_fd = os.open(
+                    name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=parent_fd,
+                )
+            except OSError as exc:
+                raise DistributionApplyError(
+                    "legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid"
+                ) from exc
+            opened = os.fstat(marker_fd)
+            if (
+                self._recovery_metadata_identity(opened) != self._recovery_metadata_identity(visible_before)
+                or opened.st_size > max_bytes
+            ):
+                raise DistributionApplyError("legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid")
+            os.lseek(marker_fd, 0, os.SEEK_SET)
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                chunk = os.read(marker_fd, 64 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise DistributionApplyError(
+                        "legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid"
+                    )
+                chunks.append(chunk)
+            after_read = os.fstat(marker_fd)
+            try:
+                visible_after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise DistributionApplyError(
+                    "legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid"
+                ) from exc
+            self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+            if self._recovery_metadata_identity(after_read) != self._recovery_metadata_identity(
+                opened
+            ) or self._recovery_metadata_identity(visible_after) != self._recovery_metadata_identity(opened):
+                raise DistributionApplyError("legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid")
+            try:
+                raw = json.loads(b"".join(chunks).decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise DistributionApplyError(
+                    "legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid"
+                ) from exc
+            if raw != _UNINSTALL_RETRY_MARKER_PAYLOAD:
+                raise DistributionApplyError("legacy-marker-invalid", recovery_metadata_state="legacy-marker-invalid")
+            return True
+        finally:
+            if marker_fd is not None:
+                os.close(marker_fd)
+            os.close(parent_fd)
+            os.close(root_fd)
+
+    def _assert_destructive_recovery_metadata_bound(
+        self,
+        expected_root: DistributionRootIdentity,
+    ) -> tuple[str, ...]:
+        """Reject a legacy recovery marker racing any new destructive state."""
+
+        paths = self._bound_destructive_recovery_metadata_paths(expected_root)
+        legacy_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
+        if legacy_path not in paths:
+            return paths
+        current_paths = {
+            _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+            _DISTRIBUTION_JOURNAL_REL.as_posix(),
+        }
+        if current_paths.intersection(paths):
+            raise DistributionApplyError("dual-recovery-state", recovery_metadata_state="dual-recovery-state")
+        self._read_bound_uninstall_retry_marker(expected_root)
+        after_paths = self._bound_destructive_recovery_metadata_paths(expected_root)
+        if legacy_path not in after_paths:
+            return after_paths
+        if current_paths.intersection(after_paths):
+            raise DistributionApplyError("dual-recovery-state", recovery_metadata_state="dual-recovery-state")
+        raise DistributionApplyError(
+            "legacy-marker-unconvertible",
+            recovery_metadata_state="legacy-marker-unconvertible",
+        )
+
+    @staticmethod
     def _workspace_condition(journal: OperationJournal) -> dict[str, object]:
         return _path_snapshot_condition(
             journal.workspace_identity,
@@ -9485,6 +9677,9 @@ class OperationJournalStore:
         predecessor: OperationJournal | None = None,
         require_absent: bool = False,
     ) -> OperationJournal:
+        destructive_recovery = _is_destructive_intent(journal.intent)
+        if destructive_recovery:
+            self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         content = _journal_bytes(journal)
         predecessor_content = _journal_bytes(predecessor) if predecessor is not None else None
         if predecessor is not None and self._forward_guard is not None:
@@ -9510,6 +9705,7 @@ class OperationJournalStore:
         destination_fd: int | None = None
         guard_fd: int | None = None
         published_new = False
+        preserve_published = False
         swapped_out: os.stat_result | None = None
         try:
             guard_fd = self._open_bound_forward_guard(parent_fd)
@@ -9569,8 +9765,19 @@ class OperationJournalStore:
             self._validate_workspace_closed_set((stage,))
             self._assert_bound_forward_guard(parent_fd, guard_fd)
             if destination_info is None:
+                if destructive_recovery:
+                    self._assert_destructive_recovery_metadata_bound(journal.root_identity)
                 _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
                 published_new = True
+                if destructive_recovery:
+                    try:
+                        self._assert_destructive_recovery_metadata_bound(journal.root_identity)
+                    except DistributionApplyError:
+                        # The successor journal is already durable.  Do not
+                        # roll it back merely because a legacy state appeared
+                        # after its publication.
+                        preserve_published = True
+                        raise
                 published = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
                 if _stat_identity_tuple(published) != _stat_identity_tuple(
                     os.fstat(stage_fd)
@@ -9578,6 +9785,8 @@ class OperationJournalStore:
                     raise DistributionApplyError("journal-precondition-mismatch")
             else:
                 assert destination_fd is not None
+                if destructive_recovery:
+                    self._assert_destructive_recovery_metadata_bound(journal.root_identity)
                 swapped_out = _swap_regular_distribution_target_if_bound(
                     parent_fd,
                     stage,
@@ -9588,6 +9797,15 @@ class OperationJournalStore:
                     identity_message="journal-precondition-mismatch",
                 )
                 published_new = True
+                if destructive_recovery:
+                    try:
+                        self._assert_destructive_recovery_metadata_bound(journal.root_identity)
+                    except DistributionApplyError:
+                        # Keep the published successor as durable recovery
+                        # evidence; a late legacy marker must not trigger the
+                        # old publication rollback path.
+                        preserve_published = True
+                        raise
                 if not _held_fd_has_exact_bytes(stage_fd, content):
                     try:
                         _rename_distribution_swap(parent_fd, stage, parent_fd, destination)
@@ -9610,6 +9828,12 @@ class OperationJournalStore:
                 hashlib.sha256(content).hexdigest(),
                 identity_error="journal-precondition-mismatch",
             )
+            if destructive_recovery:
+                try:
+                    self._assert_destructive_recovery_metadata_bound(journal.root_identity)
+                except DistributionApplyError:
+                    preserve_published = True
+                    raise
             visible = os.lstat(self.identity_path)
             if (visible.st_dev, visible.st_ino) != (
                 journal.root_identity.device,
@@ -9629,7 +9853,7 @@ class OperationJournalStore:
                 source_sha256=hashlib.sha256(content).hexdigest(),
             )
         except Exception:
-            if published_new and stage_fd is not None and stage_info is not None:
+            if published_new and stage_fd is not None and stage_info is not None and not preserve_published:
                 try:
                     if swapped_out is None:
                         _remove_distribution_target_if_bound(
@@ -9722,6 +9946,8 @@ class OperationJournalStore:
         *,
         expected_intent: JournaledDistributionIntent | None = None,
     ) -> OperationJournal:
+        if expected_intent is not None and _is_destructive_intent(expected_intent):
+            self._assert_destructive_recovery_metadata_bound(expected_root)
         if expected_intent is not None:
             initial_raw = self._read_unbound_journal_bytes()
             if initial_raw is not None:
@@ -10077,7 +10303,10 @@ class OperationJournalStore:
         swapped_out: os.stat_result | None = None
         held_fd: int | None = None
         stage_fd: int | None = None
+        destructive_recovery = _is_destructive_intent(marker.operation)
         try:
+            if destructive_recovery:
+                self._assert_destructive_recovery_metadata_bound(marker.target_root)
             try:
                 destination_info = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
             except FileNotFoundError:
@@ -10181,6 +10410,8 @@ class OperationJournalStore:
                 raise DistributionApplyError("legacy-marker-unconvertible")
             self._validate_workspace_closed_set((stage,))
             if replace_marker is None:
+                if destructive_recovery:
+                    self._assert_destructive_recovery_metadata_bound(marker.target_root)
                 _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
                 published = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
                 if _stat_identity_tuple(published) != _stat_identity_tuple(
@@ -10190,6 +10421,8 @@ class OperationJournalStore:
             else:
                 assert destination_info is not None
                 assert held_fd is not None
+                if destructive_recovery:
+                    self._assert_destructive_recovery_metadata_bound(marker.target_root)
                 swapped_out = _swap_regular_distribution_target_if_bound(
                     parent_fd,
                     stage,
@@ -10206,6 +10439,8 @@ class OperationJournalStore:
                     except OSError as exc:
                         raise DistributionApplyError("legacy-marker-unconvertible") from exc
                     raise DistributionApplyError("legacy-marker-unconvertible")
+            if destructive_recovery:
+                self._assert_destructive_recovery_metadata_bound(marker.target_root)
             os.fsync(parent_fd)
             published_info = os.fstat(stage_fd)
             successor_snapshot = _snapshot_from_stat(
@@ -10220,6 +10455,8 @@ class OperationJournalStore:
                 hashlib.sha256(content).hexdigest(),
                 identity_error="legacy-marker-unconvertible",
             )
+            if destructive_recovery:
+                self._assert_destructive_recovery_metadata_bound(marker.target_root)
             if swapped_out is not None:
                 _remove_distribution_stage_if_owned(
                     parent_fd,
@@ -10563,6 +10800,7 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-precondition-mismatch")
         if _is_destructive_intent(journal.intent):
             _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
+            self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         completed = set(completed_paths)
         persisted = self._read(journal.root_identity)
         self._assert_guard_anchors_journal(persisted)
@@ -12098,6 +12336,7 @@ class OperationJournalStore:
     ) -> OperationJournal:
         if _is_destructive_intent(journal.intent):
             _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
+            self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         # A retry re-emits the durable zero lease before its no-replace rename.
         # Do not rewrite the journal/forward guard in that window.
         if (
@@ -12166,6 +12405,9 @@ class OperationJournalStore:
         return self.write(replace(journal, created_parent_bindings=ordered), predecessor=journal)
 
     def mark_verified(self, journal: OperationJournal) -> OperationJournal:
+        if _is_destructive_intent(journal.intent):
+            _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
+            self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         if (
             journal.staging_leases
             or any(action.checkpoint == "pending" for action in journal.actions)
@@ -12183,6 +12425,9 @@ class OperationJournalStore:
         return self.write(replace(journal, status="verifying", actions=actions), predecessor=journal)
 
     def mark_completed(self, journal: OperationJournal) -> OperationJournal:
+        if _is_destructive_intent(journal.intent):
+            _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
+            self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         if _is_destructive_intent(journal.intent):
             if (
                 journal.status != "verifying"
@@ -12231,6 +12476,8 @@ class OperationJournalStore:
             or any(action.checkpoint != "verified" for action in journal.actions)
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
+        if _is_destructive_intent(journal.intent):
+            self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         self._remove_exact(
             journal,
             failure_reason="journal finalization failed",
@@ -12255,6 +12502,9 @@ class OperationJournalStore:
         failure_reason: str,
         require_guard: bool = True,
     ) -> None:
+        destructive_recovery = _is_destructive_intent(journal.intent)
+        if destructive_recovery:
+            self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         root_fd, parent_fd = self._open_parent(journal.root_identity, self._workspace_condition(journal))
         guard_fd: int | None = None
         try:
@@ -12271,18 +12521,25 @@ class OperationJournalStore:
             expected_sha256 = journal.source_sha256
             if expected_snapshot is None or expected_sha256 is None or not _same_stat_identity(info, expected_snapshot):
                 raise DistributionApplyError("journal-precondition-mismatch")
+
+            def pre_delete_check() -> None:
+                if require_guard:
+                    self._assert_bound_forward_guard(parent_fd, guard_fd)
+                if destructive_recovery:
+                    self._assert_destructive_recovery_metadata_bound(journal.root_identity)
+
             self._quarantine_and_remove(
                 parent_fd,
                 name,
                 info,
                 expected_snapshot=expected_snapshot,
                 expected_sha256=expected_sha256,
-                pre_delete_check=(
-                    (lambda: self._assert_bound_forward_guard(parent_fd, guard_fd)) if require_guard else None
-                ),
+                pre_delete_check=(pre_delete_check if require_guard or destructive_recovery else None),
                 identity_error="journal-precondition-mismatch",
                 failure_reason=failure_reason,
             )
+            if destructive_recovery:
+                self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         finally:
             if guard_fd is not None:
                 os.close(guard_fd)
@@ -12382,7 +12639,21 @@ class OperationJournalStore:
                 if pre_delete_check is not None:
                     pre_delete_check()
                 _remove_distribution_stage_if_owned(parent_fd, quarantine, moved, strict=True)
+                if pre_delete_check is not None:
+                    pre_delete_check()
             except (DistributionApplyError, OSError) as exc:
+                if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
+                    with suppress(DistributionApplyError):
+                        self._restore_quarantined_entry(
+                            parent_fd,
+                            name,
+                            quarantine,
+                            held_fd,
+                            identity_error=identity_error,
+                            failure_reason=failure_reason,
+                            require_held_identity=True,
+                        )
+                    raise
                 self._restore_quarantined_entry(
                     parent_fd,
                     name,
@@ -12437,6 +12708,9 @@ class OperationJournalStore:
     def remove_legacy_marker(self, marker: DistributionRetryMarker) -> None:
         if marker.target_root != _root_identity_for_assessment(self.target_root):
             raise DistributionApplyError("journal-root-mismatch")
+        destructive_recovery = _is_destructive_intent(marker.operation)
+        if destructive_recovery:
+            self._assert_destructive_recovery_metadata_bound(marker.target_root)
         if (
             marker.purpose
             in {
@@ -12472,6 +12746,8 @@ class OperationJournalStore:
                 identity_error="legacy-marker-unconvertible",
                 failure_reason="legacy-marker-unconvertible",
             )
+            if destructive_recovery:
+                self._assert_destructive_recovery_metadata_bound(marker.target_root)
         finally:
             os.close(parent_fd)
             os.close(root_fd)
@@ -15030,6 +15306,44 @@ def _deprovision_recovery_metadata_paths(target_root: Path) -> tuple[str, ...]:
     return tuple(path.as_posix() for path in paths if _path_present_no_follow(target_root / path))
 
 
+def _destructive_recovery_boundary_result(
+    assessment: WorkspaceAssessment | None,
+    journal: OperationJournal | None,
+    *,
+    executable: ExecutableMutationPlan | None = None,
+    intent: JournaledDistributionIntent,
+    error: DistributionApplyError | DistributionAdmissionError,
+    failure_paths: tuple[str, ...] = (),
+) -> DistributionProcessResult | None:
+    """Map a recovery-metadata race to its manual, public result state."""
+
+    state_text = getattr(error, "recovery_metadata_state", None)
+    if state_text is None:
+        return None
+    state = {
+        "legacy-marker-unconvertible": "legacy-marker",
+        "legacy-marker-invalid": "legacy-marker-invalid",
+        "dual-recovery-state": "dual-recovery-state",
+    }.get(state_text)
+    if state is None:
+        return None
+    result = _distribution_process_result_from_state(
+        assessment,
+        state=cast("DistributionDeprovisionServiceState", state),
+        executable=executable,
+        intent=intent,
+        failure_paths=failure_paths,
+    )
+    if journal is not None:
+        result = replace(
+            result,
+            plan_digest=journal.plan_digest,
+            applied_paths=tuple(record.path for record in journal.actions if record.checkpoint != "pending"),
+            pending_paths=tuple(record.path for record in journal.actions if record.checkpoint == "pending"),
+        )
+    return result
+
+
 def _deprovision_has_managed_workspace_evidence(assessment: WorkspaceAssessment) -> bool:
     """Require exact positive evidence; missing contract paths alone prove no ownership."""
 
@@ -16411,6 +16725,7 @@ def _assert_deprovision_recovery_marker_bound(
         or current_guard.purpose != expected_guard.purpose
     ):
         raise DistributionApplyError("dual-recovery-state")
+    store._assert_destructive_recovery_metadata_bound(expected_guard.target_root)
     store._assert_current_forward_guard(current_guard)
 
 
@@ -17357,6 +17672,17 @@ def _execute_deprovision_journal_plan(
         store.remove_completed(active_journal, guard_already_removed=True)
     except Exception as exc:
         failure_paths = exc.failed_paths if isinstance(exc, DistributionApplyError) else ()
+        if isinstance(exc, DistributionApplyError):
+            boundary_result = _destructive_recovery_boundary_result(
+                assessment,
+                journal,
+                executable=executable,
+                intent=intent,
+                error=exc,
+                failure_paths=failure_paths,
+            )
+            if boundary_result is not None:
+                return boundary_result
         if journal is not None:
             with suppress(DistributionApplyError):
                 durable = store._read(assessment.root_identity)
@@ -17372,7 +17698,10 @@ def _execute_deprovision_journal_plan(
                 failure_paths=failure_paths,
                 intent=intent,
             )
-        recovery_paths = _deprovision_recovery_metadata_paths(target_root)
+        try:
+            recovery_paths = store._bound_destructive_recovery_metadata_paths(assessment.root_identity)
+        except DistributionApplyError:
+            recovery_paths = ()
         return _distribution_process_result_from_state(
             assessment,
             state="guard-only" if recovery_paths else "eligibility-error",
@@ -17434,38 +17763,46 @@ def _execute_destructive_distribution(
     except (DistributionAdmissionError, DistributionManifestError, DistributionPlanError, OSError):
         return _deprovision_preflight_error_result(intent=intent)
 
-    metadata_paths = _deprovision_recovery_metadata_paths(target_root)
+    store = OperationJournalStore(target_root)
+    try:
+        metadata_paths = store._bound_destructive_recovery_metadata_paths(bound_root_identity)
+    except DistributionApplyError as exc:
+        boundary_result = _destructive_recovery_boundary_result(
+            None,
+            None,
+            intent=intent,
+            error=exc,
+        )
+        if boundary_result is not None:
+            return boundary_result
+        return _deprovision_preflight_error_result(intent=intent)
     guard_only = False
     recovery_mismatch_kind: DistributionRecoveryMismatchKind = "same-intent"
     if metadata_paths:
         if _UNINSTALL_RETRY_MARKER_REL.as_posix() in metadata_paths:
-            if len(metadata_paths) > 1:
-                return _distribution_process_result_from_state(
-                    state="dual-recovery-state",
-                    failure_paths=metadata_paths,
-                    intent=intent,
-                )
             try:
-                legacy_marker_valid = _read_uninstall_retry_marker_for_admission(target_root)
-            except DistributionAdmissionError:
-                return _distribution_process_result_from_state(
-                    state="legacy-marker-invalid",
+                store._assert_destructive_recovery_metadata_bound(bound_root_identity)
+            except DistributionApplyError as exc:
+                boundary_result = _destructive_recovery_boundary_result(
+                    None,
+                    None,
                     intent=intent,
+                    error=exc,
+                    failure_paths=metadata_paths,
                 )
-            if not legacy_marker_valid:
-                return _distribution_process_result_from_state(
-                    state="legacy-marker-invalid",
-                    intent=intent,
-                )
+                if boundary_result is not None:
+                    return boundary_result
+                return _deprovision_preflight_error_result(intent=intent)
             return _distribution_process_result_from_state(
                 state="legacy-marker",
+                failure_paths=metadata_paths,
                 intent=intent,
             )
-        store = OperationJournalStore(target_root)
         journal_present = _DISTRIBUTION_JOURNAL_REL.as_posix() in metadata_paths
         guard_present = _DISTRIBUTION_RETRY_MARKER_REL.as_posix() in metadata_paths
         if journal_present:
             try:
+                store._assert_destructive_recovery_metadata_bound(bound_root_identity)
                 journal = store._read(bound_root_identity, expected_intent=intent)
                 if journal.intent != intent or journal.authority != _journal_authority_for_intent(intent):
                     recovery_mismatch_kind = "intent-authority"
@@ -17525,6 +17862,16 @@ def _execute_destructive_distribution(
                 )
                 _assert_deprovision_published_summaries(target_root, journal)
             except (DistributionAdmissionError, DistributionApplyError, DistributionPlanError) as exc:
+                if isinstance(exc, (DistributionAdmissionError, DistributionApplyError)):
+                    boundary_result = _destructive_recovery_boundary_result(
+                        None,
+                        None,
+                        intent=intent,
+                        error=exc,
+                        failure_paths=metadata_paths,
+                    )
+                    if boundary_result is not None:
+                        return boundary_result
                 if getattr(exc, "recovery_mismatch_kind", None) == "intent-authority":
                     recovery_mismatch_kind = "intent-authority"
                 return _distribution_process_result_from_state(
@@ -17582,6 +17929,7 @@ def _execute_destructive_distribution(
 
     if guard_only:
         try:
+            store._assert_destructive_recovery_metadata_bound(bound_root_identity)
             guard = _read_distribution_retry_marker(target_root, expected_intent=intent)
             if (
                 guard is None
@@ -17609,6 +17957,16 @@ def _execute_destructive_distribution(
             store = OperationJournalStore(target_root)
             store.bind_forward_guard(guard)
         except (DistributionAdmissionError, DistributionApplyError, DistributionPlanError) as exc:
+            if isinstance(exc, (DistributionAdmissionError, DistributionApplyError)):
+                boundary_result = _destructive_recovery_boundary_result(
+                    assessment,
+                    None,
+                    intent=intent,
+                    error=exc,
+                    failure_paths=metadata_paths,
+                )
+                if boundary_result is not None:
+                    return boundary_result
             if getattr(exc, "recovery_mismatch_kind", None) == "intent-authority":
                 recovery_mismatch_kind = "intent-authority"
             return _distribution_process_result_from_state(
@@ -17723,7 +18081,19 @@ def _execute_destructive_distribution(
                 reason=f"{operation_label}-no-op-postcondition-changed",
                 intent=intent,
             )
-        if _deprovision_recovery_metadata_paths(target_root):
+        try:
+            late_metadata_paths = store._assert_destructive_recovery_metadata_bound(bound_root_identity)
+        except DistributionApplyError as exc:
+            boundary_result = _destructive_recovery_boundary_result(
+                post_assessment,
+                None,
+                intent=intent,
+                error=exc,
+            )
+            if boundary_result is not None:
+                return boundary_result
+            late_metadata_paths = ("recovery-metadata-error",)
+        if late_metadata_paths:
             return _deprovision_blocked_result(
                 post_assessment,
                 plan_digest=executable.plan_digest,
@@ -18418,6 +18788,8 @@ def _unlink_distribution_quarantine_with_backup(
         if mutation_validator is not None:
             mutation_validator()
     except (OSError, DistributionApplyError) as exc:
+        if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
+            raise
         with suppress(OSError):
             visible = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
             retained = os.stat(backup_name, dir_fd=parent_fd, follow_symlinks=False)
@@ -18772,6 +19144,8 @@ def _remove_distribution_target_if_bound(
                     transition_path=transition_path,
                 )
         except DistributionApplyError as exc:
+            if exc.recovery_metadata_state is not None:
+                raise
             _restore_distribution_quarantine(
                 parent_fd,
                 quarantine_name,
@@ -19098,6 +19472,8 @@ def _remove_distribution_stage_if_owned(
             )
             return None
         except (DistributionApplyError, OSError) as exc:
+            if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
+                raise
             with suppress(DistributionApplyError):
                 _restore_distribution_quarantine(
                     parent_fd,
@@ -19204,7 +19580,9 @@ def _remove_distribution_stage_if_owned(
                 try:
                     if mutation_validator is not None:
                         mutation_validator()
-                except DistributionApplyError:
+                except DistributionApplyError as exc:
+                    if exc.recovery_metadata_state is not None:
+                        raise
                     _restore_distribution_quarantine(
                         parent_fd,
                         quarantine_name,
@@ -19416,7 +19794,9 @@ def _remove_distribution_stage_if_owned(
             os.unlink(retained_gc_name, dir_fd=parent_fd)
             os.fsync(parent_fd)
             return retained_gc_name
-        except Exception:
+        except Exception as exc:
+            if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
+                raise
             if retained_gc_name is not None:
                 with suppress(OSError, DistributionApplyError):
                     if (
@@ -21210,6 +21590,9 @@ def apply_distribution_plan(
                 phase="managed-scaffold-refresh",
                 applied_paths=tuple(applied_paths),
                 pending_paths=tuple(pending_paths),
+                recovery_metadata_state=(
+                    exc.recovery_metadata_state if isinstance(exc, DistributionApplyError) else None
+                ),
             ) from exc
         if progress_recorder is not None:
             progress_recorder("managed-scaffold-refresh", tuple(applied_paths), tuple(pending_paths), True)
@@ -21424,6 +21807,9 @@ def apply_distribution_plan(
                     applied_paths=tuple(applied_paths),
                     pending_paths=tuple(pending_paths),
                     failed_paths=(exc.failed_paths if isinstance(exc, DistributionApplyError) else ()),
+                    recovery_metadata_state=(
+                        exc.recovery_metadata_state if isinstance(exc, DistributionApplyError) else None
+                    ),
                 ) from exc
         if progress_recorder is not None:
             progress_recorder(phase, tuple(applied_paths), tuple(pending_paths), True)
