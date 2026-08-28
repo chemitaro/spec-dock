@@ -5223,13 +5223,25 @@ def test_i370_resume_gc_cleanup_deprovision_boundary_is_parent_bound(
     outside = target_root / "outside-sentinel.txt"
     outside.write_bytes(b"outside\n")
     outside_before = (outside.lstat(), outside.read_bytes())
-    private_entries = {
-        path.name: (
-            path.lstat(),
-            path.read_bytes() if kind == "regular" else path.readlink(),
+
+    def stable_entry_state(path: Path) -> tuple[tuple[int, ...], bytes | Path]:
+        info = path.lstat()
+        # Reading a symlink can update st_atime under Linux relatime; it is not a mutation.
+        stat_fields = (
+            info.st_mode,
+            info.st_ino,
+            info.st_dev,
+            info.st_nlink,
+            info.st_uid,
+            info.st_gid,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
         )
-        for path in parent.iterdir()
-    }
+        payload = path.read_bytes() if kind == "regular" else path.readlink()
+        return stat_fields, payload
+
+    private_entries = {path.name: stable_entry_state(path) for path in parent.iterdir()}
     displaced = target_root / ".github" / "workflows-displaced"
     injected = False
 
@@ -5271,13 +5283,7 @@ def test_i370_resume_gc_cleanup_deprovision_boundary_is_parent_bound(
         assert outside.read_bytes() == outside_before[1]
         assert rename_calls == 0
         assert unlink_calls == 0
-        assert {
-            path.name: (
-                path.lstat(),
-                path.read_bytes() if kind == "regular" else path.readlink(),
-            )
-            for path in displaced.iterdir()
-        } == private_entries
+        assert {path.name: stable_entry_state(path) for path in displaced.iterdir()} == private_entries
     else:
         completed = store._resume_gc_cleanup(journal, leaf_mutation_validator=validate_boundary)
         assert completed.status == "executing"
