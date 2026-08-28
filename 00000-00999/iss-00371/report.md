@@ -46,6 +46,17 @@ root-level 1 行へ集約し、public command/flag/schema/status/exit contract �
   deepest-first の `remove-empty-directory` action として生成するようにした。
   `.workbench` と repository root 外 sentinel は保持される。
 
+### Final Quality Gate P1 remediation: cross-intent recovery
+
+Strict review で検出された cross-intent recovery mismatch の retry policy 欠陥を
+修正した。`_distribution_process_result_from_state` に型付き
+`recovery_mismatch_kind` を追加し、同一 intent の package/plan/evidence mismatch
+は従来どおり `same-keep-command`（purge は既存の manual policy）を維持する一方、
+journal の intent/authority、または guard の operation/purpose が要求 intent と
+異なる場合だけ `manual-recovery` を返すようにした。これにより purge journal に
+対する keep/deprovision request、および deprovision journal に対する purge request
+は、retry command を公開せず、target と journal checkpoint を変更しない。
+
 ## Verification
 
 ### Red to green
@@ -141,6 +152,26 @@ purge adapter が journal を直接解釈しないこと、purge/keep の mapper
 rebind、unknown nested component、cross-intent/authority/root/plan、legacy
 marker ambiguity、same-plan forward recovery の negative cases は focused
 suite で確認した。
+
+### Current cross-intent remediation checks
+
+新しい回帰を先に red で確認し、purge journal + keep request の旧実装が
+`same-keep-command` を返すことを検出した後、次の checks を green で確認した。
+
+- `uv run pytest tests/unit/infra/test_managed_distribution.py::test_i371_cross_intent_recovery_mismatch_is_manual_and_write_free`: `2 passed`
+- `uv run pytest --run-full-regression tests/cli_runtime/test_distribution_cutover.py -k i371`: `3 passed`（既存 ledger mismatch 診断を出力したが exit 0）
+- `uv run pytest --run-full-regression tests/unit/infra/test_init_update.py -k i371`: `2 passed`、exit 3（full-regression wrapper の既存 ledger missing-node mismatch。テスト assertion failure なし）
+- `uv run pytest tests/unit/infra/test_managed_distribution.py`: `493 passed`
+- `uv run pytest`: `1444 passed, 1138 skipped`
+- `make lint`: ruff check/format、mypy ともに pass
+- `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=227`
+- `git diff --check`: pass（whitespace error 0）
+
+managed regression は両 cross-intent 順序で target tree、journal bytes、guard bytes を
+不変とし、pending checkpoint 0 と `manual-recovery` を確認した。CLI route regression
+は purge journal + keep request で `retry_command=null` と manual guidance を確認した。
+この修正は未commitのため、clean exact-SHA Full Regression verified evidence は
+primary の最終 gate で取得する。
 
 ## Residual Risks / Follow-ups
 
