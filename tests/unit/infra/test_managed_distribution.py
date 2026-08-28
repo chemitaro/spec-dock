@@ -641,6 +641,84 @@ def test_i371_purge_forward_recovers_same_plan_after_history_checkpoint_failure(
     assert not (target_root / "spec-dock/.distribution-journal.json").exists()
 
 
+@pytest.mark.parametrize(
+    ("journal_intent", "request_intent"),
+    (("purge", "deprovision"), ("deprovision", "purge")),
+)
+def test_i371_cross_intent_recovery_mismatch_is_manual_and_write_free(
+    tmp_path: Path,
+    journal_intent: str,
+    request_intent: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+
+    if journal_intent == "purge":
+        journal_assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        journal_assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(journal_assessment)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    assert journal.intent == journal_intent
+    journal_bytes = store.path.read_bytes()
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    before = _i370_tree_evidence(target_root)
+
+    if request_intent == "purge":
+        result = managed_distribution.execute_explicit_spec_history_purge_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            package_version="1.2.3",
+            apply=True,
+            expected_root_identity=root_identity,
+        )
+    else:
+        result = managed_distribution.execute_deprovision_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            package_version="1.2.3",
+            apply=True,
+            expected_root_identity=root_identity,
+        )
+
+    assert result.status == "recovery_required"
+    assert result.intent == request_intent
+    assert result.reason == f"{request_intent}-recovery-mismatch"
+    assert result.retry_policy == "manual-recovery"
+    assert result.pending_paths == ()
+    assert _i370_tree_evidence(target_root) == before
+    assert store.path.read_bytes() == journal_bytes
+    assert guard_path.read_bytes() == guard_bytes
+
+
 def test_i368_forged_assessment_cannot_prune_outside_manifest_authority(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())

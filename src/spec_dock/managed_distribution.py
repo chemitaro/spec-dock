@@ -552,6 +552,7 @@ DistributionDeprovisionCompletedPhase = Literal[
     "marker-finalized",
 ]
 DistributionRetryPolicy = Literal["none", "same-keep-command", "same-remove-command", "manual-recovery"]
+DistributionRecoveryMismatchKind = Literal["same-intent", "intent-authority"]
 DistributionDeprovisionServiceState = Literal[
     "eligibility-error",
     "planned",
@@ -15013,6 +15014,7 @@ def _distribution_process_result_from_state(
     error_message: str | None = None,
     retry_policy: DistributionRetryPolicy = "same-keep-command",
     intent: JournaledDistributionIntent = "deprovision",
+    recovery_mismatch_kind: DistributionRecoveryMismatchKind = "same-intent",
 ) -> DistributionProcessResult:
     operation_label = "purge" if intent == "purge" else "deprovision"
     if intent == "purge" and retry_policy == "same-keep-command":
@@ -15185,7 +15187,7 @@ def _distribution_process_result_from_state(
                 message=f"Managed distribution {operation_label} recovery evidence does not match.",
             ),
         )
-        if intent == "purge":
+        if intent == "purge" or recovery_mismatch_kind == "intent-authority":
             retry_policy = "manual-recovery"
     elif state == "guard-only":
         if assessment is None or executable is None:
@@ -17281,6 +17283,7 @@ def _execute_destructive_distribution(
 
     metadata_paths = _deprovision_recovery_metadata_paths(target_root)
     guard_only = False
+    recovery_mismatch_kind: DistributionRecoveryMismatchKind = "same-intent"
     if metadata_paths:
         if _UNINSTALL_RETRY_MARKER_REL.as_posix() in metadata_paths:
             if len(metadata_paths) > 1:
@@ -17311,13 +17314,12 @@ def _execute_destructive_distribution(
         if journal_present:
             try:
                 journal = store._read(bound_root_identity)
-                if (
-                    journal.intent != intent
-                    or journal.authority != _journal_authority_for_intent(intent)
-                    or not _journal_package_is_compatible(
-                        journal.package_version,
-                        package_version,
-                    )
+                if journal.intent != intent or journal.authority != _journal_authority_for_intent(intent):
+                    recovery_mismatch_kind = "intent-authority"
+                    raise DistributionApplyError("journal-protocol-incompatible")
+                if not _journal_package_is_compatible(
+                    journal.package_version,
+                    package_version,
                 ):
                     raise DistributionApplyError("journal-protocol-incompatible")
                 guard: DistributionRetryMarker | None = None
@@ -17331,6 +17333,10 @@ def _execute_destructive_distribution(
                         or guard.contract_identity != journal.contract_identity
                         or guard.plan_digest != journal.plan_digest
                     ):
+                        if guard is not None and (
+                            guard.purpose != _journal_guard_purpose_for_intent(intent) or guard.operation != intent
+                        ):
+                            recovery_mismatch_kind = "intent-authority"
                         raise DistributionApplyError("dual-recovery-state")
                     store.bind_forward_guard(guard)
                     store._assert_guard_anchors_journal(journal)
@@ -17370,6 +17376,7 @@ def _execute_destructive_distribution(
                     state="recovery-mismatch",
                     failure_paths=metadata_paths,
                     intent=intent,
+                    recovery_mismatch_kind=recovery_mismatch_kind,
                 )
             if not apply:
                 return _distribution_process_result_from_state(
@@ -17432,6 +17439,10 @@ def _execute_destructive_distribution(
                 )
                 or assessment.blockers
             ):
+                if guard is not None and (
+                    guard.purpose != _journal_guard_purpose_for_intent(intent) or guard.operation != intent
+                ):
+                    recovery_mismatch_kind = "intent-authority"
                 raise DistributionApplyError("dual-recovery-state")
             executable = build_executable_mutation_plan(assessment)
             if (
@@ -17448,6 +17459,7 @@ def _execute_destructive_distribution(
                 state="recovery-mismatch",
                 failure_paths=metadata_paths,
                 intent=intent,
+                recovery_mismatch_kind=recovery_mismatch_kind,
             )
         if not apply:
             return _distribution_process_result_from_state(

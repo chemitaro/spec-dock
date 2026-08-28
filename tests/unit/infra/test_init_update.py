@@ -273,6 +273,53 @@ def test_i371_uninstall_cli_routes_deprovision_and_purge_to_typed_services(
     assert purge_calls[1]["expected_root_identity"] is not None
 
 
+def test_i371_cross_intent_purge_journal_keep_route_is_manual_and_read_only(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    history_file = target / "spec-dock/initiatives/history.md"
+    history_file.write_bytes(b"history\n")
+    root_info = target.stat()
+    root_identity = managed_distribution.DistributionRootIdentity(
+        device=root_info.st_dev,
+        inode=root_info.st_ino,
+    )
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        repo_root / "src/spec_dock/assets/install_root",
+        manifest_path=repo_root / "src/spec_dock/assets/managed_distribution.json",
+        scaffold_root=repo_root / "src/spec_dock/assets/spec_dock",
+        target_root=target,
+        expected_root_identity=root_identity,
+    )
+    executable = managed_distribution.build_executable_mutation_plan(assessment)
+    store = managed_distribution.OperationJournalStore(target)
+    marker = store.prepare_legacy_guard(executable, package_version=_expected_spec_dock_version())
+    store.bind_forward_guard(marker)
+    journal = store.prepare(executable, package_version=_expected_spec_dock_version())
+    assert journal.intent == "purge"
+    journal_bytes = store.path.read_bytes()
+    guard_path = target / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    before = _i370_public_tree_evidence(target)
+
+    assert main(["uninstall", str(target), "--apply", "--keep-specs", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "partial_failure"
+    assert payload["retry_command"] is None
+    assert payload["guidance"][0] == (
+        "manual recovery required: managed recovery evidence cannot prove one safe plan or checkpoint"
+    )
+    assert _i370_public_tree_evidence(target) == before
+    assert store.path.read_bytes() == journal_bytes
+    assert guard_path.read_bytes() == guard_bytes
+
+
 def test_i370_uninstall_deprovision_cli_has_no_legacy_or_journal_interpretation() -> None:
     """I370-T-RESULT-001/I370-T-ABS-001: CLI is a typed adapter with no hidden fallback."""
 
