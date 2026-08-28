@@ -52,6 +52,7 @@ from spec_dock.managed_distribution import (
     apply_distribution_plan,  # noqa: F401 - retained for test seam compatibility
     build_distribution_plan,
     execute_deprovision_distribution,
+    execute_explicit_spec_history_purge_distribution,
     execute_fresh_distribution,
     execute_recognized_distribution,
 )
@@ -63,7 +64,6 @@ _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
 _MANAGED_SCAFFOLD_ROOTS = tuple(Path(_SPEC_DOCK_DIRNAME) / name for name in _MANAGED_DIRS)
-_GENERATED_STATE_ROOTS = (Path("spec-dock/active"), Path("spec-dock/.agent"))
 # Keep managed skill installation aligned with the shipped Target catalog.
 _MANAGED_SKILL_NAMES = (
     "spec-dock",
@@ -76,8 +76,6 @@ _MANAGED_OBSOLETE_EXACT_PATH_PREFIXES = (
     ".github/agents/",
     ".github/workflows/",
 )
-_UNINSTALL_CLEANUP_BOUNDARY_ROOTS = (Path(".agents"), Path(".codex"), Path(".github"), Path("spec-dock"))
-_UNINSTALL_RETRY_MARKER_REL = Path("spec-dock/.uninstall-retry.json")
 _DISTRIBUTION_RETRY_MARKER_REL = Path("spec-dock/.distribution-retry.json")
 _DISTRIBUTION_RETRY_MARKER_PAYLOAD_VERSION = 1
 _DISTRIBUTION_RETRY_MARKER_PURPOSE = "distribution-rerun"
@@ -2771,7 +2769,7 @@ def _prepare_fresh_workspace_boundary(
             except Exception:
                 if created_identity is not None:
                     with suppress(OSError, RuntimeError):
-                        _remove_empty_bound_directory(
+                        _remove_empty_managed_directory(
                             target_root,
                             Path(_SPEC_DOCK_DIRNAME),
                             expected_identity=created_identity,
@@ -2854,7 +2852,7 @@ def _execute_fresh_distribution_unlocked(
                 or os.path.lexists(target_root / "spec-dock/.distribution-journal.json")
             ):
                 with suppress(OSError, RuntimeError):
-                    _remove_empty_bound_directory(
+                    _remove_empty_managed_directory(
                         target_root,
                         Path(_SPEC_DOCK_DIRNAME),
                         expected_identity=created_workspace,
@@ -2865,7 +2863,7 @@ def _execute_fresh_distribution_unlocked(
     if result.status == "blocked":
         if created_workspace is not None:
             with suppress(OSError, RuntimeError):
-                _remove_empty_bound_directory(
+                _remove_empty_managed_directory(
                     target_root,
                     Path(_SPEC_DOCK_DIRNAME),
                     expected_identity=created_workspace,
@@ -3032,31 +3030,6 @@ def _prune_empty_obsolete_parent_dirs(
         current = current.parent
 
 
-class _UninstallTargetIdentity(NamedTuple):
-    """Issue 371 remove-specs compatibility identity; not deprovision authority."""
-
-    kind: str
-    device: int
-    inode: int
-    ctime_ns: int
-    nlink: int = 0
-    size: int = 0
-    sha256: str | None = None
-    link_target: str | None = None
-
-
-class _UninstallAction(NamedTuple):
-    """Issue 371 remove-specs compatibility ledger; default/keep use the typed service."""
-
-    rel_path: str
-    category: str
-    status: str
-    reason: str
-    error: str | None = None
-    expected_identity: _UninstallTargetIdentity | None = None
-    expected_absent: bool = False
-
-
 def _uninstall_specs_mode(ns: argparse.Namespace) -> str | None:
     if getattr(ns, "keep_specs", False):
         return "keep"
@@ -3065,53 +3038,12 @@ def _uninstall_specs_mode(ns: argparse.Namespace) -> str | None:
     return None
 
 
-def _require_managed_specdock_for_uninstall(target_root: Path) -> Path:
-    try:
-        specdock_dir = _require_specdock(target_root)
-    except RuntimeError as e:
-        raise RuntimeError(f"target is not a managed SpecDock repo: {e}") from e
-
-    version_file = specdock_dir / "spec-dock.version"
-    if not version_file.is_file() and not _has_valid_uninstall_retry_marker(specdock_dir):
-        raise RuntimeError(
-            "target is not a managed SpecDock repo: missing managed "
-            "'spec-dock/spec-dock.version' state or SpecDock uninstall retry marker"
-        )
-    return specdock_dir
+def _is_safe_managed_removal_rel_path(rel_path: Path) -> bool:
+    """Allow only installer-owned roots for rollback cleanup."""
+    return rel_path == Path(_SPEC_DOCK_DIRNAME) or rel_path in _MANAGED_SCAFFOLD_ROOTS
 
 
-def _uninstall_retry_marker_payload() -> dict[str, object]:
-    return {
-        "schema_version": 1,
-        "managed_by": "spec-dock",
-        "purpose": "uninstall-rerun",
-    }
-
-
-def _has_valid_uninstall_retry_marker(specdock_dir: Path) -> bool:
-    marker = specdock_dir / _UNINSTALL_RETRY_MARKER_REL.relative_to("spec-dock")
-    if marker.is_symlink():
-        raise RuntimeError(
-            f"target contains symlinked SpecDock uninstall retry marker: {_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
-        )
-    if not marker.is_file():
-        return False
-    try:
-        payload = json.loads(marker.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False
-    return payload == _uninstall_retry_marker_payload()
-
-
-def _reject_symlinked_uninstall_retry_marker(target_root: Path) -> None:
-    marker = target_root / _UNINSTALL_RETRY_MARKER_REL
-    if marker.is_symlink():
-        raise RuntimeError(
-            f"target contains symlinked SpecDock uninstall retry marker: {_UNINSTALL_RETRY_MARKER_REL.as_posix()}"
-        )
-
-
-def _uninstall_directory_flags() -> int:
+def _managed_removal_directory_flags() -> int:
     nofollow = getattr(os, "O_NOFOLLOW", None)
     directory = getattr(os, "O_DIRECTORY", None)
     if not isinstance(nofollow, int) or not isinstance(directory, int):
@@ -3119,7 +3051,7 @@ def _uninstall_directory_flags() -> int:
     return os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
 
 
-def _assert_uninstall_visible_chain(
+def _assert_managed_removal_visible_chain(
     target_root: Path,
     rel_path: Path,
     fds: tuple[int, ...],
@@ -3131,36 +3063,36 @@ def _assert_uninstall_visible_chain(
             visible_stat = os.lstat(visible)
             held_stat = os.fstat(fd)
         except OSError as exc:
-            raise RuntimeError("uninstall target path changed during safe operation") from exc
+            raise RuntimeError("managed scaffold target path changed during safe operation") from exc
         if (
             stat.S_ISLNK(visible_stat.st_mode)
             or visible_stat.st_dev != held_stat.st_dev
             or visible_stat.st_ino != held_stat.st_ino
             or not stat.S_ISDIR(held_stat.st_mode)
         ):
-            raise RuntimeError("uninstall target path changed during safe operation")
+            raise RuntimeError("managed scaffold target path changed during safe operation")
 
 
 @contextmanager
-def _open_uninstall_parent_chain(
+def _open_managed_removal_parent_chain(
     target_root: Path,
     rel_path: Path,
     *,
     create_missing: bool = False,
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> Iterator[tuple[int, ...]]:
-    """Open an uninstall target's parent chain without following symlinks."""
+    """Open an managed scaffold target's parent chain without following symlinks."""
 
-    if not _is_safe_uninstall_rel_path(rel_path):
+    if not _is_safe_managed_removal_rel_path(rel_path):
         raise RuntimeError("unsafe uninstall path outside managed boundaries")
-    flags = _uninstall_directory_flags()
+    flags = _managed_removal_directory_flags()
     fds: list[int] = []
     try:
         root_fd = os.open(target_root, flags)
         fds.append(root_fd)
         root_stat = os.fstat(root_fd)
         if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_nlink < 1:
-            raise RuntimeError("uninstall target root is not a real directory")
+            raise RuntimeError("managed scaffold target root is not a real directory")
         if expected_root_identity is not None and (
             root_stat.st_dev,
             root_stat.st_ino,
@@ -3175,32 +3107,34 @@ def _open_uninstall_parent_chain(
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
             except FileNotFoundError:
                 if not create_missing:
-                    raise RuntimeError(f"uninstall target parent is missing for '{rel_path.as_posix()}'") from None
+                    raise RuntimeError(
+                        f"managed scaffold target parent is missing for '{rel_path.as_posix()}'"
+                    ) from None
                 os.mkdir(component, dir_fd=fds[-1])
                 next_fd = os.open(component, flags, dir_fd=fds[-1])
             except OSError as exc:
-                raise RuntimeError(f"uninstall target parent is unsafe for '{rel_path.as_posix()}'") from exc
+                raise RuntimeError(f"managed scaffold target parent is unsafe for '{rel_path.as_posix()}'") from exc
             fds.append(next_fd)
         chain = tuple(fds)
-        _assert_uninstall_visible_chain(target_root, rel_path, chain)
+        _assert_managed_removal_visible_chain(target_root, rel_path, chain)
         yield chain
     except FileExistsError:
-        raise RuntimeError(f"uninstall target parent changed for '{rel_path.as_posix()}'") from None
+        raise RuntimeError(f"managed scaffold target parent changed for '{rel_path.as_posix()}'") from None
     except OSError as exc:
-        raise RuntimeError("uninstall target cannot be opened safely") from exc
+        raise RuntimeError("managed scaffold target cannot be opened safely") from exc
     finally:
         for fd in reversed(fds):
             with suppress(OSError):
                 os.close(fd)
 
 
-def _assert_uninstall_directory_binding(target_root: Path, rel_path: Path, directory_fd: int) -> None:
+def _assert_managed_removal_directory_binding(target_root: Path, rel_path: Path, directory_fd: int) -> None:
     """Require a held directory descriptor to remain at its repository path."""
     try:
         visible = os.lstat(target_root / rel_path)
         held = os.fstat(directory_fd)
     except OSError as exc:
-        raise RuntimeError("uninstall target path changed during safe operation") from exc
+        raise RuntimeError("managed scaffold target path changed during safe operation") from exc
     if (
         stat.S_ISLNK(visible.st_mode)
         or not stat.S_ISDIR(visible.st_mode)
@@ -3208,10 +3142,10 @@ def _assert_uninstall_directory_binding(target_root: Path, rel_path: Path, direc
         or visible.st_dev != held.st_dev
         or visible.st_ino != held.st_ino
     ):
-        raise RuntimeError("uninstall target path changed during safe operation")
+        raise RuntimeError("managed scaffold target path changed during safe operation")
 
 
-def _assert_uninstall_tree_entry_identity(
+def _assert_managed_removal_tree_entry_identity(
     directory_fd: int,
     name: str,
     expected: os.stat_result,
@@ -3220,7 +3154,7 @@ def _assert_uninstall_tree_entry_identity(
     try:
         current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
     except OSError as exc:
-        raise RuntimeError("uninstall target changed during safe operation") from exc
+        raise RuntimeError("managed scaffold target changed during safe operation") from exc
     identity_matches = (
         current.st_dev,
         current.st_ino,
@@ -3233,54 +3167,54 @@ def _assert_uninstall_tree_entry_identity(
     if not stat.S_ISDIR(expected.st_mode):
         identity_matches = identity_matches and current.st_ctime_ns == expected.st_ctime_ns
     if not identity_matches:
-        raise RuntimeError("uninstall target changed during safe operation")
+        raise RuntimeError("managed scaffold target changed during safe operation")
 
 
-def _remove_uninstall_tree_fd(
+def _remove_managed_tree_fd(
     target_root: Path,
     rel_path: Path,
     directory_fd: int,
     visible_fds: tuple[int, ...],
 ) -> None:
     """Remove an installer-owned tree while preserving repository binding."""
-    _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
-    _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+    _assert_managed_removal_visible_chain(target_root, rel_path, visible_fds)
+    _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
 
     for name in os.listdir(directory_fd):
-        _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
-        _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+        _assert_managed_removal_visible_chain(target_root, rel_path, visible_fds)
+        _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
         entry = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
         if stat.S_ISLNK(entry.st_mode):
-            raise RuntimeError("refusing to remove symlink inside uninstall target")
+            raise RuntimeError("refusing to remove symlink inside managed scaffold target")
         if stat.S_ISDIR(entry.st_mode):
             child_rel_path = rel_path / name
-            child_fd = os.open(name, _uninstall_directory_flags(), dir_fd=directory_fd)
+            child_fd = os.open(name, _managed_removal_directory_flags(), dir_fd=directory_fd)
             try:
-                _remove_uninstall_tree_fd(
+                _remove_managed_tree_fd(
                     target_root,
                     child_rel_path,
                     child_fd,
                     (*visible_fds, child_fd),
                 )
-                _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
-                _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
-                _assert_uninstall_directory_binding(target_root, child_rel_path, child_fd)
-                _assert_uninstall_tree_entry_identity(directory_fd, name, entry)
+                _assert_managed_removal_visible_chain(target_root, rel_path, visible_fds)
+                _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
+                _assert_managed_removal_directory_binding(target_root, child_rel_path, child_fd)
+                _assert_managed_removal_tree_entry_identity(directory_fd, name, entry)
                 os.rmdir(name, dir_fd=directory_fd)
             finally:
                 os.close(child_fd)
             continue
         if stat.S_ISREG(entry.st_mode) and entry.st_nlink != 1:
-            raise RuntimeError("refusing to remove hard-linked uninstall target")
+            raise RuntimeError("refusing to remove hard-linked managed scaffold target")
         if not stat.S_ISREG(entry.st_mode):
-            raise RuntimeError("refusing to remove unsafe entry inside uninstall target")
-        _assert_uninstall_tree_entry_identity(directory_fd, name, entry)
-        _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
-        _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            raise RuntimeError("refusing to remove unsafe entry inside managed scaffold target")
+        _assert_managed_removal_tree_entry_identity(directory_fd, name, entry)
+        _assert_managed_removal_visible_chain(target_root, rel_path, visible_fds)
+        _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
         os.unlink(name, dir_fd=directory_fd)
 
 
-def _remove_bound_directory_tree(
+def _remove_managed_bound_directory_tree(
     target_root: Path,
     rel_path: Path,
     *,
@@ -3288,7 +3222,7 @@ def _remove_bound_directory_tree(
     expected_root_identity: DistributionRootIdentity | None,
 ) -> None:
     """Remove one already-authorized directory through held no-follow descriptors."""
-    with _open_uninstall_parent_chain(
+    with _open_managed_removal_parent_chain(
         target_root,
         rel_path,
         expected_root_identity=expected_root_identity,
@@ -3306,7 +3240,7 @@ def _remove_bound_directory_tree(
         ):
             raise RuntimeError("managed scaffold target identity changed")
 
-        directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
+        directory_fd = os.open(rel_path.name, _managed_removal_directory_flags(), dir_fd=parent_fd)
         try:
             held = os.fstat(directory_fd)
             if not stat.S_ISDIR(held.st_mode) or (held.st_dev, held.st_ino, held.st_ctime_ns) != (
@@ -3316,18 +3250,18 @@ def _remove_bound_directory_tree(
             ):
                 raise RuntimeError("managed scaffold target identity changed")
             visible_fds = (*fds, directory_fd)
-            _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
-            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
-            _remove_uninstall_tree_fd(target_root, rel_path, directory_fd, visible_fds)
-            _assert_uninstall_visible_chain(target_root, rel_path, fds)
-            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
-            _assert_uninstall_tree_entry_identity(parent_fd, rel_path.name, visible)
+            _assert_managed_removal_visible_chain(target_root, rel_path, visible_fds)
+            _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
+            _remove_managed_tree_fd(target_root, rel_path, directory_fd, visible_fds)
+            _assert_managed_removal_visible_chain(target_root, rel_path, fds)
+            _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
+            _assert_managed_removal_tree_entry_identity(parent_fd, rel_path.name, visible)
             os.rmdir(rel_path.name, dir_fd=parent_fd)
         finally:
             os.close(directory_fd)
 
 
-def _remove_empty_bound_directory(
+def _remove_empty_managed_directory(
     target_root: Path,
     rel_path: Path,
     *,
@@ -3335,7 +3269,7 @@ def _remove_empty_bound_directory(
     expected_root_identity: DistributionRootIdentity | None,
 ) -> None:
     """Remove an empty directory only while its captured identity remains bound."""
-    with _open_uninstall_parent_chain(
+    with _open_managed_removal_parent_chain(
         target_root,
         rel_path,
         expected_root_identity=expected_root_identity,
@@ -3353,7 +3287,7 @@ def _remove_empty_bound_directory(
         ):
             raise RuntimeError("empty directory target identity changed during safe cleanup")
 
-        directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
+        directory_fd = os.open(rel_path.name, _managed_removal_directory_flags(), dir_fd=parent_fd)
         try:
             held = os.fstat(directory_fd)
             if not stat.S_ISDIR(held.st_mode) or (held.st_dev, held.st_ino, held.st_ctime_ns) != (
@@ -3363,14 +3297,14 @@ def _remove_empty_bound_directory(
             ):
                 raise RuntimeError("empty directory target identity changed during safe cleanup")
             visible_fds = (*fds, directory_fd)
-            _assert_uninstall_visible_chain(target_root, rel_path, visible_fds)
-            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
+            _assert_managed_removal_visible_chain(target_root, rel_path, visible_fds)
+            _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
             with os.scandir(directory_fd) as entries:
                 if next(entries, None) is not None:
                     raise RuntimeError("empty directory target is no longer empty")
-            _assert_uninstall_visible_chain(target_root, rel_path, fds)
-            _assert_uninstall_directory_binding(target_root, rel_path, directory_fd)
-            _assert_uninstall_tree_entry_identity(parent_fd, rel_path.name, visible)
+            _assert_managed_removal_visible_chain(target_root, rel_path, fds)
+            _assert_managed_removal_directory_binding(target_root, rel_path, directory_fd)
+            _assert_managed_removal_tree_entry_identity(parent_fd, rel_path.name, visible)
             current = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
             if (current.st_dev, current.st_ino, current.st_ctime_ns) != (
                 expected_identity.device,
@@ -3379,7 +3313,7 @@ def _remove_empty_bound_directory(
             ):
                 raise RuntimeError("empty directory target identity changed during safe cleanup")
             os.rmdir(rel_path.name, dir_fd=parent_fd)
-            _assert_uninstall_visible_chain(target_root, rel_path, fds)
+            _assert_managed_removal_visible_chain(target_root, rel_path, fds)
         finally:
             os.close(directory_fd)
 
@@ -3398,1342 +3332,12 @@ def _remove_managed_scaffold_tree(
         raise RuntimeError("managed scaffold target is outside the distribution root") from exc
     if rel_path not in _MANAGED_SCAFFOLD_ROOTS:
         raise RuntimeError("managed scaffold replacement is outside the managed roots")
-    _remove_bound_directory_tree(
+    _remove_managed_bound_directory_tree(
         target_root,
         rel_path,
         expected_identity=expected_identity,
         expected_root_identity=expected_root_identity,
     )
-
-
-def _read_file_descriptor(fd: int) -> bytes:
-    chunks: list[bytes] = []
-    while True:
-        chunk = os.read(fd, 1024 * 64)
-        if not chunk:
-            return b"".join(chunks)
-        chunks.append(chunk)
-
-
-def _write_file_descriptor(
-    fd: int,
-    content: bytes,
-    *,
-    before_first_write: Callable[[], None] | None = None,
-) -> None:
-    if before_first_write is not None:
-        before_first_write()
-    view = memoryview(content)
-    written = 0
-    while written < len(view):
-        count = os.write(fd, view[written:])
-        if count <= 0:
-            raise RuntimeError("uninstall marker write made no progress")
-        written += count
-
-
-def _create_uninstall_retry_marker(
-    target_root: Path,
-    *,
-    expected_root_identity: DistributionRootIdentity | None = None,
-) -> None:
-    payload = (json.dumps(_uninstall_retry_marker_payload(), sort_keys=True) + "\n").encode("utf-8")
-    marker_rel = _UNINSTALL_RETRY_MARKER_REL
-    with _open_uninstall_parent_chain(
-        target_root,
-        marker_rel,
-        create_missing=False,
-        expected_root_identity=expected_root_identity,
-    ) as fds:
-        parent_fd = fds[-1]
-        _assert_uninstall_visible_chain(target_root, marker_rel, fds)
-        try:
-            marker_fd = os.open(
-                marker_rel.name,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-                0o600,
-                dir_fd=parent_fd,
-            )
-        except FileExistsError:
-            nofollow = getattr(os, "O_NOFOLLOW", None)
-            if not isinstance(nofollow, int):
-                raise RuntimeError("SpecDock uninstall retry marker no-follow support is unavailable") from None
-            try:
-                existing_fd = os.open(
-                    marker_rel.name,
-                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
-                    dir_fd=parent_fd,
-                )
-            except OSError as exc:
-                raise RuntimeError("SpecDock uninstall retry marker cannot be opened safely") from exc
-            try:
-                before = os.fstat(existing_fd)
-                if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
-                    raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
-                existing_payload = _read_file_descriptor(existing_fd)
-                after = os.fstat(existing_fd)
-                if (
-                    not stat.S_ISREG(after.st_mode)
-                    or after.st_nlink != 1
-                    or (after.st_dev, after.st_ino, after.st_ctime_ns, after.st_size)
-                    != (before.st_dev, before.st_ino, before.st_ctime_ns, before.st_size)
-                    or existing_payload != payload
-                ):
-                    raise RuntimeError("SpecDock uninstall retry marker is incomplete or invalid")
-            finally:
-                with suppress(OSError):
-                    os.close(existing_fd)
-            return
-        marker_identity: tuple[int, int] | None = None
-        completed = False
-        try:
-            created = os.fstat(marker_fd)
-            if not stat.S_ISREG(created.st_mode) or created.st_nlink != 1:
-                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
-            marker_identity = (created.st_dev, created.st_ino)
-            _write_file_descriptor(marker_fd, payload)
-            os.fsync(marker_fd)
-            written = os.fstat(marker_fd)
-            if (
-                not stat.S_ISREG(written.st_mode)
-                or written.st_nlink != 1
-                or (written.st_dev, written.st_ino) != marker_identity
-            ):
-                raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
-            completed = True
-        finally:
-            with suppress(OSError):
-                os.close(marker_fd)
-            if not completed and marker_identity is not None:
-                try:
-                    current = os.stat(marker_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-                except OSError:
-                    pass
-                else:
-                    if (
-                        stat.S_ISREG(current.st_mode)
-                        and current.st_nlink == 1
-                        and (current.st_dev, current.st_ino) == marker_identity
-                    ):
-                        with suppress(OSError):
-                            os.unlink(marker_rel.name, dir_fd=parent_fd)
-        _assert_uninstall_visible_chain(target_root, marker_rel, fds)
-
-
-def _write_uninstall_retry_marker(
-    target_root: Path,
-    *,
-    expected_root_identity: DistributionRootIdentity | None = None,
-) -> None:
-    _create_uninstall_retry_marker(
-        target_root,
-        expected_root_identity=expected_root_identity,
-    )
-
-
-def _symlinked_uninstall_boundary_root(target_root: Path) -> Path | None:
-    for boundary_root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS:
-        if (target_root / boundary_root).is_symlink():
-            return boundary_root
-    return None
-
-
-def _path_exists_for_uninstall(path: Path) -> bool:
-    return path.exists() or path.is_symlink()
-
-
-def _hash_uninstall_regular_fd(fd: int) -> tuple[str, os.stat_result]:
-    """Hash one held regular-file descriptor and return its final stat."""
-    before = os.fstat(fd)
-    digest = hashlib.sha256()
-    while True:
-        chunk = os.read(fd, 1024 * 1024)
-        if not chunk:
-            break
-        digest.update(chunk)
-    after = os.fstat(fd)
-    if (
-        before.st_dev,
-        before.st_ino,
-        before.st_ctime_ns,
-        before.st_size,
-    ) != (
-        after.st_dev,
-        after.st_ino,
-        after.st_ctime_ns,
-        after.st_size,
-    ):
-        raise RuntimeError("uninstall target changed while capturing identity")
-    return digest.hexdigest(), after
-
-
-def _capture_uninstall_target_identity(target_root: Path, rel_path: Path) -> _UninstallTargetIdentity | None:
-    """Capture a target identity through a no-follow parent descriptor chain."""
-    if not _path_exists_for_uninstall(target_root / rel_path):
-        return None
-    with _open_uninstall_parent_chain(target_root, rel_path) as fds:
-        parent_fd = fds[-1]
-        try:
-            info = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            return None
-        if stat.S_ISLNK(info.st_mode):
-            return _UninstallTargetIdentity(
-                "symlink" if info.st_nlink == 1 else "unsafe",
-                info.st_dev,
-                info.st_ino,
-                info.st_ctime_ns,
-                nlink=info.st_nlink,
-                link_target=os.readlink(rel_path.name, dir_fd=parent_fd),
-            )
-        if stat.S_ISDIR(info.st_mode):
-            return _UninstallTargetIdentity("directory", info.st_dev, info.st_ino, info.st_ctime_ns)
-        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            return _UninstallTargetIdentity("unsafe", info.st_dev, info.st_ino, info.st_ctime_ns)
-        fd = os.open(
-            rel_path.name,
-            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-            dir_fd=parent_fd,
-        )
-        try:
-            digest, final_info = _hash_uninstall_regular_fd(fd)
-        finally:
-            os.close(fd)
-        return _UninstallTargetIdentity(
-            "regular",
-            final_info.st_dev,
-            final_info.st_ino,
-            final_info.st_ctime_ns,
-            size=final_info.st_size,
-            sha256=digest,
-        )
-
-
-def _assert_uninstall_target_identity(
-    parent_fd: int,
-    name: str,
-    info: os.stat_result,
-    expected: _UninstallTargetIdentity,
-) -> None:
-    """Fail closed when a planned uninstall entry was replaced or rewritten."""
-    if expected.kind == "symlink":
-        if (
-            not stat.S_ISLNK(info.st_mode)
-            or info.st_dev != expected.device
-            or info.st_ino != expected.inode
-            or info.st_ctime_ns != expected.ctime_ns
-            or info.st_nlink != expected.nlink
-            or os.readlink(name, dir_fd=parent_fd) != expected.link_target
-        ):
-            raise RuntimeError("uninstall target identity changed during safe operation")
-        return
-    if expected.kind == "directory":
-        if (
-            not stat.S_ISDIR(info.st_mode)
-            or info.st_dev != expected.device
-            or info.st_ino != expected.inode
-            or info.st_ctime_ns != expected.ctime_ns
-        ):
-            raise RuntimeError("uninstall target identity changed during safe operation")
-        return
-    if expected.kind != "regular" or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-        raise RuntimeError("uninstall target identity changed during safe operation")
-    if (
-        info.st_dev != expected.device
-        or info.st_ino != expected.inode
-        or info.st_ctime_ns != expected.ctime_ns
-        or info.st_size != expected.size
-    ):
-        raise RuntimeError("uninstall target identity changed during safe operation")
-    fd = os.open(
-        name,
-        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-        dir_fd=parent_fd,
-    )
-    try:
-        digest, final_info = _hash_uninstall_regular_fd(fd)
-    finally:
-        os.close(fd)
-    if (
-        digest != expected.sha256
-        or final_info.st_dev != expected.device
-        or final_info.st_ino != expected.inode
-        or final_info.st_ctime_ns != expected.ctime_ns
-        or final_info.st_size != expected.size
-    ):
-        raise RuntimeError("uninstall target identity changed during safe operation")
-
-
-def _planned_uninstall_identity(
-    target_root: Path,
-    rel_path: Path,
-) -> tuple[_UninstallTargetIdentity | None, bool]:
-    identity = _capture_uninstall_target_identity(target_root, rel_path)
-    return identity, identity is None
-
-
-def _compare_uninstall_bytes(target_path: Path, expected: bytes) -> tuple[bool, str | None]:
-    if target_path.is_symlink():
-        return False, "comparison error: symlink requires manual review"
-    if not target_path.is_file():
-        return False, "comparison error: not a regular file; manual review required"
-    try:
-        actual = target_path.read_bytes()
-    except OSError as e:
-        return False, f"comparison error: {e}; manual review required"
-    if actual == expected:
-        return True, None
-    return False, "content mismatch; manual review required"
-
-
-def _add_exact_match_uninstall_action(
-    actions: list[_UninstallAction],
-    target_root: Path,
-    rel_path: Path,
-    *,
-    category: str,
-    expected: bytes,
-    include_missing_removals: bool = False,
-) -> None:
-    identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
-    if expected_absent:
-        if include_missing_removals:
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category=category,
-                    status="would_remove",
-                    reason="current shipped asset exact match",
-                    expected_absent=True,
-                )
-            )
-        return
-
-    expected_digest = hashlib.sha256(expected).hexdigest()
-    if identity is not None and identity.kind == "regular" and identity.sha256 == expected_digest:
-        actions.append(
-            _UninstallAction(
-                rel_path=rel_path.as_posix(),
-                category=category,
-                status="would_remove",
-                reason="current shipped asset exact match",
-                expected_identity=identity,
-            )
-        )
-    else:
-        actions.append(
-            _UninstallAction(
-                rel_path=rel_path.as_posix(),
-                category=category,
-                status="preserved",
-                reason="content mismatch; manual review required",
-            )
-        )
-
-
-def _uninstall_category_for_install_root_path(
-    rel_path: Path,
-    *,
-    bootstrap_only_rel_paths: set[Path],
-) -> str:
-    if rel_path.parts[:2] == (".agents", "skills"):
-        return "agent_skill"
-    if rel_path.parts[:2] in {(".codex", "agents"), (".github", "agents")}:
-        return "native_agent"
-    if rel_path in bootstrap_only_rel_paths:
-        return "bootstrap_only"
-    if rel_path == Path(".agents/host-adapters/meta.json"):
-        return "bootstrap_only"
-    if rel_path.parts[:2] in {
-        (".codex", "prompts"),
-        (".codex", "rules"),
-        (".github", "workflows"),
-    } or rel_path == Path(".codex/AGENTS.md"):
-        return "product_reusable"
-    return "product_reusable"
-
-
-def _is_delete_even_if_mismatch_uninstall_path(rel_path: Path) -> bool:
-    return rel_path.parts[:2] in {
-        (".agents", "skills"),
-        (".codex", "agents"),
-        (".github", "agents"),
-    } or rel_path == Path("spec-dock/spec-dock.version")
-
-
-def _iter_existing_files_or_symlinks(root: Path) -> tuple[Path, ...]:
-    if not root.exists():
-        return ()
-    if root.is_symlink():
-        return (root,)
-    return tuple(
-        sorted((path for path in root.rglob("*") if path.is_file() or path.is_symlink()), key=lambda p: p.as_posix())
-    )
-
-
-def _add_generated_state_uninstall_actions(
-    actions: list[_UninstallAction],
-    target_root: Path,
-    known_rel_paths: set[Path],
-) -> None:
-    for rel_root in (Path("spec-dock/active"), Path("spec-dock/.agent")):
-        root_path = target_root / rel_root
-        known_rel_paths.add(rel_root)
-        if not _path_exists_for_uninstall(root_path):
-            continue
-        root_identity, _ = _planned_uninstall_identity(target_root, rel_root)
-        if root_identity is None or root_identity.kind != "directory":
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_root.as_posix(),
-                    category="generated_state",
-                    status="preserved",
-                    reason="generated state root is not a safe real directory; manual review required",
-                )
-            )
-            continue
-        for path in _iter_existing_files_or_symlinks(root_path):
-            rel_path = path.relative_to(target_root)
-            known_rel_paths.add(rel_path)
-            identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
-            if identity is not None and (
-                identity.kind == "unsafe" or (identity.kind == "symlink" and rel_root != Path("spec-dock/active"))
-            ):
-                reason = (
-                    "generated state has unsafe identity; manual review required"
-                    if identity.kind == "unsafe"
-                    else "generated state has unsafe symlink identity; manual review required"
-                )
-                actions.append(
-                    _UninstallAction(
-                        rel_path=rel_path.as_posix(),
-                        category="generated_state",
-                        status="preserved",
-                        reason=reason,
-                    )
-                )
-                continue
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category="generated_state",
-                    status="would_remove",
-                    reason="SpecDock generated state",
-                    expected_identity=identity,
-                    expected_absent=expected_absent,
-                )
-            )
-
-
-def _add_spec_history_uninstall_action(
-    actions: list[_UninstallAction],
-    target_root: Path,
-    *,
-    specs_mode: str | None,
-    include_missing_removals: bool = False,
-) -> None:
-    spec_history_path = Path("spec-dock/initiatives")
-    if not (target_root / spec_history_path).exists() and not (specs_mode == "remove" and include_missing_removals):
-        return
-    if specs_mode == "remove":
-        identity, expected_absent = _planned_uninstall_identity(target_root, spec_history_path)
-        if identity is None and expected_absent:
-            actions.append(
-                _UninstallAction(
-                    rel_path=spec_history_path.as_posix(),
-                    category="spec_history",
-                    status="would_remove",
-                    reason="explicit remove-specs mode; spec history already absent",
-                    expected_absent=True,
-                )
-            )
-            return
-        if identity is not None and identity.kind != "directory":
-            actions.append(
-                _UninstallAction(
-                    rel_path=spec_history_path.as_posix(),
-                    category="spec_history",
-                    status="preserved",
-                    reason="spec history root is not a safe real directory; manual review required",
-                )
-            )
-            return
-        safety_issue = _managed_scaffold_tree_safety_issue(target_root, spec_history_path)
-        if safety_issue is not None:
-            actions.append(
-                _UninstallAction(
-                    rel_path=spec_history_path.as_posix(),
-                    category="spec_history",
-                    status="preserved",
-                    reason=f"{safety_issue}; manual review required",
-                )
-            )
-            return
-        actions.append(
-            _UninstallAction(
-                rel_path=spec_history_path.as_posix(),
-                category="spec_history",
-                status="would_remove",
-                reason="explicit remove-specs mode",
-                expected_identity=identity,
-                expected_absent=expected_absent,
-            )
-        )
-    else:
-        reason = (
-            "keep-specs mode" if specs_mode == "keep" else "dry-run preserves specs unless remove-specs is explicit"
-        )
-        actions.append(
-            _UninstallAction(
-                rel_path=spec_history_path.as_posix(),
-                category="spec_history",
-                status="preserved",
-                reason=reason,
-            )
-        )
-
-
-def _add_uninstall_retry_marker_action(
-    actions: list[_UninstallAction], target_root: Path, known_rel_paths: set[Path]
-) -> None:
-    known_rel_paths.add(_UNINSTALL_RETRY_MARKER_REL)
-    if not _path_exists_for_uninstall(target_root / _UNINSTALL_RETRY_MARKER_REL):
-        return
-    identity, expected_absent = _planned_uninstall_identity(target_root, _UNINSTALL_RETRY_MARKER_REL)
-    actions.append(
-        _UninstallAction(
-            rel_path=_UNINSTALL_RETRY_MARKER_REL.as_posix(),
-            category="generated_state",
-            status="preserved",
-            reason="SpecDock uninstall retry marker for idempotent rerun",
-            expected_identity=identity,
-            expected_absent=expected_absent,
-        )
-    )
-
-
-def _add_shortcut_uninstall_action(actions: list[_UninstallAction], target_root: Path) -> None:
-    shortcut = target_root / "spec"
-    if not _path_exists_for_uninstall(shortcut):
-        return
-    if (
-        shortcut.is_symlink() and os.readlink(shortcut) == f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"  # noqa: PTH115 - raw exact target.
-    ):
-        identity, expected_absent = _planned_uninstall_identity(target_root, Path("spec"))
-        if identity is not None and identity.kind == "unsafe":
-            actions.append(
-                _UninstallAction(
-                    rel_path="spec",
-                    category="shortcut",
-                    status="preserved",
-                    reason="repo-root shortcut has unsafe identity; manual review required",
-                )
-            )
-            return
-        actions.append(
-            _UninstallAction(
-                rel_path="spec",
-                category="shortcut",
-                status="would_remove",
-                reason="repo-root shortcut targets spec-dock/scripts/spec-dock",
-                expected_identity=identity,
-                expected_absent=expected_absent,
-            )
-        )
-    else:
-        actions.append(
-            _UninstallAction(
-                rel_path="spec",
-                category="shortcut",
-                status="preserved",
-                reason="not spec-dock shortcut; manual review required",
-            )
-        )
-
-
-def _add_unknown_boundary_uninstall_actions(
-    actions: list[_UninstallAction],
-    target_root: Path,
-    known_rel_paths: set[Path],
-) -> None:
-    for boundary_root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS:
-        for path in _iter_existing_files_or_symlinks(target_root / boundary_root):
-            rel_path = path.relative_to(target_root)
-            if rel_path in known_rel_paths:
-                continue
-            if rel_path.parts[:2] == ("spec-dock", "initiatives"):
-                continue
-            if rel_path.parts[:2] in {("spec-dock", "active"), ("spec-dock", ".agent")}:
-                continue
-            if any(
-                rel_path == managed_root or _is_path_prefix(managed_root, rel_path)
-                for managed_root in _MANAGED_SCAFFOLD_ROOTS
-            ):
-                continue
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category="unmanaged",
-                    status="preserved",
-                    reason="unmanaged file under managed boundary root",
-                )
-            )
-
-
-def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, bytes], ...]:
-    src_spec_dock = assets_dir / "spec_dock"
-    sources: list[tuple[Path, bytes]] = []
-    for managed_dir in _MANAGED_DIRS:
-        src_root = src_spec_dock / managed_dir
-        if not src_root.is_dir():
-            raise RuntimeError(f"Missing asset directory: spec_dock/{managed_dir}")
-        for source_path in sorted(
-            (
-                path
-                for path in src_root.rglob("*")
-                if path.is_file() and not _is_generated_python_cache_path(path.relative_to(src_spec_dock))
-            ),
-            key=lambda p: p.as_posix(),
-        ):
-            rel_path = Path("spec-dock") / source_path.relative_to(src_spec_dock)
-            sources.append((rel_path, source_path.read_bytes()))
-
-    src_gitignore = src_spec_dock / ".gitignore"
-    if not src_gitignore.is_file():
-        raise RuntimeError("Missing asset file: spec_dock/.gitignore")
-    sources.append((Path("spec-dock/.gitignore"), src_gitignore.read_bytes()))
-    root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
-    if not root_workbench_readme.is_file() or root_workbench_readme.is_symlink():
-        raise RuntimeError("Missing asset file: spec_dock/templates/root/.workbench/README.md")
-    sources.append((Path("spec-dock/.workbench/README.md"), root_workbench_readme.read_bytes()))
-    sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode()))
-    return tuple(sources)
-
-
-def _managed_scaffold_tree_safety_issue(target_root: Path, rel_root: Path) -> str | None:
-    """Return a preflight diagnostic for unsafe recursive scaffold entries."""
-    root = target_root / rel_root
-    walk_errors: list[OSError] = []
-    for current, directories, file_names in os.walk(
-        root,
-        topdown=True,
-        followlinks=False,
-        onerror=walk_errors.append,
-    ):
-        for name in (*directories, *file_names):
-            path = Path(current) / name
-            try:
-                info = os.lstat(path)
-            except OSError:
-                return f"managed scaffold entry cannot be inspected safely: {path.relative_to(target_root)}"
-            if stat.S_ISLNK(info.st_mode):
-                return f"managed scaffold tree contains symlink: {path.relative_to(target_root)}"
-            if stat.S_ISDIR(info.st_mode):
-                continue
-            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                return f"managed scaffold tree contains unsafe entry: {path.relative_to(target_root)}"
-    if walk_errors:
-        return f"managed scaffold tree cannot be inspected safely: {rel_root.as_posix()}"
-    return None
-
-
-def _add_managed_scaffold_uninstall_actions(
-    actions: list[_UninstallAction],
-    target_root: Path,
-    known_rel_paths: set[Path],
-) -> None:
-    """Plan each managed scaffold tree as one safe recursive removal."""
-    for rel_root in _MANAGED_SCAFFOLD_ROOTS:
-        known_rel_paths.add(rel_root)
-        if not _path_exists_for_uninstall(target_root / rel_root):
-            continue
-        identity, expected_absent = _planned_uninstall_identity(target_root, rel_root)
-        if identity is None or identity.kind != "directory":
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_root.as_posix(),
-                    category="scaffold_managed",
-                    status="preserved",
-                    reason="managed scaffold root is not a safe real directory; manual review required",
-                )
-            )
-            continue
-        safety_issue = _managed_scaffold_tree_safety_issue(target_root, rel_root)
-        if safety_issue is not None:
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_root.as_posix(),
-                    category="scaffold_managed",
-                    status="preserved",
-                    reason=f"{safety_issue}; manual review required",
-                )
-            )
-            continue
-        actions.append(
-            _UninstallAction(
-                rel_path=rel_root.as_posix(),
-                category="scaffold_managed",
-                status="would_remove",
-                reason="SpecDock managed scaffold tree",
-                expected_identity=identity,
-                expected_absent=expected_absent,
-            )
-        )
-
-
-def _append_distribution_uninstall_actions(
-    actions: list[_UninstallAction],
-    target_root: Path,
-    *,
-    plan,
-    include_missing_removals: bool,
-    known_rel_paths: set[Path],
-) -> None:
-    """Project the shared ownership classifier into the uninstall report."""
-    obsolete_paths = {Path(item["path"]) for item in plan.manifest.obsolete_exact_files}
-    current_paths = {Path(asset.path) for asset in plan.current_assets}
-    for distribution_action in plan.actions:
-        rel_path = Path(distribution_action.path)
-        if rel_path == Path("spec"):
-            # The shortcut has a dedicated renderer with a more specific
-            # target-link diagnostic below.
-            continue
-        known_rel_paths.add(rel_path)
-        target_exists = _path_exists_for_uninstall(target_root / rel_path)
-        if not target_exists and not include_missing_removals:
-            continue
-
-        category = (
-            "obsolete_managed"
-            if rel_path in obsolete_paths
-            else _uninstall_category_for_install_root_path(
-                rel_path,
-                bootstrap_only_rel_paths=set(),
-            )
-        )
-        if distribution_action.action == "prune":
-            identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
-            if identity is not None and identity.kind == "unsafe":
-                actions.append(
-                    _UninstallAction(
-                        rel_path=rel_path.as_posix(),
-                        category=category,
-                        status="preserved",
-                        reason="managed asset has unsafe identity; manual review required",
-                    )
-                )
-                continue
-            if rel_path in obsolete_paths:
-                reason = (
-                    "known obsolete SpecDock-managed asset"
-                    if target_exists
-                    else "known obsolete SpecDock-managed asset already absent"
-                )
-            elif distribution_action.provenance == "historical":
-                reason = (
-                    "historical SpecDock-managed asset exact identity"
-                    if target_exists
-                    else "historical SpecDock-managed asset already absent"
-                )
-            else:
-                reason = (
-                    "current shipped asset exact identity" if target_exists else "current shipped asset already absent"
-                )
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category=category,
-                    status="would_remove",
-                    reason=reason,
-                    expected_identity=identity,
-                    expected_absent=expected_absent,
-                )
-            )
-            continue
-
-        if distribution_action.blocked or distribution_action.action == "preserve":
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category=category,
-                    status="preserved",
-                    reason=(f"{distribution_action.reason}; {distribution_action.operator_action}"),
-                )
-            )
-            continue
-
-        # Uninstall classification should never create/adopt/upgrade a target;
-        # fail closed in the report if a future classifier change violates it.
-        actions.append(
-            _UninstallAction(
-                rel_path=rel_path.as_posix(),
-                category=category,
-                status="preserved",
-                reason="unexpected uninstall classification; manual review required",
-            )
-        )
-
-    if include_missing_removals:
-        for item in plan.manifest.obsolete_exact_files:
-            rel_path = Path(item["path"])
-            known_rel_paths.add(rel_path)
-            if rel_path in current_paths or _path_exists_for_uninstall(target_root / rel_path):
-                continue
-            actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category="obsolete_managed",
-                    status="would_remove",
-                    reason="known obsolete SpecDock-managed asset already absent",
-                    expected_absent=True,
-                )
-            )
-
-
-def _build_uninstall_plan(
-    target_root: Path,
-    *,
-    specs_mode: str | None,
-    include_missing_removals: bool = False,
-) -> tuple[_UninstallAction, ...]:
-    """Build only the Issue 371 remove-specs compatibility plan."""
-    actions: list[_UninstallAction] = []
-    known_rel_paths: set[Path] = set()
-
-    with _assets_dir() as assets_dir:
-        distribution_plan = build_distribution_plan(
-            assets_dir / "install_root",
-            manifest_path=assets_dir / "managed_distribution.json",
-            scaffold_root=assets_dir / "spec_dock",
-            target_root=target_root,
-            operation="uninstall",
-        )
-        _append_distribution_uninstall_actions(
-            actions,
-            target_root,
-            plan=distribution_plan,
-            include_missing_removals=include_missing_removals,
-            known_rel_paths=known_rel_paths,
-        )
-
-        _add_managed_scaffold_uninstall_actions(actions, target_root, known_rel_paths)
-
-        for rel_path, expected in _build_scaffold_uninstall_sources(assets_dir):
-            if any(
-                rel_path == managed_root or _is_path_prefix(managed_root, rel_path)
-                for managed_root in _MANAGED_SCAFFOLD_ROOTS
-            ):
-                continue
-            known_rel_paths.add(rel_path)
-            if _is_delete_even_if_mismatch_uninstall_path(rel_path):
-                if _path_exists_for_uninstall(target_root / rel_path) or include_missing_removals:
-                    identity, expected_absent = _planned_uninstall_identity(target_root, rel_path)
-                    if identity is not None and identity.kind == "unsafe":
-                        actions.append(
-                            _UninstallAction(
-                                rel_path=rel_path.as_posix(),
-                                category="scaffold_managed",
-                                status="preserved",
-                                reason="managed state has unsafe identity; manual review required",
-                            )
-                        )
-                        continue
-                    actions.append(
-                        _UninstallAction(
-                            rel_path=rel_path.as_posix(),
-                            category="scaffold_managed",
-                            status="would_remove",
-                            reason="SpecDock managed state",
-                            expected_identity=identity,
-                            expected_absent=expected_absent,
-                        )
-                    )
-                continue
-            _add_exact_match_uninstall_action(
-                actions,
-                target_root,
-                rel_path,
-                category="scaffold_managed",
-                expected=expected,
-                include_missing_removals=include_missing_removals,
-            )
-
-    _add_generated_state_uninstall_actions(actions, target_root, known_rel_paths)
-    _add_spec_history_uninstall_action(
-        actions,
-        target_root,
-        specs_mode=specs_mode,
-        include_missing_removals=include_missing_removals,
-    )
-    _add_uninstall_retry_marker_action(actions, target_root, known_rel_paths)
-    _add_shortcut_uninstall_action(actions, target_root)
-    known_rel_paths.add(Path("spec"))
-    _add_unknown_boundary_uninstall_actions(actions, target_root, known_rel_paths)
-
-    return tuple(sorted(actions, key=lambda action: action.rel_path))
-
-
-def _summarize_uninstall_actions(actions: tuple[_UninstallAction, ...]) -> dict[str, int]:
-    summary = {
-        "would_remove": 0,
-        "removed": 0,
-        "already_removed": 0,
-        "preserved": 0,
-        "failed": 0,
-        "pending": 0,
-        "empty_dir_removed": 0,
-    }
-    for action in actions:
-        if action.status not in summary:
-            summary[action.status] = 0
-        summary[action.status] += 1
-    return summary
-
-
-def _is_safe_uninstall_rel_path(rel_path: Path) -> bool:
-    if rel_path.is_absolute() or ".." in rel_path.parts or rel_path.parts in {(), (".",)}:
-        return False
-    if rel_path.parts[0] == ".git":
-        return False
-    return rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS} or rel_path == Path(
-        "spec"
-    )
-
-
-def _remove_uninstall_path(
-    target_root: Path,
-    action: _UninstallAction,
-    *,
-    expected_root_identity: DistributionRootIdentity | None = None,
-) -> _UninstallAction:
-    rel_path = Path(action.rel_path)
-    if not _is_safe_uninstall_rel_path(rel_path):
-        return action._replace(status="failed", error="unsafe uninstall path outside managed boundaries")
-    # Cleanup actions are ordered deepest-first.  A previously removed parent
-    # therefore makes later child entries idempotently absent; avoid treating
-    # that expected state as a safety failure before opening the descriptor
-    # chain.
-    if not _path_exists_for_uninstall(target_root / rel_path):
-        return action._replace(status="already_removed", error=None)
-    try:
-        with _open_uninstall_parent_chain(
-            target_root,
-            rel_path,
-            expected_root_identity=expected_root_identity,
-        ) as fds:
-            parent_fd = fds[-1]
-            _assert_uninstall_visible_chain(target_root, rel_path, fds)
-            try:
-                info = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                if action.expected_absent:
-                    return action._replace(status="already_removed", error=None)
-                if action.expected_identity is not None:
-                    return action._replace(status="already_removed", error=None)
-                return action._replace(status="already_removed", error=None)
-
-            if action.expected_absent:
-                return action._replace(
-                    status="failed",
-                    error="uninstall target appeared after preflight",
-                )
-            if action.expected_identity is None:
-                return action._replace(
-                    status="failed",
-                    error="uninstall target identity was not captured during preflight",
-                )
-            try:
-                _assert_uninstall_target_identity(
-                    parent_fd,
-                    rel_path.name,
-                    info,
-                    action.expected_identity,
-                )
-            except (OSError, RuntimeError) as exc:
-                return action._replace(status="failed", error=str(exc))
-
-            if stat.S_ISLNK(info.st_mode):
-                # A managed file is never removed through a symlink.  The only
-                # intentional symlink removals are the exact repo-root shortcut
-                # and generated active pointers under the managed scaffold.
-                is_generated_active_pointer = action.category == "generated_state" and rel_path.parts[:2] == (
-                    "spec-dock",
-                    "active",
-                )
-                if action.category != "shortcut" and not is_generated_active_pointer:
-                    return action._replace(
-                        status="failed",
-                        error="unsafe uninstall target symlink requires manual review",
-                    )
-                if action.category == "shortcut":
-                    try:
-                        link_target = os.readlink(rel_path.name, dir_fd=parent_fd)
-                    except OSError as exc:
-                        return action._replace(status="failed", error=str(exc))
-                    if link_target != f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock":
-                        return action._replace(
-                            status="failed",
-                            error="unsafe uninstall shortcut target requires manual review",
-                        )
-                os.unlink(rel_path.name, dir_fd=parent_fd)
-            elif stat.S_ISDIR(info.st_mode):
-                if action.category not in {"spec_history", "scaffold_managed"}:
-                    return action._replace(
-                        status="failed",
-                        error="unexpected uninstall directory requires manual review",
-                    )
-                directory_fd = os.open(rel_path.name, _uninstall_directory_flags(), dir_fd=parent_fd)
-                try:
-                    _remove_uninstall_tree_fd(target_root, rel_path, directory_fd, (*fds, directory_fd))
-                finally:
-                    os.close(directory_fd)
-                os.rmdir(rel_path.name, dir_fd=parent_fd)
-            elif stat.S_ISREG(info.st_mode):
-                if info.st_nlink != 1:
-                    return action._replace(
-                        status="failed",
-                        error="refusing to remove hard-linked uninstall target",
-                    )
-                os.unlink(rel_path.name, dir_fd=parent_fd)
-            else:
-                return action._replace(
-                    status="failed",
-                    error="unsafe uninstall target type requires manual review",
-                )
-            _assert_uninstall_visible_chain(target_root, rel_path, fds)
-    except (OSError, RuntimeError) as exc:
-        return action._replace(status="failed", error=str(exc))
-    return action._replace(status="removed", error=None)
-
-
-def _is_uninstall_cleanup_boundary_path(rel_path: Path) -> bool:
-    if rel_path.is_absolute() or ".." in rel_path.parts or rel_path.parts in {(), (".",)}:
-        return False
-    if rel_path.parts[0] == ".git":
-        return False
-    return rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS}
-
-
-def _cleanup_empty_uninstall_dirs(
-    target_root: Path,
-    actions: tuple[_UninstallAction, ...],
-    *,
-    expected_root_identity: DistributionRootIdentity | None = None,
-    include_workspace_root: bool = False,
-) -> tuple[_UninstallAction, ...]:
-    cleanup_actions: list[_UninstallAction] = []
-    candidates: set[Path] = set()
-
-    # Cleanup is derived only from proven managed removals.  Scanning every
-    # directory under a boundary would turn an unknown empty user directory
-    # into an implicit deletion candidate.
-    protected: set[Path] = set()
-    for action in actions:
-        rel_path = Path(action.rel_path)
-        if action.status == "preserved":
-            protected.add(rel_path)
-            if rel_path.parts and rel_path.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS}:
-                protected.update(rel_path.parents)
-            continue
-        if action.status != "removed" or rel_path == _UNINSTALL_RETRY_MARKER_REL:
-            continue
-        current = rel_path if action.category == "spec_history" else rel_path.parent
-        while current.parts and current.parts[0] in {root.parts[0] for root in _UNINSTALL_CLEANUP_BOUNDARY_ROOTS}:
-            candidates.add(current)
-            current = current.parent
-
-    # Fresh installs create these generated-state roots even when no state has
-    # been written yet.  Include the known roots explicitly so a successful
-    # uninstall can remove empty directories without scanning or deleting
-    # unknown user-owned paths.
-    for rel_root in _GENERATED_STATE_ROOTS:
-        root = target_root / rel_root
-        if not _path_exists_for_uninstall(root):
-            continue
-        if root.is_symlink() or not root.is_dir():
-            cleanup_actions.append(
-                _UninstallAction(
-                    rel_path=rel_root.as_posix(),
-                    category="empty_dir",
-                    status="failed",
-                    reason="generated state root changed during cleanup",
-                    error="generated state root is no longer a real directory",
-                )
-            )
-            continue
-        walk_errors: list[OSError] = []
-
-        for current_raw, _directories, _files in os.walk(
-            root,
-            topdown=False,
-            followlinks=False,
-            onerror=walk_errors.append,
-        ):
-            current_path = Path(current_raw)
-            if not current_path.is_symlink():
-                candidates.add(current_path.relative_to(target_root))
-        if walk_errors:
-            cleanup_actions.append(
-                _UninstallAction(
-                    rel_path=rel_root.as_posix(),
-                    category="empty_dir",
-                    status="failed",
-                    reason="generated state cleanup could not inspect the managed tree",
-                    error="generated state directory inspection failed",
-                )
-            )
-        candidates.add(rel_root)
-
-    if not include_workspace_root:
-        candidates.discard(Path("spec-dock"))
-
-    for rel_path in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
-        if not _is_uninstall_cleanup_boundary_path(rel_path):
-            continue
-        if rel_path in protected:
-            continue
-        if not _path_exists_for_uninstall(target_root / rel_path):
-            continue
-        try:
-            with _open_uninstall_parent_chain(
-                target_root,
-                rel_path,
-                expected_root_identity=expected_root_identity,
-            ) as fds:
-                parent_fd = fds[-1]
-                _assert_uninstall_visible_chain(target_root, rel_path, fds)
-                try:
-                    info = os.stat(rel_path.name, dir_fd=parent_fd, follow_symlinks=False)
-                except FileNotFoundError:
-                    continue
-                if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
-                    continue
-                expected_identity = _ManagedPathIdentity(info.st_dev, info.st_ino, info.st_ctime_ns)
-            _remove_empty_bound_directory(
-                target_root,
-                rel_path,
-                expected_identity=expected_identity,
-                expected_root_identity=expected_root_identity,
-            )
-        except FileNotFoundError:
-            continue
-        except (OSError, RuntimeError):
-            strict_generated_cleanup = any(
-                rel_path == generated_root or _is_path_prefix(generated_root, rel_path)
-                for generated_root in _GENERATED_STATE_ROOTS
-            ) or (include_workspace_root and rel_path == Path("spec-dock"))
-            if not strict_generated_cleanup:
-                continue
-            cleanup_actions.append(
-                _UninstallAction(
-                    rel_path=rel_path.as_posix(),
-                    category="empty_dir",
-                    status="failed",
-                    reason="empty directory cleanup failed; retry required",
-                    error="managed empty directory could not be removed safely",
-                )
-            )
-            continue
-        cleanup_actions.append(
-            _UninstallAction(
-                rel_path=rel_path.as_posix(),
-                category="empty_dir",
-                status="empty_dir_removed",
-                reason="empty directory cleanup inside uninstall boundary",
-            )
-        )
-    return tuple(cleanup_actions)
-
-
-def _apply_uninstall_plan(
-    target_root: Path,
-    actions: tuple[_UninstallAction, ...],
-    *,
-    expected_root_identity: DistributionRootIdentity | None = None,
-) -> tuple[_UninstallAction, ...]:
-    results: list[_UninstallAction] = []
-    halted = False
-    for action in actions:
-        if action.status == "would_remove":
-            if halted:
-                results.append(
-                    action._replace(
-                        status="pending",
-                        reason="not attempted after an earlier uninstall safety failure",
-                        error=None,
-                    )
-                )
-                continue
-            try:
-                result = _remove_uninstall_path(
-                    target_root,
-                    action,
-                    expected_root_identity=expected_root_identity,
-                )
-            except (OSError, RuntimeError):
-                result = action._replace(
-                    status="failed",
-                    reason="uninstall action failed; retry required",
-                    error="uninstall action failed safely",
-                )
-            results.append(result)
-            halted = result.status == "failed"
-        else:
-            results.append(action)
-    if not halted:
-        results.extend(
-            _cleanup_empty_uninstall_dirs(
-                target_root,
-                tuple(results),
-                expected_root_identity=expected_root_identity,
-            )
-        )
-    return tuple(sorted(results, key=lambda action: (action.rel_path, action.status)))
-
-
-def _uninstall_apply_blockers(
-    actions: tuple[_UninstallAction, ...],
-    *,
-    specs_mode: str,
-) -> tuple[_UninstallAction, ...]:
-    """Return preserved findings that must stop an uninstall before mutation.
-
-    ``keep-specs`` and the legacy uninstall retry marker are intentional
-    preserved state.  Every other preserved action represents an ownership,
-    type, or boundary collision and therefore blocks the entire apply plan;
-    executing unrelated ``would_remove`` actions would violate the shared
-    classifier's fail-closed contract.
-    """
-
-    blockers: list[_UninstallAction] = []
-    for action in actions:
-        if action.status != "preserved":
-            continue
-        if action.category == "spec_history" and specs_mode == "keep":
-            continue
-        if action.rel_path == _UNINSTALL_RETRY_MARKER_REL.as_posix():
-            continue
-        blockers.append(action)
-    return tuple(blockers)
-
-
-def _ensure_uninstall_retry_marker_action(
-    actions: tuple[_UninstallAction, ...],
-) -> tuple[_UninstallAction, ...]:
-    """Expose the marker as a managed action without scheduling early removal."""
-
-    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
-    if any(action.rel_path == marker_path for action in actions):
-        return actions
-    return tuple(
-        sorted(
-            (
-                *actions,
-                _UninstallAction(
-                    rel_path=marker_path,
-                    category="generated_state",
-                    status="preserved",
-                    reason="SpecDock uninstall retry marker removed last after post-verify",
-                ),
-            ),
-            key=lambda action: action.rel_path,
-        )
-    )
-
-
-def _remove_uninstall_retry_marker(
-    target_root: Path,
-    *,
-    expected_root_identity: DistributionRootIdentity | None = None,
-    expected_identity: _UninstallTargetIdentity | None = None,
-) -> None:
-    """Remove the legacy uninstall marker only after every other action passes."""
-    marker_rel = _UNINSTALL_RETRY_MARKER_REL
-    with _open_uninstall_parent_chain(
-        target_root,
-        marker_rel,
-        expected_root_identity=expected_root_identity,
-    ) as fds:
-        parent_fd = fds[-1]
-        _assert_uninstall_visible_chain(target_root, marker_rel, fds)
-        try:
-            info = os.stat(marker_rel.name, dir_fd=parent_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            return
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise RuntimeError("SpecDock uninstall retry marker is not a safe regular file")
-        if expected_identity is not None:
-            _assert_uninstall_target_identity(parent_fd, marker_rel.name, info, expected_identity)
-        os.unlink(marker_rel.name, dir_fd=parent_fd)
-
-
-def _finalize_uninstall_retry_marker(
-    target_root: Path,
-    actions: tuple[_UninstallAction, ...],
-    *,
-    expected_root_identity: DistributionRootIdentity | None = None,
-) -> tuple[_UninstallAction, ...]:
-    """Remove the marker last and reflect that mutation in the result ledger."""
-
-    marker_identity = _capture_uninstall_target_identity(target_root, _UNINSTALL_RETRY_MARKER_REL)
-    if marker_identity is None:
-        raise RuntimeError("SpecDock uninstall retry marker disappeared before finalization")
-    _remove_uninstall_retry_marker(
-        target_root,
-        expected_root_identity=expected_root_identity,
-        expected_identity=marker_identity,
-    )
-    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
-    finalized = [
-        action._replace(
-            status="removed",
-            reason="SpecDock uninstall retry marker removed after post-verify",
-            error=None,
-        )
-        if action.rel_path == marker_path
-        else action
-        for action in actions
-    ]
-    return tuple(sorted(finalized, key=lambda action: (action.rel_path, action.status)))
-
-
-def _restore_uninstall_retry_marker_action(
-    actions: tuple[_UninstallAction, ...],
-) -> tuple[_UninstallAction, ...]:
-    """Reflect a safely recreated retry marker after a postcondition failure."""
-
-    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
-    restored = [
-        action._replace(
-            status="preserved",
-            reason="SpecDock uninstall retry marker preserved after terminal cleanup failure",
-            error=None,
-        )
-        if action.rel_path == marker_path
-        else action
-        for action in actions
-    ]
-    return tuple(sorted(restored, key=lambda action: (action.rel_path, action.status)))
-
-
-def _verify_uninstall_postcondition(
-    target_root: Path,
-    actions: tuple[_UninstallAction, ...],
-    *,
-    expected_root_identity: DistributionRootIdentity,
-) -> None:
-    """Verify every scheduled removal is absent before marker deletion."""
-
-    _assert_distribution_root_identity(target_root, expected_root_identity)
-    marker_path = _UNINSTALL_RETRY_MARKER_REL.as_posix()
-    for action in actions:
-        if action.status not in {"removed", "already_removed", "empty_dir_removed"}:
-            continue
-        if action.rel_path == marker_path:
-            continue
-        if _path_exists_for_uninstall(target_root / action.rel_path):
-            raise RuntimeError(f"uninstall post-verify found residual managed path: {action.rel_path}")
-    _assert_distribution_root_identity(target_root, expected_root_identity)
 
 
 def _uninstall_retry_command(specs_mode: str | None, *, target_label: str = ".") -> str | None:
@@ -4747,101 +3351,33 @@ def _uninstall_retry_command(specs_mode: str | None, *, target_label: str = ".")
     return _shell_join(argv)
 
 
-def _uninstall_failure_paths(
-    actions: tuple[_UninstallAction, ...],
-    explicit_paths: tuple[str, ...],
-) -> list[str]:
-    paths = set(explicit_paths)
-    paths.update(action.rel_path for action in actions if action.status in {"failed", "pending"})
-    return sorted(paths)
-
-
-def _sanitize_uninstall_action_error(error: str | None) -> str | None:
-    if error is None:
-        return None
-    return "uninstall action failed safely; inspect the relative action and retry command"
-
-
-def _sanitize_uninstall_operation_error(phase: str | None) -> str:
-    phase_name = phase or "unknown phase"
-    return f"uninstall operation failed during {phase_name}; retry required"
-
-
-def _uninstall_payload(
-    target_root: Path,
+def _validate_uninstall_process_result(
+    result: DistributionProcessResult,
     *,
-    apply: bool,
     specs_mode: str | None,
-    actions: tuple[_UninstallAction, ...],
-    status: str | None = None,
-    errors: list[str] | None = None,
-    phase: str | None = None,
-    last_completed_phase: str | None = None,
-    diagnostic_paths: tuple[str, ...] = (),
-) -> dict[str, Any]:
-    resolved_status = status or ("completed" if apply else "planned")
-    is_sanitized_failure = resolved_status in {"partial_failure", "blocked"}
-    failure_paths = _uninstall_failure_paths(actions, diagnostic_paths)
-    target_label = _safe_retry_target_label(target_root)
-    return {
-        "schema_version": 1,
-        "target": (target_label or "unavailable") if is_sanitized_failure else str(target_root),
-        "mode": "apply" if apply else "dry-run",
-        "apply": apply,
-        "specs_mode": specs_mode,
-        "status": resolved_status,
-        "phase": phase or ("complete" if resolved_status == "completed" else "preflight"),
-        "last_completed_phase": last_completed_phase
-        or ("marker-finalized" if resolved_status == "completed" else "not-started"),
-        "retry_command": _uninstall_retry_command(
-            specs_mode,
-            target_label=target_label or "unavailable" if is_sanitized_failure else ".",
-        ),
-        "failed_paths": failure_paths,
-        "pending_paths": [action.rel_path for action in actions if action.status == "pending"],
-        "summary": _summarize_uninstall_actions(actions),
-        "actions": [
-            {
-                "path": action.rel_path,
-                "category": action.category,
-                "status": action.status,
-                "reason": action.reason,
-                "error": _sanitize_uninstall_action_error(action.error) if is_sanitized_failure else action.error,
-            }
-            for action in actions
-        ],
-        "guidance": [
-            (
-                "dry-run only; pass --apply with exactly one of --keep-specs or --remove-specs to mutate"
-                if not apply
-                else "retry removal with installer CLI: spec-dock uninstall <target> --apply --keep-specs or --remove-specs"
-            ),
-            "reinstall or refresh with installer CLI: spec-dock init <target> or spec-dock update <target>",
-        ],
-        "errors": (
-            [_sanitize_uninstall_operation_error(phase) for _ in (errors or ["uninstall operation failed"])]
-            if is_sanitized_failure
-            else errors or []
-        ),
-    }
+) -> None:
+    """Validate the typed service result for the selected public authority."""
 
-
-def _validate_uninstall_process_result(result: DistributionProcessResult) -> None:
-    """Reject incomplete deprovision results instead of interpreting durable state in the CLI."""
-
-    if result.intent != "deprovision" or result.phase is None or result.last_completed_phase is None:
-        raise RuntimeError("managed deprovision service returned an incomplete typed result")
+    accepted_pair = (result.intent == "deprovision" and specs_mode in {None, "keep"}) or (
+        result.intent == "purge" and specs_mode == "remove"
+    )
+    if not accepted_pair or result.phase is None or result.last_completed_phase is None:
+        raise RuntimeError("managed uninstall service returned an incomplete or mismatched typed result")
+    if result.retry_policy == "same-keep-command" and result.intent == "purge":
+        raise RuntimeError("managed uninstall service returned an invalid purge retry policy")
+    if result.retry_policy == "same-remove-command" and result.intent == "deprovision":
+        raise RuntimeError("managed uninstall service returned an invalid deprovision retry policy")
     if result.pending_paths != tuple(sorted(set(result.pending_paths), key=os.fsencode)):
-        raise RuntimeError("managed deprovision service returned non-canonical pending paths")
+        raise RuntimeError("managed uninstall service returned non-canonical pending paths")
     if result.failed_paths != tuple(sorted(set(result.failed_paths), key=os.fsencode)):
-        raise RuntimeError("managed deprovision service returned non-canonical failed paths")
+        raise RuntimeError("managed uninstall service returned non-canonical failed paths")
     if not set(result.pending_paths).issubset(result.failed_paths):
-        raise RuntimeError("managed deprovision service returned pending paths without failure diagnostics")
+        raise RuntimeError("managed uninstall service returned pending paths without failure diagnostics")
     if result.status in {"planned", "completed"}:
         if result.errors or result.failed_paths or result.pending_paths:
-            raise RuntimeError("managed deprovision success result contains failure state")
+            raise RuntimeError("managed uninstall success result contains failure state")
     elif not result.errors:
-        raise RuntimeError("managed deprovision failure result is missing its operation error")
+        raise RuntimeError("managed uninstall failure result is missing its operation error")
 
 
 def _uninstall_exit_code_from_result(result: DistributionProcessResult) -> int:
@@ -4891,6 +3427,10 @@ def _uninstall_guidance_from_result(
             result.reason or "",
             "manual recovery required: managed recovery evidence cannot prove one safe plan or checkpoint",
         )
+    elif result.retry_policy == "same-remove-command" and result.intent == "purge" and apply:
+        primary = "retry removal with installer CLI: spec-dock uninstall <target> --apply --remove-specs"
+    elif result.retry_policy == "same-remove-command" and result.intent == "purge":
+        primary = "dry-run only; pass --apply --remove-specs to mutate managed distribution artifacts"
     elif result.retry_policy == "same-keep-command" and apply:
         primary = "retry removal with installer CLI: spec-dock uninstall <target> --apply --keep-specs"
     elif result.retry_policy == "same-keep-command":
@@ -4905,7 +3445,9 @@ def _uninstall_guidance_from_result(
 
 _UNINSTALL_PUBLIC_OPERATION_ERRORS = {
     "deprovision-preflight-failed": "Managed distribution deprovision preflight failed.",
+    "purge-preflight-failed": "Managed distribution spec-history purge preflight failed.",
     "deprovision-target-not-directory": "target path is not a directory",
+    "purge-target-not-directory": "target path is not a directory",
     "deprovision-specs-mode-required": (
         "uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs"
     ),
@@ -4914,28 +3456,40 @@ _UNINSTALL_PUBLIC_OPERATION_ERRORS = {
     ),
     "deprovision-root-binding-required": "Managed distribution deprovision requires a bound target root.",
     "deprovision-root-binding-mismatch": "Managed distribution deprovision target binding changed.",
+    "purge-root-binding-required": "Managed distribution spec-history purge requires a bound target root.",
+    "purge-root-binding-mismatch": "Managed distribution spec-history purge target binding changed.",
     "managed-workspace-evidence-missing": (
         "target is not a managed SpecDock repo: missing managed "
         "'spec-dock/spec-dock.version' state or exact managed distribution evidence"
     ),
     "deprovision-preflight-blocked": "Managed distribution deprovision is blocked by preserved state.",
     "deprovision-no-op-postcondition-changed": "Managed distribution deprovision is blocked by preserved state.",
+    "purge-preflight-blocked": "Managed distribution spec-history purge is blocked by preserved state.",
+    "purge-no-op-postcondition-changed": "Managed distribution spec-history purge is blocked by preserved state.",
     "deprovision-recovery-required": "Managed distribution deprovision recovery is required.",
     "deprovision-recovery-mismatch": "Managed distribution deprovision recovery evidence does not match.",
+    "purge-recovery-required": "Managed distribution spec-history purge recovery is required.",
+    "purge-recovery-mismatch": "Managed distribution spec-history purge recovery evidence does not match.",
     "legacy-marker-unconvertible": "Legacy uninstall recovery requires manual review.",
     "legacy-marker-invalid": "Legacy uninstall recovery evidence is invalid.",
     "dual-recovery-state": "Conflicting uninstall recovery evidence requires manual review.",
 }
 _UNINSTALL_GENERIC_OPERATION_ERROR = "Managed distribution deprovision failed."
+_PURGE_GENERIC_OPERATION_ERROR = "Managed distribution spec-history purge failed."
 _UNINSTALL_GENERIC_ACTION_ERROR = "Managed distribution deprovision action failed."
+_PURGE_GENERIC_ACTION_ERROR = "Managed distribution spec-history purge action failed."
 
 
 def _uninstall_public_operation_error(error: DistributionProcessError) -> str:
+    if error.code.startswith("purge-"):
+        return _UNINSTALL_PUBLIC_OPERATION_ERRORS.get(error.code, _PURGE_GENERIC_OPERATION_ERROR)
     return _UNINSTALL_PUBLIC_OPERATION_ERRORS.get(error.code, _UNINSTALL_GENERIC_OPERATION_ERROR)
 
 
-def _uninstall_public_action_error(error: str | None) -> str | None:
-    return _UNINSTALL_GENERIC_ACTION_ERROR if error is not None else None
+def _uninstall_public_action_error(error: str | None, *, intent: str) -> str | None:
+    if error is None:
+        return None
+    return _PURGE_GENERIC_ACTION_ERROR if intent == "purge" else _UNINSTALL_GENERIC_ACTION_ERROR
 
 
 def _uninstall_payload_from_result(
@@ -4945,11 +3499,9 @@ def _uninstall_payload_from_result(
     apply: bool,
     specs_mode: str | None,
 ) -> dict[str, Any]:
-    """Map one fully populated deprovision result plus static request context."""
+    """Map one typed uninstall result without interpreting durable state."""
 
-    if specs_mode not in {None, "keep"}:
-        raise RuntimeError("managed deprovision presentation accepts only keep-specs authority")
-    _validate_uninstall_process_result(result)
+    _validate_uninstall_process_result(result, specs_mode=specs_mode)
     public_status = {
         "planned": "planned",
         "completed": "completed",
@@ -4960,8 +3512,11 @@ def _uninstall_payload_from_result(
     safe_target_label = _safe_retry_target_label(target_root)
     sanitized_failure = public_status in {"blocked", "partial_failure"}
     retry_command = None
-    if result.retry_policy == "same-keep-command" and specs_mode == "keep" and safe_target_label is not None:
-        retry_command = _uninstall_retry_command("keep", target_label=safe_target_label)
+    retry_mode = "remove" if result.intent == "purge" else "keep"
+    retry_policy = "same-remove-command" if result.intent == "purge" else "same-keep-command"
+    retry_authority_selected = specs_mode == ("remove" if result.intent == "purge" else "keep")
+    if result.retry_policy == retry_policy and safe_target_label is not None and retry_authority_selected:
+        retry_command = _uninstall_retry_command(retry_mode, target_label=safe_target_label)
     return {
         "schema_version": 1,
         "target": (safe_target_label or "unavailable") if sanitized_failure else str(target_root),
@@ -4981,36 +3536,13 @@ def _uninstall_payload_from_result(
                 "category": outcome.category,
                 "status": outcome.status,
                 "reason": outcome.reason,
-                "error": _uninstall_public_action_error(outcome.error),
+                "error": _uninstall_public_action_error(outcome.error, intent=result.intent),
             }
             for outcome in result.action_outcomes
         ],
         "guidance": _uninstall_guidance_from_result(result, apply=apply),
         "errors": [_uninstall_public_operation_error(error) for error in result.errors],
     }
-
-
-def _emit_uninstall_preflight_error(
-    target_root: Path,
-    *,
-    apply: bool,
-    specs_mode: str | None,
-    json_requested: bool,
-    message: str,
-) -> int:
-    if json_requested:
-        payload = _uninstall_payload(
-            target_root,
-            apply=apply,
-            specs_mode=specs_mode,
-            actions=(),
-            status="error",
-            errors=[message],
-        )
-        print(json.dumps(payload, sort_keys=True))
-    else:
-        print(f"error: {message}", file=sys.stderr)
-    return 2
 
 
 def _render_uninstall_text(payload: dict[str, Any]) -> str:
@@ -5064,7 +3596,28 @@ def _deprovision_request_error_result(
     )
 
 
-def _emit_uninstall_deprovision_result(
+def _purge_request_error_result(
+    message: str,
+    *,
+    code: str = "purge-preflight-failed",
+) -> DistributionProcessResult:
+    return DistributionProcessResult(
+        status="error",
+        intent="purge",
+        actions=(),
+        phase="preflight",
+        last_completed_phase="not-started",
+        errors=(
+            DistributionProcessError(
+                code=code,
+                message=message,
+            ),
+        ),
+        retry_policy="none",
+    )
+
+
+def _emit_uninstall_result(
     result: DistributionProcessResult,
     *,
     target_root: Path,
@@ -5106,7 +3659,7 @@ def _run_uninstall_deprovision(
             "target path is not a directory",
             code="deprovision-target-not-directory",
         )
-        return _emit_uninstall_deprovision_result(
+        return _emit_uninstall_result(
             result,
             target_root=target_root,
             apply=apply_requested,
@@ -5118,7 +3671,7 @@ def _run_uninstall_deprovision(
             "uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs",
             code="deprovision-specs-mode-required",
         )
-        return _emit_uninstall_deprovision_result(
+        return _emit_uninstall_result(
             result,
             target_root=target_root,
             apply=True,
@@ -5132,7 +3685,7 @@ def _run_uninstall_deprovision(
             "retry target cannot be represented safely from the current working directory",
             code="deprovision-retry-target-unrepresentable",
         )
-        return _emit_uninstall_deprovision_result(
+        return _emit_uninstall_result(
             result,
             target_root=target_root,
             apply=apply_requested,
@@ -5153,7 +3706,7 @@ def _run_uninstall_deprovision(
             )
     except (OSError, RuntimeError):
         result = _deprovision_request_error_result("Managed distribution deprovision preflight failed.")
-    return _emit_uninstall_deprovision_result(
+    return _emit_uninstall_result(
         result,
         target_root=target_root,
         apply=apply_requested,
@@ -5162,299 +3715,117 @@ def _run_uninstall_deprovision(
     )
 
 
-def _run_uninstall_remove_specs_compatibility(
+def _run_uninstall_explicit_spec_history_purge(
     target_root: Path,
     ns: argparse.Namespace,
     *,
     specs_mode: str,
     expected_root_identity: DistributionRootIdentity | None = None,
 ) -> int:
-    """Retain the D4 purge-compatible owner until Issue 371 replaces this route."""
+    """Adapt explicit ``--remove-specs`` requests to the typed purge service."""
 
     if specs_mode != "remove":
-        raise RuntimeError("remove-specs compatibility route requires remove authority")
+        raise RuntimeError("explicit spec-history purge route requires remove authority")
     apply_requested = bool(ns.apply)
     json_requested = bool(ns.json)
-    phase = "preflight"
-    last_completed_phase = "not-started"
-
     if not target_root.exists() or not target_root.is_dir():
-        return _emit_uninstall_preflight_error(
-            target_root,
+        result = _purge_request_error_result(
+            "target path is not a directory",
+            code="purge-target-not-directory",
+        )
+        return _emit_uninstall_result(
+            result,
+            target_root=target_root,
             apply=apply_requested,
             specs_mode=specs_mode,
             json_requested=json_requested,
-            message=f"target path is not a directory: {target_root}",
         )
-
     try:
         _require_retry_target_label(target_root)
-    except RuntimeError as exc:
-        return _emit_uninstall_preflight_error(
-            target_root,
+    except RuntimeError:
+        result = _purge_request_error_result(
+            "retry target cannot be represented safely from the current working directory",
+        )
+        return _emit_uninstall_result(
+            result,
+            target_root=target_root,
             apply=apply_requested,
             specs_mode=specs_mode,
             json_requested=json_requested,
-            message=str(exc),
         )
-
-    if apply_requested and specs_mode is None:
-        return _emit_uninstall_preflight_error(
-            target_root,
-            apply=apply_requested,
-            specs_mode=specs_mode,
-            json_requested=json_requested,
-            message=("uninstall --apply requires exactly one specs mode: --keep-specs or --remove-specs"),
-        )
-
     try:
-        uninstall_root_identity = expected_root_identity or _distribution_root_identity(target_root)
-        _assert_distribution_root_identity(target_root, uninstall_root_identity)
-    except RuntimeError as e:
-        return _emit_uninstall_preflight_error(
-            target_root,
-            apply=apply_requested,
-            specs_mode=specs_mode,
-            json_requested=json_requested,
-            message=str(e),
-        )
-
-    try:
-        _admit_distribution_cli(target_root, operation="uninstall")
-        if apply_requested:
-            symlink_boundary = _symlinked_uninstall_boundary_root(target_root)
-            if symlink_boundary is not None:
-                return _emit_uninstall_preflight_error(
-                    target_root,
-                    apply=apply_requested,
-                    specs_mode=specs_mode,
-                    json_requested=json_requested,
-                    message=(
-                        f"target contains symlinked SpecDock uninstall boundary root: {symlink_boundary.as_posix()}"
-                    ),
-                )
-            _reject_symlinked_uninstall_retry_marker(target_root)
-        _require_managed_specdock_for_uninstall(target_root)
-    except (OSError, RuntimeError) as e:
-        return _emit_uninstall_preflight_error(
-            target_root,
-            apply=apply_requested,
-            specs_mode=specs_mode,
-            json_requested=json_requested,
-            message=str(e),
-        )
-    last_completed_phase = "preflight-complete"
-
-    try:
-        # The complete plan must be validated before the first apply mutation.
-        # In particular, a preserved ownership collision blocks every unrelated
-        # removal; do not create the retry marker until that gate passes.
-        actions = _build_uninstall_plan(
-            target_root,
-            specs_mode=specs_mode,
-            include_missing_removals=apply_requested,
-        )
-    except (OSError, RuntimeError) as e:
-        return _emit_uninstall_preflight_error(
-            target_root,
-            apply=apply_requested,
-            specs_mode=specs_mode,
-            json_requested=json_requested,
-            message=str(e),
-        )
-    if apply_requested:
-        assert specs_mode is not None
-        blockers = _uninstall_apply_blockers(actions, specs_mode=specs_mode)
-        if blockers:
-            payload = _uninstall_payload(
-                target_root,
-                apply=True,
-                specs_mode=specs_mode,
-                actions=actions,
-                status="blocked",
-                phase="preflight",
-                last_completed_phase=last_completed_phase,
-                errors=[
-                    "uninstall apply blocked before mutation: "
-                    + "; ".join(f"{action.rel_path}: {action.reason}" for action in blockers)
-                ],
-                diagnostic_paths=tuple(action.rel_path for action in blockers),
+        with _assets_dir() as packaged_assets_dir:
+            assets_dir = packaged_assets_dir.resolve()
+            result = execute_explicit_spec_history_purge_distribution(
+                assets_dir / "install_root",
+                manifest_path=assets_dir / "managed_distribution.json",
+                scaffold_root=assets_dir / "spec_dock",
+                target_root=target_root,
+                package_version=_tool_version(),
+                apply=apply_requested,
+                expected_root_identity=expected_root_identity,
             )
-            if json_requested:
-                print(json.dumps(payload, sort_keys=True))
-            else:
-                print(_render_uninstall_text(payload))
-            return 1
-
-        try:
-            phase = "marker-write"
-            _write_uninstall_retry_marker(
-                target_root,
-                expected_root_identity=uninstall_root_identity,
-            )
-            last_completed_phase = "marker-written"
-            actions = _ensure_uninstall_retry_marker_action(actions)
-            phase = "uninstall-apply"
-            actions = _apply_uninstall_plan(
-                target_root,
-                actions,
-                expected_root_identity=uninstall_root_identity,
-            )
-            if not any(action.status == "failed" for action in actions):
-                last_completed_phase = "uninstall-applied"
-        except (OSError, RuntimeError) as e:
-            payload = _uninstall_payload(
-                target_root,
-                apply=True,
-                specs_mode=specs_mode,
-                actions=actions,
-                status="partial_failure",
-                phase=phase,
-                last_completed_phase=last_completed_phase,
-                errors=[str(e)],
-                diagnostic_paths=((_UNINSTALL_RETRY_MARKER_REL.as_posix(),) if phase == "marker-write" else ()),
-            )
-            if json_requested:
-                print(json.dumps(payload, sort_keys=True))
-            else:
-                print(_render_uninstall_text(payload))
-            return 1
-
-    has_failures = any(action.status == "failed" for action in actions)
-    if apply_requested and not has_failures:
-        try:
-            phase = "post-verify"
-            _verify_uninstall_postcondition(
-                target_root,
-                actions,
-                expected_root_identity=uninstall_root_identity,
-            )
-            last_completed_phase = "post-verified"
-            phase = "root-cleanup"
-            cleanup_actions = _cleanup_empty_uninstall_dirs(
-                target_root,
-                actions,
-                expected_root_identity=uninstall_root_identity,
-            )
-            actions = tuple(
-                sorted(
-                    (
-                        *actions,
-                        *cleanup_actions,
-                    ),
-                    key=lambda action: (action.rel_path, action.status),
-                )
-            )
-            if any(action.status == "failed" for action in cleanup_actions):
-                raise RuntimeError("uninstall empty directory cleanup failed; retry required")
-            phase = "post-verify"
-            _verify_uninstall_postcondition(
-                target_root,
-                actions,
-                expected_root_identity=uninstall_root_identity,
-            )
-            last_completed_phase = "post-verified"
-            phase = "marker-finalization"
-            actions = _finalize_uninstall_retry_marker(
-                target_root,
-                actions,
-                expected_root_identity=uninstall_root_identity,
-            )
-            last_completed_phase = "marker-finalized"
-        except (OSError, RuntimeError) as e:
-            if phase in {"post-verify", "marker-finalization"} and not _path_exists_for_uninstall(
-                target_root / _UNINSTALL_RETRY_MARKER_REL
-            ):
-                with suppress(OSError, RuntimeError):
-                    _write_uninstall_retry_marker(
-                        target_root,
-                        expected_root_identity=uninstall_root_identity,
-                    )
-                if _path_exists_for_uninstall(target_root / _UNINSTALL_RETRY_MARKER_REL):
-                    actions = _restore_uninstall_retry_marker_action(actions)
-            payload = _uninstall_payload(
-                target_root,
-                apply=True,
-                specs_mode=specs_mode,
-                actions=actions,
-                status="partial_failure",
-                phase=phase,
-                last_completed_phase=last_completed_phase,
-                errors=[str(e)],
-                diagnostic_paths=(
-                    (_UNINSTALL_RETRY_MARKER_REL.as_posix(),) if phase == "marker-finalization" else ("spec-dock",)
-                ),
-            )
-            if json_requested:
-                print(json.dumps(payload, sort_keys=True))
-            else:
-                print(_render_uninstall_text(payload))
-            return 1
-
-    payload = _uninstall_payload(
-        target_root,
+    except (OSError, RuntimeError):
+        result = _purge_request_error_result("Managed distribution spec-history purge preflight failed.")
+    return _emit_uninstall_result(
+        result,
+        target_root=target_root,
         apply=apply_requested,
         specs_mode=specs_mode,
-        actions=actions,
-        status="partial_failure" if has_failures else None,
-        phase="complete" if apply_requested and not has_failures else phase,
-        last_completed_phase="marker-finalized" if apply_requested and not has_failures else last_completed_phase,
+        json_requested=json_requested,
     )
-    if json_requested:
-        print(json.dumps(payload, sort_keys=True))
-    else:
-        print(_render_uninstall_text(payload))
-    return 1 if has_failures else 0
 
 
 def _run_uninstall(target_root: Path, ns: argparse.Namespace) -> int:
     specs_mode = _uninstall_specs_mode(ns)
     apply_requested = bool(ns.apply)
-    if specs_mode != "remove" and (
-        not apply_requested or specs_mode is None or not target_root.exists() or not target_root.is_dir()
-    ):
-        return _run_uninstall_deprovision(
-            target_root,
-            ns,
-            specs_mode=specs_mode,
-        )
-    if specs_mode == "remove" and not apply_requested:
-        return _run_uninstall_remove_specs_compatibility(
-            target_root,
-            ns,
-            specs_mode=specs_mode,
-        )
-    try:
-        with _exclusive_distribution_operation(target_root) as locked_root_identity:
-            if specs_mode == "remove":
-                return _run_uninstall_remove_specs_compatibility(
+    if specs_mode == "remove":
+        if not apply_requested:
+            return _run_uninstall_explicit_spec_history_purge(
+                target_root,
+                ns,
+                specs_mode=specs_mode,
+            )
+        try:
+            with _exclusive_distribution_operation(target_root) as locked_root_identity:
+                return _run_uninstall_explicit_spec_history_purge(
                     target_root,
                     ns,
                     specs_mode=specs_mode,
                     expected_root_identity=locked_root_identity,
                 )
-            return _run_uninstall_deprovision(
-                target_root,
-                ns,
-                specs_mode=specs_mode,
-                expected_root_identity=locked_root_identity,
-            )
-    except (OSError, RuntimeError) as exc:
-        if specs_mode != "remove":
-            result = _deprovision_request_error_result("Managed distribution deprovision preflight failed.")
-            return _emit_uninstall_deprovision_result(
+        except (OSError, RuntimeError):
+            result = _purge_request_error_result("Managed distribution spec-history purge preflight failed.")
+            return _emit_uninstall_result(
                 result,
                 target_root=target_root,
                 apply=True,
                 specs_mode=specs_mode,
                 json_requested=bool(ns.json),
             )
-        return _emit_uninstall_preflight_error(
+
+    if not apply_requested or specs_mode is None or not target_root.exists() or not target_root.is_dir():
+        return _run_uninstall_deprovision(
             target_root,
+            ns,
+            specs_mode=specs_mode,
+        )
+    try:
+        with _exclusive_distribution_operation(target_root) as locked_root_identity:
+            return _run_uninstall_deprovision(
+                target_root,
+                ns,
+                specs_mode=specs_mode,
+                expected_root_identity=locked_root_identity,
+            )
+    except (OSError, RuntimeError):
+        result = _deprovision_request_error_result("Managed distribution deprovision preflight failed.")
+        return _emit_uninstall_result(
+            result,
+            target_root=target_root,
             apply=True,
             specs_mode=specs_mode,
             json_requested=bool(ns.json),
-            message=str(exc),
         )
 
 

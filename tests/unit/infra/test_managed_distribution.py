@@ -391,6 +391,146 @@ def test_i370_deprovision_intent_maps_to_uninstall_plan_and_removal_grammar(
         build_executable_mutation_plan(forged_assessment)
 
 
+def test_i371_purge_assessment_is_typed_and_write_free(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history = target_root / "spec-dock" / "initiatives"
+    history.mkdir(parents=True)
+    history_file = history / "unknown-name.bin"
+    history_file.write_bytes(b"arbitrary history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    before = _i370_tree_evidence(target_root)
+    root_info = target_root.stat()
+
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert assessment.intent == "purge"
+    assert assessment.explicit_spec_history_purge_contract is not None
+    purge_contract = assessment.explicit_spec_history_purge_contract
+    assert purge_contract.authority == "explicit-spec-history-purge"
+    assert purge_contract.history_root == "spec-dock/initiatives"
+    assert purge_contract.history_entries[0].relative_path == "spec-dock/initiatives/unknown-name.bin"
+    assert any(action.path == "spec-dock/initiatives/unknown-name.bin" for action in assessment.actions)
+    assert _i370_tree_evidence(target_root) == before
+
+
+def test_i371_purge_apply_removes_history_and_preserves_workbench(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "arbitrary.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    root_info = target_root.stat()
+
+    result = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert result.status == "completed"
+    assert result.intent == "purge"
+    assert not history_file.exists()
+    assert workbench.read_bytes() == b"preserve\n"
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    history_actions = [action for action in result.action_outcomes if action.category == "spec_history"]
+    assert len(history_actions) == 1
+    assert history_actions[0].path == "spec-dock/initiatives"
+    assert history_actions[0].status == "removed"
+
+
+def test_i371_purge_forward_recovers_same_plan_after_history_checkpoint_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    interrupted = False
+
+    def fail_after_history_checkpoint(self, journal, completed_paths):
+        nonlocal interrupted
+        result = original_checkpoint(self, journal, completed_paths)
+        if not interrupted and history_file.relative_to(target_root).as_posix() in completed_paths:
+            interrupted = True
+            raise DistributionApplyError("injected purge checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_history_checkpoint)
+    first = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert first.intent == "purge"
+    assert interrupted is True
+    assert not history_file.exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").is_file()
+    assert (target_root / "spec-dock/.distribution-journal.json").is_file()
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert second.status == "completed", second.reason
+    assert second.intent == "purge"
+    assert workbench.read_bytes() == b"preserve\n"
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
 def test_i368_forged_assessment_cannot_prune_outside_manifest_authority(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path)
     manifest_path = _write_manifest(tmp_path, _manifest_with())

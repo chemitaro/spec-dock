@@ -123,7 +123,7 @@ class DistributionDirectoryRequirement:
 
 
 DistributionOperation = Literal["fresh", "update", "init-force", "uninstall"]
-JournaledDistributionIntent = Literal["fresh", "update", "init-force", "deprovision"]
+JournaledDistributionIntent = Literal["fresh", "update", "init-force", "deprovision", "purge"]
 DistributionActionName = Literal[
     "create",
     "adopt",
@@ -148,7 +148,7 @@ def _intent_allows_distribution_action(
 
     if intent == "fresh":
         return action in _FRESH_DISTRIBUTION_ACTIONS
-    if intent in {"deprovision", "uninstall"}:
+    if intent in {"deprovision", "purge", "uninstall"}:
         return action in _DEPROVISION_DISTRIBUTION_ACTIONS
     return True
 
@@ -156,7 +156,17 @@ def _intent_allows_distribution_action(
 def _plan_operation_for_intent(intent: JournaledDistributionIntent) -> DistributionOperation:
     """Map an internal journal intent to its read-only classifier operation."""
 
-    return "uninstall" if intent == "deprovision" else intent
+    if intent in {"deprovision", "purge"}:
+        return "uninstall"
+    if intent in {"fresh", "update", "init-force"}:
+        return cast("DistributionOperation", intent)
+    raise DistributionPlanError(f"unsupported journaled intent: {intent!r}")
+
+
+def _is_destructive_intent(intent: DistributionOperation | JournaledDistributionIntent) -> bool:
+    """Return whether an intent uses the uninstall journal/action contract."""
+
+    return intent in {"deprovision", "purge", "uninstall"}
 
 
 @dataclass(frozen=True)
@@ -373,6 +383,19 @@ class DistributionDeprovisionContract:
 
 
 @dataclass(frozen=True)
+class DistributionExplicitSpecHistoryPurgeContract:
+    """Exact, invocation-local ownership contract for explicit history purge."""
+
+    deprovision_contract: DistributionDeprovisionContract
+    history_root: str
+    history_root_binding: PathIdentitySnapshot
+    history_entries: tuple[DistributionTreeEntrySnapshot, ...]
+    history_tree_digest: str
+    authority: str
+    contract_digest: str
+
+
+@dataclass(frozen=True)
 class DistributionPlan:
     """Read-only S20/S25 plan surface consumed by the S30 apply seam."""
 
@@ -419,6 +442,11 @@ class WorkspaceAssessment:
     preservation_witnesses: tuple[DistributionPreservationWitness, ...] = ()
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
     deprovision_contract: DistributionDeprovisionContract | None = field(
+        default=None,
+        compare=False,
+        repr=False,
+    )
+    explicit_spec_history_purge_contract: DistributionExplicitSpecHistoryPurgeContract | None = field(
         default=None,
         compare=False,
         repr=False,
@@ -510,7 +538,7 @@ DistributionDeprovisionCompletedPhase = Literal[
     "post-verified",
     "marker-finalized",
 ]
-DistributionRetryPolicy = Literal["none", "same-keep-command", "manual-recovery"]
+DistributionRetryPolicy = Literal["none", "same-keep-command", "same-remove-command", "manual-recovery"]
 DistributionDeprovisionServiceState = Literal[
     "eligibility-error",
     "planned",
@@ -612,7 +640,7 @@ class DistributionStageOwnership:
 class DistributionRetryMarker:
     """Validated init/update retry marker without absolute paths or secrets."""
 
-    operation: Literal["fresh", "update", "init-force", "deprovision"]
+    operation: Literal["fresh", "update", "init-force", "deprovision", "purge"]
     package_version: str
     target_root: DistributionRootIdentity
     last_completed_phase: str
@@ -621,6 +649,7 @@ class DistributionRetryMarker:
         "recognized-journal-forward-only",
         "fresh-journal-forward-only",
         "deprovision-journal-forward-only",
+        "purge-journal-forward-only",
     ]
     stage_ownership: tuple[DistributionStageOwnership, ...] = ()
     operation_id: str | None = None
@@ -981,11 +1010,14 @@ _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE: Literal["fresh-journal-forward-only"]
 _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE: Literal["deprovision-journal-forward-only"] = (
     "deprovision-journal-forward-only"
 )
+_DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE: Literal["purge-journal-forward-only"] = "purge-journal-forward-only"
 _DISTRIBUTION_JOURNAL_AUTHORITIES = {
     "recognized-journal-forward-only": "recognized-workspace-reconciliation",
     "fresh-journal-forward-only": "fresh-distribution-provisioning",
     "deprovision-journal-forward-only": "managed-distribution-deprovision",
+    "purge-journal-forward-only": "explicit-spec-history-purge",
 }
+_EXPLICIT_SPEC_HISTORY_ROOT = "spec-dock/initiatives"
 _DISTRIBUTION_RETRY_PHASES = frozenset({
     "preflight-complete",
     "managed-scaffold-refreshed",
@@ -1220,6 +1252,7 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
         _DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
         _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE,
         _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE,
+        _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE,
     }
     supported_legacy = schema_version == _DISTRIBUTION_RETRY_SCHEMA_VERSION and purpose == _DISTRIBUTION_RETRY_PURPOSE
     expected_fields = (
@@ -1241,12 +1274,13 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
     if not supported_guard and not supported_legacy:
         _admission_block("marker-invalid", "distribution retry marker schema is unsupported")
     operation = raw.get("operation")
-    if operation not in {"fresh", "update", "init-force", "deprovision"}:
+    if operation not in {"fresh", "update", "init-force", "deprovision", "purge"}:
         _admission_block("marker-invalid", "distribution retry marker operation is unsupported")
     if supported_guard and (
         (purpose == _DISTRIBUTION_JOURNAL_GUARD_PURPOSE and operation not in {"update", "init-force"})
         or (purpose == _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE and operation != "fresh")
         or (purpose == _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE and operation != "deprovision")
+        or (purpose == _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE and operation != "purge")
     ):
         _admission_block("marker-invalid", "distribution retry marker purpose and operation do not match")
     package_version = raw.get("package_version")
@@ -1365,7 +1399,7 @@ def _read_distribution_retry_marker(target_root: Path) -> DistributionRetryMarke
     guard_purpose = (
         cast(
             "Literal['recognized-journal-forward-only', 'fresh-journal-forward-only', "
-            "'deprovision-journal-forward-only']",
+            "'deprovision-journal-forward-only', 'purge-journal-forward-only']",
             purpose,
         )
         if supported_guard
@@ -1486,6 +1520,8 @@ def _journal_authority_for_intent(intent: JournaledDistributionIntent) -> str:
         return "fresh-distribution-provisioning"
     if intent == "deprovision":
         return "managed-distribution-deprovision"
+    if intent == "purge":
+        return "explicit-spec-history-purge"
     return "recognized-workspace-reconciliation"
 
 
@@ -1495,11 +1531,14 @@ def _journal_guard_purpose_for_intent(
     "recognized-journal-forward-only",
     "fresh-journal-forward-only",
     "deprovision-journal-forward-only",
+    "purge-journal-forward-only",
 ]:
     if intent == "fresh":
         return _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE
     if intent == "deprovision":
         return _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE
+    if intent == "purge":
+        return _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE
     return _DISTRIBUTION_JOURNAL_GUARD_PURPOSE
 
 
@@ -1512,6 +1551,8 @@ def _journal_intent_for_guard_purpose(
         return "update"
     if purpose == _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE:
         return "deprovision"
+    if purpose == _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE:
+        return "purge"
     raise DistributionPlanError("unsupported journal guard purpose")
 
 
@@ -4309,7 +4350,7 @@ def _deprovision_contract_digest(
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
-def build_deprovision_contract(
+def _build_deprovision_contract(
     install_root: Path,
     *,
     manifest_path: Path,
@@ -4317,6 +4358,8 @@ def build_deprovision_contract(
     target_root: Path,
     expected_root_identity: DistributionRootIdentity,
     recovery_journal: OperationJournal | None = None,
+    preserved_roots: tuple[str, ...] = ("spec-dock/initiatives", "spec-dock/.workbench"),
+    additional_managed_roots: tuple[str, ...] = (),
 ) -> DistributionDeprovisionContract:
     """Capture one physical/generated deprovision contract without target mutation."""
 
@@ -4378,7 +4421,12 @@ def build_deprovision_contract(
         (*physical_assets, *shortcuts, *target_only_assets),
         manifest,
     )
-    preserved_roots = ("spec-dock/initiatives", "spec-dock/.workbench")
+    managed_roots = tuple(
+        sorted(
+            {*managed_roots, *additional_managed_roots},
+            key=lambda path: (len(PurePosixPath(path).parts), path),
+        )
+    )
     contract_digest = _deprovision_contract_digest(
         physical_assets=physical_assets,
         shortcuts=shortcuts,
@@ -4399,6 +4447,27 @@ def build_deprovision_contract(
         managed_assets=physical_assets,
         target_only_assets=target_only_assets,
         manifest=manifest,
+    )
+
+
+def build_deprovision_contract(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    scaffold_root: Path,
+    target_root: Path,
+    expected_root_identity: DistributionRootIdentity,
+    recovery_journal: OperationJournal | None = None,
+) -> DistributionDeprovisionContract:
+    """Capture one physical/generated deprovision contract without target mutation."""
+
+    return _build_deprovision_contract(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=expected_root_identity,
+        recovery_journal=recovery_journal,
     )
 
 
@@ -4448,59 +4517,92 @@ def _capture_preservation_witness(
 ) -> tuple[DistributionPreservationWitness | None, tuple[DistributionAction, ...]]:
     """Capture one explicit preserved tree without following links."""
 
+    try:
+        root_binding, entries, _tree_digest = _capture_distribution_tree(
+            target_root,
+            relative_root,
+            reject_symlinks=False,
+            require_single_link_regulars=True,
+        )
+    except _PreservationCaptureError as exc:
+        reason = exc.reason.replace("history-", "preservation-")
+        return None, (_generated_state_blocker(exc.path, reason),)
+    except DistributionApplyError:
+        return None, (_generated_state_blocker(relative_root, "platform-capability-unavailable"),)
+    return (
+        DistributionPreservationWitness(
+            relative_root=relative_root,
+            root_binding=root_binding,
+            entries=entries,
+            tree_digest=_preservation_tree_digest(relative_root, root_binding, entries),
+            reason="preserved-root",
+        ),
+        (),
+    )
+
+
+def _distribution_tree_digest(
+    relative_root: str,
+    root_binding: PathIdentitySnapshot,
+    entries: tuple[DistributionTreeEntrySnapshot, ...],
+) -> str:
+    """Hash a no-follow tree inventory without embedding absolute paths."""
+
+    payload = {
+        "format_version": 1,
+        "relative_root": relative_root,
+        "root_binding": _path_snapshot_condition(root_binding, include_mode=True),
+        "entries": [_tree_entry_payload(entry) for entry in entries],
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def _capture_distribution_tree(
+    target_root: Path,
+    relative_root: str,
+    *,
+    reject_symlinks: bool,
+    require_single_link_regulars: bool,
+) -> tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...], str]:
+    """Capture one descriptor-bound repository tree without following links."""
+
     observation = _observe_target(target_root, relative_root)
     if observation.snapshot is None:
-        return None, (_generated_state_blocker(relative_root, "preservation-root-unreadable"),)
+        raise _PreservationCaptureError(relative_root, "history-root-unreadable")
     root_binding = observation.snapshot.target
     if observation.state == "missing":
         entries: tuple[DistributionTreeEntrySnapshot, ...] = ()
-        return (
-            DistributionPreservationWitness(
-                relative_root=relative_root,
-                root_binding=root_binding,
-                entries=entries,
-                tree_digest=_preservation_tree_digest(relative_root, root_binding, entries),
-                reason="preserved-root",
-            ),
-            (),
-        )
+        return root_binding, entries, _distribution_tree_digest(relative_root, root_binding, entries)
     if observation.state != "directory":
         reason = (
-            "preservation-root-symlink"
+            "history-root-symlink"
             if observation.state in {"symlink", "symlink-container", "root-symlink"}
-            else "preservation-root-unsafe"
+            else "history-root-unsafe"
         )
-        return None, (_generated_state_blocker(relative_root, reason),)
+        raise _PreservationCaptureError(relative_root, reason)
 
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    directory = getattr(os, "O_DIRECTORY", None)
-    if not isinstance(nofollow, int) or not isinstance(directory, int):
-        return None, (_generated_state_blocker(relative_root, "platform-capability-unavailable"),)
-    directory_flags = os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
-    regular_flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
+    directory_flags = _distribution_directory_flags()
+    regular_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     captured: list[DistributionTreeEntrySnapshot] = []
 
     def walk(directory_fd: int, current_path: str) -> None:
-        before_directory = os.fstat(directory_fd)
-        for name in sorted(
-            os.listdir(directory_fd),
-            key=os.fsencode,
-        ):
+        before = os.fstat(directory_fd)
+        for name in sorted(os.listdir(directory_fd), key=os.fsencode):
             child_path = f"{current_path}/{name}"
             try:
                 visible = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
             except OSError as exc:
-                raise _PreservationCaptureError(child_path, "preservation-entry-unreadable") from exc
+                raise _PreservationCaptureError(child_path, "history-entry-unreadable") from exc
             mode = stat.S_IMODE(visible.st_mode)
             if stat.S_ISDIR(visible.st_mode):
                 try:
                     child_fd = os.open(name, directory_flags, dir_fd=directory_fd)
                 except OSError as exc:
-                    raise _PreservationCaptureError(child_path, "preservation-directory-unsafe") from exc
+                    raise _PreservationCaptureError(child_path, "history-directory-unsafe") from exc
                 try:
                     opened = os.fstat(child_fd)
                     if not _same_observed_node(visible, opened) or not stat.S_ISDIR(opened.st_mode):
-                        raise _PreservationCaptureError(child_path, "preservation-directory-rebound")
+                        raise _PreservationCaptureError(child_path, "history-entry-rebound")
                     captured.append(
                         DistributionTreeEntrySnapshot(
                             relative_path=child_path,
@@ -4515,29 +4617,29 @@ def _capture_preservation_witness(
                     walk(child_fd, child_path)
                     after = os.fstat(child_fd)
                     if not _same_observed_node(opened, after):
-                        raise _PreservationCaptureError(child_path, "preservation-directory-rebound")
+                        raise _PreservationCaptureError(child_path, "history-directory-rebound")
                 finally:
                     os.close(child_fd)
                 continue
             if stat.S_ISREG(visible.st_mode):
-                if visible.st_nlink != 1:
-                    raise _PreservationCaptureError(child_path, "preservation-hardlink-unsafe")
+                if require_single_link_regulars and visible.st_nlink != 1:
+                    raise _PreservationCaptureError(child_path, "history-hardlink-unsafe")
                 try:
                     child_fd = os.open(name, regular_flags, dir_fd=directory_fd)
                 except OSError as exc:
-                    raise _PreservationCaptureError(child_path, "preservation-entry-unreadable") from exc
+                    raise _PreservationCaptureError(child_path, "history-entry-unreadable") from exc
                 try:
                     opened = os.fstat(child_fd)
                     if (
                         not _same_observed_node(visible, opened)
                         or not stat.S_ISREG(opened.st_mode)
-                        or opened.st_nlink != 1
+                        or (require_single_link_regulars and opened.st_nlink != 1)
                     ):
-                        raise _PreservationCaptureError(child_path, "preservation-entry-rebound")
+                        raise _PreservationCaptureError(child_path, "history-entry-rebound")
                     sha256 = _digest_open_file(child_fd)
                     after = os.fstat(child_fd)
-                    if _source_snapshot(opened) != _source_snapshot(after):
-                        raise _PreservationCaptureError(child_path, "preservation-entry-rebound")
+                    if not _same_observed_node(opened, after) or after.st_size != opened.st_size:
+                        raise _PreservationCaptureError(child_path, "history-entry-rebound")
                     captured.append(
                         DistributionTreeEntrySnapshot(
                             relative_path=child_path,
@@ -4555,13 +4657,15 @@ def _capture_preservation_witness(
                     os.close(child_fd)
                 continue
             if stat.S_ISLNK(visible.st_mode):
+                if reject_symlinks:
+                    raise _PreservationCaptureError(child_path, "history-symlink-unsafe")
                 try:
                     link_target = str(os.readlink(name, dir_fd=directory_fd))
                     after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
                 except OSError as exc:
-                    raise _PreservationCaptureError(child_path, "preservation-entry-unreadable") from exc
+                    raise _PreservationCaptureError(child_path, "history-entry-unreadable") from exc
                 if not _same_observed_node(visible, after) or not stat.S_ISLNK(after.st_mode):
-                    raise _PreservationCaptureError(child_path, "preservation-entry-rebound")
+                    raise _PreservationCaptureError(child_path, "history-entry-rebound")
                 captured.append(
                     DistributionTreeEntrySnapshot(
                         relative_path=child_path,
@@ -4575,48 +4679,29 @@ def _capture_preservation_witness(
                     )
                 )
                 continue
-            raise _PreservationCaptureError(child_path, "preservation-special-file-unsafe")
-        after_directory = os.fstat(directory_fd)
-        if not _same_observed_node(before_directory, after_directory):
-            raise _PreservationCaptureError(current_path, "preservation-directory-rebound")
+            raise _PreservationCaptureError(child_path, "history-special-file-unsafe")
+        after = os.fstat(directory_fd)
+        if not _same_observed_node(before, after):
+            raise _PreservationCaptureError(current_path, "history-directory-rebound")
 
     root_fd: int | None = None
     try:
-        root_fd = os.open(target_root / relative_root, directory_flags)
+        root_fd = _open_deprovision_directory(target_root, relative_root)
         opened_root = os.fstat(root_fd)
-        if (
-            root_binding.device,
-            root_binding.inode,
-            root_binding.ctime_ns,
-            root_binding.file_type,
-            root_binding.mode,
-        ) != (
-            opened_root.st_dev,
-            opened_root.st_ino,
-            opened_root.st_ctime_ns,
-            "directory",
-            stat.S_IMODE(opened_root.st_mode),
-        ):
-            raise _PreservationCaptureError(relative_root, "preservation-root-rebound")
+        if not _same_stat_identity(opened_root, root_binding):
+            # The held root is already bound by _open_deprovision_directory;
+            # this branch only guards an implementation race in the helper.
+            raise _PreservationCaptureError(relative_root, "history-root-rebound")
         walk(root_fd, relative_root)
-    except _PreservationCaptureError as exc:
-        return None, (_generated_state_blocker(exc.path, exc.reason),)
-    except OSError:
-        return None, (_generated_state_blocker(relative_root, "preservation-root-unreadable"),)
+    except _PreservationCaptureError:
+        raise
+    except (OSError, DistributionPlanError) as exc:
+        raise _PreservationCaptureError(relative_root, "history-root-unreadable") from exc
     finally:
         if root_fd is not None:
             os.close(root_fd)
     ordered = tuple(sorted(captured, key=lambda entry: os.fsencode(entry.relative_path)))
-    return (
-        DistributionPreservationWitness(
-            relative_root=relative_root,
-            root_binding=root_binding,
-            entries=ordered,
-            tree_digest=_preservation_tree_digest(relative_root, root_binding, ordered),
-            reason="preserved-root",
-        ),
-        (),
-    )
+    return root_binding, ordered, _distribution_tree_digest(relative_root, root_binding, ordered)
 
 
 def _open_deprovision_directory(target_root: Path, relative_path: str) -> int:
@@ -4866,6 +4951,10 @@ def _augment_deprovision_tree(
     contract: DistributionDeprovisionContract,
     classified_actions: tuple[DistributionAction, ...],
     target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...],
+    *,
+    directory_action_provenance: DistributionProvenance = "current",
+    directory_action_reason: str = "owned-directory-empty-after-prune",
+    additional_owner_sources: Mapping[str, str] | None = None,
 ) -> tuple[
     tuple[DistributionAction, ...],
     tuple[tuple[str, DistributionTargetSnapshot], ...],
@@ -4938,6 +5027,8 @@ def _augment_deprovision_tree(
     if contract.manifest is not None:
         for item in (*contract.manifest.obsolete_exact_files, *contract.manifest.historical_shortcuts):
             owner_by_path.setdefault(item["path"], "historical-exact")
+    if additional_owner_sources:
+        owner_by_path.update(additional_owner_sources)
     for path in existing_directories:
         try:
             captured_by_directory[path] = _capture_immediate_directory_entries(target_root, path)
@@ -5063,8 +5154,8 @@ def _augment_deprovision_tree(
             path=path,
             operation="uninstall",
             action="remove-empty-directory",
-            provenance="current",
-            reason="owned-directory-empty-after-prune",
+            provenance=directory_action_provenance,
+            reason=directory_action_reason,
         )
         directory_actions.append(action)
         removable_directories.add(path)
@@ -5244,6 +5335,409 @@ def build_deprovision_workspace_assessment(
         preservation_witnesses=tuple(preservation_witnesses),
         absence_witnesses=absence_witnesses,
         deprovision_contract=contract,
+    )
+
+
+def _explicit_spec_history_purge_contract_digest(
+    *,
+    deprovision_contract: DistributionDeprovisionContract,
+    history_root: str,
+    history_tree_digest: str,
+) -> str:
+    payload = {
+        "format_version": 1,
+        "intent": "purge",
+        "authority": "explicit-spec-history-purge",
+        "history_root": history_root,
+        "history_tree_digest": history_tree_digest,
+        "deprovision_contract_digest": deprovision_contract.contract_digest,
+        "preserved_roots": list(deprovision_contract.preserved_roots),
+        "journal_protocol_version": _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def _history_tree_entry_from_journal_record(
+    record: OperationJournalAction,
+) -> DistributionTreeEntrySnapshot:
+    """Reconstruct one purge tree entry solely from its journal precondition."""
+
+    precondition = record.precondition
+    kind = precondition.get("file_type")
+    if kind not in {"regular", "directory"}:
+        raise DistributionApplyError("journal-plan-mismatch")
+    identity = precondition.get("identity")
+    if kind == "regular":
+        if (
+            not isinstance(identity, dict)
+            or identity.get("kind") != "regular"
+            or not isinstance(identity.get("sha256"), str)
+            or _SHA256_RE.fullmatch(identity["sha256"]) is None
+        ):
+            raise DistributionApplyError("journal-plan-mismatch")
+        size = precondition.get("size")
+        if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+            raise DistributionApplyError("journal-plan-mismatch")
+        sha256 = identity["sha256"]
+    else:
+        if identity is not None or precondition.get("size") is not None:
+            raise DistributionApplyError("journal-plan-mismatch")
+        size = None
+        sha256 = None
+    values = (
+        precondition.get("device"),
+        precondition.get("inode"),
+        precondition.get("ctime_ns"),
+        precondition.get("link_count"),
+        precondition.get("mode"),
+    )
+    if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in values[:4]):
+        raise DistributionApplyError("journal-plan-mismatch")
+    if isinstance(values[4], bool) or not isinstance(values[4], int) or not 0 <= values[4] <= 0o777:
+        raise DistributionApplyError("journal-plan-mismatch")
+    return DistributionTreeEntrySnapshot(
+        relative_path=record.path,
+        kind=cast("DistributionTreeEntryKind", kind),
+        device=cast("int", values[0]),
+        inode=cast("int", values[1]),
+        ctime_ns=cast("int", values[2]),
+        mode=cast("int", values[4]),
+        link_count=cast("int", values[3]),
+        size=size,
+        sha256=sha256,
+    )
+
+
+def _reconstruct_explicit_spec_history_purge_tree(
+    journal: OperationJournal,
+) -> tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...], str]:
+    if journal.intent != "purge" or journal.authority != _journal_authority_for_intent("purge"):
+        raise DistributionApplyError("journal-contract-mismatch")
+    records = tuple(
+        record for record in journal.actions if _is_same_or_descendant(record.path, _EXPLICIT_SPEC_HISTORY_ROOT)
+    )
+    if len({record.path for record in records}) != len(records):
+        raise DistributionApplyError("journal-plan-mismatch")
+    if not records:
+        empty_root_binding = _missing_snapshot(_EXPLICIT_SPEC_HISTORY_ROOT)
+        empty_entries: tuple[DistributionTreeEntrySnapshot, ...] = ()
+        return (
+            empty_root_binding,
+            empty_entries,
+            _distribution_tree_digest(_EXPLICIT_SPEC_HISTORY_ROOT, empty_root_binding, empty_entries),
+        )
+    entries: list[DistributionTreeEntrySnapshot] = []
+    root_binding: PathIdentitySnapshot | None = None
+    for record in records:
+        if record.action == "prune":
+            if record.provenance != "unknown" or record.reason != "explicit-spec-history-purge":
+                raise DistributionApplyError("journal-plan-mismatch")
+            entry = _history_tree_entry_from_journal_record(record)
+        elif record.action == "remove-empty-directory":
+            if record.provenance != "unknown" or record.reason != "explicit-spec-history-purge-directory":
+                raise DistributionApplyError("journal-plan-mismatch")
+            entry = _history_tree_entry_from_journal_record(record)
+            if entry.kind != "directory":
+                raise DistributionApplyError("journal-plan-mismatch")
+        else:
+            raise DistributionApplyError("journal-plan-mismatch")
+        if entry.relative_path == _EXPLICIT_SPEC_HISTORY_ROOT:
+            root_binding = PathIdentitySnapshot(
+                relative_path=entry.relative_path,
+                exists=True,
+                device=entry.device,
+                inode=entry.inode,
+                ctime_ns=entry.ctime_ns,
+                file_type="directory",
+                link_count=entry.link_count,
+                mode=entry.mode,
+            )
+            continue
+        entries.append(entry)
+    if root_binding is None:
+        # A valid purge with no root directory action represents an absent
+        # history root and therefore cannot contain descendant entries.
+        if entries:
+            raise DistributionApplyError("journal-plan-mismatch")
+        root_binding = _missing_snapshot(_EXPLICIT_SPEC_HISTORY_ROOT)
+    ordered = tuple(sorted(entries, key=lambda entry: os.fsencode(entry.relative_path)))
+    return root_binding, ordered, _distribution_tree_digest(_EXPLICIT_SPEC_HISTORY_ROOT, root_binding, ordered)
+
+
+def _reconstruct_explicit_spec_history_purge_contract(
+    target_root: Path,
+    *,
+    deprovision_contract: DistributionDeprovisionContract,
+    journal: OperationJournal,
+) -> DistributionExplicitSpecHistoryPurgeContract:
+    """Reconstruct purge authority from journal evidence after partial removal."""
+
+    if _root_identity_for_assessment(Path(target_root)) != journal.root_identity:
+        raise DistributionApplyError("journal-root-mismatch")
+    root_binding, entries, tree_digest = _reconstruct_explicit_spec_history_purge_tree(journal)
+    contract_digest = _explicit_spec_history_purge_contract_digest(
+        deprovision_contract=deprovision_contract,
+        history_root=_EXPLICIT_SPEC_HISTORY_ROOT,
+        history_tree_digest=tree_digest,
+    )
+    if journal.contract_identity != contract_digest:
+        raise DistributionApplyError("journal-contract-mismatch")
+    return DistributionExplicitSpecHistoryPurgeContract(
+        deprovision_contract=deprovision_contract,
+        history_root=_EXPLICIT_SPEC_HISTORY_ROOT,
+        history_root_binding=root_binding,
+        history_entries=entries,
+        history_tree_digest=tree_digest,
+        authority=_journal_authority_for_intent("purge"),
+        contract_digest=contract_digest,
+    )
+
+
+def build_explicit_spec_history_purge_contract(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    scaffold_root: Path,
+    target_root: Path,
+    expected_root_identity: DistributionRootIdentity,
+    recovery_journal: OperationJournal | None = None,
+) -> DistributionExplicitSpecHistoryPurgeContract:
+    """Build the fixed-root explicit history purge contract."""
+
+    component = _build_deprovision_contract(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=expected_root_identity,
+        recovery_journal=recovery_journal,
+        preserved_roots=("spec-dock/.workbench",),
+        additional_managed_roots=(_EXPLICIT_SPEC_HISTORY_ROOT,),
+    )
+    if recovery_journal is not None:
+        recovered_target_only_assets = _deprovision_recovery_target_only_assets(recovery_journal)
+        if recovered_target_only_assets != component.target_only_assets:
+            if component.manifest is None:
+                raise DistributionApplyError("journal-contract-mismatch")
+            component = replace(
+                component,
+                target_only_assets=recovered_target_only_assets,
+                contract_digest=_deprovision_contract_digest(
+                    physical_assets=component.managed_assets,
+                    shortcuts=component.removable_shortcuts,
+                    target_only_assets=recovered_target_only_assets,
+                    managed_roots=component.managed_roots,
+                    preserved_roots=component.preserved_roots,
+                    generated_state_digest=component.generated_state.contract_digest,
+                    manifest=component.manifest,
+                ),
+            )
+        return _reconstruct_explicit_spec_history_purge_contract(
+            target_root,
+            deprovision_contract=component,
+            journal=recovery_journal,
+        )
+    else:
+        try:
+            root_binding, entries, tree_digest = _capture_distribution_tree(
+                Path(target_root),
+                _EXPLICIT_SPEC_HISTORY_ROOT,
+                reject_symlinks=True,
+                require_single_link_regulars=True,
+            )
+        except _PreservationCaptureError:
+            observation = _observe_target(Path(target_root), _EXPLICIT_SPEC_HISTORY_ROOT)
+            if observation.snapshot is None:
+                root_binding = _missing_snapshot(_EXPLICIT_SPEC_HISTORY_ROOT)
+            else:
+                root_binding = observation.snapshot.target
+            entries = ()
+            tree_digest = _distribution_tree_digest(_EXPLICIT_SPEC_HISTORY_ROOT, root_binding, entries)
+    contract_digest = _explicit_spec_history_purge_contract_digest(
+        deprovision_contract=component,
+        history_root=_EXPLICIT_SPEC_HISTORY_ROOT,
+        history_tree_digest=tree_digest,
+    )
+    return DistributionExplicitSpecHistoryPurgeContract(
+        deprovision_contract=component,
+        history_root=_EXPLICIT_SPEC_HISTORY_ROOT,
+        history_root_binding=root_binding,
+        history_entries=entries,
+        history_tree_digest=tree_digest,
+        authority=_journal_authority_for_intent("purge"),
+        contract_digest=contract_digest,
+    )
+
+
+def build_explicit_spec_history_purge_assessment(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    scaffold_root: Path,
+    target_root: Path,
+    expected_root_identity: DistributionRootIdentity,
+    recovery_journal: OperationJournal | None = None,
+) -> WorkspaceAssessment:
+    """Build a complete read-only purge assessment for the fixed history root."""
+
+    purge_contract = build_explicit_spec_history_purge_contract(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=expected_root_identity,
+        recovery_journal=recovery_journal,
+    )
+    contract = purge_contract.deprovision_contract
+    if contract.manifest is None:
+        raise DistributionPlanError("deprovision contract is missing its validated manifest")
+    current_assets = tuple(
+        asset
+        for asset in contract.managed_assets
+        if asset.source_semantic_identity is not None
+        and asset.source_semantic_identity.canonical_source_path.startswith("install-root/")
+    )
+    scaffold_assets = tuple(
+        asset
+        for asset in contract.managed_assets
+        if asset.source_semantic_identity is not None
+        and asset.source_semantic_identity.canonical_source_path.startswith("spec-dock-scaffold/")
+    )
+    generated_assets = (
+        tuple(
+            DistributionAsset(path=entry.path, identity=entry.identity, generated_observed_target=entry.observed)
+            for entry in contract.generated_state.entries
+        )
+        + contract.target_only_assets
+    )
+    classified_actions, target_snapshots = _classify_target(
+        target_root=Path(target_root),
+        current_assets=current_assets,
+        operation="uninstall",
+        manifest=contract.manifest,
+        scaffold_assets=(*scaffold_assets, *generated_assets),
+    )
+    history_actions: list[DistributionAction] = []
+    history_snapshots = dict(target_snapshots)
+    history_blockers: list[DistributionAction] = []
+    if recovery_journal is None:
+        try:
+            _root_binding, history_entries, _tree_digest = _capture_distribution_tree(
+                Path(target_root),
+                _EXPLICIT_SPEC_HISTORY_ROOT,
+                reject_symlinks=True,
+                require_single_link_regulars=True,
+            )
+        except _PreservationCaptureError as exc:
+            history_entries = ()
+            history_blockers.append(_generated_state_blocker(exc.path, exc.reason))
+        for entry in history_entries:
+            if entry.kind == "regular":
+                history_actions.append(
+                    DistributionAction(
+                        path=entry.relative_path,
+                        operation="uninstall",
+                        action="prune",
+                        provenance="unknown",
+                        reason="explicit-spec-history-purge",
+                    )
+                )
+                observation = _observe_target(Path(target_root), entry.relative_path)
+                if observation.snapshot is None:
+                    history_blockers.append(_generated_state_blocker(entry.relative_path, "history-entry-unreadable"))
+                else:
+                    history_snapshots[entry.relative_path] = observation.snapshot
+        # The generic tree augmentation sees an explicit block action as a
+        # namespace explanation, while still retaining the operation-wide
+        # blocker and refusing a safe-subset plan.
+    else:
+        history_entries = purge_contract.history_entries
+        for record in recovery_journal.actions:
+            if not _is_same_or_descendant(record.path, _EXPLICIT_SPEC_HISTORY_ROOT):
+                continue
+            history_actions.append(
+                DistributionAction(
+                    path=record.path,
+                    operation="uninstall",
+                    action=record.action,
+                    provenance=record.provenance,
+                    reason=record.reason,
+                )
+            )
+            observed = _observe_target(Path(target_root), record.path)
+            if observed.snapshot is not None:
+                history_snapshots[record.path] = observed.snapshot
+    combined = (*classified_actions, *history_actions, *history_blockers)
+    additional_owner_sources = {entry.relative_path: "explicit-spec-history-purge" for entry in history_entries}
+    (
+        tree_actions,
+        combined_snapshots,
+        directory_snapshots,
+        leaf_parent_namespace_witnesses,
+        absence_witnesses,
+    ) = _augment_deprovision_tree(
+        Path(target_root),
+        contract,
+        combined,
+        tuple(history_snapshots.items()),
+        additional_owner_sources=additional_owner_sources,
+    )
+    history_directory_paths = {entry.relative_path for entry in history_entries if entry.kind == "directory"}
+    if purge_contract.history_root_binding.exists:
+        history_directory_paths.add(_EXPLICIT_SPEC_HISTORY_ROOT)
+    tree_actions = tuple(
+        replace(
+            action,
+            provenance="unknown",
+            reason="explicit-spec-history-purge-directory",
+        )
+        if (action.action == "remove-empty-directory" and action.path in history_directory_paths)
+        else action
+        for action in tree_actions
+    )
+    preservation_witnesses: list[DistributionPreservationWitness] = []
+    preservation_blockers: list[DistributionAction] = []
+    for relative_root in sorted(contract.preserved_roots):
+        witness, blockers = _capture_preservation_witness(Path(target_root), relative_root)
+        if witness is not None:
+            preservation_witnesses.append(witness)
+        preservation_blockers.extend(blockers)
+    actions = tuple(
+        sorted(
+            (*tree_actions, *contract.generated_state.blockers, *preservation_blockers),
+            key=lambda action: (
+                -len(PurePosixPath(action.path).parts) if action.action == "remove-empty-directory" else 0,
+                action.path,
+                action.action,
+                action.reason,
+            ),
+        )
+    )
+    plan = DistributionPlan(
+        current_assets=current_assets,
+        actions=actions,
+        manifest=contract.manifest,
+        scaffold_root=Path(scaffold_root),
+        install_root=Path(install_root),
+        manifest_path=Path(manifest_path),
+        target_root=Path(target_root),
+        operation="uninstall",
+        target_snapshots=combined_snapshots,
+        scaffold_assets=(*scaffold_assets, *generated_assets),
+    )
+    return WorkspaceAssessment(
+        intent="purge",
+        root_identity=expected_root_identity,
+        contract_identity=purge_contract.contract_digest,
+        distribution_plan=plan,
+        actions=actions,
+        blockers=tuple(action for action in actions if action.blocked),
+        directory_snapshots=directory_snapshots,
+        leaf_parent_namespace_witnesses=leaf_parent_namespace_witnesses,
+        preservation_witnesses=tuple(preservation_witnesses),
+        absence_witnesses=absence_witnesses,
+        deprovision_contract=contract,
+        explicit_spec_history_purge_contract=purge_contract,
     )
 
 
@@ -5841,6 +6335,8 @@ def build_workspace_assessment(
 
     if intent == "deprovision":
         raise DistributionPlanError("deprovision requires the dedicated deprovision assessment")
+    if intent == "purge":
+        raise DistributionPlanError("purge requires the dedicated explicit history assessment")
     if intent not in {"fresh", "update", "init-force"}:
         raise DistributionPlanError(f"unsupported journaled intent: {intent!r}")
     operation = _plan_operation_for_intent(intent)
@@ -5965,7 +6461,7 @@ def _action_postcondition_payload(plan: DistributionPlan, action: DistributionAc
     }
 
 
-def _deprovision_action_conditions(
+def _destructive_action_conditions(
     plan: ExecutableMutationPlan,
     action: DistributionAction,
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -5999,6 +6495,20 @@ def _deprovision_action_conditions(
             "expected_remaining_child_digest": snapshot.expected_remaining_child_digest,
         })
     return precondition, postcondition
+
+
+def _deprovision_action_conditions(
+    plan: ExecutableMutationPlan,
+    action: DistributionAction,
+) -> tuple[dict[str, object], dict[str, object]]:
+    return _destructive_action_conditions(plan, action)
+
+
+def _purge_action_conditions(
+    plan: ExecutableMutationPlan,
+    action: DistributionAction,
+) -> tuple[dict[str, object], dict[str, object]]:
+    return _destructive_action_conditions(plan, action)
 
 
 def _legacy_action_postcondition_payload(
@@ -6240,7 +6750,7 @@ def _distribution_plan_digest(
 ) -> str:
     ordered_actions = (
         list(actions)
-        if intent == "deprovision"
+        if _is_destructive_intent(intent)
         else sorted(actions, key=lambda action: (action.path, action.action, action.reason))
     )
 
@@ -6290,12 +6800,12 @@ def _distribution_plan_digest(
     }
     if intent == "fresh":
         payload["required_directories"] = sorted(item.path for item in plan.required_directories)
-    elif intent == "deprovision":
+    elif _is_destructive_intent(intent):
         if generated_state_contract_digest is None:
-            raise DistributionPlanError("deprovision plan digest is missing generated state authority")
+            raise DistributionPlanError("destructive plan digest is missing generated state authority")
         payload.update({
             "digest_format_version": 3,
-            "authority": "managed-distribution-deprovision",
+            "authority": _journal_authority_for_intent(intent),
             "generated_state_contract_digest": generated_state_contract_digest,
             "active_selection_witnesses": [
                 _active_selection_witness_payload(witness) for witness in active_selection_witnesses
@@ -6462,7 +6972,7 @@ def _deprovision_journal_plan_digest(
 
     payload: dict[str, object] = {
         "schema_version": _DISTRIBUTION_JOURNAL_SCHEMA_VERSION,
-        "intent": "deprovision",
+        "intent": journal.intent,
         "root_binding": {
             "device": journal.root_identity.device,
             "inode": journal.root_identity.inode,
@@ -6491,7 +7001,7 @@ def _deprovision_journal_plan_digest(
             for action in journal.actions
         ],
         "digest_format_version": digest_format_version,
-        "authority": "managed-distribution-deprovision",
+        "authority": _journal_authority_for_intent(journal.intent),
         "generated_state_contract_digest": journal.generated_state_contract_digest,
         "active_selection_witnesses": [
             _active_selection_witness_payload(witness) for witness in journal.active_selection_witnesses
@@ -6687,6 +7197,11 @@ def _validate_deprovision_plan_metadata(
     owner_by_path.update({asset.path: "root-shortcut" for asset in contract.removable_shortcuts})
     owner_by_path.update({asset.path: "workspace-marker" for asset in contract.target_only_assets})
     owner_by_path.update({entry.path: entry.origin for entry in contract.generated_state.entries})
+    purge_contract = assessment.explicit_spec_history_purge_contract
+    if purge_contract is not None:
+        owner_by_path.update({
+            entry.relative_path: "explicit-spec-history-purge" for entry in purge_contract.history_entries
+        })
     if contract.manifest is not None:
         for item in (*contract.manifest.obsolete_exact_files, *contract.manifest.historical_shortcuts):
             owner_by_path.setdefault(item["path"], "historical-exact")
@@ -6769,6 +7284,61 @@ def _validate_deprovision_plan_metadata(
             raise DistributionPlanError("deprovision preservation witness overlaps a mutating action")
 
 
+def _validate_explicit_spec_history_purge_plan_metadata(
+    assessment: WorkspaceAssessment,
+    actions: tuple[DistributionAction, ...],
+) -> None:
+    contract = assessment.explicit_spec_history_purge_contract
+    if (
+        contract is None
+        or contract.history_root != _EXPLICIT_SPEC_HISTORY_ROOT
+        or contract.authority != _journal_authority_for_intent("purge")
+        or contract.deprovision_contract.preserved_roots != ("spec-dock/.workbench",)
+        or contract.history_tree_digest
+        != _distribution_tree_digest(
+            contract.history_root,
+            contract.history_root_binding,
+            contract.history_entries,
+        )
+        or contract.contract_digest
+        != _explicit_spec_history_purge_contract_digest(
+            deprovision_contract=contract.deprovision_contract,
+            history_root=contract.history_root,
+            history_tree_digest=contract.history_tree_digest,
+        )
+    ):
+        raise DistributionPlanError("explicit purge contract is not canonical")
+    history_entries = {entry.relative_path: entry for entry in contract.history_entries}
+    history_actions = {
+        action.path: action for action in actions if _is_same_or_descendant(action.path, contract.history_root)
+    }
+    if len(history_actions) != sum(
+        1 for action in actions if _is_same_or_descendant(action.path, contract.history_root)
+    ):
+        raise DistributionPlanError("explicit purge action paths are duplicated")
+    for action in history_actions.values():
+        if action.path == contract.history_root:
+            expected_kind = "directory"
+        else:
+            entry = history_entries.get(action.path)
+            if entry is None:
+                raise DistributionPlanError("explicit purge action is outside captured history")
+            expected_kind = entry.kind
+        if action.provenance != "unknown":
+            raise DistributionPlanError("explicit purge action provenance is not canonical")
+        expected_reason = (
+            "explicit-spec-history-purge-directory"
+            if action.action == "remove-empty-directory"
+            else "explicit-spec-history-purge"
+        )
+        if (
+            action.reason != expected_reason
+            or (expected_kind == "directory" and action.action != "remove-empty-directory")
+            or (expected_kind == "regular" and action.action != "prune")
+        ):
+            raise DistributionPlanError("explicit purge action semantics are not canonical")
+
+
 def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> ExecutableMutationPlan:
     """Issue mutation authority only for a complete blocker-free assessment."""
 
@@ -6783,6 +7353,20 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
         ):
             raise DistributionPlanError(
                 "workspace assessment contract identity does not match its deprovision contract"
+            )
+        _revalidate_deprovision_source_snapshots(assessment)
+    elif assessment.intent == "purge":
+        purge_contract = assessment.explicit_spec_history_purge_contract
+        if (
+            purge_contract is None
+            or assessment.deprovision_contract is None
+            or purge_contract.deprovision_contract != assessment.deprovision_contract
+            or assessment.contract_identity != purge_contract.contract_digest
+            or purge_contract.history_root != _EXPLICIT_SPEC_HISTORY_ROOT
+            or purge_contract.authority != _journal_authority_for_intent("purge")
+        ):
+            raise DistributionPlanError(
+                "workspace assessment contract identity does not match its explicit purge contract"
             )
         _revalidate_deprovision_source_snapshots(assessment)
     elif assessment.contract_identity != _contract_identity(plan):
@@ -6820,12 +7404,20 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
             if not any(item.path == action.path for item in plan.required_directories):
                 raise DistributionPlanError("workspace assessment ensure-directory is outside directory authority")
         elif action.action == "prune":
-            if action.path not in obsolete_paths and not (
-                assessment.intent == "deprovision" and action.path in current_specs
+            purge_history_action = (
+                assessment.intent == "purge"
+                and _is_same_or_descendant(action.path, _EXPLICIT_SPEC_HISTORY_ROOT)
+                and action.provenance == "unknown"
+                and action.reason == "explicit-spec-history-purge"
+            )
+            if (
+                action.path not in obsolete_paths
+                and not (assessment.intent in {"deprovision", "purge"} and action.path in current_specs)
+                and not purge_history_action
             ):
                 raise DistributionPlanError("workspace assessment prune is outside obsolete authority")
         elif action.action == "remove-empty-directory":
-            if assessment.intent != "deprovision" or not any(
+            if assessment.intent not in {"deprovision", "purge"} or not any(
                 item.relative_path == action.path for item in assessment.directory_snapshots
             ):
                 raise DistributionPlanError("workspace assessment directory removal is outside directory authority")
@@ -6842,7 +7434,7 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
         _action_precondition_payload(plan, action)
         _action_postcondition_payload(plan, action)
     executable_actions = assessment.actions
-    if assessment.intent == "deprovision":
+    if assessment.intent in {"deprovision", "purge"}:
         executable_actions = _ordered_deprovision_actions(
             tuple(
                 action
@@ -6851,6 +7443,8 @@ def build_executable_mutation_plan(assessment: WorkspaceAssessment) -> Executabl
             )
         )
         _validate_deprovision_plan_metadata(assessment, executable_actions)
+        if assessment.intent == "purge":
+            _validate_explicit_spec_history_purge_plan_metadata(assessment, executable_actions)
     return ExecutableMutationPlan(
         intent=assessment.intent,
         root_identity=assessment.root_identity,
@@ -6946,7 +7540,7 @@ def _created_parent_bindings_payload(journal: OperationJournal) -> list[dict[str
     # journals have no created-parent inventory; their action/workspace
     # bindings are strict mode-bearing conditions instead.
     return [
-        _path_snapshot_condition(binding, include_mode=journal.intent == "deprovision")
+        _path_snapshot_condition(binding, include_mode=_is_destructive_intent(journal.intent))
         for binding in journal.created_parent_bindings
     ]
 
@@ -6977,7 +7571,7 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
         },
         "workspace_binding": _path_snapshot_condition(
             journal.workspace_identity,
-            include_mode=journal.intent == "deprovision",
+            include_mode=_is_destructive_intent(journal.intent),
         ),
         "intent": journal.intent,
         "authority": journal.authority,
@@ -6998,7 +7592,7 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
             }
             for action in (
                 journal.actions
-                if journal.intent == "deprovision"
+                if _is_destructive_intent(journal.intent)
                 else sorted(journal.actions, key=lambda item: (item.path, item.action, item.reason))
             )
         ],
@@ -7013,7 +7607,7 @@ def _journal_payload(journal: OperationJournal) -> dict[str, object]:
             bindings=created_parent_bindings,
         ),
     }
-    if journal.intent == "deprovision":
+    if _is_destructive_intent(journal.intent):
         payload.update({
             "leaf_parent_namespace_witnesses": [
                 _leaf_parent_namespace_witness_payload(witness) for witness in journal.leaf_parent_namespace_witnesses
@@ -7778,6 +8372,7 @@ def _validate_leaf_parent_namespace_witness_coverage(
 def _validate_deprovision_journal_actions(
     actions: tuple[OperationJournalAction, ...],
     *,
+    intent: Literal["deprovision", "purge"] = "deprovision",
     status: JournalStatus,
     leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...],
     preservation_witnesses: tuple[DistributionPreservationWitness, ...],
@@ -7796,8 +8391,9 @@ def _validate_deprovision_journal_actions(
             key=lambda action: (-len(PurePosixPath(action.path).parts), action.path),
         )
     )
+    allowed_provenance = {"current", "historical"} | ({"unknown"} if intent == "purge" else set())
     if actions != expected_order or any(
-        action.action not in {"prune", "remove-empty-directory"} or action.provenance not in {"current", "historical"}
+        action.action not in {"prune", "remove-empty-directory"} or action.provenance not in allowed_provenance
         for action in actions
     ):
         raise DistributionApplyError("journal-protocol-incompatible")
@@ -7808,6 +8404,12 @@ def _validate_deprovision_journal_actions(
         _validate_leaf_parent_namespace_witness_coverage(actions, leaf_parent_namespace_witnesses)
     action_by_path = {action.path: action for action in actions}
     action_index = {action.path: index for index, action in enumerate(actions)}
+    children_by_parent: dict[str, list[str]] = {}
+    for candidate in actions:
+        parent = PurePosixPath(candidate.path).parent.as_posix()
+        children_by_parent.setdefault(parent, []).append(candidate.path)
+    for children in children_by_parent.values():
+        children.sort(key=os.fsencode)
     empty_digest = _directory_child_digest(())
     for action in actions:
         path = _journal_relative_path(action.path)
@@ -7815,6 +8417,23 @@ def _validate_deprovision_journal_actions(
             raise DistributionApplyError("journal-protocol-incompatible")
         precondition = action.precondition
         postcondition = action.postcondition
+        if (
+            intent == "purge"
+            and action.provenance == "unknown"
+            and not _is_same_or_descendant(
+                path,
+                _EXPLICIT_SPEC_HISTORY_ROOT,
+            )
+        ):
+            raise DistributionApplyError("journal-protocol-incompatible")
+        if intent == "purge" and _is_same_or_descendant(path, _EXPLICIT_SPEC_HISTORY_ROOT):
+            expected_reason = (
+                "explicit-spec-history-purge-directory"
+                if action.action == "remove-empty-directory"
+                else "explicit-spec-history-purge"
+            )
+            if action.provenance != "unknown" or action.reason != expected_reason:
+                raise DistributionApplyError("journal-protocol-incompatible")
         base_precondition_fields = {
             "root",
             "parents",
@@ -7916,10 +8535,7 @@ def _validate_deprovision_journal_actions(
             ):
                 raise DistributionApplyError("journal-protocol-incompatible")
             evidence_paths.append(child_path)
-        expected_children = sorted(
-            (candidate.path for candidate in actions if PurePosixPath(candidate.path).parent.as_posix() == path),
-            key=os.fsencode,
-        )
+        expected_children = children_by_parent.get(path, [])
         if evidence_paths != expected_children or len(set(evidence_paths)) != len(evidence_paths):
             raise DistributionApplyError("journal-protocol-incompatible")
 
@@ -7979,8 +8595,10 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         "created_parent_bindings_digest",
     }
     is_deprovision = payload.get("intent") == "deprovision"
+    is_purge = payload.get("intent") == "purge"
+    is_destructive = is_deprovision or is_purge
     legacy_witnessless_deprovision = False
-    if is_deprovision:
+    if is_destructive:
         expected_fields.update({
             "leaf_parent_namespace_witnesses",
             "preservation_witnesses",
@@ -7997,7 +8615,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         "ctime_ns",
         "file_type",
         "link_count",
-    } | ({"mode"} if is_deprovision else set())
+    } | ({"mode"} if is_destructive else set())
     if is_deprovision and set(payload) == expected_fields - {"leaf_parent_namespace_witnesses"}:
         legacy_witnessless_deprovision = True
         raw_actions = payload.get("actions")
@@ -8015,7 +8633,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     workspace = payload["workspace_binding"]
     actions = payload["actions"]
     journal_schema_supported = payload["schema_version"] == _DISTRIBUTION_JOURNAL_SCHEMA_VERSION
-    journal_intent_supported = payload.get("intent") in {"fresh", "update", "init-force", "deprovision"}
+    journal_intent_supported = payload.get("intent") in {"fresh", "update", "init-force", "deprovision", "purge"}
     journal_authority_supported = (
         journal_intent_supported
         and isinstance(payload.get("authority"), str)
@@ -8031,7 +8649,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         or not journal_intent_supported
         or not journal_authority_supported
         or payload["protocol_version"] not in _DISTRIBUTION_SUPPORTED_JOURNAL_PROTOCOL_VERSIONS
-        or (is_deprovision and payload["protocol_version"] != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION)
+        or (is_destructive and payload["protocol_version"] != _DISTRIBUTION_JOURNAL_PROTOCOL_VERSION)
         or not isinstance(root, dict)
         or set(root) != {"device", "inode"}
         or not all(isinstance(root[field], int) for field in ("device", "inode"))
@@ -8054,7 +8672,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
         or not isinstance(actions, list)
     ):
         raise DistributionApplyError("journal-protocol-incompatible")
-    if is_deprovision:
+    if is_destructive:
         _journal_mode(workspace["mode"])
     preservation_witnesses: tuple[DistributionPreservationWitness, ...] = ()
     absence_witnesses: tuple[DistributionCollapsedAbsenceWitness, ...] = ()
@@ -8062,7 +8680,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     generated_state_contract_digest: str | None = None
     active_selection_witnesses: tuple[DistributionActiveSelectionWitness, ...] = ()
     leaf_parent_namespace_witnesses: tuple[DistributionLeafParentNamespaceWitness, ...] = ()
-    if is_deprovision:
+    if is_destructive:
         if not legacy_witnessless_deprovision:
             leaf_parent_namespace_witnesses = _parse_leaf_parent_namespace_witnesses(
                 payload["leaf_parent_namespace_witnesses"]
@@ -8230,7 +8848,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
     prepared_leases_are_guard_inheritable = all(
         lease.role == "stage" and lease.device > 0 and lease.inode > 0 and lease.ctime_ns > 0 for lease in leases
     )
-    if is_deprovision:
+    if is_destructive:
         deprovision_actions = {action.path: action for action in parsed_actions}
         if created_parent_bindings or (
             leases
@@ -8247,6 +8865,7 @@ def _parse_operation_journal(raw: bytes) -> OperationJournal:
             raise DistributionApplyError("journal-protocol-incompatible")
         _validate_deprovision_journal_actions(
             tuple(parsed_actions),
+            intent=cast("Literal['deprovision', 'purge']", payload["intent"]),
             status=cast("JournalStatus", payload["status"]),
             leaf_parent_namespace_witnesses=leaf_parent_namespace_witnesses,
             preservation_witnesses=preservation_witnesses,
@@ -8339,7 +8958,7 @@ class OperationJournalStore:
     def _workspace_condition(journal: OperationJournal) -> dict[str, object]:
         return _path_snapshot_condition(
             journal.workspace_identity,
-            include_mode=journal.intent == "deprovision",
+            include_mode=_is_destructive_intent(journal.intent),
         )
 
     def _open_parent(
@@ -8405,6 +9024,7 @@ class OperationJournalStore:
                 _DISTRIBUTION_JOURNAL_GUARD_PURPOSE,
                 _DISTRIBUTION_FRESH_JOURNAL_GUARD_PURPOSE,
                 _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE,
+                _DISTRIBUTION_PURGE_JOURNAL_GUARD_PURPOSE,
             }
             and current.source_snapshot is not None
             and current.source_snapshot == expected.source_snapshot
@@ -8890,6 +9510,8 @@ class OperationJournalStore:
         def initial_action(action: DistributionAction) -> OperationJournalAction:
             if plan.intent == "deprovision":
                 precondition, postcondition = _deprovision_action_conditions(plan, action)
+            elif plan.intent == "purge":
+                precondition, postcondition = _purge_action_conditions(plan, action)
             else:
                 precondition = _action_precondition_payload(plan.distribution_plan, action)
                 postcondition = _action_postcondition_payload(plan.distribution_plan, action)
@@ -8931,7 +9553,7 @@ class OperationJournalStore:
                 initial_action(action)
                 for action in (
                     plan.actions
-                    if plan.intent == "deprovision"
+                    if _is_destructive_intent(plan.intent)
                     else sorted(plan.actions, key=lambda item: (item.path, item.action, item.reason))
                 )
             ),
@@ -9438,11 +10060,12 @@ class OperationJournalStore:
         self._anchor_digestless_initial_journal(journal, plan)
         self._assert_guard_anchors_journal(journal)
         journal = self._migrate_legacy_protocol_journal(journal, plan.distribution_plan)
-        if journal.intent == "deprovision":
+        if _is_destructive_intent(journal.intent):
             self._leaf_mutation_validator = _deprovision_recovery_leaf_mutation_validator(
                 self,
                 journal,
                 forward_guard=self._forward_guard,
+                intent=journal.intent,
             )
         journal = self._resume_displaced_quarantine_cleanup(
             journal,
@@ -9483,7 +10106,7 @@ class OperationJournalStore:
             raise DistributionApplyError("journal-protocol-incompatible")
         if journal.contract_identity != assessment.contract_identity:
             raise DistributionApplyError("journal-contract-mismatch")
-        if assessment.intent == "deprovision" and journal.status in {"prepared", "executing"}:
+        if _is_destructive_intent(assessment.intent) and journal.status in {"prepared", "executing"}:
             _assert_deprovision_zero_predecessor_reservations(self.target_root, journal)
         if require_guard:
             if self._forward_guard is not None and self._forward_guard.journal_digest is None:
@@ -9492,11 +10115,12 @@ class OperationJournalStore:
                     _resume_executable_plan(assessment, journal),
                 )
             self._assert_guard_anchors_journal(journal)
-            if journal.intent == "deprovision":
+            if _is_destructive_intent(journal.intent):
                 self._leaf_mutation_validator = _deprovision_recovery_leaf_mutation_validator(
                     self,
                     journal,
                     forward_guard=self._forward_guard,
+                    intent=journal.intent,
                 )
             journal = self._resume_displaced_quarantine_cleanup(
                 journal,
@@ -9612,9 +10236,9 @@ class OperationJournalStore:
         completed_paths: tuple[str, ...],
     ) -> OperationJournal:
         leaf_mutation_validator = self._leaf_mutation_validator
-        if journal.intent == "deprovision" and leaf_mutation_validator is None:
+        if _is_destructive_intent(journal.intent) and leaf_mutation_validator is None:
             raise DistributionApplyError("journal-precondition-mismatch")
-        if journal.intent == "deprovision":
+        if _is_destructive_intent(journal.intent):
             _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
         completed = set(completed_paths)
         persisted = self._read(journal.root_identity)
@@ -9633,6 +10257,7 @@ class OperationJournalStore:
                 self,
                 active,
                 forward_guard=self._forward_guard,
+                intent=active.intent,
             )
             for record in active.actions:
                 if record.checkpoint != "pending" or record.path not in completed:
@@ -10042,11 +10667,11 @@ class OperationJournalStore:
     ) -> OperationJournal:
         """Finish a write-ahead predecessor quarantine without losing its successor lease."""
 
-        if journal.intent == "deprovision" and leaf_mutation_validator is None:
+        if _is_destructive_intent(journal.intent) and leaf_mutation_validator is None:
             raise DistributionApplyError("journal-precondition-mismatch")
 
         def validate_roleless_backup_parents(active_journal: OperationJournal) -> None:
-            if active_journal.intent != "deprovision":
+            if not _is_destructive_intent(active_journal.intent):
                 return
             # Legacy roleless backup promotion writes a new journal lease.  It
             # must be preceded by the same root/parent attachment proof as a
@@ -10078,6 +10703,7 @@ class OperationJournalStore:
                             quarantine.path,
                             parent_chain,
                             forward_guard=self._forward_guard,
+                            intent=active_journal.intent,
                         )
                 finally:
                     _close_distribution_parent_chain(parent_chain)
@@ -10579,7 +11205,7 @@ class OperationJournalStore:
     ) -> OperationJournal:
         """Finish journal-owned private-name GC before any target action resumes."""
 
-        if journal.intent == "deprovision" and leaf_mutation_validator is None:
+        if _is_destructive_intent(journal.intent) and leaf_mutation_validator is None:
             raise DistributionApplyError("journal-precondition-mismatch")
         _assert_gc_transition_graph(journal)
         active = journal
@@ -11129,7 +11755,7 @@ class OperationJournalStore:
                     file_type=quarantine.file_type,
                     role=role,
                 )
-                if journal.intent == "deprovision":
+                if _is_destructive_intent(journal.intent):
                     if leaf_mutation_validator is None:
                         raise DistributionApplyError("journal-precondition-mismatch")
                     leaf_mutation_validator(quarantine.path, parent_chain)
@@ -11147,7 +11773,7 @@ class OperationJournalStore:
         journal: OperationJournal,
         lease: DistributionStageOwnership,
     ) -> OperationJournal:
-        if journal.intent == "deprovision":
+        if _is_destructive_intent(journal.intent):
             _assert_deprovision_recovery_marker_bound(self, self._forward_guard)
         # A retry re-emits the durable zero lease before its no-replace rename.
         # Do not rewrite the journal/forward guard in that window.
@@ -11224,7 +11850,7 @@ class OperationJournalStore:
         ):
             raise DistributionApplyError("journal-precondition-mismatch")
         self._assert_published_successor_postconditions(journal)
-        if journal.intent == "deprovision":
+        if _is_destructive_intent(journal.intent):
             if journal.status not in {"executing", "verifying"} or any(
                 action.checkpoint != "published" for action in journal.actions
             ):
@@ -11234,7 +11860,7 @@ class OperationJournalStore:
         return self.write(replace(journal, status="verifying", actions=actions), predecessor=journal)
 
     def mark_completed(self, journal: OperationJournal) -> OperationJournal:
-        if journal.intent == "deprovision":
+        if _is_destructive_intent(journal.intent):
             if (
                 journal.status != "verifying"
                 or journal.staging_leases
@@ -12201,16 +12827,31 @@ def _assert_journal_action_contract(assessment: WorkspaceAssessment, journal: Op
             raise DistributionApplyError("journal-plan-mismatch")
         postcondition = _journal_postcondition(record)
         expected_identity: DistributionIdentity | None = None
+        purge_history_action = (
+            journal.intent == "purge"
+            and _is_same_or_descendant(record.path, _EXPLICIT_SPEC_HISTORY_ROOT)
+            and record.provenance == "unknown"
+            and record.reason in {"explicit-spec-history-purge", "explicit-spec-history-purge-directory"}
+        )
         if record.action == "prune":
-            if record.path not in obsolete_paths or postcondition.get("exists") is not False:
+            if (record.path not in obsolete_paths and not purge_history_action) or postcondition.get(
+                "exists"
+            ) is not False:
                 raise DistributionApplyError("journal-plan-mismatch")
         elif record.action == "ensure-directory":
             if not any(item.path == record.path for item in plan.required_directories):
                 raise DistributionApplyError("journal-plan-mismatch")
             expected_identity = DistributionIdentity(kind="directory")
         else:
-            expected_identity = current_specs.get(record.path)
-            if expected_identity is None or record.action not in {"create", "adopt", "upgrade", "preserve"}:
+            expected_identity = (
+                DistributionIdentity(kind="directory") if purge_history_action else current_specs.get(record.path)
+            )
+            valid_purge_directory = (
+                purge_history_action and expected_identity is not None and record.action == "remove-empty-directory"
+            )
+            if (
+                expected_identity is None or record.action not in {"create", "adopt", "upgrade", "preserve"}
+            ) and not valid_purge_directory:
                 raise DistributionApplyError("journal-plan-mismatch")
         target_snapshot = dict(plan.target_snapshots).get(record.path)
         if record.action == "ensure-directory":
@@ -13959,17 +14600,101 @@ def _deprovision_assessment_outcomes(
     )
 
 
+def _explicit_spec_history_purge_outcomes(
+    assessment: WorkspaceAssessment,
+    outcomes: tuple[DistributionActionOutcome, ...],
+    *,
+    include_absent: bool = False,
+) -> tuple[DistributionActionOutcome, ...]:
+    """Collapse internal history leaf/directory outcomes to the public root row."""
+
+    purge_contract = assessment.explicit_spec_history_purge_contract
+    if purge_contract is None:
+        raise DistributionPlanError("explicit purge assessment is missing its contract")
+    history_root = purge_contract.history_root
+    history = tuple(outcome for outcome in outcomes if _is_same_or_descendant(outcome.path, history_root))
+    if not purge_contract.history_root_binding.exists:
+        retained = tuple(outcome for outcome in outcomes if not _is_same_or_descendant(outcome.path, history_root))
+        if not include_absent:
+            return retained
+        root_outcome = DistributionActionOutcome(
+            path=history_root,
+            category="spec_history",
+            status="already_removed",
+            reason="explicit remove-specs mode; spec history already absent",
+        )
+        return tuple(
+            sorted(
+                (*retained, root_outcome),
+                key=lambda outcome: (os.fsencode(outcome.path), outcome.status, outcome.reason),
+            )
+        )
+    if not history:
+        return outcomes
+    priority: dict[DistributionActionOutcomeStatus, int] = {
+        "failed": 6,
+        "pending": 5,
+        "removed": 4,
+        "empty_dir_removed": 4,
+        "already_removed": 3,
+        "would_remove": 2,
+        "preserved": 1,
+    }
+    raw_status = max(history, key=lambda outcome: priority[outcome.status]).status
+    status: DistributionActionOutcomeStatus = "removed" if raw_status == "empty_dir_removed" else raw_status
+    if status in {"failed", "pending", "removed", "would_remove"}:
+        reason = "explicit remove-specs mode"
+    elif status == "already_removed":
+        reason = "explicit remove-specs mode; spec history already absent"
+    else:
+        safety_reasons = {
+            "history-root-rebound": "history root identity changed",
+            "history-root-symlink": "history root is a symlink",
+            "history-root-unsafe": "history root is unsafe",
+            "history-root-unreadable": "history root is unreadable",
+            "history-directory-rebound": "history directory identity changed",
+            "history-directory-unsafe": "history directory is unsafe",
+            "history-entry-rebound": "history entry identity changed",
+            "history-entry-unreadable": "history entry is unreadable",
+            "history-hardlink-unsafe": "history entry is hard-linked",
+            "history-symlink-unsafe": "history entry is a symlink",
+            "history-special-file-unsafe": "history entry is a special file",
+        }
+        safety_reason = next(
+            (safety_reasons[outcome.reason] for outcome in history if outcome.reason in safety_reasons),
+            "history safety requires manual review",
+        )
+        reason = f"explicit remove-specs mode; {safety_reason}; manual review required"
+    error = next((outcome.error for outcome in history if outcome.error is not None), None)
+    root_outcome = DistributionActionOutcome(
+        path=history_root,
+        category="spec_history",
+        status=status,
+        reason=reason,
+        error=error,
+    )
+    retained = tuple(outcome for outcome in outcomes if not _is_same_or_descendant(outcome.path, history_root))
+    return tuple(
+        sorted(
+            (*retained, root_outcome),
+            key=lambda outcome: (os.fsencode(outcome.path), outcome.status, outcome.reason),
+        )
+    )
+
+
 def _deprovision_preflight_error_result(
     *,
     code: str = "deprovision-preflight-failed",
     message: str = "Managed distribution deprovision preflight failed.",
     retry_policy: DistributionRetryPolicy = "same-keep-command",
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> DistributionProcessResult:
     return _distribution_process_result_from_state(
         state="eligibility-error",
         error_code=code,
         error_message=message,
         retry_policy=retry_policy,
+        intent=intent,
     )
 
 
@@ -13993,7 +14718,10 @@ def _deprovision_has_managed_workspace_evidence(assessment: WorkspaceAssessment)
         return True
     snapshots = dict(assessment.distribution_plan.target_snapshots)
     if any(
-        action.action == "prune" and action.path in snapshots and snapshots[action.path].target.exists
+        action.action == "prune"
+        and action.path in snapshots
+        and snapshots[action.path].target.exists
+        and not (assessment.intent == "purge" and _is_same_or_descendant(action.path, _EXPLICIT_SPEC_HISTORY_ROOT))
         for action in assessment.actions
     ):
         return True
@@ -14016,6 +14744,7 @@ def _deprovision_blocked_result(
     plan_digest: str | None,
     extra_failed_paths: tuple[str, ...] = (),
     reason: str = "deprovision-preflight-blocked",
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> DistributionProcessResult:
     return _distribution_process_result_from_state(
         assessment,
@@ -14023,6 +14752,7 @@ def _deprovision_blocked_result(
         plan_digest=plan_digest,
         failure_paths=extra_failed_paths,
         error_code=reason,
+        intent=intent,
     )
 
 
@@ -14113,7 +14843,11 @@ def _distribution_process_result_from_state(
     error_code: str | None = None,
     error_message: str | None = None,
     retry_policy: DistributionRetryPolicy = "same-keep-command",
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> DistributionProcessResult:
+    operation_label = "purge" if intent == "purge" else "deprovision"
+    if intent == "purge" and retry_policy == "same-keep-command":
+        retry_policy = "same-remove-command"
     actions = assessment.actions if assessment is not None else ()
     outcomes = _deprovision_assessment_outcomes(assessment) if assessment is not None else ()
     status: DistributionProcessStatus
@@ -14128,10 +14862,10 @@ def _distribution_process_result_from_state(
 
     if state == "journal":
         if assessment is None or journal is None:
-            raise DistributionPlanError("deprovision journal result state is incomplete")
+            raise DistributionPlanError(f"{operation_label} journal result state is incomplete")
         target_root = assessment.distribution_plan.target_root
         if target_root is None:
-            raise DistributionPlanError("deprovision result state is missing its target root")
+            raise DistributionPlanError(f"{operation_label} result state is missing its target root")
         pending_records = tuple(record for record in journal.actions if record.checkpoint == "pending")
         pending_paths = tuple(sorted({record.path for record in pending_records}, key=os.fsencode))
         if journal.status == "completed":
@@ -14171,7 +14905,7 @@ def _distribution_process_result_from_state(
                     replace(
                         outcome,
                         status="failed",
-                        error="Managed distribution deprovision action failed.",
+                        error=f"Managed distribution {operation_label} action failed.",
                     )
                 )
             elif checkpoint is None:
@@ -14185,38 +14919,39 @@ def _distribution_process_result_from_state(
         outcomes = tuple(journal_outcomes)
         status = "recovery_required"
         plan_digest = journal.plan_digest
-        reason = "deprovision-recovery-required"
+        reason = f"{operation_label}-recovery-required"
         applied_paths = tuple(record.path for record in journal.actions if record.checkpoint != "pending")
         errors = (
             DistributionProcessError(
-                code="deprovision-recovery-required",
-                message="Managed distribution deprovision recovery is required.",
+                code=f"{operation_label}-recovery-required",
+                message=f"Managed distribution {operation_label} recovery is required.",
             ),
         )
     elif state == "eligibility-error":
         status = "error"
+        retry_policy = "none"
         phase = "preflight"
         last_completed = "not-started"
-        reason = error_code or "deprovision-preflight-failed"
+        reason = error_code or f"{operation_label}-preflight-failed"
         errors = (
             DistributionProcessError(
                 code=reason,
-                message=error_message or "Managed distribution deprovision preflight failed.",
+                message=error_message or f"Managed distribution {operation_label} preflight failed.",
             ),
         )
     elif state == "planned":
         if assessment is None:
-            raise DistributionPlanError("deprovision planned result state is incomplete")
+            raise DistributionPlanError(f"{operation_label} planned result state is incomplete")
         status = "planned"
         phase = "preflight"
         last_completed = "preflight-complete"
     elif state == "blocked":
         if assessment is None:
-            raise DistributionPlanError("deprovision blocked result state is incomplete")
+            raise DistributionPlanError(f"{operation_label} blocked result state is incomplete")
         status = "blocked"
         phase = "preflight"
         last_completed = "preflight-complete"
-        reason = error_code or "deprovision-preflight-blocked"
+        reason = error_code or f"{operation_label}-preflight-blocked"
         failed_paths = tuple(
             sorted(
                 {
@@ -14229,7 +14964,7 @@ def _distribution_process_result_from_state(
         errors = (
             DistributionProcessError(
                 code=reason,
-                message=error_message or "Managed distribution deprovision is blocked by preserved state.",
+                message=error_message or f"Managed distribution {operation_label} is blocked by preserved state.",
             ),
         )
     elif state == "legacy-marker":
@@ -14274,20 +15009,22 @@ def _distribution_process_result_from_state(
         status = "recovery_required"
         phase = "preflight"
         last_completed = "not-started"
-        reason = "deprovision-recovery-mismatch"
+        reason = f"{operation_label}-recovery-mismatch"
         errors = (
             DistributionProcessError(
-                code="deprovision-recovery-mismatch",
-                message="Managed distribution deprovision recovery evidence does not match.",
+                code=f"{operation_label}-recovery-mismatch",
+                message=f"Managed distribution {operation_label} recovery evidence does not match.",
             ),
         )
+        if intent == "purge":
+            retry_policy = "manual-recovery"
     elif state == "guard-only":
         if assessment is None or executable is None:
-            raise DistributionPlanError("deprovision guard-only result state is incomplete")
+            raise DistributionPlanError(f"{operation_label} guard-only result state is incomplete")
         status = "recovery_required"
         phase = "marker-write"
         last_completed = "marker-written"
-        reason = "deprovision-guard-only"
+        reason = f"{operation_label}-guard-only"
         plan_digest = executable.plan_digest
         pending_paths = tuple(sorted({action.path for action in executable.actions}, key=os.fsencode))
         pending_set = set(pending_paths)
@@ -14306,31 +15043,41 @@ def _distribution_process_result_from_state(
         )
         errors = (
             DistributionProcessError(
-                code="deprovision-recovery-required",
-                message="Managed distribution deprovision recovery is required.",
+                code=f"{operation_label}-recovery-required",
+                message=f"Managed distribution {operation_label} recovery is required.",
             ),
         )
     elif state == "mutating-success":
         if assessment is None or executable is None:
-            raise DistributionPlanError("deprovision success result state is incomplete")
+            raise DistributionPlanError(f"{operation_label} success result state is incomplete")
         status = "completed"
         phase = "complete"
         last_completed = "marker-finalized"
         plan_digest = executable.plan_digest
         applied_paths = tuple(action.path for action in executable.actions)
         outcomes = _deprovision_assessment_outcomes(assessment, applied=True)
+        if intent == "purge":
+            retry_policy = "none"
     elif state == "no-op-success":
         if assessment is None:
             raise DistributionPlanError("deprovision no-op result state is incomplete")
         status = "completed"
         phase = "complete"
         last_completed = "post-verified"
+        if intent == "purge":
+            retry_policy = "none"
     else:
-        raise DistributionPlanError("unsupported deprovision result state")
+        raise DistributionPlanError(f"unsupported {operation_label} result state")
 
+    if intent == "purge" and assessment is not None:
+        outcomes = _explicit_spec_history_purge_outcomes(
+            assessment,
+            outcomes,
+            include_absent=state in {"mutating-success", "no-op-success"},
+        )
     result = DistributionProcessResult(
         status=status,
-        intent="deprovision",
+        intent=intent,
         actions=actions,
         plan_digest=plan_digest,
         reason=reason,
@@ -14343,25 +15090,30 @@ def _distribution_process_result_from_state(
         errors=errors,
         retry_policy=retry_policy,
     )
-    _validate_deprovision_process_result(result)
+    _validate_deprovision_process_result(result, intent=intent)
     return result
 
 
-def _validate_deprovision_process_result(result: DistributionProcessResult) -> None:
+def _validate_deprovision_process_result(
+    result: DistributionProcessResult,
+    *,
+    intent: JournaledDistributionIntent = "deprovision",
+) -> None:
+    operation_label = "purge" if intent == "purge" else "deprovision"
     if (
-        result.intent != "deprovision"
+        result.intent != intent
         or result.phase is None
         or result.last_completed_phase is None
         or result.pending_paths != tuple(sorted(set(result.pending_paths), key=os.fsencode))
         or result.failed_paths != tuple(sorted(set(result.failed_paths), key=os.fsencode))
         or not set(result.pending_paths).issubset(result.failed_paths)
     ):
-        raise DistributionPlanError("deprovision result population is incomplete")
+        raise DistributionPlanError(f"{operation_label} result population is incomplete")
     if result.status in {"planned", "completed"}:
         if result.errors or result.failed_paths or result.pending_paths:
-            raise DistributionPlanError("deprovision success result contains failure state")
+            raise DistributionPlanError(f"{operation_label} success result contains failure state")
     elif not result.errors:
-        raise DistributionPlanError("deprovision failure result is missing its operation error")
+        raise DistributionPlanError(f"{operation_label} failure result is missing its operation error")
 
 
 def _assert_deprovision_directory_dependencies_published(
@@ -14977,6 +15729,50 @@ def _assert_deprovision_recovery_contract_identity(
         raise DistributionApplyError("journal-contract-mismatch")
 
 
+def _assert_explicit_spec_history_purge_recovery_contract_identity(
+    contract: DistributionExplicitSpecHistoryPurgeContract,
+    journal: OperationJournal,
+) -> None:
+    """Validate the purge envelope without treating it as a deprovision contract."""
+
+    if journal.intent != "purge" or journal.authority != contract.authority:
+        raise DistributionApplyError("journal-contract-mismatch")
+    component = contract.deprovision_contract
+    if component.manifest is None or journal.generated_state_contract_digest is None:
+        raise DistributionApplyError("journal-contract-mismatch")
+    if component.generated_state.contract_digest != journal.generated_state_contract_digest:
+        raise DistributionApplyError("journal-contract-mismatch")
+    if component.source_semantic_identities != journal.source_semantic_identities:
+        raise DistributionApplyError("journal-contract-mismatch")
+    target_only_assets = _deprovision_recovery_target_only_assets(journal)
+    component_digest = _deprovision_contract_digest(
+        physical_assets=component.managed_assets,
+        shortcuts=component.removable_shortcuts,
+        target_only_assets=target_only_assets,
+        managed_roots=component.managed_roots,
+        preserved_roots=component.preserved_roots,
+        generated_state_digest=journal.generated_state_contract_digest,
+        manifest=component.manifest,
+    )
+    if component_digest != component.contract_digest:
+        raise DistributionApplyError("journal-contract-mismatch")
+    root_binding, entries, tree_digest = _reconstruct_explicit_spec_history_purge_tree(journal)
+    if (
+        contract.history_root != _EXPLICIT_SPEC_HISTORY_ROOT
+        or contract.history_root_binding != root_binding
+        or contract.history_entries != entries
+        or contract.history_tree_digest != tree_digest
+        or contract.contract_digest
+        != _explicit_spec_history_purge_contract_digest(
+            deprovision_contract=component,
+            history_root=contract.history_root,
+            history_tree_digest=contract.history_tree_digest,
+        )
+        or contract.contract_digest != journal.contract_identity
+    ):
+        raise DistributionApplyError("journal-contract-mismatch")
+
+
 def _deprovision_recovery_record_identity(
     record: OperationJournalAction,
 ) -> DistributionIdentity:
@@ -15133,14 +15929,85 @@ def _validate_deprovision_recovery_action_semantics(
             raise DistributionApplyError("journal-plan-mismatch")
 
 
+def _validate_explicit_spec_history_purge_recovery_action_semantics(
+    target_root: Path,
+    contract: DistributionExplicitSpecHistoryPurgeContract,
+    journal: OperationJournal,
+) -> None:
+    """Validate purge actions against the immutable component and history tree."""
+
+    if journal.intent != "purge" or journal.authority != contract.authority:
+        raise DistributionApplyError("journal-contract-mismatch")
+    root_binding, history_entries, tree_digest = _reconstruct_explicit_spec_history_purge_tree(journal)
+    if (
+        contract.history_root != _EXPLICIT_SPEC_HISTORY_ROOT
+        or contract.history_root_binding != root_binding
+        or contract.history_entries != history_entries
+        or contract.history_tree_digest != tree_digest
+    ):
+        raise DistributionApplyError("journal-contract-mismatch")
+    history_paths = {contract.history_root, *(entry.relative_path for entry in history_entries)}
+    component_actions = tuple(action for action in journal.actions if action.path not in history_paths)
+    _validate_deprovision_recovery_action_semantics(
+        target_root,
+        contract.deprovision_contract,
+        replace(journal, actions=component_actions),
+    )
+    entry_by_path = {entry.relative_path: entry for entry in history_entries}
+    root_record = next(
+        (record for record in journal.actions if record.path == contract.history_root),
+        None,
+    )
+    if contract.history_root_binding.exists:
+        if root_record is None:
+            raise DistributionApplyError("journal-plan-mismatch")
+        root_entry = _history_tree_entry_from_journal_record(root_record)
+        if root_entry.kind != "directory" or root_entry.relative_path != contract.history_root:
+            raise DistributionApplyError("journal-plan-mismatch")
+        if root_record.action != "remove-empty-directory":
+            raise DistributionApplyError("journal-plan-mismatch")
+    elif root_record is not None:
+        raise DistributionApplyError("journal-plan-mismatch")
+    for record in journal.actions:
+        if record.path not in history_paths:
+            continue
+        if record.path == contract.history_root:
+            continue
+        entry = entry_by_path.get(record.path)
+        if entry is None:
+            raise DistributionApplyError("journal-plan-mismatch")
+        reconstructed = _history_tree_entry_from_journal_record(record)
+        if reconstructed != entry:
+            raise DistributionApplyError("journal-plan-mismatch")
+        if entry.kind == "regular" and record.action != "prune":
+            raise DistributionApplyError("journal-plan-mismatch")
+        if entry.kind == "directory" and record.action != "remove-empty-directory":
+            raise DistributionApplyError("journal-plan-mismatch")
+        if record.provenance != "unknown" or record.reason != (
+            "explicit-spec-history-purge" if entry.kind == "regular" else "explicit-spec-history-purge-directory"
+        ):
+            raise DistributionApplyError("journal-plan-mismatch")
+    recorded_history_paths = {
+        record.path for record in journal.actions if _is_same_or_descendant(record.path, contract.history_root)
+    }
+    expected_history_paths = set(entry_by_path)
+    if contract.history_root_binding.exists:
+        expected_history_paths.add(contract.history_root)
+    if recorded_history_paths != expected_history_paths:
+        raise DistributionApplyError("journal-plan-mismatch")
+
+
 def _validate_deprovision_recovery_leaf_parent_namespaces(
     target_root: Path,
     journal: OperationJournal,
     *,
     forward_guard: DistributionRetryMarker | None = None,
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> None:
     """Re-prove every pending leaf parent before recovery can checkpoint it."""
 
+    if not _is_destructive_intent(intent):
+        raise DistributionApplyError("journal-intent-mismatch")
     witnesses = {witness.relative_path: witness for witness in journal.leaf_parent_namespace_witnesses}
     durably_quarantined_paths = frozenset(
         lease.path
@@ -15230,6 +16097,7 @@ def _assert_deprovision_recovery_parent_attachment(
     parent_chain: tuple[int, ...],
     *,
     forward_guard: DistributionRetryMarker | None,
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> OperationJournal:
     """Re-prove the immutable deprovision root-to-leaf-parent attachment."""
 
@@ -15238,8 +16106,8 @@ def _assert_deprovision_recovery_parent_attachment(
     store._assert_guard_anchors_journal(persisted)
     if (
         persisted.operation_id != journal.operation_id
-        or persisted.intent != "deprovision"
-        or persisted.authority != _journal_authority_for_intent("deprovision")
+        or persisted.intent != intent
+        or persisted.authority != _journal_authority_for_intent(intent)
         or persisted.contract_identity != journal.contract_identity
         or persisted.plan_digest != journal.plan_digest
     ):
@@ -15272,6 +16140,7 @@ def _deprovision_recovery_leaf_mutation_validator(
     journal: OperationJournal,
     *,
     forward_guard: DistributionRetryMarker | None,
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> Callable[[str, tuple[int, ...]], None]:
     """Bind recovery cleanup to the journal's immutable parent witnesses."""
 
@@ -15285,6 +16154,7 @@ def _deprovision_recovery_leaf_mutation_validator(
             path,
             parent_chain,
             forward_guard=forward_guard,
+            intent=intent,
         )
         record = next((item for item in persisted.actions if item.path == path), None)
         assert record is not None
@@ -15335,6 +16205,7 @@ def _deprovision_recovery_directory_mutation_validator(
     *,
     forward_guard: DistributionRetryMarker | None,
     require_absent: bool = True,
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> Callable[[str, tuple[int, ...]], None]:
     """Bind directory recovery to its journaled binding and empty postcondition."""
 
@@ -15347,8 +16218,8 @@ def _deprovision_recovery_directory_mutation_validator(
         store._assert_guard_anchors_journal(persisted)
         if (
             persisted.operation_id != journal.operation_id
-            or persisted.intent != "deprovision"
-            or persisted.authority != _journal_authority_for_intent("deprovision")
+            or persisted.intent != intent
+            or persisted.authority != _journal_authority_for_intent(intent)
             or persisted.contract_identity != journal.contract_identity
             or persisted.plan_digest != journal.plan_digest
         ):
@@ -15492,24 +16363,42 @@ def _validate_deprovision_recovery_contract_before_reconciliation(
     expected_root_identity: DistributionRootIdentity,
     journal: OperationJournal,
     forward_guard: DistributionRetryMarker | None = None,
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> None:
     """Validate immutable authority before a missing target can advance a checkpoint."""
 
     _assert_deprovision_zero_predecessor_reservations(target_root, journal)
-    contract = build_deprovision_contract(
-        install_root,
-        manifest_path=manifest_path,
-        scaffold_root=scaffold_root,
-        target_root=target_root,
-        expected_root_identity=expected_root_identity,
-        recovery_journal=journal,
-    )
-    if contract.manifest is None or contract.generated_state.blockers:
-        raise DistributionApplyError("journal-contract-mismatch")
-    if contract.source_semantic_identities != journal.source_semantic_identities:
-        raise DistributionApplyError("journal-contract-mismatch")
-    _assert_deprovision_recovery_contract_identity(contract, journal)
-    _validate_deprovision_recovery_action_semantics(target_root, contract, journal)
+    if intent == "purge":
+        purge_contract = build_explicit_spec_history_purge_contract(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=expected_root_identity,
+            recovery_journal=journal,
+        )
+        if (
+            purge_contract.deprovision_contract.manifest is None
+            or purge_contract.deprovision_contract.generated_state.blockers
+        ):
+            raise DistributionApplyError("journal-contract-mismatch")
+        _assert_explicit_spec_history_purge_recovery_contract_identity(purge_contract, journal)
+        _validate_explicit_spec_history_purge_recovery_action_semantics(target_root, purge_contract, journal)
+    else:
+        contract = build_deprovision_contract(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=expected_root_identity,
+            recovery_journal=journal,
+        )
+        if contract.manifest is None or contract.generated_state.blockers:
+            raise DistributionApplyError("journal-contract-mismatch")
+        if contract.source_semantic_identities != journal.source_semantic_identities:
+            raise DistributionApplyError("journal-contract-mismatch")
+        _assert_deprovision_recovery_contract_identity(contract, journal)
+        _validate_deprovision_recovery_action_semantics(target_root, contract, journal)
     if journal.plan_digest != _deprovision_journal_plan_digest(journal):
         raise DistributionApplyError("journal-plan-mismatch")
     for record in journal.actions:
@@ -15520,6 +16409,7 @@ def _validate_deprovision_recovery_contract_before_reconciliation(
         target_root,
         journal,
         forward_guard=forward_guard,
+        intent=intent,
     )
 
 
@@ -15535,7 +16425,13 @@ def _build_deprovision_recovery_assessment(
         raise DistributionApplyError("journal-contract-mismatch")
     if journal.generated_state_contract_digest is None:
         raise DistributionApplyError("journal-protocol-incompatible")
-    _assert_deprovision_recovery_contract_identity(contract, journal)
+    purge_contract = current.explicit_spec_history_purge_contract
+    if journal.intent == "purge":
+        if purge_contract is None:
+            raise DistributionApplyError("journal-contract-mismatch")
+        _assert_explicit_spec_history_purge_recovery_contract_identity(purge_contract, journal)
+    else:
+        _assert_deprovision_recovery_contract_identity(contract, journal)
     original_actions = tuple(
         DistributionAction(
             path=record.path,
@@ -15569,7 +16465,7 @@ def _build_deprovision_recovery_assessment(
         target_snapshots=tuple(pending_snapshots),
     )
     assessment = WorkspaceAssessment(
-        intent="deprovision",
+        intent=journal.intent,
         root_identity=journal.root_identity,
         contract_identity=journal.contract_identity,
         distribution_plan=recovery_plan,
@@ -15580,9 +16476,10 @@ def _build_deprovision_recovery_assessment(
         preservation_witnesses=journal.preservation_witnesses,
         absence_witnesses=journal.absence_witnesses,
         deprovision_contract=contract,
+        explicit_spec_history_purge_contract=purge_contract,
     )
     executable = ExecutableMutationPlan(
-        intent="deprovision",
+        intent=journal.intent,
         root_identity=journal.root_identity,
         contract_identity=journal.contract_identity,
         plan_digest=journal.plan_digest,
@@ -15611,14 +16508,26 @@ def _build_deprovision_recovery_contract_assessment(
     """Rebind provider semantics without classifying removed journal descendants."""
 
     _assert_deprovision_zero_predecessor_reservations(target_root, journal)
-    contract = build_deprovision_contract(
-        install_root,
-        manifest_path=manifest_path,
-        scaffold_root=scaffold_root,
-        target_root=target_root,
-        expected_root_identity=expected_root_identity,
-        recovery_journal=journal,
-    )
+    purge_contract: DistributionExplicitSpecHistoryPurgeContract | None = None
+    if journal.intent == "purge":
+        purge_contract = build_explicit_spec_history_purge_contract(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=expected_root_identity,
+            recovery_journal=journal,
+        )
+        contract = purge_contract.deprovision_contract
+    else:
+        contract = build_deprovision_contract(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=expected_root_identity,
+            recovery_journal=journal,
+        )
     if contract.manifest is None or contract.generated_state.blockers:
         raise DistributionApplyError("journal-contract-mismatch")
     current_assets = tuple(
@@ -15657,13 +16566,14 @@ def _build_deprovision_recovery_contract_assessment(
         scaffold_assets=(*scaffold_assets, *generated_assets),
     )
     current = WorkspaceAssessment(
-        intent="deprovision",
+        intent=journal.intent,
         root_identity=expected_root_identity,
-        contract_identity=contract.contract_digest,
+        contract_identity=purge_contract.contract_digest if purge_contract is not None else contract.contract_digest,
         distribution_plan=current_plan,
         actions=(),
         blockers=(),
         deprovision_contract=contract,
+        explicit_spec_history_purge_contract=purge_contract,
     )
     return _build_deprovision_recovery_assessment(current, journal)
 
@@ -15671,6 +16581,8 @@ def _build_deprovision_recovery_contract_assessment(
 def _reconcile_deprovision_pending_actions(
     store: OperationJournalStore,
     journal: OperationJournal,
+    *,
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> OperationJournal:
     _assert_deprovision_recovery_marker_bound(store, store._forward_guard)
     if store._leaf_mutation_validator is None:
@@ -15678,6 +16590,7 @@ def _reconcile_deprovision_pending_actions(
             store,
             journal,
             forward_guard=store._forward_guard,
+            intent=intent,
         )
     _assert_deprovision_zero_predecessor_reservations(store.target_root, journal)
     # Validate all already-published paths before reconciling any pending
@@ -15702,6 +16615,7 @@ def _reconcile_deprovision_pending_actions(
                     active,
                     forward_guard=store._forward_guard,
                     require_absent=False,
+                    intent=intent,
                 )
                 parent_chain = _open_distribution_parent_chain(
                     store.target_root,
@@ -15728,6 +16642,7 @@ def _reconcile_deprovision_pending_actions(
                 store,
                 active,
                 forward_guard=store._forward_guard,
+                intent=intent,
             )
         parent_chain = _open_distribution_parent_chain(
             store.target_root,
@@ -15796,17 +16711,33 @@ def _assert_deprovision_postconditions(
     ):
         raise DistributionApplyError("deprovision-postcondition-mismatch")
     _assert_deprovision_invocation_state(assessment)
-    contract = build_deprovision_contract(
-        plan.install_root,
-        manifest_path=plan.manifest_path,
-        scaffold_root=plan.scaffold_root,
-        target_root=plan.target_root,
-        expected_root_identity=assessment.root_identity,
-        recovery_journal=journal,
-    )
-    if contract.generated_state.blockers or contract.source_semantic_identities != journal.source_semantic_identities:
-        raise DistributionApplyError("deprovision-postcondition-mismatch")
-    _assert_deprovision_recovery_contract_identity(contract, journal)
+    if assessment.intent == "purge":
+        purge_contract = build_explicit_spec_history_purge_contract(
+            plan.install_root,
+            manifest_path=plan.manifest_path,
+            scaffold_root=plan.scaffold_root,
+            target_root=plan.target_root,
+            expected_root_identity=assessment.root_identity,
+            recovery_journal=journal,
+        )
+        if purge_contract.deprovision_contract.generated_state.blockers:
+            raise DistributionApplyError("deprovision-postcondition-mismatch")
+        _assert_explicit_spec_history_purge_recovery_contract_identity(purge_contract, journal)
+    else:
+        contract = build_deprovision_contract(
+            plan.install_root,
+            manifest_path=plan.manifest_path,
+            scaffold_root=plan.scaffold_root,
+            target_root=plan.target_root,
+            expected_root_identity=assessment.root_identity,
+            recovery_journal=journal,
+        )
+        if (
+            contract.generated_state.blockers
+            or contract.source_semantic_identities != journal.source_semantic_identities
+        ):
+            raise DistributionApplyError("deprovision-postcondition-mismatch")
+        _assert_deprovision_recovery_contract_identity(contract, journal)
     _assert_deprovision_published_summaries(plan.target_root, journal)
     _assert_deprovision_terminal_bindings(plan.target_root, journal)
     _assert_deprovision_remaining_namespace(plan.target_root, journal)
@@ -15829,10 +16760,11 @@ def _execute_deprovision_journal_plan(
     existing_store: OperationJournalStore | None = None,
     existing_journal: OperationJournal | None = None,
     existing_guard: DistributionRetryMarker | None = None,
+    intent: JournaledDistributionIntent = "deprovision",
 ) -> DistributionProcessResult:
     target_root = assessment.distribution_plan.target_root
     if target_root is None:
-        return _deprovision_preflight_error_result()
+        return _deprovision_preflight_error_result(intent=intent)
     store = existing_store or OperationJournalStore(target_root)
     journal: OperationJournal | None = existing_journal
     active_journal: OperationJournal | None = None
@@ -15851,7 +16783,7 @@ def _execute_deprovision_journal_plan(
             if journal.status == "prepared":
                 active_journal = store.mark_executing(journal)
             elif journal.status == "executing":
-                active_journal = _reconcile_deprovision_pending_actions(store, journal)
+                active_journal = _reconcile_deprovision_pending_actions(store, journal, intent=intent)
             else:
                 active_journal = journal
             journal = active_journal
@@ -15864,6 +16796,7 @@ def _execute_deprovision_journal_plan(
                 store,
                 active_journal,
                 forward_guard=store._forward_guard or guard,
+                intent=intent,
             )
         if active_journal is not None:
             durably_quarantined_paths.update(
@@ -16006,6 +16939,7 @@ def _execute_deprovision_journal_plan(
                 active_journal,
                 forward_guard=store._forward_guard or guard,
                 require_absent=False,
+                intent=intent,
             )
             parent_chain = _open_distribution_parent_chain(
                 target_root,
@@ -16104,14 +17038,15 @@ def _execute_deprovision_journal_plan(
                 durable = store._read(assessment.root_identity)
                 if (
                     durable.operation_id == journal.operation_id
-                    and durable.intent == "deprovision"
-                    and durable.authority == _journal_authority_for_intent("deprovision")
+                    and durable.intent == intent
+                    and durable.authority == _journal_authority_for_intent(intent)
                 ):
                     journal = durable
             return _distribution_process_result_from_state(
                 assessment,
                 journal,
                 failure_paths=failure_paths,
+                intent=intent,
             )
         recovery_paths = _deprovision_recovery_metadata_paths(target_root)
         return _distribution_process_result_from_state(
@@ -16120,17 +17055,19 @@ def _execute_deprovision_journal_plan(
             executable=executable if recovery_paths else None,
             plan_digest=executable.plan_digest,
             failure_paths=failure_paths,
-            error_code="deprovision-preflight-failed",
-            error_message="Managed distribution deprovision preflight failed.",
+            error_code=f"{intent}-preflight-failed",
+            error_message=f"Managed distribution {intent} preflight failed.",
+            intent=intent,
         )
     return _distribution_process_result_from_state(
         assessment,
         state="mutating-success",
         executable=executable,
+        intent=intent,
     )
 
 
-def execute_deprovision_distribution(
+def _execute_destructive_distribution(
     install_root: Path,
     *,
     manifest_path: Path,
@@ -16139,34 +17076,39 @@ def execute_deprovision_distribution(
     package_version: str,
     apply: bool,
     expected_root_identity: DistributionRootIdentity | None = None,
+    intent: Literal["deprovision", "purge"] = "deprovision",
 ) -> DistributionProcessResult:
-    """Assess deprovision or complete its write-free no-op apply branch."""
+    """Assess or execute one destructive distribution intent."""
 
     install_root = Path(install_root)
     manifest_path = Path(manifest_path)
     scaffold_root = Path(scaffold_root)
     target_root = Path(target_root)
+    operation_label = "purge" if intent == "purge" else "deprovision"
     try:
         observed_root_identity = _root_identity_for_assessment(target_root)
         if apply:
             if expected_root_identity is None:
                 return _deprovision_preflight_error_result(
-                    code="deprovision-root-binding-required",
-                    message="Managed distribution deprovision requires a bound target root.",
+                    code=f"{operation_label}-root-binding-required",
+                    message=f"Managed distribution {operation_label} requires a bound target root.",
+                    intent=intent,
                 )
             if observed_root_identity != expected_root_identity:
                 return _deprovision_preflight_error_result(
-                    code="deprovision-root-binding-mismatch",
-                    message="Managed distribution deprovision target binding changed.",
+                    code=f"{operation_label}-root-binding-mismatch",
+                    message=f"Managed distribution {operation_label} target binding changed.",
+                    intent=intent,
                 )
         elif expected_root_identity is not None and observed_root_identity != expected_root_identity:
             return _deprovision_preflight_error_result(
-                code="deprovision-root-binding-mismatch",
-                message="Managed distribution deprovision target binding changed.",
+                code=f"{operation_label}-root-binding-mismatch",
+                message=f"Managed distribution {operation_label} target binding changed.",
+                intent=intent,
             )
         bound_root_identity = expected_root_identity or observed_root_identity
     except (DistributionAdmissionError, DistributionManifestError, DistributionPlanError, OSError):
-        return _deprovision_preflight_error_result()
+        return _deprovision_preflight_error_result(intent=intent)
 
     metadata_paths = _deprovision_recovery_metadata_paths(target_root)
     guard_only = False
@@ -16176,19 +17118,23 @@ def execute_deprovision_distribution(
                 return _distribution_process_result_from_state(
                     state="dual-recovery-state",
                     failure_paths=metadata_paths,
+                    intent=intent,
                 )
             try:
                 legacy_marker_valid = _read_uninstall_retry_marker_for_admission(target_root)
             except DistributionAdmissionError:
                 return _distribution_process_result_from_state(
                     state="legacy-marker-invalid",
+                    intent=intent,
                 )
             if not legacy_marker_valid:
                 return _distribution_process_result_from_state(
                     state="legacy-marker-invalid",
+                    intent=intent,
                 )
             return _distribution_process_result_from_state(
                 state="legacy-marker",
+                intent=intent,
             )
         store = OperationJournalStore(target_root)
         journal_present = _DISTRIBUTION_JOURNAL_REL.as_posix() in metadata_paths
@@ -16197,8 +17143,8 @@ def execute_deprovision_distribution(
             try:
                 journal = store._read(bound_root_identity)
                 if (
-                    journal.intent != "deprovision"
-                    or journal.authority != _journal_authority_for_intent("deprovision")
+                    journal.intent != intent
+                    or journal.authority != _journal_authority_for_intent(intent)
                     or not _journal_package_is_compatible(
                         journal.package_version,
                         package_version,
@@ -16210,8 +17156,8 @@ def execute_deprovision_distribution(
                     guard = _read_distribution_retry_marker(target_root)
                     if (
                         guard is None
-                        or guard.purpose != _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE
-                        or guard.operation != "deprovision"
+                        or guard.purpose != _journal_guard_purpose_for_intent(intent)
+                        or guard.operation != intent
                         or guard.operation_id != journal.operation_id
                         or guard.contract_identity != journal.contract_identity
                         or guard.plan_digest != journal.plan_digest
@@ -16226,6 +17172,7 @@ def execute_deprovision_distribution(
                         store,
                         journal,
                         forward_guard=store._forward_guard or guard,
+                        intent=intent,
                     )
                 if apply and journal.status in {"prepared", "executing"}:
                     _validate_deprovision_recovery_contract_before_reconciliation(
@@ -16236,9 +17183,10 @@ def execute_deprovision_distribution(
                         expected_root_identity=bound_root_identity,
                         journal=journal,
                         forward_guard=store._forward_guard or guard,
+                        intent=intent,
                     )
                 if apply and journal.status == "executing":
-                    journal = _reconcile_deprovision_pending_actions(store, journal)
+                    journal = _reconcile_deprovision_pending_actions(store, journal, intent=intent)
                 recovery_assessment, recovery_executable = _build_deprovision_recovery_contract_assessment(
                     install_root,
                     manifest_path=manifest_path,
@@ -16252,11 +17200,13 @@ def execute_deprovision_distribution(
                 return _distribution_process_result_from_state(
                     state="recovery-mismatch",
                     failure_paths=metadata_paths,
+                    intent=intent,
                 )
             if not apply:
                 return _distribution_process_result_from_state(
                     recovery_assessment,
                     journal,
+                    intent=intent,
                 )
             return _execute_deprovision_journal_plan(
                 recovery_assessment,
@@ -16265,19 +17215,29 @@ def execute_deprovision_distribution(
                 existing_store=store,
                 existing_journal=journal,
                 existing_guard=guard,
+                intent=intent,
             )
         guard_only = True
 
     try:
-        assessment = build_deprovision_workspace_assessment(
-            install_root,
-            manifest_path=manifest_path,
-            scaffold_root=scaffold_root,
-            target_root=target_root,
-            expected_root_identity=bound_root_identity,
-        )
+        if intent == "purge":
+            assessment = build_explicit_spec_history_purge_assessment(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                expected_root_identity=bound_root_identity,
+            )
+        else:
+            assessment = build_deprovision_workspace_assessment(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                expected_root_identity=bound_root_identity,
+            )
     except (DistributionAdmissionError, DistributionManifestError, DistributionPlanError, OSError):
-        return _deprovision_preflight_error_result()
+        return _deprovision_preflight_error_result(intent=intent)
 
     if not guard_only and not _deprovision_has_managed_workspace_evidence(assessment):
         return _deprovision_preflight_error_result(
@@ -16286,6 +17246,7 @@ def execute_deprovision_distribution(
                 "target is not a managed SpecDock repo: missing managed "
                 "'spec-dock/spec-dock.version' state or exact managed distribution evidence"
             ),
+            intent=intent,
         )
 
     if guard_only:
@@ -16293,8 +17254,8 @@ def execute_deprovision_distribution(
             guard = _read_distribution_retry_marker(target_root)
             if (
                 guard is None
-                or guard.purpose != _DISTRIBUTION_DEPROVISION_JOURNAL_GUARD_PURPOSE
-                or guard.operation != "deprovision"
+                or guard.purpose != _journal_guard_purpose_for_intent(intent)
+                or guard.operation != intent
                 or guard.target_root != bound_root_identity
                 or not _journal_package_is_compatible(
                     guard.package_version,
@@ -16317,12 +17278,14 @@ def execute_deprovision_distribution(
                 assessment,
                 state="recovery-mismatch",
                 failure_paths=metadata_paths,
+                intent=intent,
             )
         if not apply:
             return _distribution_process_result_from_state(
                 assessment,
                 state="guard-only",
                 executable=executable,
+                intent=intent,
             )
         try:
             journal = store.prepare(executable, package_version=guard.package_version)
@@ -16331,6 +17294,7 @@ def execute_deprovision_distribution(
                 assessment,
                 state="guard-only",
                 executable=executable,
+                intent=intent,
             )
         return _execute_deprovision_journal_plan(
             assessment,
@@ -16339,6 +17303,7 @@ def execute_deprovision_distribution(
             existing_store=store,
             existing_journal=journal,
             existing_guard=guard,
+            intent=intent,
         )
 
     if not apply:
@@ -16348,24 +17313,31 @@ def execute_deprovision_distribution(
             try:
                 dry_run_plan_digest = build_executable_mutation_plan(assessment).plan_digest
             except DistributionPlanError:
-                return _deprovision_preflight_error_result()
+                return _deprovision_preflight_error_result(intent=intent)
         return _distribution_process_result_from_state(
             assessment,
             state="planned",
             plan_digest=dry_run_plan_digest,
+            intent=intent,
         )
     if assessment.blockers:
-        return _deprovision_blocked_result(assessment, plan_digest=None)
+        return _deprovision_blocked_result(
+            assessment,
+            plan_digest=None,
+            reason=f"{operation_label}-preflight-blocked",
+            intent=intent,
+        )
 
     try:
         executable = build_executable_mutation_plan(assessment)
     except DistributionPlanError:
-        return _deprovision_preflight_error_result()
+        return _deprovision_preflight_error_result(intent=intent)
     if executable.actions:
         return _execute_deprovision_journal_plan(
             assessment,
             executable,
             package_version=package_version,
+            intent=intent,
         )
 
     try:
@@ -16373,20 +17345,31 @@ def execute_deprovision_distribution(
             return _deprovision_blocked_result(
                 assessment,
                 plan_digest=executable.plan_digest,
-                reason="deprovision-no-op-postcondition-changed",
+                reason=f"{operation_label}-no-op-postcondition-changed",
+                intent=intent,
             )
-        post_assessment = build_deprovision_workspace_assessment(
-            install_root,
-            manifest_path=manifest_path,
-            scaffold_root=scaffold_root,
-            target_root=target_root,
-            expected_root_identity=bound_root_identity,
-        )
+        if intent == "purge":
+            post_assessment = build_explicit_spec_history_purge_assessment(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                expected_root_identity=bound_root_identity,
+            )
+        else:
+            post_assessment = build_deprovision_workspace_assessment(
+                install_root,
+                manifest_path=manifest_path,
+                scaffold_root=scaffold_root,
+                target_root=target_root,
+                expected_root_identity=bound_root_identity,
+            )
         if post_assessment.blockers:
             return _deprovision_blocked_result(
                 post_assessment,
                 plan_digest=executable.plan_digest,
-                reason="deprovision-no-op-postcondition-changed",
+                reason=f"{operation_label}-no-op-postcondition-changed",
+                intent=intent,
             )
         post_executable = build_executable_mutation_plan(post_assessment)
         if post_executable.actions or post_executable.plan_digest != executable.plan_digest:
@@ -16399,30 +17382,83 @@ def execute_deprovision_distribution(
                 post_assessment,
                 plan_digest=executable.plan_digest,
                 extra_failed_paths=changed_paths,
-                reason="deprovision-no-op-postcondition-changed",
+                reason=f"{operation_label}-no-op-postcondition-changed",
+                intent=intent,
             )
         if _deprovision_recovery_metadata_paths(target_root):
             return _deprovision_blocked_result(
                 post_assessment,
                 plan_digest=executable.plan_digest,
-                reason="deprovision-no-op-postcondition-changed",
+                reason=f"{operation_label}-no-op-postcondition-changed",
+                intent=intent,
             )
         if _root_identity_for_assessment(target_root) != bound_root_identity:
             return _deprovision_blocked_result(
                 post_assessment,
                 plan_digest=executable.plan_digest,
-                reason="deprovision-no-op-postcondition-changed",
+                reason=f"{operation_label}-no-op-postcondition-changed",
+                intent=intent,
             )
     except (DistributionAdmissionError, DistributionManifestError, DistributionPlanError, OSError):
         return _deprovision_blocked_result(
             assessment,
             plan_digest=executable.plan_digest,
-            reason="deprovision-no-op-postcondition-changed",
+            reason=f"{operation_label}-no-op-postcondition-changed",
+            intent=intent,
         )
     return _distribution_process_result_from_state(
         post_assessment,
         state="no-op-success",
         plan_digest=executable.plan_digest,
+        intent=intent,
+    )
+
+
+def execute_deprovision_distribution(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    scaffold_root: Path,
+    target_root: Path,
+    package_version: str,
+    apply: bool,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> DistributionProcessResult:
+    """Assess or execute the managed distribution deprovision intent."""
+
+    return _execute_destructive_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version=package_version,
+        apply=apply,
+        expected_root_identity=expected_root_identity,
+        intent="deprovision",
+    )
+
+
+def execute_explicit_spec_history_purge_distribution(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    scaffold_root: Path,
+    target_root: Path,
+    package_version: str,
+    apply: bool,
+    expected_root_identity: DistributionRootIdentity | None = None,
+) -> DistributionProcessResult:
+    """Assess or execute the explicit spec-history purge intent."""
+
+    return _execute_destructive_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version=package_version,
+        apply=apply,
+        expected_root_identity=expected_root_identity,
+        intent="purge",
     )
 
 
@@ -20063,6 +21099,7 @@ __all__ = [
     "DistributionApplyError",
     "DistributionAsset",
     "DistributionDirectoryRequirement",
+    "DistributionExplicitSpecHistoryPurgeContract",
     "DistributionIdentity",
     "DistributionManifest",
     "DistributionManifestError",
@@ -20084,9 +21121,15 @@ __all__ = [
     "RecognizedDistributionIntent",
     "WorkspaceAssessment",
     "apply_distribution_plan",
+    "build_deprovision_contract",
+    "build_deprovision_workspace_assessment",
     "build_distribution_plan",
     "build_executable_mutation_plan",
+    "build_explicit_spec_history_purge_assessment",
+    "build_explicit_spec_history_purge_contract",
     "build_workspace_assessment",
+    "execute_deprovision_distribution",
+    "execute_explicit_spec_history_purge_distribution",
     "execute_fresh_distribution",
     "execute_recognized_distribution",
 ]
