@@ -427,6 +427,116 @@ def test_i371_purge_assessment_is_typed_and_write_free(tmp_path: Path) -> None:
     assert _i370_tree_evidence(target_root) == before
 
 
+def test_i371_purge_assessment_reuses_one_coherent_history_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    original_content = b"history-before-second-observation\n"
+    history_file.write_bytes(original_content)
+    root_info = target_root.stat()
+    original_observe = managed_distribution._observe_target
+    root_observations = 0
+
+    def observe_with_changed_second_root_observation(root: Path, relative_path: str):
+        nonlocal root_observations
+        observed = original_observe(root, relative_path)
+        if relative_path == "spec-dock/initiatives":
+            root_observations += 1
+            if root_observations == 2:
+                history_file.write_bytes(b"history-after-second-observation\n")
+        return observed
+
+    monkeypatch.setattr(managed_distribution, "_observe_target", observe_with_changed_second_root_observation)
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    purge_contract = assessment.explicit_spec_history_purge_contract
+    assert purge_contract is not None
+    entry = next(
+        item for item in purge_contract.history_entries if item.relative_path == "spec-dock/initiatives/history.md"
+    )
+    snapshot = dict(assessment.distribution_plan.target_snapshots)[entry.relative_path].target
+    assert root_observations == 1
+    assert assessment.blockers == ()
+    assert entry.sha256 == hashlib.sha256(original_content).hexdigest()
+    assert snapshot.identity is not None
+    assert snapshot.identity.sha256 == entry.sha256
+    assert snapshot.device == entry.device
+    assert snapshot.inode == entry.inode
+    assert snapshot.ctime_ns == entry.ctime_ns
+
+
+def test_i371_purge_assessment_registers_nested_empty_history_directories(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_root = target_root / "spec-dock" / "initiatives"
+    (history_root / "empty-leaf").mkdir(parents=True)
+    (history_root / "nested" / "empty-nested").mkdir(parents=True)
+    (history_root / "nested" / "history.md").write_bytes(b"history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    outside = target_root / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+
+    history_directories = {
+        "spec-dock/initiatives",
+        "spec-dock/initiatives/empty-leaf",
+        "spec-dock/initiatives/nested",
+        "spec-dock/initiatives/nested/empty-nested",
+    }
+    assert assessment.blockers == ()
+    assert history_directories <= {
+        action.path for action in assessment.actions if action.action == "remove-empty-directory"
+    }
+
+    result = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "completed", result.reason
+    assert not history_root.exists()
+    assert workbench.read_bytes() == b"preserve\n"
+    assert outside.read_bytes() == b"outside\n"
+
+
 def test_i371_purge_apply_removes_history_and_preserves_workbench(tmp_path: Path) -> None:
     install_root = _minimal_install_root(tmp_path, b"managed\n")
     scaffold_root = _minimal_scaffold_root(tmp_path)

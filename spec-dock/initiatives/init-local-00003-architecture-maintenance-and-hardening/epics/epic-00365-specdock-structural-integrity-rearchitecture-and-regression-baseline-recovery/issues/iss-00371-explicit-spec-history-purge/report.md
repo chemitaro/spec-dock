@@ -31,6 +31,21 @@ root-level 1 行へ集約し、public command/flag/schema/status/exit contract �
 `94546a138bd34b253c87ca8749f3c5678d172f2a`。受理済みの requirement/design/plan
 は実装中に変更していない。
 
+### Final Quality Gate P1 remediation
+
+レビューで検出された二点を同じ accepted contract 内で修正した。
+
+- purge tree capture が contract、history actions、target snapshots、directory
+  evidence を一つの descriptor-bound capture record から提供するようにし、
+  assessment 中の history subtree 再捕捉と leaf の独立 `_observe_target()` を
+  廃止した。capture 間に二度目の root observation で内容を変える決定的テストで、
+  contract/action snapshot の identity と SHA-256 が一致し blocker-free plan が
+  分裂しないことを確認した。
+- capture 済みの全 history directory を augmentation の managed directory closure
+  と exact directory evidence に登録し、leaf および nested empty directory を
+  deepest-first の `remove-empty-directory` action として生成するようにした。
+  `.workbench` と repository root 外 sentinel は保持される。
+
 ## Verification
 
 ### Red to green
@@ -45,9 +60,11 @@ acceptance が skip された。
 
 - `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_managed_distribution.py -k 'i371_purge_assessment_is_typed_and_write_free or i371_purge_apply_removes_history_and_preserves_workbench' -q`: `2 passed`
 - `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_managed_distribution.py -k 'i371_purge_forward_recovers_same_plan_after_history_checkpoint_failure' -q`: `1 passed`
-- `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_managed_distribution.py -q`: `489 passed`
+- `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_managed_distribution.py -k 'i371_purge_assessment_reuses_one_coherent_history_capture or i371_purge_assessment_registers_nested_empty_history_directories' -q`: `2 passed`
+- `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_managed_distribution.py -q`: `491 passed`
 - `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -k 'uninstall or remove_specs or i371' -q`: `31 passed`
 - `uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py -k 'uninstall or remove_specs or i371' -q`: `49 passed`
+- `uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py -k 'i371' -q`: `3 passed`
 
 通常の quality gates は次のとおり。
 
@@ -55,7 +72,13 @@ acceptance が skip された。
 - `make lint`: ruff check/format、mypy ともに pass
 - `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=227`
 - `python -m py_compile src/spec_dock/cli.py`: pass
+- `python -m py_compile src/spec_dock/managed_distribution.py`: pass
 - `git diff --check`: pass（whitespace error 0）
+
+P1 remediation 後の init/update selector は既存の重い keep-specs case を含むため
+`534.58s` 時点で `9 passed, 163 deselected` の後に Ctrl-C で中断した（exit 130、
+assertion failure なし）。修正前の同 selector `31 passed` と、P1修正後の managed
+全体 `491 passed` および CLI I371 `3 passed` を合わせて確認した。
 
 fast selector は既存の visible-parent rebind race が 1 件だけ単発 failure
 となったが、同じ 4 parameter の再実行は `4 passed` だった。既存 race のための
@@ -125,21 +148,18 @@ suite で確認した。
   wheel receipt を含む再検証が必要。ledger の変更や failure の隠蔽は行っていない。
 - fast lane の visible-parent rebind race は既存挙動として残る。再実行で green
   だったが、根本修正は Issue 371 の scope 外。
+- init/update の再実行は重い既存ケースで中断したため、P1修正後の当該 selector
+  全件 green とは主張しない。修正前の `31 passed` evidence と対象 managed/CLI
+  suitesの修正後 greenを保全している。
 - `.artifacts/iss-00371-full-regression/20260828T092613.495723Z/` は verifier
-  evidence として保持しているが、production diff の一部ではない。
-- `git status --short` は次のとおりで、受理済み R/D/P の dirty state を含む。
+  evidence として生成したが、現在の working tree には保持していない。
+- 初回実装 commit `d3690b0879dbcb2155ea11c6a249467b6ec51df2` は upstream へ
+  push 済みである。P1 remediation 後の `git status --short` は次のとおり。
 
 ```text
- M README.md
- M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00371-explicit-spec-history-purge/design.md
- M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00371-explicit-spec-history-purge/plan.md
- M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00371-explicit-spec-history-purge/requirement.md
- M src/spec_dock/cli.py
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00371-explicit-spec-history-purge/report.md
  M src/spec_dock/managed_distribution.py
- M tests/cli_runtime/test_distribution_cutover.py
- M tests/unit/infra/test_init_update.py
  M tests/unit/infra/test_managed_distribution.py
-?? .artifacts/
 ```
 
-commit/push/PR publication は実施していない。
+P1 remediation の commit/push と PR publication は、この記録時点では実施していない。

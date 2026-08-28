@@ -272,6 +272,19 @@ class DistributionTreeEntrySnapshot:
     link_target: str | None = None
 
 
+@dataclass(frozen=True)
+class _DistributionTreeCapture:
+    root_binding: PathIdentitySnapshot
+    entries: tuple[DistributionTreeEntrySnapshot, ...]
+    tree_digest: str
+    target_snapshots: tuple[tuple[str, DistributionTargetSnapshot], ...]
+    directory_captures: tuple[
+        tuple[str, tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...]]],
+        ...,
+    ]
+    blockers: tuple[DistributionAction, ...] = ()
+
+
 DistributionDirectoryChildKind = Literal["leaf", "directory"]
 
 
@@ -4566,13 +4579,63 @@ def _capture_distribution_tree(
 ) -> tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...], str]:
     """Capture one descriptor-bound repository tree without following links."""
 
+    capture = _capture_distribution_tree_details(
+        target_root,
+        relative_root,
+        reject_symlinks=reject_symlinks,
+        require_single_link_regulars=require_single_link_regulars,
+    )
+    return capture.root_binding, capture.entries, capture.tree_digest
+
+
+def _tree_entry_target_snapshot(
+    entry: DistributionTreeEntrySnapshot,
+    *,
+    root_snapshot: PathIdentitySnapshot,
+    parents: tuple[PathIdentitySnapshot, ...],
+) -> DistributionTargetSnapshot:
+    identity: DistributionIdentity | None = None
+    if entry.kind == "regular":
+        identity = DistributionIdentity(kind="regular", sha256=entry.sha256, mode=entry.mode)
+    elif entry.kind == "symlink":
+        identity = DistributionIdentity(kind="symlink", target=entry.link_target)
+    target = PathIdentitySnapshot(
+        relative_path=entry.relative_path,
+        exists=True,
+        device=entry.device,
+        inode=entry.inode,
+        ctime_ns=entry.ctime_ns,
+        file_type=entry.kind,
+        link_count=entry.link_count,
+        mode=entry.mode,
+        size=entry.size,
+        identity=identity,
+    )
+    return _target_snapshot(root_snapshot, list(parents), target)
+
+
+def _capture_distribution_tree_details(
+    target_root: Path,
+    relative_root: str,
+    *,
+    reject_symlinks: bool,
+    require_single_link_regulars: bool,
+) -> _DistributionTreeCapture:
+    """Capture a tree and all mutation-bound evidence from one descriptor walk."""
+
     observation = _observe_target(target_root, relative_root)
     if observation.snapshot is None:
         raise _PreservationCaptureError(relative_root, "history-root-unreadable")
     root_binding = observation.snapshot.target
     if observation.state == "missing":
         entries: tuple[DistributionTreeEntrySnapshot, ...] = ()
-        return root_binding, entries, _distribution_tree_digest(relative_root, root_binding, entries)
+        return _DistributionTreeCapture(
+            root_binding=root_binding,
+            entries=entries,
+            tree_digest=_distribution_tree_digest(relative_root, root_binding, entries),
+            target_snapshots=((relative_root, observation.snapshot),),
+            directory_captures=(),
+        )
     if observation.state != "directory":
         reason = (
             "history-root-symlink"
@@ -4584,9 +4647,19 @@ def _capture_distribution_tree(
     directory_flags = _distribution_directory_flags()
     regular_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     captured: list[DistributionTreeEntrySnapshot] = []
+    target_snapshots: dict[str, DistributionTargetSnapshot] = {relative_root: observation.snapshot}
+    directory_captures: dict[str, tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...]]] = {}
+    root_snapshot = observation.snapshot.root
+    root_parents = (*observation.snapshot.parents, root_binding)
 
-    def walk(directory_fd: int, current_path: str) -> None:
+    def walk(
+        directory_fd: int,
+        current_path: str,
+        current_binding: PathIdentitySnapshot,
+        parent_bindings: tuple[PathIdentitySnapshot, ...],
+    ) -> None:
         before = os.fstat(directory_fd)
+        immediate_entries: list[DistributionTreeEntrySnapshot] = []
         for name in sorted(os.listdir(directory_fd), key=os.fsencode):
             child_path = f"{current_path}/{name}"
             try:
@@ -4603,18 +4676,29 @@ def _capture_distribution_tree(
                     opened = os.fstat(child_fd)
                     if not _same_observed_node(visible, opened) or not stat.S_ISDIR(opened.st_mode):
                         raise _PreservationCaptureError(child_path, "history-entry-rebound")
-                    captured.append(
-                        DistributionTreeEntrySnapshot(
-                            relative_path=child_path,
-                            kind="directory",
-                            device=opened.st_dev,
-                            inode=opened.st_ino,
-                            ctime_ns=opened.st_ctime_ns,
-                            mode=stat.S_IMODE(opened.st_mode),
-                            link_count=opened.st_nlink,
-                        )
+                    entry = DistributionTreeEntrySnapshot(
+                        relative_path=child_path,
+                        kind="directory",
+                        device=opened.st_dev,
+                        inode=opened.st_ino,
+                        ctime_ns=opened.st_ctime_ns,
+                        mode=stat.S_IMODE(opened.st_mode),
+                        link_count=opened.st_nlink,
                     )
-                    walk(child_fd, child_path)
+                    captured.append(entry)
+                    immediate_entries.append(entry)
+                    child_snapshot = _tree_entry_target_snapshot(
+                        entry,
+                        root_snapshot=root_snapshot,
+                        parents=parent_bindings,
+                    )
+                    target_snapshots[child_path] = child_snapshot
+                    walk(
+                        child_fd,
+                        child_path,
+                        child_snapshot.target,
+                        (*parent_bindings, child_snapshot.target),
+                    )
                     after = os.fstat(child_fd)
                     if not _same_observed_node(opened, after):
                         raise _PreservationCaptureError(child_path, "history-directory-rebound")
@@ -4640,18 +4724,23 @@ def _capture_distribution_tree(
                     after = os.fstat(child_fd)
                     if not _same_observed_node(opened, after) or after.st_size != opened.st_size:
                         raise _PreservationCaptureError(child_path, "history-entry-rebound")
-                    captured.append(
-                        DistributionTreeEntrySnapshot(
-                            relative_path=child_path,
-                            kind="regular",
-                            device=after.st_dev,
-                            inode=after.st_ino,
-                            ctime_ns=after.st_ctime_ns,
-                            mode=stat.S_IMODE(after.st_mode),
-                            link_count=after.st_nlink,
-                            size=after.st_size,
-                            sha256=sha256,
-                        )
+                    entry = DistributionTreeEntrySnapshot(
+                        relative_path=child_path,
+                        kind="regular",
+                        device=after.st_dev,
+                        inode=after.st_ino,
+                        ctime_ns=after.st_ctime_ns,
+                        mode=stat.S_IMODE(after.st_mode),
+                        link_count=after.st_nlink,
+                        size=after.st_size,
+                        sha256=sha256,
+                    )
+                    captured.append(entry)
+                    immediate_entries.append(entry)
+                    target_snapshots[child_path] = _tree_entry_target_snapshot(
+                        entry,
+                        root_snapshot=root_snapshot,
+                        parents=parent_bindings,
                     )
                 finally:
                     os.close(child_fd)
@@ -4666,23 +4755,29 @@ def _capture_distribution_tree(
                     raise _PreservationCaptureError(child_path, "history-entry-unreadable") from exc
                 if not _same_observed_node(visible, after) or not stat.S_ISLNK(after.st_mode):
                     raise _PreservationCaptureError(child_path, "history-entry-rebound")
-                captured.append(
-                    DistributionTreeEntrySnapshot(
-                        relative_path=child_path,
-                        kind="symlink",
-                        device=after.st_dev,
-                        inode=after.st_ino,
-                        ctime_ns=after.st_ctime_ns,
-                        mode=mode,
-                        link_count=after.st_nlink,
-                        link_target=link_target,
-                    )
+                entry = DistributionTreeEntrySnapshot(
+                    relative_path=child_path,
+                    kind="symlink",
+                    device=after.st_dev,
+                    inode=after.st_ino,
+                    ctime_ns=after.st_ctime_ns,
+                    mode=mode,
+                    link_count=after.st_nlink,
+                    link_target=link_target,
+                )
+                captured.append(entry)
+                immediate_entries.append(entry)
+                target_snapshots[child_path] = _tree_entry_target_snapshot(
+                    entry,
+                    root_snapshot=root_snapshot,
+                    parents=parent_bindings,
                 )
                 continue
             raise _PreservationCaptureError(child_path, "history-special-file-unsafe")
         after = os.fstat(directory_fd)
         if not _same_observed_node(before, after):
             raise _PreservationCaptureError(current_path, "history-directory-rebound")
+        directory_captures[current_path] = (current_binding, tuple(immediate_entries))
 
     root_fd: int | None = None
     try:
@@ -4692,7 +4787,7 @@ def _capture_distribution_tree(
             # The held root is already bound by _open_deprovision_directory;
             # this branch only guards an implementation race in the helper.
             raise _PreservationCaptureError(relative_root, "history-root-rebound")
-        walk(root_fd, relative_root)
+        walk(root_fd, relative_root, root_binding, root_parents)
     except _PreservationCaptureError:
         raise
     except (OSError, DistributionPlanError) as exc:
@@ -4701,7 +4796,13 @@ def _capture_distribution_tree(
         if root_fd is not None:
             os.close(root_fd)
     ordered = tuple(sorted(captured, key=lambda entry: os.fsencode(entry.relative_path)))
-    return root_binding, ordered, _distribution_tree_digest(relative_root, root_binding, ordered)
+    return _DistributionTreeCapture(
+        root_binding=root_binding,
+        entries=ordered,
+        tree_digest=_distribution_tree_digest(relative_root, root_binding, ordered),
+        target_snapshots=tuple(sorted(target_snapshots.items(), key=lambda item: os.fsencode(item[0]))),
+        directory_captures=tuple(sorted(directory_captures.items(), key=lambda item: os.fsencode(item[0]))),
+    )
 
 
 def _open_deprovision_directory(target_root: Path, relative_path: str) -> int:
@@ -4955,6 +5056,12 @@ def _augment_deprovision_tree(
     directory_action_provenance: DistributionProvenance = "current",
     directory_action_reason: str = "owned-directory-empty-after-prune",
     additional_owner_sources: Mapping[str, str] | None = None,
+    additional_managed_roots: tuple[str, ...] = (),
+    additional_directory_captures: Mapping[
+        str,
+        tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...]],
+    ]
+    | None = None,
 ) -> tuple[
     tuple[DistributionAction, ...],
     tuple[tuple[str, DistributionTargetSnapshot], ...],
@@ -4972,6 +5079,7 @@ def _augment_deprovision_tree(
     known_directories: set[str] = {
         root for root in contract.managed_roots if root not in owned_leaf_paths and root != "spec"
     }
+    known_directories.update(additional_managed_roots)
     for path in owned_leaf_paths:
         parts = PurePosixPath(path).parts[:-1]
         known_directories.update("/".join(parts[:index]) for index in range(1, len(parts) + 1))
@@ -4981,8 +5089,19 @@ def _augment_deprovision_tree(
     collapsed_roots: list[str] = []
     existing_directories: list[str] = []
     tree_blockers: list[DistributionAction] = []
+    captured_directory_evidence = additional_directory_captures or {}
     for path in sorted(known_directories, key=lambda item: (len(PurePosixPath(item).parts), item)):
         if any(_is_same_or_descendant(path, root) for root in collapsed_roots):
+            continue
+        captured = captured_directory_evidence.get(path)
+        if captured is not None:
+            binding, _entries = captured
+            if binding.exists and binding.file_type == "directory":
+                existing_directories.append(path)
+            elif not binding.exists:
+                collapsed_roots.append(path)
+            else:
+                tree_blockers.append(_generated_state_blocker(path, "managed-directory-boundary-unsafe"))
             continue
         observation = _observe_target(target_root, path)
         if observation.state == "missing":
@@ -5020,6 +5139,10 @@ def _augment_deprovision_tree(
     )
     actions_by_path = {action.path: action for action in filtered_actions}
     captured_by_directory: dict[str, tuple[PathIdentitySnapshot, tuple[DistributionTreeEntrySnapshot, ...]]] = {}
+    if additional_directory_captures:
+        captured_by_directory.update({
+            path: capture for path, capture in additional_directory_captures.items() if path in known_directories
+        })
     owner_by_path: dict[str, str] = {asset.path: "physical-provider" for asset in contract.managed_assets}
     owner_by_path.update({asset.path: "root-shortcut" for asset in contract.removable_shortcuts})
     owner_by_path.update({asset.path: "workspace-marker" for asset in contract.target_only_assets})
@@ -5030,6 +5153,8 @@ def _augment_deprovision_tree(
     if additional_owner_sources:
         owner_by_path.update(additional_owner_sources)
     for path in existing_directories:
+        if path in captured_by_directory:
+            continue
         try:
             captured_by_directory[path] = _capture_immediate_directory_entries(target_root, path)
         except _PreservationCaptureError as exc:
@@ -5159,10 +5284,13 @@ def _augment_deprovision_tree(
         )
         directory_actions.append(action)
         removable_directories.add(path)
-        observation = _observe_target(target_root, path)
-        if observation.snapshot is None:
-            raise DistributionPlanError("deprovision directory action is missing its target snapshot")
-        snapshots_by_path[path] = observation.snapshot
+        snapshot = snapshots_by_path.get(path)
+        if snapshot is None:
+            observation = _observe_target(target_root, path)
+            if observation.snapshot is None:
+                raise DistributionPlanError("deprovision directory action is missing its target snapshot")
+            snapshot = observation.snapshot
+        snapshots_by_path[path] = snapshot
         directory_snapshots.append(
             DistributionDirectoryMutationSnapshot(
                 relative_path=path,
@@ -5493,7 +5621,7 @@ def _reconstruct_explicit_spec_history_purge_contract(
     )
 
 
-def build_explicit_spec_history_purge_contract(
+def _build_explicit_spec_history_purge_contract_and_capture(
     install_root: Path,
     *,
     manifest_path: Path,
@@ -5501,8 +5629,8 @@ def build_explicit_spec_history_purge_contract(
     target_root: Path,
     expected_root_identity: DistributionRootIdentity,
     recovery_journal: OperationJournal | None = None,
-) -> DistributionExplicitSpecHistoryPurgeContract:
-    """Build the fixed-root explicit history purge contract."""
+) -> tuple[DistributionExplicitSpecHistoryPurgeContract, _DistributionTreeCapture]:
+    """Build purge authority and retain its single descriptor-bound capture."""
 
     component = _build_deprovision_contract(
         install_root,
@@ -5532,41 +5660,89 @@ def build_explicit_spec_history_purge_contract(
                     manifest=component.manifest,
                 ),
             )
-        return _reconstruct_explicit_spec_history_purge_contract(
+        contract = _reconstruct_explicit_spec_history_purge_contract(
             target_root,
             deprovision_contract=component,
             journal=recovery_journal,
         )
+        return (
+            contract,
+            _DistributionTreeCapture(
+                root_binding=contract.history_root_binding,
+                entries=contract.history_entries,
+                tree_digest=contract.history_tree_digest,
+                target_snapshots=(),
+                directory_captures=(),
+            ),
+        )
     else:
         try:
-            root_binding, entries, tree_digest = _capture_distribution_tree(
+            capture = _capture_distribution_tree_details(
                 Path(target_root),
                 _EXPLICIT_SPEC_HISTORY_ROOT,
                 reject_symlinks=True,
                 require_single_link_regulars=True,
             )
-        except _PreservationCaptureError:
+        except _PreservationCaptureError as exc:
             observation = _observe_target(Path(target_root), _EXPLICIT_SPEC_HISTORY_ROOT)
             if observation.snapshot is None:
                 root_binding = _missing_snapshot(_EXPLICIT_SPEC_HISTORY_ROOT)
             else:
                 root_binding = observation.snapshot.target
-            entries = ()
+            entries: tuple[DistributionTreeEntrySnapshot, ...] = ()
             tree_digest = _distribution_tree_digest(_EXPLICIT_SPEC_HISTORY_ROOT, root_binding, entries)
+            capture = _DistributionTreeCapture(
+                root_binding=root_binding,
+                entries=entries,
+                tree_digest=tree_digest,
+                target_snapshots=((_EXPLICIT_SPEC_HISTORY_ROOT, observation.snapshot),)
+                if observation.snapshot is not None
+                else (),
+                directory_captures=(),
+                blockers=(_generated_state_blocker(exc.path, exc.reason),),
+            )
+    root_binding = capture.root_binding
+    entries = capture.entries
+    tree_digest = capture.tree_digest
     contract_digest = _explicit_spec_history_purge_contract_digest(
         deprovision_contract=component,
         history_root=_EXPLICIT_SPEC_HISTORY_ROOT,
         history_tree_digest=tree_digest,
     )
-    return DistributionExplicitSpecHistoryPurgeContract(
-        deprovision_contract=component,
-        history_root=_EXPLICIT_SPEC_HISTORY_ROOT,
-        history_root_binding=root_binding,
-        history_entries=entries,
-        history_tree_digest=tree_digest,
-        authority=_journal_authority_for_intent("purge"),
-        contract_digest=contract_digest,
+    return (
+        DistributionExplicitSpecHistoryPurgeContract(
+            deprovision_contract=component,
+            history_root=_EXPLICIT_SPEC_HISTORY_ROOT,
+            history_root_binding=root_binding,
+            history_entries=entries,
+            history_tree_digest=tree_digest,
+            authority=_journal_authority_for_intent("purge"),
+            contract_digest=contract_digest,
+        ),
+        capture,
     )
+
+
+def build_explicit_spec_history_purge_contract(
+    install_root: Path,
+    *,
+    manifest_path: Path,
+    scaffold_root: Path,
+    target_root: Path,
+    expected_root_identity: DistributionRootIdentity,
+    recovery_journal: OperationJournal | None = None,
+) -> DistributionExplicitSpecHistoryPurgeContract:
+    """Build the fixed-root explicit history purge contract."""
+
+    contract, _capture = _build_explicit_spec_history_purge_contract_and_capture(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=expected_root_identity,
+        recovery_journal=recovery_journal,
+    )
+    return contract
 
 
 def build_explicit_spec_history_purge_assessment(
@@ -5580,7 +5756,7 @@ def build_explicit_spec_history_purge_assessment(
 ) -> WorkspaceAssessment:
     """Build a complete read-only purge assessment for the fixed history root."""
 
-    purge_contract = build_explicit_spec_history_purge_contract(
+    purge_contract, history_capture = _build_explicit_spec_history_purge_contract_and_capture(
         install_root,
         manifest_path=manifest_path,
         scaffold_root=scaffold_root,
@@ -5619,18 +5795,11 @@ def build_explicit_spec_history_purge_assessment(
     )
     history_actions: list[DistributionAction] = []
     history_snapshots = dict(target_snapshots)
-    history_blockers: list[DistributionAction] = []
+    history_blockers: list[DistributionAction] = list(history_capture.blockers)
+    history_entries = purge_contract.history_entries
     if recovery_journal is None:
-        try:
-            _root_binding, history_entries, _tree_digest = _capture_distribution_tree(
-                Path(target_root),
-                _EXPLICIT_SPEC_HISTORY_ROOT,
-                reject_symlinks=True,
-                require_single_link_regulars=True,
-            )
-        except _PreservationCaptureError as exc:
-            history_entries = ()
-            history_blockers.append(_generated_state_blocker(exc.path, exc.reason))
+        captured_history_snapshots = dict(history_capture.target_snapshots)
+        history_snapshots.update(captured_history_snapshots)
         for entry in history_entries:
             if entry.kind == "regular":
                 history_actions.append(
@@ -5642,16 +5811,9 @@ def build_explicit_spec_history_purge_assessment(
                         reason="explicit-spec-history-purge",
                     )
                 )
-                observation = _observe_target(Path(target_root), entry.relative_path)
-                if observation.snapshot is None:
+                if entry.relative_path not in captured_history_snapshots:
                     history_blockers.append(_generated_state_blocker(entry.relative_path, "history-entry-unreadable"))
-                else:
-                    history_snapshots[entry.relative_path] = observation.snapshot
-        # The generic tree augmentation sees an explicit block action as a
-        # namespace explanation, while still retaining the operation-wide
-        # blocker and refusing a safe-subset plan.
     else:
-        history_entries = purge_contract.history_entries
         for record in recovery_journal.actions:
             if not _is_same_or_descendant(record.path, _EXPLICIT_SPEC_HISTORY_ROOT):
                 continue
@@ -5681,6 +5843,13 @@ def build_explicit_spec_history_purge_assessment(
         combined,
         tuple(history_snapshots.items()),
         additional_owner_sources=additional_owner_sources,
+        additional_managed_roots=tuple(
+            sorted(
+                {entry.relative_path for entry in history_entries if entry.kind == "directory"}
+                | ({_EXPLICIT_SPEC_HISTORY_ROOT} if purge_contract.history_root_binding.exists else set())
+            )
+        ),
+        additional_directory_captures=dict(history_capture.directory_captures),
     )
     history_directory_paths = {entry.relative_path for entry in history_entries if entry.kind == "directory"}
     if purge_contract.history_root_binding.exists:
