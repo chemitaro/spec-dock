@@ -9940,6 +9940,126 @@ class OperationJournalStore:
             if root_fd is not None:
                 os.close(root_fd)
 
+    def _read_optional_bound_journal_after_metadata_race(
+        self,
+        expected_root: DistributionRootIdentity,
+        *,
+        expected_intent: JournaledDistributionIntent,
+    ) -> OperationJournal | None:
+        """Read a canonical journal without re-admitting destructive metadata."""
+
+        root_fd, parent_fd = self._open_parent(expected_root)
+        journal_fd: int | None = None
+        try:
+            self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+            name = _DISTRIBUTION_JOURNAL_REL.name
+            try:
+                visible_before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+                return None
+            except OSError as exc:
+                raise DistributionApplyError("journal-protocol-incompatible") from exc
+            if not stat.S_ISREG(visible_before.st_mode) or visible_before.st_nlink != 1:
+                raise DistributionApplyError("journal-protocol-incompatible")
+            nofollow = getattr(os, "O_NOFOLLOW", None)
+            if not isinstance(nofollow, int):
+                raise DistributionApplyError("platform lacks required no-follow file support")
+            try:
+                journal_fd = os.open(
+                    name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=parent_fd,
+                )
+            except OSError as exc:
+                raise DistributionApplyError("journal-protocol-incompatible") from exc
+            opened = os.fstat(journal_fd)
+            if self._recovery_metadata_identity(opened) != self._recovery_metadata_identity(visible_before):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            try:
+                raw = _read_fd_bytes(journal_fd)
+                after_read = os.fstat(journal_fd)
+                visible_after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise DistributionApplyError("journal-protocol-incompatible") from exc
+            if (
+                len(raw) > 16 * 1024 * 1024
+                or self._recovery_metadata_identity(after_read) != self._recovery_metadata_identity(opened)
+                or self._recovery_metadata_identity(visible_after) != self._recovery_metadata_identity(opened)
+            ):
+                raise DistributionApplyError("journal-protocol-incompatible")
+            self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+            journal = replace(
+                _parse_operation_journal(raw, expected_intent=expected_intent),
+                source_snapshot=_snapshot_from_stat(_DISTRIBUTION_JOURNAL_REL.as_posix(), after_read),
+                source_sha256=hashlib.sha256(raw).hexdigest(),
+            )
+            if journal.root_identity != expected_root:
+                raise DistributionApplyError("journal-root-mismatch")
+            parent = os.fstat(parent_fd)
+            expected_workspace = self._workspace_condition(journal)
+            if (
+                expected_workspace.get("exists") is not True
+                or expected_workspace.get("file_type") != "directory"
+                or (parent.st_dev, parent.st_ino)
+                != (
+                    expected_workspace.get("device"),
+                    expected_workspace.get("inode"),
+                )
+                or ("mode" in expected_workspace and stat.S_IMODE(parent.st_mode) != expected_workspace.get("mode"))
+            ):
+                raise DistributionApplyError("journal-parent-mismatch")
+            self._assert_recovery_metadata_parent_bound(root_fd, parent_fd, expected_root)
+            return journal
+        finally:
+            if journal_fd is not None:
+                os.close(journal_fd)
+            os.close(parent_fd)
+            os.close(root_fd)
+
+    def _is_exact_prepared_journal_for_plan(
+        self,
+        journal: OperationJournal,
+        plan: ExecutableMutationPlan,
+        guard: DistributionRetryMarker,
+        *,
+        expected_root: DistributionRootIdentity,
+    ) -> bool:
+        """Prove that a reread journal is this guard-only prepare publication."""
+
+        if (
+            guard.operation_id is None
+            or guard.journal_digest is None
+            or guard.journal_created_at_ns is None
+            or journal.root_identity != expected_root
+            or journal.intent != plan.intent
+            or journal.authority != _journal_authority_for_intent(plan.intent)
+            or journal.package_version != guard.package_version
+            or journal.operation_id != guard.operation_id
+            or journal.contract_identity != plan.contract_identity
+            or journal.plan_digest != plan.plan_digest
+            or journal.created_at_ns != guard.journal_created_at_ns
+            or journal.status != "prepared"
+            or journal.staging_leases != guard.stage_ownership
+            or any(action.checkpoint != "pending" for action in journal.actions)
+            or journal.source_sha256 != guard.journal_digest
+        ):
+            return False
+        try:
+            self._assert_guard_anchors_journal(journal)
+            expected = replace(
+                self._initial_journal(
+                    plan,
+                    package_version=guard.package_version,
+                    operation_id=guard.operation_id,
+                    created_at_ns=guard.journal_created_at_ns,
+                ),
+                staging_leases=guard.stage_ownership,
+            )
+        except DistributionApplyError:
+            return False
+        return replace(journal, source_snapshot=None, source_sha256=None) == expected
+
     def _read(
         self,
         expected_root: DistributionRootIdentity,
@@ -12538,8 +12658,6 @@ class OperationJournalStore:
                 identity_error="journal-precondition-mismatch",
                 failure_reason=failure_reason,
             )
-            if destructive_recovery:
-                self._assert_destructive_recovery_metadata_bound(journal.root_identity)
         finally:
             if guard_fd is not None:
                 os.close(guard_fd)
@@ -12576,6 +12694,8 @@ class OperationJournalStore:
             )
         except OSError as exc:
             raise DistributionApplyError(identity_error) from exc
+        raw: bytes | None = None
+        held_before: os.stat_result | None = None
         try:
             try:
                 held_before = os.fstat(held_fd)
@@ -12638,21 +12758,47 @@ class OperationJournalStore:
                 os.fsync(parent_fd)
                 if pre_delete_check is not None:
                     pre_delete_check()
-                _remove_distribution_stage_if_owned(parent_fd, quarantine, moved, strict=True)
+                _remove_distribution_stage_if_owned(
+                    parent_fd,
+                    quarantine,
+                    moved,
+                    strict=True,
+                    mutation_validator=pre_delete_check,
+                    direct_unlink=True,
+                )
                 if pre_delete_check is not None:
                     pre_delete_check()
             except (DistributionApplyError, OSError) as exc:
                 if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
-                    with suppress(DistributionApplyError):
-                        self._restore_quarantined_entry(
-                            parent_fd,
-                            name,
-                            quarantine,
-                            held_fd,
-                            identity_error=identity_error,
-                            failure_reason=failure_reason,
-                            require_held_identity=True,
-                        )
+                    try:
+                        if _stat_optional_no_follow(parent_fd, quarantine) is not None:
+                            self._restore_quarantined_entry(
+                                parent_fd,
+                                name,
+                                quarantine,
+                                held_fd,
+                                identity_error=identity_error,
+                                failure_reason=failure_reason,
+                                require_held_identity=True,
+                            )
+                        elif raw is None or held_before is None:
+                            raise DistributionApplyError(failure_reason)
+                        else:
+                            self._republish_exact_recovery_entry_from_held_bytes(
+                                parent_fd,
+                                name,
+                                held_fd,
+                                raw,
+                                held_before,
+                                expected_sha256=expected_sha256,
+                                quarantine_name=quarantine,
+                                failure_reason=failure_reason,
+                            )
+                    except (DistributionApplyError, OSError) as restore_exc:
+                        raise DistributionApplyError(
+                            failure_reason,
+                            recovery_metadata_state=exc.recovery_metadata_state,
+                        ) from restore_exc
                     raise
                 self._restore_quarantined_entry(
                     parent_fd,
@@ -12666,6 +12812,109 @@ class OperationJournalStore:
                 raise DistributionApplyError(failure_reason) from exc
         finally:
             os.close(held_fd)
+
+    @staticmethod
+    def _republish_exact_recovery_entry_from_held_bytes(
+        parent_fd: int,
+        name: str,
+        held_fd: int,
+        raw: bytes,
+        expected: os.stat_result,
+        *,
+        expected_sha256: str,
+        quarantine_name: str,
+        failure_reason: str,
+    ) -> None:
+        """Republish one unlinked regular recovery entry from its held fd."""
+
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise DistributionApplyError("platform lacks required no-follow file support")
+        expected_mode = stat.S_IMODE(expected.st_mode)
+        held = os.fstat(held_fd)
+        if (
+            not stat.S_ISREG(held.st_mode)
+            or held.st_nlink != 0
+            or held.st_dev != expected.st_dev
+            or held.st_ino != expected.st_ino
+            or stat.S_IMODE(held.st_mode) != expected_mode
+            or held.st_size != len(raw)
+            or hashlib.sha256(raw).hexdigest() != expected_sha256
+            or not _held_fd_has_exact_bytes(held_fd, raw)
+        ):
+            raise DistributionApplyError(failure_reason)
+        try:
+            if _stat_optional_no_follow(parent_fd, name) is not None:
+                raise DistributionApplyError(failure_reason)
+            if _stat_optional_no_follow(parent_fd, quarantine_name) is not None:
+                raise DistributionApplyError(failure_reason)
+        except DistributionApplyError as exc:
+            if str(exc) == "managed staging cleanup failed":
+                raise DistributionApplyError(failure_reason) from exc
+            raise
+
+        stage = f".{name}.{secrets.token_hex(16)}.restore"
+        stage_fd: int | None = None
+        stage_info: os.stat_result | None = None
+        try:
+            try:
+                stage_fd = os.open(
+                    stage,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    expected_mode,
+                    dir_fd=parent_fd,
+                )
+                _write_fd_bytes(stage_fd, raw)
+                os.fchmod(stage_fd, expected_mode)
+                stage_info = os.fstat(stage_fd)
+                visible_stage = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise DistributionApplyError(failure_reason) from exc
+            if (
+                not stat.S_ISREG(stage_info.st_mode)
+                or stage_info.st_nlink != 1
+                or stat.S_IMODE(stage_info.st_mode) != expected_mode
+                or visible_stage.st_dev != stage_info.st_dev
+                or visible_stage.st_ino != stage_info.st_ino
+                or visible_stage.st_nlink != 1
+                or stat.S_IMODE(visible_stage.st_mode) != expected_mode
+                or not _held_fd_has_exact_bytes(stage_fd, raw)
+            ):
+                raise DistributionApplyError(failure_reason)
+            _rename_distribution_no_replace(parent_fd, stage, parent_fd, name)
+            os.fsync(parent_fd)
+            try:
+                published = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                published_fd = os.open(
+                    name,
+                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=parent_fd,
+                )
+            except OSError as exc:
+                raise DistributionApplyError(failure_reason) from exc
+            try:
+                opened = os.fstat(published_fd)
+                if (
+                    not stat.S_ISREG(published.st_mode)
+                    or published.st_nlink != 1
+                    or stat.S_IMODE(published.st_mode) != expected_mode
+                    or _stat_identity_tuple(opened) != _stat_identity_tuple(published)
+                    or not _held_fd_has_exact_bytes(published_fd, raw)
+                ):
+                    raise DistributionApplyError(failure_reason)
+            finally:
+                os.close(published_fd)
+            if _stat_optional_no_follow(parent_fd, stage) is not None:
+                raise DistributionApplyError(failure_reason)
+        finally:
+            if stage_fd is not None:
+                os.close(stage_fd)
+            if stage_info is not None:
+                with suppress(OSError):
+                    residual = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
+                    if _stat_identity_tuple(residual) == _stat_identity_tuple(stage_info):
+                        os.unlink(stage, dir_fd=parent_fd)
+                        os.fsync(parent_fd)
 
     @staticmethod
     def _restore_quarantined_entry(
@@ -12752,8 +13001,6 @@ class OperationJournalStore:
                 identity_error="legacy-marker-unconvertible",
                 failure_reason="legacy-marker-unconvertible",
             )
-            if destructive_recovery:
-                self._assert_destructive_recovery_metadata_bound(marker.target_root)
         finally:
             os.close(parent_fd)
             os.close(root_fd)
@@ -15330,9 +15577,7 @@ def _destructive_recovery_boundary_result(
         "legacy-marker-unconvertible": "legacy-marker",
         "legacy-marker-invalid": "legacy-marker-invalid",
         "dual-recovery-state": "dual-recovery-state",
-    }.get(state_text)
-    if state is None:
-        return None
+    }.get(state_text, "dual-recovery-state")
     return _distribution_process_result_from_state(
         assessment,
         journal,
@@ -17707,6 +17952,49 @@ def _execute_deprovision_journal_plan(
     except Exception as exc:
         failure_paths = exc.failed_paths if isinstance(exc, DistributionApplyError) else ()
         if isinstance(exc, DistributionApplyError):
+            if exc.recovery_metadata_state is not None and journal is None:
+                durable_journal: OperationJournal | None = None
+                try:
+                    candidate = store._read_optional_bound_journal_after_metadata_race(
+                        assessment.root_identity,
+                        expected_intent=intent,
+                    )
+                    current_guard = store._forward_guard or guard
+                    if (
+                        candidate is not None
+                        and current_guard is not None
+                        and store._is_exact_prepared_journal_for_plan(
+                            candidate,
+                            executable,
+                            current_guard,
+                            expected_root=assessment.root_identity,
+                        )
+                    ):
+                        durable_journal = candidate
+                except (DistributionApplyError, OSError):
+                    durable_journal = None
+                try:
+                    recovery_paths = store._bound_destructive_recovery_metadata_paths(
+                        assessment.root_identity,
+                    )
+                except DistributionApplyError:
+                    recovery_paths = tuple(
+                        dict.fromkeys((
+                            *failure_paths,
+                            _DISTRIBUTION_RETRY_MARKER_REL.as_posix(),
+                            _DISTRIBUTION_JOURNAL_REL.as_posix(),
+                        ))
+                    )
+                boundary_result = _destructive_recovery_boundary_result(
+                    assessment,
+                    durable_journal,
+                    executable=executable,
+                    intent=intent,
+                    error=exc,
+                    failure_paths=tuple(dict.fromkeys((*recovery_paths, *failure_paths))),
+                )
+                if boundary_result is not None:
+                    return boundary_result
             boundary_result = _destructive_recovery_boundary_result(
                 assessment,
                 journal,
@@ -18019,12 +18307,57 @@ def _execute_destructive_distribution(
             )
         try:
             journal = store.prepare(executable, package_version=guard.package_version)
-        except DistributionApplyError:
-            return _distribution_process_result_from_state(
+        except DistributionApplyError as exc:
+            if exc.recovery_metadata_state is None:
+                return _distribution_process_result_from_state(
+                    assessment,
+                    state="guard-only",
+                    executable=executable,
+                    intent=intent,
+                )
+            durable_journal: OperationJournal | None = None
+            try:
+                candidate = store._read_optional_bound_journal_after_metadata_race(
+                    bound_root_identity,
+                    expected_intent=intent,
+                )
+                current_guard = store._forward_guard or guard
+                exact_candidate = candidate is not None and store._is_exact_prepared_journal_for_plan(
+                    candidate,
+                    executable,
+                    current_guard,
+                    expected_root=bound_root_identity,
+                )
+                if exact_candidate:
+                    durable_journal = candidate
+            except (DistributionApplyError, OSError):
+                durable_journal = None
+            try:
+                refreshed_metadata_paths = store._bound_destructive_recovery_metadata_paths(bound_root_identity)
+            except DistributionApplyError:
+                refreshed_metadata_paths = tuple(
+                    dict.fromkeys((
+                        *metadata_paths,
+                        _DISTRIBUTION_JOURNAL_REL.as_posix(),
+                    ))
+                )
+            boundary_result = _destructive_recovery_boundary_result(
                 assessment,
-                state="guard-only",
+                durable_journal,
                 executable=executable,
                 intent=intent,
+                error=exc,
+                failure_paths=tuple(dict.fromkeys((*refreshed_metadata_paths, *exc.failed_paths))),
+            )
+            if boundary_result is not None:
+                return boundary_result
+            return _distribution_process_result_from_state(
+                assessment,
+                durable_journal,
+                state="dual-recovery-state",
+                executable=executable,
+                intent=intent,
+                failure_paths=tuple(dict.fromkeys((*refreshed_metadata_paths, *exc.failed_paths))),
             )
         return _execute_deprovision_journal_plan(
             assessment,
@@ -19350,6 +19683,7 @@ def _remove_distribution_stage_if_owned(
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     mutation_validator: Callable[[], None] | None = None,
     post_link_mutation_validator: Callable[[], None] | None = None,
+    direct_unlink: bool = False,
     gc_path: str | None = None,
     gc_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     gc_name: str | None = None,
@@ -19374,6 +19708,21 @@ def _remove_distribution_stage_if_owned(
     if not owned:
         if strict:
             raise DistributionApplyError("managed staging identity changed")
+        return None
+    if direct_unlink:
+        try:
+            if mutation_validator is not None:
+                mutation_validator()
+            os.unlink(stage_name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+            if mutation_validator is not None:
+                mutation_validator()
+        except DistributionApplyError:
+            raise
+        except OSError as exc:
+            if strict:
+                raise DistributionApplyError("managed staging cleanup failed") from exc
+            return None
         return None
     if gc_recorder is not None and gc_path is None:
         raise DistributionApplyError("managed staging cleanup failed")

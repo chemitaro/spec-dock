@@ -792,6 +792,367 @@ def test_i371_late_legacy_after_journal_prepare_preserves_prepared_recovery(
     assert all(action.checkpoint == "pending" for action in journal.actions)
 
 
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_guard_only_prepare_race_before_journal_is_manual_and_write_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    original_write = OperationJournalStore._write
+    injected = False
+
+    def inject_before_journal_write(self, journal, **kwargs):
+        nonlocal injected
+        if not injected:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return original_write(self, journal, **kwargs)
+
+    monkeypatch.setattr(OperationJournalStore, "_write", inject_before_journal_write)
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.intent == intent
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert result.applied_paths == ()
+    assert result.pending_paths == ()
+    managed_distribution._validate_deprovision_process_result(result, intent=intent)
+    assert managed.read_bytes() == b"managed\n"
+    assert guard_path.read_bytes() == guard_bytes
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_guard_only_prepare_race_after_journal_publish_is_journal_progress_manual(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    original_rename = managed_distribution._rename_distribution_no_replace
+    injected = False
+
+    def inject_after_journal_publish(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and destination_name == journal_path.name:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", inject_after_journal_publish)
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.intent == intent
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert result.applied_paths == ()
+    assert result.pending_paths == tuple(sorted((action.path for action in executable.actions), key=os.fsencode))
+    managed_distribution._validate_deprovision_process_result(result, intent=intent)
+    assert managed.read_bytes() == b"managed\n"
+    assert guard_path.read_bytes() == guard_bytes
+    assert legacy_path.read_bytes() == legacy_bytes
+    journal = OperationJournalStore(target_root)._read(root_identity)
+    assert journal.status == "prepared"
+    assert all(action.checkpoint == "pending" for action in journal.actions)
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_cleanup_race_after_unlink_republishes_exact_recovery_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        _managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    prepared = store.prepare(executable, package_version="1.2.3")
+    completed = managed_distribution.replace(
+        prepared,
+        status="completed",
+        actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
+        created_parent_bindings=(),
+    )
+    completed = store.write(completed)
+    completed_journal_bytes = journal_path.read_bytes()
+    refreshed_marker = managed_distribution._read_distribution_retry_marker(target_root)
+    assert refreshed_marker is not None
+    guard_bytes: bytes
+    guard_bytes = guard_path.read_bytes()
+
+    original_unlink = managed_distribution.os.unlink
+    injected = False
+
+    def inject_after_unlink(name, *args, **kwargs):
+        nonlocal injected
+        result = original_unlink(name, *args, **kwargs)
+        expected_prefix = f".{guard_path.name}." if entry == "guard" else f".{journal_path.name}."
+        if not injected and isinstance(name, str) and name.startswith(expected_prefix) and name.endswith(".remove"):
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return result
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", inject_after_unlink)
+    with pytest.raises(DistributionApplyError) as raised:
+        if entry == "guard":
+            store.remove_legacy_marker(refreshed_marker)
+        else:
+            assert completed_journal_bytes is not None
+            store.remove_completed(completed)
+
+    assert injected is True
+    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert (
+        tuple(
+            path
+            for path in target_root.joinpath("spec-dock").iterdir()
+            if path.name.endswith((".remove", ".gc", ".restore")) or path.name.startswith(".spec-dock-backup-")
+        )
+        == ()
+    )
+    if entry == "guard":
+        restored = guard_path.lstat()
+        assert stat.S_ISREG(restored.st_mode)
+        assert restored.st_nlink == 1
+        assert guard_path.read_bytes() == guard_bytes
+        assert completed_journal_bytes is not None
+        assert journal_path.read_bytes() == completed_journal_bytes
+    else:
+        assert completed_journal_bytes is not None
+        restored = journal_path.lstat()
+        assert stat.S_ISREG(restored.st_mode)
+        assert restored.st_nlink == 1
+        assert journal_path.read_bytes() == completed_journal_bytes
+        assert guard_path.read_bytes() == guard_bytes
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_cleanup_race_after_first_check_restores_exact_recovery_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        _managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    prepared = store.prepare(executable, package_version="1.2.3")
+    journal_bytes: bytes
+    refreshed_marker: DistributionRetryMarker | None = None
+    if entry == "guard":
+        completed = managed_distribution.replace(
+            prepared,
+            status="completed",
+            actions=tuple(managed_distribution.replace(action, checkpoint="verified") for action in prepared.actions),
+            created_parent_bindings=(),
+        )
+        store.write(completed)
+        refreshed_marker = managed_distribution._read_distribution_retry_marker(target_root)
+        assert refreshed_marker is not None
+    journal_bytes = journal_path.read_bytes()
+    guard_bytes = guard_path.read_bytes()
+    original_assert = OperationJournalStore._assert_destructive_recovery_metadata_bound
+    injected = False
+
+    def inject_after_first_check(self, expected_root):
+        nonlocal injected
+        result = original_assert(self, expected_root)
+        quarantine = tuple(
+            target_root.joinpath("spec-dock").glob(
+                f".{guard_path.name if entry == 'guard' else journal_path.name}.*.remove"
+            )
+        )
+        if not injected and quarantine:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return result
+
+    monkeypatch.setattr(
+        OperationJournalStore,
+        "_assert_destructive_recovery_metadata_bound",
+        inject_after_first_check,
+    )
+    with pytest.raises(DistributionApplyError) as raised:
+        if entry == "guard":
+            assert refreshed_marker is not None
+            store.remove_legacy_marker(refreshed_marker)
+        else:
+            assert prepared is not None
+            store.discard_prepared(prepared)
+
+    assert injected is True
+    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert tuple(target_root.joinpath("spec-dock").glob("*.remove")) == ()
+    assert tuple(target_root.joinpath("spec-dock").glob("*.restore")) == ()
+    assert guard_path.read_bytes() == guard_bytes
+    assert journal_path.read_bytes() == journal_bytes
+
+
 def test_i371_late_legacy_after_target_unlink_leaves_action_pending(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -10148,10 +10509,10 @@ def test_i368_journal_cleanup_failure_restores_canonical_recovery_authority(
     before = store.path.read_bytes()
     original_remove = managed_distribution._remove_distribution_stage_if_owned
 
-    def fail_quarantine_cleanup(parent_fd, stage_name, created, *, strict=False):
+    def fail_quarantine_cleanup(parent_fd, stage_name, created, *, strict=False, **kwargs):
         if stage_name.endswith(".remove"):
             raise DistributionApplyError("simulated quarantine cleanup failure")
-        return original_remove(parent_fd, stage_name, created, strict=strict)
+        return original_remove(parent_fd, stage_name, created, strict=strict, **kwargs)
 
     monkeypatch.setattr(managed_distribution, "_remove_distribution_stage_if_owned", fail_quarantine_cleanup)
 

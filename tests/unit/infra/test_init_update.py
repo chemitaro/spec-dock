@@ -383,21 +383,26 @@ def test_i371_cli_maps_journal_progress_dual_state_to_partial_failure(
     managed_path = target / ".github/workflows/ci.yml"
     managed_bytes = managed_path.read_bytes()
     legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
-    original_prepare = managed_distribution.OperationJournalStore.prepare
+    original_rename = managed_distribution._rename_distribution_no_replace
     captured: dict[str, bytes] = {}
+    injected = False
 
-    def prepare_with_late_legacy(self, plan, **kwargs):
-        journal = original_prepare(self, plan, **kwargs)
-        captured["guard"] = guard_path.read_bytes()
-        captured["journal"] = journal_path.read_bytes()
-        legacy_path.write_bytes(legacy_bytes)
-        return journal
+    def rename_with_late_legacy(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and destination_name == journal_path.name:
+            captured["guard"] = guard_path.read_bytes()
+            captured["journal"] = journal_path.read_bytes()
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return None
 
-    monkeypatch.setattr(managed_distribution.OperationJournalStore, "prepare", prepare_with_late_legacy)
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", rename_with_late_legacy)
     args = ["uninstall", str(target), "--apply", f"--{mode}", "--json"]
     assert main(args) == 1
     payload = json.loads(capsys.readouterr().out)
 
+    assert injected is True
     assert payload["status"] == "partial_failure"
     assert payload["specs_mode"] == ("keep" if mode == "keep-specs" else "remove")
     assert payload["phase"] == "uninstall-apply"
@@ -413,6 +418,61 @@ def test_i371_cli_maps_journal_progress_dual_state_to_partial_failure(
     assert managed_path.read_bytes() == managed_bytes
     assert guard_path.read_bytes() == captured["guard"]
     assert journal_path.read_bytes() == captured["journal"]
+    assert legacy_path.read_bytes() == legacy_bytes
+
+
+@pytest.mark.parametrize("mode", ["keep-specs", "remove-specs"])
+def test_i371_cli_maps_guard_only_prepare_metadata_race_to_partial_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+    mode: str,
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    capsys.readouterr()
+    if mode == "remove-specs":
+        history_file = target / "spec-dock/initiatives/history.md"
+        history_file.parent.mkdir(parents=True, exist_ok=True)
+        history_file.write_bytes(b"history\n")
+
+    guard_path = target / "spec-dock/.distribution-retry.json"
+    journal_path = target / "spec-dock/.distribution-journal.json"
+    legacy_path = target / "spec-dock/.uninstall-retry.json"
+    managed_path = target / ".github/workflows/ci.yml"
+    managed_bytes = managed_path.read_bytes()
+    legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
+    original_write = managed_distribution.OperationJournalStore._write
+    injected = False
+
+    def write_with_late_legacy(self, journal, **kwargs):
+        nonlocal injected
+        if journal.intent in {"deprovision", "purge"} and not injected:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return original_write(self, journal, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.OperationJournalStore, "_write", write_with_late_legacy)
+    args = ["uninstall", str(target), "--apply", f"--{mode}", "--json"]
+    assert main(args) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert injected is True
+    assert payload["status"] == "partial_failure"
+    assert payload["specs_mode"] == ("keep" if mode == "keep-specs" else "remove")
+    assert payload["phase"] == "preflight"
+    assert payload["last_completed_phase"] == "not-started"
+    assert payload["retry_command"] is None
+    assert payload["pending_paths"] == []
+    assert payload["errors"] == ["Conflicting uninstall recovery evidence requires manual review."]
+    assert payload["guidance"][0] == (
+        "manual recovery required: conflicting legacy and schema-2 recovery states prove no single plan or checkpoint"
+    )
+    assert managed_path.read_bytes() == managed_bytes
+    assert guard_path.is_file()
+    assert journal_path.exists() is False
+    assert guard_path.read_bytes() != b""
     assert legacy_path.read_bytes() == legacy_bytes
 
 
