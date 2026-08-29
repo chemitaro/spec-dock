@@ -295,11 +295,55 @@ guard/journal × deprovision/purge × stat/fstat の全 matrix で、service res
 この pre-commit 証拠も final fixed SHA の Full Regression／Strict review の代替には
 使用しない。ledger、verifier、accepted requirement/design/plan、CLI は変更していない。
 
+### Final Quality Gate P1 remediation: metadata GC failure authority
+
+observation-only recovery remediation を含む clean SHA
+`6342f41e6f1dc47ef61e80048a81d0c044e4b51e` は fresh Full Regression で
+`verified`（approved failure 27、unexpected/missing/signature mismatch/
+unexpected error 0）となった。その後の browser-only Strict review は、destructive
+guard/journal cleanup が generic `_remove_distribution_stage_if_owned()` を通る際、
+`.remove -> .gc` 後の identity mismatch や後段 failure compensation によって、
+第三者が再束縛した pathname を rollback rename／unlink し得ることを P1 と判定した。
+
+Blue Team Strict analysis は exact SHA を GitHub connector で再検証し、guard/journal
+times deprovision/purge から到達可能な failure-time mutation を、first GC、delete
+candidate、retained backup の3 restoreと、outer exception cleanup の2 restore／
+1 unlinkとして確認した。Issue 370 の generic GC caller は変更せず、private typed
+`failure_policy` の既定を `restore-stage` のまま維持し、Issue 371 destructive
+metadata cleanup edge だけ `preserve-observed-namespace` を指定する設計を採用した。
+この policy では正常 cleanup protocol は変更せず、failure／ambiguity 認識後の
+pathname compensation だけを行わない。既存の observation-only recovery が
+specific stateを保持し、state-less failureを `quarantine-preserved` から
+`recovery_required` / `manual-recovery`、public `partial_failure` / exit 1 へ写像する。
+
+Luna Max coder の実装と独立 verifier で次を確認した。
+
+- preserve/default policy・metadata race matrix: `40 passed`
+- preserve policy A-F + destructive metadata edge: `22 passed`
+- Issue 370 default restore regression: `2 passed`
+- Issue 370 restore/GC/checkpoint/quarantine selector: `70 passed`
+- I371 managed selector: `132 passed`
+- `tests/unit/infra/test_managed_distribution.py`: `618 passed`
+- ordinary fast lane `uv run pytest -q`: `1569 passed, 1142 skipped`
+- CLI I371 focused selector: `3 passed`
+- init/update I371 focused selector: `6 passed`
+- `make lint`: ruff check/format、mypy ともに pass
+- `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=227`
+- `python -m py_compile src/spec_dock/managed_distribution.py`: pass
+- `git diff --check`: pass（whitespace error 0）
+
+独立 verifier は P0/P1 なしと判定した。foreign regular/symlink の identity と
+bytes/readlink、operation-owned evidence の保持、public manual-recovery mapping、
+default Issue 370 semantics、success path のコード差分なしを確認している。変更対象は
+`managed_distribution.py` と managed distribution unit test に限定し、accepted
+requirement/design/plan、CLI、ledger、verifier、schema/protocol/intent/authority は
+変更していない。
+
 ## Residual Risks / Follow-ups
 
-- observation-only recovery remediation と本 report を含む final frozen SHA で、clean
-  Full Regression verifier と Strict review の再検証が必要。直前の clean SHA
-  `a50526e282d6e13521acc26bc5aa7c902434f6ec` は Full Regression `verified`
+- metadata GC failure authority remediation と本 report を含む final frozen SHA で、
+  clean Full Regression verifier と Strict review の再検証が必要。直前の clean SHA
+  `6342f41e6f1dc47ef61e80048a81d0c044e4b51e` は Full Regression `verified`
   （approved failure 27、unexpected/missing/signature mismatch 0）だった。ledger、
   verifier、approved failure signaturesは変更していない。
 - fast lane の visible-parent rebind race は既存挙動として残る。再実行で green
@@ -309,8 +353,8 @@ guard/journal × deprovision/purge × stat/fstat の全 matrix で、service res
   suitesの修正後 greenを保全している。
 - `.artifacts/iss-00371-full-regression/20260828T092613.495723Z/` は verifier
   evidence として生成したが、現在の working tree には保持していない。
-- observation-only recovery remediation 前の commit
-  `a50526e282d6e13521acc26bc5aa7c902434f6ec` までは upstream へpush済みである。
+- metadata GC failure authority remediation 前の commit
+  `6342f41e6f1dc47ef61e80048a81d0c044e4b51e` までは upstream へpush済みである。
   最新 remediation の pre-commit `git status --short` は次のとおり。
 
 ```text
