@@ -147,6 +147,7 @@ DistributionActionName = Literal[
     "remove-empty-directory",
 ]
 DistributionProvenance = Literal["missing", "current", "historical", "unknown"]
+_DistributionStageFailurePolicy = Literal["restore-stage", "preserve-observed-namespace"]
 
 _FRESH_DISTRIBUTION_ACTIONS = frozenset({"create", "adopt", "preserve", "block", "ensure-directory"})
 _DEPROVISION_DISTRIBUTION_ACTIONS = frozenset({"prune", "preserve", "block", "remove-empty-directory"})
@@ -12705,6 +12706,7 @@ class OperationJournalStore:
                 pre_delete_check=(pre_delete_check if require_guard or destructive_recovery else None),
                 identity_error="journal-precondition-mismatch",
                 failure_reason=failure_reason,
+                failure_policy=("preserve-observed-namespace" if destructive_recovery else "restore-stage"),
             )
         finally:
             if guard_fd is not None:
@@ -12723,6 +12725,7 @@ class OperationJournalStore:
         pre_delete_check: Callable[[], None] | None = None,
         identity_error: str,
         failure_reason: str,
+        failure_policy: _DistributionStageFailurePolicy = "restore-stage",
     ) -> None:
         """Move a bound regular file aside before deleting its exact identity."""
 
@@ -12808,6 +12811,7 @@ class OperationJournalStore:
                     quarantine,
                     moved,
                     strict=True,
+                    failure_policy=failure_policy,
                     mutation_validator=pre_delete_check,
                 )
                 if pre_delete_check is not None:
@@ -12962,6 +12966,7 @@ class OperationJournalStore:
                 pre_delete_check=pre_delete_check if destructive_recovery else None,
                 identity_error="legacy-marker-unconvertible",
                 failure_reason="legacy-marker-unconvertible",
+                failure_policy=("preserve-observed-namespace" if destructive_recovery else "restore-stage"),
             )
         finally:
             os.close(parent_fd)
@@ -19651,6 +19656,7 @@ def _remove_distribution_stage_if_owned(
     created: os.stat_result,
     *,
     strict: bool = False,
+    failure_policy: _DistributionStageFailurePolicy = "restore-stage",
     transition_path: str | None = None,
     canonical_name: str | None = None,
     canonical_ownership: DistributionStageOwnership | None = None,
@@ -19819,13 +19825,14 @@ def _remove_distribution_stage_if_owned(
         except (DistributionApplyError, OSError) as exc:
             if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
                 raise
-            with suppress(DistributionApplyError):
-                _restore_distribution_quarantine(
-                    parent_fd,
-                    quarantine_name,
-                    stage_name,
-                    failure_message="managed staging cleanup failed",
-                )
+            if failure_policy == "restore-stage":
+                with suppress(DistributionApplyError):
+                    _restore_distribution_quarantine(
+                        parent_fd,
+                        quarantine_name,
+                        stage_name,
+                        failure_message="managed staging cleanup failed",
+                    )
             if transition_recorder is not None:
                 with suppress(Exception):
                     transition_recorder(
@@ -19903,12 +19910,13 @@ def _remove_distribution_stage_if_owned(
                 )
             )
             if not moved_is_exact:
-                _restore_distribution_quarantine(
-                    parent_fd,
-                    quarantine_name,
-                    stage_name,
-                    failure_message="managed staging cleanup failed",
-                )
+                if failure_policy == "restore-stage":
+                    _restore_distribution_quarantine(
+                        parent_fd,
+                        quarantine_name,
+                        stage_name,
+                        failure_message="managed staging cleanup failed",
+                    )
                 raise DistributionApplyError("managed staging identity changed")
             if gc_recorder is not None:
                 assert gc_path is not None
@@ -19928,12 +19936,13 @@ def _remove_distribution_stage_if_owned(
                 except DistributionApplyError as exc:
                     if exc.recovery_metadata_state is not None:
                         raise
-                    _restore_distribution_quarantine(
-                        parent_fd,
-                        quarantine_name,
-                        stage_name,
-                        failure_message="managed staging cleanup failed",
-                    )
+                    if failure_policy == "restore-stage":
+                        _restore_distribution_quarantine(
+                            parent_fd,
+                            quarantine_name,
+                            stage_name,
+                            failure_message="managed staging cleanup failed",
+                        )
                     raise
             # Keep an independent exact link until the moved deletion
             # candidate has been revalidated.  A replacement of the first
@@ -20022,12 +20031,13 @@ def _remove_distribution_stage_if_owned(
                 or deleting.st_nlink != 2
                 or (stat.S_ISLNK(deleting.st_mode) and os.readlink(delete_name, dir_fd=parent_fd) != gc_original_link)
             ):
-                _restore_distribution_quarantine(
-                    parent_fd,
-                    delete_name,
-                    quarantine_name,
-                    failure_message="managed staging cleanup failed",
-                )
+                if failure_policy == "restore-stage":
+                    _restore_distribution_quarantine(
+                        parent_fd,
+                        delete_name,
+                        quarantine_name,
+                        failure_message="managed staging cleanup failed",
+                    )
                 raise DistributionApplyError("managed staging identity changed")
             if gc_recorder is not None:
                 assert gc_path is not None
@@ -20084,12 +20094,13 @@ def _remove_distribution_stage_if_owned(
                     and os.readlink(retained_gc_name, dir_fd=parent_fd) != gc_original_link
                 )
             ):
-                _restore_distribution_quarantine(
-                    parent_fd,
-                    retained_gc_name,
-                    retained_name,
-                    failure_message="managed staging cleanup failed",
-                )
+                if failure_policy == "restore-stage":
+                    _restore_distribution_quarantine(
+                        parent_fd,
+                        retained_gc_name,
+                        retained_name,
+                        failure_message="managed staging cleanup failed",
+                    )
                 raise DistributionApplyError("managed staging identity changed")
             if gc_recorder is not None:
                 assert gc_path is not None
@@ -20141,6 +20152,8 @@ def _remove_distribution_stage_if_owned(
             return retained_gc_name
         except Exception as exc:
             if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
+                raise
+            if failure_policy == "preserve-observed-namespace":
                 raise
             if retained_gc_name is not None:
                 with suppress(OSError, DistributionApplyError):

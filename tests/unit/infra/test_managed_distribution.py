@@ -2051,9 +2051,9 @@ def test_i371_cleanup_post_gc_unlink_state_less_failure_requires_manual_recovery
     assert raised.value.recovery_metadata_state == "quarantine-preserved"
     assert not canonical_path.exists() and not canonical_path.is_symlink()
     assert counterpart_path.read_bytes() == counterpart_bytes
-    quarantines = tuple(target_root.joinpath("spec-dock").glob("*.remove"))
-    assert len(quarantines) == 1
-    assert quarantines[0].read_bytes() == expected_bytes
+    preserved_gc = tuple(target_root.joinpath("spec-dock").glob("*.gc"))
+    assert len(preserved_gc) == 1
+    assert preserved_gc[0].read_bytes() == expected_bytes
     assert not tuple(target_root.joinpath("spec-dock").glob("*.restore"))
     assert not tuple(target_root.joinpath("spec-dock").glob("*.stage"))
 
@@ -2132,9 +2132,9 @@ def test_i371_cleanup_after_gc_failure_requires_manual_recovery(
     assert not canonical_path.exists() and not canonical_path.is_symlink()
     private = tuple(target_root.joinpath("spec-dock").glob("*.restore"))
     assert private == ()
-    quarantines = tuple(target_root.joinpath("spec-dock").glob("*.remove"))
-    assert len(quarantines) == 1
-    assert quarantines[0].read_bytes() == expected_bytes
+    preserved_gc = tuple(target_root.joinpath("spec-dock").glob("*.gc"))
+    assert len(preserved_gc) == 1
+    assert preserved_gc[0].read_bytes() == expected_bytes
 
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
@@ -2303,9 +2303,9 @@ def test_i371_cleanup_post_gc_canonical_conflict_is_manual_and_preserves_both_ev
     private = tuple(target_root.joinpath("spec-dock").glob("*.restore"))
     assert private == ()
     assert ".restore" not in str(raised.value)
-    quarantine = tuple(target_root.joinpath("spec-dock").glob("*.remove"))
-    assert len(quarantine) == 1
-    assert quarantine[0].read_bytes() == expected_bytes
+    preserved_gc = tuple(target_root.joinpath("spec-dock").glob("*.gc"))
+    assert len(preserved_gc) == 1
+    assert preserved_gc[0].read_bytes() == expected_bytes
 
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
@@ -19776,6 +19776,368 @@ def test_i368_final_retained_witness_is_not_unlinked_after_authority_interpositi
         assert any(path.read_bytes() == b"owned\n" for path in owned)
     else:
         assert any(path.readlink() == Path("owned-target") for path in owned)
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i371_preserve_policy_never_restores_first_gc_on_identity_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    """Issue 371 must preserve a foreign first-GC pathname for manual recovery."""
+
+    parent = tmp_path / kind
+    parent.mkdir()
+    stage = parent / "stage"
+    aside = parent / "operation-owned-aside"
+    if kind == "regular":
+        stage.write_bytes(b"owned\n")
+    else:
+        stage.symlink_to("owned-target")
+    created = stage.lstat()
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_restore = managed_distribution._restore_distribution_quarantine
+    injected = False
+    restore_attempts = 0
+    foreign_path: Path | None = None
+
+    def replace_first_gc_after_rename(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected, foreign_path
+        result = original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and source_name == stage.name and destination_name.endswith(".gc"):
+            foreign_path = parent / destination_name
+            os.rename(destination_name, aside.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            if kind == "regular":
+                foreign_path.write_bytes(b"foreign\n")
+            else:
+                foreign_path.symlink_to("foreign-target")
+            injected = True
+        return result
+
+    def observe_restore(*args, **kwargs):
+        nonlocal restore_attempts
+        restore_attempts += 1
+        return original_restore(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_first_gc_after_rename)
+    monkeypatch.setattr(managed_distribution, "_restore_distribution_quarantine", observe_restore)
+    parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        with pytest.raises(DistributionApplyError, match="identity"):
+            managed_distribution._remove_distribution_stage_if_owned(
+                parent_fd,
+                stage.name,
+                created,
+                strict=True,
+                failure_policy="preserve-observed-namespace",
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert injected is True
+    assert restore_attempts == 0
+    assert not stage.exists() and not stage.is_symlink()
+    assert foreign_path is not None
+    if kind == "regular":
+        assert foreign_path.read_bytes() == b"foreign\n"
+        assert aside.read_bytes() == b"owned\n"
+    else:
+        assert foreign_path.readlink() == Path("foreign-target")
+        assert aside.readlink() == Path("owned-target")
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i371_default_stage_failure_policy_keeps_issue370_restore(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    """Non-Issue-371 callers retain the historical generic stage rollback."""
+
+    parent = tmp_path / f"default-{kind}"
+    parent.mkdir()
+    stage = parent / "stage"
+    aside = parent / "operation-owned-aside"
+    if kind == "regular":
+        stage.write_bytes(b"owned\n")
+    else:
+        stage.symlink_to("owned-target")
+    created = stage.lstat()
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_restore = managed_distribution._restore_distribution_quarantine
+    restore_attempts = 0
+    injected = False
+    foreign_path: Path | None = None
+
+    def replace_first_gc_after_rename(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected, foreign_path
+        result = original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and source_name == stage.name and destination_name.endswith(".gc"):
+            foreign_path = parent / destination_name
+            (parent / destination_name).rename(aside)
+            if kind == "regular":
+                foreign_path.write_bytes(b"foreign\n")
+            else:
+                foreign_path.symlink_to("foreign-target")
+            injected = True
+        return result
+
+    def observe_restore(*args, **kwargs):
+        nonlocal restore_attempts
+        restore_attempts += 1
+        return original_restore(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_first_gc_after_rename)
+    monkeypatch.setattr(managed_distribution, "_restore_distribution_quarantine", observe_restore)
+    parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        with pytest.raises(DistributionApplyError, match="identity"):
+            managed_distribution._remove_distribution_stage_if_owned(parent_fd, stage.name, created, strict=True)
+    finally:
+        os.close(parent_fd)
+
+    assert injected is True
+    assert restore_attempts == 1
+    assert foreign_path is not None
+    if kind == "regular":
+        assert stage.read_bytes() == b"foreign\n"
+        assert aside.read_bytes() == b"owned\n"
+    else:
+        assert stage.readlink() == Path("foreign-target")
+        assert aside.readlink() == Path("owned-target")
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("boundary", ["A", "B", "C", "D", "E", "F"])
+def test_i371_preserve_policy_stops_all_stage_pathname_compensation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    boundary: str,
+) -> None:
+    """Each post-failure stage boundary preserves the observed namespace."""
+
+    parent = tmp_path / f"{kind}-{boundary}"
+    parent.mkdir()
+    stage = parent / "stage"
+    aside = parent / f"operation-owned-aside-{boundary}"
+    if kind == "regular":
+        stage.write_bytes(b"owned\n")
+    else:
+        stage.symlink_to("owned-target")
+    created = stage.lstat()
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_restore = managed_distribution._restore_distribution_quarantine
+    original_unlink = managed_distribution.os.unlink
+    rename_calls: list[tuple[str, str]] = []
+    restore_attempts = 0
+    unlink_calls: list[str] = []
+    leases: list[DistributionStageOwnership] = []
+    injected = False
+    mutation_calls = 0
+    foreign_path: Path | None = None
+    foreign_before: tuple[object, ...] | None = None
+    parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+
+    def evidence(path: Path) -> tuple[object, ...]:
+        info = path.lstat()
+        payload: object
+        if stat.S_ISREG(info.st_mode):
+            payload = path.read_bytes()
+        elif stat.S_ISLNK(info.st_mode):
+            payload = str(path.readlink())
+        else:
+            payload = None
+        return (info.st_dev, info.st_ino, info.st_ctime_ns, info.st_mode, info.st_nlink, payload)
+
+    def install_foreign(path: Path) -> None:
+        nonlocal foreign_before
+        if kind == "regular":
+            path.write_bytes(b"foreign\n")
+        else:
+            path.symlink_to("foreign-target")
+        foreign_before = evidence(path)
+
+    def interpose_rename(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected, foreign_path
+        result = original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        rename_calls.append((source_name, destination_name))
+        target_rename = {"A": 1, "B": 2, "C": 3}.get(boundary)
+        if not injected and target_rename is not None and len(rename_calls) == target_rename:
+            foreign_path = parent / destination_name
+            os.rename(destination_name, aside.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            install_foreign(foreign_path)
+            injected = True
+        return result
+
+    def observe_restore(*args, **kwargs):
+        nonlocal restore_attempts
+        restore_attempts += 1
+        return original_restore(*args, **kwargs)
+
+    def observe_unlink(name, *args, **kwargs):
+        if isinstance(name, str):
+            unlink_calls.append(name)
+        return original_unlink(name, *args, **kwargs)
+
+    def inject_failure() -> None:
+        nonlocal foreign_path, foreign_before, mutation_calls
+        mutation_calls += 1
+        target_mutation = {"D": 7, "E": 5, "F": 2}.get(boundary)
+        if target_mutation is not None and mutation_calls == target_mutation:
+            foreign_path = parent / f"foreign-{boundary}"
+            install_foreign(foreign_path)
+            raise DistributionApplyError(f"injected preserve boundary {boundary}")
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", interpose_rename)
+    monkeypatch.setattr(managed_distribution, "_restore_distribution_quarantine", observe_restore)
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    try:
+        if boundary in {"D", "E", "F"}:
+            with pytest.raises(DistributionApplyError, match=r"identity|injected preserve boundary"):
+                managed_distribution._remove_distribution_stage_if_owned(
+                    parent_fd,
+                    stage.name,
+                    created,
+                    strict=True,
+                    failure_policy="preserve-observed-namespace",
+                    gc_path="managed/stage",
+                    gc_recorder=leases.append,
+                    mutation_validator=inject_failure,
+                )
+        else:
+            with pytest.raises(DistributionApplyError, match=r"identity|injected preserve boundary"):
+                managed_distribution._remove_distribution_stage_if_owned(
+                    parent_fd,
+                    stage.name,
+                    created,
+                    strict=True,
+                    failure_policy="preserve-observed-namespace",
+                )
+    finally:
+        os.close(parent_fd)
+
+    assert restore_attempts == 0
+    assert unlink_calls == []
+    if boundary in {"A", "B", "C"}:
+        assert injected is True
+        assert foreign_path is not None
+        assert foreign_before == evidence(foreign_path)
+        assert len(rename_calls) == {"A": 1, "B": 2, "C": 3}[boundary]
+        assert aside.exists() or aside.is_symlink()
+        if kind == "regular":
+            assert aside.read_bytes() == b"owned\n"
+        else:
+            assert aside.readlink() == Path("owned-target")
+    else:
+        assert mutation_calls == {"D": 7, "E": 5, "F": 2}[boundary]
+        assert foreign_path is not None
+        assert foreign_before == evidence(foreign_path)
+        reserved_lease = next(
+            lease
+            for lease in leases
+            if lease.role == "gc-reserved" and lease.gc_ordinal == {"D": 3, "E": 2, "F": 1}[boundary]
+        )
+        preserved = parent / reserved_lease.stage_name
+        assert preserved.exists() or preserved.is_symlink()
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+@pytest.mark.parametrize("foreign_kind", ["regular", "symlink"])
+def test_i371_destructive_metadata_edge_uses_preserve_policy_for_first_gc_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+    foreign_kind: str,
+) -> None:
+    """Destructive guard/journal cleanup never rolls back a foreign first-GC entry."""
+
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    metadata_path = guard_path if entry == "guard" else journal_path
+    metadata_bytes = metadata_path.read_bytes()
+    metadata_name = metadata_path.name
+    parent = metadata_path.parent
+    aside = parent / f"operation-owned-{entry}-aside"
+    foreign_source = parent / f"foreign-{foreign_kind}"
+    if foreign_kind == "regular":
+        foreign_source.write_bytes(b"foreign\n")
+    else:
+        foreign_source.symlink_to("foreign-target")
+    foreign_before = (
+        foreign_source.lstat().st_dev,
+        foreign_source.lstat().st_ino,
+        foreign_source.lstat().st_mode,
+        foreign_source.lstat().st_nlink,
+    )
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_restore = managed_distribution._restore_distribution_quarantine
+    rename_calls: list[tuple[str, str]] = []
+    restore_attempts = 0
+    injected = False
+    foreign_path: Path | None = None
+
+    def interpose_first_gc(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected, foreign_path
+        result = original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        rename_calls.append((source_name, destination_name))
+        if (
+            not injected
+            and source_name.endswith(".remove")
+            and source_name.startswith(f".{metadata_name}.")
+            and destination_name.endswith(".gc")
+        ):
+            foreign_path = parent / destination_name
+            (parent / destination_name).rename(aside)
+            foreign_source.rename(foreign_path)
+            injected = True
+        return result
+
+    def observe_restore(*args, **kwargs):
+        nonlocal restore_attempts
+        restore_attempts += 1
+        return original_restore(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", interpose_first_gc)
+    monkeypatch.setattr(managed_distribution, "_restore_distribution_quarantine", observe_restore)
+    with pytest.raises(DistributionApplyError) as raised:
+        if entry == "guard":
+            store.remove_legacy_marker(marker)
+        else:
+            store.discard_prepared(prepared)
+
+    assert injected is True
+    assert raised.value.recovery_metadata_state == "quarantine-preserved"
+    assert restore_attempts == 0
+    assert len(rename_calls) == 2
+    assert not metadata_path.exists() and not metadata_path.is_symlink()
+    assert aside.read_bytes() == metadata_bytes
+    assert foreign_path is not None
+    foreign_after = foreign_path.lstat()
+    assert (
+        foreign_after.st_dev,
+        foreign_after.st_ino,
+        foreign_after.st_mode,
+        foreign_after.st_nlink,
+    ) == foreign_before
+    if foreign_kind == "regular":
+        assert foreign_path.read_bytes() == b"foreign\n"
+    else:
+        assert foreign_path.readlink() == Path("foreign-target")
 
 
 @pytest.mark.parametrize("kind", ["regular", "symlink"])
