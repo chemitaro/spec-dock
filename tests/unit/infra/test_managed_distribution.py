@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import errno
 import hashlib
 import inspect
 import json
@@ -220,6 +221,56 @@ def _i371_late_legacy_fixture(tmp_path: Path):
     legacy_path = target_root / "spec-dock" / ".uninstall-retry.json"
     legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
     return install_root, scaffold_root, manifest_path, target_root, managed, root_identity, legacy_path, legacy_bytes
+
+
+def _i371_recovery_fixture(tmp_path: Path, intent: str):
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        _managed,
+        root_identity,
+        _legacy_path,
+        _legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    marker = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    prepared = store.prepare(executable, package_version="1.2.3")
+    return (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        root_identity,
+        assessment,
+        executable,
+        store,
+        marker,
+        prepared,
+        target_root / "spec-dock/.distribution-retry.json",
+        target_root / "spec-dock/.distribution-journal.json",
+    )
 
 
 def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
@@ -953,6 +1004,487 @@ def test_i371_guard_only_prepare_race_after_journal_publish_is_journal_progress_
     journal = OperationJournalStore(target_root)._read(root_identity)
     assert journal.status == "prepared"
     assert all(action.checkpoint == "pending" for action in journal.actions)
+
+
+def test_i371_direct_unlink_revalidates_owned_stage_after_mutation_validator(
+    tmp_path: Path,
+) -> None:
+    stage = tmp_path / "owned.stage"
+    moved = tmp_path / "moved.stage"
+    stage.write_bytes(b"owned-stage\n")
+    created = stage.lstat()
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    injected = False
+
+    def rebind_stage() -> None:
+        nonlocal injected
+        if injected:
+            return
+        stage.rename(moved)
+        stage.write_bytes(b"third-party-stage\n")
+        injected = True
+
+    try:
+        with pytest.raises(DistributionApplyError, match="managed staging identity changed"):
+            managed_distribution._remove_distribution_stage_if_owned(
+                parent_fd,
+                stage.name,
+                created,
+                strict=True,
+                mutation_validator=rebind_stage,
+                direct_unlink=True,
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert injected is True
+    assert stage.read_bytes() == b"third-party-stage\n"
+    assert moved.read_bytes() == b"owned-stage\n"
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_cleanup_post_unlink_state_less_failure_restores_canonical_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    completed = prepared
+    if entry == "guard":
+        assert marker.source_snapshot is not None
+        journal_bytes = journal_path.read_bytes()
+        guard_bytes = guard_path.read_bytes()
+
+        def operation() -> None:
+            store.remove_legacy_marker(marker)
+
+        canonical_path = guard_path
+        expected_bytes = guard_bytes
+        counterpart_path = journal_path
+        counterpart_bytes = journal_bytes
+    else:
+        completed = store.write(
+            replace(
+                prepared,
+                status="completed",
+                actions=tuple(replace(action, checkpoint="verified") for action in prepared.actions),
+                created_parent_bindings=(),
+            )
+        )
+        journal_bytes = journal_path.read_bytes()
+        guard_bytes = guard_path.read_bytes()
+
+        def operation() -> None:
+            store.remove_completed(completed)
+
+        canonical_path = journal_path
+        expected_bytes = journal_bytes
+        counterpart_path = guard_path
+        counterpart_bytes = guard_bytes
+
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    unlinked = False
+    fsync_failed = False
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal unlinked
+        result = original_unlink(name, *args, **kwargs)
+        if isinstance(name, str) and name.endswith(".remove"):
+            unlinked = True
+        return result
+
+    def fail_once_after_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected post-unlink fsync failure")
+        original_fsync(fd)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert raised.value.recovery_metadata_state is None
+    restored = canonical_path.lstat()
+    assert stat.S_ISREG(restored.st_mode)
+    assert restored.st_nlink == 1
+    assert canonical_path.read_bytes() == expected_bytes
+    assert counterpart_path.read_bytes() == counterpart_bytes
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.remove"))
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.restore"))
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.stage"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_post_unlink_canonical_publish_race_is_manual_even_byte_identical(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    if entry == "guard":
+        canonical_path = guard_path
+        expected_bytes = guard_path.read_bytes()
+
+        def operation() -> None:
+            store.remove_legacy_marker(marker)
+
+    else:
+        completed = store.write(
+            replace(
+                prepared,
+                status="completed",
+                actions=tuple(replace(action, checkpoint="verified") for action in prepared.actions),
+                created_parent_bindings=(),
+            )
+        )
+        canonical_path = journal_path
+        expected_bytes = journal_path.read_bytes()
+
+        def operation() -> None:
+            store.remove_completed(completed)
+
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    original_rename = managed_distribution._rename_distribution_no_replace
+    unlinked = False
+    fsync_failed = False
+    interposed = False
+    third_party_identity: tuple[int, int, int, int, int] | None = None
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal unlinked
+        result = original_unlink(name, *args, **kwargs)
+        if isinstance(name, str) and name.endswith(".remove"):
+            unlinked = True
+        return result
+
+    def fail_once_after_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected canonical publish race")
+        original_fsync(fd)
+
+    def interpose_before_canonical_publish(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal interposed, third_party_identity
+        if not interposed and destination_name == canonical_path.name and source_name.endswith(".restore"):
+            canonical_path.write_bytes(expected_bytes)
+            info = canonical_path.lstat()
+            third_party_identity = (
+                info.st_dev,
+                info.st_ino,
+                info.st_ctime_ns,
+                info.st_mode,
+                info.st_nlink,
+            )
+            interposed = True
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        interpose_before_canonical_publish,
+    )
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert interposed is True
+    assert third_party_identity is not None
+    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    current = canonical_path.lstat()
+    assert (
+        current.st_dev,
+        current.st_ino,
+        current.st_ctime_ns,
+        current.st_mode,
+        current.st_nlink,
+    ) == third_party_identity
+    assert canonical_path.read_bytes() == expected_bytes
+    private = tuple(target_root.joinpath("spec-dock").glob("*.restore"))
+    assert len(private) == 1
+    assert private[0].read_bytes() == expected_bytes
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.remove"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_terminal_cleanup_state_less_failure_is_same_command_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        _managed,
+        root_identity,
+        _legacy_path,
+        _legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    selected_path = guard_path if entry == "guard" else journal_path
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    unlinked = False
+    fsync_failed = False
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal unlinked
+        result = original_unlink(name, *args, **kwargs)
+        if isinstance(name, str) and name.startswith(f".{selected_path.name}.") and name.endswith(".remove"):
+            unlinked = True
+        return result
+
+    def fail_once_after_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected terminal post-unlink fsync failure")
+        original_fsync(fd)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert result.status == "recovery_required"
+    assert result.phase == "marker-finalization"
+    assert result.pending_paths == ()
+    assert result.retry_policy == ("same-remove-command" if intent == "purge" else "same-keep-command")
+    if entry == "guard":
+        assert result.last_completed_phase == "post-verified"
+        assert "spec-dock/.distribution-retry.json" in result.failed_paths
+    else:
+        assert result.last_completed_phase == "marker-finalized"
+        assert "spec-dock/.distribution-journal.json" in result.failed_paths
+    assert not any(name in str(result) for name in (".remove", ".restore", ".stage"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+@pytest.mark.parametrize("foreign_same_bytes", [False, True])
+def test_i371_cleanup_post_unlink_canonical_conflict_is_manual_and_preserves_both_evidences(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+    foreign_same_bytes: bool,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    if entry == "guard":
+        canonical_path = guard_path
+        expected_bytes = guard_path.read_bytes()
+        counterpart_path = journal_path
+        counterpart_bytes = journal_path.read_bytes()
+
+        def operation() -> None:
+            store.remove_legacy_marker(marker)
+
+    else:
+        canonical_path = journal_path
+        expected_bytes = journal_path.read_bytes()
+        counterpart_path = guard_path
+        counterpart_bytes = guard_path.read_bytes()
+
+        def operation() -> None:
+            store.discard_prepared(prepared)
+
+    foreign_bytes = expected_bytes if foreign_same_bytes else b"third-party-canonical\n"
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    unlinked = False
+    fsync_failed = False
+    foreign_identity: tuple[int, int, int, int, int] | None = None
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal foreign_identity, unlinked
+        result = original_unlink(name, *args, **kwargs)
+        if isinstance(name, str) and name.startswith(f".{canonical_path.name}.") and name.endswith(".remove"):
+            canonical_path.write_bytes(foreign_bytes)
+            info = canonical_path.lstat()
+            foreign_identity = (
+                info.st_dev,
+                info.st_ino,
+                info.st_ctime_ns,
+                info.st_mode,
+                info.st_nlink,
+            )
+            unlinked = True
+        return result
+
+    def fail_once_after_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected canonical-conflict fsync failure")
+        original_fsync(fd)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert foreign_identity is not None
+    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    current_foreign = canonical_path.lstat()
+    assert (
+        current_foreign.st_dev,
+        current_foreign.st_ino,
+        current_foreign.st_ctime_ns,
+        current_foreign.st_mode,
+        current_foreign.st_nlink,
+    ) == foreign_identity
+    assert canonical_path.read_bytes() == foreign_bytes
+    assert counterpart_path.read_bytes() == counterpart_bytes
+    private = tuple(target_root.joinpath("spec-dock").glob("*.restore"))
+    assert len(private) == 1
+    assert private[0].read_bytes() == expected_bytes
+    assert ".restore" not in str(raised.value)
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.remove"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_late_legacy_after_metadata_swap_cleans_swapped_out_predecessor_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    legacy_path = target_root / "spec-dock/.uninstall-retry.json"
+    legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
+    canonical_path = guard_path if entry == "guard" else journal_path
+    original_swap = managed_distribution._swap_regular_distribution_target_if_bound
+    injected = False
+    successor_bytes: bytes | None = None
+
+    def inject_after_selected_swap(*args, **kwargs):
+        nonlocal injected, successor_bytes
+        result = original_swap(*args, **kwargs)
+        destination = args[2]
+        if destination == canonical_path.name and not injected:
+            successor_bytes = canonical_path.read_bytes()
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return result
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_swap_regular_distribution_target_if_bound",
+        inject_after_selected_swap,
+    )
+    with pytest.raises(DistributionApplyError) as raised:
+        if entry == "guard":
+            store.prepare_legacy_guard(
+                None,
+                package_version=marker.package_version,
+                replace_marker=marker,
+            )
+        else:
+            store.mark_executing(prepared)
+
+    assert injected is True
+    assert successor_bytes is not None
+    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    assert canonical_path.read_bytes() == successor_bytes
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert not tuple(target_root.joinpath("spec-dock").glob(".distribution-journal-*.stage"))
+    assert not tuple(target_root.joinpath("spec-dock").glob(".distribution-retry-*.stage"))
 
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
