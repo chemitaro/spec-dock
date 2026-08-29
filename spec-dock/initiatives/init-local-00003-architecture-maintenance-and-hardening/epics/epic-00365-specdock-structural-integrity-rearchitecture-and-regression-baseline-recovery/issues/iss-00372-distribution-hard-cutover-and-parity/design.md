@@ -270,15 +270,15 @@ D5はこの platform abstractionを generic fallbackへ変更しない。
 
 ### 6.2 CI topology
 
-`.github/workflows/provider-ci.yml` に provider-only focused distribution jobを追加または既存 jobを最小 matrix化し、`ubuntu-latest` と `macos-latest` の両 runnerで同じ checked-out `github.sha` を検証する。
+`.github/workflows/provider-ci.yml` に provider-only focused distribution jobを追加する。`pull_request` event の candidate SHA `C` は `github.event.pull_request.head.sha` と定義し、focused jobは `actions/checkout` の `ref` に `C` を明示する。`ubuntu-latest` と `macos-latest` の両 runnerで `git rev-parse HEAD == C` を検証する。
 
 推奨責務分離は次である。
 
-- existing ordinary provider job: lint + ordinary fast lane
-- D5 focused distribution matrix: Linux/macOS、same focused commands
+- existing ordinary provider job: default PR merge ref checkoutのまま lint + ordinary fast lane
+- D5 focused distribution matrix: Linux/macOS、`ref: ${{ github.event.pull_request.head.sha }}`、same focused commands、checked-out HEAD verification
 - post-merge `provider-full-regression.yml`: current global verifier、Ubuntuのまま
 
-D5 focused jobを `continue-on-error` にしない。OS別に違う test selectionを使わず、platform capability自体を検証する部分以外は同一 command setを使う。
+D5 focused jobを `continue-on-error` にしない。default checkoutの merge ref `github.sha` を `C` と記録しない。OS別に違う test selectionを使わず、platform capability自体を検証する部分以外は同一 command setを使う。
 
 ### 6.3 Focused platform coverage
 
@@ -348,14 +348,14 @@ accepted ADRそのものを current namingに合わせて改変することは D
 
 ## 9. Evidence binding
 
-final candidateを `C` とする。Implementation Completionで使用する全 evidenceは `C` を明示的または再現可能に参照する。
+final candidateを PR head branchの full commit SHA `C` とする。`pull_request` eventでは `github.event.pull_request.head.sha == C` を authorityとし、Implementation Completionで使用する全 evidenceは `C` を明示的または再現可能に参照する。default checkoutの merge ref SHAである `github.sha` は integration CIの識別子であって `C` ではない。
 
 | evidence | binding |
 |---|---|
 | source/tests/docs | `git rev-parse HEAD == C` |
 | wheel/sdist | clean checkout `C` から build。artifact SHA-256を記録 |
 | installed/fresh consumer | 上記 candidate artifactからのみ install。checkout fallbackなし |
-| Linux/macOS CI | GitHub Actions `github.sha == C` |
+| Linux/macOS D5 focused CI | `github.event.pull_request.head.sha == C` を明示 checkoutし、runner内 `git rev-parse HEAD == C` |
 | focused tests | CI/local logが `C` checkout上の commandを記録 |
 | Full Regression | verifier resultが candidate HEADを記録し current ledger contractをpass |
 | Strict review | review input SHA `C` |
