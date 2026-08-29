@@ -1252,6 +1252,253 @@ def test_i371_post_unlink_canonical_publish_race_is_manual_even_byte_identical(
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
+@pytest.mark.parametrize("displacement", ["rename-aside", "unlink"])
+def test_i371_post_unlink_canonical_post_publish_rebind_is_manual_even_byte_identical(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+    displacement: str,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    if entry == "guard":
+        canonical_path = guard_path
+        expected_bytes = guard_path.read_bytes()
+
+        def operation() -> None:
+            store.remove_legacy_marker(marker)
+
+    else:
+        completed = store.write(
+            replace(
+                prepared,
+                status="completed",
+                actions=tuple(replace(action, checkpoint="verified") for action in prepared.actions),
+                created_parent_bindings=(),
+            )
+        )
+        canonical_path = journal_path
+        expected_bytes = journal_path.read_bytes()
+
+        def operation() -> None:
+            store.remove_completed(completed)
+
+    expected_mode = stat.S_IMODE(canonical_path.lstat().st_mode)
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    original_rename = managed_distribution._rename_distribution_no_replace
+    unlinked = False
+    fsync_failed = False
+    interposed = False
+    displaced_path = canonical_path.parent / f"{canonical_path.name}.displaced"
+    published_identity: tuple[int, int, int, int, int] | None = None
+    third_party_identity: tuple[int, int, int, int, int] | None = None
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal unlinked
+        result = original_unlink(name, *args, **kwargs)
+        if isinstance(name, str) and name.endswith(".remove"):
+            unlinked = True
+        return result
+
+    def fail_once_after_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected post-publish rebind")
+        original_fsync(fd)
+
+    def interpose_after_publish(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal interposed, published_identity, third_party_identity
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not interposed and destination_name == canonical_path.name and source_name.endswith(".restore"):
+            published = canonical_path.lstat()
+            published_identity = (
+                published.st_dev,
+                published.st_ino,
+                published.st_ctime_ns,
+                published.st_mode,
+                published.st_nlink,
+            )
+            if displacement == "rename-aside":
+                canonical_path.rename(displaced_path)
+            else:
+                canonical_path.unlink()
+            canonical_path.write_bytes(expected_bytes)
+            canonical_path.chmod(expected_mode)
+            third_party = canonical_path.lstat()
+            third_party_identity = (
+                third_party.st_dev,
+                third_party.st_ino,
+                third_party.st_ctime_ns,
+                third_party.st_mode,
+                third_party.st_nlink,
+            )
+            interposed = True
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        interpose_after_publish,
+    )
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert interposed is True
+    assert published_identity is not None
+    assert third_party_identity is not None
+    assert published_identity != third_party_identity
+    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    current = canonical_path.lstat()
+    assert (
+        current.st_dev,
+        current.st_ino,
+        current.st_ctime_ns,
+        current.st_mode,
+        current.st_nlink,
+    ) == third_party_identity
+    assert current.st_ino != published_identity[1]
+    assert stat.S_ISREG(current.st_mode)
+    assert stat.S_IMODE(current.st_mode) == expected_mode
+    assert current.st_nlink == 1
+    assert canonical_path.read_bytes() == expected_bytes
+    if displacement == "rename-aside":
+        displaced = displaced_path.lstat()
+        assert (displaced.st_dev, displaced.st_ino) == published_identity[:2]
+        assert stat.S_ISREG(displaced.st_mode)
+        assert stat.S_IMODE(displaced.st_mode) == expected_mode
+        assert displaced.st_nlink == 1
+        assert displaced_path.read_bytes() == expected_bytes
+    private = tuple(target_root.joinpath("spec-dock").glob("*.restore"))
+    assert len(private) == 1
+    private_info = private[0].lstat()
+    assert stat.S_ISREG(private_info.st_mode)
+    assert stat.S_IMODE(private_info.st_mode) == expected_mode
+    assert private_info.st_nlink == 1
+    assert private_info.st_ino not in {current.st_ino, published_identity[1]}
+    assert private[0].read_bytes() == expected_bytes
+    counterpart = journal_path if entry == "guard" else guard_path
+    assert counterpart.exists()
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.remove"))
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.stage"))
+
+
+def test_i371_recovery_publish_rejects_post_open_destination_rebind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "held.json"
+    destination = tmp_path / "destination.json"
+    displaced = tmp_path / "destination.displaced"
+    raw = b"exact recovery\n"
+    source.write_bytes(raw)
+    source.chmod(0o640)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    held_fd = os.open(source, os.O_RDONLY | nofollow)
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    expected = os.fstat(held_fd)
+    expected_sha256 = hashlib.sha256(raw).hexdigest()
+    original_exact = managed_distribution._held_fd_has_exact_bytes
+    injected = False
+    published_identity: tuple[int, int, int, int, int] | None = None
+    third_party_identity: tuple[int, int, int, int, int] | None = None
+
+    def interpose_after_content_check(fd: int, content: bytes) -> bool:
+        nonlocal injected, published_identity, third_party_identity
+        result = original_exact(fd, content)
+        if not injected:
+            try:
+                published = destination.lstat()
+            except FileNotFoundError:
+                return result
+            published_identity = (
+                published.st_dev,
+                published.st_ino,
+                published.st_ctime_ns,
+                published.st_mode,
+                published.st_nlink,
+            )
+            destination.rename(displaced)
+            destination.write_bytes(raw)
+            destination.chmod(stat.S_IMODE(expected.st_mode))
+            third_party = destination.lstat()
+            third_party_identity = (
+                third_party.st_dev,
+                third_party.st_ino,
+                third_party.st_ctime_ns,
+                third_party.st_mode,
+                third_party.st_nlink,
+            )
+            injected = True
+        return result
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_held_fd_has_exact_bytes",
+        interpose_after_content_check,
+    )
+    try:
+        with pytest.raises(DistributionApplyError, match="post-open-rebind"):
+            OperationJournalStore._publish_exact_recovery_bytes_no_replace(
+                parent_fd,
+                destination.name,
+                held_fd,
+                raw,
+                expected,
+                expected_sha256=expected_sha256,
+                failure_reason="post-open-rebind",
+            )
+    finally:
+        os.close(parent_fd)
+        os.close(held_fd)
+
+    assert injected is True
+    assert published_identity is not None
+    assert third_party_identity is not None
+    assert published_identity != third_party_identity
+    current = destination.lstat()
+    assert (
+        current.st_dev,
+        current.st_ino,
+        current.st_ctime_ns,
+        current.st_mode,
+        current.st_nlink,
+    ) == third_party_identity
+    assert current.st_ino != published_identity[1]
+    assert destination.read_bytes() == raw
+    displaced_info = displaced.lstat()
+    assert (displaced_info.st_dev, displaced_info.st_ino) == published_identity[:2]
+    assert stat.S_ISREG(displaced_info.st_mode)
+    assert stat.S_IMODE(displaced_info.st_mode) == stat.S_IMODE(expected.st_mode)
+    assert displaced_info.st_nlink == 1
+    assert displaced.read_bytes() == raw
+    assert not tuple(tmp_path.glob("*.restore"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
 def test_i371_terminal_cleanup_state_less_failure_is_same_command_recovery(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

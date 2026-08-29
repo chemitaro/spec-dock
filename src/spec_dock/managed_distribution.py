@@ -13083,15 +13083,33 @@ class OperationJournalStore:
             except OSError as exc:
                 raise DistributionApplyError(failure_reason) from exc
             try:
+                assert stage_fd is not None
                 opened = os.fstat(published_fd)
+                held_after_publish = os.fstat(stage_fd)
                 if (
                     not stat.S_ISREG(published.st_mode)
                     or published.st_nlink != 1
                     or stat.S_IMODE(published.st_mode) != expected_mode
+                    or not stat.S_ISREG(held_after_publish.st_mode)
+                    or held_after_publish.st_nlink != 1
+                    or stat.S_IMODE(held_after_publish.st_mode) != expected_mode
                     or _stat_identity_tuple(opened) != _stat_identity_tuple(published)
+                    or _stat_identity_tuple(held_after_publish) != _stat_identity_tuple(opened)
                     or not _held_fd_has_exact_bytes(published_fd, raw)
                 ):
                     raise DistributionApplyError(failure_reason)
+                opened_after = os.fstat(published_fd)
+                held_after_validation = os.fstat(stage_fd)
+                published_after = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
+                validated_identity = _stat_identity_tuple(opened_after)
+                if (
+                    _stat_identity_tuple(opened) != validated_identity
+                    or _stat_identity_tuple(held_after_validation) != validated_identity
+                    or _stat_identity_tuple(published_after) != validated_identity
+                ):
+                    raise DistributionApplyError(failure_reason)
+            except OSError as exc:
+                raise DistributionApplyError(failure_reason) from exc
             finally:
                 os.close(published_fd)
             if _stat_optional_no_follow(parent_fd, stage) is not None:
