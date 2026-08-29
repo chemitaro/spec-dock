@@ -1006,6 +1006,333 @@ def test_i371_guard_only_prepare_race_after_journal_publish_is_journal_progress_
     assert all(action.checkpoint == "pending" for action in journal.actions)
 
 
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("displacement", ["rename-aside", "unlink"])
+@pytest.mark.parametrize("with_recorder", [False, True])
+def test_i371_remove_target_post_rename_foreign_quarantine_is_never_rolled_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    displacement: str,
+    with_recorder: bool,
+) -> None:
+    target = tmp_path / "target"
+    foreign_source = tmp_path / "foreign-source"
+    aside = tmp_path / "operation-owned-aside"
+    quarantine_name = "target.remove"
+    payload = b"operation-owned\n"
+    link_target = "history-entry"
+    if kind == "regular":
+        target.write_bytes(payload)
+        foreign_source.write_bytes(payload)
+        target.chmod(0o640)
+        foreign_source.chmod(0o640)
+    else:
+        target.symlink_to(link_target)
+        foreign_source.symlink_to(link_target)
+    expected = target.lstat()
+    foreign_before = foreign_source.lstat()
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    held_fd: int | None = None
+    if kind == "regular":
+        held_fd = os.open(
+            target.name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+    original_rename = managed_distribution._rename_distribution_no_replace
+    injected = False
+    restore_attempts = 0
+    recorded: list[DistributionStageOwnership] = []
+    held_identity = (os.fstat(held_fd).st_dev, os.fstat(held_fd).st_ino) if held_fd is not None else None
+
+    def interpose_after_real_rename(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal injected, restore_attempts
+        if source_name == quarantine_name and destination_name == target.name:
+            restore_attempts += 1
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and source_name == target.name and destination_name == quarantine_name:
+            if displacement == "rename-aside":
+                os.rename(
+                    quarantine_name,
+                    aside.name,
+                    src_dir_fd=destination_parent_fd,
+                    dst_dir_fd=destination_parent_fd,
+                )
+            else:
+                os.unlink(quarantine_name, dir_fd=destination_parent_fd)
+            os.rename(
+                foreign_source.name,
+                quarantine_name,
+                src_dir_fd=destination_parent_fd,
+                dst_dir_fd=destination_parent_fd,
+            )
+            injected = True
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        interpose_after_real_rename,
+    )
+    try:
+        with pytest.raises(DistributionApplyError, match="identity"):
+            managed_distribution._remove_distribution_target_if_bound(
+                parent_fd,
+                target.name,
+                expected,
+                held_fd=held_fd,
+                identity_message="identity",
+                transition_path="target" if with_recorder else None,
+                transition_name=quarantine_name,
+                transition_recorder=recorded.append if with_recorder else None,
+            )
+    finally:
+        if held_fd is not None:
+            os.close(held_fd)
+        os.close(parent_fd)
+
+    assert injected is True
+    assert restore_attempts == 0
+    assert not target.exists() and not target.is_symlink()
+    foreign_quarantine = tmp_path / quarantine_name
+    current_foreign = foreign_quarantine.lstat()
+    assert (current_foreign.st_dev, current_foreign.st_ino) == (foreign_before.st_dev, foreign_before.st_ino)
+    assert current_foreign.st_mode == foreign_before.st_mode
+    if kind == "regular":
+        assert foreign_quarantine.read_bytes() == payload
+    else:
+        assert foreign_quarantine.readlink() == Path(link_target)
+    if displacement == "rename-aside":
+        assert (aside.lstat().st_dev, aside.lstat().st_ino) == (expected.st_dev, expected.st_ino)
+        if kind == "regular":
+            assert held_identity is not None
+            assert (aside.lstat().st_dev, aside.lstat().st_ino) == held_identity
+    else:
+        assert not aside.exists() and not aside.is_symlink()
+    assert not foreign_source.exists() and not foreign_source.is_symlink()
+    if with_recorder:
+        assert len(recorded) == 1
+        lease = recorded[0]
+        assert lease.path == "target"
+        assert lease.stage_name == quarantine_name
+        assert lease.role == "predecessor-quarantine"
+        assert (lease.device, lease.inode, lease.ctime_ns) == (0, 0, 0)
+        assert lease.file_type == kind
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("with_recorder", [False, True])
+def test_i371_cleanup_failure_after_bound_quarantine_never_pathname_rolls_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    with_recorder: bool,
+) -> None:
+    target = tmp_path / "target"
+    foreign_source = tmp_path / "foreign-source"
+    aside = tmp_path / "operation-owned-aside"
+    quarantine_name = "target.remove"
+    payload = b"operation-owned\n"
+    link_target = "history-entry"
+    if kind == "regular":
+        target.write_bytes(payload)
+        foreign_source.write_bytes(payload)
+        target.chmod(0o640)
+        foreign_source.chmod(0o640)
+    else:
+        target.symlink_to(link_target)
+        foreign_source.symlink_to(link_target)
+    expected = target.lstat()
+    foreign_before = foreign_source.lstat()
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    held_fd: int | None = None
+    if kind == "regular":
+        held_fd = os.open(
+            target.name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+    recorded: list[DistributionStageOwnership] = []
+    original_cleanup = managed_distribution._remove_distribution_stage_if_owned
+    original_backup_cleanup = managed_distribution._unlink_distribution_quarantine_with_backup
+    injected = False
+
+    def replace_quarantine_with_foreign() -> None:
+        nonlocal injected
+        if injected:
+            return
+        os.rename(quarantine_name, aside.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        os.rename(
+            foreign_source.name,
+            quarantine_name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        injected = True
+        raise DistributionApplyError("injected cleanup failure")
+
+    def fail_direct_cleanup(parent, stage_name, created, *, strict=False, **kwargs):
+        if stage_name == quarantine_name:
+            replace_quarantine_with_foreign()
+        return original_cleanup(parent, stage_name, created, strict=strict, **kwargs)
+
+    def fail_backup_cleanup(parent, stage_name, *args, **kwargs):
+        if stage_name == quarantine_name:
+            replace_quarantine_with_foreign()
+        return original_backup_cleanup(parent, stage_name, *args, **kwargs)
+
+    if with_recorder:
+        monkeypatch.setattr(
+            managed_distribution,
+            "_unlink_distribution_quarantine_with_backup",
+            fail_backup_cleanup,
+        )
+    else:
+        monkeypatch.setattr(
+            managed_distribution,
+            "_remove_distribution_stage_if_owned",
+            fail_direct_cleanup,
+        )
+    try:
+        with pytest.raises(DistributionApplyError, match="identity"):
+            managed_distribution._remove_distribution_target_if_bound(
+                parent_fd,
+                target.name,
+                expected,
+                held_fd=held_fd,
+                identity_message="identity",
+                transition_path="target" if with_recorder else None,
+                transition_name=quarantine_name,
+                transition_recorder=recorded.append if with_recorder else None,
+            )
+    finally:
+        if held_fd is not None:
+            os.close(held_fd)
+        os.close(parent_fd)
+
+    assert injected is True
+    assert not target.exists() and not target.is_symlink()
+    foreign_quarantine = tmp_path / quarantine_name
+    current_foreign = foreign_quarantine.lstat()
+    assert (current_foreign.st_dev, current_foreign.st_ino) == (foreign_before.st_dev, foreign_before.st_ino)
+    assert current_foreign.st_mode == foreign_before.st_mode
+    if kind == "regular":
+        assert foreign_quarantine.read_bytes() == payload
+    else:
+        assert foreign_quarantine.readlink() == Path(link_target)
+    assert (aside.lstat().st_dev, aside.lstat().st_ino) == (expected.st_dev, expected.st_ino)
+    assert not foreign_source.exists() and not foreign_source.is_symlink()
+    if with_recorder:
+        assert [lease.role for lease in recorded] == ["predecessor-quarantine", "predecessor-quarantine"]
+        assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
+        assert (recorded[1].device, recorded[1].inode) == (expected.st_dev, expected.st_ino)
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_journal_post_rename_foreign_quarantine_preserves_intent_and_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    intent: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    foreign_source = tmp_path / "foreign-source"
+    foreign_source.write_bytes(b"managed\n")
+    expected = managed.lstat()
+    foreign_before = foreign_source.lstat()
+    aside = managed.parent / "operation-owned-aside"
+    original_rename = managed_distribution._rename_distribution_no_replace
+    injected = False
+    quarantine_path: Path | None = None
+
+    def interpose_after_real_rename(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal injected, quarantine_path
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and source_name == managed.name and destination_name.startswith(".spec-dock-file-"):
+            quarantine_path = managed.parent / destination_name
+            quarantine_path.rename(aside)
+            foreign_source.rename(quarantine_path)
+            injected = True
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        interpose_after_real_rename,
+    )
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert quarantine_path is not None
+    assert result.status == "recovery_required", result.reason
+    assert result.intent == intent
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert guard_path.is_file()
+    assert journal_path.is_file()
+    guard = managed_distribution._read_distribution_retry_marker(target_root, expected_intent=intent)
+    assert guard is not None
+    assert guard.operation == intent
+    assert guard.purpose == managed_distribution._journal_guard_purpose_for_intent(intent)
+    journal = OperationJournalStore(target_root)._read(root_identity, expected_intent=intent)
+    assert journal.intent == intent
+    assert journal.authority == managed_distribution._journal_authority_for_intent(intent)
+    predecessor_leases = tuple(
+        lease
+        for lease in journal.staging_leases
+        if lease.path == managed.relative_to(target_root).as_posix() and lease.role == "predecessor-quarantine"
+    )
+    assert predecessor_leases
+    assert all((lease.device, lease.inode, lease.ctime_ns) == (0, 0, 0) for lease in predecessor_leases)
+    assert all(
+        not (lease.device == foreign_before.st_dev and lease.inode == foreign_before.st_ino)
+        for lease in predecessor_leases
+    )
+    assert not managed.exists() and not managed.is_symlink()
+    foreign_quarantine = quarantine_path.lstat()
+    assert (foreign_quarantine.st_dev, foreign_quarantine.st_ino) == (foreign_before.st_dev, foreign_before.st_ino)
+    assert foreign_quarantine.st_mode == foreign_before.st_mode
+    assert quarantine_path.read_bytes() == b"managed\n"
+    aside_info = aside.lstat()
+    assert (aside_info.st_dev, aside_info.st_ino) == (expected.st_dev, expected.st_ino)
+    assert aside.read_bytes() == b"managed\n"
+    assert not foreign_source.exists() and not foreign_source.is_symlink()
+
+
 def test_i371_direct_unlink_revalidates_owned_stage_after_mutation_validator(
     tmp_path: Path,
 ) -> None:
@@ -16903,6 +17230,8 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
     )
     original_rename = managed_distribution._rename_distribution_no_replace
     raced = False
+    replacement_identity: tuple[int, int] | None = None
+    quarantine_path: Path | None = None
 
     def race_before_quarantine(
         source_parent_fd: int,
@@ -16910,11 +17239,14 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
         destination_parent_fd: int,
         destination_name: str,
     ) -> None:
-        nonlocal raced
+        nonlocal raced, replacement_identity, quarantine_path
         if source_name == "config.toml" and destination_name.startswith(".spec-dock-file-") and not raced:
             raced = True
             target.unlink()
             target.write_bytes(replacement)
+            replacement_info = target.lstat()
+            replacement_identity = (replacement_info.st_dev, replacement_info.st_ino)
+            quarantine_path = target.parent / destination_name
         original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
     monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", race_before_quarantine)
@@ -16922,7 +17254,13 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
     with pytest.raises(DistributionApplyError, match="identity"):
         apply_distribution_plan(plan)
 
-    assert target.read_bytes() == replacement
+    assert raced is True
+    assert replacement_identity is not None
+    assert quarantine_path is not None
+    assert not target.exists() and not target.is_symlink()
+    quarantined = quarantine_path.lstat()
+    assert (quarantined.st_dev, quarantined.st_ino) == replacement_identity
+    assert quarantine_path.read_bytes() == replacement
     assert not list(target.parent.glob(".*.remove"))
 
 
@@ -17983,6 +18321,8 @@ def test_i368_published_successor_rejects_same_byte_replacement_before_return(
     replaced = False
     expected_name = store.path.name if entry == "journal" else ".distribution-retry.json"
     expected_path = target_root / "spec-dock" / expected_name
+    replacement_identity: tuple[int, int] | None = None
+    replacement_content: bytes | None = None
 
     def replace_before_acceptance(
         self,
@@ -17994,11 +18334,14 @@ def test_i368_published_successor_rejects_same_byte_replacement_before_return(
         *,
         identity_error,
     ):
-        nonlocal replaced
+        nonlocal replaced, replacement_identity, replacement_content
         if not replaced and name == expected_name:
             content = managed_distribution._read_fd_bytes(held_fd)
             expected_path.unlink()
             expected_path.write_bytes(content)
+            replacement_info = expected_path.lstat()
+            replacement_identity = (replacement_info.st_dev, replacement_info.st_ino)
+            replacement_content = content
             replaced = True
         return original_assert(
             parent_fd,
@@ -18021,7 +18364,22 @@ def test_i368_published_successor_rejects_same_byte_replacement_before_return(
             store.prepare_legacy_guard(executable, package_version="1.2.3")
 
     assert replaced is True
-    assert expected_path.exists()
+    assert replacement_identity is not None
+    assert replacement_content is not None
+    if entry == "journal":
+        assert not expected_path.exists() and not expected_path.is_symlink()
+        quarantine_paths = tuple(expected_path.parent.glob(f".{expected_name}.*.remove"))
+        assert len(quarantine_paths) == 1
+        quarantine_path = quarantine_paths[0]
+        quarantined = quarantine_path.lstat()
+        assert (quarantined.st_dev, quarantined.st_ino) == replacement_identity
+        assert quarantined.st_nlink == 1
+        assert quarantine_path.read_bytes() == replacement_content
+    else:
+        assert expected_path.exists()
+        current = expected_path.lstat()
+        assert (current.st_dev, current.st_ino) == replacement_identity
+        assert expected_path.read_bytes() == replacement_content
 
 
 @pytest.mark.parametrize("entry", ["journal", "guard"])

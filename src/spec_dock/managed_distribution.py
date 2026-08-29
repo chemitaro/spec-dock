@@ -19718,12 +19718,6 @@ def _remove_distribution_target_if_bound(
             )
         )
         if not moved_matches_bound:
-            _restore_distribution_quarantine(
-                parent_fd,
-                quarantine_name,
-                target_name,
-                failure_message=identity_message,
-            )
             raise DistributionApplyError(identity_message)
         os.fsync(parent_fd)
         if transition_recorder is not None:
@@ -19763,12 +19757,6 @@ def _remove_distribution_target_if_bound(
         except DistributionApplyError as exc:
             if exc.recovery_metadata_state is not None:
                 raise
-            _restore_distribution_quarantine(
-                parent_fd,
-                quarantine_name,
-                target_name,
-                failure_message=identity_message,
-            )
             if str(exc) == "deprovision-parent-namespace-mismatch":
                 raise
             raise DistributionApplyError(identity_message) from exc
