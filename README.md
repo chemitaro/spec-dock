@@ -47,7 +47,7 @@ uvx --from ~/src/spec-dock spec-dock update
 
 `spec-dock update` refreshes the recognized managed distribution through one plan/apply path. It
 preserves user-owned and unknown paths, blocks before writing when ownership or workspace identity is
-ambiguous, and records a root/intent/contract/plan-bound operation journal when an apply starts. It is distinct from
+ambiguous, and records a root/intent/authority/contract/plan/protocol-bound operation journal when an apply starts. It is distinct from
 `init --force`; older or incompatible workspaces may still require manual normalization or rebuild.
 
 既存環境の更新手順と、旧配布面からの移行・復旧方針は [移行ガイド](spec-dock/docs/migration.md) を参照してください。
@@ -166,14 +166,17 @@ Notes:
   with the same package or a compatible newer package to resume from exact action pre/postconditions.
   Root, intent, authority, contract, plan, protocol, or exact target-state mismatches, downgrades, and
   incompatible packages stop before further mutation; inspect the reported repository-relative reason
-  instead of rolling back to older installer code.
-- A legacy `spec-dock/.distribution-retry.json` is converted one way only when it is the exact
-  same-root, same-operation pre-write state and the executing package is the same or a compatible newer
-  version. An exact legacy staging lease is accepted only when its action, private stage-name family,
-  parent chain, device, inode, ctime, type, and link count all match the reconstructed plan; otherwise
-  the marker and stage are preserved for manual diagnosis. Malformed, later-phase, cross-root,
-  different-operation, downgrade, incompatible-package, unknown-stage, or dual recovery state is
-  rejected without rewriting recovery authority.
+  instead of rolling back to older installer code. Recovery is forward recovery; forward recovery is not code rollback.
+- Recovery metadata role is schema/purpose-based, not pathname-based: the same pathname
+  `spec-dock/.distribution-retry.json` carries schema 1 as a legacy migration input and schema 2 as the current forward guard. A schema-1 payload is converted one way only when it is the exact same-root,
+  same-operation pre-write state and the executing package is the same or a compatible newer version.
+  An exact legacy staging lease is accepted only when its action, private stage-name family, parent chain,
+  device, inode, ctime, type, and link count all match the reconstructed plan; otherwise the payload and
+  stage are preserved for manual diagnosis. The current `.distribution-journal.json` records the
+  root-bound forward operation. A `.uninstall-retry.json` file is legacy reader-only/manual evidence and
+  is never auto-converted, auto-deleted, or promoted to current recovery authority. Malformed,
+  later-phase, cross-root, different-operation, downgrade, incompatible-package, unknown-stage, or dual
+  recovery state is rejected without rewriting recovery authority.
 - Managed distribution deprovision is the default/`--keep-specs` uninstall owner. Dry-run performs a
   complete read-only assessment; apply uses a schema-2 forward guard in
   `spec-dock/.distribution-retry.json` and a protocol-2 journal in
@@ -191,8 +194,9 @@ Notes:
   journal files. Those fields include phase, checkpoint, failed/pending paths, and action/top-level
   errors.
 - A legacy `.uninstall-retry.json` is never converted automatically because it proves no root, specs
-  mode, plan, or checkpoint. It is preserved for manual recovery. `--keep-specs` preserves initiatives,
-  Workbench data, and unknown content. `--remove-specs` is the explicit two-part authority for shared,
+  mode, plan, or checkpoint. It is preserved as legacy reader-only/manual evidence for manual recovery.
+  `--keep-specs` preserves initiatives, Workbench data, and unknown content. `--remove-specs` is the
+  current explicit spec-history purge authority for shared,
   journaled spec-history purge: dry-run is write-free, and apply uses the same root-bound forward journal.
   A matching partial purge is retried only with `spec-dock uninstall --apply --remove-specs <target>`;
   legacy or conflicting recovery state remains manual and is never converted automatically.

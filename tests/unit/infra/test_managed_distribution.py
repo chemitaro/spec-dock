@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import replace
 import errno
 import hashlib
@@ -110,6 +111,61 @@ EXPECTED_HISTORICAL_CURRENT_IDENTITY = {
     "mode": 0o644,
     "source": {"kind": "git-provider-source", "ref": HISTORICAL_COMMIT},
 }
+
+
+def test_i372_cli_has_no_legacy_distribution_writer_or_kernel_seam() -> None:
+    """I372-T-AUTH-001: CLI remains an adapter, not a second distribution owner."""
+
+    tree = ast.parse(inspect.getsource(cli))
+    definitions = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    forbidden_writer_definitions = {
+        "_write_atomic_regular_file",
+        "_write_active_pathfile",
+        "_write_spec_dock_version",
+        "_write_distribution_retry_marker",
+        "_remove_distribution_retry_marker",
+        "_install_repo_root_shortcut",
+    }
+    assert definitions.isdisjoint(forbidden_writer_definitions)
+
+    forbidden_kernel_edges = {
+        "_rename_distribution_no_replace",
+        "_swap_regular_distribution_target_if_bound",
+        "_remove_distribution_target_if_bound",
+        "DistributionStageOwnership",
+        "apply_distribution_plan",
+    }
+    imported_from_managed_distribution = {
+        alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "spec_dock.managed_distribution"
+        for alias in node.names
+    }
+    assert imported_from_managed_distribution.isdisjoint(forbidden_kernel_edges)
+
+    direct_private_calls = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in forbidden_writer_definitions | forbidden_kernel_edges
+    }
+    assert not direct_private_calls
+
+    managed_tree = ast.parse(inspect.getsource(managed_distribution))
+    managed_definitions = {
+        node.name for node in managed_tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert {
+        "execute_fresh_distribution",
+        "execute_recognized_distribution",
+        "execute_deprovision_distribution",
+        "execute_explicit_spec_history_purge_distribution",
+        "apply_distribution_plan",
+    }.issubset(managed_definitions)
+    assert any(
+        isinstance(node, ast.ClassDef) and node.name == "DistributionStageOwnership" for node in managed_tree.body
+    )
 
 
 def _manifest_with(**overrides: object) -> dict[str, object]:

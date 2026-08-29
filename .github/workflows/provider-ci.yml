@@ -21,3 +21,32 @@ jobs:
         run: make lint
       - name: Run provider pytest suite
         run: uv run pytest
+
+  provider-distribution-parity:
+    name: Provider distribution parity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify PR head candidate checkout
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+      - name: Install provider package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv
+      - name: Run managed distribution focused tests
+        run: uv run pytest tests/unit/infra/test_managed_distribution.py
+      - name: Run distribution cutover focused tests
+        run: uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py
+      - name: Run packaged distribution parity tests
+        run: uv run pytest --run-full-regression --full-regression-shard tests/integration/test_epic_00343_distribution.py

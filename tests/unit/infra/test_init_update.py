@@ -41,6 +41,20 @@ _REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS = tuple(
 )
 
 
+def _workflow_job_lines(workflow_text: str, job_key: str) -> list[str]:
+    lines = workflow_text.splitlines()
+    start = lines.index(f"  {job_key}:")
+    end = next(
+        (
+            index
+            for index, line in enumerate(lines[start + 1 :], start=start + 1)
+            if re.fullmatch(r"  [A-Za-z0-9_-]+:.*", line)
+        ),
+        len(lines),
+    )
+    return lines[start:end]
+
+
 def _i370_public_tree_evidence(root: Path) -> dict[str, tuple[object, ...]]:
     evidence: dict[str, tuple[object, ...]] = {}
     for path in (root, *root.rglob("*")):
@@ -659,18 +673,28 @@ def test_i370_docs_describe_deprovision_authority_recovery_and_parity() -> None:
         "compatible newer package",
         ".distribution-retry.json",
         "schema 2",
+        "schema 1",
+        "legacy migration input",
+        "same pathname",
+        "current forward guard",
         ".distribution-journal.json",
         "prepared → executing → verifying → completed",
         "DistributionProcessResult",
         ".uninstall-retry.json",
+        "legacy reader-only/manual evidence",
         "自動変換しない",
+        "forward recovery is not code rollback",
+        "current explicit spec-history purge authority",
         "--keep-specs",
         "--remove-specs",
-        "Issue 371",
         "root・intent・authority・contract・plan・protocol",
         "unknown / modified",
     ):
         assert literal in japanese_docs
+
+    assert "Issue 371 の compatibility owner" not in japanese_docs
+    assert "Issue 371 が所有するcompatibility route" not in japanese_docs
+    assert "future/compatibility owner" not in japanese_docs
 
     root_readme = (repo_root / "README.md").read_text(encoding="utf-8")
     for literal in (
@@ -679,7 +703,12 @@ def test_i370_docs_describe_deprovision_authority_recovery_and_parity() -> None:
         "protocol-2 journal",
         "typed `DistributionProcessResult`",
         "legacy `.uninstall-retry.json` is never converted automatically",
-        "`--remove-specs` is the explicit two-part authority for shared",
+        "schema 1 as a legacy migration input",
+        "schema 2 as the current forward guard",
+        "same pathname",
+        "legacy reader-only/manual evidence",
+        "forward recovery is not code rollback",
+        "`--remove-specs` is the\n  current explicit spec-history purge authority for shared",
     ):
         assert literal in root_readme
 
@@ -6562,12 +6591,38 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         }
 
         assert "name: Provider CI" in workflow_lines["fast"]
-        assert section_keys(workflow_lines["fast"], "jobs:") == {"provider-tests"}
+        assert section_keys(workflow_lines["fast"], "jobs:") == {
+            "provider-tests",
+            "provider-distribution-parity",
+        }
         assert section_keys(workflow_lines["full"], "jobs:") == {"provider-full-regression"}
         assert "python -m pip install uv" in workflow_texts["fast"]
-        assert "        run: make lint" in workflow_lines["fast"]
-        assert workflow_lines["fast"].count("        run: uv run pytest") == 1
-        assert "--run-full-regression" not in workflow_texts["fast"]
+        provider_test_lines = _workflow_job_lines(workflow_texts["fast"], "provider-tests")
+        assert "        run: make lint" in provider_test_lines
+        assert provider_test_lines.count("        run: uv run pytest") == 1
+        assert "--run-full-regression" not in "\n".join(provider_test_lines)
+        provider_parity_lines = _workflow_job_lines(workflow_texts["fast"], "provider-distribution-parity")
+        provider_parity_text = "\n".join(provider_parity_lines)
+        assert "    runs-on: ${{ matrix.os }}" in provider_parity_lines
+        assert "        os: [ubuntu-latest, macos-latest]" in provider_parity_lines
+        assert "          ref: ${{ github.event.pull_request.head.sha }}" in provider_parity_lines
+        assert "          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}" in provider_parity_lines
+        assert provider_parity_text.count("${{ github.event.pull_request.head.sha }}") == 2
+        assert '        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"' in provider_parity_lines
+        assert "continue-on-error:" not in provider_parity_text
+        expected_provider_parity_commands = (
+            "        run: uv run pytest tests/unit/infra/test_managed_distribution.py",
+            (
+                "        run: uv run pytest --run-full-regression --full-regression-shard "
+                "tests/cli_runtime/test_distribution_cutover.py"
+            ),
+            (
+                "        run: uv run pytest --run-full-regression --full-regression-shard "
+                "tests/integration/test_epic_00343_distribution.py"
+            ),
+        )
+        for command in expected_provider_parity_commands:
+            assert command in provider_parity_lines
         assert "verify-full-regression.py" in workflow_texts["full"]
         assert "timeout-minutes" not in workflow_texts["full"]
         assert "--timeout-seconds" not in workflow_texts["full"]

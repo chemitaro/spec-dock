@@ -919,6 +919,150 @@ def test_tc_360_s80_wheel_and_sdist_fresh_and_updated_consumers_match_provider(
         _assert_installed_asset_manifest(target, expected)
 
 
+def test_tc_372_m3_wheel_and_sdist_packaged_deprovision_and_purge_preserve_boundary(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    """Packaged public uninstall routes preserve the accepted consumer boundary."""
+
+    helper = _Issue69Harness()
+    temp_root = candidate_wheel.wheel_path.parent
+    for artifact_kind, artifact, existing_venv_python in (
+        ("wheel", candidate_wheel.wheel_path, candidate_wheel.venv_python),
+        ("sdist", candidate_wheel.sdist_path, None),
+    ):
+        environment_root = temp_root / f"m3-{artifact_kind}-venv"
+        if existing_venv_python is None:
+            installed_cli = _install_candidate_artifact(candidate_wheel, artifact, environment_root)
+            venv_python = helper._issue_69_venv_python(environment_root)
+        else:
+            venv_python = existing_venv_python
+            installed_cli = helper._issue_69_ensure_spec_dock_wrapper(venv_python)
+        isolated_cwd = temp_root / f"m3-{artifact_kind}-isolated-cwd"
+        isolated_cwd.mkdir()
+        snapshot = helper._issue_69_collect_isolated_installed_runtime_snapshot(
+            venv_python=venv_python,
+            repo_root=candidate_wheel.repo_root,
+            cwd=isolated_cwd,
+        )
+        helper._issue_69_assert_runtime_snapshot_uses_installed_package(
+            snapshot=snapshot,
+            repo_root=candidate_wheel.repo_root,
+        )
+        env = _runtime_env(helper, temp_root)
+
+        keep_target = temp_root / f"m3-{artifact_kind}-keep"
+        keep_target.mkdir()
+        helper._init_origin_repo(keep_target)
+        init_result = subprocess.run(
+            [str(installed_cli), "init", str(keep_target)],
+            cwd=temp_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+        keep_workbench = keep_target / "spec-dock" / ".workbench"
+        keep_readme = keep_workbench / "README.md"
+        keep_readme_before = keep_readme.read_bytes()
+        keep_payload = keep_workbench / "m3-opaque.bin"
+        keep_payload_bytes = b"M3 keep-specs payload\x00\xff\n"
+        keep_payload.write_bytes(keep_payload_bytes)
+        keep_marker = keep_target / "spec-dock" / "initiatives" / "m3-keep-marker.txt"
+        keep_marker_bytes = b"M3 preserved spec history\n"
+        keep_marker.write_bytes(keep_marker_bytes)
+
+        keep_result = subprocess.run(
+            [
+                str(installed_cli),
+                "uninstall",
+                str(keep_target),
+                "--json",
+                "--apply",
+                "--keep-specs",
+            ],
+            cwd=temp_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert keep_result.returncode == 0, keep_result.stdout + keep_result.stderr
+        assert keep_result.stderr == ""
+        assert keep_result.stdout.count("\n") == 1
+        keep_payload_json = json.loads(keep_result.stdout)
+        assert keep_payload_json["status"] == "completed"
+        assert keep_payload_json["specs_mode"] == "keep"
+        keep_actions = {str(action["path"]): action for action in keep_payload_json["actions"]}
+        assert keep_actions["spec-dock/initiatives"]["status"] == "preserved"
+        assert keep_actions["spec-dock/initiatives"]["category"] == "spec_history"
+        assert keep_marker.read_bytes() == keep_marker_bytes
+        assert keep_readme.read_bytes() == keep_readme_before
+        assert keep_payload.read_bytes() == keep_payload_bytes
+        assert keep_workbench.is_dir()
+        assert not (keep_target / ".agents" / "skills" / "spec-dock" / "SKILL.md").exists()
+        assert not (keep_target / "spec-dock" / "scripts" / "spec-dock").exists()
+        assert not (keep_target / "spec-dock" / ".uninstall-retry.json").exists()
+
+        purge_target = temp_root / f"m3-{artifact_kind}-purge"
+        purge_target.mkdir()
+        helper._init_origin_repo(purge_target)
+        init_result = subprocess.run(
+            [str(installed_cli), "init", str(purge_target)],
+            cwd=temp_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+        purge_workbench = purge_target / "spec-dock" / ".workbench"
+        purge_readme = purge_workbench / "README.md"
+        purge_readme_before = purge_readme.read_bytes()
+        purge_payload = purge_workbench / "m3-opaque.bin"
+        purge_payload_bytes = b"M3 remove-specs payload\x00\xff\n"
+        purge_payload.write_bytes(purge_payload_bytes)
+        purge_marker = purge_target / "spec-dock" / "initiatives" / "m3-purge-marker.txt"
+        purge_marker.write_bytes(b"M3 removed spec history\n")
+
+        purge_result = subprocess.run(
+            [
+                str(installed_cli),
+                "uninstall",
+                str(purge_target),
+                "--json",
+                "--apply",
+                "--remove-specs",
+            ],
+            cwd=temp_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert purge_result.returncode == 0, purge_result.stdout + purge_result.stderr
+        assert purge_result.stderr == ""
+        assert purge_result.stdout.count("\n") == 1
+        purge_payload_json = json.loads(purge_result.stdout)
+        assert purge_payload_json["status"] == "completed"
+        assert purge_payload_json["specs_mode"] == "remove"
+        purge_actions = {str(action["path"]): action for action in purge_payload_json["actions"]}
+        purge_history_action = purge_actions["spec-dock/initiatives"]
+        assert purge_history_action["category"] == "spec_history"
+        assert purge_history_action["error"] is None
+        assert "remove-specs" in str(purge_history_action["reason"])
+        assert purge_history_action["status"] == "removed"
+        assert not purge_marker.exists()
+        assert not (purge_target / "spec-dock" / "initiatives").exists()
+        assert purge_readme.read_bytes() == purge_readme_before
+        assert purge_payload.read_bytes() == purge_payload_bytes
+        assert purge_workbench.is_dir()
+        assert purge_target.joinpath("spec-dock").is_dir()
+        assert not (purge_target / ".agents" / "skills" / "spec-dock" / "SKILL.md").exists()
+        assert not (purge_target / "spec-dock" / "scripts" / "spec-dock").exists()
+        assert not (purge_target / "spec-dock" / ".uninstall-retry.json").exists()
+
+
 def test_tc_346_s01_003_isolated_wheel_origin_rejects_checkout_fallback(candidate_wheel: CandidateWheel) -> None:
     helper = _Issue69Harness()
     isolated_cwd = candidate_wheel.wheel_path.parent / "isolated-cwd"
