@@ -251,11 +251,55 @@ pre-commit candidate では次を確認した。
 代替には使用しない。最終 gate は commit/push 後の clean exact SHA に対して fresh
 verifier と browser-only Strict review を実行し、外部 artifact と最終応答で記録する。
 
+### Final Quality Gate P1 remediation: observation-only recovery
+
+前段修正後の Strict review は、recovery quarantine の final identity observation と
+pathname rename の間、および private `.restore` stage の observation と
+rename/unlink の間に再束縛 race が残ることを P1 と判定した。deterministic
+interposition で旧コードを検証し、exact quarantine 1件、metadata identity
+mismatch 8件、foreign canonical 2件の計11件を意図した理由で red にした。
+
+accepted R18/R21/R29 contract に従い、recovery を exact namespace state の観測と
+分類だけへ縮退した。`_recover_quarantined_recovery_entry()` は canonical が held
+inode と exact かつ quarantine absent の場合だけ mutation 0 で
+`canonical-restored` とし、それ以外は mutation 0 の `manual-conflict` とする。
+candidate が追加した `_restore_quarantined_entry()` と
+`_publish_exact_recovery_bytes_no_replace()`、その全 call edge、private `.restore`
+生成・rename・cleanup authority を削除した。post-rename identity mismatch でも
+rollback rename を行わず fail-closed とする。既存 `quarantine-preserved` から
+durable journal／guard-only の `recovery_required`・`manual-recovery` mapping、
+schema/protocol/intent/authority、public CLI contract は変更していない。
+
+独立 verifier は、rename 成功後の final quarantine `stat`/held `fstat` failure と
+identity mismatch が observation-only classifier より前に state-less 例外となる
+経路を追加P1として検出した。これら16 parameter を red で確認し、post-rename
+failure を `recovery_metadata_state=quarantine-preserved` 付きで伝播するようにした。
+guard/journal × deprovision/purge × stat/fstat の全 matrix で、service result の
+`recovery_required` / `manual-recovery`、public `partial_failure` / exit 1、
+`retry_command=null`、quarantine/foreign evidence の不変を確認した。
+
+最新 pre-commit candidate では次を確認した。
+
+- deterministic race regressions: 旧コード `11 failed` → 修正後 `11 passed`
+- post-rename observation/public mapping matrix: 旧コード `16 failed` → 修正後 `16 passed`
+- I371 managed selector: `108 passed`
+- `tests/unit/infra/test_managed_distribution.py`: `594 passed`
+- ordinary fast lane `uv run pytest -q`: `1545 passed, 1142 skipped`
+- CLI I371 focused selector: `3 passed`
+- init/update I371 focused selector: `6 passed`
+- `make lint`: ruff check/format、mypy ともに pass
+- `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=227`
+- `python -m py_compile src/spec_dock/managed_distribution.py`: pass
+- `git diff --check`: pass（whitespace error 0）
+
+この pre-commit 証拠も final fixed SHA の Full Regression／Strict review の代替には
+使用しない。ledger、verifier、accepted requirement/design/plan、CLI は変更していない。
+
 ## Residual Risks / Follow-ups
 
-- pathname/quarantine remediation と本 report を含む final frozen SHA で、clean
+- observation-only recovery remediation と本 report を含む final frozen SHA で、clean
   Full Regression verifier と Strict review の再検証が必要。直前の clean SHA
-  `fdcb26bb19aac8e5732b74489a23183975f2b811` は Full Regression `verified`
+  `a50526e282d6e13521acc26bc5aa7c902434f6ec` は Full Regression `verified`
   （approved failure 27、unexpected/missing/signature mismatch 0）だった。ledger、
   verifier、approved failure signaturesは変更していない。
 - fast lane の visible-parent rebind race は既存挙動として残る。再実行で green
@@ -265,8 +309,8 @@ verifier と browser-only Strict review を実行し、外部 artifact と最終
   suitesの修正後 greenを保全している。
 - `.artifacts/iss-00371-full-regression/20260828T092613.495723Z/` は verifier
   evidence として生成したが、現在の working tree には保持していない。
-- quarantine ownership remediation 前の commit
-  `fdcb26bb19aac8e5732b74489a23183975f2b811` までは upstream へpush済みである。
+- observation-only recovery remediation 前の commit
+  `a50526e282d6e13521acc26bc5aa7c902434f6ec` までは upstream へpush済みである。
   最新 remediation の pre-commit `git status --short` は次のとおり。
 
 ```text
