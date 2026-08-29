@@ -339,11 +339,55 @@ default Issue 370 semantics、success path のコード差分なしを確認し�
 requirement/design/plan、CLI、ledger、verifier、schema/protocol/intent/authority は
 変更していない。
 
+### Final Quality Gate P1 remediation: terminal bound metadata finalization
+
+metadata GC failure authority remediation を含む clean SHA
+`85e737e167ac15df494b492b51e9cf2fce6f4105` は fresh Full Regression で
+`verified`（approved failure 27、unexpected/missing/signature mismatch/
+unexpected error 0）となった。その後の browser-only Strict review は、正常系でも
+generic multi-stage GC の `.gc` intermediate が final delete より前に第三者へ
+再束縛された場合、後続 cleanup が foreign pathname を移動し得ることを P1 と判定した。
+
+Blue Team Strict analysis は exact SHA を GitHub connector で再検証し、destructive
+guard/journal cleanup を generic GC から分離する dedicated terminal finalizer を
+採用した。finalizer は canonical metadata を `O_NOFOLLOW` で保持し、初回の exact
+identity/hash 検証、既存 `pre_delete_check`、最終 exact identity/hash 検証を経て、
+同一 parent fd に対する単一 `unlink` を直ちに実行し fsync する。最終検証と unlink の
+間には callback、stat、rename、link、stage cleanup を置かない。これは accepted
+requirement section 9 が Issue 370 P3 advisory として明示的に保持する
+「POSIX最終検証からunlinkまでの狭い非原子的窓」の範囲内であり、R/D/P、CLI、ledger、
+verifier、schema/protocol/intent/authority は変更していない。
+
+最終検証前に canonical が再束縛された場合は mutation 0 で
+`metadata-cleanup-conflict` とし、public `recovery_required` /
+`manual-recovery`、`partial_failure` / exit 1、`retry_command=null` へ写像する。
+unlink 後の fsync fault も rollback や private stage publication を行わず、同じ manual
+recovery contract へ閉じる。destructive metadata edge のために導入した
+`failure_policy` は削除し、generic Issue 370 helper の既定 rollback semantics を復元した。
+
+pre-commit candidate では次を確認した。
+
+- terminal finalizer focused regressions: `28 passed`
+- Issue 370 restore/GC/checkpoint/quarantine selector: `21 passed`
+- I370/I371 managed selector: `220 passed`
+- `tests/unit/infra/test_managed_distribution.py`: `574 passed`
+- ordinary fast lane `uv run pytest -q`: `1525 passed, 1142 skipped`
+- CLI I371 focused selector: `3 passed`
+- init/update I371 focused selector: `6 passed`
+- `make lint`: ruff check/format、mypy ともに pass
+- `git diff --check`: pass（whitespace error 0）
+
+独立 verifier は production P0/P1 なしと判定した。新テストを HEAD production に
+重ねた behavioral RED では `28 failed` となり、旧 generic GC route が foreign rebound
+へ到達することを確認した。generic Issue 370 default restore の直接 regression anchor も
+`failure_policy` 引数なしで保持した。この pre-commit evidence は final frozen SHA の
+Full Regression／Strict review の代替には使用しない。
+
 ## Residual Risks / Follow-ups
 
-- metadata GC failure authority remediation と本 report を含む final frozen SHA で、
+- terminal bound metadata finalization と本 report を含む final frozen SHA で、
   clean Full Regression verifier と Strict review の再検証が必要。直前の clean SHA
-  `6342f41e6f1dc47ef61e80048a81d0c044e4b51e` は Full Regression `verified`
+  `85e737e167ac15df494b492b51e9cf2fce6f4105` は Full Regression `verified`
   （approved failure 27、unexpected/missing/signature mismatch 0）だった。ledger、
   verifier、approved failure signaturesは変更していない。
 - fast lane の visible-parent rebind race は既存挙動として残る。再実行で green
@@ -353,8 +397,8 @@ requirement/design/plan、CLI、ledger、verifier、schema/protocol/intent/autho
   suitesの修正後 greenを保全している。
 - `.artifacts/iss-00371-full-regression/20260828T092613.495723Z/` は verifier
   evidence として生成したが、現在の working tree には保持していない。
-- metadata GC failure authority remediation 前の commit
-  `6342f41e6f1dc47ef61e80048a81d0c044e4b51e` までは upstream へpush済みである。
+- terminal bound metadata finalization 前の commit
+  `85e737e167ac15df494b492b51e9cf2fce6f4105` までは upstream へpush済みである。
   最新 remediation の pre-commit `git status --short` は次のとおり。
 
 ```text

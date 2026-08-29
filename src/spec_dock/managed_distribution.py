@@ -147,7 +147,6 @@ DistributionActionName = Literal[
     "remove-empty-directory",
 ]
 DistributionProvenance = Literal["missing", "current", "historical", "unknown"]
-_DistributionStageFailurePolicy = Literal["restore-stage", "preserve-observed-namespace"]
 
 _FRESH_DISTRIBUTION_ACTIONS = frozenset({"create", "adopt", "preserve", "block", "ensure-directory"})
 _DEPROVISION_DISTRIBUTION_ACTIONS = frozenset({"prune", "preserve", "block", "remove-empty-directory"})
@@ -574,6 +573,7 @@ DistributionDeprovisionServiceState = Literal[
     "legacy-marker-invalid",
     "dual-recovery-state",
     "quarantine-preserved",
+    "metadata-cleanup-conflict",
     "recovery-mismatch",
     "guard-only",
     "journal",
@@ -12697,22 +12697,130 @@ class OperationJournalStore:
                 if destructive_recovery:
                     self._assert_destructive_recovery_metadata_bound(journal.root_identity)
 
-            self._quarantine_and_remove(
-                parent_fd,
-                name,
-                info,
-                expected_snapshot=expected_snapshot,
-                expected_sha256=expected_sha256,
-                pre_delete_check=(pre_delete_check if require_guard or destructive_recovery else None),
-                identity_error="journal-precondition-mismatch",
-                failure_reason=failure_reason,
-                failure_policy=("preserve-observed-namespace" if destructive_recovery else "restore-stage"),
-            )
+            if destructive_recovery:
+                assert expected_snapshot is not None
+                assert expected_sha256 is not None
+                self._finalize_bound_metadata(
+                    parent_fd,
+                    name,
+                    expected_snapshot=expected_snapshot,
+                    expected_sha256=expected_sha256,
+                    pre_delete_check=pre_delete_check,
+                    identity_error="journal-precondition-mismatch",
+                    failure_reason=failure_reason,
+                )
+            else:
+                self._quarantine_and_remove(
+                    parent_fd,
+                    name,
+                    info,
+                    expected_snapshot=expected_snapshot,
+                    expected_sha256=expected_sha256,
+                    pre_delete_check=pre_delete_check if require_guard else None,
+                    identity_error="journal-precondition-mismatch",
+                    failure_reason=failure_reason,
+                )
         finally:
             if guard_fd is not None:
                 os.close(guard_fd)
             os.close(parent_fd)
             os.close(root_fd)
+
+    def _finalize_bound_metadata(
+        self,
+        parent_fd: int,
+        name: str,
+        *,
+        expected_snapshot: PathIdentitySnapshot,
+        expected_sha256: str,
+        pre_delete_check: Callable[[], None] | None,
+        identity_error: str,
+        failure_reason: str,
+    ) -> None:
+        """Delete one exact destructive metadata file after a final bound check."""
+
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if not isinstance(nofollow, int):
+            raise DistributionApplyError(
+                failure_reason,
+                recovery_metadata_state="metadata-cleanup-conflict",
+            )
+        try:
+            held_fd = os.open(
+                name,
+                os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise DistributionApplyError(
+                failure_reason,
+                recovery_metadata_state="metadata-cleanup-conflict",
+            ) from exc
+        try:
+            try:
+                self._assert_bound_regular_entry(
+                    parent_fd,
+                    name,
+                    held_fd,
+                    expected_snapshot,
+                    expected_sha256,
+                    identity_error=identity_error,
+                )
+            except (DistributionApplyError, OSError) as exc:
+                raise DistributionApplyError(
+                    failure_reason,
+                    recovery_metadata_state="metadata-cleanup-conflict",
+                ) from exc
+            if pre_delete_check is not None:
+                try:
+                    pre_delete_check()
+                except (DistributionApplyError, OSError) as exc:
+                    if isinstance(exc, DistributionApplyError):
+                        if exc.recovery_metadata_state is not None:
+                            raise
+                        if str(exc) in {
+                            "dual-recovery-state",
+                            "legacy-marker-unconvertible",
+                            "legacy-marker-invalid",
+                        }:
+                            raise DistributionApplyError(
+                                str(exc),
+                                recovery_metadata_state=str(exc),
+                            ) from exc
+                    raise DistributionApplyError(
+                        failure_reason,
+                        recovery_metadata_state="metadata-cleanup-conflict",
+                    ) from exc
+            try:
+                self._assert_bound_regular_entry(
+                    parent_fd,
+                    name,
+                    held_fd,
+                    expected_snapshot,
+                    expected_sha256,
+                    identity_error=identity_error,
+                )
+            except (DistributionApplyError, OSError) as exc:
+                raise DistributionApplyError(
+                    failure_reason,
+                    recovery_metadata_state="metadata-cleanup-conflict",
+                ) from exc
+            try:
+                os.unlink(name, dir_fd=parent_fd)
+            except OSError as exc:
+                raise DistributionApplyError(
+                    failure_reason,
+                    recovery_metadata_state="metadata-cleanup-conflict",
+                ) from exc
+            try:
+                os.fsync(parent_fd)
+            except OSError as exc:
+                raise DistributionApplyError(
+                    failure_reason,
+                    recovery_metadata_state="metadata-cleanup-conflict",
+                ) from exc
+        finally:
+            os.close(held_fd)
 
     def _quarantine_and_remove(
         self,
@@ -12725,7 +12833,6 @@ class OperationJournalStore:
         pre_delete_check: Callable[[], None] | None = None,
         identity_error: str,
         failure_reason: str,
-        failure_policy: _DistributionStageFailurePolicy = "restore-stage",
     ) -> None:
         """Move a bound regular file aside before deleting its exact identity."""
 
@@ -12811,7 +12918,6 @@ class OperationJournalStore:
                     quarantine,
                     moved,
                     strict=True,
-                    failure_policy=failure_policy,
                     mutation_validator=pre_delete_check,
                 )
                 if pre_delete_check is not None:
@@ -12957,17 +13063,28 @@ class OperationJournalStore:
                 if destructive_recovery:
                     self._assert_destructive_recovery_metadata_bound(marker.target_root)
 
-            self._quarantine_and_remove(
-                parent_fd,
-                name,
-                info,
-                expected_snapshot=expected_snapshot,
-                expected_sha256=expected_sha256,
-                pre_delete_check=pre_delete_check if destructive_recovery else None,
-                identity_error="legacy-marker-unconvertible",
-                failure_reason="legacy-marker-unconvertible",
-                failure_policy=("preserve-observed-namespace" if destructive_recovery else "restore-stage"),
-            )
+            if destructive_recovery:
+                assert expected_snapshot is not None
+                assert expected_sha256 is not None
+                self._finalize_bound_metadata(
+                    parent_fd,
+                    name,
+                    expected_snapshot=expected_snapshot,
+                    expected_sha256=expected_sha256,
+                    pre_delete_check=pre_delete_check,
+                    identity_error="legacy-marker-unconvertible",
+                    failure_reason="legacy-marker-unconvertible",
+                )
+            else:
+                self._quarantine_and_remove(
+                    parent_fd,
+                    name,
+                    info,
+                    expected_snapshot=expected_snapshot,
+                    expected_sha256=expected_sha256,
+                    identity_error="legacy-marker-unconvertible",
+                    failure_reason="legacy-marker-unconvertible",
+                )
         finally:
             os.close(parent_fd)
             os.close(root_fd)
@@ -15540,12 +15657,16 @@ def _destructive_recovery_boundary_result(
     state_text = getattr(error, "recovery_metadata_state", None)
     if state_text is None:
         return None
-    state = {
-        "legacy-marker-unconvertible": "legacy-marker",
-        "legacy-marker-invalid": "legacy-marker-invalid",
-        "dual-recovery-state": "dual-recovery-state",
-        "quarantine-preserved": "quarantine-preserved",
-    }.get(state_text, "dual-recovery-state")
+    if state_text == "metadata-cleanup-conflict" and journal is None:
+        state = "guard-only"
+    else:
+        state = {
+            "legacy-marker-unconvertible": "legacy-marker",
+            "legacy-marker-invalid": "legacy-marker-invalid",
+            "dual-recovery-state": "dual-recovery-state",
+            "quarantine-preserved": "quarantine-preserved",
+            "metadata-cleanup-conflict": "metadata-cleanup-conflict",
+        }.get(state_text, "dual-recovery-state")
     return _distribution_process_result_from_state(
         assessment,
         journal,
@@ -15553,6 +15674,7 @@ def _destructive_recovery_boundary_result(
         executable=executable,
         intent=intent,
         failure_paths=failure_paths,
+        retry_policy=("manual-recovery" if state_text == "metadata-cleanup-conflict" else "same-keep-command"),
     )
 
 
@@ -15715,6 +15837,7 @@ def _distribution_process_result_from_state(
         "legacy-marker-invalid",
         "dual-recovery-state",
         "quarantine-preserved",
+        "metadata-cleanup-conflict",
     }
     journal_progress_state = state == "journal" or (journal is not None and state in manual_recovery_states)
     if journal_progress_state:
@@ -19656,7 +19779,6 @@ def _remove_distribution_stage_if_owned(
     created: os.stat_result,
     *,
     strict: bool = False,
-    failure_policy: _DistributionStageFailurePolicy = "restore-stage",
     transition_path: str | None = None,
     canonical_name: str | None = None,
     canonical_ownership: DistributionStageOwnership | None = None,
@@ -19825,14 +19947,13 @@ def _remove_distribution_stage_if_owned(
         except (DistributionApplyError, OSError) as exc:
             if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
                 raise
-            if failure_policy == "restore-stage":
-                with suppress(DistributionApplyError):
-                    _restore_distribution_quarantine(
-                        parent_fd,
-                        quarantine_name,
-                        stage_name,
-                        failure_message="managed staging cleanup failed",
-                    )
+            with suppress(DistributionApplyError):
+                _restore_distribution_quarantine(
+                    parent_fd,
+                    quarantine_name,
+                    stage_name,
+                    failure_message="managed staging cleanup failed",
+                )
             if transition_recorder is not None:
                 with suppress(Exception):
                     transition_recorder(
@@ -19910,13 +20031,12 @@ def _remove_distribution_stage_if_owned(
                 )
             )
             if not moved_is_exact:
-                if failure_policy == "restore-stage":
-                    _restore_distribution_quarantine(
-                        parent_fd,
-                        quarantine_name,
-                        stage_name,
-                        failure_message="managed staging cleanup failed",
-                    )
+                _restore_distribution_quarantine(
+                    parent_fd,
+                    quarantine_name,
+                    stage_name,
+                    failure_message="managed staging cleanup failed",
+                )
                 raise DistributionApplyError("managed staging identity changed")
             if gc_recorder is not None:
                 assert gc_path is not None
@@ -19936,13 +20056,12 @@ def _remove_distribution_stage_if_owned(
                 except DistributionApplyError as exc:
                     if exc.recovery_metadata_state is not None:
                         raise
-                    if failure_policy == "restore-stage":
-                        _restore_distribution_quarantine(
-                            parent_fd,
-                            quarantine_name,
-                            stage_name,
-                            failure_message="managed staging cleanup failed",
-                        )
+                    _restore_distribution_quarantine(
+                        parent_fd,
+                        quarantine_name,
+                        stage_name,
+                        failure_message="managed staging cleanup failed",
+                    )
                     raise
             # Keep an independent exact link until the moved deletion
             # candidate has been revalidated.  A replacement of the first
@@ -20031,13 +20150,12 @@ def _remove_distribution_stage_if_owned(
                 or deleting.st_nlink != 2
                 or (stat.S_ISLNK(deleting.st_mode) and os.readlink(delete_name, dir_fd=parent_fd) != gc_original_link)
             ):
-                if failure_policy == "restore-stage":
-                    _restore_distribution_quarantine(
-                        parent_fd,
-                        delete_name,
-                        quarantine_name,
-                        failure_message="managed staging cleanup failed",
-                    )
+                _restore_distribution_quarantine(
+                    parent_fd,
+                    delete_name,
+                    quarantine_name,
+                    failure_message="managed staging cleanup failed",
+                )
                 raise DistributionApplyError("managed staging identity changed")
             if gc_recorder is not None:
                 assert gc_path is not None
@@ -20094,13 +20212,12 @@ def _remove_distribution_stage_if_owned(
                     and os.readlink(retained_gc_name, dir_fd=parent_fd) != gc_original_link
                 )
             ):
-                if failure_policy == "restore-stage":
-                    _restore_distribution_quarantine(
-                        parent_fd,
-                        retained_gc_name,
-                        retained_name,
-                        failure_message="managed staging cleanup failed",
-                    )
+                _restore_distribution_quarantine(
+                    parent_fd,
+                    retained_gc_name,
+                    retained_name,
+                    failure_message="managed staging cleanup failed",
+                )
                 raise DistributionApplyError("managed staging identity changed")
             if gc_recorder is not None:
                 assert gc_path is not None
@@ -20152,8 +20269,6 @@ def _remove_distribution_stage_if_owned(
             return retained_gc_name
         except Exception as exc:
             if isinstance(exc, DistributionApplyError) and exc.recovery_metadata_state is not None:
-                raise
-            if failure_policy == "preserve-observed-namespace":
                 raise
             if retained_gc_name is not None:
                 with suppress(OSError, DistributionApplyError):
