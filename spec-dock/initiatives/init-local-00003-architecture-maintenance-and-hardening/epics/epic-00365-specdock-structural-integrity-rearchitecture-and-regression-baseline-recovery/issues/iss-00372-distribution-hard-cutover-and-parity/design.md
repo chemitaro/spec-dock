@@ -350,6 +350,8 @@ accepted ADRそのものを current namingに合わせて改変することは D
 
 final candidateを PR head branchの full commit SHA `C` とする。`pull_request` eventでは `github.event.pull_request.head.sha == C` を authorityとし、Implementation Completionで使用する全 evidenceは `C` を明示的または再現可能に参照する。default checkoutの merge ref SHAである `github.sha` は integration CIの識別子であって `C` ではない。
 
+tracked `report.md` は `C` をfreezeするcommitに含め、実装要約、変更境界、実行するverification contractを確定する。`C` のpush後にしか得られないrun ID、check result、artifact digest、Strict result等のfinal receiptは、candidate SHAを変更しないPR本文、GitHub check summary、CI artifactへ記録する。final receiptをtracked reportへ追記してはならない。report訂正が必要ならそのcommitを新candidate `C2` とし、影響するevidenceを `C2` で再取得する。
+
 | evidence | binding |
 |---|---|
 | source/tests/docs | `git rev-parse HEAD == C` |
@@ -359,6 +361,7 @@ final candidateを PR head branchの full commit SHA `C` とする。`pull_reque
 | focused tests | CI/local logが `C` checkout上の commandを記録 |
 | Full Regression | verifier resultが candidate HEADを記録し current ledger contractをpass |
 | Strict review | review input SHA `C` |
+| final evidence receipt | PR本文、GitHub check summary、CI artifactが `C` とrun/check/artifact identityを記録し、tracked treeを変更しない |
 
 Strict review remediationで sourceが `C2` に変わった場合、`C` の package/platform/test/review evidenceを final completionへ流用しない。必要 gateを `C2` で再取得する。
 
@@ -366,7 +369,7 @@ Strict review remediationで sourceが `C2` に変わった場合、`C` の pack
 
 ### 10.1 Implementation Completion
 
-code/test/CI/docsの planned changeが完了し、same candidateで required local/package/platform/Full Regression evidenceが揃った状態。PR mergeを意味しない。
+code/test/CI/docsの planned changeとtracked reportが `C` に含まれ、same candidateで required local/package/platform/Full Regression evidenceが候補を変更しないrecord boundaryに揃った状態。PR mergeを意味しない。
 
 ### 10.2 Strict Review Pass
 

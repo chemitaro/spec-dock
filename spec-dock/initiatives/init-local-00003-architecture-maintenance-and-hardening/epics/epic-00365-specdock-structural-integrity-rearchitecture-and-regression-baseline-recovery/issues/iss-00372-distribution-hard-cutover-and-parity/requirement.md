@@ -63,7 +63,7 @@ Issue `iss-00368`〜`iss-00371` で受理・実装された distribution contrac
 - `.github/workflows/provider-ci.yml` における Linux/macOS focused provider evidence
 - `.github/workflows/provider-full-regression.yml` と current verifier/ledger contract の維持確認
 - `README.md`、`spec-dock/docs/README.md`、`spec-dock/docs/migration.md` と対応 provider asset projection の recovery/docs parity
-- candidate SHA に束縛した final verification/report evidence
+- candidate SHA に束縛し、candidate commitを変更しない PR/check/CI artifact上の final verification receiptと、freeze前に完成したIssue report
 
 ### 対象外
 
@@ -118,7 +118,7 @@ Issue `iss-00368`〜`iss-00371` で受理・実装された distribution contrac
 | I372-AC08 | `make lint` と ordinary `uv run pytest` が green。heavy focused suites は `--run-full-regression --full-regression-shard` で明示実行され、lane policyを迂回しない。 | R08 |
 | I372-AC09 | final candidate SHA に対し current `verify-full-regression.py` が current ledger contractを満たす。合否は verifier result/signature contractで判定し、過去の27 failuresや特定秒数を universal fixed gateにしない。 | R08, R10 |
 | I372-AC10 | README/migration/recovery wording と provider projection が source/testsの current guard/journal semanticsに一致し、dogfood/provider parity testが green。 | R09 |
-| I372-AC11 | final evidenceに candidate SHA `C`、PR head SHA、各 CI runner の checked-out HEAD、OS/runner、Python version、focused commands、package artifact digests、Full Regression verifier resultが対応付けられ、remediation後に `C` が変わった場合は stale evidenceを final扱いしない。 | R07, R08, R10 |
+| I372-AC11 | tracked `report.md` は `C` freeze前に実装要約と検証方法まで完成させる。`C` 確定後の final evidence receiptはcandidate commitを変えないPR本文、GitHub check summary、CI artifactに candidate SHA `C`、PR head SHA、各 CI runner の checked-out HEAD、OS/runner、Python version、focused commands、package artifact digests、Full Regression verifier resultを対応付ける。remediationまたはtracked report変更で `C` が変わった場合は stale evidenceを final扱いしない。 | R07, R08, R10 |
 | I372-AC12 | Implementation Completion、Strict Review Pass、Human PR Merge Gate、`issue finish` が別々に記録され、前者の不足を後者で代用しない。 | R10 |
 
 ## 完了時の非回帰保証

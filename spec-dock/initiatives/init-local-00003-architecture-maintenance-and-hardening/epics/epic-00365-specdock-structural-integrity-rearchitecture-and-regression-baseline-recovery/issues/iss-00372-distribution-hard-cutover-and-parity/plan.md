@@ -54,7 +54,8 @@ ID: "iss-00372"
 - provider CI: `.github/workflows/provider-ci.yml`
 - post-merge Full Regression: `.github/workflows/provider-full-regression.yml`（current verifier routeを維持。D5で不用意にmatrix化しない）
 - docs: `README.md`, `spec-dock/docs/README.md`, `spec-dock/docs/migration.md`, provider mirrors under `src/spec_dock/assets/spec_dock/docs/`
-- final issue evidence: existing `.../iss-00372-distribution-hard-cutover-and-parity/report.md`
+- tracked issue report: existing `.../iss-00372-distribution-hard-cutover-and-parity/report.md`。candidate freeze前に実装要約とverification contractまで完成させる
+- post-freeze final evidence receipt: candidateを変更しないPR本文、GitHub check summary、CI artifact
 
 ## Step 1 — Freeze current route/authority inventory
 
@@ -497,7 +498,7 @@ verifierの current result contractが `verified`/exit 0相当を返し、unexpe
 ### Failure classification
 
 - D5 changeにより新規に生じた failure: D5で修正し、candidate SHAを更新して Step 6以降の relevant evidenceを再取得。
-- current ledger contract自体と矛盾する unrelated historical failure: D5で ledgerを書き換えて隠さず、owner evidenceとして reportへ記録。D5 final completionは verifier greenなしに宣言しない。
+- current ledger contract自体と矛盾する unrelated historical failure: D5で ledgerを書き換えて隠さず、次candidate freeze前のreportまたはcandidateを変更しないPR/check evidenceへ記録する。D5 final completionは verifier greenなしに宣言しない。
 - timingだけの増減: verifier completion/CI resource issueとして調査するが、過去600秒等を acceptance thresholdへ昇格しない。
 
 ### Stop condition
@@ -506,9 +507,9 @@ ledgerを変更しないと D5 unrelated failureを pass扱いできない場合
 
 **Trace:** R08, R10 / AC09, AC11 / Design §7.3, §9
 
-## Step 11 — Bind same-candidate package/platform/test/docs evidence
+## Step 11 — Bind same-candidate evidence without mutating the candidate
 
-**Ownership:** final evidence/report。
+**Ownership:** tracked reportのpre-freeze completionと、PR/check/CI artifact上のpost-freeze final receipt。
 
 ### 先に検査する
 
@@ -519,7 +520,11 @@ git status --short
 
 `C` を確定し、dirty working treeで package receiptやfinal Full Regression evidenceを取らない。
 
-### Evidence table to record in `report.md`
+`report.md` はこの時点より前に実装要約、変更境界、verification contractまでcommit済みでなければならない。`C` 確定後にfinal resultをtracked reportへ追記しない。
+
+### Evidence table to record without changing `C`
+
+PR本文、GitHub check summary、CI artifactの組合せに次を記録する。
 
 - candidate SHA `C`
 - changed production/test/CI/docs paths
@@ -534,11 +539,11 @@ git status --short
 - structural absence result
 - docs/provider mirror parity result
 
-個別 evidence fileを新設する必要はない。CI artifactやexisting Full Regression resultを参照し、Issue reportに再検証可能な識別子を記録する。
+tracked evidence fileを新設しない。PR本文はrepository guidelineどおりtest outputとchange impactを記録し、GitHub check summary/CI artifactの再検証可能なrun/check/artifact identityを参照する。これらの記録はcandidate commitを変更しない。
 
 ### Green
 
-全 final evidenceが同じ `C` に結び付く。Strict remediation等で SHAが変わったら stale evidenceを final欄から外し、影響 gateを再実行する。
+全 final evidenceが同じ `C` に結び付き、receipt記録後もbranch HEADが `C` のままである。Strict remediationまたはtracked report訂正で SHAが変わったら新candidateとしてfreezeし、stale evidenceを final欄から外して影響 gateを再実行する。
 
 **Trace:** R06, R07, R08, R09, R10 / AC05–AC11 / Design §9
 
@@ -553,7 +558,7 @@ git status --short
 - AC01〜AC11
 - source clean candidate `C`
 - same-SHA package/Linux/macOS/tests/docs/Full Regression evidence
-- report evidence更新
+- `C` に含まれるpre-freeze reportと、`C` を変更しないpost-freeze PR/check/CI artifact receipt
 
 ### Gate B — Strict Review Pass
 
