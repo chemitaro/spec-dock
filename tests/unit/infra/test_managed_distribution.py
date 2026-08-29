@@ -1333,45 +1333,239 @@ def test_i371_journal_post_rename_foreign_quarantine_preserves_intent_and_eviden
     assert not foreign_source.exists() and not foreign_source.is_symlink()
 
 
-def test_i371_direct_unlink_revalidates_owned_stage_after_mutation_validator(
+def test_i371_stage_cleanup_has_no_direct_unlink_escape() -> None:
+    source = inspect.getsource(managed_distribution._remove_distribution_stage_if_owned)
+    signature = inspect.signature(managed_distribution._remove_distribution_stage_if_owned)
+
+    assert "direct_unlink" not in signature.parameters
+    assert "direct_unlink" not in source
+    assert "os.unlink(stage_name" not in source
+
+
+@pytest.mark.parametrize("displacement", ["rename-aside", "unlink"])
+def test_i371_exact_recovery_hardlink_is_preserved_without_pathname_unlink(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    displacement: str,
 ) -> None:
-    stage = tmp_path / "owned.stage"
-    moved = tmp_path / "moved.stage"
-    stage.write_bytes(b"owned-stage\n")
-    created = stage.lstat()
+    """A canonical/quarantine hardlink pair is manual, never auto-cleaned."""
+
+    canonical = tmp_path / "entry.json"
+    quarantine = tmp_path / "entry.json.remove"
+    foreign_source = tmp_path / "foreign-source"
+    aside = tmp_path / "operation-owned-aside"
+    raw = b"exact recovery evidence\n"
+    canonical.write_bytes(raw)
+    canonical.chmod(0o640)
+    os.link(canonical, quarantine)
+    foreign_source.write_bytes(raw)
+    foreign_source.chmod(0o640)
+
     parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-    injected = False
+    held_fd = os.open(
+        canonical.name,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=parent_fd,
+    )
+    expected = os.fstat(held_fd)
+    original_unlink = managed_distribution.os.unlink
+    unlink_calls: list[str] = []
 
-    def rebind_stage() -> None:
-        nonlocal injected
-        if injected:
-            return
-        stage.rename(moved)
-        stage.write_bytes(b"third-party-stage\n")
-        injected = True
-
-    try:
-        with pytest.raises(DistributionApplyError, match="managed staging identity changed"):
-            managed_distribution._remove_distribution_stage_if_owned(
-                parent_fd,
-                stage.name,
-                created,
-                strict=True,
-                mutation_validator=rebind_stage,
-                direct_unlink=True,
+    def interpose_private_quarantine_unlink(name, *args, **kwargs):
+        if name == quarantine.name:
+            unlink_calls.append(name)
+            if displacement == "rename-aside":
+                os.rename(quarantine.name, aside.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            else:
+                original_unlink(quarantine.name, dir_fd=parent_fd)
+            os.rename(
+                foreign_source.name,
+                quarantine.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
             )
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", interpose_private_quarantine_unlink)
+    try:
+        outcome = OperationJournalStore(tmp_path)._recover_quarantined_recovery_entry(
+            parent_fd,
+            canonical.name,
+            quarantine.name,
+            held_fd,
+            raw,
+            expected,
+            expected_sha256=hashlib.sha256(raw).hexdigest(),
+            failure_reason="recovery-failed",
+            pre_delete_check=None,
+        )
     finally:
+        os.close(held_fd)
         os.close(parent_fd)
 
-    assert injected is True
-    assert stage.read_bytes() == b"third-party-stage\n"
-    assert moved.read_bytes() == b"owned-stage\n"
+    assert outcome == "manual-conflict"
+    assert unlink_calls == []
+    canonical_info = canonical.lstat()
+    quarantine_info = quarantine.lstat()
+    assert (canonical_info.st_dev, canonical_info.st_ino) == (
+        quarantine_info.st_dev,
+        quarantine_info.st_ino,
+    )
+    assert canonical_info.st_nlink == quarantine_info.st_nlink == 2
+    assert canonical.read_bytes() == quarantine.read_bytes() == raw
+    assert foreign_source.read_bytes() == raw
+    assert not aside.exists()
 
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
-def test_i371_cleanup_post_unlink_state_less_failure_restores_canonical_evidence(
+def test_i371_quarantine_cleanup_failure_preserves_operation_owned_quarantine(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    if entry == "guard":
+        canonical_path = guard_path
+
+        def operation() -> None:
+            store.remove_legacy_marker(marker)
+
+    else:
+        completed = store.write(
+            replace(
+                prepared,
+                status="completed",
+                actions=tuple(replace(action, checkpoint="verified") for action in prepared.actions),
+                created_parent_bindings=(),
+            )
+        )
+        canonical_path = journal_path
+
+        def operation() -> None:
+            store.remove_completed(completed)
+
+    expected_bytes = canonical_path.read_bytes()
+    foreign_source = canonical_path.with_name(f"{canonical_path.name}.foreign")
+    foreign_source.write_bytes(expected_bytes)
+    foreign_source.chmod(canonical_path.stat().st_mode & 0o7777)
+    foreign_before = foreign_source.lstat()
+    original_cleanup = managed_distribution._remove_distribution_stage_if_owned
+    cleanup_calls: list[str] = []
+
+    def fail_cleanup(parent, stage_name, created, *, strict=False, **kwargs):
+        cleanup_calls.append(stage_name)
+        if stage_name.endswith(".remove"):
+            os.rename(foreign_source.name, canonical_path.name, src_dir_fd=parent, dst_dir_fd=parent)
+            raise DistributionApplyError("injected cleanup failure")
+        return original_cleanup(parent, stage_name, created, strict=strict, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_stage_if_owned", fail_cleanup)
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert cleanup_calls and cleanup_calls[0].endswith(".remove")
+    assert raised.value.recovery_metadata_state == "quarantine-preserved"
+    canonical_info = canonical_path.lstat()
+    assert (canonical_info.st_dev, canonical_info.st_ino) == (foreign_before.st_dev, foreign_before.st_ino)
+    assert stat.S_IMODE(canonical_info.st_mode) == stat.S_IMODE(foreign_before.st_mode)
+    assert canonical_path.read_bytes() == expected_bytes
+    quarantines = tuple(canonical_path.parent.glob(f".{canonical_path.name}.*.remove"))
+    assert len(quarantines) == 1
+    assert quarantines[0].read_bytes() == expected_bytes
+    restores = tuple(canonical_path.parent.glob(f".{canonical_path.name}.*.restore"))
+    assert len(restores) == 1
+    assert restores[0].read_bytes() == expected_bytes
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_quarantine_preserved_durable_journal_maps_to_same_intent_recovery(
+    tmp_path: Path,
+    intent: Literal["deprovision", "purge"],
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        assessment,
+        executable,
+        _store,
+        _marker,
+        prepared,
+        _guard_path,
+        _journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+
+    result = managed_distribution._distribution_process_result_from_state(
+        assessment,
+        prepared,
+        state="quarantine-preserved",
+        executable=executable,
+        intent=intent,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == f"{intent}-recovery-required"
+    assert result.retry_policy == "manual-recovery"
+    assert tuple(error.code for error in result.errors) == (f"{intent}-recovery-required",)
+    assert result.reason != "dual-recovery-state"
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_quarantine_preserved_guard_only_maps_to_guard_recovery_semantics(
+    tmp_path: Path,
+    intent: Literal["deprovision", "purge"],
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        assessment,
+        executable,
+        _store,
+        _marker,
+        _prepared,
+        _guard_path,
+        _journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+
+    result = managed_distribution._distribution_process_result_from_state(
+        assessment,
+        None,
+        state="quarantine-preserved",
+        executable=executable,
+        intent=intent,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == f"{intent}-guard-only"
+    assert result.phase == "marker-write"
+    assert result.retry_policy == "manual-recovery"
+    assert tuple(error.code for error in result.errors) == (f"{intent}-recovery-required",)
+    assert result.reason != "dual-recovery-state"
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_cleanup_post_gc_unlink_state_less_failure_restores_canonical_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     entry: str,
@@ -1432,7 +1626,7 @@ def test_i371_cleanup_post_unlink_state_less_failure_restores_canonical_evidence
     def observe_unlink(name, *args, **kwargs):
         nonlocal unlinked
         result = original_unlink(name, *args, **kwargs)
-        if isinstance(name, str) and name.endswith(".remove"):
+        if isinstance(name, str) and name.endswith(".gc"):
             unlinked = True
         return result
 
@@ -1463,7 +1657,7 @@ def test_i371_cleanup_post_unlink_state_less_failure_restores_canonical_evidence
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
-def test_i371_post_unlink_canonical_publish_race_is_manual_even_byte_identical(
+def test_i371_cleanup_after_gc_failure_restores_canonical_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     entry: str,
@@ -1505,18 +1699,16 @@ def test_i371_post_unlink_canonical_publish_race_is_manual_even_byte_identical(
         def operation() -> None:
             store.remove_completed(completed)
 
+    expected_identity = canonical_path.lstat()
     original_unlink = managed_distribution.os.unlink
     original_fsync = managed_distribution.os.fsync
-    original_rename = managed_distribution._rename_distribution_no_replace
     unlinked = False
     fsync_failed = False
-    interposed = False
-    third_party_identity: tuple[int, int, int, int, int] | None = None
 
     def observe_unlink(name, *args, **kwargs):
         nonlocal unlinked
         result = original_unlink(name, *args, **kwargs)
-        if isinstance(name, str) and name.endswith(".remove"):
+        if isinstance(name, str) and name.endswith(".gc"):
             unlinked = True
         return result
 
@@ -1527,60 +1719,36 @@ def test_i371_post_unlink_canonical_publish_race_is_manual_even_byte_identical(
             raise OSError(errno.EIO, "injected canonical publish race")
         original_fsync(fd)
 
-    def interpose_before_canonical_publish(
-        source_parent_fd: int,
-        source_name: str,
-        destination_parent_fd: int,
-        destination_name: str,
-    ) -> None:
-        nonlocal interposed, third_party_identity
-        if not interposed and destination_name == canonical_path.name and source_name.endswith(".restore"):
-            canonical_path.write_bytes(expected_bytes)
-            info = canonical_path.lstat()
-            third_party_identity = (
-                info.st_dev,
-                info.st_ino,
-                info.st_ctime_ns,
-                info.st_mode,
-                info.st_nlink,
-            )
-            interposed = True
-        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
-
     monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
     monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
-    monkeypatch.setattr(
-        managed_distribution,
-        "_rename_distribution_no_replace",
-        interpose_before_canonical_publish,
-    )
     with pytest.raises(DistributionApplyError) as raised:
         operation()
 
     assert unlinked is True
     assert fsync_failed is True
-    assert interposed is True
-    assert third_party_identity is not None
-    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    assert raised.value.recovery_metadata_state is None
     current = canonical_path.lstat()
     assert (
         current.st_dev,
         current.st_ino,
-        current.st_ctime_ns,
         current.st_mode,
         current.st_nlink,
-    ) == third_party_identity
+    ) == (
+        expected_identity.st_dev,
+        expected_identity.st_ino,
+        expected_identity.st_mode,
+        expected_identity.st_nlink,
+    )
     assert canonical_path.read_bytes() == expected_bytes
     private = tuple(target_root.joinpath("spec-dock").glob("*.restore"))
-    assert len(private) == 1
-    assert private[0].read_bytes() == expected_bytes
+    assert private == ()
     assert not tuple(target_root.joinpath("spec-dock").glob("*.remove"))
 
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
 @pytest.mark.parametrize("displacement", ["rename-aside", "unlink"])
-def test_i371_post_unlink_canonical_post_publish_rebind_is_manual_even_byte_identical(
+def test_i371_post_gc_canonical_post_publish_rebind_is_manual_even_byte_identical(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     entry: str,
@@ -1626,7 +1794,6 @@ def test_i371_post_unlink_canonical_post_publish_rebind_is_manual_even_byte_iden
     expected_mode = stat.S_IMODE(canonical_path.lstat().st_mode)
     original_unlink = managed_distribution.os.unlink
     original_fsync = managed_distribution.os.fsync
-    original_rename = managed_distribution._rename_distribution_no_replace
     unlinked = False
     fsync_failed = False
     interposed = False
@@ -1637,7 +1804,7 @@ def test_i371_post_unlink_canonical_post_publish_rebind_is_manual_even_byte_iden
     def observe_unlink(name, *args, **kwargs):
         nonlocal unlinked
         result = original_unlink(name, *args, **kwargs)
-        if isinstance(name, str) and name.endswith(".remove"):
+        if isinstance(name, str) and name.endswith(".gc"):
             unlinked = True
         return result
 
@@ -1648,15 +1815,14 @@ def test_i371_post_unlink_canonical_post_publish_rebind_is_manual_even_byte_iden
             raise OSError(errno.EIO, "injected post-publish rebind")
         original_fsync(fd)
 
-    def interpose_after_publish(
-        source_parent_fd: int,
-        source_name: str,
-        destination_parent_fd: int,
-        destination_name: str,
-    ) -> None:
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    original_restore = managed_distribution.OperationJournalStore._restore_quarantined_entry
+
+    def restore_then_rebind(*args, **kwargs):
         nonlocal interposed, published_identity, third_party_identity
-        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
-        if not interposed and destination_name == canonical_path.name and source_name.endswith(".restore"):
+        result = original_restore(*args, **kwargs)
+        if not interposed:
             published = canonical_path.lstat()
             published_identity = (
                 published.st_dev,
@@ -1680,14 +1846,9 @@ def test_i371_post_unlink_canonical_post_publish_rebind_is_manual_even_byte_iden
                 third_party.st_nlink,
             )
             interposed = True
+        return result
 
-    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
-    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
-    monkeypatch.setattr(
-        managed_distribution,
-        "_rename_distribution_no_replace",
-        interpose_after_publish,
-    )
+    monkeypatch.setattr(store, "_restore_quarantined_entry", restore_then_rebind)
     with pytest.raises(DistributionApplyError) as raised:
         operation()
 
@@ -1697,7 +1858,7 @@ def test_i371_post_unlink_canonical_post_publish_rebind_is_manual_even_byte_iden
     assert published_identity is not None
     assert third_party_identity is not None
     assert published_identity != third_party_identity
-    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    assert raised.value.recovery_metadata_state == "quarantine-preserved"
     current = canonical_path.lstat()
     assert (
         current.st_dev,
@@ -1857,7 +2018,7 @@ def test_i371_terminal_cleanup_state_less_failure_is_same_command_recovery(
     def observe_unlink(name, *args, **kwargs):
         nonlocal unlinked
         result = original_unlink(name, *args, **kwargs)
-        if isinstance(name, str) and name.startswith(f".{selected_path.name}.") and name.endswith(".remove"):
+        if isinstance(name, str) and name.startswith(f".{selected_path.name}.") and name.endswith(".gc"):
             unlinked = True
         return result
 
@@ -1903,7 +2064,7 @@ def test_i371_terminal_cleanup_state_less_failure_is_same_command_recovery(
 @pytest.mark.parametrize("entry", ["guard", "journal"])
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
 @pytest.mark.parametrize("foreign_same_bytes", [False, True])
-def test_i371_cleanup_post_unlink_canonical_conflict_is_manual_and_preserves_both_evidences(
+def test_i371_cleanup_post_gc_canonical_conflict_is_manual_and_preserves_both_evidences(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     entry: str,
@@ -1952,7 +2113,7 @@ def test_i371_cleanup_post_unlink_canonical_conflict_is_manual_and_preserves_bot
     def observe_unlink(name, *args, **kwargs):
         nonlocal foreign_identity, unlinked
         result = original_unlink(name, *args, **kwargs)
-        if isinstance(name, str) and name.startswith(f".{canonical_path.name}.") and name.endswith(".remove"):
+        if isinstance(name, str) and name.startswith(f".{canonical_path.name}.") and name.endswith(".gc"):
             canonical_path.write_bytes(foreign_bytes)
             info = canonical_path.lstat()
             foreign_identity = (
@@ -1980,7 +2141,7 @@ def test_i371_cleanup_post_unlink_canonical_conflict_is_manual_and_preserves_bot
     assert unlinked is True
     assert fsync_failed is True
     assert foreign_identity is not None
-    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    assert raised.value.recovery_metadata_state == "quarantine-preserved"
     current_foreign = canonical_path.lstat()
     assert (
         current_foreign.st_dev,
@@ -1995,7 +2156,9 @@ def test_i371_cleanup_post_unlink_canonical_conflict_is_manual_and_preserves_bot
     assert len(private) == 1
     assert private[0].read_bytes() == expected_bytes
     assert ".restore" not in str(raised.value)
-    assert not tuple(target_root.joinpath("spec-dock").glob("*.remove"))
+    quarantine = tuple(target_root.joinpath("spec-dock").glob("*.remove"))
+    assert len(quarantine) == 1
+    assert quarantine[0].read_bytes() == expected_bytes
 
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
@@ -2063,7 +2226,7 @@ def test_i371_late_legacy_after_metadata_swap_cleans_swapped_out_predecessor_sta
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
-def test_i371_cleanup_race_after_unlink_republishes_exact_recovery_evidence(
+def test_i371_gc_cleanup_never_unlinks_operation_quarantine_name(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     entry: str,
@@ -2076,8 +2239,8 @@ def test_i371_cleanup_race_after_unlink_republishes_exact_recovery_evidence(
         target_root,
         _managed,
         root_identity,
-        legacy_path,
-        legacy_bytes,
+        _legacy_path,
+        _legacy_bytes,
     ) = _i371_late_legacy_fixture(tmp_path)
     if intent == "purge":
         history_file = target_root / "spec-dock" / "initiatives" / "history.md"
@@ -2111,35 +2274,29 @@ def test_i371_cleanup_race_after_unlink_republishes_exact_recovery_evidence(
         created_parent_bindings=(),
     )
     completed = store.write(completed)
-    completed_journal_bytes = journal_path.read_bytes()
     refreshed_marker = managed_distribution._read_distribution_retry_marker(target_root)
     assert refreshed_marker is not None
-    guard_bytes: bytes
-    guard_bytes = guard_path.read_bytes()
 
     original_unlink = managed_distribution.os.unlink
-    injected = False
+    remove_unlink_calls: list[str] = []
 
-    def inject_after_unlink(name, *args, **kwargs):
-        nonlocal injected
-        result = original_unlink(name, *args, **kwargs)
-        expected_prefix = f".{guard_path.name}." if entry == "guard" else f".{journal_path.name}."
-        if not injected and isinstance(name, str) and name.startswith(expected_prefix) and name.endswith(".remove"):
-            legacy_path.write_bytes(legacy_bytes)
-            injected = True
-        return result
+    def observe_unlink(name, *args, **kwargs):
+        if isinstance(name, str) and name.endswith(".remove"):
+            remove_unlink_calls.append(name)
+            raise AssertionError("operation-owned recovery quarantine must not be unlinked by the GC path")
+        return original_unlink(name, *args, **kwargs)
 
-    monkeypatch.setattr(managed_distribution.os, "unlink", inject_after_unlink)
-    with pytest.raises(DistributionApplyError) as raised:
-        if entry == "guard":
-            store.remove_legacy_marker(refreshed_marker)
-        else:
-            assert completed_journal_bytes is not None
-            store.remove_completed(completed)
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    if entry == "guard":
+        store.remove_legacy_marker(refreshed_marker)
+        assert not guard_path.exists()
+        assert journal_path.is_file()
+    else:
+        store.remove_completed(completed)
+        assert not journal_path.exists()
+        assert guard_path.is_file()
 
-    assert injected is True
-    assert raised.value.recovery_metadata_state == "dual-recovery-state"
-    assert legacy_path.read_bytes() == legacy_bytes
+    assert remove_unlink_calls == []
     assert (
         tuple(
             path
@@ -2148,25 +2305,11 @@ def test_i371_cleanup_race_after_unlink_republishes_exact_recovery_evidence(
         )
         == ()
     )
-    if entry == "guard":
-        restored = guard_path.lstat()
-        assert stat.S_ISREG(restored.st_mode)
-        assert restored.st_nlink == 1
-        assert guard_path.read_bytes() == guard_bytes
-        assert completed_journal_bytes is not None
-        assert journal_path.read_bytes() == completed_journal_bytes
-    else:
-        assert completed_journal_bytes is not None
-        restored = journal_path.lstat()
-        assert stat.S_ISREG(restored.st_mode)
-        assert restored.st_nlink == 1
-        assert journal_path.read_bytes() == completed_journal_bytes
-        assert guard_path.read_bytes() == guard_bytes
 
 
 @pytest.mark.parametrize("entry", ["guard", "journal"])
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
-def test_i371_cleanup_race_after_first_check_restores_exact_recovery_evidence(
+def test_i371_cleanup_race_after_quarantine_check_preserves_recovery_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     entry: str,
@@ -2253,10 +2396,18 @@ def test_i371_cleanup_race_after_first_check_restores_exact_recovery_evidence(
     assert injected is True
     assert raised.value.recovery_metadata_state == "dual-recovery-state"
     assert legacy_path.read_bytes() == legacy_bytes
-    assert tuple(target_root.joinpath("spec-dock").glob("*.remove")) == ()
+    quarantine_name = guard_path.name if entry == "guard" else journal_path.name
+    quarantines = tuple(target_root.joinpath("spec-dock").glob(f".{quarantine_name}.*.remove"))
+    assert len(quarantines) == 1
+    expected_bytes = guard_bytes if entry == "guard" else journal_bytes
+    assert quarantines[0].read_bytes() == expected_bytes
     assert tuple(target_root.joinpath("spec-dock").glob("*.restore")) == ()
-    assert guard_path.read_bytes() == guard_bytes
-    assert journal_path.read_bytes() == journal_bytes
+    if entry == "guard":
+        assert not guard_path.exists()
+        assert journal_path.read_bytes() == journal_bytes
+    else:
+        assert guard_path.read_bytes() == guard_bytes
+        assert not journal_path.exists()
 
 
 def test_i371_late_legacy_after_target_unlink_leaves_action_pending(
@@ -2321,7 +2472,7 @@ def test_i371_late_legacy_after_target_unlink_leaves_action_pending(
 
 
 @pytest.mark.parametrize("intent", ["deprovision", "purge"])
-def test_i371_terminal_guard_cleanup_restores_guard_and_preserves_completed_journal_on_late_legacy(
+def test_i371_terminal_guard_cleanup_preserves_quarantine_and_completed_journal_on_late_legacy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     intent: str,
@@ -2393,16 +2544,19 @@ def test_i371_terminal_guard_cleanup_restores_guard_and_preserves_completed_jour
     assert result.reason == "dual-recovery-state"
     assert result.retry_policy == "manual-recovery"
     assert result.phase == "marker-finalization"
-    assert result.last_completed_phase == "post-verified"
+    assert result.last_completed_phase == "marker-finalized"
     assert result.pending_paths == ()
-    assert "spec-dock/.distribution-retry.json" in result.failed_paths
+    assert "spec-dock/.distribution-journal.json" in result.failed_paths
     assert tuple(error.code for error in result.errors) == ("dual-recovery-state",)
     managed_distribution._validate_deprovision_process_result(result, intent=intent)
     assert quarantined_guard_bytes is not None
-    assert guard_path.read_bytes() == quarantined_guard_bytes
+    assert not guard_path.exists()
+    quarantined_guard = tuple(guard_path.parent.glob(f".{guard_path.name}.*.remove"))
+    assert len(quarantined_guard) == 1
+    assert quarantined_guard[0].read_bytes() == quarantined_guard_bytes
     assert journal_path.read_bytes() == completed_journal_bytes
     assert legacy_path.read_bytes() == legacy_bytes
-    assert tuple(guard_path.parent.glob(f".{guard_path.name}.*.remove")) == ()
+    assert len(tuple(guard_path.parent.glob(f".{guard_path.name}.*.remove"))) == 1
     assert cleanup_calls == 0
 
 
@@ -18259,7 +18413,7 @@ def test_i368_journal_swap_revalidates_guard_at_publish_boundary(
     assert store.path.read_bytes() == before
 
 
-def test_i368_journal_finalization_restores_journal_when_guard_races(
+def test_i368_journal_finalization_preserves_quarantine_when_guard_races(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -18306,7 +18460,10 @@ def test_i368_journal_finalization_restores_journal_when_guard_races(
 
     assert replaced is True
     assert guard_path.read_bytes() == replacement
-    assert store.path.read_bytes() == journal_bytes
+    assert not store.path.exists()
+    quarantine = tuple(store.path.parent.glob(f".{store.path.name}.*.remove"))
+    assert len(quarantine) == 1
+    assert quarantine[0].read_bytes() == journal_bytes
 
 
 @pytest.mark.parametrize("entry", ["journal", "guard"])

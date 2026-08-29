@@ -217,11 +217,46 @@ unsupported intent の generic classification を確認した。P1-B regression 
 keep projection の維持を確認した。Full Regression の clean candidate SHA 検証は
 primary のプロセス gate として実施し、ledger/verifier は変更していない。
 
+### Final Quality Gate P1 remediation: quarantine ownership and pathname unlink
+
+Strict review で検出された recovery quarantine の pathname race を、accepted
+R18/R19/R21/R22/R29 contract 内で修正した。canonical path から operation-owned
+quarantine への no-replace rename 後は、後段 failure で canonical pathname や
+quarantine pathname を identity 条件なしに unlink／rollback rename しない。
+`_remove_distribution_stage_if_owned` の Issue 371 専用 `direct_unlink` escape と、
+canonical/quarantine が同一 inode の hardlink である場合に quarantine name を
+unlink する helper を削除した。
+
+cleanup failure 後に exact canonical と exact quarantine が併存する場合、または
+third-party canonical conflict がある場合は、operation-owned quarantine を bounded
+recovery evidence として保持し、内部 `quarantine-preserved` state から public
+`recovery_required` / `manual-recovery` へ写像する。これは genuine な
+`dual-recovery-state` と区別し、既存 schema version、protocol version、guard
+version、intent/authority、CLI JSON/text/exit contract は変更しない。Issue 370 から
+継承した一般 GC cleanup seam の再設計はこの修正に含めていない。
+
+pre-commit candidate では次を確認した。
+
+- focused pathname/quarantine recovery regressions: `46 passed`
+- `tests/unit/infra/test_managed_distribution.py`: `575 passed`
+- ordinary fast lane `uv run pytest -q`: `1526 passed, 1142 skipped`
+- CLI I371 focused selector: `3 passed`（部分 Full Regression selector のため
+  ledger missing-node 診断は出るが assertion failure 0）
+- `make lint`: ruff check/format、mypy ともに pass
+- `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=227`
+- `python -m py_compile src/spec_dock/managed_distribution.py`: pass
+- `git diff --check`: pass（whitespace error 0）
+
+この pre-commit 証拠は fixed candidate SHA の Full Regression／Strict review の
+代替には使用しない。最終 gate は commit/push 後の clean exact SHA に対して fresh
+verifier と browser-only Strict review を実行し、外部 artifact と最終応答で記録する。
+
 ## Residual Risks / Follow-ups
 
-- parser/read boundary と dry-run projection remediation を含む final frozen SHAで、
-  clean Full Regression verifier の再検証が必要。直前の clean SHA
-  `6bd80c78a4b4ba4762eacaaea4e16af5ca3845f6` は `verified` であり、ledger、
+- pathname/quarantine remediation と本 report を含む final frozen SHA で、clean
+  Full Regression verifier と Strict review の再検証が必要。直前の clean SHA
+  `fdcb26bb19aac8e5732b74489a23183975f2b811` は Full Regression `verified`
+  （approved failure 27、unexpected/missing/signature mismatch 0）だった。ledger、
   verifier、approved failure signaturesは変更していない。
 - fast lane の visible-parent rebind race は既存挙動として残る。再実行で green
   だったが、根本修正は Issue 371 の scope 外。
@@ -230,16 +265,16 @@ primary のプロセス gate として実施し、ledger/verifier は変更し�
   suitesの修正後 greenを保全している。
 - `.artifacts/iss-00371-full-regression/20260828T092613.495723Z/` は verifier
   evidence として生成したが、現在の working tree には保持していない。
-- cross-intent remediation commit `6bd80c78a4b4ba4762eacaaea4e16af5ca3845f6`
-  までは upstream へpush済みである。parser/read boundary と dry-run projection
-  remediation 後の `git status --short` は次のとおり。
+- quarantine ownership remediation 前の commit
+  `fdcb26bb19aac8e5732b74489a23183975f2b811` までは upstream へpush済みである。
+  最新 remediation の pre-commit `git status --short` は次のとおり。
 
 ```text
  M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00371-explicit-spec-history-purge/report.md
- M src/spec_dock/cli.py
  M src/spec_dock/managed_distribution.py
- M tests/unit/infra/test_init_update.py
  M tests/unit/infra/test_managed_distribution.py
 ```
 
-P1 remediation の commit/push と PR publication は、この記録時点では実施していない。
+この report は pre-commit 時点の事実だけを記録する。commit/push 後の fixed SHA、
+fresh Full Regression artifact、Strict review 結果は Final Quality Gate の外部証拠と
+最終応答で確定し、report-only commit による reviewed SHA の更新は行わない。

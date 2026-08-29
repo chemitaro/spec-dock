@@ -572,6 +572,7 @@ DistributionDeprovisionServiceState = Literal[
     "legacy-marker",
     "legacy-marker-invalid",
     "dual-recovery-state",
+    "quarantine-preserved",
     "recovery-mismatch",
     "guard-only",
     "journal",
@@ -12811,7 +12812,6 @@ class OperationJournalStore:
                     moved,
                     strict=True,
                     mutation_validator=pre_delete_check,
-                    direct_unlink=True,
                 )
                 if pre_delete_check is not None:
                     pre_delete_check()
@@ -12843,12 +12843,28 @@ class OperationJournalStore:
                         pre_delete_check=pre_delete_check,
                     )
                 except (DistributionApplyError, OSError) as recovery_exc:
+                    recovery_state = (
+                        recovery_exc.recovery_metadata_state
+                        if isinstance(recovery_exc, DistributionApplyError)
+                        else None
+                    )
+                    if (
+                        recovery_state is None
+                        and isinstance(recovery_exc, DistributionApplyError)
+                        and str(recovery_exc)
+                        in {
+                            "dual-recovery-state",
+                            "legacy-marker-unconvertible",
+                            "legacy-marker-invalid",
+                        }
+                    ):
+                        recovery_state = str(recovery_exc)
                     raise DistributionApplyError(
                         failure_reason,
-                        recovery_metadata_state=manual_state or "dual-recovery-state",
+                        recovery_metadata_state=manual_state or recovery_state or "dual-recovery-state",
                     ) from recovery_exc
                 if recovery_outcome == "manual-conflict" and manual_state is None:
-                    manual_state = "dual-recovery-state"
+                    manual_state = "quarantine-preserved"
                 raise DistributionApplyError(
                     failure_reason,
                     recovery_metadata_state=manual_state,
@@ -12883,6 +12899,8 @@ class OperationJournalStore:
             or not _held_fd_has_exact_bytes(held_fd, raw)
         ):
             raise DistributionApplyError(failure_reason)
+        if pre_delete_check is not None:
+            pre_delete_check()
 
         def is_exact(info: os.stat_result | None) -> bool:
             return (
@@ -12929,21 +12947,7 @@ class OperationJournalStore:
             if quarantined is None:
                 return "canonical-restored"
             if is_exact(quarantined):
-                try:
-                    self._remove_exact_recovery_quarantine_link(
-                        parent_fd,
-                        quarantine,
-                        held_fd,
-                        pre_delete_check=pre_delete_check,
-                        failure_reason=failure_reason,
-                    )
-                except (DistributionApplyError, OSError):
-                    canonical_after = _stat_optional_no_follow(parent_fd, name)
-                    quarantined_after = _stat_optional_no_follow(parent_fd, quarantine)
-                    if is_exact(canonical_after) and quarantined_after is None:
-                        return "canonical-restored"
-                    return "manual-conflict"
-                return "canonical-restored"
+                return "manual-conflict"
             return "manual-conflict"
 
         if canonical is None and is_exact(quarantined) and held.st_nlink == expected.st_nlink:
@@ -12969,17 +12973,7 @@ class OperationJournalStore:
                     if quarantined is None:
                         return "canonical-restored"
                     if is_exact(quarantined):
-                        try:
-                            self._remove_exact_recovery_quarantine_link(
-                                parent_fd,
-                                quarantine,
-                                held_fd,
-                                pre_delete_check=pre_delete_check,
-                                failure_reason=failure_reason,
-                            )
-                        except (DistributionApplyError, OSError):
-                            return "manual-conflict"
-                        return "canonical-restored"
+                        return "manual-conflict"
                     return "manual-conflict"
                 if canonical is None and is_exact(quarantined):
                     return "manual-conflict"
@@ -13123,48 +13117,6 @@ class OperationJournalStore:
                     if _stat_identity_tuple(residual) == _stat_identity_tuple(stage_info):
                         os.unlink(stage, dir_fd=parent_fd)
                         os.fsync(parent_fd)
-
-    @staticmethod
-    def _remove_exact_recovery_quarantine_link(
-        parent_fd: int,
-        quarantine: str,
-        held_fd: int,
-        *,
-        pre_delete_check: Callable[[], None] | None,
-        failure_reason: str,
-    ) -> None:
-        """Remove only an exact extra hardlink left at the quarantine name."""
-
-        try:
-            before = os.stat(quarantine, dir_fd=parent_fd, follow_symlinks=False)
-            held = os.fstat(held_fd)
-        except OSError as exc:
-            raise DistributionApplyError(failure_reason) from exc
-        if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_nlink != 2
-            or before.st_dev != held.st_dev
-            or before.st_ino != held.st_ino
-            or before.st_ctime_ns != held.st_ctime_ns
-            or before.st_mode != held.st_mode
-            or held.st_nlink != 2
-        ):
-            raise DistributionApplyError(failure_reason)
-        if pre_delete_check is not None:
-            pre_delete_check()
-        try:
-            rebound = os.stat(quarantine, dir_fd=parent_fd, follow_symlinks=False)
-        except OSError as exc:
-            raise DistributionApplyError(failure_reason) from exc
-        if _stat_identity_tuple(rebound) != _stat_identity_tuple(before) or rebound.st_nlink != 2:
-            raise DistributionApplyError(failure_reason)
-        try:
-            os.unlink(quarantine, dir_fd=parent_fd)
-            os.fsync(parent_fd)
-        except OSError as exc:
-            raise DistributionApplyError(failure_reason) from exc
-        if pre_delete_check is not None:
-            pre_delete_check()
 
     @staticmethod
     def _restore_quarantined_entry(
@@ -15827,6 +15779,7 @@ def _destructive_recovery_boundary_result(
         "legacy-marker-unconvertible": "legacy-marker",
         "legacy-marker-invalid": "legacy-marker-invalid",
         "dual-recovery-state": "dual-recovery-state",
+        "quarantine-preserved": "quarantine-preserved",
     }.get(state_text, "dual-recovery-state")
     return _distribution_process_result_from_state(
         assessment,
@@ -15996,6 +15949,7 @@ def _distribution_process_result_from_state(
         "legacy-marker",
         "legacy-marker-invalid",
         "dual-recovery-state",
+        "quarantine-preserved",
     }
     journal_progress_state = state == "journal" or (journal is not None and state in manual_recovery_states)
     if journal_progress_state:
@@ -16084,7 +16038,7 @@ def _distribution_process_result_from_state(
                         message="Legacy uninstall recovery evidence is invalid.",
                     ),
                 )
-            else:
+            elif state == "dual-recovery-state":
                 status = "recovery_required"
                 reason = "dual-recovery-state"
                 errors = (
@@ -16169,6 +16123,32 @@ def _distribution_process_result_from_state(
             DistributionProcessError(
                 code="dual-recovery-state",
                 message="Conflicting uninstall recovery evidence requires manual review.",
+            ),
+        )
+        retry_policy = "manual-recovery"
+    elif state == "quarantine-preserved":
+        if assessment is None or executable is None:
+            raise DistributionPlanError(f"{operation_label} quarantine-preserved result state is incomplete")
+        status = "recovery_required"
+        phase = "marker-write"
+        last_completed = "marker-written"
+        reason = f"{operation_label}-guard-only"
+        plan_digest = executable.plan_digest
+        pending_paths = tuple(sorted({action.path for action in executable.actions}, key=os.fsencode))
+        failed_paths = tuple(
+            sorted(
+                {
+                    *failed_paths,
+                    *pending_paths,
+                    _DISTRIBUTION_JOURNAL_REL.as_posix(),
+                },
+                key=os.fsencode,
+            )
+        )
+        errors = (
+            DistributionProcessError(
+                code=f"{operation_label}-recovery-required",
+                message=f"Managed distribution {operation_label} recovery is required.",
             ),
         )
         retry_policy = "manual-recovery"
@@ -19921,7 +19901,6 @@ def _remove_distribution_stage_if_owned(
     transition_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     mutation_validator: Callable[[], None] | None = None,
     post_link_mutation_validator: Callable[[], None] | None = None,
-    direct_unlink: bool = False,
     gc_path: str | None = None,
     gc_recorder: Callable[[DistributionStageOwnership], None] | None = None,
     gc_name: str | None = None,
@@ -19946,37 +19925,6 @@ def _remove_distribution_stage_if_owned(
     if not owned:
         if strict:
             raise DistributionApplyError("managed staging identity changed")
-        return None
-    if direct_unlink:
-        try:
-            if mutation_validator is not None:
-                mutation_validator()
-            try:
-                rebound = os.stat(stage_name, dir_fd=parent_fd, follow_symlinks=False)
-            except FileNotFoundError as exc:
-                raise DistributionApplyError("managed staging identity changed") from exc
-            except OSError as exc:
-                if strict:
-                    raise DistributionApplyError("managed staging cleanup failed") from exc
-                return None
-            if (
-                _stat_identity_tuple(rebound) != _stat_identity_tuple(created)
-                or _file_type(rebound.st_mode) != _file_type(created.st_mode)
-                or stat.S_IMODE(rebound.st_mode) != stat.S_IMODE(created.st_mode)
-                or rebound.st_nlink != created.st_nlink
-                or rebound.st_nlink != 1
-            ):
-                raise DistributionApplyError("managed staging identity changed")
-            os.unlink(stage_name, dir_fd=parent_fd)
-            os.fsync(parent_fd)
-            if mutation_validator is not None:
-                mutation_validator()
-        except DistributionApplyError:
-            raise
-        except OSError as exc:
-            if strict:
-                raise DistributionApplyError("managed staging cleanup failed") from exc
-            return None
         return None
     if gc_recorder is not None and gc_path is None:
         raise DistributionApplyError("managed staging cleanup failed")
