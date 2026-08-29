@@ -12773,7 +12773,10 @@ class OperationJournalStore:
                 moved = os.stat(quarantine, dir_fd=parent_fd, follow_symlinks=False)
                 held_after = os.fstat(held_fd)
             except OSError as exc:
-                raise DistributionApplyError(failure_reason) from exc
+                raise DistributionApplyError(
+                    failure_reason,
+                    recovery_metadata_state="quarantine-preserved",
+                ) from exc
             moved_identity = (
                 moved.st_dev,
                 moved.st_ino,
@@ -12789,20 +12792,14 @@ class OperationJournalStore:
                 held_after.st_nlink,
             )
             if moved_identity != held_identity:
-                self._restore_quarantined_entry(
-                    parent_fd,
-                    name,
-                    quarantine,
-                    held_fd,
-                    identity_error=identity_error,
-                    failure_reason=failure_reason,
-                    require_held_identity=False,
+                raise DistributionApplyError(
+                    identity_error,
+                    recovery_metadata_state="quarantine-preserved",
                 )
-                raise DistributionApplyError(identity_error)
             try:
                 # Persist the name transition before the destructive step.  A
-                # later cleanup failure can then restore the still-linked exact
-                # inode instead of losing the canonical recovery authority.
+                # later cleanup failure retains exact journal/guard evidence
+                # for manual recovery instead of silently changing a pathname.
                 os.fsync(parent_fd)
                 if pre_delete_check is not None:
                     pre_delete_check()
@@ -12885,7 +12882,7 @@ class OperationJournalStore:
         failure_reason: str,
         pre_delete_check: Callable[[], None] | None,
     ) -> Literal["canonical-restored", "manual-conflict"]:
-        """Recover a quarantined entry from the observed namespace state."""
+        """Classify a quarantined entry from the observed namespace state."""
 
         held = os.fstat(held_fd)
         expected_mode = stat.S_IMODE(expected.st_mode)
@@ -12913,248 +12910,11 @@ class OperationJournalStore:
                 and info.st_nlink == held.st_nlink
             )
 
-        def publish_private() -> None:
-            private_name = f".{name}.{secrets.token_hex(16)}.restore"
-            self._publish_exact_recovery_bytes_no_replace(
-                parent_fd,
-                private_name,
-                held_fd,
-                raw,
-                expected,
-                expected_sha256=expected_sha256,
-                failure_reason=failure_reason,
-            )
-
-        def publish_canonical_or_private() -> bool:
-            try:
-                self._publish_exact_recovery_bytes_no_replace(
-                    parent_fd,
-                    name,
-                    held_fd,
-                    raw,
-                    expected,
-                    expected_sha256=expected_sha256,
-                    failure_reason=failure_reason,
-                )
-            except (DistributionApplyError, OSError):
-                publish_private()
-                return False
-            return True
-
         canonical = _stat_optional_no_follow(parent_fd, name)
         quarantined = _stat_optional_no_follow(parent_fd, quarantine)
-        if is_exact(canonical):
-            if quarantined is None:
-                return "canonical-restored"
-            if is_exact(quarantined):
-                return "manual-conflict"
-            return "manual-conflict"
-
-        if canonical is None and is_exact(quarantined) and held.st_nlink == expected.st_nlink:
-            try:
-                self._restore_quarantined_entry(
-                    parent_fd,
-                    name,
-                    quarantine,
-                    held_fd,
-                    identity_error=failure_reason,
-                    failure_reason=failure_reason,
-                    require_held_identity=True,
-                )
-                held = os.fstat(held_fd)
-                restored = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-                if not is_exact(restored) or _stat_optional_no_follow(parent_fd, quarantine) is not None:
-                    raise DistributionApplyError(failure_reason)
-                return "canonical-restored"
-            except (DistributionApplyError, OSError):
-                canonical = _stat_optional_no_follow(parent_fd, name)
-                quarantined = _stat_optional_no_follow(parent_fd, quarantine)
-                if is_exact(canonical):
-                    if quarantined is None:
-                        return "canonical-restored"
-                    if is_exact(quarantined):
-                        return "manual-conflict"
-                    return "manual-conflict"
-                if canonical is None and is_exact(quarantined):
-                    return "manual-conflict"
-
-        if canonical is None and is_exact(quarantined):
-            return "manual-conflict"
-
-        if canonical is None:
-            if quarantined is None and held.st_nlink == 0:
-                if not publish_canonical_or_private():
-                    return "manual-conflict"
-                if _stat_optional_no_follow(parent_fd, name) is not None:
-                    return "canonical-restored"
-                raise DistributionApplyError(failure_reason)
-            if quarantined is not None:
-                if not publish_canonical_or_private():
-                    return "manual-conflict"
-                canonical = _stat_optional_no_follow(parent_fd, name)
-                if canonical is not None:
-                    return "manual-conflict"
-            publish_private()
-            return "manual-conflict"
-
-        publish_private()
+        if is_exact(canonical) and quarantined is None:
+            return "canonical-restored"
         return "manual-conflict"
-
-    @staticmethod
-    def _publish_exact_recovery_bytes_no_replace(
-        parent_fd: int,
-        destination: str,
-        held_fd: int,
-        raw: bytes,
-        expected: os.stat_result,
-        *,
-        expected_sha256: str,
-        failure_reason: str,
-    ) -> None:
-        """Publish exact held recovery bytes without replacing any pathname."""
-
-        nofollow = getattr(os, "O_NOFOLLOW", None)
-        if not isinstance(nofollow, int):
-            raise DistributionApplyError("platform lacks required no-follow file support")
-        expected_mode = stat.S_IMODE(expected.st_mode)
-        held = os.fstat(held_fd)
-        if (
-            not stat.S_ISREG(held.st_mode)
-            or held.st_dev != expected.st_dev
-            or held.st_ino != expected.st_ino
-            or stat.S_IMODE(held.st_mode) != expected_mode
-            or held.st_size != len(raw)
-            or hashlib.sha256(raw).hexdigest() != expected_sha256
-            or not _held_fd_has_exact_bytes(held_fd, raw)
-        ):
-            raise DistributionApplyError(failure_reason)
-        try:
-            os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            pass
-        except OSError as exc:
-            raise DistributionApplyError(failure_reason) from exc
-        else:
-            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), destination)
-
-        stage = f".{destination}.{secrets.token_hex(16)}.restore"
-        stage_fd: int | None = None
-        stage_info: os.stat_result | None = None
-        try:
-            try:
-                stage_fd = os.open(
-                    stage,
-                    os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow | getattr(os, "O_CLOEXEC", 0),
-                    expected_mode,
-                    dir_fd=parent_fd,
-                )
-                _write_fd_bytes(stage_fd, raw)
-                os.fchmod(stage_fd, expected_mode)
-                stage_info = os.fstat(stage_fd)
-                visible_stage = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
-            except OSError as exc:
-                raise DistributionApplyError(failure_reason) from exc
-            if (
-                not stat.S_ISREG(stage_info.st_mode)
-                or stage_info.st_nlink != 1
-                or stat.S_IMODE(stage_info.st_mode) != expected_mode
-                or visible_stage.st_dev != stage_info.st_dev
-                or visible_stage.st_ino != stage_info.st_ino
-                or visible_stage.st_nlink != 1
-                or stat.S_IMODE(visible_stage.st_mode) != expected_mode
-                or not _held_fd_has_exact_bytes(stage_fd, raw)
-            ):
-                raise DistributionApplyError(failure_reason)
-            _rename_distribution_no_replace(parent_fd, stage, parent_fd, destination)
-            os.fsync(parent_fd)
-            try:
-                published = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
-                published_fd = os.open(
-                    destination,
-                    os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0),
-                    dir_fd=parent_fd,
-                )
-            except OSError as exc:
-                raise DistributionApplyError(failure_reason) from exc
-            try:
-                assert stage_fd is not None
-                opened = os.fstat(published_fd)
-                held_after_publish = os.fstat(stage_fd)
-                if (
-                    not stat.S_ISREG(published.st_mode)
-                    or published.st_nlink != 1
-                    or stat.S_IMODE(published.st_mode) != expected_mode
-                    or not stat.S_ISREG(held_after_publish.st_mode)
-                    or held_after_publish.st_nlink != 1
-                    or stat.S_IMODE(held_after_publish.st_mode) != expected_mode
-                    or _stat_identity_tuple(opened) != _stat_identity_tuple(published)
-                    or _stat_identity_tuple(held_after_publish) != _stat_identity_tuple(opened)
-                    or not _held_fd_has_exact_bytes(published_fd, raw)
-                ):
-                    raise DistributionApplyError(failure_reason)
-                opened_after = os.fstat(published_fd)
-                held_after_validation = os.fstat(stage_fd)
-                published_after = os.stat(destination, dir_fd=parent_fd, follow_symlinks=False)
-                validated_identity = _stat_identity_tuple(opened_after)
-                if (
-                    _stat_identity_tuple(opened) != validated_identity
-                    or _stat_identity_tuple(held_after_validation) != validated_identity
-                    or _stat_identity_tuple(published_after) != validated_identity
-                ):
-                    raise DistributionApplyError(failure_reason)
-            except OSError as exc:
-                raise DistributionApplyError(failure_reason) from exc
-            finally:
-                os.close(published_fd)
-            if _stat_optional_no_follow(parent_fd, stage) is not None:
-                raise DistributionApplyError(failure_reason)
-        finally:
-            if stage_fd is not None:
-                os.close(stage_fd)
-            if stage_info is not None:
-                with suppress(OSError):
-                    residual = os.stat(stage, dir_fd=parent_fd, follow_symlinks=False)
-                    if _stat_identity_tuple(residual) == _stat_identity_tuple(stage_info):
-                        os.unlink(stage, dir_fd=parent_fd)
-                        os.fsync(parent_fd)
-
-    @staticmethod
-    def _restore_quarantined_entry(
-        parent_fd: int,
-        name: str,
-        quarantine: str,
-        held_fd: int,
-        *,
-        identity_error: str,
-        failure_reason: str,
-        require_held_identity: bool,
-    ) -> None:
-        """Restore the held recovery entry after a post-rename failure."""
-
-        try:
-            quarantined = os.stat(quarantine, dir_fd=parent_fd, follow_symlinks=False)
-            held = os.fstat(held_fd)
-        except OSError as exc:
-            raise DistributionApplyError(failure_reason) from exc
-        if require_held_identity and (
-            quarantined.st_dev,
-            quarantined.st_ino,
-            quarantined.st_ctime_ns,
-            quarantined.st_mode,
-            quarantined.st_nlink,
-        ) != (
-            held.st_dev,
-            held.st_ino,
-            held.st_ctime_ns,
-            held.st_mode,
-            held.st_nlink,
-        ):
-            raise DistributionApplyError(identity_error)
-        try:
-            _rename_distribution_no_replace(parent_fd, quarantine, parent_fd, name)
-            os.fsync(parent_fd)
-        except OSError as exc:
-            raise DistributionApplyError(failure_reason) from exc
 
     def remove_legacy_marker(self, marker: DistributionRetryMarker) -> None:
         if marker.target_root != _root_identity_for_assessment(self.target_root):
