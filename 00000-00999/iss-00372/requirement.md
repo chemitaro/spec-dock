@@ -34,6 +34,7 @@ Issue `iss-00368`〜`iss-00371` で受理・実装された distribution contrac
 - **ordinary fast lane**: repository policy により `full_regression` nodes を skip する通常の `uv run pytest`。
 - **focused full-regression shard**: heavy node を明示的に実行する `--run-full-regression --full-regression-shard` lane。
 - **Full Regression verifier**: Issue 368 の current `verify-full-regression.py` と ledger による post-merge/current-candidate verification contract。
+- **candidate SHA `C`**: PR head branch の full commit SHA。`pull_request` event では `github.event.pull_request.head.sha` を authority とし、D5 focused job はその SHA を明示 checkoutして runner 内の `git rev-parse HEAD` と一致させる。default checkoutの merge ref SHAである `github.sha` は `C` ではない。
 
 ## 観測可能な要件
 
@@ -113,11 +114,11 @@ Issue `iss-00368`〜`iss-00371` で受理・実装された distribution contrac
 | I372-AC04 | public parser/flag/dry-run/apply/text/JSON/exit/retry behavior の既存 characterization が greenで、new public surfaceがない。 | R01, R05 |
 | I372-AC05 | provider/dogfood parity testが greenで、wheel/sdist package manifestが provider asset manifestと bytes/modes を含め一致し、installed/fresh consumerが same content contractを満たす。 | R06 |
 | I372-AC06 | wheel と sdist からの isolated consumer で、fresh provisioning と recognized refresh に加え、D5が対象とする deprovision/purge routeの少なくとも public dispatch・preservation境界が packaged runtime から検証される。checkout source fallback はない。 | R05, R06 |
-| I372-AC07 | provider CI が Linux/macOS の同一 `github.sha` に focused D5 gateを実行し、両 runner で required checksが green。macOS jobを `continue-on-error` 等の best-effort にしない。 | R07, R10 |
+| I372-AC07 | provider CI の focused D5 job が Linux/macOS の両方で `github.event.pull_request.head.sha == C` を明示 checkoutし、各 runner の `git rev-parse HEAD == C` を検証したうえで required checksが green。default PR merge refの `github.sha` を `C` とみなさず、macOS jobを `continue-on-error` 等の best-effort にしない。 | R07, R10 |
 | I372-AC08 | `make lint` と ordinary `uv run pytest` が green。heavy focused suites は `--run-full-regression --full-regression-shard` で明示実行され、lane policyを迂回しない。 | R08 |
 | I372-AC09 | final candidate SHA に対し current `verify-full-regression.py` が current ledger contractを満たす。合否は verifier result/signature contractで判定し、過去の27 failuresや特定秒数を universal fixed gateにしない。 | R08, R10 |
 | I372-AC10 | README/migration/recovery wording と provider projection が source/testsの current guard/journal semanticsに一致し、dogfood/provider parity testが green。 | R09 |
-| I372-AC11 | final evidenceに candidate SHA、OS/runner、Python version、focused commands、package artifact digests、Full Regression verifier resultが対応付けられ、remediation後に SHA が変わった場合は stale evidenceを final扱いしない。 | R07, R08, R10 |
+| I372-AC11 | final evidenceに candidate SHA `C`、PR head SHA、各 CI runner の checked-out HEAD、OS/runner、Python version、focused commands、package artifact digests、Full Regression verifier resultが対応付けられ、remediation後に `C` が変わった場合は stale evidenceを final扱いしない。 | R07, R08, R10 |
 | I372-AC12 | Implementation Completion、Strict Review Pass、Human PR Merge Gate、`issue finish` が別々に記録され、前者の不足を後者で代用しない。 | R10 |
 
 ## 完了時の非回帰保証

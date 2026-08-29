@@ -29,7 +29,7 @@ ID: "iss-00372"
 
 この Plan の authoring baselineは `e8b885fcb98e63e6c2e5f32245f8d65345157d1f`。
 
-実装開始時の branch HEADを `B`、最終 candidate SHAを `C` とする。`B` がこの baselineより進んでいる場合、各 Stepの「先に検査すること」を再実行し、すでに満たされている変更を重複実装しない。accepted D1〜D4 semanticsと本 Requirement/Designに矛盾する差分がある場合は停止する。
+実装開始時の branch HEADを `B`、最終 candidate SHAを `C` とする。`C` は PR head branchの full commit SHAであり、`pull_request` eventでは `github.event.pull_request.head.sha` を authorityとする。default checkoutの merge ref SHAである `github.sha` は `C` ではない。`B` がこの baselineより進んでいる場合、各 Stepの「先に検査すること」を再実行し、すでに満たされている変更を重複実装しない。accepted D1〜D4 semanticsと本 Requirement/Designに矛盾する差分がある場合は停止する。
 
 原則:
 
@@ -349,7 +349,7 @@ D5で packaged deprovision/purge coverageを追加した後の final package gat
 
 ### 変更不要条件
 
-branch `B` で既に provider-only required jobが `ubuntu-latest` / `macos-latest` の同一 `github.sha` に対し D5 focused suiteを実行し、best-effortでない場合は workflow変更不要。
+branch `B` で既に provider-only required jobが `ubuntu-latest` / `macos-latest` の両方で `github.event.pull_request.head.sha` を明示 checkoutし、各 runnerの `git rev-parse HEAD` と一致する同一 `C` に対して D5 focused suiteを実行し、best-effortでない場合は workflow変更不要。
 
 ### 最小変更
 
@@ -358,6 +358,8 @@ baselineでは macOS jobがないため、`provider-ci.yml` に最小の provide
 - runner: `ubuntu-latest`, `macos-latest`
 - Python: current provider CIと同じ 3.11 unless repository-wide supported version policyが branch `B` で変更済み
 - installation: current provider CIと同じ pip/uv setup
+- candidate identity: `C = github.event.pull_request.head.sha`
+- checkout: `actions/checkout` の `ref` に `C` を明示し、test前に `git rev-parse HEAD == C` を検証
 - same focused command set on both OS
 - `continue-on-error` 不可
 - consumer install_rootへ provider workflowを copyしない
@@ -370,7 +372,7 @@ baseline workflow sourceには macOS runnerがなく、D5 platform gateは未成
 
 ### Green
 
-- PR candidate `C` で Linux/macOS jobsが同じ `github.sha` を表示
+- PR candidate `C` で Linux/macOS jobsが同じ `github.event.pull_request.head.sha` を使用し、各 checked-out HEADが `C` と一致
 - real no-replace pathが両 hostで成功、または意図した capability-negative fixtureは target write 0で既存 diagnosticを返す
 - root/parent rebind、guard/journal recovery、cross-intent write-zero、package representative parityが両OS green
 
@@ -524,8 +526,8 @@ git status --short
 - wheel SHA-256
 - sdist SHA-256
 - isolated package/fresh consumer command/result
-- Linux provider CI run/check + `github.sha`
-- macOS provider CI run/check + `github.sha`
+- Linux provider CI run/check + `github.event.pull_request.head.sha` + checked-out `git rev-parse HEAD`
+- macOS provider CI run/check + `github.event.pull_request.head.sha` + checked-out `git rev-parse HEAD`
 - ordinary `make lint`, `uv run pytest`, `validate`
 - focused heavy commands/results
 - Full Regression verifier command/result
