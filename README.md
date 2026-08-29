@@ -192,9 +192,10 @@ Notes:
   errors.
 - A legacy `.uninstall-retry.json` is never converted automatically because it proves no root, specs
   mode, plan, or checkpoint. It is preserved for manual recovery. `--keep-specs` preserves initiatives,
-  Workbench data, and unknown content. `--remove-specs` remains a separate compatibility authority for Issue 371
-  and is required before spec history is deleted; neither route upgrades recovery authority into the
-  other.
+  Workbench data, and unknown content. `--remove-specs` is the explicit two-part authority for shared,
+  journaled spec-history purge: dry-run is write-free, and apply uses the same root-bound forward journal.
+  A matching partial purge is retried only with `spec-dock uninstall --apply --remove-specs <target>`;
+  legacy or conflicting recovery state remains manual and is never converted automatically.
 - `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
   installer update command by running
   `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>`.

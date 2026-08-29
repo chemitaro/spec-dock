@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import errno
 import hashlib
 import inspect
 import json
@@ -8,10 +9,11 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
+import spec_dock.cli as cli
 import spec_dock.managed_distribution as managed_distribution
 from spec_dock.managed_distribution import (
     DistributionAction,
@@ -206,6 +208,72 @@ def _i370_tree_evidence(root: Path) -> dict[str, tuple[object, ...]]:
     return evidence
 
 
+def _i371_late_legacy_fixture(tmp_path: Path):
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path / "manifest", _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    legacy_path = target_root / "spec-dock" / ".uninstall-retry.json"
+    legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
+    return install_root, scaffold_root, manifest_path, target_root, managed, root_identity, legacy_path, legacy_bytes
+
+
+def _i371_recovery_fixture(tmp_path: Path, intent: str):
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        _managed,
+        root_identity,
+        _legacy_path,
+        _legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    marker = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    prepared = store.prepare(executable, package_version="1.2.3")
+    return (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        root_identity,
+        assessment,
+        executable,
+        store,
+        marker,
+        prepared,
+        target_root / "spec-dock/.distribution-retry.json",
+        target_root / "spec-dock/.distribution-journal.json",
+    )
+
+
 def test_s20_public_catalog_is_derived_from_physical_install_root() -> None:
     plan = build_distribution_plan(INSTALL_ROOT, manifest_path=MANIFEST_PATH)
 
@@ -389,6 +457,1649 @@ def test_i370_deprovision_intent_maps_to_uninstall_plan_and_removal_grammar(
     )
     with pytest.raises(DistributionPlanError, match="not allowed"):
         build_executable_mutation_plan(forged_assessment)
+
+
+def test_i371_purge_assessment_is_typed_and_write_free(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history = target_root / "spec-dock" / "initiatives"
+    history.mkdir(parents=True)
+    history_file = history / "unknown-name.bin"
+    history_file.write_bytes(b"arbitrary history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    before = _i370_tree_evidence(target_root)
+    root_info = target_root.stat()
+
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert assessment.intent == "purge"
+    assert assessment.explicit_spec_history_purge_contract is not None
+    purge_contract = assessment.explicit_spec_history_purge_contract
+    assert purge_contract.authority == "explicit-spec-history-purge"
+    assert purge_contract.history_root == "spec-dock/initiatives"
+    assert purge_contract.history_entries[0].relative_path == "spec-dock/initiatives/unknown-name.bin"
+    assert any(action.path == "spec-dock/initiatives/unknown-name.bin" for action in assessment.actions)
+    assert _i370_tree_evidence(target_root) == before
+
+
+def test_i371_purge_assessment_reuses_one_coherent_history_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    original_content = b"history-before-second-observation\n"
+    history_file.write_bytes(original_content)
+    root_info = target_root.stat()
+    original_observe = managed_distribution._observe_target
+    root_observations = 0
+
+    def observe_with_changed_second_root_observation(root: Path, relative_path: str):
+        nonlocal root_observations
+        observed = original_observe(root, relative_path)
+        if relative_path == "spec-dock/initiatives":
+            root_observations += 1
+            if root_observations == 2:
+                history_file.write_bytes(b"history-after-second-observation\n")
+        return observed
+
+    monkeypatch.setattr(managed_distribution, "_observe_target", observe_with_changed_second_root_observation)
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    purge_contract = assessment.explicit_spec_history_purge_contract
+    assert purge_contract is not None
+    entry = next(
+        item for item in purge_contract.history_entries if item.relative_path == "spec-dock/initiatives/history.md"
+    )
+    snapshot = dict(assessment.distribution_plan.target_snapshots)[entry.relative_path].target
+    assert root_observations == 1
+    assert assessment.blockers == ()
+    assert entry.sha256 == hashlib.sha256(original_content).hexdigest()
+    assert snapshot.identity is not None
+    assert snapshot.identity.sha256 == entry.sha256
+    assert snapshot.device == entry.device
+    assert snapshot.inode == entry.inode
+    assert snapshot.ctime_ns == entry.ctime_ns
+
+
+def test_i371_purge_assessment_registers_nested_empty_history_directories(
+    tmp_path: Path,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_root = target_root / "spec-dock" / "initiatives"
+    (history_root / "empty-leaf").mkdir(parents=True)
+    (history_root / "nested" / "empty-nested").mkdir(parents=True)
+    (history_root / "nested" / "history.md").write_bytes(b"history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    outside = target_root / "outside-sentinel.txt"
+    outside.write_bytes(b"outside\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+
+    history_directories = {
+        "spec-dock/initiatives",
+        "spec-dock/initiatives/empty-leaf",
+        "spec-dock/initiatives/nested",
+        "spec-dock/initiatives/nested/empty-nested",
+    }
+    assert assessment.blockers == ()
+    assert history_directories <= {
+        action.path for action in assessment.actions if action.action == "remove-empty-directory"
+    }
+
+    result = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert result.status == "completed", result.reason
+    assert not history_root.exists()
+    assert workbench.read_bytes() == b"preserve\n"
+    assert outside.read_bytes() == b"outside\n"
+
+
+def test_i371_purge_apply_removes_history_and_preserves_workbench(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "arbitrary.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    root_info = target_root.stat()
+
+    result = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino),
+    )
+
+    assert result.status == "completed"
+    assert result.intent == "purge"
+    assert not history_file.exists()
+    assert workbench.read_bytes() == b"preserve\n"
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    history_actions = [action for action in result.action_outcomes if action.category == "spec_history"]
+    assert len(history_actions) == 1
+    assert history_actions[0].path == "spec-dock/initiatives"
+    assert history_actions[0].status == "removed"
+
+
+def test_i371_purge_forward_recovers_same_plan_after_history_checkpoint_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    workbench = target_root / "spec-dock" / ".workbench" / "sentinel.txt"
+    workbench.parent.mkdir(parents=True)
+    workbench.write_bytes(b"preserve\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    original_checkpoint = OperationJournalStore.checkpoint_published
+    interrupted = False
+
+    def fail_after_history_checkpoint(self, journal, completed_paths):
+        nonlocal interrupted
+        result = original_checkpoint(self, journal, completed_paths)
+        if not interrupted and history_file.relative_to(target_root).as_posix() in completed_paths:
+            interrupted = True
+            raise DistributionApplyError("injected purge checkpoint failure")
+        return result
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", fail_after_history_checkpoint)
+    first = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert first.status == "recovery_required", first.reason
+    assert first.intent == "purge"
+    assert interrupted is True
+    assert not history_file.exists()
+    assert (target_root / "spec-dock/.distribution-retry.json").is_file()
+    assert (target_root / "spec-dock/.distribution-journal.json").is_file()
+
+    monkeypatch.setattr(OperationJournalStore, "checkpoint_published", original_checkpoint)
+    second = managed_distribution.execute_explicit_spec_history_purge_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert second.status == "completed", second.reason
+    assert second.intent == "purge"
+    assert workbench.read_bytes() == b"preserve\n"
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+def test_i371_late_legacy_before_guard_publish_is_manual_and_write_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = OperationJournalStore.prepare_legacy_guard
+    injected = False
+
+    def create_legacy_before_guard(self, plan, **kwargs):
+        nonlocal injected
+        legacy_path.write_bytes(legacy_bytes)
+        injected = True
+        return original(self, plan, **kwargs)
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", create_legacy_before_guard)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "legacy-marker-unconvertible"
+    assert result.retry_policy == "manual-recovery"
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert not (target_root / "spec-dock/.distribution-retry.json").exists()
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert managed.read_bytes() == b"managed\n"
+
+
+def test_i371_late_legacy_after_guard_publish_is_dual_and_journal_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = OperationJournalStore.prepare_legacy_guard
+    injected = False
+
+    def create_legacy_after_guard(self, plan, **kwargs):
+        nonlocal injected
+        marker = original(self, plan, **kwargs)
+        legacy_path.write_bytes(legacy_bytes)
+        injected = True
+        return marker
+
+    monkeypatch.setattr(OperationJournalStore, "prepare_legacy_guard", create_legacy_after_guard)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert managed.read_bytes() == b"managed\n"
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert (target_root / "spec-dock/.distribution-retry.json").is_file()
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+def test_i371_late_legacy_after_journal_prepare_preserves_prepared_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = OperationJournalStore.prepare
+    injected = False
+
+    def create_legacy_after_journal(self, plan, **kwargs):
+        nonlocal injected
+        journal = original(self, plan, **kwargs)
+        legacy_path.write_bytes(legacy_bytes)
+        injected = True
+        return journal
+
+    monkeypatch.setattr(OperationJournalStore, "prepare", create_legacy_after_journal)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert managed.read_bytes() == b"managed\n"
+    assert legacy_path.read_bytes() == legacy_bytes
+    journal = OperationJournalStore(target_root)._read(root_identity)
+    assert journal.status == "prepared"
+    assert all(action.checkpoint == "pending" for action in journal.actions)
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_guard_only_prepare_race_before_journal_is_manual_and_write_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    original_write = OperationJournalStore._write
+    injected = False
+
+    def inject_before_journal_write(self, journal, **kwargs):
+        nonlocal injected
+        if not injected:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return original_write(self, journal, **kwargs)
+
+    monkeypatch.setattr(OperationJournalStore, "_write", inject_before_journal_write)
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.intent == intent
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert result.applied_paths == ()
+    assert result.pending_paths == ()
+    managed_distribution._validate_deprovision_process_result(result, intent=intent)
+    assert managed.read_bytes() == b"managed\n"
+    assert guard_path.read_bytes() == guard_bytes
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_guard_only_prepare_race_after_journal_publish_is_journal_progress_manual(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+        assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    original_rename = managed_distribution._rename_distribution_no_replace
+    injected = False
+
+    def inject_after_journal_publish(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and destination_name == journal_path.name:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", inject_after_journal_publish)
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.intent == intent
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert result.applied_paths == ()
+    assert result.pending_paths == tuple(sorted((action.path for action in executable.actions), key=os.fsencode))
+    managed_distribution._validate_deprovision_process_result(result, intent=intent)
+    assert managed.read_bytes() == b"managed\n"
+    assert guard_path.read_bytes() == guard_bytes
+    assert legacy_path.read_bytes() == legacy_bytes
+    journal = OperationJournalStore(target_root)._read(root_identity)
+    assert journal.status == "prepared"
+    assert all(action.checkpoint == "pending" for action in journal.actions)
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("displacement", ["rename-aside", "unlink"])
+@pytest.mark.parametrize("with_recorder", [False, True])
+def test_i371_remove_target_post_rename_foreign_quarantine_is_never_rolled_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    displacement: str,
+    with_recorder: bool,
+) -> None:
+    target = tmp_path / "target"
+    foreign_source = tmp_path / "foreign-source"
+    aside = tmp_path / "operation-owned-aside"
+    quarantine_name = "target.remove"
+    payload = b"operation-owned\n"
+    link_target = "history-entry"
+    if kind == "regular":
+        target.write_bytes(payload)
+        foreign_source.write_bytes(payload)
+        target.chmod(0o640)
+        foreign_source.chmod(0o640)
+    else:
+        target.symlink_to(link_target)
+        foreign_source.symlink_to(link_target)
+    expected = target.lstat()
+    foreign_before = foreign_source.lstat()
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    held_fd: int | None = None
+    if kind == "regular":
+        held_fd = os.open(
+            target.name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+    original_rename = managed_distribution._rename_distribution_no_replace
+    injected = False
+    restore_attempts = 0
+    recorded: list[DistributionStageOwnership] = []
+    held_identity = (os.fstat(held_fd).st_dev, os.fstat(held_fd).st_ino) if held_fd is not None else None
+
+    def interpose_after_real_rename(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal injected, restore_attempts
+        if source_name == quarantine_name and destination_name == target.name:
+            restore_attempts += 1
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and source_name == target.name and destination_name == quarantine_name:
+            if displacement == "rename-aside":
+                os.rename(
+                    quarantine_name,
+                    aside.name,
+                    src_dir_fd=destination_parent_fd,
+                    dst_dir_fd=destination_parent_fd,
+                )
+            else:
+                os.unlink(quarantine_name, dir_fd=destination_parent_fd)
+            os.rename(
+                foreign_source.name,
+                quarantine_name,
+                src_dir_fd=destination_parent_fd,
+                dst_dir_fd=destination_parent_fd,
+            )
+            injected = True
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        interpose_after_real_rename,
+    )
+    try:
+        with pytest.raises(DistributionApplyError, match="identity"):
+            managed_distribution._remove_distribution_target_if_bound(
+                parent_fd,
+                target.name,
+                expected,
+                held_fd=held_fd,
+                identity_message="identity",
+                transition_path="target" if with_recorder else None,
+                transition_name=quarantine_name,
+                transition_recorder=recorded.append if with_recorder else None,
+            )
+    finally:
+        if held_fd is not None:
+            os.close(held_fd)
+        os.close(parent_fd)
+
+    assert injected is True
+    assert restore_attempts == 0
+    assert not target.exists() and not target.is_symlink()
+    foreign_quarantine = tmp_path / quarantine_name
+    current_foreign = foreign_quarantine.lstat()
+    assert (current_foreign.st_dev, current_foreign.st_ino) == (foreign_before.st_dev, foreign_before.st_ino)
+    assert current_foreign.st_mode == foreign_before.st_mode
+    if kind == "regular":
+        assert foreign_quarantine.read_bytes() == payload
+    else:
+        assert foreign_quarantine.readlink() == Path(link_target)
+    if displacement == "rename-aside":
+        assert (aside.lstat().st_dev, aside.lstat().st_ino) == (expected.st_dev, expected.st_ino)
+        if kind == "regular":
+            assert held_identity is not None
+            assert (aside.lstat().st_dev, aside.lstat().st_ino) == held_identity
+    else:
+        assert not aside.exists() and not aside.is_symlink()
+    assert not foreign_source.exists() and not foreign_source.is_symlink()
+    if with_recorder:
+        assert len(recorded) == 1
+        lease = recorded[0]
+        assert lease.path == "target"
+        assert lease.stage_name == quarantine_name
+        assert lease.role == "predecessor-quarantine"
+        assert (lease.device, lease.inode, lease.ctime_ns) == (0, 0, 0)
+        assert lease.file_type == kind
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+@pytest.mark.parametrize("with_recorder", [False, True])
+def test_i371_cleanup_failure_after_bound_quarantine_never_pathname_rolls_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    with_recorder: bool,
+) -> None:
+    target = tmp_path / "target"
+    foreign_source = tmp_path / "foreign-source"
+    aside = tmp_path / "operation-owned-aside"
+    quarantine_name = "target.remove"
+    payload = b"operation-owned\n"
+    link_target = "history-entry"
+    if kind == "regular":
+        target.write_bytes(payload)
+        foreign_source.write_bytes(payload)
+        target.chmod(0o640)
+        foreign_source.chmod(0o640)
+    else:
+        target.symlink_to(link_target)
+        foreign_source.symlink_to(link_target)
+    expected = target.lstat()
+    foreign_before = foreign_source.lstat()
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    held_fd: int | None = None
+    if kind == "regular":
+        held_fd = os.open(
+            target.name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+    recorded: list[DistributionStageOwnership] = []
+    original_cleanup = managed_distribution._remove_distribution_stage_if_owned
+    original_backup_cleanup = managed_distribution._unlink_distribution_quarantine_with_backup
+    injected = False
+
+    def replace_quarantine_with_foreign() -> None:
+        nonlocal injected
+        if injected:
+            return
+        os.rename(quarantine_name, aside.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        os.rename(
+            foreign_source.name,
+            quarantine_name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        injected = True
+        raise DistributionApplyError("injected cleanup failure")
+
+    def fail_direct_cleanup(parent, stage_name, created, *, strict=False, **kwargs):
+        if stage_name == quarantine_name:
+            replace_quarantine_with_foreign()
+        return original_cleanup(parent, stage_name, created, strict=strict, **kwargs)
+
+    def fail_backup_cleanup(parent, stage_name, *args, **kwargs):
+        if stage_name == quarantine_name:
+            replace_quarantine_with_foreign()
+        return original_backup_cleanup(parent, stage_name, *args, **kwargs)
+
+    if with_recorder:
+        monkeypatch.setattr(
+            managed_distribution,
+            "_unlink_distribution_quarantine_with_backup",
+            fail_backup_cleanup,
+        )
+    else:
+        monkeypatch.setattr(
+            managed_distribution,
+            "_remove_distribution_stage_if_owned",
+            fail_direct_cleanup,
+        )
+    try:
+        with pytest.raises(DistributionApplyError, match="identity"):
+            managed_distribution._remove_distribution_target_if_bound(
+                parent_fd,
+                target.name,
+                expected,
+                held_fd=held_fd,
+                identity_message="identity",
+                transition_path="target" if with_recorder else None,
+                transition_name=quarantine_name,
+                transition_recorder=recorded.append if with_recorder else None,
+            )
+    finally:
+        if held_fd is not None:
+            os.close(held_fd)
+        os.close(parent_fd)
+
+    assert injected is True
+    assert not target.exists() and not target.is_symlink()
+    foreign_quarantine = tmp_path / quarantine_name
+    current_foreign = foreign_quarantine.lstat()
+    assert (current_foreign.st_dev, current_foreign.st_ino) == (foreign_before.st_dev, foreign_before.st_ino)
+    assert current_foreign.st_mode == foreign_before.st_mode
+    if kind == "regular":
+        assert foreign_quarantine.read_bytes() == payload
+    else:
+        assert foreign_quarantine.readlink() == Path(link_target)
+    assert (aside.lstat().st_dev, aside.lstat().st_ino) == (expected.st_dev, expected.st_ino)
+    assert not foreign_source.exists() and not foreign_source.is_symlink()
+    if with_recorder:
+        assert [lease.role for lease in recorded] == ["predecessor-quarantine", "predecessor-quarantine"]
+        assert (recorded[0].device, recorded[0].inode, recorded[0].ctime_ns) == (0, 0, 0)
+        assert (recorded[1].device, recorded[1].inode) == (expected.st_dev, expected.st_ino)
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_journal_post_rename_foreign_quarantine_preserves_intent_and_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    intent: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    (target_root / "spec-dock").mkdir(parents=True)
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    foreign_source = tmp_path / "foreign-source"
+    foreign_source.write_bytes(b"managed\n")
+    expected = managed.lstat()
+    foreign_before = foreign_source.lstat()
+    aside = managed.parent / "operation-owned-aside"
+    original_rename = managed_distribution._rename_distribution_no_replace
+    injected = False
+    quarantine_path: Path | None = None
+
+    def interpose_after_real_rename(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal injected, quarantine_path
+        original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and source_name == managed.name and destination_name.startswith(".spec-dock-file-"):
+            quarantine_path = managed.parent / destination_name
+            quarantine_path.rename(aside)
+            foreign_source.rename(quarantine_path)
+            injected = True
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        interpose_after_real_rename,
+    )
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert quarantine_path is not None
+    assert result.status == "recovery_required", result.reason
+    assert result.intent == intent
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    assert guard_path.is_file()
+    assert journal_path.is_file()
+    guard = managed_distribution._read_distribution_retry_marker(target_root, expected_intent=intent)
+    assert guard is not None
+    assert guard.operation == intent
+    assert guard.purpose == managed_distribution._journal_guard_purpose_for_intent(intent)
+    journal = OperationJournalStore(target_root)._read(root_identity, expected_intent=intent)
+    assert journal.intent == intent
+    assert journal.authority == managed_distribution._journal_authority_for_intent(intent)
+    predecessor_leases = tuple(
+        lease
+        for lease in journal.staging_leases
+        if lease.path == managed.relative_to(target_root).as_posix() and lease.role == "predecessor-quarantine"
+    )
+    assert predecessor_leases
+    assert all((lease.device, lease.inode, lease.ctime_ns) == (0, 0, 0) for lease in predecessor_leases)
+    assert all(
+        not (lease.device == foreign_before.st_dev and lease.inode == foreign_before.st_ino)
+        for lease in predecessor_leases
+    )
+    assert not managed.exists() and not managed.is_symlink()
+    foreign_quarantine = quarantine_path.lstat()
+    assert (foreign_quarantine.st_dev, foreign_quarantine.st_ino) == (foreign_before.st_dev, foreign_before.st_ino)
+    assert foreign_quarantine.st_mode == foreign_before.st_mode
+    assert quarantine_path.read_bytes() == b"managed\n"
+    aside_info = aside.lstat()
+    assert (aside_info.st_dev, aside_info.st_ino) == (expected.st_dev, expected.st_ino)
+    assert aside.read_bytes() == b"managed\n"
+    assert not foreign_source.exists() and not foreign_source.is_symlink()
+
+
+def test_i371_stage_cleanup_has_no_direct_unlink_escape() -> None:
+    source = inspect.getsource(managed_distribution._remove_distribution_stage_if_owned)
+    signature = inspect.signature(managed_distribution._remove_distribution_stage_if_owned)
+
+    assert "direct_unlink" not in signature.parameters
+    assert "direct_unlink" not in source
+    assert "os.unlink(stage_name" not in source
+
+
+def test_i371_recovery_has_no_restore_or_private_publish_authority() -> None:
+    recovery_source = inspect.getsource(OperationJournalStore._recover_quarantined_recovery_entry)
+    quarantine_source = inspect.getsource(OperationJournalStore._quarantine_and_remove)
+
+    assert not hasattr(OperationJournalStore, "_restore_quarantined_entry")
+    assert not hasattr(OperationJournalStore, "_publish_exact_recovery_bytes_no_replace")
+    assert "_restore_quarantined_entry" not in recovery_source
+    assert "_publish_exact_recovery_bytes_no_replace" not in recovery_source
+    assert "_restore_quarantined_entry" not in quarantine_source
+
+
+def test_i371_recovery_is_observation_only_for_exact_quarantine(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An exact quarantine is evidence for manual recovery, never a restore source."""
+
+    canonical = tmp_path / "entry.json"
+    quarantine = tmp_path / "entry.json.remove"
+    raw = b"exact recovery evidence\n"
+    canonical.write_bytes(raw)
+    canonical.chmod(0o640)
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    held_fd = os.open(
+        canonical.name,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=parent_fd,
+    )
+    expected = os.fstat(held_fd)
+    os.rename(canonical.name, quarantine.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+    original_rename = managed_distribution._rename_distribution_no_replace
+    rename_calls: list[tuple[str, str]] = []
+
+    def observe_rename(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        rename_calls.append((source_name, destination_name))
+        return original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", observe_rename)
+    try:
+        outcome = OperationJournalStore(tmp_path)._recover_quarantined_recovery_entry(
+            parent_fd,
+            canonical.name,
+            quarantine.name,
+            held_fd,
+            raw,
+            expected,
+            expected_sha256=hashlib.sha256(raw).hexdigest(),
+            failure_reason="recovery-failed",
+            pre_delete_check=None,
+        )
+    finally:
+        os.close(held_fd)
+        os.close(parent_fd)
+
+    assert outcome == "manual-conflict"
+    assert rename_calls == []
+    assert not canonical.exists() and not canonical.is_symlink()
+    quarantine_info = quarantine.lstat()
+    assert (quarantine_info.st_dev, quarantine_info.st_ino) == (expected.st_dev, expected.st_ino)
+    assert quarantine.read_bytes() == raw
+
+
+@pytest.mark.parametrize("foreign_kind", ["regular", "symlink"])
+def test_i371_recovery_foreign_canonical_never_creates_private_restore(
+    tmp_path: Path,
+    foreign_kind: str,
+) -> None:
+    """Foreign canonical evidence is preserved without creating a candidate .restore path."""
+
+    canonical = tmp_path / "entry.json"
+    aside = tmp_path / "entry.json.aside"
+    raw = b"owned recovery evidence\n"
+    canonical.write_bytes(raw)
+    canonical.chmod(0o640)
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    held_fd = os.open(
+        canonical.name,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=parent_fd,
+    )
+    expected = os.fstat(held_fd)
+    os.rename(canonical.name, aside.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+    if foreign_kind == "regular":
+        canonical.write_bytes(b"foreign canonical\n")
+        canonical.chmod(0o640)
+    else:
+        canonical.symlink_to("foreign-target")
+    foreign_before = canonical.lstat()
+    try:
+        outcome = OperationJournalStore(tmp_path)._recover_quarantined_recovery_entry(
+            parent_fd,
+            canonical.name,
+            "entry.json.remove",
+            held_fd,
+            raw,
+            expected,
+            expected_sha256=hashlib.sha256(raw).hexdigest(),
+            failure_reason="recovery-failed",
+            pre_delete_check=None,
+        )
+    finally:
+        os.close(held_fd)
+        os.close(parent_fd)
+
+    assert outcome == "manual-conflict"
+    current = canonical.lstat()
+    assert (current.st_dev, current.st_ino, current.st_mode, current.st_nlink) == (
+        foreign_before.st_dev,
+        foreign_before.st_ino,
+        foreign_before.st_mode,
+        foreign_before.st_nlink,
+    )
+    if foreign_kind == "regular":
+        assert canonical.read_bytes() == b"foreign canonical\n"
+    else:
+        assert canonical.readlink() == Path("foreign-target")
+    assert aside.read_bytes() == raw
+    assert tuple(tmp_path.glob("*.restore")) == ()
+
+
+@pytest.mark.parametrize("displacement", ["rename-aside", "unlink"])
+def test_i371_exact_recovery_hardlink_is_preserved_without_pathname_unlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    displacement: str,
+) -> None:
+    """A canonical/quarantine hardlink pair is manual, never auto-cleaned."""
+
+    canonical = tmp_path / "entry.json"
+    quarantine = tmp_path / "entry.json.remove"
+    foreign_source = tmp_path / "foreign-source"
+    aside = tmp_path / "operation-owned-aside"
+    raw = b"exact recovery evidence\n"
+    canonical.write_bytes(raw)
+    canonical.chmod(0o640)
+    os.link(canonical, quarantine)
+    foreign_source.write_bytes(raw)
+    foreign_source.chmod(0o640)
+
+    parent_fd = os.open(tmp_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    held_fd = os.open(
+        canonical.name,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=parent_fd,
+    )
+    expected = os.fstat(held_fd)
+    original_unlink = managed_distribution.os.unlink
+    unlink_calls: list[str] = []
+
+    def interpose_private_quarantine_unlink(name, *args, **kwargs):
+        if name == quarantine.name:
+            unlink_calls.append(name)
+            if displacement == "rename-aside":
+                os.rename(quarantine.name, aside.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            else:
+                original_unlink(quarantine.name, dir_fd=parent_fd)
+            os.rename(
+                foreign_source.name,
+                quarantine.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", interpose_private_quarantine_unlink)
+    try:
+        outcome = OperationJournalStore(tmp_path)._recover_quarantined_recovery_entry(
+            parent_fd,
+            canonical.name,
+            quarantine.name,
+            held_fd,
+            raw,
+            expected,
+            expected_sha256=hashlib.sha256(raw).hexdigest(),
+            failure_reason="recovery-failed",
+            pre_delete_check=None,
+        )
+    finally:
+        os.close(held_fd)
+        os.close(parent_fd)
+
+    assert outcome == "manual-conflict"
+    assert unlink_calls == []
+    canonical_info = canonical.lstat()
+    quarantine_info = quarantine.lstat()
+    assert (canonical_info.st_dev, canonical_info.st_ino) == (
+        quarantine_info.st_dev,
+        quarantine_info.st_ino,
+    )
+    assert canonical_info.st_nlink == quarantine_info.st_nlink == 2
+    assert canonical.read_bytes() == quarantine.read_bytes() == raw
+    assert foreign_source.read_bytes() == raw
+    assert not aside.exists()
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_quarantine_preserved_durable_journal_maps_to_same_intent_recovery(
+    tmp_path: Path,
+    intent: Literal["deprovision", "purge"],
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        assessment,
+        executable,
+        _store,
+        _marker,
+        prepared,
+        _guard_path,
+        _journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+
+    result = managed_distribution._distribution_process_result_from_state(
+        assessment,
+        prepared,
+        state="quarantine-preserved",
+        executable=executable,
+        intent=intent,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == f"{intent}-recovery-required"
+    assert result.retry_policy == "manual-recovery"
+    assert tuple(error.code for error in result.errors) == (f"{intent}-recovery-required",)
+    assert result.reason != "dual-recovery-state"
+
+
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_quarantine_preserved_guard_only_maps_to_guard_recovery_semantics(
+    tmp_path: Path,
+    intent: Literal["deprovision", "purge"],
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        assessment,
+        executable,
+        _store,
+        _marker,
+        _prepared,
+        _guard_path,
+        _journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+
+    result = managed_distribution._distribution_process_result_from_state(
+        assessment,
+        None,
+        state="quarantine-preserved",
+        executable=executable,
+        intent=intent,
+    )
+
+    assert result.status == "recovery_required"
+    assert result.reason == f"{intent}-guard-only"
+    assert result.phase == "marker-write"
+    assert result.retry_policy == "manual-recovery"
+    assert tuple(error.code for error in result.errors) == (f"{intent}-recovery-required",)
+    assert result.reason != "dual-recovery-state"
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_terminal_metadata_post_unlink_fsync_failure_is_typed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    if entry == "guard":
+        selected_path = guard_path
+
+        def operation() -> None:
+            store.remove_legacy_marker(marker)
+
+    else:
+        completed = store.write(
+            replace(
+                prepared,
+                status="completed",
+                actions=tuple(replace(action, checkpoint="verified") for action in prepared.actions),
+                created_parent_bindings=(),
+            )
+        )
+        selected_path = journal_path
+
+        def operation() -> None:
+            store.remove_completed(completed)
+
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    unlinked = False
+    fsync_failed = False
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal unlinked
+        result = original_unlink(name, *args, **kwargs)
+        if isinstance(name, str) and name == selected_path.name:
+            unlinked = True
+        return result
+
+    def fail_once_after_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected post-unlink fsync failure")
+        original_fsync(fd)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert raised.value.recovery_metadata_state == "metadata-cleanup-conflict"
+    assert not selected_path.exists() and not selected_path.is_symlink()
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.remove"))
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.gc"))
+    assert not tuple(target_root.joinpath("spec-dock").glob("*.restore"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_terminal_cleanup_state_less_failure_is_manual_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        _managed,
+        root_identity,
+        _legacy_path,
+        _legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    if intent == "purge":
+        history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+        history_file.parent.mkdir(parents=True)
+        history_file.write_bytes(b"history\n")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    journal_path = target_root / "spec-dock/.distribution-journal.json"
+    selected_path = guard_path if entry == "guard" else journal_path
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    unlinked = False
+    fsync_failed = False
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal unlinked
+        result = original_unlink(name, *args, **kwargs)
+        if isinstance(name, str) and name == selected_path.name:
+            unlinked = True
+        return result
+
+    def fail_once_after_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected terminal post-unlink fsync failure")
+        original_fsync(fd)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_once_after_unlink)
+    execute = (
+        managed_distribution.execute_explicit_spec_history_purge_distribution
+        if intent == "purge"
+        else managed_distribution.execute_deprovision_distribution
+    )
+    result = execute(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert result.status == "recovery_required"
+    assert result.phase == "marker-finalization"
+    assert result.pending_paths == ()
+    assert result.retry_policy == "manual-recovery"
+    assert result.last_completed_phase == "marker-finalized"
+    assert "spec-dock/.distribution-journal.json" in result.failed_paths
+    assert not any(name in str(result) for name in (".remove", ".restore", ".stage"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_late_legacy_after_metadata_swap_cleans_swapped_out_predecessor_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    legacy_path = target_root / "spec-dock/.uninstall-retry.json"
+    legacy_bytes = (json.dumps(managed_distribution._UNINSTALL_RETRY_MARKER_PAYLOAD, sort_keys=True) + "\n").encode()
+    canonical_path = guard_path if entry == "guard" else journal_path
+    original_swap = managed_distribution._swap_regular_distribution_target_if_bound
+    injected = False
+    successor_bytes: bytes | None = None
+
+    def inject_after_selected_swap(*args, **kwargs):
+        nonlocal injected, successor_bytes
+        result = original_swap(*args, **kwargs)
+        destination = args[2]
+        if destination == canonical_path.name and not injected:
+            successor_bytes = canonical_path.read_bytes()
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return result
+
+    monkeypatch.setattr(
+        managed_distribution,
+        "_swap_regular_distribution_target_if_bound",
+        inject_after_selected_swap,
+    )
+    with pytest.raises(DistributionApplyError) as raised:
+        if entry == "guard":
+            store.prepare_legacy_guard(
+                None,
+                package_version=marker.package_version,
+                replace_marker=marker,
+            )
+        else:
+            store.mark_executing(prepared)
+
+    assert injected is True
+    assert successor_bytes is not None
+    assert raised.value.recovery_metadata_state == "dual-recovery-state"
+    assert canonical_path.read_bytes() == successor_bytes
+    assert legacy_path.read_bytes() == legacy_bytes
+    assert not tuple(target_root.joinpath("spec-dock").glob(".distribution-journal-*.stage"))
+    assert not tuple(target_root.joinpath("spec-dock").glob(".distribution-retry-*.stage"))
+
+
+def test_i371_late_legacy_after_target_unlink_leaves_action_pending(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        install_root,
+        scaffold_root,
+        manifest_path,
+        target_root,
+        managed,
+        root_identity,
+        legacy_path,
+        legacy_bytes,
+    ) = _i371_late_legacy_fixture(tmp_path)
+    original = managed_distribution._remove_distribution_target_if_bound
+    injected = False
+
+    def create_legacy_after_unlink(*args, **kwargs):
+        nonlocal injected
+        result = original(*args, **kwargs)
+        if not injected and args[1] == managed.name:
+            legacy_path.write_bytes(legacy_bytes)
+            injected = True
+        return result
+
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_target_if_bound", create_legacy_after_unlink)
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert injected is True
+    assert result.status == "recovery_required"
+    assert result.reason == "dual-recovery-state"
+    assert result.retry_policy == "manual-recovery"
+    assert not managed.exists()
+    assert legacy_path.read_bytes() == legacy_bytes
+    journal = OperationJournalStore(target_root)._read(root_identity)
+    managed_distribution._validate_deprovision_process_result(result, intent="deprovision")
+    assert result.phase == "uninstall-apply"
+    assert result.last_completed_phase == "marker-written"
+    assert result.plan_digest == journal.plan_digest
+    target_record = next(action for action in journal.actions if action.path == ".github/workflows/ci.yml")
+    assert target_record.checkpoint == "pending"
+    expected_pending = tuple(
+        sorted(
+            (action.path for action in journal.actions if action.checkpoint == "pending"),
+            key=os.fsencode,
+        )
+    )
+    assert result.pending_paths == expected_pending
+    assert set(result.pending_paths).issubset(result.failed_paths)
+    outcome_by_path = {outcome.path: outcome for outcome in result.action_outcomes}
+    assert all(outcome_by_path[path].status == "pending" for path in expected_pending)
+
+
+@pytest.mark.parametrize(
+    ("journal_intent", "request_intent", "journal_authority"),
+    (
+        ("purge", "deprovision", "explicit-spec-history-purge"),
+        ("deprovision", "purge", "managed-distribution-deprovision"),
+        ("deprovision", "deprovision", "arbitrary-invalid-authority"),
+    ),
+)
+def test_i371_cross_intent_recovery_mismatch_is_manual_and_write_free(
+    tmp_path: Path,
+    journal_intent: str,
+    request_intent: str,
+    journal_authority: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+
+    if journal_intent == "purge":
+        journal_assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    else:
+        journal_assessment = managed_distribution.build_deprovision_workspace_assessment(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            expected_root_identity=root_identity,
+        )
+    executable = build_executable_mutation_plan(journal_assessment)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    assert journal.intent == journal_intent
+    if journal_authority != managed_distribution._journal_authority_for_intent(
+        cast("managed_distribution.JournaledDistributionIntent", journal_intent)
+    ):
+        raw = json.loads(store.path.read_text(encoding="utf-8"))
+        raw["authority"] = journal_authority
+        store.path.write_text(json.dumps(raw, sort_keys=True), encoding="utf-8")
+    journal_bytes = store.path.read_bytes()
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    before = _i370_tree_evidence(target_root)
+
+    if request_intent == "purge":
+        result = managed_distribution.execute_explicit_spec_history_purge_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            package_version="1.2.3",
+            apply=True,
+            expected_root_identity=root_identity,
+        )
+    else:
+        result = managed_distribution.execute_deprovision_distribution(
+            install_root,
+            manifest_path=manifest_path,
+            scaffold_root=scaffold_root,
+            target_root=target_root,
+            package_version="1.2.3",
+            apply=True,
+            expected_root_identity=root_identity,
+        )
+
+    assert result.status == "recovery_required"
+    assert result.intent == request_intent
+    assert result.reason == f"{request_intent}-recovery-mismatch"
+    assert result.retry_policy == "manual-recovery"
+    assert result.pending_paths == ()
+    assert _i370_tree_evidence(target_root) == before
+    assert store.path.read_bytes() == journal_bytes
+    assert guard_path.read_bytes() == guard_bytes
+
+
+@pytest.mark.parametrize("binding_field", ("root_binding", "workspace_binding"))
+def test_i371_cross_intent_journal_binding_mismatch_is_classified_before_binding_read(
+    tmp_path: Path,
+    binding_field: str,
+) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    journal = _prepare_guarded_journal(store, executable)
+    raw = json.loads(store.path.read_text(encoding="utf-8"))
+    if binding_field == "root_binding":
+        raw[binding_field] = {"device": root_info.st_dev, "inode": root_info.st_ino + 1}
+    else:
+        raw[binding_field]["inode"] += 1
+    store.path.write_text(json.dumps(raw, sort_keys=True), encoding="utf-8")
+    journal_bytes = store.path.read_bytes()
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    before = _i370_tree_evidence(target_root)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert journal.intent == "purge"
+    assert result.status == "recovery_required"
+    assert result.retry_policy == "manual-recovery"
+    assert _i370_tree_evidence(target_root) == before
+    assert store.path.read_bytes() == journal_bytes
+    assert guard_path.read_bytes() == guard_bytes
+
+
+def test_i371_canonical_cross_discriminator_precedes_malformed_journal_fields() -> None:
+    raw = {
+        "schema_version": 2,
+        "protocol_version": 2,
+        "intent": "purge",
+        "authority": "explicit-spec-history-purge",
+        "root_binding": "malformed-later-field",
+    }
+
+    with pytest.raises(DistributionApplyError) as raised:
+        managed_distribution._parse_operation_journal(
+            json.dumps(raw).encode("utf-8"),
+            expected_intent="deprovision",
+        )
+
+    assert raised.value.recovery_mismatch_kind == "intent-authority"
+
+
+def test_i371_unsupported_journal_intent_does_not_infer_authority_mismatch() -> None:
+    raw = {
+        "schema_version": 2,
+        "protocol_version": 2,
+        "intent": {"malformed": True},
+        "authority": "explicit-spec-history-purge",
+    }
+
+    with pytest.raises(DistributionApplyError) as raised:
+        managed_distribution._parse_operation_journal(json.dumps(raw).encode("utf-8"), expected_intent="deprovision")
+
+    assert raised.value.recovery_mismatch_kind is None
+
+
+def test_i371_cross_intent_guard_only_is_manual_without_journal_creation(tmp_path: Path) -> None:
+    install_root = _minimal_install_root(tmp_path, b"managed\n")
+    scaffold_root = _minimal_scaffold_root(tmp_path)
+    manifest_path = _write_manifest(tmp_path, _manifest_with())
+    target_root = tmp_path / "consumer"
+    managed = target_root / ".github" / "workflows" / "ci.yml"
+    managed.parent.mkdir(parents=True)
+    managed.write_bytes(b"managed\n")
+    history_file = target_root / "spec-dock" / "initiatives" / "history.md"
+    history_file.parent.mkdir(parents=True)
+    history_file.write_bytes(b"history\n")
+    root_info = target_root.stat()
+    root_identity = DistributionRootIdentity(device=root_info.st_dev, inode=root_info.st_ino)
+    assessment = managed_distribution.build_explicit_spec_history_purge_assessment(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        expected_root_identity=root_identity,
+    )
+    executable = build_executable_mutation_plan(assessment)
+    store = OperationJournalStore(target_root)
+    marker = store.prepare_legacy_guard(executable, package_version="1.2.3")
+    guard_path = target_root / "spec-dock/.distribution-retry.json"
+    guard_bytes = guard_path.read_bytes()
+    before = _i370_tree_evidence(target_root)
+
+    result = managed_distribution.execute_deprovision_distribution(
+        install_root,
+        manifest_path=manifest_path,
+        scaffold_root=scaffold_root,
+        target_root=target_root,
+        package_version="1.2.3",
+        apply=True,
+        expected_root_identity=root_identity,
+    )
+
+    assert marker.operation == "purge"
+    assert result.status == "recovery_required"
+    assert result.retry_policy == "manual-recovery"
+    assert not (target_root / "spec-dock/.distribution-journal.json").exists()
+    assert guard_path.read_bytes() == guard_bytes
+    assert _i370_tree_evidence(target_root) == before
 
 
 def test_i368_forged_assessment_cannot_prune_outside_manifest_authority(tmp_path: Path) -> None:
@@ -9245,7 +10956,7 @@ def test_i368_terminal_journal_finalizes_after_completed_prune_disappears_from_a
     assert not journal_path.exists()
 
 
-def test_i368_journal_finalization_preserves_concurrent_replacement(
+def test_i368_journal_finalization_preserves_concurrent_replacement_quarantine(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -9292,10 +11003,14 @@ def test_i368_journal_finalization_preserves_concurrent_replacement(
     with pytest.raises(DistributionApplyError, match="journal-precondition-mismatch"):
         store.remove_completed(completed)
 
-    assert store.path.read_bytes() == replacement
+    assert replaced is True
+    assert not store.path.exists() and not store.path.is_symlink()
+    quarantines = tuple(store.path.parent.glob(f".{store.path.name}.*.remove"))
+    assert len(quarantines) == 1
+    assert quarantines[0].read_bytes() == replacement
 
 
-def test_i368_legacy_marker_removal_preserves_concurrent_replacement(
+def test_i368_legacy_marker_removal_preserves_concurrent_replacement_quarantine(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -9347,10 +11062,14 @@ def test_i368_legacy_marker_removal_preserves_concurrent_replacement(
     with pytest.raises(DistributionApplyError, match="legacy-marker-unconvertible"):
         store.remove_legacy_marker(admitted)
 
-    assert marker_path.read_bytes() == replacement
+    assert replaced is True
+    assert not marker_path.exists() and not marker_path.is_symlink()
+    quarantines = tuple(marker_path.parent.glob(f".{marker_path.name}.*.remove"))
+    assert len(quarantines) == 1
+    assert quarantines[0].read_bytes() == replacement
 
 
-def test_i368_journal_cleanup_failure_restores_canonical_recovery_authority(
+def test_i368_journal_cleanup_failure_preserves_quarantine_recovery_authority(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -9378,18 +11097,20 @@ def test_i368_journal_cleanup_failure_restores_canonical_recovery_authority(
     before = store.path.read_bytes()
     original_remove = managed_distribution._remove_distribution_stage_if_owned
 
-    def fail_quarantine_cleanup(parent_fd, stage_name, created, *, strict=False):
+    def fail_quarantine_cleanup(parent_fd, stage_name, created, *, strict=False, **kwargs):
         if stage_name.endswith(".remove"):
             raise DistributionApplyError("simulated quarantine cleanup failure")
-        return original_remove(parent_fd, stage_name, created, strict=strict)
+        return original_remove(parent_fd, stage_name, created, strict=strict, **kwargs)
 
     monkeypatch.setattr(managed_distribution, "_remove_distribution_stage_if_owned", fail_quarantine_cleanup)
 
     with pytest.raises(DistributionApplyError, match="journal finalization failed"):
         store.remove_completed(completed)
 
-    assert store.path.read_bytes() == before
-    assert not list(store.path.parent.glob(f".{store.path.name}.*.remove"))
+    assert not store.path.exists() and not store.path.is_symlink()
+    quarantines = list(store.path.parent.glob(f".{store.path.name}.*.remove"))
+    assert len(quarantines) == 1
+    assert quarantines[0].read_bytes() == before
 
 
 def test_i368_legacy_marker_quarantine_fsync_failure_restores_marker(
@@ -14993,6 +16714,8 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
     )
     original_rename = managed_distribution._rename_distribution_no_replace
     raced = False
+    replacement_identity: tuple[int, int] | None = None
+    quarantine_path: Path | None = None
 
     def race_before_quarantine(
         source_parent_fd: int,
@@ -15000,11 +16723,14 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
         destination_parent_fd: int,
         destination_name: str,
     ) -> None:
-        nonlocal raced
+        nonlocal raced, replacement_identity, quarantine_path
         if source_name == "config.toml" and destination_name.startswith(".spec-dock-file-") and not raced:
             raced = True
             target.unlink()
             target.write_bytes(replacement)
+            replacement_info = target.lstat()
+            replacement_identity = (replacement_info.st_dev, replacement_info.st_ino)
+            quarantine_path = target.parent / destination_name
         original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
     monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", race_before_quarantine)
@@ -15012,7 +16738,13 @@ def test_i368_prune_preserves_replacement_raced_at_final_path(
     with pytest.raises(DistributionApplyError, match="identity"):
         apply_distribution_plan(plan)
 
-    assert target.read_bytes() == replacement
+    assert raced is True
+    assert replacement_identity is not None
+    assert quarantine_path is not None
+    assert not target.exists() and not target.is_symlink()
+    quarantined = quarantine_path.lstat()
+    assert (quarantined.st_dev, quarantined.st_ino) == replacement_identity
+    assert quarantine_path.read_bytes() == replacement
     assert not list(target.parent.glob(".*.remove"))
 
 
@@ -16011,7 +17743,7 @@ def test_i368_journal_swap_revalidates_guard_at_publish_boundary(
     assert store.path.read_bytes() == before
 
 
-def test_i368_journal_finalization_restores_journal_when_guard_races(
+def test_i368_journal_finalization_preserves_quarantine_when_guard_races(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -16058,7 +17790,10 @@ def test_i368_journal_finalization_restores_journal_when_guard_races(
 
     assert replaced is True
     assert guard_path.read_bytes() == replacement
-    assert store.path.read_bytes() == journal_bytes
+    assert not store.path.exists()
+    quarantine = tuple(store.path.parent.glob(f".{store.path.name}.*.remove"))
+    assert len(quarantine) == 1
+    assert quarantine[0].read_bytes() == journal_bytes
 
 
 @pytest.mark.parametrize("entry", ["journal", "guard"])
@@ -16073,6 +17808,8 @@ def test_i368_published_successor_rejects_same_byte_replacement_before_return(
     replaced = False
     expected_name = store.path.name if entry == "journal" else ".distribution-retry.json"
     expected_path = target_root / "spec-dock" / expected_name
+    replacement_identity: tuple[int, int] | None = None
+    replacement_content: bytes | None = None
 
     def replace_before_acceptance(
         self,
@@ -16084,11 +17821,14 @@ def test_i368_published_successor_rejects_same_byte_replacement_before_return(
         *,
         identity_error,
     ):
-        nonlocal replaced
+        nonlocal replaced, replacement_identity, replacement_content
         if not replaced and name == expected_name:
             content = managed_distribution._read_fd_bytes(held_fd)
             expected_path.unlink()
             expected_path.write_bytes(content)
+            replacement_info = expected_path.lstat()
+            replacement_identity = (replacement_info.st_dev, replacement_info.st_ino)
+            replacement_content = content
             replaced = True
         return original_assert(
             parent_fd,
@@ -16111,7 +17851,22 @@ def test_i368_published_successor_rejects_same_byte_replacement_before_return(
             store.prepare_legacy_guard(executable, package_version="1.2.3")
 
     assert replaced is True
-    assert expected_path.exists()
+    assert replacement_identity is not None
+    assert replacement_content is not None
+    if entry == "journal":
+        assert not expected_path.exists() and not expected_path.is_symlink()
+        quarantine_paths = tuple(expected_path.parent.glob(f".{expected_name}.*.remove"))
+        assert len(quarantine_paths) == 1
+        quarantine_path = quarantine_paths[0]
+        quarantined = quarantine_path.lstat()
+        assert (quarantined.st_dev, quarantined.st_ino) == replacement_identity
+        assert quarantined.st_nlink == 1
+        assert quarantine_path.read_bytes() == replacement_content
+    else:
+        assert expected_path.exists()
+        current = expected_path.lstat()
+        assert (current.st_dev, current.st_ino) == replacement_identity
+        assert expected_path.read_bytes() == replacement_content
 
 
 @pytest.mark.parametrize("entry", ["journal", "guard"])
@@ -17194,6 +18949,443 @@ def test_i368_final_retained_witness_is_not_unlinked_after_authority_interpositi
         assert any(path.read_bytes() == b"owned\n" for path in owned)
     else:
         assert any(path.readlink() == Path("owned-target") for path in owned)
+
+
+@pytest.mark.parametrize("kind", ["regular", "symlink"])
+def test_i371_generic_stage_default_keeps_issue370_restore(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    """Non-Issue-371 callers retain the historical generic stage rollback."""
+
+    parent = tmp_path / f"default-{kind}"
+    parent.mkdir()
+    stage = parent / "stage"
+    aside = parent / "operation-owned-aside"
+    if kind == "regular":
+        stage.write_bytes(b"owned\n")
+    else:
+        stage.symlink_to("owned-target")
+    created = stage.lstat()
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_restore = managed_distribution._restore_distribution_quarantine
+    restore_attempts = 0
+    injected = False
+    foreign_path: Path | None = None
+
+    def replace_first_gc_after_rename(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected, foreign_path
+        result = original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if not injected and source_name == stage.name and destination_name.endswith(".gc"):
+            foreign_path = parent / destination_name
+            (parent / destination_name).rename(aside)
+            if kind == "regular":
+                foreign_path.write_bytes(b"foreign\n")
+            else:
+                foreign_path.symlink_to("foreign-target")
+            injected = True
+        return result
+
+    def observe_restore(*args, **kwargs):
+        nonlocal restore_attempts
+        restore_attempts += 1
+        return original_restore(*args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", replace_first_gc_after_rename)
+    monkeypatch.setattr(managed_distribution, "_restore_distribution_quarantine", observe_restore)
+    parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        with pytest.raises(DistributionApplyError, match="identity"):
+            managed_distribution._remove_distribution_stage_if_owned(parent_fd, stage.name, created, strict=True)
+    finally:
+        os.close(parent_fd)
+
+    assert injected is True
+    assert restore_attempts == 1
+    assert foreign_path is not None
+    if kind == "regular":
+        assert stage.read_bytes() == b"foreign\n"
+        assert aside.read_bytes() == b"owned\n"
+    else:
+        assert stage.readlink() == Path("foreign-target")
+        assert aside.readlink() == Path("owned-target")
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+@pytest.mark.parametrize("foreign_kind", ["regular", "symlink"])
+def test_i371_destructive_metadata_success_path_does_not_mutate_foreign_rebind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+    foreign_kind: str,
+) -> None:
+    """Destructive metadata cleanup must not enter the generic multi-stage GC path."""
+
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    metadata_path = guard_path if entry == "guard" else journal_path
+    parent = metadata_path.parent
+    foreign_source = parent / f"foreign-{foreign_kind}"
+    if foreign_kind == "regular":
+        foreign_source.write_bytes(b"foreign\n")
+    else:
+        foreign_source.symlink_to("foreign-target")
+    foreign_before = (
+        foreign_source.lstat().st_dev,
+        foreign_source.lstat().st_ino,
+        foreign_source.lstat().st_mode,
+        foreign_source.lstat().st_nlink,
+        foreign_source.read_bytes() if foreign_kind == "regular" else str(foreign_source.readlink()),
+    )
+    original_rename = managed_distribution._rename_distribution_no_replace
+    original_link = managed_distribution.os.link
+    original_unlink = managed_distribution.os.unlink
+    rename_calls: list[tuple[str, str]] = []
+    link_calls: list[str] = []
+    unlink_calls: list[str] = []
+    injected = False
+    operation_owned_aside: Path | None = None
+
+    def interpose_first_gc_to_delete(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal injected, operation_owned_aside
+        result = original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        rename_calls.append((source_name, destination_name))
+        if not injected and source_name.endswith(".gc") and destination_name.endswith(".gc"):
+            operation_owned_aside = parent / f"operation-owned-{entry}-aside"
+            (parent / destination_name).rename(operation_owned_aside)
+            foreign_source.rename(parent / destination_name)
+            injected = True
+        return result
+
+    def observe_link(source, destination, *args, **kwargs):
+        link_calls.append(str(destination))
+        return original_link(source, destination, *args, **kwargs)
+
+    def observe_unlink(name, *args, **kwargs):
+        if isinstance(name, str):
+            unlink_calls.append(name)
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(managed_distribution, "_rename_distribution_no_replace", interpose_first_gc_to_delete)
+    monkeypatch.setattr(managed_distribution.os, "link", observe_link)
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    if entry == "guard":
+        store.remove_legacy_marker(marker)
+    else:
+        store.discard_prepared(prepared)
+
+    assert injected is False
+    assert rename_calls == []
+    assert link_calls == []
+    assert unlink_calls == [metadata_path.name]
+    assert not metadata_path.exists() and not metadata_path.is_symlink()
+    current_foreign = foreign_source.lstat()
+    assert (
+        current_foreign.st_dev,
+        current_foreign.st_ino,
+        current_foreign.st_mode,
+        current_foreign.st_nlink,
+        foreign_source.read_bytes() if foreign_kind == "regular" else str(foreign_source.readlink()),
+    ) == foreign_before
+    assert operation_owned_aside is None
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+@pytest.mark.parametrize("foreign_kind", ["regular", "symlink"])
+def test_i371_destructive_metadata_final_check_rejects_pre_delete_rebind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+    foreign_kind: str,
+) -> None:
+    """A pathname rebound by the pre-delete callback is never unlinked."""
+
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    metadata_path = guard_path if entry == "guard" else journal_path
+    metadata_bytes = metadata_path.read_bytes()
+    parent = metadata_path.parent
+    aside = parent / f"{metadata_path.name}.owned-aside"
+    foreign_source = parent / f"foreign-{foreign_kind}"
+    foreign_target = parent / "foreign-target"
+    if foreign_kind == "regular":
+        foreign_source.write_bytes(b"foreign metadata\n")
+    else:
+        foreign_target.write_bytes(b"foreign target\n")
+        foreign_source.symlink_to(foreign_target.name)
+    foreign_before = foreign_source.lstat()
+    foreign_payload = foreign_source.read_bytes() if foreign_kind == "regular" else foreign_source.readlink()
+    original_assert = OperationJournalStore._assert_destructive_recovery_metadata_bound
+    original_unlink = managed_distribution.os.unlink
+    checks = 0
+    unlink_calls: list[str] = []
+
+    def rebind_after_pre_delete_check(self, expected_root):
+        nonlocal checks
+        result = original_assert(self, expected_root)
+        checks += 1
+        if checks == 2:
+            metadata_path.rename(aside)
+            foreign_source.rename(metadata_path)
+        return result
+
+    def observe_unlink(name, *args, **kwargs):
+        if isinstance(name, str):
+            unlink_calls.append(name)
+        return original_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(
+        OperationJournalStore,
+        "_assert_destructive_recovery_metadata_bound",
+        rebind_after_pre_delete_check,
+    )
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    operation = (
+        (lambda: store.remove_legacy_marker(marker)) if entry == "guard" else (lambda: store.discard_prepared(prepared))
+    )
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert checks == 2
+    assert raised.value.recovery_metadata_state == "metadata-cleanup-conflict"
+    assert unlink_calls == []
+    current_metadata = metadata_path.lstat()
+    assert (
+        current_metadata.st_dev,
+        current_metadata.st_ino,
+        current_metadata.st_mode,
+        current_metadata.st_nlink,
+    ) == (
+        foreign_before.st_dev,
+        foreign_before.st_ino,
+        foreign_before.st_mode,
+        foreign_before.st_nlink,
+    )
+    assert (metadata_path.read_bytes() if foreign_kind == "regular" else metadata_path.readlink()) == foreign_payload
+    assert aside.read_bytes() == metadata_bytes
+    assert not foreign_source.exists() and not foreign_source.is_symlink()
+    assert not tuple(parent.glob("*.remove"))
+    assert not tuple(parent.glob("*.gc"))
+    assert not tuple(parent.glob("*.restore"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_destructive_metadata_finalizer_uses_one_terminal_unlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    """Normal destructive cleanup bypasses all generic pathname compensation."""
+
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    metadata_path = guard_path if entry == "guard" else journal_path
+    original_assert = OperationJournalStore._assert_bound_regular_entry
+    original_unlink = managed_distribution.os.unlink
+    events: list[str] = []
+    unlink_calls: list[str] = []
+
+    def observe_bound(self, parent_fd, name, held_fd, expected_snapshot, expected_sha256, *, identity_error):
+        events.append("bound-check")
+        return original_assert(
+            parent_fd,
+            name,
+            held_fd,
+            expected_snapshot,
+            expected_sha256,
+            identity_error=identity_error,
+        )
+
+    def observe_unlink(name, *args, **kwargs):
+        if isinstance(name, str):
+            events.append("unlink")
+            unlink_calls.append(name)
+        return original_unlink(name, *args, **kwargs)
+
+    def fail_generic(*args, **kwargs):
+        raise AssertionError("destructive metadata cleanup entered generic stage GC")
+
+    monkeypatch.setattr(OperationJournalStore, "_assert_bound_regular_entry", observe_bound)
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution, "_remove_distribution_stage_if_owned", fail_generic)
+    monkeypatch.setattr(
+        managed_distribution,
+        "_rename_distribution_no_replace",
+        fail_generic,
+    )
+    monkeypatch.setattr(managed_distribution.os, "link", fail_generic)
+    if entry == "guard":
+        store.remove_legacy_marker(marker)
+    else:
+        store.discard_prepared(prepared)
+
+    assert events[-2:] == ["bound-check", "unlink"]
+    assert unlink_calls == [metadata_path.name]
+    assert not metadata_path.exists() and not metadata_path.is_symlink()
+    assert not tuple(metadata_path.parent.glob("*.remove"))
+    assert not tuple(metadata_path.parent.glob("*.gc"))
+    assert not tuple(metadata_path.parent.glob("*.restore"))
+
+
+@pytest.mark.parametrize("entry", ["guard", "journal"])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_destructive_metadata_fsync_failure_requires_manual_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    intent: str,
+) -> None:
+    """A post-unlink fsync fault never attempts rollback or private publication."""
+
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        _target_root,
+        _root_identity,
+        _assessment,
+        _executable,
+        store,
+        marker,
+        prepared,
+        guard_path,
+        journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    metadata_path = guard_path if entry == "guard" else journal_path
+    counterpart = journal_path if entry == "guard" else guard_path
+    original_unlink = managed_distribution.os.unlink
+    original_fsync = managed_distribution.os.fsync
+    unlink_calls: list[str] = []
+    unlinked = False
+    fsync_failed = False
+
+    def observe_unlink(name, *args, **kwargs):
+        nonlocal unlinked
+        if isinstance(name, str):
+            unlink_calls.append(name)
+            if name == metadata_path.name:
+                unlinked = True
+        return original_unlink(name, *args, **kwargs)
+
+    def fail_after_terminal_unlink(fd: int) -> None:
+        nonlocal fsync_failed
+        if unlinked and not fsync_failed:
+            fsync_failed = True
+            raise OSError(errno.EIO, "injected metadata fsync failure")
+        original_fsync(fd)
+
+    monkeypatch.setattr(managed_distribution.os, "unlink", observe_unlink)
+    monkeypatch.setattr(managed_distribution.os, "fsync", fail_after_terminal_unlink)
+    operation = (
+        (lambda: store.remove_legacy_marker(marker)) if entry == "guard" else (lambda: store.discard_prepared(prepared))
+    )
+    with pytest.raises(DistributionApplyError) as raised:
+        operation()
+
+    assert unlinked is True
+    assert fsync_failed is True
+    assert raised.value.recovery_metadata_state == "metadata-cleanup-conflict"
+    assert unlink_calls == [metadata_path.name]
+    assert not metadata_path.exists() and not metadata_path.is_symlink()
+    assert counterpart.is_file()
+    assert not tuple(metadata_path.parent.glob("*.remove"))
+    assert not tuple(metadata_path.parent.glob("*.gc"))
+    assert not tuple(metadata_path.parent.glob("*.restore"))
+
+
+@pytest.mark.parametrize("journal_backed", [False, True])
+@pytest.mark.parametrize("intent", ["deprovision", "purge"])
+def test_i371_metadata_cleanup_conflict_maps_to_public_manual_recovery(
+    tmp_path: Path,
+    journal_backed: bool,
+    intent: Literal["deprovision", "purge"],
+) -> None:
+    (
+        _install_root,
+        _scaffold_root,
+        _manifest_path,
+        target_root,
+        _root_identity,
+        assessment,
+        executable,
+        _store,
+        _marker,
+        prepared,
+        _guard_path,
+        _journal_path,
+    ) = _i371_recovery_fixture(tmp_path, intent)
+    result = managed_distribution._destructive_recovery_boundary_result(
+        assessment,
+        prepared if journal_backed else None,
+        executable=executable,
+        intent=intent,
+        error=DistributionApplyError(
+            "metadata cleanup failed",
+            recovery_metadata_state="metadata-cleanup-conflict",
+        ),
+        failure_paths=("spec-dock/.distribution-journal.json",),
+    )
+    assert result is not None
+    assert result.status == "recovery_required"
+    assert result.retry_policy == "manual-recovery"
+    if journal_backed:
+        assert result.reason == f"{intent}-recovery-required"
+    else:
+        assert result.reason == f"{intent}-guard-only"
+        assert result.phase == "marker-write"
+    managed_distribution._validate_deprovision_process_result(result, intent=intent)
+    payload = cli._uninstall_payload_from_result(
+        result,
+        target_root=target_root,
+        apply=True,
+        specs_mode="remove" if intent == "purge" else "keep",
+    )
+    assert payload["status"] == "partial_failure"
+    assert payload["retry_command"] is None
+    assert cli._uninstall_exit_code_from_result(result) == 1
 
 
 @pytest.mark.parametrize("kind", ["regular", "symlink"])

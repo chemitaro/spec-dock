@@ -2074,88 +2074,6 @@ def test_s65_uninstall_generated_root_type_collision_is_zero_write(
     assert _filesystem_snapshot(tmp_path) == before
 
 
-def test_s70_uninstall_cleanup_rebind_keeps_replacement_untouched(tmp_path: Path, monkeypatch) -> None:
-    managed_file = tmp_path / ".agents/skills/spec-dock/SKILL.md"
-    managed_file.parent.mkdir(parents=True)
-    managed_file.write_text("managed\n", encoding="utf-8")
-    managed_file.unlink()
-    actions = (
-        cli._UninstallAction(
-            rel_path=".agents/skills/spec-dock/SKILL.md",
-            category="agent_skill",
-            status="removed",
-            reason="test cleanup race",
-        ),
-    )
-    displaced = tmp_path.with_name(f"{tmp_path.name}-agents-displaced")
-    replacement_sentinel = "preserve replacement\n"
-    original_rmdir = cli.os.rmdir
-    switched = False
-
-    def rebind_before_rmdir(name, *, dir_fd=None):
-        nonlocal switched
-        if not switched:
-            switched = True
-            (tmp_path / ".agents").rename(displaced / ".agents")
-            replacement = tmp_path / ".agents"
-            replacement.mkdir(parents=True)
-            (replacement / "replacement-sentinel.txt").write_text(replacement_sentinel, encoding="utf-8")
-        return original_rmdir(name, dir_fd=dir_fd)
-
-    displaced.mkdir()
-    monkeypatch.setattr(cli.os, "rmdir", rebind_before_rmdir)
-
-    result = cli._cleanup_empty_uninstall_dirs(
-        tmp_path,
-        actions,
-        expected_root_identity=cli._distribution_root_identity(tmp_path),
-    )
-
-    assert result == ()
-    assert (tmp_path / ".agents/replacement-sentinel.txt").read_text(encoding="utf-8") == replacement_sentinel
-    assert not (tmp_path / ".agents/skills/spec-dock").exists()
-
-
-def test_s70_uninstall_cleanup_rechecks_empty_directory_identity_before_rmdir(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    candidate = tmp_path / ".agents/skills/spec-dock"
-    candidate.mkdir(parents=True)
-    actions = (
-        cli._UninstallAction(
-            rel_path=".agents/skills/spec-dock/SKILL.md",
-            category="agent_skill",
-            status="removed",
-            reason="test cleanup race",
-        ),
-    )
-    displaced = candidate.with_name("spec-dock-displaced")
-    original_remove = cli._remove_empty_bound_directory
-    swapped = False
-
-    def replace_candidate_before_identity_recheck(target_root, rel_path, **kwargs):
-        nonlocal swapped
-        if not swapped and rel_path == Path(".agents/skills/spec-dock"):
-            swapped = True
-            candidate.rename(displaced)
-            candidate.mkdir()
-        return original_remove(target_root, rel_path, **kwargs)
-
-    monkeypatch.setattr(cli, "_remove_empty_bound_directory", replace_candidate_before_identity_recheck)
-
-    result = cli._cleanup_empty_uninstall_dirs(
-        tmp_path,
-        actions,
-        expected_root_identity=cli._distribution_root_identity(tmp_path),
-    )
-
-    assert result == ()
-    assert swapped
-    assert candidate.is_dir()
-    assert displaced.is_dir()
-
-
 def test_s60_post_verify_failure_keeps_marker_until_forward_retry(tmp_path: Path, monkeypatch, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     (tmp_path / "spec-dock/docs/README.md").unlink()
@@ -2867,7 +2785,7 @@ def test_s70_uninstall_does_not_run_fallible_workspace_cleanup_after_marker_fina
     assert not attempted
     assert not marker.exists()
     assert (tmp_path / "spec-dock").is_dir()
-    assert list((tmp_path / "spec-dock").iterdir()) == []
+    assert list((tmp_path / "spec-dock").iterdir()) == [tmp_path / "spec-dock/.workbench"]
 
 
 def test_s70_uninstall_marker_survives_partial_failure_and_is_removed_on_retry(
@@ -3111,16 +3029,21 @@ def test_s70_uninstall_marker_write_failure_is_retryable(
     assert not journal.exists()
 
 
-def test_s70_uninstall_existing_partial_marker_is_rejected_before_reuse(tmp_path: Path) -> None:
+def test_i371_legacy_marker_reader_remains_service_owned(
+    tmp_path: Path,
+    capsys,
+) -> None:
     assert main(["init", str(tmp_path)]) == 0
+    capsys.readouterr()
     marker = tmp_path / "spec-dock/.uninstall-retry.json"
     marker.write_bytes(b'{"managed_by":"spec-dock"')
+    before = marker.read_bytes()
 
-    with pytest.raises(RuntimeError, match="incomplete or invalid"):
-        cli._create_uninstall_retry_marker(
-            tmp_path,
-            expected_root_identity=cli._distribution_root_identity(tmp_path),
-        )
+    assert main(["uninstall", str(tmp_path), "--apply", "--keep-specs", "--json"]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert payload["retry_command"] is None
+    assert marker.read_bytes() == before
 
 
 def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, capsys) -> None:
@@ -3147,32 +3070,27 @@ def test_s70_uninstall_keep_and_remove_specs_preserve_boundary(tmp_path: Path, c
     assert not (remove_target / "spec-dock/.uninstall-retry.json").exists()
 
 
-def test_s70_uninstall_empty_boundary_allows_fresh_reinit_and_blocks_markerless_rerun(tmp_path: Path, capsys) -> None:
+def test_s70_uninstall_preserves_workbench_and_allows_idempotent_rerun(tmp_path: Path, capsys) -> None:
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 0
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 0
     capsys.readouterr()
     assert (tmp_path / "spec-dock").is_dir()
-    assert list((tmp_path / "spec-dock").iterdir()) == []
+    assert list((tmp_path / "spec-dock").iterdir()) == [tmp_path / "spec-dock/.workbench"]
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 2
-    captured = capsys.readouterr().err
-    assert "missing-version" in captured
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "completed"
+    assert payload["summary"]["already_removed"] > 0
     assert (tmp_path / "spec-dock").is_dir()
-    assert list((tmp_path / "spec-dock").iterdir()) == []
-
-    assert main(["init", str(tmp_path)]) == 0
-    capsys.readouterr()
-    assert (tmp_path / "spec-dock/spec-dock.version").is_file()
-
-    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs"]) == 0
-    capsys.readouterr()
-    assert (tmp_path / "spec-dock").is_dir()
-    assert list((tmp_path / "spec-dock").iterdir()) == []
+    assert list((tmp_path / "spec-dock").iterdir()) == [tmp_path / "spec-dock/.workbench"]
 
 
-def test_s70_uninstall_remove_specs_cleans_nested_generated_directories(tmp_path: Path, capsys) -> None:
+def test_s70_uninstall_remove_specs_blocks_unknown_nested_generated_directories(
+    tmp_path: Path,
+    capsys,
+) -> None:
     assert main(["init", str(tmp_path)]) == 0
     capsys.readouterr()
     nested_active = tmp_path / "spec-dock/active/nested/empty/deeper"
@@ -3180,19 +3098,15 @@ def test_s70_uninstall_remove_specs_cleans_nested_generated_directories(tmp_path
     nested_active.mkdir(parents=True)
     nested_agent.mkdir(parents=True)
 
-    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 0
+    before = _filesystem_snapshot(tmp_path)
+    assert main(["uninstall", str(tmp_path), "--apply", "--remove-specs", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
-    removed_empty_paths = {action["path"] for action in payload["actions"] if action["status"] == "empty_dir_removed"}
-
-    assert payload["status"] == "completed"
-    assert "spec-dock/active/nested/empty/deeper" in removed_empty_paths
-    assert "spec-dock/active/nested/empty" in removed_empty_paths
-    assert "spec-dock/active/nested" in removed_empty_paths
-    assert "spec-dock/.agent/nested/empty" in removed_empty_paths
-    assert not nested_active.exists()
-    assert not nested_agent.exists()
-    assert (tmp_path / "spec-dock").is_dir()
-    assert list((tmp_path / "spec-dock").iterdir()) == []
+    assert payload["status"] == "blocked"
+    assert "spec-dock/active/nested" in payload["failed_paths"]
+    assert "spec-dock/.agent/nested" in payload["failed_paths"]
+    assert _filesystem_snapshot(tmp_path) == before
+    assert nested_active.is_dir()
+    assert nested_agent.is_dir()
 
 
 def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
@@ -3229,21 +3143,20 @@ def test_s70_uninstall_does_not_cleanup_empty_preserved_or_unknown_directories(
     assert _filesystem_snapshot(tmp_path) == before
 
 
-def test_i370_uninstall_routes_default_and_keep_only_to_deprovision_service(
+def test_i371_uninstall_routes_deprovision_and_purge_to_typed_services(
     tmp_path: Path,
     monkeypatch,
     capsys,
 ) -> None:
-    """I370-T-CLI-001: default/keep and remove-specs have disjoint route owners."""
+    """Issue 371 routes every uninstall authority through one typed service."""
 
-    service_calls: list[dict[str, object]] = []
-    compatibility_calls: list[tuple[Path, bool, str | None]] = []
+    service_calls: list[tuple[str, bool, object]] = []
 
     def fake_deprovision_service(
         install_root: Path,
         **kwargs: object,
     ) -> managed_distribution.DistributionProcessResult:
-        service_calls.append({"install_root": install_root, **kwargs})
+        service_calls.append(("deprovision", bool(kwargs["apply"]), kwargs.get("expected_root_identity")))
         apply = bool(kwargs["apply"])
         return managed_distribution.DistributionProcessResult(
             status="completed" if apply else "planned",
@@ -3251,52 +3164,65 @@ def test_i370_uninstall_routes_default_and_keep_only_to_deprovision_service(
             actions=(),
             phase="complete" if apply else "preflight",
             last_completed_phase="marker-finalized" if apply else "preflight-complete",
-            retry_policy="same-keep-command",
+            retry_policy="none" if apply else "same-keep-command",
         )
 
-    def fake_remove_specs_compatibility(
-        target_root: Path,
-        ns: object,
-        *,
-        specs_mode: str,
-        expected_root_identity: object = None,
-    ) -> int:
-        del expected_root_identity
-        compatibility_calls.append((
-            target_root,
-            bool(ns.apply),  # type: ignore[attr-defined]
-            specs_mode,
-        ))
-        return 0
+    def fake_purge_service(
+        install_root: Path,
+        **kwargs: object,
+    ) -> managed_distribution.DistributionProcessResult:
+        service_calls.append(("purge", bool(kwargs["apply"]), kwargs.get("expected_root_identity")))
+        apply = bool(kwargs["apply"])
+        return managed_distribution.DistributionProcessResult(
+            status="completed" if apply else "planned",
+            intent="purge",
+            actions=(),
+            phase="complete" if apply else "preflight",
+            last_completed_phase="marker-finalized" if apply else "preflight-complete",
+            retry_policy="none" if apply else "same-remove-command",
+        )
 
     monkeypatch.setattr(cli, "execute_deprovision_distribution", fake_deprovision_service)
-    monkeypatch.setattr(cli, "_run_uninstall_remove_specs_compatibility", fake_remove_specs_compatibility)
+    monkeypatch.setattr(cli, "execute_explicit_spec_history_purge_distribution", fake_purge_service)
 
     target = tmp_path / "consumer"
     target.mkdir()
-    default_args = ["uninstall", str(target), "--json"]
-    keep_dry_args = ["uninstall", str(target), "--keep-specs", "--json"]
-    keep_apply_args = ["uninstall", str(target), "--apply", "--keep-specs", "--json"]
-    remove_dry_args = ["uninstall", str(target), "--remove-specs", "--json"]
-    remove_apply_args = ["uninstall", str(target), "--apply", "--remove-specs", "--json"]
+    requests = (
+        ["uninstall", str(target), "--json"],
+        ["uninstall", str(target), "--keep-specs", "--json"],
+        ["uninstall", str(target), "--apply", "--keep-specs", "--json"],
+        ["uninstall", str(target), "--remove-specs", "--json"],
+        ["uninstall", str(target), "--apply", "--remove-specs", "--json"],
+    )
+    for request in requests:
+        assert main(request) == 0
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert captured.out.count("\n") == 1
 
-    for args in (default_args, keep_dry_args, keep_apply_args, remove_dry_args, remove_apply_args):
-        assert main(args) == 0
-        capsys.readouterr()
-
-    assert [call["apply"] for call in service_calls] == [False, False, True]
-    assert all("specs_mode" not in call for call in service_calls)
-    assert service_calls[2]["expected_root_identity"] is not None
-    assert compatibility_calls == [
-        (target.resolve(), False, "remove"),
-        (target.resolve(), True, "remove"),
+    assert [(kind, apply) for kind, apply, _identity in service_calls] == [
+        ("deprovision", False),
+        ("deprovision", False),
+        ("deprovision", True),
+        ("purge", False),
+        ("purge", True),
     ]
+    assert service_calls[2][2] is not None
+    assert service_calls[4][2] is not None
 
 
-def test_i370_cutover_ast_has_one_deprovision_owner_and_isolated_remove_compatibility() -> None:
-    """I370-T-ABS-001: actual call edges isolate default/keep from D4 mutation helpers."""
+def test_i371_distribution_cutover_has_single_purge_writer() -> None:
+    """The old remove-specs writer is absent and the typed purge owner is unique."""
 
-    tree = ast.parse(inspect.getsource(cli))
+    source = inspect.getsource(cli)
+    tree = ast.parse(source)
+    definitions = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    assert not any(name.endswith("remove_specs_compatibility") for name in definitions)
+    assert not any(name.startswith("_Uninstall") for name in definitions)
+    assert not any(name.endswith("_uninstall_plan") for name in definitions)
+    assert not any(name.endswith("_uninstall_tree_fd") for name in definitions)
+    assert not any(name.endswith("uninstall_retry_marker") for name in definitions)
+
     call_edges: dict[str, set[str]] = {}
     for node in tree.body:
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -3307,41 +3233,14 @@ def test_i370_cutover_ast_has_one_deprovision_owner_and_isolated_remove_compatib
             if isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
         }
 
-    legacy_mutation_edges = {
-        "_build_uninstall_plan",
-        "_apply_uninstall_plan",
-        "_verify_uninstall_postcondition",
-        "_write_uninstall_retry_marker",
-        "_remove_uninstall_tree_fd",
-        "_remove_uninstall_path",
-        "_cleanup_empty_uninstall_dirs",
-        "_finalize_uninstall_retry_marker",
-    }
-    assert call_edges["_run_uninstall_deprovision"].isdisjoint(legacy_mutation_edges)
-    assert call_edges["_run_uninstall"].isdisjoint(legacy_mutation_edges)
-    assert "execute_deprovision_distribution" in call_edges["_run_uninstall_deprovision"]
     assert "_run_uninstall_deprovision" in call_edges["_run_uninstall"]
-    assert "_run_uninstall_remove_specs_compatibility" in call_edges["_run_uninstall"]
-
-    callers = {
-        callee: {caller for caller, callees in call_edges.items() if callee in callees}
-        for callee in legacy_mutation_edges
-    }
-    assert callers["_build_uninstall_plan"] == {"_run_uninstall_remove_specs_compatibility"}
-    assert callers["_apply_uninstall_plan"] == {"_run_uninstall_remove_specs_compatibility"}
-    assert callers["_verify_uninstall_postcondition"] == {"_run_uninstall_remove_specs_compatibility"}
-    assert callers["_write_uninstall_retry_marker"] == {"_run_uninstall_remove_specs_compatibility"}
-    assert callers["_finalize_uninstall_retry_marker"] == {"_run_uninstall_remove_specs_compatibility"}
-    assert callers["_remove_uninstall_path"] == {"_apply_uninstall_plan"}
-    assert callers["_cleanup_empty_uninstall_dirs"] == {
-        "_apply_uninstall_plan",
-        "_run_uninstall_remove_specs_compatibility",
-    }
-    assert callers["_remove_uninstall_tree_fd"] == {
-        "_remove_bound_directory_tree",
-        "_remove_uninstall_path",
-        "_remove_uninstall_tree_fd",
-    }
+    assert "_run_uninstall_explicit_spec_history_purge" in call_edges["_run_uninstall"]
+    assert "execute_deprovision_distribution" in call_edges["_run_uninstall_deprovision"]
+    assert (
+        "execute_explicit_spec_history_purge_distribution" in call_edges["_run_uninstall_explicit_spec_history_purge"]
+    )
+    assert source.count("execute_explicit_spec_history_purge_distribution(") == 1
+    assert "OperationJournalStore" not in inspect.getsource(cli._run_uninstall_explicit_spec_history_purge)
 
 
 def test_i370_typed_uninstall_mapper_preserves_schema_status_and_retry_contract(
