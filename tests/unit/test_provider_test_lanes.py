@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -38,6 +39,15 @@ FULL_REGRESSION_VERIFIER = (
     "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
     "iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py"
 )
+FULL_REGRESSION_LEDGER = (
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
+    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
+    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
+)
+PRE_MIGRATION_LEDGER_CURRENT_HEAD = "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2"
+PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256 = "f997de22e6507e6a27ce76284df079c9dd1e65bb015e309801b4aa041ea3dfcf"
+RETAINED_SKILL_HISTORICAL_NODE = "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source"
+RETAINED_SKILL_SUCCESSOR_NODE = "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood"
 
 
 def test_full_regression_signature_normalization_is_platform_independent() -> None:
@@ -70,6 +80,42 @@ def test_full_regression_signature_normalization_is_platform_independent() -> No
         expanded_assertion,
         repository,
     )
+
+
+def test_full_regression_ledger_migration_preserves_schema1_history() -> None:
+    payload = json.loads((_repo_root() / FULL_REGRESSION_LEDGER).read_text(encoding="utf-8"))
+    rows = payload["failure_paths"]
+    assert isinstance(rows, list)
+
+    schema1_projection = [
+        {
+            "nodeid": row["nodeid"],
+            "fixed_point_signature_sha256": row["fixed_point_signature_sha256"],
+            "rationale": row.get("rationale", ""),
+        }
+        for row in rows
+    ]
+    projection_bytes = json.dumps(
+        schema1_projection,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+    assert payload["schema_version"] == 2
+    assert payload["current_head_sha"] == PRE_MIGRATION_LEDGER_CURRENT_HEAD
+    assert hashlib.sha256(projection_bytes).hexdigest() == PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256
+
+    resolved_rows = [row for row in rows if row.get("lifecycle") == "resolved"]
+    assert [row["nodeid"] for row in resolved_rows] == [RETAINED_SKILL_HISTORICAL_NODE]
+    assert resolved_rows[0]["resolution_mode"] == "superseded"
+    assert resolved_rows[0]["successor_nodeid"] == RETAINED_SKILL_SUCCESSOR_NODE
+    assert all(
+        row.get("lifecycle") == "active"
+        for row in rows
+        if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE
+    )
+    assert not any(row.get("lifecycle") == "retired" for row in rows)
 
 
 def _fake_report(
