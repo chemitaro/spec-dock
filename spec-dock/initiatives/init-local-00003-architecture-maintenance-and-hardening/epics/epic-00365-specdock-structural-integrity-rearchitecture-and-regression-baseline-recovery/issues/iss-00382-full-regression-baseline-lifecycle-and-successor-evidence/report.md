@@ -33,6 +33,7 @@ repository-only Full Regression baseline authorityを`scripts/quality/`へ実装
 | M5 quality repair | `make lint` format 3 files / mypy 4 errors | formatter適用とtyped test boundaryによりlint green |
 | M6 ledger authority cutover | root authority files absent、canonical sources still referenced Issue 368 artifact | root authority 2 files、historical SHA-256 freeze、provider lane 32 passed、ordinary pytest 1570 passed |
 | M7 Strict前静的監査P1修復 | root ledger metadataの旧runner command assertion failure | canonical command 1行修正、adapter equivalence contract test追加 |
+| M8 Provider parity hermetic build dependency preparation repair | macOS parity jobで16件が`Missing dependencies: setuptools>=69`、native venvのpip `--target`経路がstale setuptoolsを置換できない | native build-backend pip経路修正、fallback characterization、artifact-build unit 5 passed、heavy parityは15 passed/dirty-status 1 failure |
 
 ### M6 authority cutover追記（pre-freeze不整合の訂正）
 
@@ -62,6 +63,15 @@ M6 commit `22309ce0932c3233385d5cdefe317e867cfd3c52`に対するFull Regression 
 - M7の変更により`22309ce...`時点のFull Regression receiptはstaleである。M7後のcandidate SHAに対するFull RegressionはprimaryがStep 9で再取得する。
 
 M7ではP2として扱ったhistorical verifier testのdirect loadとoutcome set境界の重複は変更していない。前者はhistorical compatibility evidence、後者はJSON input validationとpolicy domain validationの別責務であり、今回のP1修復範囲外である。
+
+### M8 Provider parity hermetic build dependency preparation repair追記
+
+PR #383 Provider CI run `33315553126`のmacOS parity job `99268220215`で、candidate wheel fixture setupの16件すべてが`Missing dependencies: setuptools>=69`でERRORとなり、Ubuntu parityはfail-fastでcancelledになった。根因は、native build venvのpip-present経路がbuild backend requirementsをvenv自身のsite-packagesへ`pip install --target`しており、seeded setuptools 68.2.2のdist-infoを置換できなかったことである。local wheelhouseには`setuptools==75.8.0`が存在する。
+
+- RED: `uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -k 'native_build_venv_installs_backend_requirements_in_place or pip_unavailable_fallback_keeps_target_install_semantics'`でnative command assertionが失敗した。観測された旧commandは`--target <venv>/lib/python3.12/site-packages`を含み、fallback testはpassした。
+- GREEN: build-backend専用helperを追加し、native pip probe成功時のcommandを`python -m pip install --no-cache-dir --upgrade --no-index --find-links <local wheelhouse> <exact pins>`（`--target`なし）へ変更した。pip unavailable経路は既存generic target installerのまま維持した。focused 2 passed、Issue 69 artifact-build unit group 5 passed、`make lint` pass。
+- 指定heavy command `uv run pytest --run-full-regression --full-regression-shard tests/integration/test_epic_00343_distribution.py`は、15 passed、1 failed（`test_tc_346_s01_001_candidate_wheel_receipt`）だった。唯一のfailureはcandidate fixtureが未commitの`tests/unit/infra/test_init_update.py`変更をpre/post dirty statusとして検出したもので、残り15件のbuild/install/distribution semantic assertionsはpassした。testやworkflowを変更して隠していない。
+- workflow、pyproject、wheelhouse、distribution production/runtime/assets、integration testは変更していない。manual Full Regression run `33315602048`は旧SHAの結果であり、M8後はstaleとしてprimaryが再取得する。
 
 ## Verification
 

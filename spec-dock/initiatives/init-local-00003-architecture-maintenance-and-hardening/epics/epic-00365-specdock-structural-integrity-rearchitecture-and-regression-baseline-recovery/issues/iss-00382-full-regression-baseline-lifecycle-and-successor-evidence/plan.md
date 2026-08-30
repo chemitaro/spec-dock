@@ -88,6 +88,16 @@ M6 commit `22309ce0932c3233385d5cdefe317e867cfd3c52`でFull Regressionがverifie
 
 M7ではproduction evaluator/runner/conftest、ledger rows/signatures/lifecycle、distribution sourceを変更しない。historical verifierのdirect-load testとoutcome set境界の重複は、canonical runtime dependencyではないため対象外とする。
 
+### Step 8C — M8 Provider parity hermetic build dependency preparation repair（追加）
+
+PR #383のProvider CI run `33315553126`でmacOS parity job `99268220215`がcandidate wheel fixture setupの16件すべてで`Missing dependencies: setuptools>=69`となり、Ubuntu parityはfail-fastでcancelledになった。manual Full Regression run `33315602048`は旧SHAでpassしているが、M8後のcandidateではstale receiptとして扱う。
+
+1. REDとしてnative build venvのpip-present経路が、staleなseeded setuptoolsを置換できるbuild-backend installation command（`--target`なし、`--upgrade`、`--no-index`、`--find-links`、exact pinned requirements）を満たすことをテストする。pip unavailable経路は既存のgeneric target installerでhermetic fallbackを維持するcharacterization testも追加する。
+2. native venvでpip probeが成功した場合だけ、build-backend専用の小helperをそのvenvの通常pip environmentへ適用する。pip unavailableまたはvenv生成失敗時は既存`_issue_69_install_target_packages`のtarget semanticsを使い、`python -m build --no-isolation`、local wheelhouse、network禁止、OS分岐なしを維持する。
+3. Issue 69 artifact-build unit group、指定distribution parity、`make lint`、ordinary pytest、`spec-dock validate`、`git diff --check`を実行する。未commit作業ツリーではcandidate fixtureのclean-status assertionが失敗し得るため、heavy結果はsemantic passと環境由来のdirty-status failureを分離して記録し、primaryがM8 commit後に再実行する。
+
+M8の変更範囲はIssue 69 test harnessとこのIssueのplan/reportだけであり、workflow、pyproject、wheelhouse、distribution production/runtime/assets、integration test、public CLIを変更しない。
+
 ### Step 9 — exact candidate Full Regression
 
 clean candidate SHAから`uv run python -m scripts.quality.verify_full_regression --shards 4`を実行し、active、resolved、unexpected結果をmachine-readable receiptへ記録する。candidate変更後はstale receiptを再利用しない。
