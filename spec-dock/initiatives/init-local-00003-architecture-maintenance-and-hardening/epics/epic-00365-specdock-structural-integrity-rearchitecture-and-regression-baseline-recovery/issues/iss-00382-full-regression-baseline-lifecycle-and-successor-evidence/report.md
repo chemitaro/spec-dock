@@ -91,3 +91,14 @@ exact candidate SHAに対するcanonical Full Regression、Strict review、GitHu
 - Full Regressionはheavy post-merge laneであり、ordinary PR merge-blocking fast gateへ変更していない。
 - Issue 368 verifierはhistorical evidenceとして残るが、workflow/manual canonical routeのfallback authorityではない。
 - Issue 382のexact candidate Full Regression、Strict pass、merge-ready PR、人間mergeは未完了。Issue 372はそれらが成立するまでblockedのままとする。
+
+### M9 external certification evidence materialization（追加）
+
+M8時点の「exact candidate Full Regression、Strict pass、merge-ready PR、人間mergeは未完了」という記録は、その時点の履歴として変更しない。以下は、その後に取得されたcode candidate `46d16fd0a0cfa286db0bc4c292b5d5b73190a10f`に対するM9の外部認証であり、M8の暫定未完了状態をsupersedeする現在の証跡である。
+
+- Provider CI run `33322223928`は、provider-tests pass（2m33s）、macOS parity pass（1h6m4s）、Ubuntu parity pass（1h13m44s）だった。
+- Provider Full Regression run `33323717175`はpass（1h7m36s）となり、artifact id `9736472371`、name `provider-full-regression-evidence`を生成した。`result.json`はcandidate SHAが`46d16fd0a0cfa286db0bc4c292b5d5b73190a10f`とexact matchし、`status=verified`、`evaluation.verified=true`、active 26／resolved 1／retired 0／violations 0だった。result JSONのSHA-256は`e1b77c0294ff383d8ac71af6f78540508bae28b6c71a7f2d9d1952a16d229782`である。
+- Strict session `required-strict-github-connector-verificati-503`は`review_status=pass`、findings 0、confidence 0.95だった。Strict JSONのSHA-256は`0d3ae1fd8b86d4b5e0c49f00379e987eb538128fd7101ce8979a10303e26d4da`である。
+- PR #383は、このreviewed candidateにおいてOPEN、non-draft、MERGEABLE/CLEANである。人間によるmergeはまだ実施していない。
+
+このM9追記はtrackedなplan/reportを変更するため、新しいdoc-only candidate SHAを生成する。したがって、上記のCI、Full Regression、Strictは`46d16fd...`に対する証跡であり、追記後の新HEADに対する証跡ではない。primaryはこの追記をcommit/pushした後、新しいexact SHAでCI、Full Regression、Strictを再実行してからmerge判断を行う。これにより、認証対象と文書追記後candidateの自己参照を避ける。Issue #372の再開およびIssue 382/372のfinishは、人間mergeを含む残存ライフサイクル条件の成立後に行う。
