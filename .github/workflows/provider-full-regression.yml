@@ -25,8 +25,7 @@ jobs:
           python -m pip install uv
       - name: Run provider full regression
         run: >-
-          uv run python
-          spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py
+          uv run python -m scripts.quality.verify_full_regression
           --shards 4
       - name: Upload full-regression evidence
         if: always()

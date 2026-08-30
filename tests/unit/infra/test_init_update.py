@@ -6623,7 +6623,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         for command in expected_provider_parity_commands:
             assert command in provider_parity_lines
-        assert "verify-full-regression.py" in workflow_texts["full"]
+        full_workflow_flattened = " ".join(workflow_texts["full"].split())
+        assert "uv run python -m scripts.quality.verify_full_regression --shards 4" in full_workflow_flattened
+        assert "verify-full-regression.py" not in workflow_texts["full"]
         assert "timeout-minutes" not in workflow_texts["full"]
         assert "--timeout-seconds" not in workflow_texts["full"]
         assert "--max-total-seconds" not in workflow_texts["full"]

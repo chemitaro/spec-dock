@@ -455,6 +455,14 @@ def test_full_regression_workflow_has_no_execution_time_caps() -> None:
     assert "--shards 4" in workflow
 
 
+def test_full_regression_workflow_uses_canonical_runner_without_issue368_fallback() -> None:
+    workflow = (_repo_root() / ".github/workflows/provider-full-regression.yml").read_text(encoding="utf-8")
+    flattened = " ".join(workflow.split())
+
+    assert "uv run python -m scripts.quality.verify_full_regression --shards 4" in flattened
+    assert "verify-full-regression.py" not in workflow
+
+
 def test_full_regression_main_keeps_verified_status_after_long_observation(
     monkeypatch,
     tmp_path: Path,
