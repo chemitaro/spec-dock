@@ -132,3 +132,17 @@ Issue 372 の変更後も次を維持する。
 - JSON は一つの object とし、repository外 absolute pathやsource content等の既存 sanitization boundaryを弱めない。
 - package surfaceだけを手修正して provider/dogfood/source driftを隠さない。
 - Linux/macOS差を silent fallback によって隠さない。
+
+## 2026-08-30 収束Addendum（既実施M1〜M5を変更しない）
+
+本節は既存要件と実施済み成果を遡及変更しない。Step 10で発見されたrepository quality-policy blockerを解消し、同じD5目的へ収束するための追加条件だけを定める。
+
+| ID | 追加要件 |
+|---|---|
+| I372-R11 | Issue `iss-00382` がaccepted ADRに従うrepository-level Full Regression lifecycle/successor authorityを実装し、人間mergeされるまでIssue 372のfinal Full Regression判定を停止する。Issue 372内にbaseline exception、failure test復活、historical row削除を実装しない。 |
+| I372-R12 | Issue 382 merge後、Issue 372のproduction semanticsを追加変更せず、新しいfinal candidate SHAへordinary/focused/package/Linux/macOS/Full Regression/Strict evidenceを再束縛する。旧candidateまたはIssue 368 artifact verifierのreceiptをfinal evidenceへ流用しない。 |
+
+| AC | 追加受け入れ条件 | 対応要件 |
+|---|---|---|
+| I372-AC13 | Issue 382のexact merged implementationがrepository-level canonical verifierを提供し、retained-skill successorをcollected・executed・passed・not-skippedとして証明し、他のactive baseline rowを維持する。 | R11 |
+| I372-AC14 | Issue 382 merge後に形成したIssue 372 candidateについて、accepted canonical verifier、same-SHA evidence、Strict reviewがgreenであり、Implementation Completion、human merge、`issue finish`が別々に記録される。 | R12 |

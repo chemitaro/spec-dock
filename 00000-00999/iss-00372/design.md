@@ -409,3 +409,11 @@ Issue lifecycle closure。READMEの current contractどおり、commit/push/PR/m
 | I372-R08 | §3.8, §7 |
 | I372-R09 | §3.9, §8 |
 | I372-R10 | §9, §10, §11 |
+
+## 13. 2026-08-30 収束Addendum（D5 production設計は変更しない）
+
+Step 10で観測した`ledger-mismatch`はD5 distribution semanticsの欠陥ではなく、schema 1 Full Regression baselineがsuccessor evidenceを表現できないrepository quality-governance gapである。Issue 372へ例外分岐や新しいdistribution stateを追加しない。
+
+Issue `iss-00382` が`scripts/quality/`にrepository-only pure evaluatorと二つのthin adapterを実装し、human mergeされた状態をIssue 372再開条件とする。Issue 368 artifact verifierはhistorical evidenceであり、Issue 372 final gateのcanonical fallbackにしない。
+
+再開後のIssue 372はM1〜M5 implementationを再設計せず、merged authorityを含む新candidateを形成して§9〜§10のsame-candidate evidenceを取り直す。追加production changeが必要と判明した場合は本Addendumで正当化せず、既存stop/interview gateへ戻す。
