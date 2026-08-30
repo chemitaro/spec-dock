@@ -111,3 +111,18 @@ ChatGPT Use Extra High による red-team 分析では、最初に不整合と�
 | `issue finish` | 未実施 |
 
 従って Issue 372 の実装完了、最終 candidate `C`、merge可能状態はまだ宣言しない。
+
+### Step 10B — accepted canonical verifier による pre-freeze acceptance（2026-08-31）
+
+Issue 382 の人間による merge と lifecycle closure を確認したうえで、Issue 372 branch の
+merge commit `bc1560096593c645ec0309a37a080c53a7e7f35d` を pre-freeze candidate として
+受入確認した。
+
+- PR [#383](https://github.com/chemitaro/spec-dock/pull/383) は `bc1560096593c645ec0309a37a080c53a7e7f35d` として Issue 372 branch に merge 済みである。
+- GitHub Issue #382 は `CLOSED`、`./spec-dock/scripts/spec-dock deps check --id iss-00372 --github --json` は `ready=true`、`blockers=[]` である。
+- 実行したのは repository-level canonical root route `uv run python -m scripts.quality.verify_full_regression --shards 4` である。root の `scripts/quality/` evaluator と root `full-regression-ledger.json` / `full-regression-timing-weights.json` を使用し、Issue 368 配下の historical `verify-full-regression.py`／artifact verifier は流用していない。
+- focused GREEN: `uv run pytest tests/unit/test_full_regression_baseline.py tests/unit/test_provider_test_lanes.py` — `70 passed in 3.98s`。resolved successorを含む evaluator/adapter contract selectorもこの結果に含まれる。
+- Full Regression: 上記 canonical command は exit 0、`2708 tests collected`、`status=verified`、`evaluation.verified=true`、`active_verified=26`、`resolved_verified=1`、`retired_verified=0`、`violations=[]`、`total_elapsed_seconds=1630.669` だった。各 shard の pytest process は active baseline failureを観測して exit 1 だが、shared evaluator が26件の承認済みactive failureとして正確に検証し、runner全体を verified とした。
+- result artifact: `spec-dock/.workbench/full-regression/20260830T231104.876692Z/result.json`。`candidate_sha` は `bc1560096593c645ec0309a37a080c53a7e7f35d` と一致する。resolved successor `tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood` は shard-2 で exactly once collected・executed、outcome `passed` であり、skipされていない。観測ファイルは同ディレクトリの `shard-1.json`〜`shard-4.json` にある。
+- この節は report 追記前の `bc156009…` に対する Step 10B pre-freeze acceptance 証拠であり、report追記後に生成される新しい candidate の final same-SHA receiptではない。primary はこの追記を含む commit/push後の新SHAについて、ordinary/focused/package/Linux/macOS/Full Regression/Strict evidenceを再取得する。
+- 本Stepでは production semantics、ledger/timing policy、historical row/history、workflow、tests、その他の tracked fileを変更していない。既実施履歴も書き換えていない。
