@@ -2,12 +2,21 @@ from collections.abc import Mapping
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
+from scripts.quality.full_regression_baseline import (
+    CandidateObservation,
+    evaluate_baseline,
+    failure_signature,
+    normalize_failure_message,
+    parse_baseline,
+)
 
-from tests.conftest import _normalize_failure_message
+from tests.conftest import build_candidate_observation
 
 REQUIRED_FAST_NODE_IDS = frozenset({
     "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_legacy_flag_reports_parser_error",
@@ -53,14 +62,277 @@ def test_full_regression_signature_normalization_is_platform_independent() -> No
         "  - [('/repo', 10000)]"
     )
 
-    assert _normalize_failure_message(macos_runtime_error, repository) == _normalize_failure_message(
+    assert normalize_failure_message(macos_runtime_error, repository) == normalize_failure_message(
         linux_runtime_error,
         repository,
     )
-    assert _normalize_failure_message(compact_assertion, repository) == _normalize_failure_message(
+    assert normalize_failure_message(compact_assertion, repository) == normalize_failure_message(
         expanded_assertion,
         repository,
     )
+
+
+def _fake_report(
+    nodeid: str,
+    *,
+    when: str = "call",
+    outcome: str,
+    wasxfail: str | None = None,
+    message: str = "",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        nodeid=nodeid,
+        when=when,
+        outcome=outcome,
+        passed=outcome == "passed",
+        failed=outcome == "failed",
+        skipped=outcome == "skipped",
+        wasxfail=wasxfail,
+        longrepr=SimpleNamespace(reprcrash=SimpleNamespace(message=message)) if message else "",
+    )
+
+
+def test_pytest_adapter_builds_typed_observation_for_xfail_and_phase_errors() -> None:
+    repository = Path("/repo")
+    passed = "tests/sample.py::test_passed"
+    failed = "tests/sample.py::test_failed"
+    skipped = "tests/sample.py::test_skipped"
+    xfailed = "tests/sample.py::test_xfailed"
+    xpassed = "tests/sample.py::test_xpassed"
+    setup_error = "tests/sample.py::test_setup_error"
+    teardown_error = "tests/sample.py::test_teardown_error"
+    reports = (
+        _fake_report(passed, outcome="passed"),
+        _fake_report(failed, outcome="failed", message="AssertionError: fixed failure"),
+        _fake_report(skipped, outcome="skipped"),
+        _fake_report(xfailed, outcome="skipped", wasxfail="expected failure"),
+        _fake_report(xpassed, outcome="passed", wasxfail="unexpected pass"),
+        _fake_report(setup_error, when="setup", outcome="failed", message="fixture setup failed"),
+        _fake_report(teardown_error, when="teardown", outcome="failed", message="teardown failed"),
+    )
+
+    observation = build_candidate_observation(
+        (passed, failed, skipped, xfailed, xpassed, setup_error, teardown_error),
+        reports,
+        repository=repository,
+    )
+
+    assert isinstance(observation, CandidateObservation)
+    assert observation.executed == (passed, failed, skipped, xfailed, xpassed, setup_error, teardown_error)
+    assert observation.outcomes == {
+        passed: "passed",
+        failed: "failed",
+        skipped: "skipped",
+        xfailed: "xfailed",
+        xpassed: "xpassed",
+        setup_error: "error",
+        teardown_error: "error",
+    }
+    assert observation.failure_signatures == {
+        failed: failure_signature("AssertionError: fixed failure", repository),
+    }
+
+
+def test_pytest_adapter_preserves_duplicate_and_missing_coverage_for_shared_evaluator() -> None:
+    duplicate = "tests/sample.py::test_duplicate"
+    missing = "tests/sample.py::test_missing"
+    observation = build_candidate_observation(
+        (duplicate, duplicate, missing),
+        (_fake_report(duplicate, outcome="passed"),),
+        repository=Path("/repo"),
+    )
+    baseline = parse_baseline(
+        {
+            "schema_version": 2,
+            "failure_paths": [
+                {
+                    "nodeid": duplicate,
+                    "fixed_point_signature_sha256": "a" * 64,
+                    "rationale": "historical",
+                    "lifecycle": "resolved",
+                    "resolution_mode": "fixed-in-place",
+                },
+                {
+                    "nodeid": missing,
+                    "fixed_point_signature_sha256": "b" * 64,
+                    "rationale": "historical",
+                    "lifecycle": "resolved",
+                    "resolution_mode": "fixed-in-place",
+                },
+            ],
+        }
+    )
+
+    result = evaluate_baseline(baseline, observation)
+
+    assert not result.verified
+    assert any(item.code == "coverage_mismatch" for item in result.violations)
+
+
+def test_standalone_observation_round_trip_and_merge_use_typed_shared_result() -> None:
+    from scripts.quality.verify_full_regression import (
+        merge_observations,
+        observation_from_json,
+        observation_to_json,
+    )
+
+    first = CandidateObservation(
+        collected=("tests/sample.py::test_first",),
+        executed=("tests/sample.py::test_first",),
+        outcomes={"tests/sample.py::test_first": "xpassed"},
+        failure_signatures={},
+        retirement_evidence={},
+    )
+    second = CandidateObservation(
+        collected=("tests/sample.py::test_second",),
+        executed=("tests/sample.py::test_second",),
+        outcomes={"tests/sample.py::test_second": "passed"},
+        failure_signatures={},
+        retirement_evidence={},
+    )
+
+    round_tripped = observation_from_json(observation_to_json(first))
+    merged = merge_observations((round_tripped, second))
+
+    assert round_tripped == first
+    assert merged.collected == ("tests/sample.py::test_first", "tests/sample.py::test_second")
+    assert merged.outcomes["tests/sample.py::test_first"] == "xpassed"
+    assert merged.outcomes["tests/sample.py::test_second"] == "passed"
+    baseline = parse_baseline(
+        {
+            "schema_version": 2,
+            "failure_paths": [
+                {
+                    "nodeid": "tests/sample.py::test_first",
+                    "fixed_point_signature_sha256": "a" * 64,
+                    "rationale": "historical",
+                    "lifecycle": "resolved",
+                    "resolution_mode": "fixed-in-place",
+                }
+            ],
+        }
+    )
+    assert not evaluate_baseline(baseline, round_tripped).verified
+
+
+def test_standalone_runner_uses_hook_observation_without_junit_inference(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from scripts.quality import verify_full_regression as verifier
+
+    candidate_sha = "a" * 40
+    nodeid = "tests/sample.py::test_failure"
+    artifact_root = tmp_path / "artifacts"
+    verifier.LEDGER = tmp_path / "ledger.json"
+    verifier.LEDGER.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "current_head_sha": candidate_sha,
+                "failure_paths": [
+                    {
+                        "nodeid": nodeid,
+                        "fixed_point_signature_sha256": "0" * 64,
+                        "rationale": "historical",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    verifier.TIMING_WEIGHTS = tmp_path / "timing-weights.json"
+    verifier.TIMING_WEIGHTS.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verifier.sys,
+        "argv",
+        ["verify_full_regression.py", "--artifact-dir", str(artifact_root), "--shards", "1"],
+    )
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 0.0)
+
+    commands: list[list[str]] = []
+
+    def fake_run_streamed(
+        argv: list[str],
+        *,
+        cwd: Path,
+        output_path: Path,
+        stream: bool = True,
+    ) -> int:
+        del cwd, stream
+        commands.append(argv)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if "--collect-only" in argv:
+            output_path.write_text(f"[   0.0s] {nodeid}\n", encoding="utf-8")
+            return 0
+        observation_path = Path(
+            next(arg.split("=", 1)[1] for arg in argv if arg.startswith("--full-regression-observation="))
+        )
+        observation_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "collected": [nodeid],
+                    "executed": [nodeid],
+                    "outcomes": {nodeid: "failed"},
+                    "failure_signatures": {nodeid: "0" * 64},
+                    "retirement_evidence": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        output_path.write_text("", encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(verifier, "_run_streamed", fake_run_streamed)
+    monkeypatch.setattr(verifier, "_load_timing_weights", lambda repository, head: ({}, 1.0))
+
+    def fake_subprocess_run(argv, **kwargs):
+        if argv[:2] == ["git", "rev-parse"]:
+            return subprocess.CompletedProcess(argv, 0, stdout=f"{candidate_sha}\n")
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(verifier.subprocess, "run", fake_subprocess_run)
+
+    assert verifier.main() == 0
+    result_paths = list(artifact_root.glob("*/result.json"))
+    assert len(result_paths) == 1
+    result = json.loads(result_paths[0].read_text(encoding="utf-8"))
+    assert result["status"] == "verified"
+    assert any("--full-regression-observation=" in arg for command in commands for arg in command)
+    assert not any("--junitxml=" in arg for command in commands for arg in command)
+
+
+def test_manual_full_regression_shard_without_observation_keeps_pytest_exit_status(
+    tmp_path: Path,
+) -> None:
+    project = _prepare_mini_project(
+        tmp_path,
+        {
+            "tests/unit/test_manual_shard.py": (
+                "import pytest\n\n"
+                "@pytest.mark.full_regression\n"
+                "def test_passes():\n"
+                "    pass\n\n"
+                "@pytest.mark.full_regression\n"
+                "def test_fails():\n"
+                "    assert False\n"
+            )
+        },
+    )
+    result = _run_pytest(
+        project,
+        "--run-full-regression",
+        "--full-regression-shard",
+        "-p",
+        "no:cacheprovider",
+        "tests/unit/test_manual_shard.py::test_passes",
+        "tests/unit/test_manual_shard.py::test_fails",
+    )
+
+    assert result.returncode == 1, _result_output(result)
+    assert "full-regression shard observation path is missing" not in _result_output(result)
 
 
 def _repo_root() -> Path:
@@ -392,6 +664,18 @@ def _prepare_mini_project(
     *,
     ledger_guard: bool = False,
 ) -> Path:
+    shared_quality_root = _repo_root() / "scripts"
+    mini_quality_root = tmp_path / "scripts"
+    (mini_quality_root / "quality").mkdir(parents=True)
+    shutil.copy2(shared_quality_root / "__init__.py", mini_quality_root / "__init__.py")
+    shutil.copy2(
+        shared_quality_root / "quality" / "__init__.py",
+        mini_quality_root / "quality" / "__init__.py",
+    )
+    shutil.copy2(
+        shared_quality_root / "quality" / "full_regression_baseline.py",
+        mini_quality_root / "quality" / "full_regression_baseline.py",
+    )
     classifier_path = _repo_root() / "tests" / "conftest.py"
     assert classifier_path.is_file(), f"S01 classifier is missing: {classifier_path}"
 
@@ -431,6 +715,7 @@ def _write_full_regression_ledger(project: Path, nodeids: tuple[str, ...]) -> No
     ledger.parent.mkdir(parents=True, exist_ok=True)
     ledger.write_text(
         json.dumps({
+            "schema_version": 1,
             "failure_paths": [
                 {
                     "nodeid": nodeid,

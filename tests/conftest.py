@@ -1,10 +1,16 @@
-import hashlib
+from __future__ import annotations
+
 import json
 from pathlib import Path
-import re
 import sys
+from typing import TYPE_CHECKING, Literal, cast
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
+    from scripts.quality.full_regression_baseline import CandidateObservation, FullRegressionBaseline
 
 HEAVY_NODE_PREFIXES = (
     "tests/cli_runtime/",
@@ -36,50 +42,81 @@ FULL_REGRESSION_LEDGER = (
 )
 
 _full_regression_guard_active = False
-_full_regression_expected: dict[str, str] = {}
-_full_regression_failures: dict[str, str] = {}
-_full_regression_errors: list[str] = []
-_full_regression_missing_nodes: set[str] = set()
 _full_regression_ledger_errors: list[str] = []
 _full_regression_shard_mode = False
+_full_regression_collected: tuple[str, ...] = ()
+_full_regression_reports: list[pytest.TestReport] = []
+_full_regression_baseline: FullRegressionBaseline | None = None
+_full_regression_observation_path: Path | None = None
 
 
-def _normalize_failure_message(message: str, repository: Path) -> str:
-    message = message.split(" +  where ", 1)[0]
-    message = message.replace(str(repository), "<repo>")
-    message = re.sub(r"/tmp/tmp[^/`'\"\\ ]*", "<tmp>", message)
-    message = re.sub(
-        r"/(?:private/)?var/folders/[^/]+/[^/]+/T/tmp[^/`'\"\\ ]*",
-        "<tmp>",
-        message,
+def _report_outcome(report: pytest.TestReport) -> str | None:
+    was_xfail = getattr(report, "wasxfail", None)
+    if report.when != "call":
+        if report.failed:
+            return "error"
+        if report.skipped:
+            return "skipped"
+        return None
+    if was_xfail:
+        return "xfailed" if report.skipped else "xpassed"
+    if report.failed:
+        return "failed"
+    if report.skipped:
+        return "skipped"
+    if report.passed:
+        return "passed"
+    return "error"
+
+
+def _report_failure_message(report: pytest.TestReport) -> str:
+    reprcrash = getattr(report.longrepr, "reprcrash", None)
+    return reprcrash.message if reprcrash is not None else str(report.longrepr)
+
+
+def build_candidate_observation(
+    collected: Iterable[str],
+    reports: Iterable[pytest.TestReport],
+    *,
+    repository: Path,
+) -> CandidateObservation:
+    """Adapt pytest collection/reports to the shared pure evaluator input."""
+
+    from scripts.quality.full_regression_baseline import CandidateObservation, failure_signature
+
+    collected_nodes = tuple(collected)
+    executed_nodes: list[str] = []
+    outcomes: dict[str, str] = {}
+    signatures: dict[str, str] = {}
+    for report in reports:
+        outcome = _report_outcome(report)
+        if outcome is None:
+            continue
+        executed_nodes.append(report.nodeid)
+        outcomes[report.nodeid] = outcome
+        if outcome == "failed" and report.when == "call":
+            signatures[report.nodeid] = failure_signature(_report_failure_message(report), repository)
+    return CandidateObservation(
+        collected=collected_nodes,
+        executed=tuple(executed_nodes),
+        outcomes=cast("Mapping[str, Literal['passed', 'failed', 'skipped', 'xfailed', 'xpassed', 'error']]", outcomes),
+        failure_signatures=signatures,
+        retirement_evidence={},
     )
-    message = re.sub(r"/(?:private/)?var/folders/[^'\" ,]+", "<tmp-runtime-path>", message)
-    message = re.sub(
-        r"(\n\s*Right contains one more item:[^\n]*)\n(?:\s*\n)?\s*Full diff:.*\Z",
-        r"\1\n  Use -v to get more diff",
-        message,
-        flags=re.DOTALL,
-    )
-    message = message.replace("<repo>/.venv/bin/python3", "<python>")
-    message = message.replace("<repo>/.venv/bin/python", "<python>")
-    return " ".join(message.split())
 
 
-def _approved_full_regression_signatures() -> dict[str, str]:
-    ledger = json.loads(FULL_REGRESSION_LEDGER.read_text(encoding="utf-8"))
-    failure_paths = ledger.get("failure_paths", [])
-    expected = {
-        entry["nodeid"]: entry["fixed_point_signature_sha256"]
-        for entry in failure_paths
-        if entry.get("current_status") == "failed"
-        and entry.get("fixed_point_status") == "failed"
-        and entry.get("disposition") == "approved-no-op"
-        and entry.get("failure_signature_match") is True
-        and entry.get("current_signature_sha256") == entry.get("fixed_point_signature_sha256")
+def _observation_payload(observation: CandidateObservation) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "collected": list(observation.collected),
+        "executed": list(observation.executed),
+        "outcomes": dict(observation.outcomes),
+        "failure_signatures": dict(observation.failure_signatures),
+        "retirement_evidence": {
+            evidence_id: {"checked": evidence.checked, "outcome": evidence.outcome}
+            for evidence_id, evidence in observation.retirement_evidence.items()
+        },
     }
-    if len(expected) != len(failure_paths) or not expected:
-        raise pytest.UsageError("full-regression ledger contains incomplete failure signatures")
-    return expected
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -95,6 +132,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Run an explicitly selected full-regression shard without global ledger completeness checks.",
     )
+    parser.addoption(
+        "--full-regression-observation",
+        action="store",
+        type=Path,
+        default=None,
+        help="Write the machine-readable observation for a full-regression shard.",
+    )
 
 
 def _classification_error(item: pytest.Item, reason: str) -> pytest.UsageError:
@@ -106,11 +150,17 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    global _full_regression_guard_active, _full_regression_expected, _full_regression_missing_nodes
-    global _full_regression_shard_mode
+    global _full_regression_baseline, _full_regression_collected, _full_regression_guard_active
+    global _full_regression_ledger_errors, _full_regression_observation_path
+    global _full_regression_reports, _full_regression_shard_mode
 
     run_full_regression = config.getoption("--run-full-regression")
     _full_regression_shard_mode = config.getoption("--full-regression-shard")
+    _full_regression_observation_path = config.getoption("--full-regression-observation")
+    _full_regression_baseline = None
+    _full_regression_ledger_errors = []
+    _full_regression_reports = []
+    _full_regression_guard_active = False
     if _full_regression_shard_mode and not run_full_regression:
         raise pytest.UsageError("--full-regression-shard requires --run-full-regression")
 
@@ -154,54 +204,69 @@ def pytest_collection_modifyitems(
             item.add_marker(pytest.mark.skip(reason=POLICY_SKIP_REASON))
 
     if run_full_regression and not config.option.collectonly:
+        _full_regression_collected = tuple(item.nodeid for item in items)
         if _full_regression_shard_mode:
             return
         _full_regression_guard_active = True
         try:
-            expected = _approved_full_regression_signatures()
-        except (OSError, ValueError, KeyError, TypeError, pytest.UsageError) as exc:
+            from scripts.quality.full_regression_baseline import parse_baseline
+
+            _full_regression_baseline = parse_baseline(
+                json.loads(FULL_REGRESSION_LEDGER.read_text(encoding="utf-8"))
+            )
+        except (ImportError, OSError, ValueError, KeyError, TypeError, pytest.UsageError) as exc:
             _full_regression_ledger_errors.append(f"{type(exc).__name__}: {exc}")
-            expected = {}
-        _full_regression_expected = expected
-        collected_nodeids = {item.nodeid for item in items}
-        _full_regression_missing_nodes = set(expected) - collected_nodeids
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    if not _full_regression_guard_active or not report.failed:
+    if not (_full_regression_guard_active or _full_regression_shard_mode):
         return
-    if report.when != "call":
-        _full_regression_errors.append(report.nodeid)
-        return
-    reprcrash = getattr(report.longrepr, "reprcrash", None)
-    message = reprcrash.message if reprcrash is not None else str(report.longrepr)
-    normalized = _normalize_failure_message(message, Path.cwd().resolve())
-    _full_regression_failures[report.nodeid] = hashlib.sha256(normalized.encode()).hexdigest()
+    _full_regression_reports.append(report)
 
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    if _full_regression_shard_mode:
+        if _full_regression_observation_path is None:
+            return
+        try:
+            observation = build_candidate_observation(
+                _full_regression_collected,
+                _full_regression_reports,
+                repository=Path.cwd().resolve(),
+            )
+            _full_regression_observation_path.parent.mkdir(parents=True, exist_ok=True)
+            _full_regression_observation_path.write_text(
+                json.dumps(_observation_payload(observation), sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"full-regression observation write failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+            session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
+        return
     if not _full_regression_guard_active:
         return
-    expected = _full_regression_expected
-    actual = _full_regression_failures
-    if (
-        not _full_regression_errors
-        and not _full_regression_ledger_errors
-        and not _full_regression_missing_nodes
-        and actual == expected
-    ):
-        print(f"verified {len(actual)} approved failure signatures against the full-regression ledger")
+    if _full_regression_baseline is None or _full_regression_ledger_errors:
+        details = {"ledger_errors": sorted(_full_regression_ledger_errors)}
+        print(f"full-regression ledger mismatch: {json.dumps(details, sort_keys=True)}", file=sys.stderr)
+        session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
         return
-    details = {
-        "unexpected_errors": sorted(_full_regression_errors),
-        "ledger_errors": sorted(_full_regression_ledger_errors),
-        "missing_expected_nodes": sorted(_full_regression_missing_nodes),
-        "missing_failures": sorted(set(expected) - set(actual)),
-        "unexpected_failures": sorted(set(actual) - set(expected)),
-        "signature_mismatches": sorted(
-            nodeid for nodeid in set(actual) & set(expected) if actual[nodeid] != expected[nodeid]
-        ),
-    }
-    print(f"full-regression ledger mismatch: {json.dumps(details, sort_keys=True)}", file=sys.stderr)
+    try:
+        from scripts.quality.full_regression_baseline import evaluate_baseline
+
+        observation = build_candidate_observation(
+            _full_regression_collected,
+            _full_regression_reports,
+            repository=Path.cwd().resolve(),
+        )
+        result = evaluate_baseline(_full_regression_baseline, observation)
+    except (ImportError, OSError, ValueError, TypeError) as exc:
+        details = {"ledger_errors": [f"{type(exc).__name__}: {exc}"]}
+        print(f"full-regression ledger mismatch: {json.dumps(details, sort_keys=True)}", file=sys.stderr)
+        session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
+        return
+    if result.verified:
+        print(f"verified {len(result.active_verified)} approved failure signatures against the full-regression ledger")
+        return
+    print(f"full-regression ledger mismatch: {json.dumps(result.to_dict(), sort_keys=True)}", file=sys.stderr)
     session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
