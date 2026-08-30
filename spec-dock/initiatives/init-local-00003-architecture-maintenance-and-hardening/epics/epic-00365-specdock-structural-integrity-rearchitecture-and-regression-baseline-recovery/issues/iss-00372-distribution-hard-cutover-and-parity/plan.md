@@ -611,3 +611,32 @@ Issue 372 implementationは次を全て満たした場合にのみ coder handoff
 12. Human PR mergeと `issue finish` は implementation/review completionとは別 gateとして処理される。
 
 この exitを満たすために Windows、generic transaction framework、automatic rollback、automatic Issue creation、unrelated Full Regression remediation、新 public APIを追加しない。
+
+## 2026-08-30 収束Addendum（実施済み計画を遡及変更しない）
+
+既存Step 1〜9およびM1〜M5の実施記録・成果はそのまま保持する。Step 10で観測済みのredも書き換えず、次の追加workを順番に行う。
+
+### Step 10A — external quality-governance dependency `iss-00382`
+
+- accepted ADR、Issue 382 requirement/design/planをauthorityに、repository-level evaluatorを別IssueとしてTDD実装する。
+- Issue 372固有exception、historical row削除、旧failure test復活、distribution production変更でgreen化しない。
+- Issue 382はfocused/ordinary/Full Regression/Strictを通したmerge-ready PRまで整え、人間mergeを待つ。
+
+### Step 10B — accepted canonical verifierでIssue 372を再判定する
+
+- Issue 382がhuman mergeされdependencyがsatisfiedになったことを確認する。
+- merged baseをIssue 372 branchへ通常のrepository workflowで取り込み、新candidate `C2`を形成する。
+- `uv run python -m scripts.quality.verify_full_regression --shards 4`をclean `C2`で実行する。
+- retained-skill successor、全active row、unexpected failure/errorがaccepted typed resultでgreenでなければStep 11へ進まない。
+
+### Step 11A — new candidate evidenceを再束縛する
+
+既存Step 11のevidence tableを`C2`で再取得する。旧candidateのpackage、Linux/macOS、Full Regression、Strict receiptを流用しない。M1〜M5 production diffに追加修正がない場合でもbase/candidate SHAが変わるためsame-SHA gateは再実行する。
+
+### Step 12A — Final Quality Gateとdelivery closure
+
+- exact pushed `C2`へStrict Final Quality Gateを行い、finding修正でSHAが変われば影響gateとreviewを繰り返す。
+- P0/P1=0かつreview passのmerge-ready PRを人間へ渡す。
+- human merge後にのみIssue 372の`issue finish`と最終status同期を行う。
+
+**Trace:** I372-R11, I372-R12 / I372-AC13, I372-AC14 / Design §13
