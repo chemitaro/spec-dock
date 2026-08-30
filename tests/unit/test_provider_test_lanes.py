@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from scripts.quality.full_regression_baseline import (
@@ -46,7 +47,9 @@ FULL_REGRESSION_LEDGER = (
 )
 PRE_MIGRATION_LEDGER_CURRENT_HEAD = "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2"
 PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256 = "f997de22e6507e6a27ce76284df079c9dd1e65bb015e309801b4aa041ea3dfcf"
-RETAINED_SKILL_HISTORICAL_NODE = "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source"
+RETAINED_SKILL_HISTORICAL_NODE = (
+    "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source"
+)
 RETAINED_SKILL_SUCCESSOR_NODE = "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood"
 
 
@@ -110,11 +113,7 @@ def test_full_regression_ledger_migration_preserves_schema1_history() -> None:
     assert [row["nodeid"] for row in resolved_rows] == [RETAINED_SKILL_HISTORICAL_NODE]
     assert resolved_rows[0]["resolution_mode"] == "superseded"
     assert resolved_rows[0]["successor_nodeid"] == RETAINED_SKILL_SUCCESSOR_NODE
-    assert all(
-        row.get("lifecycle") == "active"
-        for row in rows
-        if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE
-    )
+    assert all(row.get("lifecycle") == "active" for row in rows if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE)
     assert not any(row.get("lifecycle") == "retired" for row in rows)
 
 
@@ -125,16 +124,19 @@ def _fake_report(
     outcome: str,
     wasxfail: str | None = None,
     message: str = "",
-) -> SimpleNamespace:
-    return SimpleNamespace(
-        nodeid=nodeid,
-        when=when,
-        outcome=outcome,
-        passed=outcome == "passed",
-        failed=outcome == "failed",
-        skipped=outcome == "skipped",
-        wasxfail=wasxfail,
-        longrepr=SimpleNamespace(reprcrash=SimpleNamespace(message=message)) if message else "",
+) -> pytest.TestReport:
+    return cast(
+        "pytest.TestReport",
+        SimpleNamespace(
+            nodeid=nodeid,
+            when=when,
+            outcome=outcome,
+            passed=outcome == "passed",
+            failed=outcome == "failed",
+            skipped=outcome == "skipped",
+            wasxfail=wasxfail,
+            longrepr=SimpleNamespace(reprcrash=SimpleNamespace(message=message)) if message else "",
+        ),
     )
 
 
@@ -187,27 +189,25 @@ def test_pytest_adapter_preserves_duplicate_and_missing_coverage_for_shared_eval
         (_fake_report(duplicate, outcome="passed"),),
         repository=Path("/repo"),
     )
-    baseline = parse_baseline(
-        {
-            "schema_version": 2,
-            "failure_paths": [
-                {
-                    "nodeid": duplicate,
-                    "fixed_point_signature_sha256": "a" * 64,
-                    "rationale": "historical",
-                    "lifecycle": "resolved",
-                    "resolution_mode": "fixed-in-place",
-                },
-                {
-                    "nodeid": missing,
-                    "fixed_point_signature_sha256": "b" * 64,
-                    "rationale": "historical",
-                    "lifecycle": "resolved",
-                    "resolution_mode": "fixed-in-place",
-                },
-            ],
-        }
-    )
+    baseline = parse_baseline({
+        "schema_version": 2,
+        "failure_paths": [
+            {
+                "nodeid": duplicate,
+                "fixed_point_signature_sha256": "a" * 64,
+                "rationale": "historical",
+                "lifecycle": "resolved",
+                "resolution_mode": "fixed-in-place",
+            },
+            {
+                "nodeid": missing,
+                "fixed_point_signature_sha256": "b" * 64,
+                "rationale": "historical",
+                "lifecycle": "resolved",
+                "resolution_mode": "fixed-in-place",
+            },
+        ],
+    })
 
     result = evaluate_baseline(baseline, observation)
 
@@ -244,20 +244,18 @@ def test_standalone_observation_round_trip_and_merge_use_typed_shared_result() -
     assert merged.collected == ("tests/sample.py::test_first", "tests/sample.py::test_second")
     assert merged.outcomes["tests/sample.py::test_first"] == "xpassed"
     assert merged.outcomes["tests/sample.py::test_second"] == "passed"
-    baseline = parse_baseline(
-        {
-            "schema_version": 2,
-            "failure_paths": [
-                {
-                    "nodeid": "tests/sample.py::test_first",
-                    "fixed_point_signature_sha256": "a" * 64,
-                    "rationale": "historical",
-                    "lifecycle": "resolved",
-                    "resolution_mode": "fixed-in-place",
-                }
-            ],
-        }
-    )
+    baseline = parse_baseline({
+        "schema_version": 2,
+        "failure_paths": [
+            {
+                "nodeid": "tests/sample.py::test_first",
+                "fixed_point_signature_sha256": "a" * 64,
+                "rationale": "historical",
+                "lifecycle": "resolved",
+                "resolution_mode": "fixed-in-place",
+            }
+        ],
+    })
     assert not evaluate_baseline(baseline, round_tripped).verified
 
 
@@ -272,19 +270,17 @@ def test_standalone_runner_uses_hook_observation_without_junit_inference(
     artifact_root = tmp_path / "artifacts"
     verifier.LEDGER = tmp_path / "ledger.json"
     verifier.LEDGER.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "current_head_sha": candidate_sha,
-                "failure_paths": [
-                    {
-                        "nodeid": nodeid,
-                        "fixed_point_signature_sha256": "0" * 64,
-                        "rationale": "historical",
-                    }
-                ],
-            }
-        ),
+        json.dumps({
+            "schema_version": 1,
+            "current_head_sha": candidate_sha,
+            "failure_paths": [
+                {
+                    "nodeid": nodeid,
+                    "fixed_point_signature_sha256": "0" * 64,
+                    "rationale": "historical",
+                }
+            ],
+        }),
         encoding="utf-8",
     )
     verifier.TIMING_WEIGHTS = tmp_path / "timing-weights.json"
@@ -316,16 +312,14 @@ def test_standalone_runner_uses_hook_observation_without_junit_inference(
             next(arg.split("=", 1)[1] for arg in argv if arg.startswith("--full-regression-observation="))
         )
         observation_path.write_text(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "collected": [nodeid],
-                    "executed": [nodeid],
-                    "outcomes": {nodeid: "failed"},
-                    "failure_signatures": {nodeid: "0" * 64},
-                    "retirement_evidence": {},
-                }
-            ),
+            json.dumps({
+                "schema_version": 1,
+                "collected": [nodeid],
+                "executed": [nodeid],
+                "outcomes": {nodeid: "failed"},
+                "failure_signatures": {nodeid: "0" * 64},
+                "retirement_evidence": {},
+            }),
             encoding="utf-8",
         )
         output_path.write_text("", encoding="utf-8")
@@ -781,7 +775,7 @@ def _write_full_regression_ledger(project: Path, nodeids: tuple[str, ...]) -> No
                     "fixed_point_signature_sha256": "0" * 64,
                 }
                 for nodeid in nodeids
-            ]
+            ],
         }),
         encoding="utf-8",
     )

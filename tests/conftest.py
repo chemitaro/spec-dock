@@ -211,9 +211,7 @@ def pytest_collection_modifyitems(
         try:
             from scripts.quality.full_regression_baseline import parse_baseline
 
-            _full_regression_baseline = parse_baseline(
-                json.loads(FULL_REGRESSION_LEDGER.read_text(encoding="utf-8"))
-            )
+            _full_regression_baseline = parse_baseline(json.loads(FULL_REGRESSION_LEDGER.read_text(encoding="utf-8")))
         except (ImportError, OSError, ValueError, KeyError, TypeError, pytest.UsageError) as exc:
             _full_regression_ledger_errors.append(f"{type(exc).__name__}: {exc}")
 

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 import pytest
 from scripts.quality.full_regression_baseline import (
     BaselineContractError,
     CandidateObservation,
+    Outcome,
     RetirementEvidenceObservation,
     evaluate_baseline,
     failure_signature,
@@ -55,7 +60,7 @@ def _observation(
     *,
     collected: tuple[str, ...],
     executed: tuple[str, ...],
-    outcomes: dict[str, str],
+    outcomes: Mapping[str, Outcome],
     failure_signatures: dict[str, str] | None = None,
     retirement_evidence: dict[str, RetirementEvidenceObservation] | None = None,
 ) -> CandidateObservation:
@@ -96,7 +101,7 @@ def test_active_failure_with_exact_signature_is_verified() -> None:
 
 
 @pytest.mark.parametrize("outcome", ["passed", "skipped", "xfailed", "xpassed", "error"])
-def test_active_non_failure_outcomes_fail_closed(outcome: str) -> None:
+def test_active_non_failure_outcomes_fail_closed(outcome: Outcome) -> None:
     baseline = _baseline(_row())
     observation = _observation(
         collected=(ACTIVE_NODE,),
@@ -142,7 +147,7 @@ def test_resolved_fixed_in_place_requires_normal_pass() -> None:
 
 
 @pytest.mark.parametrize("outcome", ["skipped", "xfailed", "xpassed", "failed", "error"])
-def test_resolved_fixed_in_place_rejects_non_normal_pass(outcome: str) -> None:
+def test_resolved_fixed_in_place_rejects_non_normal_pass(outcome: Outcome) -> None:
     baseline = _baseline(_row(FIXED_NODE, lifecycle="resolved", resolution_mode="fixed-in-place"))
     observation = _observation(
         collected=(FIXED_NODE,),
@@ -158,7 +163,9 @@ def test_resolved_fixed_in_place_rejects_non_normal_pass(outcome: str) -> None:
 
 
 def test_resolved_superseded_requires_byte_exact_successor_node() -> None:
-    baseline = _baseline(_row(OLD_NODE, lifecycle="resolved", resolution_mode="superseded", successor_nodeid=SUCCESSOR_NODE))
+    baseline = _baseline(
+        _row(OLD_NODE, lifecycle="resolved", resolution_mode="superseded", successor_nodeid=SUCCESSOR_NODE)
+    )
     observation = _observation(
         collected=(SUCCESSOR_NODE,),
         executed=(SUCCESSOR_NODE,),
@@ -174,7 +181,11 @@ def test_resolved_superseded_requires_byte_exact_successor_node() -> None:
 @pytest.mark.parametrize(
     ("collected", "executed", "outcome"),
     [
-        (("tests/example/test_example.py::test_successor_extra",), ("tests/example/test_example.py::test_successor_extra",), "passed"),
+        (
+            ("tests/example/test_example.py::test_successor_extra",),
+            ("tests/example/test_example.py::test_successor_extra",),
+            "passed",
+        ),
         ((), (), "passed"),
         ((SUCCESSOR_NODE,), (), "passed"),
         ((SUCCESSOR_NODE,), (SUCCESSOR_NODE,), "skipped"),
@@ -187,9 +198,11 @@ def test_resolved_superseded_requires_byte_exact_successor_node() -> None:
 def test_resolved_superseded_negative_cases_are_not_passed(
     collected: tuple[str, ...],
     executed: tuple[str, ...],
-    outcome: str,
+    outcome: Outcome,
 ) -> None:
-    baseline = _baseline(_row(OLD_NODE, lifecycle="resolved", resolution_mode="superseded", successor_nodeid=SUCCESSOR_NODE))
+    baseline = _baseline(
+        _row(OLD_NODE, lifecycle="resolved", resolution_mode="superseded", successor_nodeid=SUCCESSOR_NODE)
+    )
     outcomes = {executed[0]: outcome} if executed else {}
     observation = _observation(collected=collected, executed=executed, outcomes=outcomes)
 
@@ -200,7 +213,9 @@ def test_resolved_superseded_negative_cases_are_not_passed(
 
 
 def test_resolved_superseded_rejects_old_failure_recurrence() -> None:
-    baseline = _baseline(_row(OLD_NODE, lifecycle="resolved", resolution_mode="superseded", successor_nodeid=SUCCESSOR_NODE))
+    baseline = _baseline(
+        _row(OLD_NODE, lifecycle="resolved", resolution_mode="superseded", successor_nodeid=SUCCESSOR_NODE)
+    )
     observation = _observation(
         collected=(SUCCESSOR_NODE, OLD_NODE),
         executed=(SUCCESSOR_NODE, OLD_NODE),
@@ -211,7 +226,9 @@ def test_resolved_superseded_rejects_old_failure_recurrence() -> None:
     result = evaluate_baseline(baseline, observation)
 
     assert not result.verified
-    assert any(violation.code == "unexpected_failure" and violation.nodeid == OLD_NODE for violation in result.violations)
+    assert any(
+        violation.code == "unexpected_failure" and violation.nodeid == OLD_NODE for violation in result.violations
+    )
 
 
 def test_retired_requires_checked_absence_evidence() -> None:
@@ -317,7 +334,12 @@ def test_unexpected_failure_and_error_are_machine_readable() -> None:
     }
     rendered = result.to_dict()
     assert rendered["verified"] is False
-    assert rendered["violations"][0]["code"]
+    rendered_violations = rendered["violations"]
+    assert isinstance(rendered_violations, list)
+    assert rendered_violations
+    first_violation = rendered_violations[0]
+    assert isinstance(first_violation, dict)
+    assert isinstance(first_violation.get("code"), str)
 
 
 def test_failure_signature_matches_existing_normalization() -> None:
