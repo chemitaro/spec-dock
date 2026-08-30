@@ -50,6 +50,12 @@ class CandidateObservation:
         "passed", "failed", "skipped", "xfailed", "xpassed", "error"
     ]]
     failure_signatures: Mapping[str, str]
+    retirement_evidence: Mapping[str, RetirementEvidenceObservation]
+
+@dataclass(frozen=True)
+class RetirementEvidenceObservation:
+    checked: bool
+    outcome: Literal["absent", "present", "unknown"]
 
 @dataclass(frozen=True)
 class BaselineEvaluation:
@@ -77,9 +83,11 @@ adapterは`verified`とtyped violationsをrenderするだけで判定を再実�
 - `active`: old nodeがexact signatureでfailする。
 - `resolved/fixed-in-place`: old nodeがexactly once collected/executedされnormal passする。
 - `resolved/superseded`: 明示successorがexactly once collected/executedされnormal passし、old failureが再発しない。
-- `retired`: ADRで定義されたowning-surface absence evidenceを要求する。Issue 382では汎用inferenceを作らない。
+- `retired`: baseline rowにnon-emptyで一意な`retirement_evidence_id`とaccepted authority referenceを要求する。observationの同一IDが`checked=true`かつ`outcome="absent"`の場合だけgreenとする。
 
-unknown lifecycle/mode、duplicate row/current/successor node、missing historical signature、invalid successor referenceはevaluation前に`BaselineContractError`とする。skip、xfail、xpass、setup/teardown/collection error、missing、duplicate、deselectionをpassへ丸めない。JUnitで証明不能なoutcomeはpytest hookがshardごとにmachine-readable observation JSONを出力する。
+unknown lifecycle/mode、duplicate row/current/successor node/evidence ID、missing historical signature、invalid successor reference、retired rowのmissing evidence ID/authorityはevaluation前に`BaselineContractError`とする。skip、xfail、xpass、setup/teardown/collection error、missing、duplicate、deselectionをpassへ丸めない。JUnitで証明不能なoutcomeはpytest hookがshardごとにmachine-readable observation JSONを出力する。
+
+`CandidateObservation.retirement_evidence`はadapter inputであり、pure evaluatorはfilesystemをprobeしない。Issue 382のcurrent ledgerにretired rowはなく、pytest/standalone adapterは空mappingを供給する。将来retired rowを追加するownerはaccepted authorityに対応するrow-specific probeと、その結果からこのtyped observationを作るadapter testを同じ変更で追加しなければならない。provider未登録またはevidence未取得なら必ずviolationとなる。synthetic pure unit testだけがcurrent Issueでpositive retired observationを直接構築する。
 
 ## 変更対象
 
@@ -89,13 +97,13 @@ unknown lifecycle/mode、duplicate row/current/successor node、missing historic
 
 ## 移行・互換性・rollback
 
-schema 1互換をtestsで固定してからschema 2へ移行する。retained-skill rowだけを`resolved/superseded`とし、successorを`test_s40b_retained_skill_identity_matches_current_provider_and_dogfood`へ固定する。他のactive rowのnode/signature/rationaleは同一でなければならない。
+schema 1互換をtestsで固定してからschema 2へ移行する。retained-skill rowだけを`resolved/superseded`とし、successorを完全なnode ID `tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood`へ固定する。他のactive rowのnode/signature/rationaleは同一でなければならない。current migrationでretired rowは作らない。
 
 workflowは`uv run python -m scripts.quality.verify_full_regression --shards 4`へ切り替える。rollbackはhistorical row削除、schema 1 authority復活、Issue 368 artifactへのsilent fallbackでは行わずforward-fixする。
 
 ## testability
 
-- pure table testsでactive、fixed、superseded、retiredと全negative outcomeをI/Oなしで検証する。
+- pure table testsでactive、fixed、superseded、synthetic retired evidenceと全negative outcomeをI/Oなしで検証する。
 - migration testで既存active集合不変とretained-skill rowだけのresolved移行を検証する。
 - 同一observationに対するpytest/standalone adapterのtyped result同値を検証する。
 - contract testでadapter側にlifecycle policyが戻らないことを固定する。

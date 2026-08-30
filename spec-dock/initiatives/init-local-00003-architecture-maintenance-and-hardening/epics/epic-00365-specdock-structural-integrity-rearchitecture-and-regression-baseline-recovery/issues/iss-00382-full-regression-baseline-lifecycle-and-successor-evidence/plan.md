@@ -33,11 +33,11 @@ pure evaluator → observation adapter → ledger migration → canonical runner
 
 ### Step 2 — resolved successor sliceをRED/GREENにする
 
-retained-skill old nodeを`resolved/superseded`、successorを`test_s40b_retained_skill_identity_matches_current_provider_and_dogfood`とする。normal pass/exactly-onceだけをgreenにし、missing ID、uncollected、deselected、skip、xfail、xpass、failed、error、duplicate、old failure再発を個別にredで固定する。
+retained-skill old nodeを`resolved/superseded`、successorを完全なnode ID `tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood`とする。byte-for-byte一致、normal pass、exactly-onceだけをgreenにし、関数名だけ/suffix match、missing ID、uncollected、deselected、skip、xfail、xpass、failed、error、duplicate、old failure再発を個別にredで固定する。
 
 ### Step 3 — fixed/retired/schema negative contractをRED/GREENにする
 
-fixed-in-placeはold nodeのnormal passだけ、retiredはrequired absence evidenceがある場合だけgreenにする。unknown lifecycle/mode、duplicate row/node、historical signature消失をparse errorにする。汎用retirement inferenceは実装しない。
+fixed-in-placeはold nodeのnormal passだけgreenにする。retired baselineはnon-empty unique evidence IDとaccepted authorityを要求し、synthetic observationの同一IDが`checked=true`かつ`outcome=absent`の場合だけgreenにする。missing/unknown/present/uncheckedをredにし、unknown lifecycle/mode、duplicate row/node/evidence ID、historical signature消失をparse errorにする。current ledgerにはretired row/providerを追加せず、両adapterは空evidence mappingを供給してfail closedする。汎用retirement inferenceは実装しない。
 
 ### Step 4 — pytest observation adapterを接続する
 

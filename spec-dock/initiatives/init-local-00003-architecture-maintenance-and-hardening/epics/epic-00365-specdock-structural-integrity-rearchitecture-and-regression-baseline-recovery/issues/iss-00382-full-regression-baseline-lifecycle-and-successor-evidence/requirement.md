@@ -31,8 +31,8 @@ old row削除、failure test復活、failure count更新、Issue 372固有except
 | I382-R01 | baseline rowは`active`、`resolved`、`retired`を明示できる。schema 1 rowは互換読取時に`active`として扱い、historical node/signature/rationaleを失わない。 |
 | I382-R02 | `active` rowはcurrent candidateでexact node ID・failure signatureのfailureを要求する。missing、passed、skipped、xfail、signature driftをfail closedする。 |
 | I382-R03 | `resolved/fixed-in-place` rowはexact node IDがcollected・executed・passed・not-skippedであることを要求する。 |
-| I382-R04 | `resolved/superseded` rowは明示されたsuccessor node IDがcollected・executed・passed・not-skippedであることを要求する。old nodeのfailure継続やsuccessor absence/skip/failureを拒否する。 |
-| I382-R05 | `retired` rowは明示的なowning-surface absence evidenceを要求する。retiredを単なるunchecked ignoreにしない。Issue 382では一般purposeのretirement inferenceを追加せず、schemaとnegative contractまでを所有する。 |
+| I382-R04 | `resolved/superseded` rowは明示された完全なpytest successor node IDがbyte-for-byte一致し、collected・executed・passed・not-skippedであることを要求する。関数名だけの指定やsuffix/fuzzy match、old nodeのfailure継続、successor absence/skip/failureを拒否する。 |
+| I382-R05 | `retired` rowはbaselineにnon-emptyで一意な`retirement_evidence_id`とaccepted authority referenceを要求し、observationの同一IDが`checked=true`かつ`outcome=absent`の場合だけverifiedとする。retiredを単なるunchecked ignoreにしない。Issue 382のcurrent ledgerにはretired row/evidence providerを追加せず、adapterはevidenceを供給できないretired rowをfail closedする。 |
 | I382-R06 | schema validationとobservation evaluationは一つのpure evaluator moduleが所有し、standalone verifierとpytest guardは同じtyped resultを利用する。 |
 | I382-R07 | evaluator resultはactive verified、resolved successor verified、retired verified、unexpected failure/error、signature mismatch、coverage mismatchを区別し、machine-readableに出力できる。 |
 | I382-R08 | existing active 26 rowsのfailure/signature contractを維持し、retained-skill rowだけを`resolved/superseded`としてcurrent provider/dogfood successorへ束縛する。 |
@@ -77,8 +77,8 @@ old row削除、failure test復活、failure count更新、Issue 372固有except
 
 | AC | 条件 |
 |---|---|
-| I382-AC01 | pure evaluatorのtable testsがactive/resolved-fixed/resolved-superseded/retiredのgreen caseと全negative caseを通す。 |
-| I382-AC02 | retained-skill old rowがhistorical evidence付きで残り、successor nodeのcollected・executed・passed・not-skippedを証明したcandidateだけがgreenになる。 |
+| I382-AC01 | pure evaluatorのtable testsがactive/resolved-fixed/resolved-supersededに加え、syntheticなexact `retirement_evidence_id`、accepted authority、`checked=true`、`outcome=absent`を持つretired green caseと、missing/unknown/present/unchecked evidenceを含む全negative caseを通す。 |
+| I382-AC02 | retained-skill old rowがhistorical evidence付きで残り、完全なsuccessor node `tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood` のcollected・executed・passed・not-skippedを証明したcandidateだけがgreenになる。 |
 | I382-AC03 | successor missing/skip/xfail/fail/uncollected、old failure再発、signature drift、unknown failure/errorをそれぞれ検出するred-first regression testがある。 |
 | I382-AC04 | standalone verifierとpytest guardへ同じobservationを与えると同じclassification/resultになるcontract testがある。policy logicの重複実装がない。 |
 | I382-AC05 | existing active rowsのexpected node/signature集合がmigration前後で一致する。retained-skill row以外のdisposition driftが0。 |
