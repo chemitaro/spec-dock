@@ -5,7 +5,7 @@
   "fixed_point_sha": "7588d54114a2b8be7661353952f65741169320bd",
   "current_head_sha": "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2",
   "commands": {
-    "current_full": "uv run python spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py",
+    "current_full": "uv run python -m scripts.quality.verify_full_regression --shards 4",
     "fixed_point_full": "uv run pytest --run-full-regression"
   },
   "fixed_point_verification": {

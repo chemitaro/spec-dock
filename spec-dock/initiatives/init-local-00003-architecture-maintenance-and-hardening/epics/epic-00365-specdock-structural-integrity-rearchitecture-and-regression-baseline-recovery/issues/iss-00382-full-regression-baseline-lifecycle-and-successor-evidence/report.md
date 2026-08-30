@@ -32,6 +32,7 @@ repository-only Full Regression baseline authorityを`scripts/quality/`へ実装
 | M4 workflow cutover | canonical runner / old path absence assertion failure | provider workflow focused 19 passed、provider structural 2 passed |
 | M5 quality repair | `make lint` format 3 files / mypy 4 errors | formatter適用とtyped test boundaryによりlint green |
 | M6 ledger authority cutover | root authority files absent、canonical sources still referenced Issue 368 artifact | root authority 2 files、historical SHA-256 freeze、provider lane 32 passed、ordinary pytest 1570 passed |
+| M7 Strict前静的監査P1修復 | root ledger metadataの旧runner command assertion failure | canonical command 1行修正、adapter equivalence contract test追加 |
 
 ### M6 authority cutover追記（pre-freeze不整合の訂正）
 
@@ -51,6 +52,16 @@ M6 cutover後の確認結果:
 - ordinary `uv run pytest`: 1570 passed、1134 skipped（56.28秒）。
 - `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=228`。
 - M6ではFull Regression本体を実行していない。authority cutover後のcandidateでのheavy実行はprimaryがStep 9で行う。
+
+### M7 Strict前静的監査追記（M6 receiptの扱い）
+
+M6 commit `22309ce0932c3233385d5cdefe317e867cfd3c52`に対するFull Regression verified結果を確認した後、Strict review前の静的監査で2件のP1を検出した。
+
+- root `full-regression-ledger.json`の`commands.current_full`が旧Issue 368 verifierを指していたため、exact canonical command `uv run python -m scripts.quality.verify_full_regression --shards 4`をassertするRED testを追加し、metadataの該当1行を修正した。これはAC06のcanonical command metadata違反であり、Full Regressionの結果そのものを変更する修正ではない。
+- pytest adapterの`build_candidate_observation`とstandalone adapterの公開JSON境界について、同一typed observationをround-tripし、同一baselineへの`BaselineEvaluation.to_dict()`を直接比較するcontract testを追加した。既存のshared evaluator/JSON実装が同値を満たしていたため、production behaviorは変更していない。
+- M7の変更により`22309ce...`時点のFull Regression receiptはstaleである。M7後のcandidate SHAに対するFull RegressionはprimaryがStep 9で再取得する。
+
+M7ではP2として扱ったhistorical verifier testのdirect loadとoutcome set境界の重複は変更していない。前者はhistorical compatibility evidence、後者はJSON input validationとpolicy domain validationの別責務であり、今回のP1修復範囲外である。
 
 ## Verification
 

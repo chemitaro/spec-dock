@@ -94,6 +94,12 @@ def test_full_regression_authority_is_root_and_issue368_history_is_frozen() -> N
         assert hashlib.sha256(artifact_path.read_bytes()).hexdigest() == expected_sha256
 
 
+def test_full_regression_root_ledger_records_canonical_runner_command() -> None:
+    payload = json.loads((_repo_root() / FULL_REGRESSION_ROOT_LEDGER).read_text(encoding="utf-8"))
+
+    assert payload["commands"]["current_full"] == "uv run python -m scripts.quality.verify_full_regression --shards 4"
+
+
 def test_full_regression_signature_normalization_is_platform_independent() -> None:
     repository = Path("/repo")
     macos_runtime_error = (
@@ -254,6 +260,53 @@ def test_pytest_adapter_preserves_duplicate_and_missing_coverage_for_shared_eval
 
     assert not result.verified
     assert any(item.code == "coverage_mismatch" for item in result.violations)
+
+
+def test_pytest_and_standalone_adapters_return_identical_evaluation() -> None:
+    from scripts.quality.verify_full_regression import observation_from_json, observation_to_json
+
+    repository = Path("/repo")
+    active = "tests/sample.py::test_active"
+    historical = "tests/sample.py::test_historical"
+    successor = "tests/sample.py::test_successor"
+    unexpected = "tests/sample.py::test_unexpected"
+    active_message = "AssertionError: active baseline failure"
+    reports = (
+        _fake_report(active, outcome="failed", message=active_message),
+        _fake_report(successor, outcome="passed"),
+        _fake_report(unexpected, outcome="failed", message="AssertionError: unexpected failure"),
+    )
+    pytest_observation = build_candidate_observation(
+        (active, successor, unexpected),
+        reports,
+        repository=repository,
+    )
+    standalone_observation = observation_from_json(observation_to_json(pytest_observation))
+    baseline = parse_baseline({
+        "schema_version": 2,
+        "failure_paths": [
+            {
+                "nodeid": active,
+                "fixed_point_signature_sha256": failure_signature(active_message, repository),
+                "rationale": "historical active failure",
+                "lifecycle": "active",
+            },
+            {
+                "nodeid": historical,
+                "fixed_point_signature_sha256": "b" * 64,
+                "rationale": "historical successor",
+                "lifecycle": "resolved",
+                "resolution_mode": "superseded",
+                "successor_nodeid": successor,
+            },
+        ],
+    })
+
+    pytest_result = evaluate_baseline(baseline, pytest_observation)
+    standalone_result = evaluate_baseline(baseline, standalone_observation)
+
+    assert standalone_observation == pytest_observation
+    assert standalone_result.to_dict() == pytest_result.to_dict()
 
 
 def test_standalone_observation_round_trip_and_merge_use_typed_shared_result() -> None:
