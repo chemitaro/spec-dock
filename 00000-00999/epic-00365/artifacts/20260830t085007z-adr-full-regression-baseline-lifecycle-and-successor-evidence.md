@@ -20,7 +20,7 @@ reflected_to: ["iss-00382", "iss-00372"]
 ## Context
 
 - Issue `iss-00368` の Full Regression ledger schema 1 は、すべての ledger row が current candidate でも同じ node ID・failure signatureで失敗し続けることを唯一の成功形としている。
-- Issue `iss-00372` では historical Issue 359 digestをauthorityとする `test_s40b_retained_skill_identity_matches_issue359_final_source` が、current provider/dogfood bytes・mode parityをauthorityとする `test_s40b_retained_skill_identity_matches_current_provider_and_dogfood` へ置換された。
+- Issue `iss-00372` では historical Issue 359 digestをauthorityとする `tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source` が、current provider/dogfood bytes・mode parityをauthorityとする `tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood` へ置換された。
 - current verifierは旧nodeのfailureが観測されないことを `missing_failures` として拒否する。Issue 372 Reportでは unexpected failure、unexpected error、signature mismatchは0であり、停止理由はdistribution regressionではなくbaseline lifecycleの表現不足である。
 - historical rowを削除してgreenにすると、過去の受理根拠とsuccessor coverageが失われる。旧failureを復活させるとcurrent source of truthを弱める。
 - Epic `epic-00365` とIssue `iss-00372`はunrelated failure remediationおよびbaseline policyの独自変更を対象外としている。この判断はrepository-level quality governanceとして別authorityを持つ必要がある。
@@ -48,7 +48,7 @@ schema 1 rowは互換読取時に`active`として扱う。schema 2への移行�
 - skipped、xfail、xpass、deselected、uncollectedではない。
 - successor node IDとresolution metadataがbaseline observationへ束縛される。
 
-今回のretained-skill rowは`resolved/superseded`とし、successorを `test_s40b_retained_skill_identity_matches_current_provider_and_dogfood` に固定する。
+今回のretained-skill rowは`resolved/superseded`とし、successorを完全なpytest node ID `tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood` に固定する。suffix、関数名だけ、fuzzy matchは認めない。
 
 ### 3. One evaluator, two adapters
 
