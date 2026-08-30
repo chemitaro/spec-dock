@@ -68,6 +68,16 @@ uv run pytest
 ./spec-dock/scripts/spec-dock validate
 ```
 
+### Step 8A — M6 ledger authority cutover（追加）
+
+Step 8の検証で、pre-freeze candidate SHA `8b66840688da20b686399d7bc6f05d6bb77ac5e5`の実装がIssue 368配下のledger/timing weightsをcanonical runtimeから参照している不整合を確認した。この追加stepでは、既存Step 1〜8の実施済み記録を書き換えず、authorityの切替とhistorical evidenceの固定だけを行う。
+
+1. REDとしてprovider lane testに、repository rootの`full-regression-ledger.json` / `full-regression-timing-weights.json`の存在、`tests/conftest.py`・canonical runner・provider workflowからIssue 368 artifact pathが消えていること、Issue 368配下の2 artifactが親固定点 `48b34e23283f9270d671d1e1eb3c3a3365fe1856`のSHA-256内容と一致することを追加する。
+2. 現行schema 2 ledger（26 active、1 resolved/superseded、0 retired）とtiming weightsをrepository rootへ移し、pytest guard / canonical runnerの既定pathおよびtest helperをroot authorityへ変更する。Issue 368配下のledger/timing weightsは親固定点のhistorical schema 1/contentへ戻し、fallbackは実装しない。
+3. focused provider tests、`make lint`、ordinary pytest、`spec-dock validate`を実行する。Full Regressionはこのauthority cutoverを含むcommit後のprimaryがcandidate SHAで実行し、Step 9のreceiptへ記録する。
+
+M6の完了条件は、canonical runtimeがroot authorityだけを読み、Issue 368 artifactがhistorical evidenceとして固定され、既存のschema migration invariantとlane policyが変わらないことである。
+
 ### Step 9 — exact candidate Full Regression
 
 clean candidate SHAから`uv run python -m scripts.quality.verify_full_regression --shards 4`を実行し、active、resolved、unexpected結果をmachine-readable receiptへ記録する。candidate変更後はstale receiptを再利用しない。

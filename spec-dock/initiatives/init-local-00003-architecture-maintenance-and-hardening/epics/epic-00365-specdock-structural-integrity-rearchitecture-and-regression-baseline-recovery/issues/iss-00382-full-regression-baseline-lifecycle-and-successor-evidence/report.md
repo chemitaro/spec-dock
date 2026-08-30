@@ -31,6 +31,26 @@ repository-only Full Regression baseline authorityを`scripts/quality/`へ実装
 | M3 ledger migration | schema 1のためmigration invariant failure | schema 2 projection digest、26 active、1 resolved、0 retired |
 | M4 workflow cutover | canonical runner / old path absence assertion failure | provider workflow focused 19 passed、provider structural 2 passed |
 | M5 quality repair | `make lint` format 3 files / mypy 4 errors | formatter適用とtyped test boundaryによりlint green |
+| M6 ledger authority cutover | root authority files absent、canonical sources still referenced Issue 368 artifact | root authority 2 files、historical SHA-256 freeze、provider lane 32 passed、ordinary pytest 1570 passed |
+
+### M6 authority cutover追記（pre-freeze不整合の訂正）
+
+pre-freeze Full Regression candidate SHA `8b66840688da20b686399d7bc6f05d6bb77ac5e5`について、既存のverification結果自体は確認済みだった。しかしその後、canonical `tests/conftest.py` と `scripts/quality/verify_full_regression.py` がIssue 368配下のledger/timing weightsを直接参照していることを確認した。これはcanonical authorityをrepository rootへ置く設計との不整合であり、M6として追加修正した。
+
+- 現行schema 2 ledger（26 active、1 resolved/superseded、0 retired）と現用timing weightsを`full-regression-ledger.json` / `full-regression-timing-weights.json`としてrepository rootへ移した。
+- pytest guard、canonical runner、test helperの既定pathをroot authorityへ変更し、Issue 368配下へのcanonical runtime dependencyを除いた。workflowは既にcanonical runnerを参照していたため変更していない。
+- Issue 368配下のledgerは親固定点 `48b34e23283f9270d671d1e1eb3c3a3365fe1856`のhistorical schema 1内容へ復元した。timing weightsは親固定点から変更されていないことを確認した。provider lane testは両artifactのSHA-256を固定して、将来の書換えをfail closedにする。
+
+従前のOutcomeにある「historical artifact自体は変更していない」は、M6 cutover前の状態を記録した履歴上の記述であり、M6では一時的にschema 2へ移行されていたIssue 368 ledgerを親固定点へ復元した、というのが確定した事実である。過去のverification結果や実施済みmilestoneは改変せず、この追記で時系列と現在のauthorityを明示する。
+
+M6 cutover後の確認結果:
+
+- RED: `test_full_regression_authority_is_root_and_issue368_history_is_frozen` はroot ledger不在で失敗した。
+- GREEN: provider laneのledger/migration/full-regression選択20 passed、provider lane全体32 passed、pure evaluator 36 passed。
+- `make lint`: ruff check、ruff format check、mypy（175 source files）がすべてpass。
+- ordinary `uv run pytest`: 1570 passed、1134 skipped（56.28秒）。
+- `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=228`。
+- M6ではFull Regression本体を実行していない。authority cutover後のcandidateでのheavy実行はprimaryがStep 9で行う。
 
 ## Verification
 

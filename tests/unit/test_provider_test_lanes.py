@@ -40,17 +40,58 @@ FULL_REGRESSION_VERIFIER = (
     "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
     "iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py"
 )
-FULL_REGRESSION_LEDGER = (
+FULL_REGRESSION_HISTORICAL_LEDGER = (
     "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
     "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
     "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
 )
+FULL_REGRESSION_HISTORICAL_TIMING_WEIGHTS = (
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
+    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
+    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-timing-weights.json"
+)
+FULL_REGRESSION_ROOT_LEDGER = "full-regression-ledger.json"
+FULL_REGRESSION_ROOT_TIMING_WEIGHTS = "full-regression-timing-weights.json"
+FULL_REGRESSION_LEDGER = FULL_REGRESSION_ROOT_LEDGER
+ISSUE368_HISTORICAL_LEDGER_SHA256 = "3fb3192110ad9981a6826dae8a5eea30f12bc9f5b65106173dc5777749a8ea3b"
+ISSUE368_HISTORICAL_TIMING_WEIGHTS_SHA256 = "b647b3a0ee3f24202c954e0dd367809dc8981ba686bf6a67f349868ab01da5fc"
 PRE_MIGRATION_LEDGER_CURRENT_HEAD = "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2"
 PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256 = "f997de22e6507e6a27ce76284df079c9dd1e65bb015e309801b4aa041ea3dfcf"
 RETAINED_SKILL_HISTORICAL_NODE = (
     "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source"
 )
 RETAINED_SKILL_SUCCESSOR_NODE = "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood"
+
+
+def test_full_regression_authority_is_root_and_issue368_history_is_frozen() -> None:
+    repository = _repo_root()
+
+    root_ledger = repository / FULL_REGRESSION_ROOT_LEDGER
+    root_timing_weights = repository / FULL_REGRESSION_ROOT_TIMING_WEIGHTS
+    assert root_ledger.is_file()
+    assert root_timing_weights.is_file()
+
+    canonical_sources = (
+        repository / "tests/conftest.py",
+        repository / "scripts/quality/verify_full_regression.py",
+        repository / ".github/workflows/provider-full-regression.yml",
+    )
+    for source_path in canonical_sources:
+        source = source_path.read_text(encoding="utf-8")
+        assert "iss-00368-recognized-workspace-reconciliation" not in source
+
+    historical_artifacts = (
+        (
+            repository / FULL_REGRESSION_HISTORICAL_LEDGER,
+            ISSUE368_HISTORICAL_LEDGER_SHA256,
+        ),
+        (
+            repository / FULL_REGRESSION_HISTORICAL_TIMING_WEIGHTS,
+            ISSUE368_HISTORICAL_TIMING_WEIGHTS_SHA256,
+        ),
+    )
+    for artifact_path, expected_sha256 in historical_artifacts:
+        assert hashlib.sha256(artifact_path.read_bytes()).hexdigest() == expected_sha256
 
 
 def test_full_regression_signature_normalization_is_platform_independent() -> None:
@@ -754,13 +795,7 @@ def _prepare_mini_project(
 
 
 def _write_full_regression_ledger(project: Path, nodeids: tuple[str, ...]) -> None:
-    ledger = (
-        project
-        / "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics"
-        / "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues"
-        / "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
-    )
-    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger = project / "full-regression-ledger.json"
     ledger.write_text(
         json.dumps({
             "schema_version": 1,

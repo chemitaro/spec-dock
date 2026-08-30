@@ -35,11 +35,7 @@ REQUIRED_FAST_NODE_IDS = frozenset({
 
 
 POLICY_SKIP_REASON = "full_regression test is disabled by default; use --run-full-regression to run it"
-FULL_REGRESSION_LEDGER = (
-    Path(__file__).parents[1] / "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
-    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
-    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
-)
+FULL_REGRESSION_LEDGER = Path(__file__).parents[1] / "full-regression-ledger.json"
 
 _full_regression_guard_active = False
 _full_regression_ledger_errors: list[str] = []

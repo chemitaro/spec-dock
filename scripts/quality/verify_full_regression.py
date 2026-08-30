@@ -23,18 +23,8 @@ from scripts.quality.full_regression_baseline import (
     parse_baseline,
 )
 
-LEDGER = (
-    Path(__file__).resolve().parents[2]
-    / "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
-    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
-    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
-)
-TIMING_WEIGHTS = (
-    Path(__file__).resolve().parents[2]
-    / "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
-    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
-    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-timing-weights.json"
-)
+LEDGER = Path(__file__).resolve().parents[2] / "full-regression-ledger.json"
+TIMING_WEIGHTS = Path(__file__).resolve().parents[2] / "full-regression-timing-weights.json"
 OBSERVATION_SCHEMA_VERSION = 1
 _OUTCOMES = frozenset({"passed", "failed", "skipped", "xfailed", "xpassed", "error"})
 _RETIREMENT_OUTCOMES = frozenset({"absent", "present", "unknown"})
