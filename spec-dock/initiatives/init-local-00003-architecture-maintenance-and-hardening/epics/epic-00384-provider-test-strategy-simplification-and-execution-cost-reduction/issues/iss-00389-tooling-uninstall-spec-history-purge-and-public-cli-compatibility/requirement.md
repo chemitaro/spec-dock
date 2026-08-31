@@ -34,7 +34,8 @@ ID: "iss-00389"
 
 対象:
 
-- `--remove-specs`のremove / deprecate / independent purge判断
+- legacy alias policy（removed / deprecated diagnostic-only / deprecated explicit handoff）
+- purge capability（retired / independent command）
 - destructive confirmation contract
 - dry-run / apply、text / JSON、exit code、cleanup-pending semantics
 - compatibility window、sunset、migration / release guidance
@@ -57,7 +58,7 @@ ID: "iss-00389"
 
 ## 受け入れ条件
 
-- [ ] `--remove-specs`の最終形をremove / deprecate / independent purgeの一つに確定している。
+- [ ] `--remove-specs`のlegacy alias policyとpurge capabilityを独立した二軸で確定し、組合せごとの診断・handoff・sunsetが一意である。
 - [ ] purgeを残す場合、command名、confirmation、dry-run / apply、text / JSON、exit contractが確定している。
 - [ ] public compatibility windowとsunsetがversionまたはdateで確定している。
 - [ ] normal uninstallからspec-history purgeへの到達経路が許可されていない。

@@ -65,9 +65,9 @@ Issue #372 は distribution hard cutover と parity を対象とし、Full Regre
 - production route、test node、workflow、ledger、selectorを削除する前に、full baseline SHAへ束縛したnode inventoryを作成する。
 - inventoryは全collected nodeについて、durable contract、owner layer、current lane、target lane、cost evidence、keep / move / consolidate / delete-after-retirement、owner Issueを持つ。
 - delete対象はretired production contractのaccepted authority、またはexact successor nodeを持つ。
-- removal receiptはold node / route、successorまたはretirement authority、owner Issue、verification command、result SHAを持つ。
+- removal receiptはold node / route、successorまたはretirement authority、owner Issue、verification commandを持つ。repository内receiptには自己参照になるresult SHAを書かず、merge parent SHA、inventory before / after digest、change manifest digest、verification result digestを保存する。
 - baseline SHA変更後に旧inventoryを黙って再利用しない。
-- baseline inventoryを`S0`へ束縛し、各削除PRはmerge parent SHA、result SHA、node inventory digestのdelta receiptを作る。rebase後はreceiptを再生成する。
+- baseline inventoryを`S0`へ束縛し、各削除PRはmerge parent SHA、node inventory before / after digest、change manifest digest、verification result digestのdelta receiptを作る。out-of-band authorityはresult commit上のGitHub Actions check run `Provider Receipt Binding`とし、result SHA、repository内receipt digest、check_run_id、content-addressed artifact_id、retention_daysを記録する。次IssueはGitHub APIで取得・digest照合し、check / artifact消失、期限切れ、SHA / digest不一致ならfail closedにする。rebase後はrepository内receiptとbindingを再生成する。
 - 次のIssueはlatest inventory headだけをconsumeする。並行PRはmerge順確定後にrebaseし、node set、owner、receiptを再照合する。
 
 ### R4. layerごとの証明責務
@@ -116,16 +116,16 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 
 ### R5C. lifecycle format and cross-version compatibility
 
-- canonical lifecycle stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2(desired digest)`、`legacy-recovery-active`、`blocked`とする。`fresh`、`current-supported`、`legacy-supported`、`legacy-expired`、`unknown`はsupport classificationという別axisとし、各classificationからcanonical lifecycle stateへの一意なmappingを持つ。
-- package世代は現行`P0`、uninstall-first bridge`P1`、new install/update writer`P2`、legacy sunset後`P3`として扱う。`package_generation × lifecycle_state × operation`の全cellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery owner、implementation owner、sunset / removal ownerを持つ。
+- canonical lifecycle stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2(installed_version=A, candidate_digest=D)`、`updating-v2(desired_version=B, desired_digest=D)`、`legacy-recovery-active`、`blocked`とする。serialized enum / fixture keyはそれぞれ`ready-v2` / `updating-v2`に統一する。`fresh`、`current-supported`、`legacy-supported`、`legacy-expired`、`unknown`はsupport classificationという別axisとし、各classificationからcanonical lifecycle stateへの一意なmappingを持つ。
+- package世代は現行`P0`、uninstall-first bridge`P1`、new install/update writer`P2`、legacy sunset後`P3`として扱う。`package_generation × lifecycle_state × public_operation × execution_mode`の全cellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery owner、implementation owner、sunset / removal ownerを持つ。`public_operation`はinstall、`init --force`、update、uninstall、purge、retry、現存legacy aliasを含み、`execution_mode`はinspect / dry-run / applyを操作から分離する。
 - `P1`はlegacy install/update writerを維持しつつ、legacy stateとfuture `InstallationRecordV2`を読むtooling-only uninstall / purge dual-readerを提供する。同一operationにold/new writerを併存させない。
-- C5でexact record path、serialized schema / version、canonical fixture、invalid / unknown / future cases、root / slot completenessを`LifecycleCompatibilityContractV1`として固定する。C5 readerがfixtureをconsumeし、C6 writerはその既存contractへのconformanceを証明する。
-- `P2`へcutoverする前に`P1` uninstallが`ready-v2`を安全に処理でき、exact P0 artifact / version / digestとP1 writerが`ready-v2`をmutation前にfail closedにできることを証明する。P0に能力がない場合はdecisionで上書きせず、P0が既にblockできるformat / guardまたはrelease sequenceへ変更する。
+- C5でexact record path、serialized schema / version、`InstallationRecordV2`と`SkillSlotMarkerV1`のcanonical fixture、invalid / unknown / future cases、root / slot completenessを`LifecycleCompatibilityContractV1`として固定する。C5 readerがfixtureをconsumeし、C6 writerはその既存contractへのconformanceを証明する。
+- D1はP0が満たすpolicyと、成立しない場合にformat / release sequenceを再審議するauthorityだけを決める。C5内部でcontract / fixtureを先にfreezeし、そのexact fixtureへimmutable P0 artifact / version / digestのmutation-zero probeを実行する。probe failure時はproduction mutationへ進まず親へ戻し、probe success後だけbridgeを実装する。
 - `updating-v2`では同じdesired version / digestのexternal updateだけを許可し、uninstall、purge、別version update、old engine fallbackをblockする。
 - tooling-only uninstall後のuser data / generated projectionを保持したworkspaceから、accepted install routeで再installできる。
 - active legacy recovery stateは、accepted bounded recovery-only adapterまたはlast-compatible package pinのどちらかで扱う。未決状態を新journalへ推測変換しない。
 - bridge sunsetをEpic内で行うかfollow-upへ渡すかを`iss-00388`で確定し、期限なしのdual-readerをsteady stateへ残さない。
-- C6は最初のdestructive stepより前にfixed recordを`state=updating-v2`、`desired_version`、`desired_digest`へatomic replaceする。全root / slot配置後だけ`ready-v2`へatomic replaceする。
+- C6は最初のdestructive stepより前に唯一のauthoritative fixed recordを`state=updating-v2`、`desired_version`、`desired_digest`へatomic replaceする。以後の全faultで`ready-v2` authorityはなく、物理的に残るlegacy markerはnon-authoritative metadataであり、全readerは`InstallationRecordV2`を優先する。全root / current slot配置とretired slot処理後だけ`ready-v2`へatomic replaceする。
 
 ### R6. failureを成功扱いしない
 

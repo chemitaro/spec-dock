@@ -50,7 +50,7 @@ decision tableは少なくとも`command/option`、`intent`、`confirmation`、`
 
 ## 移行・互換性・rollback
 
-deprecated aliasを採る場合は、non-destructive diagnosticまたは明示purge handoffを経由し、silent purgeへfallbackしない。decision未確定時は現行実装を変更せず後続Issueをblockする。
+decisionは`legacy_alias_policy = removed | deprecated-diagnostic-only | deprecated-explicit-handoff`と`purge_capability = retired | independent-command`の二軸で記録する。deprecated aliasを採る場合は、non-destructive diagnosticまたは明示purge handoffを経由し、silent purgeへfallbackしない。decision未確定時は現行実装を変更せず後続Issueをblockする。
 
 ## testability
 

@@ -118,7 +118,7 @@ legacy direct-update window、markerless slot migration、`.gitignore`、`init -
 
 ### Required decisions
 
-- `P0` / `P1` / `P2` / `P3`と`legacy-ready` / `ready-v2` / `updating-v2`のallow / fail-closed matrix。
+- `P0` / `P1` / `P2` / `P3`と全canonical state、全public operation、inspect / dry-run / apply execution modeのallow / fail-closed / N/A matrix。retryとlegacy aliasも明示する。
 - active legacy journalをbounded recovery-only adapterで扱うか、last-compatible packageへpinするか。
 - `P0`がnew guardを検出してmutation前に停止する条件。
 - legacy reader / fixtures / testsをEpic内で削除するか、期限付きfollow-upへ渡すか。
@@ -174,7 +174,7 @@ exact baseline SHAの全collected nodeをdurable contract、owner layer、curren
 - collected node setとinventory node setが一致し、missing disposition / unknown ownerが0。
 - active failure nodeをdurable behavior ownerへ割り当て、判断不能nodeだけ個別decision candidateにする。
 - production route / manifest / journal symbolのconsumer graphを記録し、C5で削除候補となるsymbolがlegacy install / updateから非参照かを判定する。
-- `InventoryHeadV1`と`RemovalReceiptDeltaV1`がparent SHA、result SHA、node digestを持つ。
+- `InventoryHeadV1`とrepository内`RemovalReceiptDeltaV1`がparent SHA、inventory before / after digest、change manifest digest、verification result digestを持つ。result SHAはGitHub Actions check run `Provider Receipt Binding`のcheck_run_id、content-addressed artifact_id、retention_daysでreceipt digestへ束縛し、次IssueがGitHub APIで取得・照合できない場合はfail closedにする。
 - rebase後の再生成、parallel PRのmerge-order再照合、latest head consumptionを検証する。
 
 production code、tests、workflowは変更しない。
@@ -189,14 +189,14 @@ legacy install / update writerを維持したまま、exact lifecycle compatibil
 
 - D1、D2、D3がaccepted。
 - C4 latest inventory headがcomplete。
-- exact P0 artifact / version / digestを固定し、new fixtureでmutation-zeroにできるtechnical feasibilityを証明する。証明できない場合はworkspace format / release sequenceを親へ戻し、C5を開始しない。
+- D1がP0 policyと成立しない場合のformat / release sequence再審議authorityをacceptedにしている。C5開始前に未作成のcanonical fixtureを要求しない。
 - C4 production symbol graphで削除候補journal / manifest symbolsがlegacy install / updateから非参照である。分離不能ならC5 / C6をcombined vertical Issueへ置換する。
 - bridgeをProduct contractとして受理。拒否された場合はC5 / C6をcombined vertical Issueへ置換する。
 
 ### Stable contract
 
-- `LifecycleCompatibilityContractV1`、`InstallationRecordV2`、`LifecycleStateReaderV1`、`ToolingDeletePlanV1`、`PurgeAuthorityV1`、`LifecyclePublicResultV1`。
-- C5がexact record path、serialized schema / version、canonical ready-v2 / updating-v2 fixtures、invalid / unknown / future cases、root / slot completenessを固定する。C6はfixture producerではなくconformance ownerである。
+- `LifecycleCompatibilityContractV1`、`InstallationRecordV2`、`SkillSlotMarkerV1`、`LifecycleStateReaderV1`、`ToolingDeletePlanV1`、`PurgeAuthorityV1`、`LifecyclePublicResultV1`。
+- C5がexact record / marker path、serialized schema / version、canonical ready-v2 / updating-v2 / slot fixtures、invalid / unknown / future cases、root / slot completenessを固定する。C6はfixture producerではなくconformance ownerである。
 - dual-reader / single-writer。old/new uninstall writerをruntime toggleで併存させない。
 - legacy-readyとfuture ready-v2をread-only分類する。
 - ready-v2はuninstall / dry-runを許可し、P1 legacy update / init-forceはC5が追加するadmission guardでfail closedにする。
@@ -204,11 +204,12 @@ legacy install / update writerを維持したまま、exact lifecycle compatibil
 
 ### Vertical acceptance
 
+- C5内部の順序を`contract / fixture freeze -> immutable P0 probe -> production bridge`に固定する。probe failureならtarget mutationを開始せず親へ戻し、format / release sequenceを再設計する。
 - legacy install / updateが引き続きGREEN。
 - new tooling-only uninstall、accepted purge、confirmation、JSON / text / exitがGREEN。
 - tooling-only uninstall後にuser data / generated projectionがbyte-identicalで残り、accepted legacy install routeで再installできる。
 - C5が固定したcanonical ready-v2 / updating-v2 fixtureをnew uninstallとP1 admission guardが処理する。C6は同じfixtureへconformする。
-- exact P0 artifactがcanonical new fixturesをmutation-zeroでblockする。不能ならdecisionで上書きしない。
+- exact P0 artifactがC5-frozen canonical new fixturesをmutation-zeroでblockする。不能ならdecisionで上書きしない。
 - exact successor node IDsをcurrent authoritative required command / contextで実行し、collected = executed、policy skip 0、affected package / platform smoke GREENを証明する。
 - successor tests成立後に限り、legacy install / updateから非参照とC4が証明したold deprovision / purge専用routes、journals、testsだけをreceipt付きで削除する。shared symbolはC6またはcombined Issueまで残す。
 - built artifactでinstall → tooling uninstall → reinstallの代表lifecycleを通す。
@@ -240,11 +241,13 @@ C5 bridge上でfresh / init / update writerを4 disposable roots、2 fixed skill
 - 4 roots / 2 slotsを完全stage・validateし、全配置後だけready recordをatomic replaceする。
 - root間failure後はsame desired version / digestのexternal rerunだけで収束する。
 - 最初のdestructive step前にfixed recordをupdating-v2 / desired version / digestへatomic replaceし、全配置後だけready-v2へ遷移する。
+- updating record成功後の全faultでauthoritative recordはupdating-v2のまま、ready-v2 authorityはabsent、許可mutationはsame desired version / digest updateだけである。物理的に残るlegacy ready markerはnon-authoritativeで、全readerがfixed recordを優先する。
 - user data、generated projections、unknown paths、shared skill parent、unrelated skillsがbyte-identical。
 - `P0` / `P1` updateはready-v2 / updating-v2をmutation前にfail closedにする。
 - successor tests、package smoke成立後にold per-file update、historical manifest、update journal / checkpoint、対応testsをreceipt付きで削除する。
 - exact successor node IDsをcurrent authoritative required command / contextで実行し、collected = executed、policy skip 0、affected package / platform smoke GREENを証明する。
-- updating record前後、最初のroot削除前、各root delete / rename間、全root後 / ready前、stale staging mismatch、ready write failureをfault acceptanceに含める。
+- updating record前後、最初のroot削除前、各root delete前 / delete後・rename前 / rename後、root間、各current slot delete前 / delete後・rename前 / rename後、2 slots間、finite retired slot削除の各境界、全slot後 / ready前、stale staging mismatch、ready write failureをfault acceptanceに含める。
+- 各fault後のsame-version / same-digest rerun convergenceと、invalid / foreign / markerless slotのbyte-identical preserve-and-blockを証明する。C5のskill delete proofはtooling uninstallによるvalid owned current 2 slots削除に限定し、C6 updateのcurrent slot replacement / retired slot deletionはC6が所有する。
 
 ### Recovery / rollback
 
@@ -261,7 +264,7 @@ C4 inventoryが確認したactive failureを、durable contract ownerごとの�
 
 - 一つのobservable public behaviorまたはsecurity invariant。
 - production fix、public adapter、docs、successor testsを同じIssueで完了する。
-- exact old node、fix / retirement / successor、focused command、parent / result SHA receipt。
+- exact old node、fix / retirement / successor、focused command、repository内parent/digest receiptとout-of-band result SHA binding。
 - matching Issue単独merge後にzero failure / zero policy skip。
 - actual Issue ID、dependency、owned node set、terminal dispositionをlatest inventory headへ記録する。
 - exact successor nodeをmerge時点のauthoritative required command / contextで実行し、collected = executed、policy skip 0を証明する。
@@ -311,6 +314,7 @@ unrelated effective required contextsを`U`として、GitHub external stateを`
 - merge queueがactiveならmerge-group eventでもcontext生成と同じblockを確認する。
 - old contextをrequired setから外し、`U + new`だけがeffective required setでreview gateも残ることを確認する。
 - `RequiredCheckTransitionReceiptV1`を保存する。
+- C8 receiptは`U + old -> U + old + new -> U + new`までのappend-only chain headとして保存し、C9がold workflow removalとpost-removal live stateを追記し、C10がfinalizeするowner分担を記録する。
 
 ### Rollback
 
@@ -329,14 +333,18 @@ new check名を維持したまま、old Provider CI duplicate lanes、post-merge
 
 ### Acceptance
 
+- C9 result candidate SHAをmerge前に固定し、そのexact result treeをbaseにexact inverse patchまたはC9全体revertを適用したrestoration branchを作る。
+- restoration bundleはworkflow、scripts、selectors、policy configuration、ledgerを含むold contextの全transitive dependencyとdigestを持ち、C9 result treeへclean applyできる。
+- old workflowがbase branchから消えた状態のPR eventでold contextをnon-required生成してGREENにし、merge queue active時はmerge-groupでも生成する。
 - removal PR自体がnew required gateでGREEN。
 - authoritative lane間duplicate 0、artifact build invocation 1、policy skip 0。
 - removed workflow / node / selector / ledgerごとにsuccessorまたはretirement receiptがある。
 - old workflow不存在のままold contextをrequiredへ戻さない。
+- C8の`RequiredCheckTransitionReceiptV1` chainへexact old workflow removal、post-removal live effective required set、ruleset scope、human review、merge queue resultを追記する。
 
 ### Rollback
 
-旧contextへ戻す必要がある場合に備え、C9 merge前にold workflow restoration patch / branch、expected old context、digest、実行手順を固定し、restoration PR上でold checkがGREENになるcanaryを行う。new checkが全面RED / pendingでも、restoration PRのold checkをnon-requiredで起動し、`U + old + new`へ追加、oldと`U`のGREENを確認してから`U + old`へ戻す。その後human reviewを維持したままrestoration PRをmergeする。required testが0になる瞬間を作らない。
+旧contextへ戻す必要がある場合は、上記C9 exact result tree起点のrestoration branchを使う。new checkが全面RED / pendingでも、restoration PRのold checkをnon-requiredでPR / merge-group上に起動し、`U + old + new`へ追加、oldと`U`のGREENを確認してから`U + old`へ戻す。その後human reviewを維持したままrestoration PRをmergeする。required testが0になる瞬間を作らない。
 
 ## C10 proposal — Fixed-Runner Budget And Stability Closeout
 
@@ -371,6 +379,7 @@ final candidateはcommit SHA、artifact digest、node inventory digest、runner 
 - seeded fault packの各faultとowner nodeを列挙し、100% detectionを確認する。
 - Linux / macOS各accepted smokeのtest bodyが600秒以内である。
 - latest final `InventoryHeadV1`を再生成し、全node / removal receipt coverage 100%、active failure 0を確認する。
+- C8 / C9の`RequiredCheckTransitionReceiptV1` chainをfinal live effective required set、ruleset scope、human review requirement、merge queue behaviorへ再照合してfinalizeする。
 - C11をEpic外へ送る場合はactual follow-up Issue ID、owner、expiryをclose gateで再確認する。
 
 ## C11 conditional proposal — Legacy Lifecycle Bridge Sunset
@@ -387,6 +396,9 @@ finite legacy reader / recovery-only adapterと対応testsを削除し、P3 new-
 - ready-v2のinstall / update / uninstall / accepted purgeがGREEN。
 - removed adapter、fixtures、testsにreceiptがある。
 - unknown / foreign stateのpreserve-and-blockを維持する。
+- exact successor node setを固定し、current new required contextでcollected = executed、policy skip 0を証明する。
+- P3 built-artifact lifecycle smoke、public diagnostic / docs update、unaffected lifecycle command GREENを同じPRで完了する。
+- repository内receiptとout-of-band result bindingをlatest inventory chainへ追加し、後続Issueなしでreleasableであることをmerge pointで証明する。
 
 D1がsunsetをEpic後へ送る場合、Requirementはfinite bridgeが残ったままclose可能であることと、owner follow-up / expiryを明示する。
 
@@ -398,7 +410,8 @@ D1がsunsetをEpic後へ送る場合、Requirementはfinite bridgeが残った�
 | tooling-only uninstall / delete plan / purge / confirmation / public result | C5、decisionはD2 |
 | root staging / replacement / ready / updating / same-version rerun | C6 |
 | fixed skill write lifecycle | C6 |
-| fixed skill delete lifecycle | C5 |
+| tooling uninstallによるvalid owned current fixed skill delete lifecycle | C5 |
+| updateによるcurrent slot replacement / finite retired slot deletionと全slot fault境界 | C6 |
 | `.gitignore` / `init --force` | C6、decisionはD1 |
 | shipped workflow asset ownership | decisionはD3。既定はpreserve、update mutationを選ぶ場合はC6、uninstall deleteを選ぶ場合はADR改定後のC5 |
 | distribution外active failure | matching `FIX-*` |
@@ -409,7 +422,7 @@ D1がsunsetをEpic後へ送る場合、Requirementはfinite bridgeが残った�
 | artifact欠落 / digest mismatch / selector / duplicate / metrics | C7 |
 | ledger / timing / shard / policy skip meta-tests | C9 |
 
-旧testを削除する各PRは、old node ID、durable contract、exact successorまたはaccepted retirement authority、owner Issue、focused command、parent SHA、result SHAを同じreceiptへ持つ。
+旧testを削除する各PRは、old node ID、durable contract、exact successorまたはaccepted retirement authority、owner Issue、focused command、parent SHA、inventory / manifest / verification digestsをrepository内receiptへ持ち、result SHAをout-of-band immutable bindingでそのreceiptへ結ぶ。
 
 ## Sequence gates
 

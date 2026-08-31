@@ -64,7 +64,7 @@ removal owner
 
 evidenceが欠落・競合・不正な場合は`unknown`とし、mutation前にpreserve-and-blockする。version文字列だけでownershipを証明しない。
 
-matrixは`package_generation × lifecycle_state × operation`をcanonical authorityとし、`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2`、`legacy-recovery-active`、`blocked`と、install、init-force、update、uninstall、purge、dry-runの全cellを埋める。exact P0 artifactを実行してnew fixtureへのmutation-zeroを確認し、実現不能な能力をdecisionで付与しない。
+matrixは`package_generation × lifecycle_state × public_operation × execution_mode`をcanonical authorityとする。stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2`、`legacy-recovery-active`、`blocked`、operationはinstall、`init --force`、update、uninstall、purge、retry、現存legacy alias、modeはinspect / dry-run / applyを含む。D1はexact P0 artifactが満たすmutation-zero policyと不成立時の再設計authorityを決め、C5がcontract / fixture freeze後にprobeを実行する。実現不能な能力をdecisionで付与しない。
 
 ## 変更対象
 

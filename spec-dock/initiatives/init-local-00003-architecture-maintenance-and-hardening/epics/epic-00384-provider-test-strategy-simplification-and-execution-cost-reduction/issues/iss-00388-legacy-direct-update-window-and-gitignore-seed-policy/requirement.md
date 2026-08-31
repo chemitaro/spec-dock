@@ -30,7 +30,7 @@ accepted ADR `20260831t005139z-adr` はper-file historical identityをsteady sta
 - `spec-dock/.gitignore`がabsent、provider-identical、consumer-modified、symlink、unexpected typeの各状態について、preserve / block / explicit overwriteの一つを決定する。
 - `init --force`がcustom `.gitignore`とlegacy workspaceへ持つauthorityを明示する。
 - install/updateのtext、JSON、exit codeを変更する場合、breaking changeまたはdeprecation windowを明示する。
-- `P0` / `P1` / `P2` / `P3`とcanonical lifecycle state、全public operationのallow / fail-closed / N/A matrixを確定する。support classificationは別axisとしてstateへ一意にmappingする。
+- `P0` / `P1` / `P2` / `P3`とcanonical lifecycle state、全public operation、inspect / dry-run / apply execution modeのallow / fail-closed / N/A matrixを確定する。retry、legacy alias、`init --force`もoperationとして列挙し、support classificationは別axisとしてstateへ一意にmappingする。
 - active legacy journalをbounded recovery-only adapterで扱うか、last-compatible packageへpinするかを決定する。
 - legacy reader / fixtures / testsをEpic内でsunsetするか、owner / expiry付きfollow-upへ渡すかを決定する。
 
@@ -68,8 +68,8 @@ accepted ADR `20260831t005139z-adr` はper-file historical identityをsteady sta
 - [ ] `.gitignore`の全collision matrixと`init --force` authorityが確定している。
 - [ ] public text / JSON / exit compatibility windowが必要な場合は具体的versionまたはdateで確定している。
 - [ ] package / workspace compatibility matrixと、old packageのnew state fail-closed contractが確定している。
-- [ ] exact P0 artifact / version / digestによるnew fixture mutation-zero evidenceがある。成立しない場合はworkspace format / release sequenceを変更している。
-- [ ] `package_generation × lifecycle_state × operation`の全cellにauthority、evidence、diagnostic、recovery / implementation / removal ownerがある。
+- [ ] exact P0 artifactが満たすmutation-zero policyと、C5 probeが成立しない場合にworkspace format / release sequenceを変更するauthorityが確定している。canonical schema / fixtureの作成・probe実行はC5が所有する。
+- [ ] `package_generation × lifecycle_state × public_operation × execution_mode`の全cellにauthority、evidence、diagnostic、recovery / implementation / removal ownerがある。
 - [ ] active legacy recoveryをadapterまたはlast-compatible packageのどちらが所有するか確定している。
 - [ ] bridge sunsetをEpic内で行うかfollow-upへ渡すか、owner / expiryを含めて確定している。
 - [ ] unknown stateのdefaultがmutation前のpreserve-and-blockである。
