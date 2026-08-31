@@ -115,13 +115,24 @@ EXPECTED_HISTORICAL_CURRENT_IDENTITY = {
 
 _RECOVERY_PATHNAMES = (".distribution-retry.json", ".distribution-journal.json", ".uninstall-retry.json")
 _RECOVERY_PATH_MUTATORS = frozenset({"rename", "replace", "touch", "unlink", "write_bytes", "write_text"})
+_RECOVERY_OS_MUTATORS = frozenset({"open", "remove", "rename", "replace", "unlink"})
+_RECOVERY_SAFE_SERVICE_CALLS = frozenset({
+    "execute_deprovision_distribution",
+    "execute_explicit_spec_history_purge_distribution",
+    "execute_fresh_distribution",
+    "execute_recognized_distribution",
+})
 
 
-def _has_recovery_path_role(node: ast.AST, role_names: set[str]) -> bool:
-    names = {child.id for child in ast.walk(node) if isinstance(child, ast.Name)}
-    literals = (child.value for child in ast.walk(node) if isinstance(child, ast.Constant))
-    return not names.isdisjoint(role_names) or any(
-        isinstance(literal, str) and literal.endswith(_RECOVERY_PATHNAMES) for literal in literals
+def _has_recovery_path_role(node: ast.AST, roles: set[str] | frozenset[str]) -> bool:
+    return any(
+        (isinstance(child, ast.Name) and child.id in roles)
+        or (
+            isinstance(child, ast.Constant)
+            and isinstance(child.value, str)
+            and child.value.endswith(_RECOVERY_PATHNAMES)
+        )
+        for child in ast.walk(node)
     )
 
 
@@ -134,22 +145,54 @@ def _cli_recovery_writer_roles(source: str) -> tuple[str, ...]:
         if isinstance(node, ast.Assign) and _has_recovery_path_role(node.value, module_roles):
             module_roles.update(target.id for target in node.targets if isinstance(target, ast.Name))
 
+    functions = tuple(node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)))
+    role_factories = frozenset(
+        function.name
+        for function in functions
+        if any(
+            isinstance(node, ast.Return)
+            and node.value is not None
+            and not isinstance(node.value, ast.Call)
+            and _has_recovery_path_role(node.value, module_roles)
+            for node in ast.walk(function)
+        )
+    )
     violations: set[str] = set()
-    for function in (node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
-        role_names = set(module_roles)
+    for function in functions:
+        role_names = set(module_roles | role_factories)
         for assignment in (node for node in ast.walk(function) if isinstance(node, ast.Assign)):
             if _has_recovery_path_role(assignment.value, role_names):
                 role_names.update(target.id for target in assignment.targets if isinstance(target, ast.Name))
 
         for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
-            if not isinstance(call.func, ast.Attribute) or not _has_recovery_path_role(call.func.value, role_names):
-                continue
-            mode = call.args[0] if call.func.attr == "open" and call.args else None
-            writable_open = (
-                isinstance(mode, ast.Constant) and isinstance(mode.value, str) and bool(set(mode.value) & set("wax+"))
-            )
-            if call.func.attr in _RECOVERY_PATH_MUTATORS or writable_open:
-                violations.add(f"{function.name}:{call.func.attr}")
+            arguments = (*call.args, *(keyword.value for keyword in call.keywords))
+            has_role_argument = any(_has_recovery_path_role(value, role_names) for value in arguments)
+            if isinstance(call.func, ast.Name):
+                if has_role_argument and call.func.id not in role_factories | _RECOVERY_SAFE_SERVICE_CALLS:
+                    violations.add(f"{function.name}:{call.func.id}")
+            elif isinstance(call.func, ast.Attribute):
+                if (
+                    isinstance(call.func.value, ast.Name)
+                    and call.func.value.id == "os"
+                    and call.func.attr in _RECOVERY_OS_MUTATORS
+                    and has_role_argument
+                ):
+                    violations.add(f"{function.name}:os.{call.func.attr}")
+                    continue
+                if not _has_recovery_path_role(call.func.value, role_names):
+                    continue
+                mode = (
+                    call.args[0]
+                    if call.func.attr == "open" and call.args
+                    else next((keyword.value for keyword in call.keywords if keyword.arg == "mode"), None)
+                )
+                writable_open = (
+                    isinstance(mode, ast.Constant)
+                    and isinstance(mode.value, str)
+                    and bool(set(mode.value) & set("wax+"))
+                )
+                if call.func.attr in _RECOVERY_PATH_MUTATORS or writable_open:
+                    violations.add(f"{function.name}:{call.func.attr}")
 
     return tuple(sorted(violations))
 
@@ -167,17 +210,33 @@ def test_i372_reference_github_uses_current_uninstall_recovery_metadata() -> Non
     assert "自動作成も current recovery state への自動変換も行いません" in provider
 
 
+_RENAMED_RECOVERY_CLI_PREFIX = """
+RETRY_PATH = Path("spec-dock/.distribution-retry.json")
+def _renamed_recovery_path(root): return root / RETRY_PATH
+def _renamed_recovery_reader(root): return os.lstat(_renamed_recovery_path(root))
+def _renamed_service_coordinator(root): return execute_recognized_distribution(root, legacy_marker=_renamed_recovery_path(root))
+"""
+
+
 def test_i372_cli_recovery_writer_guard_is_role_based() -> None:
     """I372-T-AUTH-002: renaming a CLI-owned recovery writer cannot evade the guard."""
 
-    synthetic_source = """
-RETRY_PATH = Path("spec-dock/.distribution-retry.json")
-def _renamed_recovery_reader(root): return (root / RETRY_PATH).exists()
-def _renamed_service_coordinator(root, marker): return execute_recognized_distribution(root, root / RETRY_PATH, marker)
-def _renamed_recovery_publisher(root, payload): (root / RETRY_PATH).open("w").write(payload)
+    writer_source = """
+def _renamed_atomic_writer(path, payload): path.write_text(payload)
+def _renamed_recovery_publisher(root, payload):
+    marker = _renamed_recovery_path(root)
+    _renamed_atomic_writer(marker, payload)
+def _renamed_recovery_remover(root): os.unlink(_renamed_recovery_path(root))
+def _renamed_recovery_stream_writer(root): _renamed_recovery_path(root).open(mode="w")
+def _renamed_fd_writer(root): os.open(_renamed_recovery_path(root), os.O_WRONLY)
 """
 
-    assert _cli_recovery_writer_roles(synthetic_source) == ("_renamed_recovery_publisher:open",)
+    assert _cli_recovery_writer_roles(_RENAMED_RECOVERY_CLI_PREFIX + writer_source) == (
+        "_renamed_fd_writer:os.open",
+        "_renamed_recovery_publisher:_renamed_atomic_writer",
+        "_renamed_recovery_remover:os.unlink",
+        "_renamed_recovery_stream_writer:open",
+    )
 
 
 def test_i372_cli_has_no_legacy_distribution_writer_or_kernel_seam() -> None:
