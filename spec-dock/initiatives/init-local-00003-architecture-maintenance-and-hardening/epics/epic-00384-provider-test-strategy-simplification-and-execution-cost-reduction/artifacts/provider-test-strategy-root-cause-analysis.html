@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="ja" data-plantuml-status="pending" data-plantuml-contract="2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SpecDock テスト実行時間の根本原因と再設計案</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f3f6fb;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #536273;
+      --border: #d8e0ea;
+      --accent: #175cd3;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --error: #b42318;
+      --error-bg: #fef3f2;
+      --code-bg: #101828;
+      --code-text: #f2f4f7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(100% - 24px, 960px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header, section {
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgb(16 24 40 / 8%);
+    }
+
+    header { margin-top: 0; }
+    h1, h2 { line-height: 1.4; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2.25rem); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.2rem, 4vw, 1.5rem); }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .plantuml-status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .plantuml-status.error { background: var(--error-bg); color: var(--error); }
+    .plantuml-diagram {
+      position: relative;
+      min-height: 160px;
+      margin-top: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      color: #182230;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .plantuml-diagram[data-zoom-ready="true"] { cursor: zoom-in; }
+    .plantuml-diagram[data-zoom-ready="true"]:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .diagram-zoom-hint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgb(16 24 40 / 14%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plantuml-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .muted { color: var(--muted); }
+
+    a { color: var(--accent); }
+    h3 { margin: 22px 0 8px; line-height: 1.45; }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 6px; }
+    .kicker {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .lede { max-width: 54rem; font-size: 1.08rem; }
+    .meta { color: var(--muted); font-size: 0.88rem; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .metric {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--background);
+    }
+    .metric strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.45rem;
+      line-height: 1.2;
+    }
+    .metric span { display: block; margin-top: 6px; color: var(--muted); font-size: 0.86rem; }
+    .table-wrap { margin-top: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; min-width: 640px; }
+    th, td { padding: 10px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--background); }
+    td.number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--accent);
+      border-radius: 8px;
+      background: var(--background);
+    }
+    .callout.warning { border-left-color: #f79009; }
+    .callout.danger { border-left-color: var(--error); }
+    .callout.success { border-left-color: var(--success); }
+    .callout p:first-child { margin-top: 0; }
+    .callout p:last-child { margin-bottom: 0; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--background);
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .decision {
+      padding: 15px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--background);
+    }
+    .decision h3 { margin: 0 0 8px; font-size: 1rem; }
+    .diagram-caption { margin-top: 8px; color: var(--muted); font-size: 0.86rem; }
+    .toc { columns: 2 260px; margin: 10px 0 0; }
+    .toc a { text-decoration: none; }
+    .source-list code { overflow-wrap: anywhere; }
+    .checklist { list-style: none; padding-left: 0; }
+    .checklist li::before { content: "□"; margin-right: 8px; color: var(--accent); font-weight: 800; }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.diagram-zoom-open { overflow: hidden; }
+
+    .diagram-zoom-dialog[hidden] { display: none !important; }
+    .diagram-zoom-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgb(3 10 21 / 78%);
+    }
+
+    .diagram-zoom-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(1800px, 100%);
+      height: min(1200px, 100%);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+    }
+
+    .diagram-zoom-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin: 0;
+      padding: 6px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .diagram-zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diagram-zoom-controls button {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .diagram-zoom-controls button svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .diagram-zoom-controls button:hover,
+    .diagram-zoom-controls button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .diagram-zoom-controls button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .diagram-zoom-level {
+      min-width: 3.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    #diagram-zoom-reset {
+      width: auto;
+      min-width: 58px;
+      padding-inline: 8px;
+    }
+
+    .diagram-zoom-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #ffffff;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .diagram-zoom-canvas {
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 24px;
+    }
+
+    .diagram-zoom-canvas svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .diagram-zoom-dialog { padding: 0; }
+      .diagram-zoom-panel { border-radius: 0; }
+      .diagram-zoom-canvas { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0c111d;
+        --surface: #161b26;
+        --text: #f5f7fa;
+        --muted: #b9c2cf;
+        --border: #333b48;
+        --success-bg: #053321;
+        --error-bg: #55160c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="kicker">Epic 384 · Root-cause analysis</p>
+      <h1>SpecDock テスト実行時間の根本原因と再設計案</h1>
+      <p class="lede">結論から言うと、4時間級のテストを4 shardへ分けることは根本解ではありません。現在の重さは、巨大化したdistribution機能、同じ契約の重複テスト、process・Git・venv・大規模コピーを何度も通る実行方法から生じています。目標は、必要な契約を一度ずつ証明し、単一のpytest processでも10分以内に終わる構造です。</p>
+      <p class="meta">調査日: 2026-08-31 JST ／ 対象: <code>iss-00372-distribution-hard-cutover-and-parity</code> latest <code>7af12c54...</code> ／ 実測candidate: <code>53f309a4...</code>・<code>bc156009...</code></p>
+      <div class="metrics" aria-label="主要な調査結果">
+        <div class="metric"><strong>2,708</strong><span>現在collectされるtest cases</span></div>
+        <div class="metric"><strong>5.51時間</strong><span>GitHub Full Regressionの4 shard-process elapsed合計</span></div>
+        <div class="metric"><strong>22,332行</strong><span><code>managed_distribution.py</code> の規模</span></div>
+        <div class="metric"><strong>26件</strong><span>現在も成功扱いされるactive failure signatures</span></div>
+      </div>
+      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
+        図を読み込んでいます。
+      </div>
+    </header>
+
+    <section aria-labelledby="summary-heading">
+      <h2 id="summary-heading">最初に押さえる結論</h2>
+      <div class="callout danger">
+        <p><strong>問題は「並列数が足りない」ことではありません。</strong></p>
+        <p>GitHubの4 shard実行は約99分で終わりましたが、4 processの経過時間を足すと約5.51時間です。並列化は総作業量を消さず、CPUとrunner resourceへ押し込んでいます。</p>
+      </div>
+      <ol>
+        <li><strong>production contractが大きすぎます。</strong> install / update / uninstall / purgeが、path identity、journal、retry、crash recovery、historical compatibilityを一つのengineで扱っています。</li>
+        <li><strong>同じ契約を何度も証明しています。</strong> managed distribution 575 casesは、同一candidateで最大4回実行されます。</li>
+        <li><strong>高価な境界を使いすぎています。</strong> Python subprocess、Git repository、wheel / sdist、venv、pip install、44 MB級dogfood copyを多数のtestが反復します。</li>
+        <li><strong>失敗testを維持する仕組みが増えています。</strong> 26 failuresをledger照合で成功扱いするため、さらにrunner・evaluator・meta-testsが必要です。</li>
+      </ol>
+      <p><strong>第一推奨:</strong> provider-owned immutable payloadとuser-owned spec historyを分離し、通常updateを「stage → validate → activation record一つのatomic swap」へ縮小します。その後、durable invariantを最も安いlayerで一度だけ証明します。</p>
+    </section>
+
+    <section aria-labelledby="toc-heading">
+      <h2 id="toc-heading">この資料の読み方</h2>
+      <ol class="toc">
+        <li><a href="#terms">時間の意味を分ける</a></li>
+        <li><a href="#evidence">実測値を確認する</a></li>
+        <li><a href="#current-flow">現在の重複実行を見る</a></li>
+        <li><a href="#root-causes">根本原因をたどる</a></li>
+        <li><a href="#distribution">install / uninstallを見直す</a></li>
+        <li><a href="#options">選択肢を比較する</a></li>
+        <li><a href="#target">目標のtest portfolioを確認する</a></li>
+        <li><a href="#deletion">何を残し、何を削るか</a></li>
+        <li><a href="#baseline">26 failuresを終わらせる</a></li>
+        <li><a href="#roadmap">Issue分割と順序を見る</a></li>
+        <li><a href="#decisions">Product判断を確認する</a></li>
+        <li><a href="#verification">完了の確認方法を見る</a></li>
+      </ol>
+    </section>
+
+    <section id="terms" aria-labelledby="terms-heading">
+      <h2 id="terms-heading">「速い」を一つの数字で扱わない</h2>
+      <p>今回の問題では、次の四つを分ける必要があります。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>指標</th><th>意味</th><th>今回の注意点</th></tr></thead>
+          <tbody>
+            <tr><td><strong>wall time</strong></td><td>利用者が開始から終了まで待つ時間</td><td>shardを増やすと短く見えます。</td></tr>
+            <tr><td><strong>process elapsed</strong></td><td>各pytest processが占有した経過時間の合計</td><td>4 shardではwallより大きくなります。runner resource量の目安です。</td></tr>
+            <tr><td><strong>CPU time / CPU使用率</strong></td><td>実際にCPUが計算へ使われた量と瞬間的な負荷</td><td>今回のGitHub artifactには直接のCPU telemetryがありません。process elapsedと同一視しません。</td></tr>
+            <tr><td><strong>unique contract work</strong></td><td>異なるproduct invariantを証明する本来必要な作業</td><td>同じnodeを別lane・同じOSで再実行しても増えません。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warning">
+        <p>利用者からの「逐次約4時間」「並列時に約10分CPUほぼ100%」は重要な問題入力です。ただし、今回同一machine・同一SHAでCPUを再測定した値ではありません。本資料では、直接確認できたwall、shard process、source構造と区別して記載します。</p>
+      </div>
+    </section>
+
+    <section id="evidence" aria-labelledby="evidence-heading">
+      <h2 id="evidence-heading">同一candidateで確認した実測値</h2>
+      <p>GitHub PR runと手動Full Regressionは、どちらもexact SHA <code>53f309a487484cbc6af1dd5a562ca2a3f31f2bbd</code>です。candidate差ではなく、実行graphそのものを比較できます。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>実行</th><th>結果</th><th>test body</th><th>意味</th></tr></thead>
+          <tbody>
+            <tr><td>PR ordinary / Ubuntu</td><td>1,567 passed、1,141 skipped</td><td class="number">10分50秒</td><td>fastと呼ぶ既定gateだけで目標を超えます。</td></tr>
+            <tr><td>PR distribution parity / Ubuntu</td><td>575 + 158 + 16 cases</td><td class="number">76分41秒</td><td>cutover 158 casesが53分11秒、package 16 casesが22分19秒です。</td></tr>
+            <tr><td>PR distribution parity / macOS</td><td>575 + 158 + 16 cases</td><td class="number">56分39秒</td><td>同じrule matrixを別OSでも広く反復します。</td></tr>
+            <tr><td>Full Regression / Ubuntu</td><td>2,708 collected、4 shards、verified</td><td class="number">99分19秒 wall</td><td>fastを含む全nodeを再実行します。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Full Regressionの内訳</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>値</th><th>読み方</th></tr></thead>
+          <tbody>
+            <tr><td>collection</td><td class="number">7.911秒</td><td>全体の0.14%未満です。collection最適化は主解ではありません。</td></tr>
+            <tr><td>shard 1</td><td class="number">4,964.26秒</td><td rowspan="4">4 processは同時に走りますが、各processが使った時間は残ります。</td></tr>
+            <tr><td>shard 2</td><td class="number">5,958.94秒</td></tr>
+            <tr><td>shard 3</td><td class="number">4,719.11秒</td></tr>
+            <tr><td>shard 4</td><td class="number">4,208.80秒</td></tr>
+            <tr><td><strong>shard-process合計</strong></td><td class="number"><strong>19,851.11秒（5.51時間）</strong></td><td>parallelismで消えていない総process経過量です。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>通常gateの費用集中</h3>
+      <p>pytest progressのtimestampから、次の4 file spansが約636 / 651秒、約97.7%を占めます。これはper-test CPU timeではありませんが、bottleneckが少数fileへ集中していることを示します。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>test file</th><th>実行されたcases</th><th>およそのwall span</th></tr></thead>
+          <tbody>
+            <tr><td><code>test_cli_smoke.py</code></td><td class="number">2</td><td class="number">約63秒</td></tr>
+            <tr><td><code>test_active_store.py</code></td><td class="number">6</td><td class="number">約66秒</td></tr>
+            <tr><td><code>test_init_update.py</code> のrequired-fast subset</td><td class="number">3</td><td class="number">約60秒</td></tr>
+            <tr><td><code>test_managed_distribution.py</code></td><td class="number">575</td><td class="number">約447秒</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="meta">同じ575 casesはfocused jobではUbuntu 70.47秒、macOS 55.19秒でした。この約6倍のばらつきは、filesystem-heavy testがrunner状態・order・環境に敏感であることも示します。</p>
+    </section>
+
+    <section id="current-flow" aria-labelledby="current-flow-heading">
+      <h2 id="current-flow-heading">現在は同じ候補コードを何度も試している</h2>
+      <p>下の図では、一本のcandidateから複数laneへ分かれています。platform差の確認は必要ですが、Ubuntuで同じnodeをordinary・parity・fullの三回通すことは、異なる契約を増やしません。</p>
+      <script type="text/plain" class="plantuml-source" id="source-current-execution" data-target="diagram-current-execution">
+@startuml
+title 現在の同一候補コードに対する重複実行
+left to right direction
+
+artifact "候補コード\n53f309a4..." as Candidate
+rectangle "PR通常gate\nUbuntu\n1,567件実行\n10分50秒" as Fast
+rectangle "distribution parity\nUbuntu\n76分41秒" as LinuxParity
+rectangle "distribution parity\nmacOS\n56分39秒" as MacParity
+rectangle "Full Regression\nUbuntu・4 shard\n2,708件\n99分19秒" as Full
+
+Candidate --> Fast : 全2,708件を収集\n1,141件をskip
+Candidate --> LinuxParity : distributionを再実行
+Candidate --> MacParity : OS別に広い集合を再実行
+Candidate --> Full : fastを含む全件を再実行
+
+Fast --> LinuxParity : managed 575件が重複
+Fast --> Full : fast 1,567件が重複
+LinuxParity --> Full : cutover 158件とpackage 16件が重複
+MacParity --> Full : OS非依存ruleも重複
+
+note bottom of Full
+  4 shard-processの合計は約5.51時間
+  26 failure signaturesをledgerで成功扱い
+end note
+@enduml
+      </script>
+      <div id="diagram-current-execution" class="plantuml-diagram">現在の実行グラフを描画しています。</div>
+      <p class="diagram-caption">図を選択すると拡大できます。PlantUMLソースはHTML内に残してあります。</p>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-current-execution"></pre></details>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>family</th><th>PR Ubuntu ordinary</th><th>PR Ubuntu parity</th><th>PR macOS parity</th><th>Full Ubuntu</th><th>回数</th></tr></thead>
+          <tbody>
+            <tr><td>managed distribution 575 cases</td><td>実行</td><td>実行</td><td>実行</td><td>実行</td><td class="number">4</td></tr>
+            <tr><td>distribution cutover 158 cases</td><td>skip</td><td>実行</td><td>実行</td><td>実行</td><td class="number">3</td></tr>
+            <tr><td>package parity 16 cases</td><td>skip</td><td>実行</td><td>実行</td><td>実行</td><td class="number">3</td></tr>
+            <tr><td>その他のfast cases</td><td>実行</td><td>原則なし</td><td>原則なし</td><td>実行</td><td class="number">2</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="root-causes" aria-labelledby="root-causes-heading">
+      <h2 id="root-causes-heading">根本原因はproductionからCIまで連鎖している</h2>
+      <script type="text/plain" class="plantuml-source" id="source-root-causes" data-target="diagram-root-causes">
+@startuml
+title テスト肥大化の因果関係
+top to bottom direction
+
+rectangle "大きなdistribution契約\ninstall・update・uninstall・purge\njournal・retry・歴史互換" as Product
+rectangle "巨大な状態空間\nfile種別 × checkpoint × intent × drift" as State
+rectangle "Issue・Stepごとにtestを加算\n現在のdurable invariantへ統合されない" as Historical
+rectangle "同じ不変条件を複数層で証明\nunit・CLI・package・platform" as Duplicate
+rectangle "高価な境界を反復\nprocess・Git・venv・build・大規模copy" as Mechanics
+rectangle "pathでfast / fullを分類\n費用と責務が一致しない" as Lane
+rectangle "4 shard・timing weight\nwallだけを圧縮" as Parallel
+rectangle "CPU圧迫・長いCI・複雑な品質基盤" as Outcome
+
+Product --> State : 自動復旧の組合せが増える
+State --> Historical : regressionを追加する
+Historical --> Duplicate : 置換されず残る
+Duplicate --> Mechanics : 各boundaryを通る
+Lane --> Duplicate : 排他的ownerがない
+Mechanics --> Parallel : 遅さをworkerで吸収する
+Parallel --> Outcome : 総作業量を残す
+Duplicate --> Outcome : 同じnodeを再実行する
+@enduml
+      </script>
+      <div id="diagram-root-causes" class="plantuml-diagram">根本原因の因果図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-root-causes"></pre></details>
+      <h3>優先順位</h3>
+      <ol>
+        <li><strong>production state space</strong> — <code>managed_distribution.py</code>だけで22,332行、41 classes、454 functions / methodsです。</li>
+        <li><strong>contract ownershipの欠如</strong> — 同じinvariantをunit・CLI・package・platformが重ねて証明します。</li>
+        <li><strong>execution graphの重複</strong> — exact same SHAのnodeをordinary・parity・fullで再実行します。</li>
+        <li><strong>expensive mechanics</strong> — subprocess、Git、venv、pip、artifact build、large copyを多数回使います。</li>
+        <li><strong>historical additive tests</strong> — <code>s35</code>〜<code>s70</code>、<code>i368</code>〜<code>i371</code>などの実装stepがtest名と集合へ残ります。</li>
+        <li><strong>approved failure infrastructure</strong> — 26 failuresと、それを承認する約974行のquality code・ledger・meta-testsが共存します。</li>
+        <li><strong>parallelism-first</strong> — 上の原因を残したままwallだけを短くします。</li>
+      </ol>
+    </section>
+
+    <section id="distribution" aria-labelledby="distribution-heading">
+      <h2 id="distribution-heading">install / update / uninstall testsが多い本当の理由</h2>
+      <p>関連する主要4 test filesは合計約35,000行です。これは単にtest authorが細かすぎるからではありません。production側が次の状態を公開契約のように扱っているためです。</p>
+      <ul>
+        <li>regular file、directory、symlink、hardlink、FIFOとparent chainのidentity</li>
+        <li>provider manifest、historical identity、version recognition、generated projections</li>
+        <li>preservation witness、closed-set evidence、plan digest、journal、forward guard</li>
+        <li>crash checkpointごとのresume、cleanup、quarantine、predecessor reservation</li>
+        <li>create、upgrade、deprovision、explicit spec-history purgeのintentとcross-intent mismatch</li>
+        <li>same bytes but new inode、path rebind race、malformed markerなどのfail-closed cases</li>
+      </ul>
+      <div class="callout success">
+        <p><strong>残すべき安全性:</strong> foreign pathを削除しない、symlinkをfollowしない、ownershipやparent identityが変わったら書込み前に止まる、user historyを保護する、candidate artifactをhashで固定する。</p>
+      </div>
+      <div class="callout warning">
+        <p><strong>Product判断が必要な複雑性:</strong> arbitrary checkpointから自動rollback / resumeすること、cross-intent journalを永続互換にすること、通常uninstallとuser history purgeを一つのengineで行うこと、すべてのhistorical workspaceを直接upgradeすること。</p>
+      </div>
+      <h3>推奨する小さな契約</h3>
+      <ol>
+        <li><strong>所有権を分ける:</strong> provider-owned payloadとuser-owned <code>spec-dock/</code> historyを別のboundaryにします。</li>
+        <li><strong>immutable payloadをstageする:</strong> 新versionをbounded managed rootの別directoryへ完成させ、manifest、digest、実行可能性を検証します。</li>
+        <li><strong>activationを一度だけ切り替える:</strong> 同一filesystem上のactivation record一つをatomic replaceします。active payloadをin-place mutationしません。</li>
+        <li><strong>cleanupを成功判定から分ける:</strong> activation前の失敗では旧versionを使い続け、activation後のold payload cleanup failureでは新versionをactiveのまま保ちます。</li>
+        <li><strong>driftは直さず止める:</strong> provider ownershipを証明できないfileは上書き・削除せず、診断を返します。</li>
+        <li><strong>通常uninstallはhistoryを保持する:</strong> exactly provider-ownedな対象だけを削除します。</li>
+        <li><strong>互換性を有限にする:</strong> 第一推奨はcurrent + N-1です。それ以前はone-shot migrationまたはbackup後のre-initへ送ります。</li>
+      </ol>
+      <p>repo-local runtimeが不要ならpackageから実行する構成が最も小さくなります。offline・self-contained要件でcopyが必要なら、一つのversioned managed payloadとthin entrypointに集約します。</p>
+    </section>
+
+    <section id="options" aria-labelledby="options-heading">
+      <h2 id="options-heading">四つの選択肢</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>選択肢</th><th>product変更</th><th>wall / CPU改善</th><th>safety / compatibility</th><th>判断</th></tr></thead>
+          <tbody>
+            <tr><td>A. shard・cache・runnerだけ改善</td><td>なし</td><td>wallのみ。総作業量は残る</td><td>現行を維持</td><td><span class="pill">却下</span></td></tr>
+            <tr><td>B. testだけlower layerへ移す</td><td>小</td><td>中程度</td><td>巨大stateの証明は残る</td><td><span class="pill">移行手段</span></td></tr>
+            <tr><td>C. product contractとtestを同時に縮小</td><td>中〜大</td><td>wall / CPU双方を根本削減</td><td>fail closedを残し、自動復旧を縮小</td><td><span class="pill">第一推奨</span></td></tr>
+            <tr><td>D. repo-local distributionを廃止</td><td>最大</td><td>最も小さい</td><td>offline / self-contained要件と衝突の可能性</td><td><span class="pill">長期候補</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Option Cは、testを減らすために安全を捨てる案ではありません。「未知の対象へ書かない・消さない」というfail-closed invariantを残し、「あらゆる途中状態を自動復旧する」という別のpromiseを縮小する案です。</p>
+    </section>
+
+    <section id="target" aria-labelledby="target-heading">
+      <h2 id="target-heading">目標のproduct / test architecture</h2>
+      <script type="text/plain" class="plantuml-source" id="source-target-architecture" data-target="diagram-target-architecture">
+@startuml
+title 目標の候補コード検証と責務分担
+left to right direction
+
+actor "開発者" as Developer
+component "候補artifactを一度build\nwheel・sdist・managed payload\nSHAとdigestを固定" as Build
+component "純粋なdomain契約\n状態遷移・manifest・path rule\n目標30秒" as Pure
+component "filesystem / application契約\nownership・idempotence・fail closed\n目標3分" as Service
+component "CLI契約smoke\n引数・exit code・JSON / text\n目標1分" as CLI
+component "Linux artifact smoke\ninit・update・history保持uninstall\n目標4分" as Linux
+component "macOS境界smoke\nOS差があるcasesだけ\n目標4分" as Mac
+artifact "candidate receipt\nsource SHA・artifact digest" as Receipt
+
+Developer --> Build : 一回だけ作る
+Build --> Receipt : bytesを固定する
+Receipt --> Pure : 同一candidateを検証
+Receipt --> Service : 同一candidateを検証
+Receipt --> CLI : 同一candidateを検証
+Receipt --> Linux : 同じartifactを使う
+Receipt --> Mac : 同じartifactを使う
+Pure --> Service : ruleを一度だけ所有
+Service --> CLI : 代表経路だけ渡す
+CLI --> Linux : end-to-endは最小にする
+
+note bottom of Pure
+  canonical regressionは単一pytest process
+  全体10分以内・approved failure 0
+end note
+note bottom of Mac
+  Linuxと同じpure ruleは繰り返さない
+  platform差のあるboundaryだけを確認
+end note
+@enduml
+      </script>
+      <div id="diagram-target-architecture" class="plantuml-diagram">目標architectureを描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-target-architecture"></pre></details>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>layer</th><th>一度だけ証明する責務</th><th>置いてはいけないもの</th><th>予算</th></tr></thead>
+          <tbody>
+            <tr><td>pure / domain</td><td>state transition、validation、property</td><td>subprocess、Git、package build、large copy</td><td class="number">30秒</td></tr>
+            <tr><td>filesystem / application</td><td>ownership、atomic action、fault後の再実行、fail closed</td><td>full dogfood clone、CLI processの完全matrix</td><td class="number">3分</td></tr>
+            <tr><td>CLI contract smoke</td><td>parser、exit code、JSON / text mapping、代表happy / failure</td><td>全state cross-product、fresh venv反復</td><td class="number">1分</td></tr>
+            <tr><td>artifact / platform smoke</td><td>exact bytes、install、init、update、uninstall、OS差</td><td>pure ruleの再検証、historical cross-product</td><td class="number">OSごと4分</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Linuxの配分は合計8分30秒です。残り1分30秒をcollection、fixture、runner varianceのheadroomにします。macOSは共通3 layerを繰り返さず、OS差のあるboundaryだけを4分以内で試します。</p>
+      <div class="callout success">
+        <p><strong>最終budget:</strong> canonical local regressionは単一pytest processで10分以内です。childを含む <code>(user CPU + system CPU) / wall</code> は各回1.1以下にします。shard、<code>pytest-xdist</code>、timing-weight schedulerを標準経路にしません。同一candidate・OSのduplicate nodeは0、artifact buildは1回、approved failureは0です。</p>
+      </div>
+    </section>
+
+    <section id="deletion" aria-labelledby="deletion-heading">
+      <h2 id="deletion-heading">何を残し、何を移し、何を削るか</h2>
+      <p>「遅いから削除」は禁止します。削除は、現在の契約を廃止した証拠か、より安いlayerのreplacement proofがある場合だけ行います。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>判定</th><th>具体例</th><th>必要な証拠</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Keep</strong></td><td>foreign path保護、no-follow、parent rebind block、artifact digest、history保持、再実行収束、OS差</td><td>current security / public invariantへ直接link</td></tr>
+            <tr><td><strong>Move</strong></td><td>manifest schema、path normalization、state transition、error mapping、fault logic</td><td>pure / service testが元のfailureを決定的に再現</td></tr>
+            <tr><td><strong>Consolidate</strong></td><td><code>s35</code>〜<code>s70</code>、<code>i368</code>〜<code>i371</code>、fresh / update / retry / symlink matrix</td><td>durable invariant名とowner layerを一つに固定</td></tr>
+            <tr><td><strong>Delete / Retire</strong></td><td>廃止したrollback・cross-intent・purge contract、同一OSのduplicate node、lower layerと同じpackage / CLI proof</td><td>retired product contractまたはreplacement node receipt</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>具体的な縮小方法</h3>
+      <ul>
+        <li>file種別 × checkpoint × intent × driftの完全直積を、equivalence partition、pairwise、property testへ置き換えます。</li>
+        <li>wheelは代表end-to-endを実行し、sdistはbuild・metadata・import proofへ縮小します。behaviorが同じuse caseを双方で繰り返しません。</li>
+        <li>44 MB級dogfood treeは一つのrelease smokeだけに使い、通常contractは1.6 MB級provider assetsまたはminimal synthetic workspaceを使います。</li>
+        <li>CLI subprocessはpublic commandごとに代表happy pathとfail-closed pathを基本上限にします。parserとrendererはin-processで試します。</li>
+        <li>Issue名testは現在のinvariant名へ置換します。successorができたら旧nodeを同時に削除します。</li>
+      </ul>
+      <p class="meta">全2,708 nodeの個別削除一覧はまだ断定していません。100% contract mappingは最初の実装Issueの成果です。調査段階で件数だけを目標にすると、安全testを誤って削るためです。</p>
+    </section>
+
+    <section id="baseline" aria-labelledby="baseline-heading">
+      <h2 id="baseline-heading">26件の「承認済み失敗」を終わらせる</h2>
+      <p>現在のschema-v2 ledgerは、失敗を隠さずactive / resolved / retiredへ分類する移行証拠として有用です。しかし、steady stateでは失敗を成功へ変換する仕組み自体をなくす必要があります。</p>
+      <ol>
+        <li>26 nodesをcurrent contract familyへgroup化します。</li>
+        <li>各nodeを <code>valid-current-bug</code>、<code>obsolete-contract</code>、<code>duplicate-proof</code>、<code>renamed/replaced</code> に分類します。</li>
+        <li>bugは修正し、obsoleteは契約ごと廃止し、duplicateはowner proofへ統合します。</li>
+        <li>successorは同一candidateでexactly once collected・executed、passed、not skippedを証明します。</li>
+        <li>新しいactive ledger rowの追加を禁止し、active countを0へ減らします。</li>
+        <li>zero-failure canonical commandを連続して通します。</li>
+        <li>ledger、baseline evaluator、pytest observation hook、timing weights、4-shard runner、関連meta-testsを一つのcutoverで削除します。</li>
+        <li>historical receiptはSpecDock ArtifactとGit historyに残し、毎回のtest runtimeへ残しません。</li>
+      </ol>
+    </section>
+
+    <section id="roadmap" aria-labelledby="roadmap-heading">
+      <h2 id="roadmap-heading">Product判断後にIssue境界を確定する</h2>
+      <p><code>assess-issue-granularity</code> の結果は <code>RETURN_TO_PARENT</code> です。Product判断6 groupsが未受理なので、子Issueはまだ作りません。下図と表は判断後の条件付きproposalです。</p>
+      <script type="text/plain" class="plantuml-source" id="source-roadmap" data-target="diagram-roadmap">
+@startuml
+title 条件付きIssue候補の依存関係
+left to right direction
+
+rectangle "Epic R5A\nProduct判断6 groups" as Decision
+rectangle "候補1\nevidence / invariant\ninventory" as Inventory
+rectangle "候補2\nimmutable payload\natomic activation" as Activation
+rectangle "候補3\nprovider-only uninstall\npurge boundary" as Uninstall
+rectangle "候補4\nlegacy migration\nsupport sunset" as Legacy
+rectangle "候補5〜7\n26 failuresを\n12 / 9 / 5で解消" as Failures
+rectangle "候補8\nbuild-once artifact\nplatform portfolio" as Artifact
+rectangle "候補9\n10分budget cutover\n旧runner撤去" as Cutover
+
+Decision --> Inventory : 判断後に候補を確定
+Inventory --> Activation : invariantを渡す
+Inventory --> Failures : node分類を渡す
+Activation --> Uninstall : ownershipを渡す
+Activation --> Legacy : current stateを渡す
+Activation --> Artifact : exact payloadを渡す
+Uninstall --> Artifact : lifecycleを渡す
+Legacy --> Artifact : supported migrationを渡す
+Artifact --> Cutover : 小さなportfolioを渡す
+Failures --> Cutover : active 0を渡す
+
+note bottom of Decision
+  未回答の間は
+  子Issueを作成・開始しない
+end note
+@enduml
+      </script>
+      <div id="diagram-roadmap" class="plantuml-diagram">Issue依存図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-roadmap"></pre></details>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Issue</th><th>観測可能な価値</th><th>主な完了条件</th></tr></thead>
+          <tbody>
+            <tr><td>1. inventory</td><td>全test nodeのcontract・cost・重複・fault packを確定</td><td>2,708 nodesをfamily単位で100%分類</td></tr>
+            <tr><td>2. init / update</td><td>immutable payloadとsingle activation swap</td><td>activation前は旧version、後は新version。user history不変</td></tr>
+            <tr><td>3. uninstall / purge</td><td>provider-only uninstallとpurge廃止または独立化</td><td>managed root外を削除せずhistory不変</td></tr>
+            <tr><td>4. legacy</td><td>必要な場合だけone-shot migrationとsunset</td><td>supported version・終了条件・fixture retirement</td></tr>
+            <tr><td>5. active / context cluster</td><td>active failures 12件を解消</td><td>plain pytest GREENまたはaccepted retirement</td></tr>
+            <tr><td>6. import / sync cluster</td><td>active failures 9件を解消</td><td>successor exactly once / passed / not skipped</td></tr>
+            <tr><td>7. runtime misc cluster</td><td>remaining 5件を解消</td><td>active baseline count 0</td></tr>
+            <tr><td>8. artifact / platform</td><td>artifact一回、supported platformだけを証明</td><td>wheel / sdist / macOS / dogfoodをaccepted triggerへ縮小</td></tr>
+            <tr><td>9. CI cutover</td><td>単一process10分、duplicate zero、plain GREEN</td><td>旧sharder・ledger・timing weights・policy flagsを撤去</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="decisions" aria-labelledby="decisions-heading">
+      <h2 id="decisions-heading">実装前にProduct ownerが決める六つのgroup</h2>
+      <div class="decision-grid">
+        <article class="decision">
+          <h3>1. spec-history purge</h3>
+          <p><strong>推奨:</strong> 通常uninstallはhistoryを常に保持し、自動 <code>--remove-specs</code> を廃止します。</p>
+          <p class="meta">維持する場合は、purge専用security contractとplatform smokeが必要です。</p>
+        </article>
+        <article class="decision">
+          <h3>2. lifecycle / recovery</h3>
+          <p><strong>推奨:</strong> <code>init --force</code>を廃止またはpayload reinstallに限定し、自動rollback / resumeを外します。current + previousの最大2世代にします。</p>
+          <p class="meta">維持する場合は、force・journal・GC・recovery matrixを削れません。</p>
+        </article>
+        <article class="decision">
+          <h3>3. compatibility window</h3>
+          <p><strong>推奨:</strong> direct updateはcurrent + N-1です。それ以前はone-shot migrationまたはre-initとします。</p>
+          <p class="meta">実利用versionの情報がないため、これは推奨であって確認済み事実ではありません。</p>
+        </article>
+        <article class="decision">
+          <h3>4. repo-local runtime</h3>
+          <p><strong>推奨:</strong> 不要ならpackage executionへ寄せ、必要ならversioned immutable payload + activation recordへ集約します。</p>
+          <p class="meta">offline・self-contained要件を先に確認します。</p>
+        </article>
+        <article class="decision">
+          <h3>5. artifact / platform evidence</h3>
+          <p><strong>推奨:</strong> wheelを通常PR、sdistをrelease、macOSはOS差だけ、dogfood parityはmanifest / hash中心にします。</p>
+          <p class="meta">全lifecycleを毎PR・各OSで繰り返すと10分目標を満たせません。</p>
+        </article>
+        <article class="decision">
+          <h3>6. public compatibility</h3>
+          <p><strong>推奨:</strong> 廃止するCLI flagsとJSON fieldsをdeprecationまたはbreaking changeとして明示します。</p>
+          <p class="meta">policyがなければ旧adapterとtestを無期限に維持することになります。</p>
+        </article>
+      </div>
+      <div class="callout warning">
+        <p>この六つのgroupは下位Issueが推測で決めてはいけません。回答がない間、EpicのRequirement / Design / Planはdraftを維持し、子Issueを作成・開始しません。</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="failure-heading">
+      <h2 id="failure-heading">推奨案が間違っていると判断する条件</h2>
+      <p>Option Cを採用前に、次の反証を行います。一つでも成立すれば、該当contractをRequirement / Designへ戻します。</p>
+      <ul>
+        <li>利用者がarbitrary checkpointからのautomatic recoveryを必要とし、manual retryやre-initを受け入れられない。</li>
+        <li>N-1より古いworkspaceが継続的に存在し、one-shot migrationでは運用できない。</li>
+        <li>repo-local copied runtimeがoffline・audit・agent operationの必須要件で、managed payload一つへ集約できない。</li>
+        <li>pure / serviceへ移した後、mutation testingまたはhistorical bug reproductionで重要なboundary regressionを検出できない。</li>
+        <li>contract縮小後のsingle-process prototypeが10分を大幅に超え、別moduleが主bottleneckである。</li>
+        <li>simplified reconcilerがunknown / drift / rebind時のfail-closed proofを満たさない。</li>
+      </ul>
+      <p>contractを残す場合、そのcostを明示します。worker増加で見えなくすることはしません。</p>
+    </section>
+
+    <section id="verification" aria-labelledby="verification-heading">
+      <h2 id="verification-heading">Epic完了時の確認方法</h2>
+      <ul class="checklist">
+        <li>canonical local regressionを単一pytest processで連続5回実行し、各回600秒以内。</li>
+        <li>5回すべてがzero failures、zero policy skips。</li>
+        <li>child-inclusive wall、user CPU、system CPUをcandidate SHA付きで記録し、平均論理core使用数を各回1.1以下にする。</li>
+        <li>Linux 2 vCPU hard quota、8 GiB、networkなしのreference環境でもbudgetを満たす。</li>
+        <li>同一candidate・OSのduplicate node countが0。</li>
+        <li>wheel / sdist / managed payloadのbuild countが各1で、Linux / macOSが同じdigestを使用。</li>
+        <li>Linux / macOSのplatform test bodyが各600秒以内。</li>
+        <li>unknown path、drift、symlink、parent rebind、permission failure、mid-operation stopでfail closed。</li>
+        <li>uninstall前後でuser spec historyがbyte-identical。</li>
+        <li>active approved failuresが0で、ledger・timing weights・4-shard runnerがない。</li>
+        <li>削除test familyごとにreplacement proofまたはretired product contractが残る。</li>
+        <li>seeded fault packを100%検出し、cutover後のrolling 20 runsでflake 0・retry 0。</li>
+      </ul>
+      <h3>今回実施した確認</h3>
+      <ul>
+        <li><code>01ae</code> latest worktreeのbranch / HEAD / clean stateをread-only確認。</li>
+        <li>Provider CIとFull Regressionのrun metadata、job logs、uploaded shard evidenceを確認。</li>
+        <li>pytest lane plugin、workflow、shard runner、ledger、distribution production / testsをsource inspection。</li>
+        <li>LOC、AST shape、test count、subprocess / temporary workspaceを静的集計。</li>
+        <li>Epic #384を作成・active化し、Requirement / Design / Planとresearch / decision Artifactsへ反映。</li>
+        <li>独立したChatGPT Use reviewを反証役として実行。採用判断はlocal evidenceを優先。</li>
+      </ul>
+      <h3>今回実施していない確認</h3>
+      <ul>
+        <li>latest SHAのFull Regression再実行。既存のcanonical evidenceがあり、CPU負荷の高い重複実行を避けました。</li>
+        <li>latest SHAの直接CPU telemetry。最初のimplementation Issueでsingle-process baselineとして取得します。</li>
+        <li>全2,708 nodeの個別削除判定。family-level根本分析までを完了し、node-level inventoryを条件付き候補1へ渡します。</li>
+        <li>Product判断6 groupsの受理。説明資料確認後に決める必要があります。</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="sources-heading">
+      <h2 id="sources-heading">証拠と正本</h2>
+      <ul class="source-list">
+        <li>Epic: <a href="https://github.com/chemitaro/spec-dock/issues/384">GitHub Issue #384</a></li>
+        <li>関連scope: <a href="https://github.com/chemitaro/spec-dock/issues/372">GitHub Issue #372</a></li>
+        <li>Provider CI: <a href="https://github.com/chemitaro/spec-dock/actions/runs/33327601995">GitHub Actions run 33327601995</a></li>
+        <li>Full Regression: <a href="https://github.com/chemitaro/spec-dock/actions/runs/33327608584">GitHub Actions run 33327608584</a></li>
+        <li>正本文書: <code>spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/</code></li>
+        <li>source-grounded調査: <code>artifacts/20260830t234548z-research-provider-test-suite-root-cause-analysis-and-redesign.md</code></li>
+        <li>選択肢・判断分析: <code>artifacts/20260830t235429z-disc-provider-test-strategy-simplification-decision-analysis.md</code></li>
+      </ul>
+      <p class="meta">図は固定versionの公式 <code>@plantuml/core</code> を使い、このbrowser内だけでSVGへ変換します。PlantUML ServerやKrokiへsourceを送りません。初回描画にはTailscale接続に加えてCDNへ接続できるinternet環境が必要です。</p>
+    </section>
+  </main>
+
+  <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
+    <section class="diagram-zoom-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagram-zoom-title">
+      <h2 id="diagram-zoom-title" class="visually-hidden">図を拡大表示</h2>
+      <header class="diagram-zoom-header">
+        <div class="diagram-zoom-controls" aria-label="図の拡大率を操作する">
+          <button type="button" id="diagram-zoom-out" aria-label="図を縮小する" title="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-reset" aria-label="100%に戻す" title="100%に戻す">
+            <span id="diagram-zoom-level" class="diagram-zoom-level" aria-live="polite">100%</span>
+          </button>
+          <button type="button" id="diagram-zoom-in" aria-label="図を拡大する" title="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-close" aria-label="拡大表示を閉じる" title="閉じる">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+      </header>
+      <div id="diagram-zoom-viewport" class="diagram-zoom-viewport" tabindex="0">
+        <div id="diagram-zoom-canvas" class="diagram-zoom-canvas"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const sources = [...document.querySelectorAll(".plantuml-source")];
+      const status = document.getElementById("plantuml-status");
+
+      window.__plantumlDocumentState = {
+        expected: sources.length,
+        rendered: 0,
+        errors: [],
+        completed: false
+      };
+
+      window.__plantumlFail = message => {
+        const state = window.__plantumlDocumentState;
+        state.errors.push(String(message));
+        state.completed = true;
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図の描画に失敗しました: ${message}`;
+      };
+
+      for (const output of document.querySelectorAll("[data-source-copy]")) {
+        const source = document.getElementById(output.dataset.sourceCopy);
+        if (source) output.textContent = source.textContent.trim();
+      }
+
+      document.documentElement.dataset.plantumlStatus = "running";
+    })();
+  </script>
+
+  <script
+    src="https://unpkg.com/@plantuml/core@1.2026.6/viz-global.js"
+    onerror="window.__plantumlFail('viz-global.jsを読み込めませんでした。')"></script>
+
+  <script type="module">
+    const state = window.__plantumlDocumentState;
+    const status = document.getElementById("plantuml-status");
+    const zoomDialog = document.getElementById("diagram-zoom-dialog");
+    const zoomTitle = document.getElementById("diagram-zoom-title");
+    const zoomViewport = document.getElementById("diagram-zoom-viewport");
+    const zoomCanvas = document.getElementById("diagram-zoom-canvas");
+    const zoomLevelOutput = document.getElementById("diagram-zoom-level");
+    const zoomOutButton = document.getElementById("diagram-zoom-out");
+    const zoomInButton = document.getElementById("diagram-zoom-in");
+    const zoomResetButton = document.getElementById("diagram-zoom-reset");
+    const zoomCloseButton = document.getElementById("diagram-zoom-close");
+    let zoomLevel = 1;
+    let zoomBaseWidth = 0;
+    let zoomedSvg = null;
+    let zoomReturnFocus = null;
+
+    const diagramTitle = sourceElement => {
+      const titleLine = sourceElement.textContent.match(/^\s*title\s+(.+)$/m);
+      return titleLine?.[1]?.trim() || "図を拡大表示";
+    };
+
+    const applyDiagramZoom = () => {
+      if (!zoomedSvg || zoomBaseWidth <= 0) return;
+      zoomedSvg.style.width = `${Math.round(zoomBaseWidth * zoomLevel)}px`;
+      zoomedSvg.style.height = "auto";
+      zoomLevelOutput.value = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelOutput.textContent = zoomLevelOutput.value;
+      zoomResetButton.setAttribute("aria-label", `100%に戻す（現在${zoomLevelOutput.value}）`);
+      zoomOutButton.disabled = zoomLevel <= 0.5;
+      zoomInButton.disabled = zoomLevel >= 3;
+    };
+
+    const setDiagramZoom = nextLevel => {
+      zoomLevel = Math.min(3, Math.max(0.5, nextLevel));
+      applyDiagramZoom();
+    };
+
+    const closeDiagramZoom = () => {
+      if (zoomDialog.hidden) return;
+      zoomDialog.hidden = true;
+      document.body.classList.remove("diagram-zoom-open");
+      zoomCanvas.replaceChildren();
+      zoomedSvg = null;
+      zoomBaseWidth = 0;
+      zoomReturnFocus?.focus();
+      zoomReturnFocus = null;
+    };
+
+    const openDiagramZoom = (target, sourceElement) => {
+      const sourceSvg = target.querySelector("svg");
+      if (!sourceSvg) return;
+
+      zoomReturnFocus = target;
+      zoomedSvg = sourceSvg.cloneNode(true);
+      zoomedSvg.removeAttribute("height");
+      zoomedSvg.style.maxWidth = "none";
+      const viewBoxWidth = zoomedSvg.viewBox?.baseVal?.width || 0;
+      const declaredWidth = Number.parseFloat(zoomedSvg.getAttribute("width")) || 0;
+      zoomBaseWidth = Math.max(viewBoxWidth, declaredWidth, sourceSvg.getBoundingClientRect().width);
+      zoomLevel = 1;
+      zoomTitle.textContent = diagramTitle(sourceElement);
+      zoomCanvas.replaceChildren(zoomedSvg);
+      zoomDialog.hidden = false;
+      document.body.classList.add("diagram-zoom-open");
+      zoomViewport.scrollTo({ top: 0, left: 0 });
+      applyDiagramZoom();
+      zoomCloseButton.focus();
+    };
+
+    const prepareDiagramZoom = (target, sourceElement) => {
+      target.dataset.zoomReady = "true";
+      target.tabIndex = 0;
+      target.setAttribute("role", "button");
+      target.setAttribute("aria-label", `${diagramTitle(sourceElement)}を拡大表示する`);
+      const hint = document.createElement("span");
+      hint.className = "diagram-zoom-hint";
+      hint.textContent = "クリックして拡大";
+      hint.setAttribute("aria-hidden", "true");
+      target.append(hint);
+      target.addEventListener("click", () => openDiagramZoom(target, sourceElement));
+      target.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDiagramZoom(target, sourceElement);
+        }
+      });
+    };
+
+    const focusableZoomElements = () => [...zoomDialog.querySelectorAll(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => !element.hidden && element.getClientRects().length > 0);
+
+    zoomOutButton.addEventListener("click", () => setDiagramZoom(zoomLevel - 0.25));
+    zoomInButton.addEventListener("click", () => setDiagramZoom(zoomLevel + 0.25));
+    zoomResetButton.addEventListener("click", () => setDiagramZoom(1));
+    zoomCloseButton.addEventListener("click", closeDiagramZoom);
+    zoomDialog.addEventListener("click", event => {
+      if (event.target === zoomDialog) closeDiagramZoom();
+    });
+    document.addEventListener("keydown", event => {
+      if (zoomDialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDiagramZoom();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableZoomElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    try {
+      const { renderToString } = await import(
+        "https://unpkg.com/@plantuml/core@1.2026.6/plantuml.js"
+      );
+
+      const renderDiagram = lines => new Promise((resolve, reject) => {
+        renderToString(
+          lines,
+          svg => resolve(svg),
+          message => reject(new Error(message))
+        );
+      });
+
+      const normalizeDiagnosticText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+      const inspectRenderedSvg = svgMarkup => {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const root = parsed.documentElement;
+        if (!root || root.localName.toLowerCase() === "parsererror" || parsed.querySelector("parsererror")) {
+          throw new Error("PlantUMLが不正なSVGを返しました。");
+        }
+        if (root.localName.toLowerCase() !== "svg") {
+          throw new Error("PlantUMLの描画結果がSVGではありません。");
+        }
+
+        const fullText = normalizeDiagnosticText(root.textContent);
+        const diagramType = root.getAttribute("data-diagram-type")?.toLowerCase() ?? "";
+        const hasKnownErrorText = /Syntax Error\?|An error has occurred/i.test(fullText);
+        const hasDiagnosticStructure = /PlantUML version\b/i.test(fullText)
+          && /\[From [^\]]*\(line \d+\)\s*\]/i.test(fullText)
+          && /@startuml/i.test(fullText);
+
+        if (diagramType === "error" || hasKnownErrorText || hasDiagnosticStructure) {
+          const diagnosticLines = [...root.querySelectorAll("text")]
+            .filter(element => {
+              const presentation = [
+                element.getAttribute("fill"),
+                element.getAttribute("style"),
+                element.getAttribute("text-decoration")
+              ].filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, "");
+              return /(?:fill:)?(?:#ff0000|#f00|red|rgb\(255,0,0\))/.test(presentation)
+                || presentation.includes("wavy");
+            })
+            .map(element => normalizeDiagnosticText(element.textContent))
+            .filter(Boolean);
+          const reason = [...new Set(diagnosticLines)].join(" / ").slice(0, 500)
+            || (hasKnownErrorText
+              ? fullText.match(/Syntax Error\?|An error has occurred/i)?.[0]
+              : "PlantUMLの診断画面が返されました。");
+          throw new Error(`PlantUMLの診断SVGが検出されました: ${reason}`);
+        }
+
+        return root;
+      };
+
+      for (const sourceElement of document.querySelectorAll(".plantuml-source")) {
+        const target = document.getElementById(sourceElement.dataset.target);
+        if (!target) {
+          state.errors.push(`${sourceElement.id}: 描画先がありません。`);
+          continue;
+        }
+
+        try {
+          const lines = sourceElement.textContent.trim().split(/\r?\n/);
+          const svgMarkup = await renderDiagram(lines);
+          const svg = inspectRenderedSvg(svgMarkup);
+          target.replaceChildren(document.importNode(svg, true));
+          prepareDiagramZoom(target, sourceElement);
+          target.dataset.plantumlStatus = "success";
+          state.rendered += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          state.errors.push(`${sourceElement.id}: ${message}`);
+          target.dataset.plantumlStatus = "error";
+          target.textContent = `この図の描画に失敗しました: ${message}`;
+        }
+      }
+
+      state.completed = true;
+      if (state.rendered === state.expected && state.errors.length === 0) {
+        document.documentElement.dataset.plantumlStatus = "success";
+        status.textContent = `図を${state.rendered}件すべて描画できました。`;
+      } else {
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図を${state.rendered}件描画し、${state.errors.length}件のエラーが発生しました。`;
+      }
+    } catch (error) {
+      window.__plantumlFail(error instanceof Error ? error.message : String(error));
+    }
+  </script>
+</body>
+</html>
