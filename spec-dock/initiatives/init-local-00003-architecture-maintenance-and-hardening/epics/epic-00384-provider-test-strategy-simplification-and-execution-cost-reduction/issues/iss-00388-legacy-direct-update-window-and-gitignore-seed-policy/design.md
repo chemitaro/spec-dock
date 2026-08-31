@@ -64,7 +64,9 @@ removal owner
 
 evidenceが欠落・競合・不正な場合は`unknown`とし、mutation前にpreserve-and-blockする。version文字列だけでownershipを証明しない。
 
-matrixは`package_generation × lifecycle_state × public_operation × execution_mode`をcanonical authorityとする。stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2`、`legacy-recovery-active`、`blocked`、operationはinstall、`init --force`、update、uninstall、purge、retry、現存legacy alias、modeはinspect / dry-run / applyを含む。D1はexact P0 artifactが満たすmutation-zero policyと不成立時の再設計authorityを決め、C5がcontract / fixture freeze後にprobeを実行する。実現不能な能力をdecisionで付与しない。
+matrixは`package_generation × lifecycle_state × public_operation × execution_mode`をcanonical authorityとする。stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2`、`uninstalling-v2`、`legacy-recovery-active`、`blocked`、operationはinstall、`init --force`、update、uninstall、purge、retry、現存legacy alias、modeはinspect / dry-run / applyを含む。D1はexact P0 artifactが満たすmutation-zero policyと不成立時の再設計authorityを決め、C5がcontract / fixture freeze後にprobeを実行する。実現不能な能力をdecisionで付与しない。
+
+調査とdraftはD2 / D3と並行できるが、matrix finalizationはD2のpurge / alias / public result decisionとD3のworkflow mutation authorityを正式inputとして待つ。D1が唯一の統合matrix authorityとなり、digest、coverage 100%、multiple authority 0、D1 / D2 / D3 conflict 0を受理条件にする。
 
 ## 変更対象
 

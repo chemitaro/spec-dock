@@ -29,6 +29,7 @@ current `install_root`は2 managed skillsと`.github/workflows/ci.yml`を配布�
 - exact same candidate artifact bytesを必要lane間で再利用し、source SHA / digest mismatchをfailureとする。
 - `artifact_build_count`の計数単位とtargetを定義する。
 - GitHub ruleset / branch protection / merge queueのauthority、required context名、変更ownerを定義する。
+- C4が追加するnon-required `Provider Receipt Binding` producerのstable name、PR / main-push events、token / App permissions、artifact retentionを定義する。
 - shadow acceptance、old + new required、new-only required、old workflow removalの順序とrollbackを定義する。
 - unrelated effective required contextsを`U`として、`U + old -> U + old + new -> U + new`の集合契約、ruleset scope、merge queue canaryを定義する。
 
@@ -69,8 +70,9 @@ current `install_root`は2 managed skillsと`.github/workflows/ci.yml`を配布�
 - [ ] public deprecation windowが必要な場合はversionまたはdateで確定している。
 - [ ] human PR merge gateを維持する。
 - [ ] required contextのstable name、external authority、変更ownerが確定している。
-- [ ] shadow GREEN / failure canary、old + new required、new-only required、old workflow removalのtransitionとrollbackが確定している。
-- [ ] canaryは`U`とoldをGREEN、新だけをREDにし、merge queueがactiveならmerge-groupでもblockを証明する。
+- [ ] shadow GREEN / failure-detection canary、old + new required、required-set enforcement canary、new-only required、old workflow removalのtransitionとrollbackが確定している。
+- [ ] C7 detection canaryはnew check自身のREDだけ、C8 enforcement canaryは`U`とoldをGREEN、新だけをREDにし、merge queueがactiveならmerge-groupでもblockを証明する。
+- [ ] receipt binding producerのpermissions、stable name、actual-main rebinding、artifact content digest / retentionが確定している。
 - [ ] workflowをuninstall delete対象へ含める場合はparent ADR改定とC5 behavior / tests追加が必要であり、それまではpreserveする。
 - [ ] accepted decisionがEpic Requirement / Design / Planへ反映されている。
 

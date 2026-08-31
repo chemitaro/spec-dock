@@ -5,7 +5,7 @@
   "title": "Legacy Direct Update Window And Gitignore Seed Policy",
   "slug": "legacy-direct-update-window-and-gitignore-seed-policy",
   "created_at": "2026-08-31T16:34:25+09:00",
-  "updated_at": "2026-08-31T16:34:25+09:00",
+  "updated_at": "2026-08-31T19:53:31+09:00",
   "parent_id": "epic-00384",
   "initiative_id": "init-local-00003",
   "epic_id": "epic-00384",
@@ -18,5 +18,9 @@
     "issue_number": 388,
     "repo_owner": "chemitaro",
     "repo_name": "spec-dock"
-  }
+  },
+  "depends_on": [
+    "iss-00389",
+    "iss-00390"
+  ]
 }

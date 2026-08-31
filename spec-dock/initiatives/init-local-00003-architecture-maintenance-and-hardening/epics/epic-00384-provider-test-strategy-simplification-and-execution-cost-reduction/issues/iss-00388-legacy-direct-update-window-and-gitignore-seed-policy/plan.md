@@ -30,7 +30,7 @@ ID: "iss-00388"
 5. accepted decision Artifactを作成し、Epic docsへ反映する。
 6. 後続uninstall-first bridge / install-update Issueのstart gateとremoval receiptを確定する。
 
-`iss-00389`、`iss-00390`とはdecision inputが独立しており並行可能。後続inventoryのcollection / cost取得は並行可能だが、disposition、target lane、ownerのfinalizationとproduction cutoverは本Issueのaccepted decisionへ依存する。
+`iss-00389`、`iss-00390`とは調査とdraftだけ並行可能。本Issueのmatrix final acceptanceは両Issueのaccepted decisionへ依存する。後続inventoryのcollection / cost取得は並行可能だが、disposition、target lane、ownerのfinalizationとproduction cutoverは統合matrixへ依存する。
 
 ## 実装step
 
@@ -43,7 +43,8 @@ ID: "iss-00388"
 7. 各material choiceについて最推奨、代替、利用者影響、migration cost、failure modeを提示してinterviewする。
 8. 回答をdecision-candidateへ反映し、整合確認後にaccepted ADRまたは既存ADRの追補として受理する。
 9. 後続Issueが削除するmanifest section、adapter、fixture、test familyをremoval receiptへ固定する。
-10. Epic Requirement / Design / Planのgateとcandidate定義をactual decisionへ更新する。
+10. `iss-00389` / `iss-00390`のaccepted decisionをreconcileし、単一matrix digest、coverage 100%、multiple authority 0、conflict 0を確認する。
+11. Epic Requirement / Design / Planのgateとcandidate定義をactual decisionへ更新する。
 
 ## 検証
 

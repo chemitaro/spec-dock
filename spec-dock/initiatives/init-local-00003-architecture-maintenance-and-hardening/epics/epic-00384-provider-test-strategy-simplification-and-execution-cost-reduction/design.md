@@ -113,11 +113,12 @@ behavior testの作成・移動・削除は対応production Issueが所有する
 
 長期dual engineではなく、有限なreader compatibilityとsingle writerを設計する。名称は実装時にrepository styleへ合わせられるが、責務は次のstable contractへ分ける。
 
-- `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、legacy-recovery-active、blockedをread-only分類する。
+- `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、uninstalling-v2、legacy-recovery-active、blockedをread-only分類する。
 - `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、`InstallationRecordV2` / `SkillSlotMarkerV1`のcanonical ready / updating / slot fixtures、invalid / unknown / future schema cases、root / slot completeness ruleを固定する。C5がownerとなり、contract freeze後にexact P0 artifact probeを行い、C6は変更せずconformする。
-- `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、2 skill slot versionsだけを持つ。arbitrary path、per-file digest、checkpoint listを持たない。
+- `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、delete plan digest、2 skill slot versionsだけを持つ。arbitrary path、per-file digest、checkpoint listを持たない。
 - `SkillSlotMarkerV1`: schema、owner、exact slot、distribution versionだけを持つ。
-- `ToolingDeletePlanV1`: fixed roots、valid owned exact slots、installation recordだけをtyped targetにする。
+- `ToolingDeletePlanV1`: fixed roots、valid owned exact slots、installation recordだけをtyped targetにし、canonical digestを持つ。
+- `PurgeOperationRecordV1`: D2がindependent purgeを残す場合だけ、tooling recordと別のfixed pathにtarget evidence digest、state、plan digestを持ち、same-plan rerunだけを許可する。
 - `PurgeAuthorityV1`: tooling lifecycleから独立したaccepted target evidenceとconfirmationを持つ。
 - `LifecyclePublicResultV1`: dry-run / apply、text / JSON、exit、cleanup-pendingを一意にmappingする。
 - `InventoryHeadV1` / `RemovalReceiptDeltaV1`: repository内ではmerge parent、inventory before / after digest、change manifest digest、verification result digestを連鎖する。result SHAは自己参照を避けてGit historyとout-of-band immutable bindingでreceipt digestへ束縛する。
@@ -142,8 +143,8 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 - fixed root / parent bindingを確認する。
 - 4 candidate rootsをtargetと同一filesystemに全てstageする。
 - `docs` → `templates` → `system` → `scripts` の順で全量置換する。
-- valid owner markerを持つcurrent skill slotsをroot単位で置換する。
-- finite retired slotsをexact name + valid markerでだけ削除する。
+- valid owner markerを持つcurrent skill slotは、marker検証後に同一filesystem上のfixed bounded tombstoneへatomic renameし、candidateをexact slotへrenameしてからtombstoneをcleanupする。
+- finite retired slotもexact name + valid marker確認後にbounded tombstoneへatomic renameし、cleanup failureはauthorityを失わないcleanup-pendingとして扱う。
 - 全配置後にsmall ready markerをatomic file replaceする。
 - cleanup failureをrollbackせず、診断付き成功またはbounded cleanup pendingとして扱う。
 - rootsだけ、またはskillsだけがnew contractへ移行した状態をreadyとして扱わない。
@@ -151,10 +152,13 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 
 ### `uninstall_tooling(target)`
 
+- 最初のdelete前にinstallation recordを`uninstalling-v2(delete_plan_digest=P)`へatomic replaceする。
 - fixed provider roots、owned fixed / retired skill slots、installation recordだけを削除する。
+- valid owned skill slotはmarker検証後にfixed bounded tombstoneへatomic renameしてからcleanupし、recursive delete途中でmarker authorityを失わない。
 - durable user data、`.workbench`、generated projections、unrelated skills、unknown pathsを変更しない。
 - spec history purge authorityを持たない。
 - unexpected root type / binding / marker mismatchで対象delete前にblockする。
+- 4 roots、valid owned current 2 slotsを処理した後、installation recordを最後に削除する。途中停止後は同じplan digestのuninstall rerunだけを許可する。
 
 CLIはargument、confirmation、text / JSON、exit codeをmappingするadapterに限定し、ownership policy、recursive traversal、journal transitionを持たない。
 
@@ -205,6 +209,7 @@ Python / Linux / macOSで非空directory同士のcross-platform atomic exchange�
 - `tooling-absent-preserved-data`: provider toolingはなく、user data / generated projectionだけが残り、accepted install routeで再installできる。
 - `ready-v2(installed_version=A, candidate_digest=D)`: authoritative installation recordとexpected fixed roots / slotsがA / Dを示す。serialized enumとfixture keyは`ready-v2`とする。
 - `updating-v2(desired B, digest D)`: stagingまたはold/new/missing rootが混在し、same desired version / digestのexternal rerunだけを許可する。
+- `uninstalling-v2(delete_plan_digest=P)`: fixed tooling targetの一部が削除済みで、same plan digestのtooling uninstall rerunだけを許可する。
 - `legacy-recovery-active`: accepted legacy journal / markerが残り、bounded recovery-only adapterまたはlast-compatible package pinが必要である。
 - `blocked`: root binding、type、shared slot ownership、candidate integrityを証明できない。
 
@@ -226,12 +231,15 @@ per-file checkpoint、intent別journal、quarantine、rollback image、cross-int
 | root間の停止 | mixed roots、authoritative recordはupdating-v2、旧markerはnon-authoritative | same desired version / digestを再実行して全root再置換 |
 | current slot delete後・rename前 / slot間 | mixed roots / slots、authoritative recordはupdating-v2 | same desired version / digestを再実行して全root / slot再置換 |
 | retired slot削除前後 | finite retired slotが残存または削除済み、authoritative recordはupdating-v2 | same desired version / digestを再実行し、invalid / foreign / markerless slotはpreserve-and-block |
+| slot tombstone cleanup failure | exact slotはcandidateまたはabsent、validated old markerはbounded tombstone内 | operationを成功またはcleanup-pendingとして返し、authorityを推測せずbounded cleanup |
 | scripts後・ready前 | repo-local復旧不能の可能性 | installed package / `uvx`から再実行 |
 | ready後cleanup failure | candidateはready、staging残存 | update成功。bounded cleanupを後実行 |
 | record / staging digest mismatch | mutation前block | authorityを推測せず人間がstale stagingを診断 |
 | symlink / rebind / marker mismatch | write前block | diagnosticに従い人間が境界を修復 |
 
 whole-operation rollbackは提供しない。provider toolingの一時availabilityより、user dataとshared contentを削除しないことを優先する。
+
+tooling uninstallでは`uninstalling-v2` record書込み前のfailureはtarget旧stateを維持する。書込み後の各root delete前後、scripts delete後、各current slot tombstone rename / cleanup前後、record delete失敗ではrecordとdelete plan digestをauthorityとして保持し、same-plan rerunだけを許可する。bounded tombstoneはrecord + plan digest + validated markerでだけ再認識し、foreign tombstoneはblockする。record削除成功後だけ`tooling-absent-preserved-data`になる。independent purgeを残す場合も`PurgeOperationRecordV1`で同じmonotonic原則を適用し、tooling uninstall recordをpurge authorityに流用しない。
 
 ## Skill lifecycle
 
@@ -312,7 +320,7 @@ production route、test node、workflow machineryを削除するchangeは二層r
 - change manifest digest
 - verification result digest
 
-out-of-band authorityはresult commit上のGitHub Actions check run `Provider Receipt Binding`とする。check summaryはresult commit SHA、repository内receipt digest、check_run_id、content-addressed artifact_id、retention_daysを持つ。次IssueはGitHub APIでGit history、check、artifact digestを照合してlatest headを解決し、bindingが欠落・期限切れ・SHA / digest不一致ならfail closedにする。同じartifact_idの上書きや別runからの代用を認めない。
+out-of-band authorityはresult commit上のGitHub Actions check run `Provider Receipt Binding`とする。C4がexisting required contextsを変えないadditive non-required workflowとしてproducerをbootstrapする。check summaryはresult commit SHA、repository内receipt digest、check_run_id、content-addressed artifact_id、artifact content digest、retention_daysを持つ。PR head bindingに加え、main pushでactual merged commitへ再bindingし、次IssueはGitHub APIでGit history、check、artifact digestを照合してlatest headを解決する。bindingが欠落・期限切れ・SHA / digest不一致ならfail closedとし、同じartifact_idの上書きや別runからの代用を認めない。
 
 rebase後はdelta receiptを再生成し、並行PRはmerge順確定後に再照合する。testがslowであることだけをretirement authorityにしない。production contractの廃止authorityをtests-only Issueが後付けしない。
 
@@ -360,7 +368,7 @@ OLD_REQUIRED
   -> NEW_REQUIRED_ONLY
 ```
 
-new contextはold contextを残したままrequiredへ追加し、failure canaryでmerge blockを確認する。old workflowはnew-only requiredを再取得するまでrepositoryに残す。external settingsとcode PRは同一transactionとみなさず、各transitionにreceiptとrollback条件を持たせる。
+new contextはold contextを残したままrequiredへ追加する。C7はnon-required shadow自身がREDを検出するfailure-detection canaryだけを所有し、merge blockを要求しない。C8はnewをrequiredへ追加後、required-set enforcement canaryでmerge blockを確認する。old workflowはnew-only requiredを再取得するまでrepositoryに残す。external settingsとcode PRは同一transactionとみなさず、各transitionにreceiptとrollback条件を持たせる。
 
 unrelated effective required contextsを`U`とし、実際の集合遷移は`U + old -> U + old + new -> U + new`とする。canaryでは`U`とoldを全てGREEN、newだけREDにする。merge queueがactiveならPRとmerge-groupの双方でcontext生成とblockを証明する。
 

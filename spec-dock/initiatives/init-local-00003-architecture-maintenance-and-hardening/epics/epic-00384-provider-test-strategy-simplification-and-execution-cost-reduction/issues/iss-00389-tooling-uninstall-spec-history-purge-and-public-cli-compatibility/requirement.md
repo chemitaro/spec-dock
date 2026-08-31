@@ -25,6 +25,7 @@ ID: "iss-00389"
 - 通常uninstallのdelete authorityを4 fixed roots、valid owned 2 fixed skill slots、fixed installation record / ready markerに限定する。shipped workflowはparent ADR改定とimplementation acceptance追加なしに削除しない。
 - update、retry、tooling uninstallからspec-history purgeへ到達できない。
 - purgeを残す場合、独立command、明示confirmation、dry-run / apply、text / JSON、exit codeを定義する。
+- purgeを残す場合、tooling installation recordと別のfixed operation record、target evidence / plan digest、partial failure後のsame-plan rerun、record-last deletionを定義する。
 - deprecated aliasを残す場合、silent destructive executionを禁止し、具体的sunsetを持つ。
 - cleanup-pendingをsuccess、warning、partial failureのどれとして返すかを明示する。
 - tooling uninstallでinstallation recordを削除した後、独立purgeがtarget authorityを証明するevidenceを明示する。
@@ -60,6 +61,7 @@ ID: "iss-00389"
 
 - [ ] `--remove-specs`のlegacy alias policyとpurge capabilityを独立した二軸で確定し、組合せごとの診断・handoff・sunsetが一意である。
 - [ ] purgeを残す場合、command名、confirmation、dry-run / apply、text / JSON、exit contractが確定している。
+- [ ] purgeを残す場合、persistent partial-failure state、fixed record path、same-plan retry authority、各delete境界、record-last順序が確定している。retireする場合はN/A authorityを記録している。
 - [ ] public compatibility windowとsunsetがversionまたはdateで確定している。
 - [ ] normal uninstallからspec-history purgeへの到達経路が許可されていない。
 - [ ] deprecated aliasがsilent destructive executionを行わない。

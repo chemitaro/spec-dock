@@ -52,6 +52,8 @@ decision tableは少なくとも`command/option`、`intent`、`confirmation`、`
 
 decisionは`legacy_alias_policy = removed | deprecated-diagnostic-only | deprecated-explicit-handoff`と`purge_capability = retired | independent-command`の二軸で記録する。deprecated aliasを採る場合は、non-destructive diagnosticまたは明示purge handoffを経由し、silent purgeへfallbackしない。decision未確定時は現行実装を変更せず後続Issueをblockする。
 
+`purge_capability = independent-command`の場合、tooling recordから独立したfixed `PurgeOperationRecordV1`、target evidence digest、plan digest、monotonic state、same-plan rerun、record-last deletionをstable contractにする。`retired`の場合はproduction partial stateを作らずN/A receiptを残す。
+
 ## testability
 
 - 現行parser / intent / text / JSON / exit mappingをread-only inventory化する。
