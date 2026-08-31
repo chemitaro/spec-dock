@@ -184,7 +184,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 | I387-AC11 | definition-only候補がproof成立時だけ削除され、判断結果がReportに残る |
 | I387-AC12 | retirement-only test/support候補が100%分類され、削除可能項目とそのorphan supportが撤去され、保持項目にはsurviving consumerと理由がある |
 | I387-AC13 | 新しいabsence test/scanner/fixture/helperを追加せず、collected test count、test LOC、test file数、fixture file数がbaselineから純増しない |
-| I387-AC14 | Plan checklistの全必須項目がPASSまたは理由付きN/Aで、command、実測、証拠、cleanup結果がReportに追跡できる |
+| I387-AC14 | pre-freeze checklistがPASSまたは理由付きN/AでReportに追跡でき、post-freeze commit/push/Strict/PR gateはreviewed SHAを変えないPR/handoff evidenceで追跡できる |
 | I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean package/fresh initの実結果が記録される |
 | I387-AC16 | current二skill、consumer CI、authoritative Historical evidence、Epic #384所有surfaceに意図しない差分がない |
 | I387-AC17 | `spec-dock validate`が成功し、Issue #387のR/D/P/Reportが履歴を捏造しない |
