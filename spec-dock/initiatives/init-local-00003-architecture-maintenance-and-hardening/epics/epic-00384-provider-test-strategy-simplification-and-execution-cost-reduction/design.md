@@ -113,9 +113,9 @@ behavior testの作成・移動・削除は対応production Issueが所有する
 
 長期dual engineではなく、有限なreader compatibilityとsingle writerを設計する。名称は実装時にrepository styleへ合わせられるが、責務は次のstable contractへ分ける。
 
-- `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、uninstalling-v2、legacy-recovery-active、blockedをread-only分類する。
-- `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、`InstallationRecordV2` / `SkillSlotMarkerV1`のcanonical ready / updating / uninstalling / slot fixtures、invalid / unknown / future schema cases、root / slot completeness ruleを固定する。uninstalling fixturesはcomplete、各root削除後、current / retired slot rename後・progress前、progress後・marker削除後、record delete failureを含む。C5がownerとなり、contract freeze後にexact P0 artifact probeを行い、C6は変更せずconformする。
-- `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、delete plan digest、2 skill slot versions、fixed current 2 slotsとcode-versioned finite retired slotsだけのbounded tombstone progress bitsetを持つ。arbitrary path、per-file digest、可変checkpoint listを持たない。
+- `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、placing-v2、ready-v2、updating-v2、uninstalling-v2、legacy-recovery-active、blockedをread-only分類する。
+- `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、`InstallationRecordV2` / `SkillSlotMarkerV1`のcanonical placing / ready / updating / uninstalling / slot fixtures、invalid / unknown / future schema cases、root / slot completeness ruleを固定する。placing fixturesはrecord-only、各root配置後、current slot marker付き配置後、2 slots間、全配置後・ready書込み失敗を含む。uninstalling fixturesはcomplete、各root削除後、current / retired slot rename後・progress前、progress後・marker削除後、record delete failureを含む。C5がownerとなり、contract freeze後にexact P0 artifact probeを行い、C6は変更せずconformする。
+- `InstallationRecordV2`: already-bound repository root直下で親作成不要、disposable roots / skill parent / durable user data外のfixed exact pathに、schema、state、installed / desired version、candidate digest、delete plan digest、2 skill slot versions、fixed current 2 slotsとcode-versioned finite retired slotsだけのbounded tombstone progress bitsetを持つ。arbitrary path、per-file digest、可変checkpoint listを持たない。
 - `SkillSlotMarkerV1`: schema、owner、exact slot、distribution versionだけを持つ。
 - `ToolingDeletePlanV1`: fixed roots、valid owned current 2 slots、code-fixed finite retired slots、installation recordだけをtyped targetにし、canonical digestを持つ。
 - `PurgeOperationRecordV1`: D2がindependent purgeを残す場合だけ、tooling recordと別のfixed pathにtarget evidence digest、state、plan digestを持ち、same-plan rerunだけを許可する。
@@ -133,9 +133,11 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 
 - durable / shared collisionをpreflightする。
 - 4 provider rootsを完全stage・validateして配置する。
+- installation recordの`placing-v2(desired_version, desired_digest, origin)` atomic persistを最初のtarget mutationとし、root / slot mutationより先に行う。
 - absent fixed skill slotsをowner marker付きで配置する。
 - ready markerを最後に書く。
 - unknown existing skill slotやunexpected root typeではwrite前にblockする。
+- placing途中はsame version / digest / originのinstall / reinstall rerunだけを許可する。
 
 ### `update_tooling(target, candidate)`
 
@@ -208,6 +210,7 @@ Python / Linux / macOSで非空directory同士のcross-platform atomic exchange�
 - `absent`: provider roots / valid ready markerがない。
 - `legacy-ready`: accepted finite evidenceで現行workspaceを認識できる。
 - `tooling-absent-preserved-data`: provider toolingはなく、user data / generated projectionだけが残り、accepted install routeで再installできる。
+- `placing-v2(desired B, digest D, origin O)`: fresh installまたはpost-uninstall reinstallのroots / slotsが一部配置済みで、same version / digest / originのrerunだけを許可する。
 - `ready-v2(installed_version=A, candidate_digest=D)`: authoritative installation recordとexpected fixed roots / slotsがA / Dを示す。serialized enumとfixture keyは`ready-v2`とする。
 - `updating-v2(desired B, digest D)`: stagingまたはold/new/missing rootが混在し、same desired version / digestのexternal rerunだけを許可する。
 - `uninstalling-v2(delete_plan_digest=P)`: fixed tooling targetの一部が削除済みで、same plan digestのtooling uninstall rerunだけを許可する。
@@ -225,6 +228,9 @@ per-file checkpoint、intent別journal、quarantine、rollback image、cross-int
 | failure | result | next action |
 |---|---|---|
 | stage / validate failure | target旧stateを維持 | candidate修正後に再実行 |
+| placing record書込み失敗 | target mutation 0 | candidate / filesystem修正後に再実行 |
+| placing record後・各root / slot配置間 | authoritative recordはplacing-v2、部分配置 | same version / digest / originのinstall / reinstallだけを再実行 |
+| 全配置後・ready書込み失敗 | authoritative recordはplacing-v2、content配置済み | same install / reinstall rerunで検証後readyへ遷移 |
 | updating record書込み失敗 | target旧stateを維持 | candidate / filesystem修正後に再実行 |
 | updating record後・root削除前 | target content旧state、recordはupdating | same desired version / digestだけを再実行 |
 | final root binding recheck failure（updating record前） | target旧stateを維持 | binding修復後に再実行 |
