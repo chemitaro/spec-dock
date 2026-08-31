@@ -114,7 +114,7 @@ behavior testの作成・移動・削除は対応production Issueが所有する
 長期dual engineではなく、有限なreader compatibilityとsingle writerを設計する。名称は実装時にrepository styleへ合わせられるが、責務は次のstable contractへ分ける。
 
 - `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、uninstalling-v2、legacy-recovery-active、blockedをread-only分類する。
-- `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、`InstallationRecordV2` / `SkillSlotMarkerV1`のcanonical ready / updating / slot fixtures、invalid / unknown / future schema cases、root / slot completeness ruleを固定する。C5がownerとなり、contract freeze後にexact P0 artifact probeを行い、C6は変更せずconformする。
+- `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、`InstallationRecordV2` / `SkillSlotMarkerV1`のcanonical ready / updating / uninstalling / slot fixtures、invalid / unknown / future schema cases、root / slot completeness ruleを固定する。uninstalling fixturesはcomplete、各root削除後、current / retired slot rename後・progress前、progress後・marker削除後、record delete failureを含む。C5がownerとなり、contract freeze後にexact P0 artifact probeを行い、C6は変更せずconformする。
 - `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、delete plan digest、2 skill slot versions、fixed current 2 slotsとcode-versioned finite retired slotsだけのbounded tombstone progress bitsetを持つ。arbitrary path、per-file digest、可変checkpoint listを持たない。
 - `SkillSlotMarkerV1`: schema、owner、exact slot、distribution versionだけを持つ。
 - `ToolingDeletePlanV1`: fixed roots、valid owned current 2 slots、code-fixed finite retired slots、installation recordだけをtyped targetにし、canonical digestを持つ。
@@ -159,7 +159,7 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 - durable user data、`.workbench`、generated projections、unrelated skills、unknown pathsを変更しない。
 - spec history purge authorityを持たない。
 - unexpected root type / binding / marker mismatchで対象delete前にblockする。
-- 4 roots、valid owned current 2 slotsを処理した後、installation recordを最後に削除する。途中停止後は同じplan digestのuninstall rerunだけを許可する。
+- 4 roots、valid owned current 2 slots、code-fixed finite retired slotsを処理した後、installation recordを最後に削除する。途中停止後は同じplan digestのuninstall rerunだけを許可する。
 
 CLIはargument、confirmation、text / JSON、exit codeをmappingするadapterに限定し、ownership policy、recursive traversal、journal transitionを持たない。
 
