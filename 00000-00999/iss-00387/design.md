@@ -49,7 +49,7 @@ ID: "iss-00387"
 ### 3.2 更新順序
 
 1. provider sourceを変更する。
-2.既存の同期経路またはbyte-exact copyで対応projectionを更新する。
+2. 既存の同期経路またはbyte-exact copyで対応projectionを更新する。
 3. `cmp`または既存parity testで一致を確認する。
 4. projection側だけの修正で差分を隠さない。
 
