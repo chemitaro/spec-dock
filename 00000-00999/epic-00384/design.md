@@ -97,6 +97,12 @@ root内部はcustomization pointではない。updateはinner fileのmodified / 
 
 各rootに `.spec-dock-owner.json` 相当のowner markerを同梱し、`schema_version`、`owner`、`slot`、`distribution_version` だけを持たせる。markerはexact slotのupdate / delete authorityであり、arbitrary pathやinner file digestを持たない。
 
+## Cutover Issue ownership
+
+4 disposable rootsと2 fixed skill slotsは同一candidate staging、同一update orchestration、同一installation record / ready markerを共有する。したがってinstall / update production cutoverは一つのchild Issueが所有し、rootsだけ、またはskillsだけがnew contractへ移行した状態を`ready(new version)`として公開しない。
+
+tooling uninstallはinstall / update cutoverへ依存する別Issueが所有する。test portfolioのold contract削除は対応production cutoverの後に行い、CI execution graphとfinal performance evidenceも別Issueが所有する。
+
 ## Deep interface
 
 product behaviorをper-file action APIではなく、次の3 service boundaryへ集約する。名称は実装Issueでrepository styleへ合わせられるが、責務は分割しない。
@@ -119,6 +125,8 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 - finite retired slotsをexact name + valid markerでだけ削除する。
 - 全配置後にsmall ready markerをatomic file replaceする。
 - cleanup failureをrollbackせず、診断付き成功またはbounded cleanup pendingとして扱う。
+- rootsだけ、またはskillsだけがnew contractへ移行した状態をreadyとして扱わない。
+- old per-file engineとnew root replacement engineをruntime toggleで併存させない。
 
 ### `uninstall_tooling(target)`
 
@@ -128,6 +136,17 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 - unexpected root type / binding / marker mismatchで対象delete前にblockする。
 
 CLIはargument、confirmation、text / JSON、exit codeをmappingするadapterに限定し、ownership policy、recursive traversal、journal transitionを持たない。
+
+## Proposed installer module boundary
+
+`managed_distribution.py`の後継は、少なくとも次の責務を分離する。名称は実装Issueがrepository styleへ合わせる。
+
+- model: fixed root / slot、marker schema、ready state、action order
+- service: install / update / uninstall orchestration
+- filesystem: no-follow binding、same-filesystem staging、root replacement
+- migration: finite one-shot legacy recognition
+
+arbitrary historical catalog、scheduler、baseline、journal state machineを新moduleへ移植しない。
 
 ## Update protocol
 
@@ -241,17 +260,34 @@ testがslowという理由だけでは削除しない。retired contractまた�
 - budget violationはfailureであり、worker追加やtiming-weight調整で回避しない。
 - reporterは標準time / pytest reportの薄い集約とし、新しいschedulerやbaseline frameworkにしない。
 
+## Removal receipt
+
+production route、test node、workflow machineryを削除するchangeは、次をbaseline SHAへ束縛して記録する。
+
+- owner Issue
+- retired contractまたはsuccessor contract
+- removed production symbols / manifest sections
+- removed test node IDs
+- successor test node IDs
+- focused verification command
+- result SHA
+
+testがslowであることだけをretirement authorityにしない。production contractの廃止authorityをtest portfolio Issueが後付けしない。
+
 ## Migration / compatibility
 
-1. accepted ADRとcurrent inventoryを実装Issueの固定入力にする。
-2. root replacement serviceを導入し、current recognized workspaceのone-shot migrationを同じvertical sliceで実装する。
-3. new service proofが成立したrouteから旧per-file engineとtestsを同じchangeで削除する。
-4. fixed skill markerをprovider sourceへ追加し、current 2 slotsをone-shot migrationする。
-5. tooling-only uninstallとpurge / public compatibilityを確定する。
-6. 26 active failure nodesをfix / retired / successorへ処理し、plain zero-failure suiteにする。
-7. duplicate selection、Full Regression ledger、timing weights、4-shard runnerをcutoverで削除する。
+1. `iss-00388`、`iss-00389`、`iss-00390`のdecision-only Issuesをacceptする。
+2. fixed baseline SHAで全test node inventoryとremoval receipt baselineを作る。
+3. active failure nodesのfix / retirement / successor authorityを個別に確定する。
+4. install / updateを4 roots + 2 slots + one ready markerへcutoverし、同じIssueでold update routeと対応testsを削除する。
+5. tooling-only uninstallとaccepted purge compatibilityへcutoverし、同じIssueでold deprovision / purge / cross-intent routeを削除する。
+6. durable contract ownerごとのpytest portfolioへ再編し、active approved failureとpolicy skipを0にする。
+7. candidate build once、Linux canonical、macOS delta、duplicate 0、single pytest processのCI graphへcutoverする。
+8. fixed reference 5 runsとrolling 20 runsのacceptance evidenceを取得する。
 
 old / new engineを長期dual modeにしない。destructive safety issueが見つかった場合はapply routeを停止し、read-only diagnosticへ戻す。旧engineへのautomatic fallbackは行わない。
+
+test selector defect時のrollbackはshard / approved failureの再導入ではない。全correctness portfolioをsingle pytest processで実行するfail-closed gateへ戻す。
 
 ## 変更対象
 
