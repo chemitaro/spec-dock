@@ -27,6 +27,8 @@ ID: "iss-00389"
 - purgeを残す場合、独立command、明示confirmation、dry-run / apply、text / JSON、exit codeを定義する。
 - deprecated aliasを残す場合、silent destructive executionを禁止し、具体的sunsetを持つ。
 - cleanup-pendingをsuccess、warning、partial failureのどれとして返すかを明示する。
+- tooling uninstallでinstallation recordを削除した後、独立purgeがtarget authorityを証明するevidenceを明示する。
+- `tooling-absent-preserved-data`からのreinstall authorityとpublic diagnosticを明示する。
 
 ## スコープ
 
@@ -36,6 +38,7 @@ ID: "iss-00389"
 - destructive confirmation contract
 - dry-run / apply、text / JSON、exit code、cleanup-pending semantics
 - compatibility window、sunset、migration / release guidance
+- post-uninstall purge eligibilityとreinstall contract
 - 後続Issueが削除・置換するpublic surfaceとtestのremoval receipt
 
 対象外:
@@ -50,6 +53,7 @@ ID: "iss-00389"
 - compatibility名目で`--remove-specs`をsilent purgeへmappingすると、明示authorityなしの不可逆削除になる。
 - normal uninstallとpurgeのresult modelが曖昧だと、partial failureをsuccess扱いし得る。
 - foreign / invalid markerやunknown rootでdelete authorityを推定してはならない。
+- installation record不存在だけをpurge authorityとしてはならない。
 
 ## 受け入れ条件
 
@@ -59,6 +63,8 @@ ID: "iss-00389"
 - [ ] normal uninstallからspec-history purgeへの到達経路が許可されていない。
 - [ ] deprecated aliasがsilent destructive executionを行わない。
 - [ ] unknown ownershipのdefaultがpreserve-and-blockである。
+- [ ] tooling uninstall後のindependent purge eligibility evidenceが確定している。
+- [ ] `tooling-absent-preserved-data`からのreinstall contractが確定している。
 - [ ] 後続Issueのremoval receiptがpublic option、intent mapping、retry guidance、testsを列挙している。
 - [ ] accepted decisionがEpic Requirement / Design / Planへ反映されている。
 

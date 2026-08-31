@@ -14,7 +14,7 @@ ID: "iss-00388"
 
 ## 目的
 
-4 disposable rootsと2 fixed skill slotsへのcutoverに先立ち、legacy direct-updateを認識する有限windowと、`spec-dock/.gitignore`のinit seed / collision contractをProduct判断として確定する。実装者がhistorical compatibilityや既存consumer fileの扱いを推測せず、後続install/update Issueが一意なmigration contractを実装できる状態を成果とする。
+4 disposable rootsと2 fixed skill slotsへのcutoverに先立ち、legacy direct-updateを認識する有限window、package / workspace compatibility、active legacy recovery、bridge sunsetと、`spec-dock/.gitignore`のinit seed / collision contractをProduct判断として確定する。実装者がhistorical compatibilityやdowngrade behaviorを推測せず、後続uninstall-first bridgeとinstall/update Issueが一意なmigration contractを実装できる状態を成果とする。
 
 ## 背景
 
@@ -30,6 +30,9 @@ accepted ADR `20260831t005139z-adr` はper-file historical identityをsteady sta
 - `spec-dock/.gitignore`がabsent、provider-identical、consumer-modified、symlink、unexpected typeの各状態について、preserve / block / explicit overwriteの一つを決定する。
 - `init --force`がcustom `.gitignore`とlegacy workspaceへ持つauthorityを明示する。
 - install/updateのtext、JSON、exit codeを変更する場合、breaking changeまたはdeprecation windowを明示する。
+- `P0` / `P1` / `P2` / `P3`と`legacy-ready` / `ready-v2` / `updating-v2`のallow / fail-closed matrixを確定する。
+- active legacy journalをbounded recovery-only adapterで扱うか、last-compatible packageへpinするかを決定する。
+- legacy reader / fixtures / testsをEpic内でsunsetするか、owner / expiry付きfollow-upへ渡すかを決定する。
 
 ## スコープ
 
@@ -41,6 +44,8 @@ accepted ADR `20260831t005139z-adr` はper-file historical identityをsteady sta
 - `.gitignore` init seed、collision、customization policy
 - `init --force`とpublic diagnostic / compatibility policy
 - accepted decision Artifactと後続Issueへのremoval receipt契約
+- old packageによるnew workspace mutationの禁止とdiagnostic
+- uninstall-first bridgeの有限reader contract、recovery owner、sunset owner
 
 対象外:
 
@@ -62,8 +67,11 @@ accepted ADR `20260831t005139z-adr` はper-file historical identityをsteady sta
 - [ ] legacy-supportedのversionまたはdate window、tree evidence、sunsetが有限に確定している。
 - [ ] `.gitignore`の全collision matrixと`init --force` authorityが確定している。
 - [ ] public text / JSON / exit compatibility windowが必要な場合は具体的versionまたはdateで確定している。
+- [ ] package / workspace compatibility matrixと、old packageのnew state fail-closed contractが確定している。
+- [ ] active legacy recoveryをadapterまたはlast-compatible packageのどちらが所有するか確定している。
+- [ ] bridge sunsetをEpic内で行うかfollow-upへ渡すか、owner / expiryを含めて確定している。
 - [ ] unknown stateのdefaultがmutation前のpreserve-and-blockである。
-- [ ] 後続install/update Issueが削除するmanifest section、migration adapter、fixture、test familyがremoval receiptとして列挙されている。
+- [ ] 後続uninstall bridge / install-update Issueが削除するmanifest section、migration adapter、fixture、test familyがremoval receiptとして列挙されている。
 - [ ] accepted decisionがEpic Requirement / Design / Planへ反映されている。
 
 ## 制約・前提

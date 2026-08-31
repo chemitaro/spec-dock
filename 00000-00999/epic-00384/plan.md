@@ -17,313 +17,326 @@ ID: "epic-00384"
 
 現行2,708 testsを4 shardへ分配する運用を最終形とせず、distribution product contractとtest portfolioを同時に縮小する。完了時には、provider-owned contentを4 disposable rootsと2 fixed skill slotsで管理し、merge-required regressionを単一pytest processで10分以内に実行し、active approved failures、duplicate nodes、timing-weight schedulerを持たない。
 
-本Planはaccepted ADR `20260831t005139z-adr` を実装境界のauthorityとする。未決Product判断はdecision-only Issueで受理し、影響するproduction / test / CI Issueをその前に作成・開始しない。Issue #372のcandidate、canonical docs、acceptance evidenceは変更しない。
+本Planはaccepted ADR `20260831t005139z-adr` を実装境界のauthorityとする。未決Product判断はdecision-only Issueで受理し、影響するproduction / CI Issueをその前に開始しない。Issue #372のcandidate、canonical docs、acceptance evidenceは変更しない。
+
+すべてのproduction-changing child Issueは、依存済み`main`へ単独mergeした直後にreleasableでなければならない。Epic branchへimplementationを蓄積して最後に一括mergeしない。behavior変更、public adapter、docs、successor tests、built-artifact smoke、old route / test receiptを同じbehavior-owning Issueで完了する。
 
 ## Issue granularity assessment
 
 - **Result**: `PROPOSED_ISSUE_CANDIDATES`
 - **Decision basis**:
-  - 4 disposable rootsと2 fixed skill slotsはcandidate staging、update orchestration、installation record / ready markerを共有するため、一つのinstall/update cutover Issueがend-to-endで所有する。
-  - unresolved Product decisionsはproduction implementationから分離する。判断Issueはaccepted authorityを成果とし、codeを変更しない。
-  - full node inventory、26 active failure disposition、test portfolio再編、CI / budget cutover、5-run / rolling-20 evidenceは入力、acceptance、failure時の戻り先が異なる。
-  - technical layer、file、test / implementationという役割だけでは分割しない。
-  - production contractを廃止するIssueより先に、そのcontractを証明するtestを削除しない。
+  - decision、inventory、external required-check transition、closeoutはruntimeを変更せず、独立した受入境界を持つsafe-transition / evidence scopeである。
+  - 現行distribution engineはinstall / update / deprovision / purgeでmanifest、journal、admission、retry marker、result modelを共有する。install-first splitではnew workspaceをold uninstallが理解できないため、uninstall-first dual-reader bridgeを先にmergeする。
+  - bridgeはlegacy writerを維持したままlegacy / future workspaceを読む。install / update cutoverはbridge merge後にnew writerを公開し、各merge pointで全public lifecycleをGREENにする。
+  - 包括的tests-only Issueはbehaviorからproofを分離するため廃止する。testsはbehavior ownerへ移し、distribution外failureはinventoryからcontract ownerへfan-outする。
+  - CI repository changeとGitHub external required-check changeは原子的でない。shadow追加、required set切替、old machinery撤去を別境界にする。
 - **Current adoption**:
-  - decision-only candidates 1〜3は`iss-00388`、`iss-00389`、`iss-00390`として作成済みだが、decisionは未受理である。
-  - candidates 4〜10はproposalであり、Product gates通過後にactual `iss-xxxxx`として作成する。
+  - decision-only candidates D1〜D3は`iss-00388`、`iss-00389`、`iss-00390`として作成済みだがdecision未受理である。
+  - C4〜C10、conditional C11、`FIX-<contract>`はproposalであり、creation gate通過後にactual `iss-xxxxx`を付与する。
 - **Assumptions / unresolved evidence**:
-  - legacy support window、`.gitignore`、purge CLI、workflow ownership、artifact / platform triggerは未決である。
-  - 2,708 nodesと26 active failuresはhistorical observationであり、inventory Issueのexact baselineで再計測する。
+  - 2,708 nodesと26 active failuresはhistorical observationであり、C4がexact baselineを再取得する。
+  - dual-reader bridge、legacy recovery policy、bridge sunset、purge eligibility、external required-check authorityはProduct / Policy decisionが必要である。
+  - bridgeを受理できない場合、C5とC6は一つのproduction vertical Issueへ統合する。
   - 10分budget、CPU比1.1、rolling 20はtargetであり、達成証拠ではない。
 
-## Child Issue graph
+## Revised child Issue graph
 
 | Label | Actual ID | 種別 | タイトル |
 |---|---|---|---|
-| E384-01 | `iss-00388` / #388 | Decision-only | Legacy Direct Update Window And Gitignore Seed Policy |
-| E384-02 | `iss-00389` / #389 | Decision-only | Tooling Uninstall Spec History Purge And Public CLI Compatibility |
-| E384-03 | `iss-00390` / #390 | Decision-only | Retained Workflow Ownership And Artifact Platform Validation Policy |
-| E384-04 | proposal | Evidence / planning | Provider Test Contract Inventory And Removal Receipt Baseline |
-| E384-05 | proposal | Decision-only | Active Approved Failure Disposition Authority |
-| E384-06 | proposal | Production implementation | Install Update Cutover To Disposable Roots And Fixed Skill Slots |
-| E384-07 | proposal | Production implementation | Tooling Only Uninstall And Purge Compatibility Cutover |
-| E384-08 | proposal | Test implementation | Contract Owned Pytest Portfolio And Zero Failure Cutover |
-| E384-09 | proposal | CI implementation | Single Process CI Graph Artifact Reuse And Budget Gate Cutover |
-| E384-10 | proposal | Acceptance evidence | Five Run Reference And Rolling 20 Stability Acceptance |
+| D1 | `iss-00388` / #388 | Decision-only safe-transition | Legacy Direct Update Window And Gitignore Seed Policy |
+| D2 | `iss-00389` / #389 | Decision-only safe-transition | Tooling Uninstall Spec History Purge And Public CLI Compatibility |
+| D3 | `iss-00390` / #390 | Decision-only safe-transition | Retained Workflow Ownership And Artifact Platform Validation Policy |
+| C4 | proposal | Evidence safe-transition | Rolling Test Contract Inventory And Removal Receipt Head |
+| C5 | proposal | Production vertical | Tooling-Only Uninstall And Purge Dual-Reader Bridge |
+| C6 | proposal | Production vertical | Install And Update Cutover To Disposable Roots And Fixed Slots |
+| FIX-* | conditional proposals | Production / test vertical | Behavior-Owned Active Failure Repair Or Contract Retirement |
+| C7 | proposal | CI safe-transition | Canonical Portfolio And Shadow Provider Contract Gate |
+| C8 | proposal | External-state safe-transition | Required Check Set Cutover |
+| C9 | proposal | CI safe-transition | Legacy Provider CI And Full Regression Retirement |
+| C10 | proposal | Closeout evidence | Fixed-Runner Budget And Stability Closeout |
+| C11 | conditional proposal | Production vertical | Legacy Lifecycle Bridge Sunset |
 
-## Parent acceptance coverage
-
-| Epic acceptance | Owner |
-|---|---|
-| legacy window / `.gitignore` / `init --force` | E384-01 (`iss-00388`) |
-| uninstall / purge public contract | E384-02 (`iss-00389`) |
-| workflow ownership / artifact-platform trigger | E384-03 (`iss-00390`) |
-| full node inventory / removal baseline | E384-04 |
-| active approved failure disposition | E384-05 |
-| 4 roots + 2 slots + ready marker | E384-06 |
-| tooling-only uninstall / purge separation | E384-07 |
-| contract-owned tests / zero active failure / zero policy skip | E384-08 |
-| single process / worker 1 / duplicate 0 / build 1 / metrics | E384-09 |
-| five reference runs / seeded faults / rolling 20 | E384-10 |
+固定10件を守ることは目的ではない。`FIX-*`の件数はC4 inventoryが示すdurable contract ownershipで決まり、C11はD1がEpic内sunsetを選んだ場合だけ作成する。
 
 ## Direct dependencies
 
 ```text
-E384-01 -> E384-04
-E384-02 -> E384-04
-E384-03 -> E384-04
-E384-04 -> E384-05
-E384-01 -> E384-06
-E384-03 -> E384-06
-E384-04 -> E384-06
-E384-02 -> E384-07
-E384-04 -> E384-07
-E384-06 -> E384-07
-E384-04 -> E384-08
-E384-05 -> E384-08
-E384-06 -> E384-08
-E384-07 -> E384-08
-E384-03 -> E384-09
-E384-08 -> E384-09
-E384-09 -> E384-10
+D1 ─┐
+D2 ─┼─> C5 Tooling-Only Uninstall / Purge Bridge
+C4 ─┘
+
+D1 ─┐
+D3 ─┼─> C6 Install / Update Cutover
+C4 ─┤
+C5 ─┘
+
+C4 ─> FIX-<contract>*
+
+D3 ─┐
+C4 ─┼─> C7 Shadow Provider Contract Gate
+C5 ─┤
+C6 ─┤
+FIX-* complete ─┘
+
+C7 ─> C8 Required Check Set Cutover
+C8 ─> C9 Legacy CI Retirement
+C9 ─> C10 Final Closeout
+
+D1 + C6 ─> C11 Legacy Sunset（D1がEpic内sunsetを選んだ場合）
+C11 ─> C10（作成された場合）
 ```
 
-E384-01〜03は並行して判断できる。E384-05とE384-06もwriterが競合しないため並行可能だが、production writerであるE384-06とE384-07は直列とする。
+D1〜D3とC4は並行可能である。production writerはC5、C6を直列にする。`FIX-*`はfile ownershipが重ならず、各contractが独立acceptanceを持つ場合だけ並行できる。
 
-## E384-01 — `iss-00388` Legacy Direct Update Window And Gitignore Seed Policy
+## Parent acceptance coverage
 
-### Outcome
+| Epic acceptance | Revised owner |
+|---|---|
+| legacy window / recovery / downgrade / `.gitignore` / `init --force` | D1 |
+| tooling-only uninstall / purge eligibility / public CLI | D2 |
+| workflow ownership / artifact-platform trigger / required-check authority | D3 |
+| full node inventory / rolling receipt head | C4 |
+| uninstall-first compatibility bridge / post-uninstall reinstall | C5 |
+| 4 roots + 2 slots + `InstallationRecordV2` / new writer | C6 |
+| active failure fix / retirement / successor | matching `FIX-*`、C5またはC6 |
+| behavior test ownership / removal receipt | each behavior-owning production Issue |
+| single-process gate / build once / metrics / lane ownership | C7 |
+| external required-check transition / human gate | C8 |
+| ledger / timing / shard / old workflow retirement | C9 |
+| five reference runs / seeded faults / rolling 20 | C10 |
+| finite legacy reader / recovery adapter removal | C11 when D1 requires Epic-local sunset |
 
-legacy direct-updateの有限window、markerless migration evidence / sunset、`.gitignore` collision、`init --force`、public compatibilityをaccepted decisionにする。
-
-### Gate / implementation handoff
-
-- production codeは変更しない。
-- fresh / current-supported / legacy-supported / legacy-expired / unknownを相互排他的に定義する。
-- unknownはpreserve-and-blockする。
-- E384-06が削除するmanifest section、adapter、fixtures、testsをreceipt化する。
-
-詳細なRequirement / Design / strict Planは`iss-00388`を正本とする。
-
-## E384-02 — `iss-00389` Tooling Uninstall Spec History Purge And Public CLI Compatibility
-
-### Outcome
-
-`--remove-specs`のremove / deprecate / independent purge、confirmation、dry-run / apply、text / JSON / exit、sunsetをaccepted decisionにする。
-
-### Gate / implementation handoff
-
-- normal uninstallからhistory purgeへ到達させない。
-- destructive aliasをsilent実行させない。
-- unknown ownershipはpreserve-and-blockする。
-- E384-07が変更するoption、intent、route、journal、tests、docsをreceipt化する。
-
-詳細なRequirement / Design / critical Planは`iss-00389`を正本とする。
-
-## E384-03 — `iss-00390` Retained Workflow Ownership And Artifact Platform Validation Policy
-
-### Outcome
-
-shipped workflow ownership、update / uninstall authority、wheel / sdist / Linux / macOS trigger、artifact build invocation / digest / reuse / retentionをaccepted decisionにする。
-
-### Gate / implementation handoff
-
-- platform-independent nodesをmacOSで再実行しない。
-- exact artifact bytesをlane間で再利用し、missing / digest / source SHA mismatchをfailする。
-- human PR merge gateを維持する。
-- shipped asset changeはE384-06、provider CI changeはE384-09へ分けてreceipt化する。
-
-詳細なRequirement / Design / strict Planは`iss-00390`を正本とする。
-
-## E384-04 proposal — Provider Test Contract Inventory And Removal Receipt Baseline
+## D1 — `iss-00388` decision-only
 
 ### Observable outcome
 
-exact baseline SHAの全collected nodeをcurrent contract、owner layer、current / target lane、cost、disposition、owner Issueへ100% mappingし、testやproduction routeを削除する前のremoval receipt baselineを作る。
+legacy direct-update window、markerless slot migration、`.gitignore`、`init --force`に加え、package / workspace compatibility、active legacy recovery、bridge sunsetをaccepted decisionにする。
 
-### Creation / start gate
+### Required decisions
 
-- E384-01、E384-02、E384-03がacceptedである。
-- exact baseline SHAを固定し、historical 2,708 / 26 countsを再利用しない。
+- `P0` / `P1` / `P2` / `P3`と`legacy-ready` / `ready-v2` / `updating-v2`のallow / fail-closed matrix。
+- active legacy journalをbounded recovery-only adapterで扱うか、last-compatible packageへpinするか。
+- `P0`がnew guardを検出してmutation前に停止する条件。
+- legacy reader / fixtures / testsをEpic内で削除するか、期限付きfollow-upへ渡すか。
+- finite tree evidence、version / date sunset、unknown preserve-and-block。
 
-### Implementation plan
+production code、tests、assets、workflowは変更しない。
 
-1. `pytest --collect-only`相当のexact node set、current lanes、ledger、timing evidenceを取得する。
-2. nodeごとにcontract ID、owner layer、current lanes、target lane、keep / move / consolidate / delete-after-retirement、owner Issueを記録する。
-3. duplicate groups、active failure nodes、production route / retired authorityを紐づける。
-4. JSON / Markdown inventoryとremoval receipt schemaをIssue Artifactsとして保存する。
-5. node set equality、duplicate nodeid 0、missing disposition 0、unknown owner 0、ledger count一致を検証する。
-
-production code、tests、workflowは変更しない。baseline SHAが変わればinventoryをstaleとして後続deletionをblockする。
-
-## E384-05 proposal — Active Approved Failure Disposition Authority
+## D2 — `iss-00389` decision-only
 
 ### Observable outcome
 
-E384-04で確認したactive failure nodeを一件ずつ`fix`、`contract retirement`、`exact successor replacement`へ分類し、blanket approvalと無期限quarantineを0にする。
+normal uninstall、独立purge、deprecated `--remove-specs`、confirmation、public resultに加え、tooling uninstall後のpurge eligibilityを一意なcontractにする。
 
-### Creation / start gate
+### Required decisions
 
-- E384-04 inventoryがcompleteである。
-- current authorityからexpected behaviorを決定できないnodeはProduct interviewへ戻す。
+- installation record削除後に独立purge targetを証明するevidence。
+- deprecated aliasのparser error / non-mutating deprecation / independent confirmation。
+- cleanup-pendingのsuccess / warning / partial failure / failure semantics。
+- `tooling-absent-preserved-data`からのreinstall authority。
+- legacy / new workspaceでのdry-run / apply、text / JSON、exit、retry guidance。
 
-### Implementation plan
+production code、tests、assets、workflowは変更しない。
 
-1. 各nodeにowner、canonical authority、exact nodeid、disposition、successor / retirement authority、implementation ownerを付ける。
-2. current ledger、inventory、successor nodeをset equalityで照合する。
-3. conflicting disposition、unknown owner、approved-no-opを0にする。
-4. accepted disposition ArtifactをE384-08へのreceiptとする。
-
-production fixやtest削除は行わない。判断不能nodeが一つでもあればE384-08をblockする。
-
-## E384-06 proposal — Install Update Cutover To Disposable Roots And Fixed Skill Slots
+## D3 — `iss-00390` decision-only
 
 ### Observable outcome
 
-fresh / init / updateを4 disposable roots、2 fixed skill slots、one installation record / ready markerへ一括cutoverし、old per-file update authorityと対応testsを同じIssueで退役させる。
+shipped workflow ownership、artifact / platform triggerに加え、GitHub ruleset / branch protection / merge queueのauthority、required context名、変更owner、shadow acceptanceをaccepted policyにする。
 
-### Creation / start gate
+### Required decisions
 
-- E384-01、E384-03がacceptedである。
-- E384-04のbaseline / removal receiptがcompleteである。
+- current external required contextsとhuman review requirementのauthority / owner。
+- new workflow / job / contextのstable name。
+- required化前の連続GREEN数、failure canary、retention。
+- old + new required、new-only required、old workflow removalのtransition receipt。
+- wheel / sdist / Linux / macOS trigger、artifact digest、reuse、retention。
 
-### Implementation plan
+workflow YAML、reporter、artifact builderは変更しない。
 
-1. fixed roots / slots、marker schema、ready state、action orderをpure modelとして定義する。
-2. root / slot candidateをtargetと同一filesystemへ全量stageし、tree digest、required entrypoint、markerをvalidateする。
-3. target root / parent / repository bindingをno-followで検証し、skill collisionを全mutation前にblockする。
-4. `docs -> templates -> system -> scripts`とslotsをfixed orderでreplaceし、全配置後にだけready markerをatomic replaceする。
-5. E384-01のfinite migration、`.gitignore`、E384-03のworkflow seedを実装する。
-6. successor service testsを成立させ、old per-file update route、historical manifest sections、journal / checkpoint / update recovery testsを削除する。
-7. provider assetsからdogfooding projectionを更新し、built wheel representative smokeを行う。
-
-### Acceptance / failure
-
-- 4 roots / 2 slotsがcandidate treeと完全一致し、obsolete / local editが残らない。
-- Initiatives、Artifacts、`.workbench`、unknown paths、shared skills parent、unrelated skillsがbyte-identicalである。
-- staging failureではtarget mutation 0、symlink / rebind / unexpected type / marker mismatchはpre-write blockする。
-- root間failure後はexternal same-version rerunで収束し、old engineへfallbackしない。
-- ready markerは部分配置をnew versionとして公開しない。
-
-## E384-07 proposal — Tooling Only Uninstall And Purge Compatibility Cutover
+## C4 proposal — Rolling Test Contract Inventory And Removal Receipt Head
 
 ### Observable outcome
 
-normal uninstallを4 fixed roots、valid owned exact skill slots、installation recordだけへ限定し、E384-02のaccepted purge compatibilityへcutoverする。
+exact baseline SHAの全collected nodeをdurable contract、owner layer、current / target lane、cost、disposition、owner Issueへ100% mappingし、後続PRが更新できるrolling inventory headを作る。
 
 ### Creation / start gate
 
-- E384-02がacceptedである。
-- E384-04がcompleteである。
-- E384-06がaccepted implementation baseにある。
+- exact baseline SHAを固定する。D1〜D3と並行開始できる。
+- historical 2,708 / 26 countsをauthorityとして再利用しない。
 
-### Implementation plan
+### Acceptance
 
-1. fixed owned targetsだけからtyped delete planを構築する。
-2. 全targetのbinding、type、markerをmutation前に検証する。
-3. dry-run / applyを同じresultからrenderし、tooling-only uninstallへCLIを切り替える。
-4. purgeを残す場合は独立entrypoint / authorityへ移す。
-5. update / retry / uninstallからpurge serviceへの到達不能をnegative testで証明する。
-6. old deprovision / purge / cross-intent recovery routes、journals、tests、docsをreceipt付きで削除する。
+- collected node setとinventory node setが一致し、missing disposition / unknown ownerが0。
+- active failure nodeをdurable behavior ownerへ割り当て、判断不能nodeだけ個別decision candidateにする。
+- `InventoryHeadV1`と`RemovalReceiptDeltaV1`がparent SHA、result SHA、node digestを持つ。
+- rebase後の再生成、parallel PRのmerge-order再照合、latest head consumptionを検証する。
 
-### Acceptance / failure
+production code、tests、workflowは変更しない。
 
-- durable user data、generated projections、unknown paths、shared skill parent、unrelated skillsを変更しない。
-- valid owner markerのexact slotだけを削除する。
-- marker / binding mismatchは該当delete前にblockする。
-- deprecated aliasはsilent purgeしない。
-- defect時はapplyを停止し、dry-run diagnosticへ戻す。old engineへfallbackしない。
-
-## E384-08 proposal — Contract Owned Pytest Portfolio And Zero Failure Cutover
+## C5 proposal — Tooling-Only Uninstall And Purge Dual-Reader Bridge
 
 ### Observable outcome
 
-durable contract ownerごとのsmall portfolioへtestを再配置し、active approved failure、policy-injected skip、per-file / journal / historical matrixをsteady stateから除去する。
+legacy install / update writerを維持したまま、tooling-only uninstall / accepted purge surfaceをnew fixed-target serviceへcutoverし、legacy workspaceとfuture `InstallationRecordV2`を安全に読む。
 
 ### Creation / start gate
 
-- E384-04 inventoryとE384-05 dispositionがcompleteである。
-- E384-06、E384-07のproduction cutover evidence / receiptsがある。
+- D1、D2がaccepted。
+- C4 latest inventory headがcomplete。
+- bridgeをProduct contractとして受理。拒否された場合はC5 / C6をcombined vertical Issueへ置換する。
 
-### Implementation plan
+### Stable contract
 
-1. fixed roots / slots / marker / orderをpure owner testsへ移す。
-2. filesystem service testsをminimal synthetic workspaceとroot / slot fault injectionへ集約する。
-3. CLI testsをparser、confirmation、exit、JSON / text mappingと代表pathへ縮小する。
-4. package testsをexact built artifactの少数lifecycle smokeへ縮小する。
-5. macOS固有nodeをplatform delta setへ分離する。
-6. duplicate proofをlowest valid owner layerへ統合する。
-7. E384-05のfix / retire / successorを一件ずつ実施する。
-8. policy skipを撤去し、不要nodeはlane selectionでcollection対象外にする。
-9. old nodeごとにcontract、retired route / successor、command、result SHAをreceipt化する。
+- `LifecycleStateReaderV1`、`ToolingDeletePlanV1`、`PurgeAuthorityV1`、`LifecyclePublicResultV1`。
+- dual-reader / single-writer。old/new uninstall writerをruntime toggleで併存させない。
+- legacy-readyとfuture ready-v2をread-only分類する。
+- ready-v2はuninstall / dry-runを許可し、legacy update / init-forceはfail closedにする。
+- updating-v2、unknown roots、foreign / invalid slots、active unresolved recoveryではdestructive actionをblockする。
 
-### Acceptance / failure
+### Vertical acceptance
 
-- selected nodesはzero failure、zero active approved failure、zero policy skipである。
-- 全nodeがcontract ID、owner layer、laneを持つ。
-- seeded fault packの各faultに一つ以上のowner proofがある。
-- selector omission時は正しいowner layerへtestを戻し、shard / approved failureを復活させない。
+- legacy install / updateが引き続きGREEN。
+- new tooling-only uninstall、accepted purge、confirmation、JSON / text / exitがGREEN。
+- tooling-only uninstall後にuser data / generated projectionがbyte-identicalで残り、accepted legacy install routeで再installできる。
+- C6が公開するfuture ready-v2 fixtureをnew uninstallが処理できる。
+- successor tests成立後に限り、old deprovision / purge routes、journals、testsをreceipt付きで削除する。
+- built artifactでinstall → tooling uninstall → reinstallの代表lifecycleを通す。
 
-最終600秒budgetはE384-09 / E384-10が所有する。correctness proof削除とperformance達成を同じacceptanceにしない。
+### Recovery / rollback
 
-## E384-09 proposal — Single Process CI Graph Artifact Reuse And Budget Gate Cutover
+- destructive defectではapplyを停止し、read-only diagnosticへ戻す。
+- C6前はlegacy install / update writerを維持する。
+- C6後のrollback baseとしてready-v2をuninstallできるがupdateしない。
+- old engineへのautomatic fallbackを行わない。
+
+## C6 proposal — Install And Update Cutover To Disposable Roots And Fixed Slots
 
 ### Observable outcome
 
-canonical local / PR gateをone pytest process、worker 1、candidate build invocation 1、Linux canonical + macOS delta、duplicate node 0へcutoverし、Full Regression machineryを退役させる。
+C5 bridge上でfresh / init / update writerを4 disposable roots、2 fixed skill slots、`InstallationRecordV2`へcutoverし、new writerが公開する全workspaceをmerge済みuninstallが理解する。
 
 ### Creation / start gate
 
-- E384-03がacceptedである。
-- E384-08がzero-failure portfolioを完成している。
-- reference runner、artifact trigger、macOS delta policyが確定している。
+- D1、D3がaccepted。
+- C4 latest inventory headがcomplete。
+- C5がmerge済みで、future ready-v2 uninstall proofがGREEN。
 
-### Implementation plan
+### Vertical acceptance
 
-1. candidate artifactをaccepted commandで一度buildし、source SHAと各output digestをreceiptへ固定する。
-2. Linux canonical jobでexact artifactとsingle pytest processを使用する。
-3. child-inclusive wall / user / system CPU、node、subprocess、workspace、copy bytesを計測するthin reporterを実装する。
-4. same artifact bytesをmacOSへ渡し、accepted deltaだけを実行する。
-5. lane node receiptsを比較し、same candidate / OS duplicate、build count、digest mismatchをfailureにする。
-6. required checkを新gateへ切り替える。
-7. ledger、timing weights、baseline evaluator、policy options、4-shard verifier、duplicate selectors、関連meta-testsを削除する。
+- fresh、legacy one-shot migration、ready-v2 update、tooling-only uninstall、accepted purge、post-uninstall reinstallが一つのpublic lifecycle matrixでGREEN。
+- 4 roots / 2 slotsを完全stage・validateし、全配置後だけready recordをatomic replaceする。
+- root間failure後はsame desired version / digestのexternal rerunだけで収束する。
+- user data、generated projections、unknown paths、shared skill parent、unrelated skillsがbyte-identical。
+- `P0` / `P1` updateはready-v2 / updating-v2をmutation前にfail closedにする。
+- successor tests、package smoke成立後にold per-file update、historical manifest、update journal / checkpoint、対応testsをreceipt付きで削除する。
 
-### Acceptance / failure
+### Recovery / rollback
 
-- pytest process count 1、worker 1、shard / xdistなし。
-- one-runでfailure 0、policy skip 0、duplicate 0、build invocation 1。
-- metricsがcandidate SHA付きで出力され、budget超過はfailureになる。
-- artifact missing / digest / source mismatchはtest開始前にfailする。
-- selector omission時は全correctness portfolioをsingle processで実行するgateへ戻し、shard / approved failureを再導入しない。
-- human PR merge gateを維持する。
+- stage failureはtarget mutation 0。
+- updating-v2はsame desired external rerun以外をblock。
+- defect時はnew apply routeを停止し、C5 uninstall / diagnosticを維持する。
+- old update engineへautomatic fallbackしない。
 
-## E384-10 proposal — Five Run Reference And Rolling 20 Stability Acceptance
+## FIX-<contract> conditional proposals — Behavior-Owned Failure Repair
+
+C4 inventoryが確認したactive failureを、durable contract ownerごとの最小vertical Issueへfan-outする。
+
+各candidateは次を持つ。
+
+- 一つのobservable public behaviorまたはsecurity invariant。
+- production fix、public adapter、docs、successor testsを同じIssueで完了する。
+- exact old node、fix / retirement / successor、focused command、parent / result SHA receipt。
+- matching Issue単独merge後にzero failure / zero policy skip。
+
+current authorityからexpected behaviorを決定できないnodeは、実装Issueを作らず個別decision gateへ戻す。unrelated contractを一つのfailure cleanup Issueへ集約しない。
+
+## C7 proposal — Canonical Portfolio And Shadow Provider Contract Gate
 
 ### Observable outcome
 
-同一final candidateでfixed Linux reference 5 runs、seeded fault pack、Linux / macOS smoke、rolling 20 canonical runsを完了し、Epic acceptanceをevidenceで閉じる。
+candidate build once、Linux canonical single-process portfolio、macOS platform delta、metrics、duplicate detectorをnon-required shadow gateとして追加し、old required gateを維持したままsuccessor gateを証明する。
 
 ### Creation / start gate
 
-- E384-09がcompleteである。
-- hard 2-vCPU / 8 GiB reference、same runner class、rolling trigger / retention、series reset条件が確定している。
+- D3 accepted。
+- C5、C6、全blocking `FIX-*`がmerge済み。
+- C4 latest inventory headでzero unresolved owner。
 
-### Evidence plan
+### Acceptance
 
-1. dependency install後、networkなし、同一runner classで5回連続実行する。
-2. 各runのcandidate SHA、artifact digest、wall / CPU、process、node、workspace、copy、build、duplicateをreceipt化する。
-3. seeded fault expected / observed matrixを100%満たす。
-4. accepted Linux / macOS smokeを実行する。
-5. 同一series条件でrolling 20 runsのflake 0、retry 0、unexpected failure 0を確認する。
-6. child / Epic reportとacceptance checkboxesを更新する。
+- new contextはstable nameを持ち、old workflow / contextsを変更しない。
+- exact candidate artifactを一度buildし、source SHAと各output digestを固定する。
+- Linuxはsingle pytest process / worker 1、macOSはaccepted deltaだけを同じartifact bytesで実行する。
+- process-tree wall / CPU、node、subprocess、workspace、copy bytes、build count、duplicate countを報告する。
+- shadowはnon-required、owner、expiry、C9 retirement ownerを持つ。
+- D3で決めた連続GREENとfailure canaryを満たす。
+- selector omission時は全correctness portfolioをsingle processで実行し、shard / approved failureへ戻さない。
 
-全5回で次を満たす。
+## C8 proposal — Required Check Set Cutover
+
+### Observable outcome
+
+GitHub external stateを`old required`から`old + new required`、`new required + old non-required`へ移し、human review requirementを維持する。
+
+### Creation / start gate
+
+- C7 shadow acceptance complete。
+- current ruleset / branch protection / merge queue、required contexts、review requirement、ownerをlive取得する。
+
+### Acceptance
+
+- oldを残したままnew contextをrequiredへ追加する。
+- canary PRでold + newの両方がrequiredであることを確認する。
+- new checkを意図的にREDにしhuman mergeがblockされ、GREEN復帰後に進める。
+- old contextをrequired setから外し、newだけがrequiredかつreview gateが残ることを確認する。
+- `RequiredCheckTransitionReceiptV1`を保存する。
+
+### Rollback
+
+C9前はold workflowがrepositoryに残るため、new defect時にold contextをrequiredへ再追加できる。new contextを外すのはold context復旧確認後だけとする。
+
+## C9 proposal — Legacy Provider CI And Full Regression Retirement
+
+### Observable outcome
+
+new check名を維持したまま、old Provider CI duplicate lanes、post-merge Full Regression、ledger、timing weights、baseline evaluator、policy skip、4-shard verifierを撤去する。
+
+### Creation / start gate
+
+- C8 receiptがnew-only requiredとhuman review gateを証明する。
+- old contextsがexternal required setに含まれないことをlive再取得する。
+
+### Acceptance
+
+- removal PR自体がnew required gateでGREEN。
+- authoritative lane間duplicate 0、artifact build invocation 1、policy skip 0。
+- removed workflow / node / selector / ledgerごとにsuccessorまたはretirement receiptがある。
+- old workflow不存在のままold contextをrequiredへ戻さない。
+
+### Rollback
+
+旧contextへ戻す必要がある場合は、先にold workflowをrepositoryへ復元してGREENを確認し、その後external required setを変更する。
+
+## C10 proposal — Fixed-Runner Budget And Stability Closeout
+
+### Observable outcome
+
+同一final candidateでfixed Linux reference 5 runs、PR critical path 5 runs、seeded fault pack、Linux / macOS smoke、rolling 20 canonical runsを完了し、Epic acceptanceをevidenceで閉じる。
+
+### Creation / start gate
+
+- C9 complete。
+- C11を作成するdecisionの場合はC11 complete。
+- hard 2-vCPU / 8 GiB reference、same runner class、rolling trigger / retention、series reset条件が確定。
+
+### Evidence acceptance
 
 ```text
 pytest_process_count = 1
 worker_count = 1
 wall_seconds <= 600
-(child_user_seconds + child_system_seconds) / wall_seconds <= 1.1
+process_tree_cpu_seconds / wall_seconds <= 1.1
 unexpected_failures = 0
 approved_active_failures = 0
 policy_skips = 0
@@ -331,61 +344,106 @@ duplicate_nodes_same_candidate_os = 0
 artifact_build_count = 1
 ```
 
-一回でもthreshold超過、failure、skip、duplicate、retryがあればEpicをcloseしない。E384-08またはE384-09のownerへ戻し、修正後は該当seriesをresetする。
+final candidateはcommit SHA、artifact digest、node inventory digest、runner classの組で定義する。一つでも変わればseriesをresetする。一回でもthreshold超過、failure、skip、duplicate、retryがあればEpicをcloseせず、matching behavior owner、C7またはC9へ戻す。
+
+## C11 conditional proposal — Legacy Lifecycle Bridge Sunset
+
+D1がEpic内sunsetを選んだ場合だけ作成する。
+
+### Observable outcome
+
+finite legacy reader / recovery-only adapterと対応testsを削除し、P3 new-only lifecycleをGREENにする。
+
+### Acceptance
+
+- legacy-readyはactionable diagnostic付きでmutation前にfail closed。
+- ready-v2のinstall / update / uninstall / accepted purgeがGREEN。
+- removed adapter、fixtures、testsにreceiptがある。
+- unknown / foreign stateのpreserve-and-blockを維持する。
+
+D1がsunsetをEpic後へ送る場合、Requirementはfinite bridgeが残ったままclose可能であることと、owner follow-up / expiryを明示する。
+
+## Test ownership
+
+| Test family | Behavior owner |
+|---|---|
+| legacy admission / recovery / downgrade / post-uninstall reinstall | C5、decisionはD1 |
+| tooling-only uninstall / delete plan / purge / confirmation / public result | C5、decisionはD2 |
+| root staging / replacement / ready / updating / same-version rerun | C6 |
+| fixed skill write lifecycle | C6 |
+| fixed skill delete lifecycle | C5 |
+| `.gitignore` / `init --force` | C6、decisionはD1 |
+| shipped workflow asset ownership | C6またはpreserve owner、decisionはD3 |
+| distribution外active failure | matching `FIX-*` |
+| built artifact init → update → uninstall lifecycle | C6を主ownerとしC5 contractも同じsmokeで通す |
+| macOS固有filesystem / mode / executable | behavior-owning Issueでnode作成、lane assignmentはC7 |
+| selector / duplicate / metrics / artifact receipt | C7 |
+| ledger / timing / shard / policy skip meta-tests | C9 |
+
+旧testを削除する各PRは、old node ID、durable contract、exact successorまたはaccepted retirement authority、owner Issue、focused command、parent SHA、result SHAを同じreceiptへ持つ。
 
 ## Sequence gates
 
-### Gate 1 — Decision acceptance
+### Gate 1 — Decisions and rolling inventory
 
-`iss-00388`、`iss-00389`、`iss-00390`のProduct / Policy choicesをaccepted authorityとして固定する。
+D1〜D3をProduct / Policy authorityとしてacceptする。C4は並行してbaselineを作り、decision反映後にlatest inventory headを確定する。
 
-### Gate 2 — Inventory
+### Gate 2 — Uninstall-first bridge
 
-E384-04を作成し、exact baseline SHAの全node inventory、duplicate grouping、removal receipt baselineを完成する。
+C5を単独mergeし、legacy install / update、新uninstall / purge、post-uninstall reinstallを統合GREENにする。
 
-### Gate 3 — Failure authority and install/update
+### Gate 3 — Install / update writer cutover
 
-E384-05はactive failuresを個別処置し、E384-06は4 roots + 2 slotsへcutoverする。両者は並行可能。
+C6を単独mergeし、P2 lifecycleとP0 / P1 fail-closed downgrade matrixをGREENにする。
 
-### Gate 4 — Uninstall
+### Gate 4 — Behavior-owned failure repairs
 
-E384-06後、E384-07でtooling-only uninstallとpurge compatibilityへcutoverする。
+`FIX-*`をcontract ownerごとにmergeし、active approved failureを0にする。各merge後のmainをGREENに保つ。
 
-### Gate 5 — Test portfolio
+### Gate 5 — Additive shadow gate
 
-E384-05、E384-06、E384-07のauthority / receiptsを入力にE384-08を進める。
+C7でnew gateをnon-required shadowとして追加し、old required gateを維持する。
 
-### Gate 6 — CI budget cutover
+### Gate 6 — External required-check cutover
 
-E384-09でsingle-process CI、artifact reuse、budget reportingへcutoverし、Full Regression machineryを撤去する。
+C8でold + new requiredを経てnew-only requiredへ移す。old workflowは残す。
 
-### Gate 7 — Final evidence
+### Gate 7 — Old machinery retirement
 
-E384-10でsame-candidate 5-run referenceとrolling 20 acceptanceを完了する。
+C9でold workflow / ledger / shard / policy skipを撤去する。
+
+### Gate 8 — Optional legacy sunset
+
+D1がEpic内sunsetを要求した場合だけC11をmergeする。
+
+### Gate 9 — Final evidence
+
+C10でsame-candidate 5-run referenceとrolling 20 acceptanceを完了する。
 
 ## Epic verification
 
-1. canonical regressionをworker 1で連続5回実行する。
-2. child-inclusive wall / user / system CPU、subprocess、temp workspace、copied bytesを記録する。
-3. local / Linux / macOS laneのexecuted node集合を比較し、same OS duplicate 0を確認する。
-4. artifact receiptのsource SHA / digest / build countを確認する。
-5. fresh / current / accepted legacy、root-inner drift、symlink、parent rebind、permission failure、root間stopをnew owner layerで検証する。
-6. init、update、tooling-only uninstallとskill lifecycleをLinux built artifactで通す。
-7. user dataとunrelated skillsがbyte-identicalであることを確認する。
-8. plain zero-failure / zero policy skipを確認する。
-9. baselineから削除した全production route / test / workflow machineryのremoval receiptを確認する。
-10. SpecDock validation、lint、provider / dogfood parityを確認する。
-
-performanceは最良値ではなく5回すべてを記録する。wall 600秒超、平均論理core 1.1超、worker追加依存、duplicate node、active approved failureのいずれかがあればEpic acceptance未達とする。
+1. child PRごとにmerge parent上のpublic lifecycle matrixを実行し、後続Issueなしでもreleasableであることを確認する。
+2. canonical regressionをworker 1で連続5回実行する。
+3. root processと全descendantのwall / user / system CPU、subprocess、temp workspace、copied bytesを記録する。
+4. local / Linux / macOS laneのexecuted node集合を比較し、steady-state same OS duplicate 0を確認する。
+5. artifact receiptのsource SHA / digest / build countを確認する。
+6. P0 / P1 / P2 compatibility matrix、legacy / current、root-inner drift、symlink、rebind、permission、root間stopをowner layerで検証する。
+7. init、update、tooling-only uninstall、accepted purge、post-uninstall reinstallをbuilt artifactで通す。
+8. user data、generated projections、unknown paths、unrelated skillsがbyte-identicalであることを確認する。
+9. plain zero-failure / zero policy skip / zero approved failureを確認する。
+10. baselineから削除した全production route / test / workflow machineryのrolling removal receiptを確認する。
+11. required-check transition receiptとlive external stateを照合する。
+12. SpecDock validation、lint、provider / dogfood parityを確認する。
 
 ## Exit / handoff
 
 - Requirementの全受け入れ条件を同一final candidateのevidenceで満たす。
+- 各production-changing child Issueを依存順に`main`へmergeし、各merge pointのreleasabilityを証明する。
 - 4 disposable rootsとfixed skill slots以外へprovider delete authorityを持たない。
 - canonical regressionがsingle process / 10分以内 / zero failure / zero policy skipである。
 - duplicate nodes、approved failure ledger、4-shard runner、timing weightsが残っていない。
 - distribution contractとtest ownershipをcode / test name / CI commandから理解できる。
-- candidate labelはIssue作成時にactual `iss-xxxxx` IDへ置換する。
-- E384-10 evidenceが揃う前にEpicをcloseしない。
+- proposal labelはIssue作成時にactual `iss-xxxxx` IDへ置換する。
+- C10 evidenceが揃う前にEpicをcloseしない。
 - agentは各Issueをmerge-ready PRまで進めるが、mergeは人間が行う。
 - Issue #372のdocs、branch、candidate、acceptance evidenceを変更しない。
