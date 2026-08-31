@@ -114,6 +114,7 @@ behavior testの作成・移動・削除は対応production Issueが所有する
 長期dual engineではなく、有限なreader compatibilityとsingle writerを設計する。名称は実装時にrepository styleへ合わせられるが、責務は次のstable contractへ分ける。
 
 - `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、legacy-recovery-active、blockedをread-only分類する。
+- `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、canonical ready / updating fixtures、invalid / unknown / future schema cases、root / slot completeness rule、exact P0 artifact evidenceを固定する。C5がownerとなり、C6は変更せずconformする。
 - `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、2 skill slot versionsだけを持つ。arbitrary path、per-file digest、checkpoint listを持たない。
 - `SkillSlotMarkerV1`: schema、owner、exact slot、distribution versionだけを持つ。
 - `ToolingDeletePlanV1`: fixed roots、valid owned exact slots、installation recordだけをtyped targetにする。
@@ -187,10 +188,11 @@ arbitrary historical catalog、scheduler、baseline、journal state machineを�
 ### Replace / ready
 
 1. root bindingを再確認する。
-2. 4 provider rootsを固定順でdelete + renameする。
-3. skill slotをfixed exact pathごとにreplaceする。
-4. installation record / ready markerを最後にatomic replaceする。
-5. staging残存をbest effortでcleanupする。
+2. 最初のdestructive stepより前にinstallation recordを`state=updating-v2`、`desired_version`、`desired_digest`へatomic replaceする。
+3. 4 provider rootsを固定順でdelete + renameする。
+4. skill slotをfixed exact pathごとにreplaceする。
+5. 全root / slot配置後にinstallation recordを`ready-v2`へatomic replaceする。
+6. staging残存をbest effortでcleanupする。recordとstaging digestが一致しない場合はstagingをauthorityにせずblockする。
 
 Python / Linux / macOSで非空directory同士のcross-platform atomic exchangeはpublic guaranteeにしない。各rootのdelete + renameと、複数rootの順次置換を正直なfailure modelとして受け入れる。
 
@@ -208,16 +210,21 @@ Python / Linux / macOSで非空directory同士のcross-platform atomic exchange�
 
 per-file checkpoint、intent別journal、quarantine、rollback image、cross-intent resumeをstate modelへ持ち込まない。
 
+`fresh | current-supported | legacy-supported | legacy-expired | unknown`はsupport classificationでありlifecycle stateではない。D1は各classificationをcanonical lifecycle stateへ一意にmappingする。operation authorityは`package_generation × lifecycle_state × operation` matrixだけから決める。
+
 ### Failure contract
 
 | failure | result | next action |
 |---|---|---|
 | stage / validate failure | target旧stateを維持 | candidate修正後に再実行 |
+| updating record書込み失敗 | target旧stateを維持 | candidate / filesystem修正後に再実行 |
+| updating record後・root削除前 | target content旧state、recordはupdating | same desired version / digestだけを再実行 |
 | root削除前のfailure | target旧stateを維持 | 再実行 |
 | delete後・rename前 | 一root欠落、user data不変 | external updaterから再実行 |
 | root間の停止 | mixed roots、ready markerは旧 | desired versionを再実行して全root再置換 |
 | scripts後・ready前 | repo-local復旧不能の可能性 | installed package / `uvx`から再実行 |
 | ready後cleanup failure | candidateはready、staging残存 | update成功。bounded cleanupを後実行 |
+| record / staging digest mismatch | mutation前block | authorityを推測せず人間がstale stagingを診断 |
 | symlink / rebind / marker mismatch | write前block | diagnosticに従い人間が境界を修復 |
 
 whole-operation rollbackは提供しない。provider toolingの一時availabilityより、user dataとshared contentを削除しないことを優先する。
@@ -254,7 +261,7 @@ Linux canonical portfolioはcollection / variance headroomを含め10分以内�
 
 test ownershipはlayerではなくbehavior ownerへ帰属させる。uninstall / purge bridgeはlegacy admission、tooling-only delete、purge、post-uninstall reinstallを同じIssueで証明する。install / update cutoverはroot replacement、ready / updating state、same-version rerun、skill write lifecycleを同じIssueで証明する。distribution外のactive failureはinventoryが示すdurable contract ownerへfan-outし、current authorityから期待動作を決められないnodeだけ個別decision Issueへ戻す。
 
-CI Issueはlane assignment、selector、metrics、artifact receiptだけを所有し、production behaviorのsuccessor testを後付けしない。behaviorを変えないexact duplicate cleanupはinventoryが独立acceptanceを証明した場合だけsafe-transition Issueにできる。
+各behavior Issueはexact successor nodeをそのmerge時点のauthoritative required command / contextへ組み込み、collected = executed、policy skip 0、affected artifact / platform smoke GREENを証明する。macOS nodeもC7まで未選択にしない。CI Issueは既にauthoritativeに実行されているnodeを非重複laneへ移し、selector、metrics、artifact receiptを所有するだけで、production behaviorのsuccessor proofを後付けしない。behaviorを変えないexact duplicate cleanupはinventoryが独立acceptanceを証明した場合だけsafe-transition Issueにできる。
 
 ### Keep
 
@@ -327,7 +334,7 @@ P0: legacy writer + legacy reader
   -> P3: new-only reader/writer after accepted sunset
 ```
 
-- `P0 × ready-v2`、`P0 × updating-v2`はmutation前にfail closedにする。
+- exact P0 artifactがcanonical ready-v2 / updating-v2 fixtureをmutation-zeroでblockできるformat / guardをC5で証明する。成立しない場合はP0に能力があると仮定せず、workspace format / release sequenceを親へ戻す。
 - `P1 × legacy-ready`はlegacy install/updateとnew uninstall/purgeをGREENにする。
 - `P1 × tooling-absent-preserved-data`はaccepted install routeで再installできる。
 - `P1 × ready-v2`はuninstall / dry-runを許可し、update / init-forceはfail closedにする。
@@ -347,6 +354,8 @@ OLD_REQUIRED
 ```
 
 new contextはold contextを残したままrequiredへ追加し、failure canaryでmerge blockを確認する。old workflowはnew-only requiredを再取得するまでrepositoryに残す。external settingsとcode PRは同一transactionとみなさず、各transitionにreceiptとrollback条件を持たせる。
+
+unrelated effective required contextsを`U`とし、実際の集合遷移は`U + old -> U + old + new -> U + new`とする。canaryでは`U`とoldを全てGREEN、newだけREDにする。merge queueがactiveならPRとmerge-groupの双方でcontext生成とblockを証明する。
 
 ## 変更対象
 

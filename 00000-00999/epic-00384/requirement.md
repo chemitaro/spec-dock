@@ -116,14 +116,16 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 
 ### R5C. lifecycle format and cross-version compatibility
 
-- production cutoverは`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2(desired digest)`、`legacy-recovery-active`、`blocked`を区別する。
-- package世代は現行`P0`、uninstall-first bridge`P1`、new install/update writer`P2`、legacy sunset後`P3`として扱い、各package / workspace combinationのallow、fail-closed、recovery ownerをdecision authorityへ束縛する。
+- canonical lifecycle stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2(desired digest)`、`legacy-recovery-active`、`blocked`とする。`fresh`、`current-supported`、`legacy-supported`、`legacy-expired`、`unknown`はsupport classificationという別axisとし、各classificationからcanonical lifecycle stateへの一意なmappingを持つ。
+- package世代は現行`P0`、uninstall-first bridge`P1`、new install/update writer`P2`、legacy sunset後`P3`として扱う。`package_generation × lifecycle_state × operation`の全cellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery owner、implementation owner、sunset / removal ownerを持つ。
 - `P1`はlegacy install/update writerを維持しつつ、legacy stateとfuture `InstallationRecordV2`を読むtooling-only uninstall / purge dual-readerを提供する。同一operationにold/new writerを併存させない。
-- `P2`へcutoverする前に`P1` uninstallが`ready-v2`を安全に処理でき、`P0` / `P1` updateが`ready-v2`をmutation前にfail closedにできることを証明する。
+- C5でexact record path、serialized schema / version、canonical fixture、invalid / unknown / future cases、root / slot completenessを`LifecycleCompatibilityContractV1`として固定する。C5 readerがfixtureをconsumeし、C6 writerはその既存contractへのconformanceを証明する。
+- `P2`へcutoverする前に`P1` uninstallが`ready-v2`を安全に処理でき、exact P0 artifact / version / digestとP1 writerが`ready-v2`をmutation前にfail closedにできることを証明する。P0に能力がない場合はdecisionで上書きせず、P0が既にblockできるformat / guardまたはrelease sequenceへ変更する。
 - `updating-v2`では同じdesired version / digestのexternal updateだけを許可し、uninstall、purge、別version update、old engine fallbackをblockする。
 - tooling-only uninstall後のuser data / generated projectionを保持したworkspaceから、accepted install routeで再installできる。
 - active legacy recovery stateは、accepted bounded recovery-only adapterまたはlast-compatible package pinのどちらかで扱う。未決状態を新journalへ推測変換しない。
 - bridge sunsetをEpic内で行うかfollow-upへ渡すかを`iss-00388`で確定し、期限なしのdual-readerをsteady stateへ残さない。
+- C6は最初のdestructive stepより前にfixed recordを`state=updating-v2`、`desired_version`、`desired_digest`へatomic replaceする。全root / slot配置後だけ`ready-v2`へatomic replaceする。
 
 ### R6. failureを成功扱いしない
 
@@ -145,7 +147,8 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 
 - 新canonical gateは既存required checkを変更・削除せず、non-required shadowとして追加する。
 - shadowの連続GREENとfailure canaryを確認後、GitHub ruleset / branch protectionのauthority、owner、変更前required contextsをreceipt化する。
-- external required-checkは`old required`から`old + new required`、`new required + old non-required`の順に移し、human review requirementを維持する。
+- unrelated effective required contextsを`U`とし、external required-checkは`U + old`から`U + old + new`、`U + new`の順に移す。対象branch / ruleset scope、複数rulesetのeffective state、human review requirementを集合差分で維持する。
+- failure canaryはoldと`U`を全てGREENにし、newだけを意図的にREDにしてmerge blockを証明する。merge queueがactiveならmerge-group eventでも同じcanaryを行う。
 - old workflow / ledger / shard machineryは、new checkだけがrequiredであることを再取得してから別PRで削除する。
 - required-check defect時はold workflowがrepositoryに残る間だけold contextへrollbackできる。workflow不存在のcontextをrequiredへ戻さない。
 
@@ -183,6 +186,7 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - [x] 4 disposable roots、fixed skill slots、user history保護、external rerun convergenceをaccepted ADR `20260831t005139z-adr` に記録している。
 - [ ] R5Bの残るProduct判断を、影響する実装Issueの開始前にaccepted decisionとして記録している。
 - [ ] production-changing child PRごとに、依存済み`main`上のaccepted public lifecycle command matrixがzero failure、zero policy skipであり、後続Issueなしでもreleasableである。
+- [ ] 各production-changing child PRのexact successor node IDsがmerge時点のauthoritative required command / contextでcollection・executionされ、collected count = executed count、policy skip 0である。
 - [ ] baseline SHAへ束縛したinventoryが全collected nodeを100%包含する。
 - [ ] 削除した全test node、production route、workflow machineryにremoval receiptがある。
 - [ ] 全test familyのcontract / layer / lane / cost / keep-move-consolidate-delete判定が追跡できる。
@@ -194,6 +198,7 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - [ ] install/update cutover前に旧per-file update testsを削除せず、tooling-only uninstall cutover前に旧deprovision / purge testsを削除していない。
 - [ ] uninstall-first bridge merge時にlegacy install / update、tooling-only uninstall、accepted purge surface、post-uninstall reinstallが統合GREENである。
 - [ ] install/update cutover merge時にnew writerとnew uninstallが統合GREENであり、old package / writerはnew workspaceをmutation前にfail closedにする。
+- [ ] `updating-v2` recordを最初のdestructive step前に永続化し、record前後、各root delete / rename間、ready遷移前、stale staging mismatch、ready write failureのfaultをsame-digest rerun contractで検出する。
 - [ ] default pathでshard runnerを使用せず、test worker concurrencyが1である。
 - [ ] fixed 2-vCPU Linux referenceで同じbudgetを満たし、seeded fault pack（user data誤書込み、allowlist外削除、symlink follow、root間failure、skill marker mismatch、artifact欠落）を100%検出する。
 - [ ] cutover後のrolling 20 canonical runsでflake 0、retry 0である。

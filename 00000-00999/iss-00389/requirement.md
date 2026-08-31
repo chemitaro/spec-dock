@@ -22,7 +22,7 @@ ID: "iss-00389"
 
 ## 観測可能な要件
 
-- 通常uninstallのdelete authorityを4 fixed roots、valid owned fixed skill slots、installation record / ready markerに限定する。
+- 通常uninstallのdelete authorityを4 fixed roots、valid owned 2 fixed skill slots、fixed installation record / ready markerに限定する。shipped workflowはparent ADR改定とimplementation acceptance追加なしに削除しない。
 - update、retry、tooling uninstallからspec-history purgeへ到達できない。
 - purgeを残す場合、独立command、明示confirmation、dry-run / apply、text / JSON、exit codeを定義する。
 - deprecated aliasを残す場合、silent destructive executionを禁止し、具体的sunsetを持つ。

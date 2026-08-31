@@ -30,16 +30,16 @@ consumer workflowとprovider CIのownerを分離し、build-once artifact、Linu
 5. accepted decision、artifact / required-check receipt contract、change / removal handoffを作る。
 6. Epic docsへ反映する。
 
-`iss-00388`、`iss-00389`とは並行可能。後続test inventory、install/update cutover、CI cutoverは本Issueのacceptanceへ依存する。
+`iss-00388`、`iss-00389`とは並行可能。後続inventoryのcollection / cost取得は並行可能だが、target lane / disposition finalization、uninstall bridge、install/update cutover、CI cutoverは本Issueのacceptanceへ依存する。
 
 ## 実装step
 
 1. `src/spec_dock/assets/install_root/.github/workflows/ci.yml`とroot `.github/workflows/*.yml`のsource / projection関係を確認する。
 2. current jobsごとにtrigger、OS、artifact build、executed node family、required statusを抽出する。
-3. live external stateからruleset / branch protection / merge queue、required contexts、review requirement、変更ownerを確認する。
+3. live external stateからruleset / branch protection / merge queue、effective required context set `U + old`、review requirement、変更ownerと実行権限を確認する。
 4. seed / reusable projection / excludedのownership案とlifecycle authorityを比較する。
 5. wheel / sdist / Linux / macOSのtrigger、build invocation、digest、retention、reuse案を比較する。
-6. shadow追加、old + new required、new-only required、old removalのstate machineとrollbackを比較する。
+6. `U + old -> U + old + new -> U + new`、PR / merge-group canary、old removal、事前検証済みrestoration patchを含むstate machineとrollbackを比較する。
 7. Product ownerへ最推奨と代替を提示し、各policyを明示受理する。
 8. accepted ADRまたは追補へownershipとreceipt schemaを記録する。
 9. install/update Issueが変更するshipped asset、CI shadow / retirement、external check cutoverを別receiptにする。

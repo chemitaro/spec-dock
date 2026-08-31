@@ -32,6 +32,7 @@ Target:
 - legacy recognitionはexact evidenceとsunsetを持つone-shot adapterだけが所有する。
 - `.gitignore`は独立したinit-seed contractを持ち、unknown / custom stateを黙って上書きしない。
 - `P0` / `P1` / `P2` / `P3` compatibility matrix、recovery owner、finite bridge sunsetを持つ。
+- support classificationとcanonical lifecycle stateを別axisとし、一意なmappingを持つ。
 
 ## 責務・Interface
 
@@ -62,6 +63,8 @@ removal owner
 ```
 
 evidenceが欠落・競合・不正な場合は`unknown`とし、mutation前にpreserve-and-blockする。version文字列だけでownershipを証明しない。
+
+matrixは`package_generation × lifecycle_state × operation`をcanonical authorityとし、`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2`、`legacy-recovery-active`、`blocked`と、install、init-force、update、uninstall、purge、dry-runの全cellを埋める。exact P0 artifactを実行してnew fixtureへのmutation-zeroを確認し、実現不能な能力をdecisionで付与しない。
 
 ## 変更対象
 
