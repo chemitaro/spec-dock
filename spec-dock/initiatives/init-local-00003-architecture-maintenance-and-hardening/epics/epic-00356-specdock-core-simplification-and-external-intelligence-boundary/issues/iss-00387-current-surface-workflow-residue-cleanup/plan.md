@@ -142,9 +142,9 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** implementation baselineを一意にする。
 - **前提:** 改訂R/D/PがStrict reviewを通過し、commit/push済み。
 - **操作:** 変更しない。
-- **確認:** `git status --short`、`git branch --show-current`、`git rev-parse HEAD`、`git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'`、`git rev-parse '@{upstream}'`を別々に実行する。
-- **期待結果:** clean、branch=`iss-00387-current-surface-workflow-residue-cleanup`、HEAD=upstream。HEADを`<implementation-baseline-sha>`として以後のdiffへ使用する。
-- **証拠:** branch、full SHA、clean status。
+- **確認:** `git status --short`、`git branch --show-current`、`git rev-parse HEAD`、`git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'`、`git rev-parse '@{upstream}'`を別々に実行する。最後に`IMPLEMENTATION_BASELINE_SHA="$(git rev-parse --verify 'HEAD^{commit}')"`、`printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'`、`test "$(git rev-parse '@{upstream}')" = "$IMPLEMENTATION_BASELINE_SHA"`を実行する。
+- **期待結果:** clean、branch=`iss-00387-current-surface-workflow-residue-cleanup`、HEAD=upstream。検証済み40桁値を`<implementation-baseline-sha>`として以後のdiffへ使用する。
+- **証拠:** branch、検証済みfull SHA、clean status。full SHAはReportへ一度記録し、後続shellでは同じ40桁値を再代入してC00-01値と一致確認する。
 - **停止条件:** dirty、detached、upstream不一致、Git operation/lock。
 - **cleanup:** なし。
 
@@ -470,8 +470,8 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 残存契約を最小の既存suiteで検証する。
 - **前提:** M1〜M4完了。
-- **操作:** 変更しない。
-- **確認:** `uv run pytest tests/unit/application/test_set_active.py tests/unit/infra/test_authoring_kit_assets.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_issue_lifecycle.py tests/cli_runtime/test_doctor.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -q`。削除済みfileはcommandから除き、残存focused fileを明示する。
+- **操作:** focused suiteの前に、Reportへ記録したC00-01の40桁値を`export IMPLEMENTATION_BASELINE_SHA='<C00-01 full SHAへ一度だけ置換>'`へ再代入する。C00〜C40のapproved inventoryにある変更pathとcurrent IssueのPlan/Reportを`git add -- <explicit-path>...`でstageする。globや動的path展開を使わない。以後このindexをcandidate checkpointとする。
+- **確認:** `printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'`、`test "$(git rev-parse --verify "${IMPLEMENTATION_BASELINE_SHA}^{commit}")" = "$IMPLEMENTATION_BASELINE_SHA"`、`test "$IMPLEMENTATION_BASELINE_SHA" = '<Reportに記録したC00-01 full SHAへ一度だけ置換>'`を実行する。`git diff --name-status`が空、`git ls-files --others --exclude-standard`が空、`git diff --cached --name-status "$IMPLEMENTATION_BASELINE_SHA"`がapproved inventoryだけであることを確認する。その後`uv run pytest tests/unit/application/test_set_active.py tests/unit/infra/test_authoring_kit_assets.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_issue_lifecycle.py tests/cli_runtime/test_doctor.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -q`を実行する。削除済みfileはcommandから除き、残存focused fileを明示する。
 - **期待結果:** required testsが実行されGREEN。skipは理由付き。
 - **証拠:** command、selected tests、pass/skip/fail、duration。
 - **停止条件:** retirement-only test再導入でしか通らない、selector/ordering/failure/parity regression。
@@ -482,7 +482,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** repository全体の非回帰。
 - **前提:** C50-01 PASS。
 - **操作:** 変更しない。
-- **確認:** `make lint`、`git diff --check`、`uv run pytest`。
+- **確認:** `make lint`、`git diff --cached --check "$IMPLEMENTATION_BASELINE_SHA"`、`uv run pytest`。
 - **期待結果:** 全command成功。ordinary laneのpolicy skipを実測記録。
 - **証拠:** summary/count/duration。
 - **停止条件:** failure無視、test lane/marker変更で回避。
@@ -544,13 +544,13 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
 - **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
 
-**Evidence recording and invalidation rule:** C60-01 PASS直後、`C60_TRACKED_SNAPSHOT="$(mktemp)"`で本Issue所有の空fileを作り、そのexact pathを出力する。`git diff --binary "$IMPLEMENTATION_BASELINE_SHA" -- . > "$C60_TRACKED_SNAPSHOT"`と`shasum -a 256 "$C60_TRACKED_SNAPSHOT"`で、その時点のtracked candidateを保存する。以後tracked contentを編集するたびに、同じ方法で別の`C60_TRACKED_AFTER`を作り、`diff -u "$C60_TRACKED_SNAPSHOT" "$C60_TRACKED_AFTER"`に現れた新しいpath/hunkだけを次の順で一度分類する。baselineからの累積diff全体を分類対象にしない。
+**Evidence recording and invalidation rule:** C50-01で作ったGit index checkpoint以後、各tracked editの直後に`git diff --name-status`、`git diff -- current-Issue-plan-path current-Issue-report-path`、`git ls-files --others --exclude-standard`を確認し、次の順で一度分類する。
 
-1. 新しいhunkがcurrent IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`・`Evidence reference`、およびcurrent Issue Reportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文への実測事実の記録だけなら`EVIDENCE_ONLY`とする。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しを一文字でも変えた場合は該当しない。`EVIDENCE_ONLY`は既存status/evidenceを失効させない。旧`C60_TRACKED_SNAPSHOT`だけを削除し、`C60_TRACKED_AFTER`を`C60_TRACKED_SNAPSHOT`へ置き換えてpathとSHA-256を再記録してから次checkへ進む。
-2. `EVIDENCE_ONLY`ではなく、変更pathが全てtracked `*.md`なら`MARKDOWN_SUBSTANTIVE`とする。C50-02〜C90-04を`NOT_RUN`へ戻し、C50-02から再実行する。C50-01の既存PASSだけは保持できる。
-3. Markdown以外のtracked pathが一つでも変わる、または分類に迷う場合は`NON_MARKDOWN_OR_AMBIGUOUS`とする。C50-01〜C90-04を`NOT_RUN`へ戻し、C50-01から再実行する。
+1. unstaged hunkがcurrent IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`・`Evidence reference`、およびcurrent Issue Reportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文への実測事実の記録だけなら`EVIDENCE_ONLY`とする。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しを一文字でも変えた場合は該当しない。該当Plan/Report pathだけをexplicit pathでstageし、`git diff --name-status`とnon-ignored untrackedが再び空であることを確認して次checkへ進む。
+2. current IssueのRequirement、Design、Planのcheck本文、またはReport見出しを変えるhunkなら`SPECIFICATION_CONTRACT`とする。production writerは実装を`BLOCKED`としてmain agentへ返し、current candidateを追加stage/commitしない。main agentがcleanな仕様固定点でR/D/P改訂、commit/push、independent Strict reviewを完了した後、その新しい固定SHAからC00-01を新規実行する。旧candidateのstatus/evidenceを流用しない。
+3. 1、2以外のtracked変更、non-ignored untracked追加、または分類不能なら`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`とする。C00-03とC00-05〜C90-04を`NOT_RUN`へ戻し、C00-03から再実行する。C00-04だけはoriginal implementation baselineのbefore metricsなのでPASSを保持し、変更後candidateで採り直さない。
 
-2または3では`C60_TRACKED_SNAPSHOT`と`C60_TRACKED_AFTER`をexact pathで削除・不在確認する。さらにC60-01 success時の一時directoryが残っている場合は、再実行前に旧C60-01のimmediate path evidenceとbyte-for-byte照合した`$CONSUMER`と`$ARTIFACT_DIR`だけを削除・不在確認し、そのcleanup証拠をReportへ記録する。旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceへ流用しない。再実行中のledger/Report更新は1の`EVIDENCE_ONLY`なので再失効を発生させない。
+2または3でC60-01 success時の一時directoryが残っている場合は、再実行前に旧C60-01のimmediate path evidenceとbyte-for-byte照合した`$CONSUMER`と`$ARTIFACT_DIR`だけを削除・不在確認し、そのcleanup証拠をReportへ記録する。旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceへ流用しない。substantive修正pathは必要な再review・再実行とapproved inventory照合が完了するまでstageしない。
 
 ### C60-02 — Current Full Regression
 
@@ -579,7 +579,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 ### C90-02 — After metrics/test budget
 
 - **対象 / 目的:** stagingに依存しないworking-tree母集団で、testを含む撤退を数量確認する。
-- **前提:** C90-01完了。C90-02のためのstaging/index mutationは行わない。
+- **前提:** C90-01完了。C50-01以降のcandidate checkpointは既にindexにある。C90-02の計測目的では追加のstaging/index mutationを行わない。
 - **操作:** `git ls-files -z -- tests`からworking treeに現存するtracked pathだけを明示listへ残し、missing tracked pathは除外する。`tests`配下のnon-ignored untracked pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体のcollect-only、残る三指標は同じexisting tracked listから算出する。
 - **確認:** repository rootで次のzsh blockをそのまま実行する。
 
@@ -646,18 +646,18 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
 - **前提:** C00-01〜C90-03のversion管理ledgerが全てPASSまたは理由付きN/A。
-- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。Plan ledgerの`状態`・`Evidence reference`とReportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`だけに実測事実を記録し、Evidence recording and invalidation ruleの`EVIDENCE_ONLY`であることを直前snapshotとの差分hunkごとに確認してfinal tracked contentを確定する。最後の`C60_TRACKED_SNAPSHOT`とその他の本Issue所有cacheもexact ownership確認後に削除・不在確認する。C90-04自身のPASSをPlan/Reportへ書かず、この最終contentをcommit candidateとしてfreezeする。
-- **確認:** `test -n "$ARTIFACT_DIR"`、`test -n "$CONSUMER"`、`test "$ARTIFACT_DIR" != "$CONSUMER"`、各`test -d`、cleanup前後のexact path出力、各`test ! -e`を実行する。その後、version管理ledgerとraw command evidence、Report内容、`git status --short --untracked-files=all`、`git diff --check`を照合する。
+- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。Plan ledgerの`状態`・`Evidence reference`とReportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`だけに実測事実を記録し、Evidence recording and invalidation ruleの`EVIDENCE_ONLY`であることをunstaged diff hunkごとに確認して該当Plan/Report pathだけをstageする。その他の本Issue所有cacheもexact ownership確認後に削除・不在確認し、unstaged/untracked差分0のfinal indexをcommit candidateとしてfreezeする。C90-04自身のPASSをPlan/Reportへ書かない。
+- **確認:** `test -n "$ARTIFACT_DIR"`、`test -n "$CONSUMER"`、`test "$ARTIFACT_DIR" != "$CONSUMER"`、各`test -d`、cleanup前後のexact path出力、各`test ! -e`を実行する。その後、version管理ledgerとraw command evidence、Report内容、空の`git diff --name-status`、空のnon-ignored untracked一覧、`git diff --cached --name-status "$IMPLEMENTATION_BASELINE_SHA"`、`git diff --cached --check "$IMPLEMENTATION_BASELINE_SHA"`を照合する。
 - **期待結果:** C60-01 success時に保持された二つのmktemp-owned directoryだけがexact pathで削除される。C00-01〜C90-03にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
 - **証拠:** candidate freezeのPASS/BLOCKEDをPR/handoff evidenceへ記録し、version管理Plan/Reportには追記しない。
 - **停止条件:** C60-01 evidenceとcleanup変数の不一致、empty/same/missing/unknown path、raw実行なしのPASS、final SHA自己参照、長いlog複製、unknown temporary/untracked path。
-- **cleanup:** C60-01がsuccess時に保持したexact `$CONSUMER`と`$ARTIFACT_DIR`、最後のexact `C60_TRACKED_SNAPSHOT`、およびownershipを証明できる本Issue所有temporary/duplicate scratch/logだけ。glob、prefix、parent directory、user-owned/unknown pathは削除しない。
+- **cleanup:** C60-01がsuccess時に保持したexact `$CONSUMER`と`$ARTIFACT_DIR`、およびownershipを証明できる本Issue所有temporary/duplicate scratch/logだけ。glob、prefix、parent directory、user-owned/unknown pathは削除しない。
 
 ### C90-05 — Commit、push、Strict quality gate、PR
 
 - **対象 / 目的:** human merge判断へ固定candidateを渡す。
 - **前提:** version管理ledgerのC00-01〜C90-03が完了し、C90-04 candidate freezeがhandoff evidence上でPASS、identity確認済み。
-- **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。cleanなfinal SHA上でもう一度`spec-dock validate`を実行してから、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、影響milestoneとC90-01〜04を再実行してPlan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
+- **操作:** C90-04でfreezeしたfinal indexに追加stageがないことを確認してcommit/pushし、Issue #387参照PRを作る。cleanなfinal SHA上でもう一度`spec-dock validate`を実行してから、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、Evidence recording and invalidation ruleで分類して必要な再reviewまたは再実行を行い、Plan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
 - **確認:** staged name-status、clean status、remote SHA、final SHA上のvalidate、PR checks、Strict review status。
 - **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
 - **証拠:** final SHA、PR URL、checks/review summaryをversion管理Plan/ReportではなくPR/handoff evidenceへ記録する。これらの記録のためにreviewed SHAを変更しない。

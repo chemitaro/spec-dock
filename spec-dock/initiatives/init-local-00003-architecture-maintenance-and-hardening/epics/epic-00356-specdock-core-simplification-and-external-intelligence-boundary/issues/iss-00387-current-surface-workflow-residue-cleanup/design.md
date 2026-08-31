@@ -230,13 +230,13 @@ fresh consumerのinstaller executionは、その場でinventoryした同一wheel
 
 C60-01は最初の一時directory作成前にfailure trapを設定し、`ARTIFACT_DIR`と`CONSUMER`を各`mktemp -d`直後に記録する。nonzero終了時は同checkで作成済みのexact pathだけを削除する。success時だけtrapを解除し、C90-04が同じpath evidenceを照合してcleanupする。
 
-C60-01成功直後にimplementation baselineからのtracked diffを一時fileへ保存してSHA-256を記録する。以後のtracked editは、直前snapshotと編集後snapshotの差分に現れた新しいpath/hunkだけを次の三分類で扱う。baselineからの累積diff全体を再分類しない。evidence-only editを受理したら編集後snapshotを次の比較基準へ昇格する。substantive editなら両snapshotをexact cleanupし、指定checkからの再実行で新しいC60 snapshotを作る。
+C50-01開始前に、C00〜C40で承認されたcandidate pathとcurrent IssueのPlan/Reportだけをexplicit pathでGit indexへstageする。`git diff`が空、non-ignored untrackedが0、`git diff --cached`がapproved inventoryだけである状態をcandidate checkpointとする。これにより、C50以降に加えた編集はunstaged/untracked差分として直接観測でき、一時snapshot fileやshell session状態を持たない。
 
-1. **evidence-only:** current IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`と`Evidence reference`だけ、またはcurrent Issue Reportの`Outcome`、`Verification`、`Residual Risks / Follow-ups`本文だけへ、実測済み事実を記録する変更。この変更だけなら既存checkを失効させない。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しの変更は含めない。
-2. **Markdown-only substantive:** evidence-only以外の差分がtracked `*.md`だけに限定される変更。C50-01は有効のまま、C50-02〜C90-04を失効させ、C50-02から再実行する。
-3. **non-Markdown or ambiguous:** Markdown以外を一つでも変更する、または上記二分類を証明できない変更。C50-01〜C90-04を失効させ、C50-01から再実行する。
+1. **evidence-only:** current IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`と`Evidence reference`だけ、またはcurrent Issue Reportの`Outcome`、`Verification`、`Residual Risks / Follow-ups`本文だけへ、実測済み事実を記録する変更。この変更だけなら既存checkを失効させない。diff hunkを確認後、そのPlan/Report pathだけをstageし、再びunstaged/untracked差分0にする。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しの変更は含めない。
+2. **specification contract:** current IssueのRequirement、Design、Planのcheck本文、またはReport見出しを変更するhunk。production writerは実装を`BLOCKED`としてmain agentへ返し、current candidateを追加stage/commitしない。main agentがcleanな仕様固定点でR/D/P改訂とindependent Strict reviewを完了した後、その新しい固定SHAからC00-01を新規実行する。旧candidateのstatus/evidenceは流用しない。
+3. **other substantive or ambiguous:** 1、2以外のtracked変更、non-ignored untracked追加、または分類不能な変更。C00-03とC00-05〜C90-04を`NOT_RUN`へ戻し、C00-03から再実行する。C00-04だけはoriginal implementation baselineのbefore metricsなのでPASSを保持し、変更後candidateで採り直さない。
 
-2または3を検出した時点で、失効対象を`NOT_RUN`へ戻す。C60-01が保持した一時directoryがある場合はimmediate path evidenceと照合した旧`CONSUMER`と`ARTIFACT_DIR`だけを先にcleanupし、不在証拠を残す。再実行の途中で作成した新しいwheel、digest、fresh consumer、verifier、audit結果だけをfinal candidate evidenceに使う。この分類により、実測記録は有限回で完了でき、実装・test・config・inventoryの変更はfocused、lint、ordinary suiteを含め最終candidateへ再束縛される。
+2または3を検出した時点で、C60-01が保持した一時directoryがある場合はimmediate path evidenceと照合した旧`CONSUMER`と`ARTIFACT_DIR`だけを先にcleanupし、不在証拠を残す。失効対象の旧wheel、digest、fresh consumer、verifier、audit結果をfinal candidate evidenceに使わない。修正pathをstageするのは、必要な再reviewと再実行が完了し、approved inventoryとの一致を再確認した後だけとする。
 
 after test metricsはstagingへ依存させない。`git ls-files -z -- tests`のうちworking treeに現存するpathだけをLOC/file/fixture指標の母集団とし、non-ignored untracked test pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体の`uv run pytest --collect-only -q`を使い、個別のfilename patternでdiscoveryを再定義しない。
 
