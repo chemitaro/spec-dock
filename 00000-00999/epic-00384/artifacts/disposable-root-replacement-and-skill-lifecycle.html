@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="ja" data-plantuml-status="pending" data-plantuml-contract="2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SpecDockのテストを根本から軽くする設計</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f3f6fb;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #536273;
+      --border: #d8e0ea;
+      --accent: #175cd3;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --error: #b42318;
+      --error-bg: #fef3f2;
+      --code-bg: #101828;
+      --code-text: #f2f4f7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(100% - 24px, 960px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header, section {
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgb(16 24 40 / 8%);
+    }
+
+    header { margin-top: 0; }
+    h1, h2 { line-height: 1.4; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2.25rem); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.2rem, 4vw, 1.5rem); }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .plantuml-status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .plantuml-status.error { background: var(--error-bg); color: var(--error); }
+    .plantuml-diagram {
+      position: relative;
+      min-height: 160px;
+      margin-top: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      color: #182230;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .plantuml-diagram[data-zoom-ready="true"] { cursor: zoom-in; }
+    .plantuml-diagram[data-zoom-ready="true"]:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .diagram-zoom-hint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgb(16 24 40 / 14%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plantuml-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .muted { color: var(--muted); }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-size: 0.86rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .lead { font-size: 1.08rem; }
+    .callout {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--accent);
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    }
+
+    .callout.warning { border-left-color: #b54708; }
+    .callout.success { border-left-color: var(--success); }
+
+    .metric-grid, .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .metric, .card {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--surface) 92%, var(--background));
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.4rem;
+      line-height: 1.25;
+    }
+
+    .card h3 { margin: 0 0 6px; font-size: 1rem; }
+    .card p { margin: 0; }
+    .good { color: var(--success); font-weight: 800; }
+    .danger { color: var(--error); font-weight: 800; }
+
+    .table-wrap { margin-top: 14px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    th, td { padding: 10px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 6px; }
+
+    .decision {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.diagram-zoom-open { overflow: hidden; }
+
+    .diagram-zoom-dialog[hidden] { display: none !important; }
+    .diagram-zoom-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgb(3 10 21 / 78%);
+    }
+
+    .diagram-zoom-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(1800px, 100%);
+      height: min(1200px, 100%);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+    }
+
+    .diagram-zoom-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin: 0;
+      padding: 6px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .diagram-zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diagram-zoom-controls button {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .diagram-zoom-controls button svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .diagram-zoom-controls button:hover,
+    .diagram-zoom-controls button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .diagram-zoom-controls button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .diagram-zoom-level {
+      min-width: 3.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    #diagram-zoom-reset {
+      width: auto;
+      min-width: 58px;
+      padding-inline: 8px;
+    }
+
+    .diagram-zoom-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #ffffff;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .diagram-zoom-canvas {
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 24px;
+    }
+
+    .diagram-zoom-canvas svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .diagram-zoom-dialog { padding: 0; }
+      .diagram-zoom-panel { border-radius: 0; }
+      .diagram-zoom-canvas { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0c111d;
+        --surface: #161b26;
+        --text: #f5f7fa;
+        --muted: #b9c2cf;
+        --border: #333b48;
+        --success-bg: #053321;
+        --error-bg: #55160c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Epic #384 / Accepted Architecture</p>
+      <h1>SpecDockのテストを根本から軽くする設計</h1>
+      <p class="lead">4時間規模のテストを並列化だけで10分に見せるのではなく、巨大化した配布更新の契約そのものを小さくします。結論は、利用者データを完全に分離し、SpecDock内部の4つのrootを更新時に丸ごと交換する方式です。</p>
+      <p><span class="decision">採択済み</span> Option C2 — Disposable Root Replacement / Fixed Skill Slots</p>
+      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
+        図を読み込んでいます。
+      </div>
+    </header>
+
+    <section>
+      <h2>まず押さえる結論</h2>
+      <div class="card-grid">
+        <article class="card">
+          <h3 class="good">残すもの</h3>
+          <p>Initiatives、そこに含まれるArtifacts、Workbench、未知の利用者ファイル、他のskills。</p>
+        </article>
+        <article class="card">
+          <h3>丸ごと交換するもの</h3>
+          <p><code>spec-dock/docs</code>、<code>templates</code>、<code>system</code>、<code>scripts</code>。</p>
+        </article>
+        <article class="card">
+          <h3>別扱いするもの</h3>
+          <p>共有領域にある2つのSpecDock skill。固定slotと小さなowner markerで管理します。</p>
+        </article>
+        <article class="card">
+          <h3 class="danger">やめるもの</h3>
+          <p>ファイルごとの過去hash、操作journal、全checkpointからの自動復旧、通常uninstallからのspec削除。</p>
+        </article>
+      </div>
+      <div class="callout success">
+        <strong>安全性の焦点を変えます。</strong> Provider内部の変更を保存することではなく、利用者データと共有領域を絶対に巻き込まないことを安全契約にします。
+      </div>
+    </section>
+
+    <section>
+      <h2>なぜテストがここまで長くなったのか</h2>
+      <p>現行テストは、単に書きすぎたのではありません。配布更新機能が「過去のあらゆるファイル状態を識別し、失敗位置から自動復旧する」という大きな責務を持つため、その状態の組合せをかなり忠実に検査しています。</p>
+      <div class="metric-grid">
+        <div class="metric"><strong>2,708</strong>Full Regressionのtest数</div>
+        <div class="metric"><strong>約99分</strong>4 shardでも必要なwall time</div>
+        <div class="metric"><strong>約5.51時間</strong>shard processの実行時間合計</div>
+        <div class="metric"><strong>22,332行</strong><code>managed_distribution.py</code></div>
+        <div class="metric"><strong>約35,000行</strong>主要4 distribution test files</div>
+        <div class="metric"><strong>650.55秒</strong>通常PR testだけでも10分超</div>
+      </div>
+      <p class="muted">数値はEpic #384のresearch Artifactに固定したcandidate / GitHub Actions証拠に基づきます。利用者観測の「逐次約4時間」「約10分CPUほぼ100%」は別環境の問題入力であり、同一machineのCPU telemetryとは区別しています。</p>
+
+      <script type="text/plain" class="plantuml-source" id="source-root-cause" data-target="diagram-root-cause">
+@startuml
+title 現行方式と目標方式
+left to right direction
+skinparam componentStyle rectangle
+
+package "現行: ファイル単位の調停" #FDECEC {
+  component "現在・過去のhash" as Hash
+  component "file種別 / link / inode" as Kind
+  component "intent\ninit / update / uninstall / purge" as Intent
+  component "journal / checkpoint / retry" as Journal
+  component "巨大な状態の直積" as Cross #F8B4B4
+  Hash --> Cross
+  Kind --> Cross
+  Intent --> Cross
+  Journal --> Cross
+}
+
+package "目標: root境界の契約" #E8F8EF {
+  component "4つの固定provider root" as Roots
+  component "2つの固定skill slot" as Slots
+  component "利用者データは対象外" as Data
+  component "失敗後は同じversionを再実行" as Rerun
+  component "小さなservice contract" as Small #A6E3BE
+  Roots --> Small
+  Slots --> Small
+  Data --> Small
+  Rerun --> Small
+}
+
+Cross -[#175CD3,bold]-> Small : product contractを縮小
+@enduml
+      </script>
+      <div id="diagram-root-cause" class="plantuml-diagram">根本原因の比較図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-root-cause"></pre></details>
+    </section>
+
+    <section>
+      <h2>何を誰のものとして扱うか</h2>
+      <p>最も重要なのは、<code>spec-dock/</code> 全体を一括削除しないことです。利用者データ、生成物、provider内部、共有skillsを先に分類し、削除authorityを固定leaf rootだけに絞ります。</p>
+
+      <script type="text/plain" class="plantuml-source" id="source-ownership" data-target="diagram-ownership">
+@startuml
+title 所有権の固定境界
+top to bottom direction
+skinparam componentStyle rectangle
+
+folder "consumer repository" as Repo {
+  folder "spec-dock" as SD {
+    folder "initiatives / Artifacts\n利用者データ: 永久保持" as UserData #CFF5DD
+    folder ".workbench / unknown\n不透明な利用者領域: 保持" as Opaque #CFF5DD
+    folder "active / .agent / diagrams\n生成物: 配布管理しない" as Generated #FFF1C2
+    folder "docs" as Docs #DCEBFF
+    folder "templates" as Templates #DCEBFF
+    folder "system" as System #DCEBFF
+    folder "scripts" as Scripts #DCEBFF
+  }
+  folder ".agents/skills\n共有親: 置換禁止" as SkillParent {
+    folder "spec-dock\n固定slot" as SkillCore #E9D7FF
+    folder "spec-dock-grill-with-docs\n固定slot" as SkillGrill #E9D7FF
+    folder "その他のskills\n必ず保持" as OtherSkills #CFF5DD
+  }
+}
+
+note right of Docs
+4 rootだけがdisposable
+内部編集は次回updateで消える
+end note
+
+note right of SkillCore
+owner markerが有効な
+exact slotだけ更新・削除
+end note
+@enduml
+      </script>
+      <div id="diagram-ownership" class="plantuml-diagram">所有権境界図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-ownership"></pre></details>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>区分</th><th>代表path</th><th>update</th><th>uninstall</th></tr></thead>
+          <tbody>
+            <tr><td>利用者データ</td><td><code>spec-dock/initiatives/**</code></td><td>触れない</td><td>触れない</td></tr>
+            <tr><td>ローカル領域</td><td><code>.workbench/**</code>、未知path</td><td>触れない</td><td>触れない</td></tr>
+            <tr><td>生成物</td><td><code>active/**</code>、dashboard、図</td><td>配布差分を管理しない</td><td>原則触れない</td></tr>
+            <tr><td>provider内部</td><td><code>docs</code>、<code>templates</code>、<code>system</code>、<code>scripts</code></td><td>root全量置換</td><td>root削除</td></tr>
+            <tr><td>SpecDock skill</td><td>2つの固定slot</td><td>marker確認後root置換</td><td>marker確認後slot削除</td></tr>
+            <tr><td>他のskill</td><td><code>.agents/skills/*</code> のその他</td><td>触れない</td><td>触れない</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>updateはどう動くか</h2>
+      <p>新しい4 rootを先に全部作って検証し、その後に固定順で交換します。複数root全体を「完全に原子的」とは約束しません。途中停止ではtoolingが一時的に混在・欠落しても、外部installerから同じversionを再実行すれば収束する設計です。</p>
+
+      <script type="text/plain" class="plantuml-source" id="source-update-sequence" data-target="diagram-update-sequence">
+@startuml
+title Disposable Root Replacement の更新手順
+autonumber
+actor "利用者" as User
+participant "外部installer\ninstalled package / uvx" as Installer
+participant "staging" as Stage
+participant "consumer repository" as Repo
+participant "ready marker" as Marker
+
+User -> Installer : spec-dock update
+Installer -> Repo : repository / parent / fixed rootをlstat
+Installer -> Stage : 4 rootと2 skill slotsを完全展開
+Installer -> Stage : entrypoint / mode / digest / markerを検証
+alt collision・symlink・binding異常
+  Installer --> User : mutation前にblockして診断
+else preflight成功
+  Installer -> Repo : docsを全量置換
+  Installer -> Repo : templatesを全量置換
+  Installer -> Repo : systemを全量置換
+  Installer -> Repo : scriptsを最後に全量置換
+  Installer -> Repo : owned skill slotsを全量置換
+  Installer -> Marker : version / digestをatomic replace
+  Installer --> User : update完了
+end
+@enduml
+      </script>
+      <div id="diagram-update-sequence" class="plantuml-diagram">更新シーケンス図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-update-sequence"></pre></details>
+
+      <div class="callout warning">
+        <strong>重要な制約:</strong> Provider rootやmanaged skillの内側を直接編集しても、次回updateでは保存されません。独自変更が必要なら、配布copyではなくSpecDock自体をforkして管理します。
+      </div>
+    </section>
+
+    <section>
+      <h2>途中で失敗したらどうなるか</h2>
+      <p>以前の設計は、全checkpointをjournalへ記録して自動再開しようとしていました。新設計は状態を増やしません。利用者データを守ったうえで、desired versionをもう一度適用します。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>失敗位置</th><th>残る状態</th><th>回復方法</th></tr></thead>
+          <tbody>
+            <tr><td>stage / validate中</td><td>旧installationがそのまま</td><td>candidate修正後に再実行</td></tr>
+            <tr><td>root削除後・rename前</td><td>一つのprovider rootが欠落</td><td>外部installerで同versionを再実行</td></tr>
+            <tr><td>root間</td><td>old / new rootが混在、ready markerは旧</td><td>4 rootをdesiredへ再置換</td></tr>
+            <tr><td><code>scripts</code>置換後・ready前</td><td>repo-local commandが使えない可能性</td><td>installed packageまたは<code>uvx</code>から再実行</td></tr>
+            <tr><td>ready後のcleanup</td><td>新versionはready、stagingだけ残る</td><td>成功扱い。限定cleanupを後で実施</td></tr>
+            <tr><td>symlink / marker不正</td><td>targetは未変更</td><td>人間が境界を確認して修復</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>この設計はtoolingの一時availabilityを完全保証しません。その代わり、Initiatives / Artifactsを巻き込むrollbackや、自動復旧engineが新たな破壊経路になることを避けます。</p>
+    </section>
+
+    <section>
+      <h2>skillを安全に更新・削除する方法</h2>
+      <p><code>.agents/skills</code> は共有領域なので、親全体を交換できません。そこで「SpecDockが所有すると証明できる固定slot」だけをleaf root単位で扱います。</p>
+
+      <script type="text/plain" class="plantuml-source" id="source-skill-lifecycle" data-target="diagram-skill-lifecycle">
+@startuml
+title Fixed Skill Slot の判断
+start
+:exact fixed slotを確認;
+if (slotが存在する?) then (no)
+  :owner marker付きcomplete rootをinstall;
+  stop
+else (yes)
+  :root内のowner markerを検証;
+  if (owner / slot / schemaが有効?) then (yes)
+    if (current slot?) then (yes)
+      :candidate rootへ全量置換;
+    else (retired slot)
+      :有限allowlistとのexact一致を確認;
+      :slot rootだけ削除;
+    endif
+    stop
+  else (no)
+    :既存rootを保持;
+    :上書き・削除せずblock;
+    stop
+  endif
+endif
+@enduml
+      </script>
+      <div id="diagram-skill-lifecycle" class="plantuml-diagram">skill lifecycle図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-skill-lifecycle"></pre></details>
+
+      <p>markerはowner、slot、schema version、distribution versionだけを持ちます。過去の全file hash、任意の削除path、checkpointは持ちません。現在のmarkerなし2 skillsは一度だけexact treeを確認して移行し、そのmigration adapter自体にも終了期限を設けます。</p>
+    </section>
+
+    <section>
+      <h2>uninstallの意味も小さくする</h2>
+      <p>通常uninstallが削除できるのは、4 provider roots、owner markerが有効なSpecDock skill slots、小さなinstallation recordだけです。</p>
+      <ul>
+        <li><code>spec-dock/initiatives/**</code> とArtifactsは残ります。</li>
+        <li><code>.workbench/**</code>、生成物、未知path、他のskillsも残ります。</li>
+        <li><code>--remove-specs</code> に相当する利用者データ削除は通常uninstallから外します。</li>
+        <li>本当にpurgeが必要なら、別command・別authority・別Issueとして設計します。</li>
+      </ul>
+      <div class="callout"><strong>考え方:</strong> 「ツールを外す」と「利用者の履歴を消す」は、同じ操作であってはいけません。</div>
+    </section>
+
+    <section>
+      <h2>テストはどう減らすか</h2>
+      <p>新しいテストを足してから旧テストを残すのでは、実行時間は減りません。production contractの切替と同じchangeで、退役したcontractのtestを削除します。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>残す証明</th><th>廃止できる証明</th></tr></thead>
+          <tbody>
+            <tr><td>allowlist外へ書かない・消さない</td><td>provider root内のfileごとのmodified / unknown判定</td></tr>
+            <tr><td>symlink root / parent rebindでwrite前停止</td><td>過去versionごとのfile hash catalog</td></tr>
+            <tr><td>Initiatives / Artifacts / 他skillsがbyte-identical</td><td>全checkpointからのjournal resume</td></tr>
+            <tr><td>staging failureではtarget未変更</td><td>cross-intent recoveryとquarantine復元</td></tr>
+            <tr><td>root間failure後の再実行収束</td><td>通常uninstallとspec purgeの組合せmatrix</td></tr>
+            <tr><td>fixed skill markerのowned / foreign境界</td><td>同じnodeのordinary / parity / full重複実行</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>最終portfolioはpure contract、filesystem service、CLI mapping、built-artifact lifecycle、OS固有差分に分けます。ただしtechnical layerごとにIssueを分割せず、一つの利用者behaviorをproductionからtest削除までend-to-endで受け入れます。</p>
+    </section>
+
+    <section>
+      <h2>実装の分け方</h2>
+      <ol>
+        <li><strong>Disposable provider root lifecycle:</strong> 4 rootのinit / update、ready marker、one-shot migration、旧per-file route削除。</li>
+        <li><strong>Fixed skill slot lifecycle:</strong> 2 slotsのowner marker、update / retirement、他skillsの保持。</li>
+        <li><strong>Tooling-only uninstall and compatibility:</strong> user data不変、purge分離、workflow / CLI ownership判断。</li>
+        <li><strong>Test portfolio and CI cutover:</strong> 旧tests・ledger・timing weights・4-shard runnerを撤去し、単一process10分gateへ移行。</li>
+      </ol>
+      <p>これはIssue候補の粒度評価結果であり、まだIssueは作成・開始していません。legacy support期間、<code>.github/workflows/ci.yml</code>の所有者、purge CLIの移行などは、影響するIssueを開始する前にProduct判断を確定します。</p>
+    </section>
+
+    <section>
+      <h2>成功条件</h2>
+      <ul>
+        <li>canonical regressionを単一pytest process、worker 1で5回実行し、全回600秒以内。</li>
+        <li>child process込みの平均論理core使用数が全回1.1以下。</li>
+        <li>zero failure、zero policy skip、same candidate / OSのduplicate nodeが0。</li>
+        <li>active failure ledger、timing weights、4-shard runnerが残っていない。</li>
+        <li>root間failure、symlink、marker mismatch、allowlist外削除などのseeded faultを100%検出。</li>
+        <li>Initiatives / Artifactsとunrelated skillsがupdate / uninstall前後でbyte-identical。</li>
+      </ul>
+      <p>wall timeだけ速くてもCPUを使い切る設計は合格ではありません。時間、CPU、process数、workspace copy量、duplicate実行を同時に測ります。</p>
+    </section>
+
+    <section>
+      <h2>まだ決めていないこと</h2>
+      <ul>
+        <li><code>.github/workflows/ci.yml</code> をinit時だけseedするか、reusable workflowへ変えるか。</li>
+        <li>markerなしlegacy workspaceを何version・何日まで直接updateできるようにするか。</li>
+        <li><code>--remove-specs</code> を完全に廃止するか、独立purge commandへ移すか。</li>
+        <li><code>.gitignore</code> の初回seedと既存consumer customizationの衝突規則。</li>
+        <li>wheel / sdist / macOS smokeをどのtriggerで実行するか。</li>
+      </ul>
+      <p>これらは4 root全量置換とfixed skill slotsの採択を取り消す未決事項ではありません。該当Issueの契約を確定するための残りのProduct判断です。</p>
+    </section>
+
+    <section>
+      <h2>正本と読み方</h2>
+      <p>このHTMLは人間向けの補助資料です。durable authorityはEpic #384のMarkdown文書とaccepted ADRにあります。</p>
+      <ul>
+        <li><strong>根本原因の証拠:</strong> <code>20260830t234548z-research-provider-test-suite-root-cause-analysis-and-redesign.md</code></li>
+        <li><strong>詳細な統合分析:</strong> <code>20260831t005132z-disc-disposable-root-replacement-and-skill-lifecycle-design.md</code></li>
+        <li><strong>採択判断:</strong> <code>20260831t005139z-adr-disposable-provider-roots-and-fixed-skill-slots.md</code></li>
+        <li><strong>正規要件・設計・計画:</strong> Epic #384の<code>requirement.md</code>、<code>design.md</code>、<code>plan.md</code></li>
+      </ul>
+    </section>
+  </main>
+
+  <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
+    <section class="diagram-zoom-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagram-zoom-title">
+      <h2 id="diagram-zoom-title" class="visually-hidden">図を拡大表示</h2>
+      <header class="diagram-zoom-header">
+        <div class="diagram-zoom-controls" aria-label="図の拡大率を操作する">
+          <button type="button" id="diagram-zoom-out" aria-label="図を縮小する" title="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-reset" aria-label="100%に戻す" title="100%に戻す">
+            <span id="diagram-zoom-level" class="diagram-zoom-level" aria-live="polite">100%</span>
+          </button>
+          <button type="button" id="diagram-zoom-in" aria-label="図を拡大する" title="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-close" aria-label="拡大表示を閉じる" title="閉じる">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+      </header>
+      <div id="diagram-zoom-viewport" class="diagram-zoom-viewport" tabindex="0">
+        <div id="diagram-zoom-canvas" class="diagram-zoom-canvas"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const sources = [...document.querySelectorAll(".plantuml-source")];
+      const status = document.getElementById("plantuml-status");
+
+      window.__plantumlDocumentState = {
+        expected: sources.length,
+        rendered: 0,
+        errors: [],
+        completed: false
+      };
+
+      window.__plantumlFail = message => {
+        const state = window.__plantumlDocumentState;
+        state.errors.push(String(message));
+        state.completed = true;
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図の描画に失敗しました: ${message}`;
+      };
+
+      for (const output of document.querySelectorAll("[data-source-copy]")) {
+        const source = document.getElementById(output.dataset.sourceCopy);
+        if (source) output.textContent = source.textContent.trim();
+      }
+
+      document.documentElement.dataset.plantumlStatus = "running";
+    })();
+  </script>
+
+  <script
+    src="https://unpkg.com/@plantuml/core@1.2026.6/viz-global.js"
+    onerror="window.__plantumlFail('viz-global.jsを読み込めませんでした。')"></script>
+
+  <script type="module">
+    const state = window.__plantumlDocumentState;
+    const status = document.getElementById("plantuml-status");
+    const zoomDialog = document.getElementById("diagram-zoom-dialog");
+    const zoomTitle = document.getElementById("diagram-zoom-title");
+    const zoomViewport = document.getElementById("diagram-zoom-viewport");
+    const zoomCanvas = document.getElementById("diagram-zoom-canvas");
+    const zoomLevelOutput = document.getElementById("diagram-zoom-level");
+    const zoomOutButton = document.getElementById("diagram-zoom-out");
+    const zoomInButton = document.getElementById("diagram-zoom-in");
+    const zoomResetButton = document.getElementById("diagram-zoom-reset");
+    const zoomCloseButton = document.getElementById("diagram-zoom-close");
+    let zoomLevel = 1;
+    let zoomBaseWidth = 0;
+    let zoomedSvg = null;
+    let zoomReturnFocus = null;
+
+    const diagramTitle = sourceElement => {
+      const titleLine = sourceElement.textContent.match(/^\s*title\s+(.+)$/m);
+      return titleLine?.[1]?.trim() || "図を拡大表示";
+    };
+
+    const applyDiagramZoom = () => {
+      if (!zoomedSvg || zoomBaseWidth <= 0) return;
+      zoomedSvg.style.width = `${Math.round(zoomBaseWidth * zoomLevel)}px`;
+      zoomedSvg.style.height = "auto";
+      zoomLevelOutput.value = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelOutput.textContent = zoomLevelOutput.value;
+      zoomResetButton.setAttribute("aria-label", `100%に戻す（現在${zoomLevelOutput.value}）`);
+      zoomOutButton.disabled = zoomLevel <= 0.5;
+      zoomInButton.disabled = zoomLevel >= 3;
+    };
+
+    const setDiagramZoom = nextLevel => {
+      zoomLevel = Math.min(3, Math.max(0.5, nextLevel));
+      applyDiagramZoom();
+    };
+
+    const closeDiagramZoom = () => {
+      if (zoomDialog.hidden) return;
+      zoomDialog.hidden = true;
+      document.body.classList.remove("diagram-zoom-open");
+      zoomCanvas.replaceChildren();
+      zoomedSvg = null;
+      zoomBaseWidth = 0;
+      zoomReturnFocus?.focus();
+      zoomReturnFocus = null;
+    };
+
+    const openDiagramZoom = (target, sourceElement) => {
+      const sourceSvg = target.querySelector("svg");
+      if (!sourceSvg) return;
+
+      zoomReturnFocus = target;
+      zoomedSvg = sourceSvg.cloneNode(true);
+      zoomedSvg.removeAttribute("height");
+      zoomedSvg.style.maxWidth = "none";
+      const viewBoxWidth = zoomedSvg.viewBox?.baseVal?.width || 0;
+      const declaredWidth = Number.parseFloat(zoomedSvg.getAttribute("width")) || 0;
+      zoomBaseWidth = Math.max(viewBoxWidth, declaredWidth, sourceSvg.getBoundingClientRect().width);
+      zoomLevel = 1;
+      zoomTitle.textContent = diagramTitle(sourceElement);
+      zoomCanvas.replaceChildren(zoomedSvg);
+      zoomDialog.hidden = false;
+      document.body.classList.add("diagram-zoom-open");
+      zoomViewport.scrollTo({ top: 0, left: 0 });
+      applyDiagramZoom();
+      zoomCloseButton.focus();
+    };
+
+    const prepareDiagramZoom = (target, sourceElement) => {
+      target.dataset.zoomReady = "true";
+      target.tabIndex = 0;
+      target.setAttribute("role", "button");
+      target.setAttribute("aria-label", `${diagramTitle(sourceElement)}を拡大表示する`);
+      const hint = document.createElement("span");
+      hint.className = "diagram-zoom-hint";
+      hint.textContent = "クリックして拡大";
+      hint.setAttribute("aria-hidden", "true");
+      target.append(hint);
+      target.addEventListener("click", () => openDiagramZoom(target, sourceElement));
+      target.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDiagramZoom(target, sourceElement);
+        }
+      });
+    };
+
+    const focusableZoomElements = () => [...zoomDialog.querySelectorAll(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => !element.hidden && element.getClientRects().length > 0);
+
+    zoomOutButton.addEventListener("click", () => setDiagramZoom(zoomLevel - 0.25));
+    zoomInButton.addEventListener("click", () => setDiagramZoom(zoomLevel + 0.25));
+    zoomResetButton.addEventListener("click", () => setDiagramZoom(1));
+    zoomCloseButton.addEventListener("click", closeDiagramZoom);
+    zoomDialog.addEventListener("click", event => {
+      if (event.target === zoomDialog) closeDiagramZoom();
+    });
+    document.addEventListener("keydown", event => {
+      if (zoomDialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDiagramZoom();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableZoomElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    try {
+      const { renderToString } = await import(
+        "https://unpkg.com/@plantuml/core@1.2026.6/plantuml.js"
+      );
+
+      const renderDiagram = lines => new Promise((resolve, reject) => {
+        renderToString(
+          lines,
+          svg => resolve(svg),
+          message => reject(new Error(message))
+        );
+      });
+
+      const normalizeDiagnosticText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+      const inspectRenderedSvg = svgMarkup => {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const root = parsed.documentElement;
+        if (!root || root.localName.toLowerCase() === "parsererror" || parsed.querySelector("parsererror")) {
+          throw new Error("PlantUMLが不正なSVGを返しました。");
+        }
+        if (root.localName.toLowerCase() !== "svg") {
+          throw new Error("PlantUMLの描画結果がSVGではありません。");
+        }
+
+        const fullText = normalizeDiagnosticText(root.textContent);
+        const diagramType = root.getAttribute("data-diagram-type")?.toLowerCase() ?? "";
+        const hasKnownErrorText = /Syntax Error\?|An error has occurred/i.test(fullText);
+        const hasDiagnosticStructure = /PlantUML version\b/i.test(fullText)
+          && /\[From [^\]]*\(line \d+\)\s*\]/i.test(fullText)
+          && /@startuml/i.test(fullText);
+
+        if (diagramType === "error" || hasKnownErrorText || hasDiagnosticStructure) {
+          const diagnosticLines = [...root.querySelectorAll("text")]
+            .filter(element => {
+              const presentation = [
+                element.getAttribute("fill"),
+                element.getAttribute("style"),
+                element.getAttribute("text-decoration")
+              ].filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, "");
+              return /(?:fill:)?(?:#ff0000|#f00|red|rgb\(255,0,0\))/.test(presentation)
+                || presentation.includes("wavy");
+            })
+            .map(element => normalizeDiagnosticText(element.textContent))
+            .filter(Boolean);
+          const reason = [...new Set(diagnosticLines)].join(" / ").slice(0, 500)
+            || (hasKnownErrorText
+              ? fullText.match(/Syntax Error\?|An error has occurred/i)?.[0]
+              : "PlantUMLの診断画面が返されました。");
+          throw new Error(`PlantUMLの診断SVGが検出されました: ${reason}`);
+        }
+
+        return root;
+      };
+
+      for (const sourceElement of document.querySelectorAll(".plantuml-source")) {
+        const target = document.getElementById(sourceElement.dataset.target);
+        if (!target) {
+          state.errors.push(`${sourceElement.id}: 描画先がありません。`);
+          continue;
+        }
+
+        try {
+          const lines = sourceElement.textContent.trim().split(/\r?\n/);
+          const svgMarkup = await renderDiagram(lines);
+          const svg = inspectRenderedSvg(svgMarkup);
+          target.replaceChildren(document.importNode(svg, true));
+          prepareDiagramZoom(target, sourceElement);
+          target.dataset.plantumlStatus = "success";
+          state.rendered += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          state.errors.push(`${sourceElement.id}: ${message}`);
+          target.dataset.plantumlStatus = "error";
+          target.textContent = `この図の描画に失敗しました: ${message}`;
+        }
+      }
+
+      state.completed = true;
+      if (state.rendered === state.expected && state.errors.length === 0) {
+        document.documentElement.dataset.plantumlStatus = "success";
+        status.textContent = `図を${state.rendered}件すべて描画できました。`;
+      } else {
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図を${state.rendered}件描画し、${state.errors.length}件のエラーが発生しました。`;
+      }
+    } catch (error) {
+      window.__plantumlFail(error instanceof Error ? error.message : String(error));
+    }
+  </script>
+</body>
+</html>
