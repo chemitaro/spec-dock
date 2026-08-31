@@ -51,6 +51,14 @@ Issue #372 は distribution hard cutover と parity を対象とし、Full Regre
 - historical Issue / Step 名だけを根拠とするtestは、durable invariantへ改名・統合するか、対応契約とともに削除する。
 - test削除は、同じ invariant をより低い層で証明するtest、または product contract の廃止記録に結び付ける。
 
+### R3A. baseline-bound inventory and removal receipt
+
+- production route、test node、workflow、ledger、selectorを削除する前に、full baseline SHAへ束縛したnode inventoryを作成する。
+- inventoryは全collected nodeについて、durable contract、owner layer、current lane、target lane、cost evidence、keep / move / consolidate / delete-after-retirement、owner Issueを持つ。
+- delete対象はretired production contractのaccepted authority、またはexact successor nodeを持つ。
+- removal receiptはold node / route、successorまたはretirement authority、owner Issue、verification command、result SHAを持つ。
+- baseline SHA変更後に旧inventoryを黙って再利用しない。
+
 ### R4. layerごとの証明責務
 
 - domain testは純粋な状態遷移・validation・propertyを網羅し、filesystem、Git、package build、CLI processを起動しない。
@@ -87,24 +95,27 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 3. automatic rollback / arbitrary checkpoint resumeを廃止し、external rerun convergenceをfailure contractにする。
 4. `.agents/skills` はfixed slot marker方式で管理する。
 
-次は影響する実装Issueを作成・開始する前に個別確定する。未回答を実装者が推測しない。
+次のdecision-only child Issuesを、影響する実装Issueの作成・開始前にacceptedにする。未回答を実装者が推測しない。
 
-1. `.github/workflows/ci.yml` のownershipと更新方法。
-2. legacy direct updateのversion / date window。
-3. `--remove-specs` の完全廃止または独立purge commandへの移行方法。
-4. `.gitignore` init seedのcollision / customization policy。
-5. wheel / sdist / macOS smokeのtriggerとpublic deprecation window。
+1. `iss-00388`: legacy direct-update window、markerless migration sunset、`.gitignore` collision / customization、`init --force`。
+2. `iss-00389`: `--remove-specs` removal / deprecation / independent purge、confirmation、JSON / text / exit、sunset。
+3. `iss-00390`: `.github/workflows/ci.yml` ownership、wheel / sdist / macOS trigger、artifact build count / digest / reuse。
+
+全test inventory作成後、active approved failureのうちcurrent authorityからexpected behaviorを決定できないnodeは、個別のdecision gateへ戻す。
 
 ### R6. failureを成功扱いしない
 
 - canonical required testはzero unexpected failuresかつzero approved active failuresでGREENになる。
 - 26件のactive failure signatureを成功として受理するledgerは、各nodeを「修正」「現行契約外として削除」「有効なsuccessorへ置換」のいずれかで処理した後に撤去する。
+- active failureはexact nodeごとにfix / contract retirement / successor replacementを決定し、family単位のblanket approval、`approved-no-op`、無期限quarantineをsteady stateへ残さない。
+- distribution以外のcurrent contractをEpic #384の都合だけでretireしない。
 - quarantineが一時的に必要な場合はowner、reason、expiry、successorを必須とし、merge-required GREENの定義には含めない。
 - cutover後のrolling 20 canonical runsでflake retryなし・unexpected failureなしを確認する。
 
 ### R7. 実行量の可視化
 
 - CI summaryはlaneごとのwall time、CPU time、node count、artifact build count、workspace copy bytes、duplicate node countをcandidate SHAに束縛して表示する。
+- `artifact_build_count` はcandidate artifactを生成するbuild command invocation数とし、targetを1とする。一つのinvocationがaccepted policyに応じてwheel / sdistを生成してよいが、各output digestを個別に固定する。
 - budget超過はtest failureとして扱い、timing weight更新やworker追加だけで回避できない。
 
 ## スコープ
@@ -140,11 +151,15 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 
 - [x] 4 disposable roots、fixed skill slots、user history保護、external rerun convergenceをaccepted ADR `20260831t005139z-adr` に記録している。
 - [ ] R5Bの残るProduct判断を、影響する実装Issueの開始前にaccepted decisionとして記録している。
+- [ ] baseline SHAへ束縛したinventoryが全collected nodeを100%包含する。
+- [ ] 削除した全test node、production route、workflow machineryにremoval receiptがある。
 - [ ] 全test familyのcontract / layer / lane / cost / keep-move-consolidate-delete判定が追跡できる。
 - [ ] canonical local regressionを単一pytest processで連続5回実行し、各回600秒以内、zero failures、zero policy skipsである。
 - [ ] 上記5回のchild-inclusive平均論理core使用数が各1.1以下であり、同時pytest worker数が1である。
 - [ ] canonical PR test bodyのcritical pathが同一runner classの連続5 successful runsで各600秒以内である。
-- [ ] 同一candidate・OSにおけるduplicate test node数が0で、wheel / sdistの各artifact build回数が1である。
+- [ ] 同一candidate・OSにおけるduplicate test node数が0で、candidate artifact build invocation数が1、accepted wheel / sdist outputの各digestが一意である。
+- [ ] platform不適用nodeはcollection後のpolicy skipではなくlane ownershipによって対象外となる。
+- [ ] install/update cutover前に旧per-file update testsを削除せず、tooling-only uninstall cutover前に旧deprovision / purge testsを削除していない。
 - [ ] default pathでshard runnerを使用せず、test worker concurrencyが1である。
 - [ ] fixed 2-vCPU Linux referenceで同じbudgetを満たし、seeded fault pack（user data誤書込み、allowlist外削除、symlink follow、root間failure、skill marker mismatch、artifact欠落）を100%検出する。
 - [ ] cutover後のrolling 20 canonical runsでflake 0、retry 0である。
@@ -152,6 +167,7 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - [ ] active approved failureが0になり、`full-regression-ledger.json`、timing weights、baseline evaluator、4-shard verifierを削除またはmerge判定外の一時migration toolingへ退役させている。
 - [ ] obsolete / duplicate testsの削除前後で、残すdurable invariantsのtraceabilityとnegative-path proofが維持されている。
 - [ ] budget summaryがcandidate SHA、wall / CPU time、node / subprocess / workspace / duplicate countsを報告する。
+- [ ] human PR merge gateを維持し、Issue #372のcandidate / canonical docs / acceptance evidenceを変更していない。
 
 ## 制約・前提
 
