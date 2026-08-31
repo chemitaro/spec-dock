@@ -3,7 +3,7 @@
 ID: "iss-00387"
 タイトル: "Current Surface Workflow Residue Cleanup"
 関連GitHub: ["#387"]
-状態: "draft"
+状態: "approved"
 最終更新: "2026-08-31"
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -187,7 +187,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 | I387-AC14 | pre-freeze checklistがPASSまたは理由付きN/AでReportに追跡でき、post-freeze commit/push/Strict/PR gateはreviewed SHAを変えないPR/handoff evidenceで追跡できる |
 | I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean package/fresh initの実結果が記録される |
 | I387-AC16 | current二skill、consumer CI、authoritative Historical evidence、Epic #384所有surfaceに意図しない差分がない |
-| I387-AC17 | `spec-dock validate`が成功し、Issue #387のR/D/P/Reportが履歴を捏造しない |
+| I387-AC17 | final candidate内容を含むSHAで`spec-dock validate`が成功し、Issue #387のR/D/P/Reportが履歴を捏造しない |
 | I387-AC18 | 削除testを参照していたledger/timing/required-node entryが同じ変更で整合し、その他のFull Regression schema、policy、shard、workflow、weight算出方法に差分がない |
 
 ## 9. Traceability

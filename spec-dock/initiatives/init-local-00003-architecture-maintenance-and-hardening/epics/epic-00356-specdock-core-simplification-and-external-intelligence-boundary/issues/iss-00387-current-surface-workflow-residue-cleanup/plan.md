@@ -3,7 +3,7 @@
 ID: "iss-00387"
 タイトル: "Current Surface Workflow Residue Cleanup"
 関連GitHub: ["#387"]
-状態: "draft"
+状態: "approved"
 最終更新: "2026-08-31"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00356", "init-local-00003"]
@@ -436,8 +436,8 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **前提:** C40-01〜06のdecision完了。
 - **操作:** 本Issueの削除で未使用になったimport、constant、helper、fixtureだけを削除する。
 - **確認:** `make lint`、`uv run pytest --collect-only -q`、beforeと同じtracked test/fixture metrics。
-- **期待結果:** lint/collection成功、test metrics純増なし、candidate coverage/closure=1.0。
-- **証拠:** interim metrics、orphan list。
+- **期待結果:** lint/collection成功、test metrics純増なし。C40-01〜06でdiscoveredしたinterim subsetのdecision coverage/closure=1.0。C40-08/09を含む全体closureはここで判定せずC90-02で判定する。
+- **証拠:** interim subset metrics、対象ID範囲、orphan list。
 - **停止条件:** unrelated refactorが必要、collection対象が予期せず消える。
 - **cleanup:** 本Issue由来orphanのみ。
 
@@ -548,9 +548,9 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
 - **前提:** C00-01〜C90-03の結果が確定し、全必須項目がPASSまたは理由付きN/A。
-- **操作:** temp consumer、build artifact、cacheをexact ownership確認後に片付ける。§15のC00-01〜C90-04を`PASS/BLOCKED/N/A(reason)`へ更新し、ReportのOutcome/Verification/Risksへ実測を要約してreview candidateをfreezeする。
-- **確認:** statusとraw command evidence、`git status --short --untracked-files=all`を照合する。
-- **期待結果:** C00-01〜C90-04にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
+- **操作:** temp consumer、build artifact、cacheをexact ownership確認後に片付ける。§15のC00-01〜C90-03を実測どおり更新し、ReportのOutcome/Verification/Risksを完成させる。同じcandidate writeでC90-04をPASSにしてから、最終内容に対してvalidateとdiff checkを実行し、成功時だけreview candidateをfreezeする。失敗時はC90-04をBLOCKEDへ戻しfreezeしない。
+- **確認:** statusとraw command evidence、`git status --short --untracked-files=all`、`./spec-dock/scripts/spec-dock validate`、`git diff --check`を、最終Plan/Report書込み後に照合する。
+- **期待結果:** C00-01〜C90-04にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、最終内容のvalidate/diff checkが成功し、意図したtracked diffだけが残る。
 - **証拠:** status ledger、Report sections。
 - **停止条件:** raw実行なしのPASS、final SHA自己参照、長いlog複製。
 - **cleanup:** 本Issue所有temporaryとduplicate scratch/logだけ。user-owned/unknown pathが混在する場合は停止する。
@@ -559,8 +559,8 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** human merge判断へ固定candidateを渡す。
 - **前提:** C90-01〜04 PASS、review candidate freeze、identity確認済み。
-- **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。固定SHAでindependent ChatGPT code review/Final Quality Gateを実施し、`review_status=fail`またはP0/P1 findingがあれば最小修正と再reviewを行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
-- **確認:** staged name-status、clean status、remote SHA、PR checks、Strict review status。
+- **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。cleanなfinal SHA上でもう一度`spec-dock validate`を実行してから、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、影響milestoneとC90-01〜04を再実行してPlan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
+- **確認:** staged name-status、clean status、remote SHA、final SHA上のvalidate、PR checks、Strict review status。
 - **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
 - **証拠:** final SHA、PR URL、checks/review summaryをversion管理Plan/ReportではなくPR/handoff evidenceへ記録する。これらの記録のためにreviewed SHAを変更しない。
 - **停止条件:** identity不一致、unexpected staged path、`review_status=fail`、P0/P1 finding、CI failure。
