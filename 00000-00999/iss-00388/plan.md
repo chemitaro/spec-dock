@@ -26,9 +26,9 @@ ID: "iss-00388"
 1. accepted ADRとcurrent manifest / parser / assetのauthorityを確認する。
 2. known workspace evidenceを収集し、factとassumptionを分ける。
 3. legacy window、recovery owner、package / workspace matrix、bridge sunset、`.gitignore` matrix、`init --force`の選択肢を作る。
-4. Product interviewで一つずつ受理する。
-5. accepted decision Artifactを作成し、Epic docsへ反映する。
-6. 後続uninstall-first bridge / install-update Issueのstart gateとremoval receiptを確定する。
+4. Product interviewでdraft choiceを一つずつ確認する。
+5. `iss-00389` / `iss-00390` acceptance後にreconcileし、path-specific matrix digest、coverage 100%、multiple authority 0、conflict 0を確認する。
+6. reconciled decision Artifactをacceptedにし、Epic docs、後続uninstall-first bridge / install-update Issueのstart gate、removal receiptへ反映する。
 
 `iss-00389`、`iss-00390`とは調査とdraftだけ並行可能。本Issueのmatrix final acceptanceは両Issueのaccepted decisionへ依存する。後続inventoryのcollection / cost取得は並行可能だが、disposition、target lane、ownerのfinalizationとproduction cutoverは統合matrixへ依存する。
 
