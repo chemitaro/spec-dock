@@ -162,7 +162,7 @@ Class BをClass Aへ昇格させることは原則禁止する。すなわち、
 | removed flag rejection | direct `active set --checkout` parser-error test、helpの旧flag集合assertion | selector success/no-writeを残して削除 |
 | authoring scanner | `CURRENT_LEGACY_VOCABULARY_PATTERNS`、`_current_vocabulary_violations()`、forbidden phrase detector、mutation/infix/Historical positive control | link/parity/current schemaのpositive testと分離して削除 |
 | legacy active context pack | `tests/cli_runtime/test_runtime_active_s05.py`のAuthority、grants、Promotion、EAL contract test群とledger row | Current structural context-pack assertionを分離し、retirement-only test/assertionとexact ledger参照を撤去 |
-| legacy active behavior | `tests/cli_runtime/test_runtime_active_s06.py`のforce/dependency/GitHub behavior test群とledger row | surviving selection-only/issue-start testを保持し、file/testとexact ledger参照を一体撤去 |
+| legacy active behavior | `tests/cli_runtime/test_runtime_active_s06.py`のforce/dependency/GitHub behavior test群、ledger row、専用mypy override | surviving selection-only/issue-start testを保持し、file/testを削除する場合だけexact ledger参照と専用mypy overrideを一体撤去。fileを保持する場合はoverrideも保持 |
 | legacy flag fast node | `test_active_set_legacy_flag_reports_parser_error`と`REQUIRED_FAST_NODE_IDS`/timing weight entry | positive selector smokeを保持し、testとexact参照を一体撤去 |
 | legacy evidence mutation | `S09_LEGACY_EVIDENCE_MUTATIONS`、`apply_s09_legacy_evidence_mutation`、`s09_invariance.py`とconsumer tests | current lifecycle/doctor behaviorの唯一の観測でなければ削除 |
 | Historical test copy | preservation SHA/copy/mutation machinery、`tests/fixtures/authoring_kit/existing_issue/**` | authoritative originalを保持し、test-only copyであれば削除 |
@@ -180,12 +180,16 @@ Class BをClass Aへ昇格させることは原則禁止する。すなわち、
 
 ### 6.1 pyproject
 
-削除候補を二entryへ限定する。
+変更対象を次に限定する。
 
-- mypy override: `tests.cli_runtime.test_delegated_authoring`
-- package-data: `assets/install_root/.codex/**`
+- 無条件cleanup:
+  - 既存の複数module mypy overrideから`tests.cli_runtime.test_delegated_authoring` memberだけを削除し、同じentryの現存moduleと`disable_error_code = ["var-annotated"]`を保持する。
+  - package-dataから`assets/install_root/.codex/**`だけを削除する。
+- 条件付きexact-entry cleanup:
+  - `tests/cli_runtime/test_runtime_active_s06.py`を削除する場合に限り、`module = "tests.cli_runtime.test_runtime_active_s06"`と`disable_error_code = ["assignment", "var-annotated"]`から成る専用`[[tool.mypy.overrides]]` entry全体を削除する。
+  - 同test fileを保持する場合は、専用entryを変更せず保持する。
 
-`.agents/**`と`.github/**`はcurrent installed assetのため保持する。clean wheel/sdistの実inventoryで削除の安全性を確認する。
+`.agents/**`と`.github/**`はcurrent installed assetのため保持する。上記以外の`pyproject.toml` entry、override structure、error-code policyは変更しない。clean wheel/sdistの実inventoryでpackage-data削除の安全性を確認する。
 
 ### 6.2 Definition-only constants
 
@@ -217,6 +221,12 @@ implementation baselineとfinal candidateで次を同じcommandにより採取�
 5. `deleted test LOC / max(1, deleted production LOC)`は情報として記録するが、値を稼ぐためにtestを削ることを防ぐため合否閾値にはしない。
 
 削除可能なtest supportが発見された場合はtest/support deletionが0でないことを要求する。候補を全てretainする場合は、各項目にsurviving consumerの具体的証拠が必要である。
+
+### 6.4 Exact build artifact binding
+
+C60-01は専用の空の一時artifact directoryへ`uv build --clear --out-dir "$ARTIFACT_DIR" .`を1回だけ実行し、そdirectoryにexactly one wheelとexactly one sdistがあることを確認する。両artifactのabsolute path、SHA-256、archive inventoryを採取する。
+
+fresh consumerのinstaller executionは、その場でinventoryした同一wheelのabsolute pathだけを`uvx --isolated --no-cache --from "$WHEEL" spec-dock init "$CONSUMER"`へ渡す。`--from .`、別build、sdist、artifact directoryだけを指定する代替は認めない。sdistはinventory evidenceとして保持するが、installation/execution sourceにはしない。Reportにはwheel/sdistのpathとdigest、exact `uvx` command、init/validate/cmp結果を対応付ける。
 
 ## 7. Checklistとexecution record
 
@@ -265,6 +275,8 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | active setがGit portを呼ぶ | request contractionを未完了とし、application testから修正する |
 | issue start regression | public `active set --checkout`を復活させず、call site/orderingをforward-fixする |
 | live `.codex` assetを発見 | phantom判定を撤回しpackage config削除を止める |
+| S06 testと専用mypy overrideのremove/retain不一致 | C20-04のtest decisionとC30-01のexact entry処理を一致させ、無関係overrideを変更せず再確認する |
+| fresh consumerがinventory済みwheel以外を実行 | `--from .`、sdist、別buildを止め、同一absolute wheel pathとdigestへ再束縛してC60-01を再実行する |
 | test candidateがsurviving behaviorの唯一の観測 | 削除を止め、retirement-only assertionだけを分離できるか再設計する |
 | checklistを恒久testへ転記したくなる | 自動化を止め、one-time evidenceとReport記録へ戻す |
 | test budgetが純増 | 新規test/supportを除去する。例外が必要なら実装を止めR/D/Pを再承認する |
@@ -284,7 +296,7 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | request shape | `rg`/AST/call-site audit、compile。field absence専用testは作らない |
 | selection-only | 既存`tests/unit/application/test_set_active.py`のpositive behavior |
 | issue start ordering | `tests/cli_runtime/test_issue_lifecycle.py` |
-| package config/archive | clean `uv build`とsource/wheel/sdist/installed inventory。stale path不在testは作らない |
+| package config/archive | delegated member、条件付きS06専用override、package-dataのexact diff audit。clean buildのwheel/sdist inventoryを採取し、同一wheelだけを`uvx --isolated --no-cache --from`へ渡す。stale path不在testは作らない |
 | source/projection parity | existing `cmp`/parity assertions |
 | overall non-regression | ordinary `uv run pytest`、current verifier、fresh init、`spec-dock validate` |
 | retirement test support | consumer map、deletion diff、before/after metrics、remaining positive suite |

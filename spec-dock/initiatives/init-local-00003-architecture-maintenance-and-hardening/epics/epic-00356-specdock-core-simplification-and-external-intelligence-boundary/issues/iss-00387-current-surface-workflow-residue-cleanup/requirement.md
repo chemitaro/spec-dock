@@ -37,7 +37,7 @@ Issue 357〜360で成立した「小さいStorage Core + Authoring Kit + agent-f
 2. root `README.md`が、削除済みの`active set --checkout`とEAL必須手順を案内する。
 3. `docs/authoring/overview.md`がIssue #359完了前の未来形を残す。
 4. public parserは`active set`をselection-onlyにしているが、`ActiveSetArgs`と`SetActiveRequest`は`force`、`checkout`、`use_github`、`issue_limit`等を保持し、`set_active()`からcheckoutできる。
-5. `pyproject.toml`に退役済みtest moduleのmypy overrideと、実体のない`assets/install_root/.codex/**` package-data globがある。
+5. `pyproject.toml`に実在しない`tests.cli_runtime.test_delegated_authoring`のmypy override member、`tests/cli_runtime/test_runtime_active_s06.py`撤去時に孤立する専用mypy override、実体のない`assets/install_root/.codex/**` package-data globがある。
 6. Current-facing testには、削除済みroute/module/fieldの不在、旧語彙scanner、Historical exclusion、旧evidence mutationを恒久監視するretirement-only test supportが残っている。
 7. Current-facing drift guardをroot READMEとactive-noneへ拡張すると、廃止項目が増えるたびにnegative test、phrase inventory、mutation testが増える。
 8. `tests/unit/infra/test_init_update.py`にdefinition-only constant候補がある。
@@ -81,6 +81,7 @@ Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cl
 - `checkout_active_target()`のsignature、body、docstring、behavior。`issue start`が使用するCurrent coreとして保持する。
 - `managed_distribution.py`、`managed_distribution.json`、journal/checkpoint/recovery、legacy identity catalog、uninstall/purge。
 - provider workflow、shard、test lane policy、provider test portfolio再編。`full-regression-ledger.json`、`full-regression-timing-weights.json`、`tests/conftest.py`は原則対象外だが、本Issueで実際に削除するtest nodeへの参照を除くためのexact entry更新だけをreferential-integrity例外として許可する。
+- `pyproject.toml`のI387-R06で明示したmodule member、条件付き専用override、package-data glob以外のentry、override structure、error-code policy。
 - Epic #384のfixed skill slot、distribution root replacement、test simplificationの先取り。
 - public CLI command、flag、JSON schema、exit codeの変更。
 - repository全体をscanする新しいproduction linterやpolicy engine。
@@ -113,9 +114,11 @@ Artifactはevidence-onlyであり、review/synthesis後に採用内容をR/D/P�
 
 ### I387-R06 — stale package/test residueを証拠付きで整理する
 
-- mypy overrideから実在しない`tests.cli_runtime.test_delegated_authoring`だけを除く。
+- mypy overrideの既存module listから実在しない`tests.cli_runtime.test_delegated_authoring`だけを除き、同じoverride内の現存moduleと`disable_error_code`は保持する。
+- `tests/cli_runtime/test_runtime_active_s06.py`を削除する場合に限り、`module = "tests.cli_runtime.test_runtime_active_s06"`と`disable_error_code = ["assignment", "var-annotated"]`から成る専用`[[tool.mypy.overrides]]` entry全体を削除する。同test fileを保持する場合は専用entryを変更せず保持する。
 - package-dataから実体のない`assets/install_root/.codex/**`だけを除く。
 - current `.agents/**`と`.github/**` package-dataは保持する。
+- 上記以外の`pyproject.toml` entry、override structure、error-code policyは変更しない。
 - definition-only候補は§4.2のproof成立時だけ削除する。
 
 ### I387-R07 — 廃止機能専用のtest supportも撤退する
@@ -146,7 +149,7 @@ definition-only、phantom package-data、Epic #384 ownershipを証明できな�
 
 ### I387-N04 — 比例的検証と再現性
 
-TDDは、現在残るbehaviorに実質的変更があり、既存testで期待する失敗を再現できない場合だけ適用する。文書、設定、dead residue、retirement-only test supportの削除には新しいRED/absence testを作らず、Planのone-time checklistを使う。既存testで残存behaviorを十分に観測できる場合は新規testを追加しない。実行したcommand、結果、未実施checkを区別してReportへ記録する。
+TDDは、現在残るbehaviorに実質的変更があり、既存testで期待する失敗を再現できない場合だけ適用する。文書、設定、dead residue、retirement-only test supportの削除には新しいRED/absence testを作らず、Planのone-time checklistを使う。既存testで残存behaviorを十分に観測できる場合は新規testを追加しない。実行したcommand、結果、未実施checkを区別してReportへ記録する。fresh consumerはclean buildで一意に確定し、inventoryとdigestを採取した同一wheelのabsolute pathを`uvx --isolated --no-cache --from <exact-wheel-path>`へ渡して実行する。sdistは同じbuildのinventory evidenceとして検査するが、fresh consumer executionには使用しない。
 
 ### I387-N05 — distribution非変更
 
@@ -161,6 +164,8 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 - providerとdogfoodに差分が出た場合、片側をauthority化せずprovider sourceから再同期する。
 - `issue start`のcheckout順序またはfailure behaviorが変わる場合、internal request縮小を完了扱いにしない。
 - `.codex`のlive sourceまたはpackage consumerが見つかった場合、package-data entryを削除せず再調査する。
+- `tests/cli_runtime/test_runtime_active_s06.py`のremove/retain判断と専用mypy overrideのremove/retainが一致しない場合は停止する。
+- fresh consumerがinventory済みwheel以外、project path `.`、またはsdistを`--from`へ渡す場合は停止し、同一wheel artifactへ再束縛する。
 - test assetがauthoritative Historical evidenceまたはsurviving behaviorの唯一の観測手段である場合、その項目の削除を止め、混合責務を分離できるか再判定する。
 - checklist確認を自動化するために新しいabsence test/scannerが必要になった場合、その自動化を止め、one-time evidenceとして実行する。
 - Epic #384所有fileの変更が必要になった場合、その作業を本Issueへ取り込まずEpic #384へ返す。
@@ -180,12 +185,12 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 | I387-AC07 | `active set`がGit/GitHub/dependency portを呼ばずselection-only behaviorを維持する |
 | I387-AC08 | `issue start`がdependency check → checkout → active writeの契約を維持する |
 | I387-AC09 | `checkout_active_target()`に差分がない |
-| I387-AC10 | stale mypy overrideとphantom package-data globがなく、current install assetsがpackageに残る |
+| I387-AC10 | `tests.cli_runtime.test_delegated_authoring` module memberとphantom package-data globがなく、S06 testを削除した場合だけ専用mypy override全体もなく、S06 testを保持した場合は同overrideが不変で残る。その他の`pyproject.toml` entryとcurrent install assetsは保持される |
 | I387-AC11 | definition-only候補がproof成立時だけ削除され、判断結果がReportに残る |
 | I387-AC12 | retirement-only test/support候補が100%分類され、削除可能項目とそのorphan supportが撤去され、保持項目にはsurviving consumerと理由がある |
 | I387-AC13 | 新しいabsence test/scanner/fixture/helperを追加せず、collected test count、test LOC、test file数、fixture file数がbaselineから純増しない |
 | I387-AC14 | version管理ledgerのC00-01〜C90-03がPASSまたは理由付きN/AでReportに追跡でき、candidate freeze C90-04とcommit/push/final validate/Strict/PR C90-05はfinal SHAを変えないPR/handoff evidenceで追跡できる |
-| I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean package/fresh initの実結果が記録される |
+| I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean packageの実結果が記録され、fresh consumerはinventory/digest採取済みの同一exact wheelを`uvx --isolated --no-cache --from`で実行する。sdistはinventory evidenceとして検査され、project path `.`またはsdistをfresh consumerのexecution sourceにしない |
 | I387-AC16 | current二skill、consumer CI、authoritative Historical evidence、Epic #384所有surfaceに意図しない差分がない |
 | I387-AC17 | final candidate内容を含むSHAで`spec-dock validate`が成功し、Issue #387のR/D/P/Reportが履歴を捏造しない |
 | I387-AC18 | 削除testを参照していたledger/timing/required-node entryが同じ変更で整合し、その他のFull Regression schema、policy、shard、workflow、weight算出方法に差分がない |
@@ -196,7 +201,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 |---|---|---|
 | active-none / README / overview | R01〜R04, R08, R09 | one-time content review、provider/dogfood parity、fresh consumer |
 | active selection | R05, N01, N04 | existing positive application/CLI/lifecycle tests、call-site audit |
-| package/test hygiene | R06, R09, N03, N05 | AST/reference proof、clean wheel/sdist inventory |
+| package/test hygiene | R06, R09, N03, N04, N05 | AST/reference proof、S06 testと専用mypy overrideの条件付きexact-entry audit、clean wheel/sdist inventory、同一wheel-bound fresh consumer |
 | retirement-only test support | R07, R09, N04, N06 | consumer map、before/after metrics、deleted/retained decision ledger |
 | Historical / Epic #384境界 | R07, N02, N05 | baseline diff auditと削除node参照のexact-entry audit。恒久exclusion testは作らない |
 | Issue完了 | 全要件 | ordinary suite、current verifier、validate、actual Report、human PR gate |
