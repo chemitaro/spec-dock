@@ -4,7 +4,7 @@ ID: "iss-00387"
 タイトル: "Current Surface Workflow Residue Cleanup"
 関連GitHub: ["#387"]
 状態: "approved"
-最終更新: "2026-08-31"
+最終更新: "2026-09-01"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -53,6 +53,7 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 | 2026-08-31 | initial planはTDDでCurrent drift guard、absence assertion、mutation testを追加する方針だった | implementation未着手のため実施済みstepなし |
 | 2026-08-31 | user判断とChatGPT Use Strict分析により、test-addition drivenからevidence-driven retirementへ変更 | 旧S01/S03/S05/S06は未実施のまま廃止。完了扱いにしない |
 | 2026-09-01 | Strict reviewのP2指摘により、S06専用mypy overrideの条件付きexact-entry cleanupと、C60-01の同一wheel artifact bindingを追加 | implementation未着手のため実施済みcheckなし。checklist数、ledger行、closure gateは不変 |
+| 2026-09-01 | fixed SHA `f3b6c2b6f1db2c3b7e54966496f76a74db34d689`のStrict review P1指摘により、`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`のfinite repair checkpointと、exact ledger二列以外のR/D/P全hunkを覆う`SPECIFICATION_CONTRACT`境界を追加 | implementation未着手のため失効させる実測なし。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
 
 ## 3. 実装原則
 
@@ -68,6 +69,8 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 10. 実行していないcommand、policy skip、未collection testをPASSにしない。
 11. checklist用の新しいrepository script、scanner、fixture、test helperを作らない。
 12. 一時物はWorkbenchまたは`mktemp -d`に置き、証拠転記後に本Issue所有物だけを片付ける。
+13. current Requirement/Designの全hunkと、§15の既存rowにある`状態`・`Evidence reference`のcell value以外のcurrent Plan全hunkを`SPECIFICATION_CONTRACT`とし、production writer判断で変更・stageしない。
+14. `OTHER_SUBSTANTIVE_OR_AMBIGUOUS`のrepairはapproved既存pathだけで閉じ、repair hunk・失効status・短いinvalidation evidenceを一度だけまとめてexplicit stageしたrepair checkpointから有限順序で再実行する。
 
 ## 4. 検証分類と禁止事項
 
@@ -110,7 +113,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 ## 6. Checklistの実行規約
 
-各checkは次のfieldを持つ。
+本Planは38個のcheckを持つ。IDは見出しで固定し、各checkは次の8 fieldを一つずつ過不足なく持つ。field外の共通規約はこの8 fieldの構成に数えず、補足規約として扱う。
 
 - **対象 / 目的**: 何を、なぜ確認するか。
 - **前提**: 実行可能になる条件。
@@ -121,7 +124,11 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件**: 続行せずmain agentへ返す条件。
 - **cleanup**: 削除するtemporary/orphan item。
 
-状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`だけを使う。C00-01〜C90-03の完了時に§15を更新する。final content writeを含むC90-04とpost-freeze C90-05は同じ語彙をPR/handoff evidenceで使い、version管理ledgerへ追記しない。長いstdout/stderrをPlanへ貼らず、command、exit、count、主要observed resultをReportへ記録する。
+状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`だけを使う。C00-01〜C90-03の36 rowだけを§15のversion管理ledgerに置く。final content writeを含むC90-04とpost-freeze C90-05は二つのexternal gateであり、同じ状態語彙をPR/handoff evidenceで使い、version管理ledgerへ追加しない。
+
+current R/D/P/Reportの`SPECIFICATION_CONTRACT`判定はC00-01開始後の全期間に適用し、C50-01の初回stage前snapshotでも確認する。Plan内で`EVIDENCE_ONLY`として更新できるのは、§15に既に存在する36 rowの`状態`列と`Evidence reference`列のcell valueだけである。column header、separator、`ID`列、rowの追加・削除・並べ替え、§15の説明本文を含むそれ以外のPlan hunkはすべて`SPECIFICATION_CONTRACT`である。Requirement/Designの全hunkも`SPECIFICATION_CONTRACT`とし、Reportでは既存の`Outcome`、`Verification`、`Residual Risks / Follow-ups`本文への実測記録だけを`EVIDENCE_ONLY`とする。Reportの見出し・構造変更も`SPECIFICATION_CONTRACT`とする。許可領域と他領域が同一hunkに混在する場合、または同一classification snapshotの別hunkに一件でも`SPECIFICATION_CONTRACT`がある場合はsnapshot全体を同classとしてfail-closedし、他classのhunkもstageしない。長いstdout/stderrをPlanへ貼らず、command、exit、count、主要observed resultをReportへ記録する。
+
+current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup`であり、分類対象のR/D/P/Reportはその直下の`requirement.md`、`design.md`、`plan.md`、`report.md`に固定する。
 
 ## 7. Milestone
 
@@ -470,11 +477,11 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 残存契約を最小の既存suiteで検証する。
 - **前提:** M1〜M4完了。
-- **操作:** focused suiteの前に、Reportへ記録したC00-01の40桁値を`export IMPLEMENTATION_BASELINE_SHA='<C00-01 full SHAへ一度だけ置換>'`へ再代入する。C00〜C40のapproved inventoryにある変更pathとcurrent IssueのPlan/Reportを`git add -- <explicit-path>...`でstageする。globや動的path展開を使わない。以後このindexをcandidate checkpointとする。
+- **操作:** focused suiteの前に、Reportへ記録したC00-01の40桁値を`export IMPLEMENTATION_BASELINE_SHA='<C00-01 full SHAへ一度だけ置換>'`へ再代入する。初回stage前snapshotのcurrent R/D/P/Reportを§6のspecification境界で確認し、`SPECIFICATION_CONTRACT` hunkが0である場合だけ、C00〜C40のapproved inventoryにある変更pathとcurrent IssueのPlan/Reportを`git add -- <explicit-path>...`でstageする。globや動的path展開を使わない。以後このindexをcandidate checkpointとする。
 - **確認:** `printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'`、`test "$(git rev-parse --verify "${IMPLEMENTATION_BASELINE_SHA}^{commit}")" = "$IMPLEMENTATION_BASELINE_SHA"`、`test "$IMPLEMENTATION_BASELINE_SHA" = '<Reportに記録したC00-01 full SHAへ一度だけ置換>'`を実行する。`git diff --name-status`が空、`git ls-files --others --exclude-standard`が空、`git diff --cached --name-status "$IMPLEMENTATION_BASELINE_SHA"`がapproved inventoryだけであることを確認する。その後`uv run pytest tests/unit/application/test_set_active.py tests/unit/infra/test_authoring_kit_assets.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_issue_lifecycle.py tests/cli_runtime/test_doctor.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -q`を実行する。削除済みfileはcommandから除き、残存focused fileを明示する。
 - **期待結果:** required testsが実行されGREEN。skipは理由付き。
 - **証拠:** command、selected tests、pass/skip/fail、duration。
-- **停止条件:** retirement-only test再導入でしか通らない、selector/ordering/failure/parity regression。
+- **停止条件:** 初回stage前snapshotに`SPECIFICATION_CONTRACT` hunkがある、retirement-only test再導入でしか通らない、selector/ordering/failure/parity regression。
 - **cleanup:** cacheはC90-04。
 
 ### C50-02 — Static and ordinary suite
@@ -544,13 +551,17 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
 - **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
 
-**Evidence recording and invalidation rule:** C50-01で作ったGit index checkpoint以後、各tracked editの直後に`git diff --name-status`、`git diff -- current-Issue-plan-path current-Issue-report-path`、`git ls-files --others --exclude-standard`を確認し、次の順で一度分類する。
+**Evidence recording, classification, and repair-checkpoint rule:** C50-01で作ったGit index checkpoint以後、各tracked editまたはnon-ignored untracked追加の直後に、`CURRENT_ISSUE_DIR='spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup'`を設定し、`git diff --name-status`、`git diff -- "$CURRENT_ISSUE_DIR/requirement.md" "$CURRENT_ISSUE_DIR/design.md" "$CURRENT_ISSUE_DIR/plan.md" "$CURRENT_ISSUE_DIR/report.md"`、`git ls-files --others --exclude-standard`を確認してhunk単位で次の順に分類する。複数classが同一hunkに混在する場合は上位の停止側へ倒す。同一snapshot内の別hunkに一件でも`SPECIFICATION_CONTRACT`があればsnapshot全体を同classとし、他classのhunkもstageしない。
 
-1. unstaged hunkがcurrent IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`・`Evidence reference`、およびcurrent Issue Reportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文への実測事実の記録だけなら`EVIDENCE_ONLY`とする。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しを一文字でも変えた場合は該当しない。該当Plan/Report pathだけをexplicit pathでstageし、`git diff --name-status`とnon-ignored untrackedが再び空であることを確認して次checkへ進む。
-2. current IssueのRequirement、Design、Planのcheck本文、またはReport見出しを変えるhunkなら`SPECIFICATION_CONTRACT`とする。production writerは実装を`BLOCKED`としてmain agentへ返し、current candidateを追加stage/commitしない。main agentがcleanな仕様固定点でR/D/P改訂、commit/push、independent Strict reviewを完了した後、その新しい固定SHAからC00-01を新規実行する。旧candidateのstatus/evidenceを流用しない。
-3. 1、2以外のtracked変更、non-ignored untracked追加、または分類不能なら`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`とする。C00-03とC00-05〜C90-04を`NOT_RUN`へ戻し、C00-03から再実行する。C00-04だけはoriginal implementation baselineのbefore metricsなのでPASSを保持し、変更後candidateで採り直さない。
-
-2または3でC60-01 success時の一時directoryが残っている場合は、再実行前に旧C60-01のimmediate path evidenceとbyte-for-byte照合した`$CONSUMER`と`$ARTIFACT_DIR`だけを削除・不在確認し、そのcleanup証拠をReportへ記録する。旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceへ流用しない。substantive修正pathは必要な再review・再実行とapproved inventory照合が完了するまでstageしない。
+1. Plan §15の既存C00-01〜C90-03 rowにある`状態`列・`Evidence reference`列のcell valueだけ、またはReportの既存`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文へ実測事実だけを記録するhunkは`EVIDENCE_ONLY`とする。Planのheader、separator、`ID`列、row set/order、§15説明本文、およびReport見出し・構造は含めない。該当Plan/Report pathだけをexplicit stageし、unstaged/untracked 0を確認して次checkへ進む。
+2. current RequirementとDesignの全hunk、および1のexact二列cell value以外のcurrent Planの全hunkは`SPECIFICATION_CONTRACT`とする。front matter、原則、test budget、実行規約、milestone、check本文、exit、ledger規約・構造を含む。Report見出し・構造も同じ扱いとする。production writerは直ちに`BLOCKED` handoffし、そのhunkまたはcurrent candidateを追加stage/commitしない。main agentがclean working tree/index上でR/D/P改訂をcommit/pushし、remote branch tipと一致するfixed full SHAにindependent Strict再reviewを通した後、その新SHAからC00-01を新規実行する。旧status/evidenceは流用しない。
+3. 1、2以外のtracked hunk、non-ignored untracked追加、または分類不能な変更は`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`とする。最初の検出からrepair checkpoint成立までを一つのrepair windowとし、その間は通常のcheck実行と通常のledger/Report evidence editを停止する。次の有限順序を一repair windowにつき一度だけ実行する。
+   1. C60-01 success時の一時directoryが残っている場合は、immediate path evidenceとbyte-for-byte照合した旧`$CONSUMER`と`$ARTIFACT_DIR`だけを削除して不在確認し、旧wheel、digest、fresh consumer、verifier、audit evidenceを失効させる。
+   2. repairをC00-03で承認済みの既存pathだけで完了する。新規path、rename先を含むapproved inventory外path、またはnon-ignored untracked pathが一件でも必要・出現した場合は、repair bundleの一部もstageせず`BLOCKED` handoffする。
+   3. §15のC00-03とC00-05〜C90-03を`NOT_RUN`へ戻し、該当`Evidence reference` cellへexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair; see Report Verification`を記録する。C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻し、各Evidence referenceをexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair`とする。C00-04の`PASS`、Evidence reference、original implementation baselineのbefore metricsは変更せず、採り直さない。Reportの`Verification`へ`class=OTHER_SUBSTANTIVE_OR_AMBIGUOUS; repair_paths=<approved paths>; invalidated=C00-03,C00-05..C90-05; C00-04=retained; temp_cleanup=<none|exact removed paths>`の一entryだけを記録する。
+   4. classified repair hunk、失効status、Plan/Reportの短いinvalidation evidenceを一つのunstaged repair bundleとして一度だけまとめて確認する。全hunkがapproved repairまたは3の記録だけで、`SPECIFICATION_CONTRACT`、新規path、未承認pathを含まないことを確認する。
+   5. approved repair pathのexplicit listに`"$CURRENT_ISSUE_DIR/plan.md"`と`"$CURRENT_ISSUE_DIR/report.md"`を加え、一回の`git add -- <approved-repair-path-1> ... "$CURRENT_ISSUE_DIR/plan.md" "$CURRENT_ISSUE_DIR/report.md"`でstageする。`git add .`、glob、動的path展開、部分stageは使わない。`git diff --name-status`が空、`git ls-files --others --exclude-standard`が空、`git diff --cached --name-status "$IMPLEMENTATION_BASELINE_SHA"`がapproved inventoryだけであることを確認し、これをrepair checkpointとする。成立しなければ再実行へ進まず`BLOCKED` handoffする。
+   6. repair checkpointからC00-03を再実行し、C00-04を飛ばしてC00-05からC90-04までID順に再実行し、そのPASS後にC90-05を先頭から実行する。再実行中の後続`EVIDENCE_ONLY` editは1の通常規約でstageする。新たな`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`を検出した場合だけ、新しいrepair windowとして同じ順序を最初から適用する。
 
 ### C60-02 — Current Full Regression
 
@@ -646,7 +657,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
 - **前提:** C00-01〜C90-03のversion管理ledgerが全てPASSまたは理由付きN/A。
-- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。Plan ledgerの`状態`・`Evidence reference`とReportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`だけに実測事実を記録し、Evidence recording and invalidation ruleの`EVIDENCE_ONLY`であることをunstaged diff hunkごとに確認して該当Plan/Report pathだけをstageする。その他の本Issue所有cacheもexact ownership確認後に削除・不在確認し、unstaged/untracked差分0のfinal indexをcommit candidateとしてfreezeする。C90-04自身のPASSをPlan/Reportへ書かない。
+- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。Plan §15の既存rowにある`状態`・`Evidence reference`のcell valueとReportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文だけに実測事実を記録し、Evidence recording, classification, and repair-checkpoint ruleの`EVIDENCE_ONLY`であることをunstaged diff hunkごとに確認して該当Plan/Report pathだけをstageする。ledger header・ID・row set/orderや他のR/D/P本文は変更しない。その他の本Issue所有cacheもexact ownership確認後に削除・不在確認し、open repair windowがなく、unstaged/untracked差分0のfinal indexをcommit candidateとしてfreezeする。C90-04自身のPASSをPlan/Reportへ書かない。
 - **確認:** `test -n "$ARTIFACT_DIR"`、`test -n "$CONSUMER"`、`test "$ARTIFACT_DIR" != "$CONSUMER"`、各`test -d`、cleanup前後のexact path出力、各`test ! -e`を実行する。その後、version管理ledgerとraw command evidence、Report内容、空の`git diff --name-status`、空のnon-ignored untracked一覧、`git diff --cached --name-status "$IMPLEMENTATION_BASELINE_SHA"`、`git diff --cached --check "$IMPLEMENTATION_BASELINE_SHA"`を照合する。
 - **期待結果:** C60-01 success時に保持された二つのmktemp-owned directoryだけがexact pathで削除される。C00-01〜C90-03にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
 - **証拠:** candidate freezeのPASS/BLOCKEDをPR/handoff evidenceへ記録し、version管理Plan/Reportには追記しない。
@@ -657,7 +668,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** human merge判断へ固定candidateを渡す。
 - **前提:** version管理ledgerのC00-01〜C90-03が完了し、C90-04 candidate freezeがhandoff evidence上でPASS、identity確認済み。
-- **操作:** C90-04でfreezeしたfinal indexに追加stageがないことを確認してcommit/pushし、Issue #387参照PRを作る。cleanなfinal SHA上でもう一度`spec-dock validate`を実行してから、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、Evidence recording and invalidation ruleで分類して必要な再reviewまたは再実行を行い、Plan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
+- **操作:** C90-04でfreezeしたfinal indexに追加stageがないことを確認してcommit/pushし、Issue #387参照PRを作る。cleanなfinal SHA上でもう一度`spec-dock validate`を実行してから、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、Evidence recording, classification, and repair-checkpoint ruleで分類して必要な再reviewまたは再実行を行い、Plan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
 - **確認:** staged name-status、clean status、remote SHA、final SHA上のvalidate、PR checks、Strict review status。
 - **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
 - **証拠:** final SHA、PR URL、checks/review summaryをversion管理Plan/ReportではなくPR/handoff evidenceへ記録する。これらの記録のためにreviewed SHAを変更しない。
@@ -666,7 +677,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 ## 15. Execution status ledger
 
-初期状態はversion管理対象のC00-01〜C90-03が全て`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceだけを更新する。この二列の実測更新は`EVIDENCE_ONLY`であり、既にPASSしたcheckを失効させない。check本文や三列以外を同時に変えた場合はevidence-onlyとして扱わない。C90-04とC90-05はfinal tracked contentの自己参照を避けるclosure gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
+初期状態はversion管理対象のC00-01〜C90-03の36 rowが全て`NOT_RUN`である。実装者は各milestone終了時に、既存rowの`状態`と短い`Evidence reference`のcell valueだけを更新する。このexact二列だけの実測更新は`EVIDENCE_ONLY`であり、既にPASSしたcheckを失効させない。column header、separator、`ID`列、row set/order、この説明本文を含むそれ以外のPlan hunkはすべて`SPECIFICATION_CONTRACT`である。C90-04とC90-05はfinal tracked contentの自己参照を避ける二つのexternal gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
 
 | ID | 状態 | Evidence reference |
 |---|---|---|
@@ -720,4 +731,5 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - authoritative Historical evidence、current二skill、consumer CI、Epic #384 surfaceに意図しない差分がない。
 - focused、lint、ordinary、current verifier、package/fresh consumer、validateの実結果がある。
 - pushed clean branch、fixed final SHA、merge-ready PR、Strict quality gate pass、residual riskが明確である。
+- open repair windowがなく、latest candidate/repair checkpointのunstaged/untracked差分が0で、全R/D/P hunkがfixed SHA Strict review済みである。
 - human merge前に`issue finish`を実行していない。
