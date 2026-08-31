@@ -235,7 +235,7 @@ Planの各checkは次のfieldを持つ。
 | cleanup対象 | temp/build/cache/orphan support |
 | 状態 | `NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)` |
 
-command未実行、policy skip、対象test未collectionをPASSにしない。Planのversion管理status ledgerはreview candidate freezeまでのcheckを実施時に更新する。commit/push/Strict/PRのpost-freeze gateはreviewed SHAを変更しないPR/handoff evidenceへ記録する。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
+command未実行、policy skip、対象test未collectionをPASSにしない。Planのversion管理status ledgerはfinal content writeより前に完了できるC00-01〜C90-03だけを実施時に更新する。candidate freeze C90-04とcommit/push/final validate/Strict/PR C90-05はfinal SHAを変更しないPR/handoff evidenceへ記録する。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
 
 ## 8. Epic #384との境界
 
