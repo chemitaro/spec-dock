@@ -149,7 +149,7 @@ definition-only、phantom package-data、Epic #384 ownershipを証明できな�
 
 ### I387-N04 — 比例的検証と再現性
 
-TDDは、現在残るbehaviorに実質的変更があり、既存testで期待する失敗を再現できない場合だけ適用する。文書、設定、dead residue、retirement-only test supportの削除には新しいRED/absence testを作らず、Planのone-time checklistを使う。既存testで残存behaviorを十分に観測できる場合は新規testを追加しない。実行したcommand、結果、未実施checkを区別してReportへ記録する。fresh consumerはclean buildで一意に確定し、inventoryとdigestを採取した同一wheelのabsolute pathを`uvx --isolated --no-cache --from <exact-wheel-path>`へ渡して実行する。sdistは同じbuildのinventory evidenceとして検査するが、fresh consumer executionには使用しない。C60-01は一時directoryを各作成直後に記録し、非0終了時は同check内で作成済みexact pathだけを削除する。成功時だけfailure trapを解除し、C90-04へexact ownershipを渡す。
+TDDは、現在残るbehaviorに実質的変更があり、既存testで期待する失敗を再現できない場合だけ適用する。文書、設定、dead residue、retirement-only test supportの削除には新しいRED/absence testを作らず、Planのone-time checklistを使う。既存testで残存behaviorを十分に観測できる場合は新規testを追加しない。実行したcommand、結果、未実施checkを区別してReportへ記録する。fresh consumerはclean buildで一意に確定し、inventoryとdigestを採取した同一wheelのabsolute pathを`uvx --isolated --no-cache --from <exact-wheel-path>`へ渡して実行する。sdistは同じbuildのinventory evidenceとして検査するが、fresh consumer executionには使用しない。C60-01は一時directoryを各作成直後に記録し、非0終了時は同check内で作成済みexact pathだけを削除する。成功時だけfailure trapを解除し、C90-04へexact ownershipを渡す。C60-01成功後にtracked contentが変更された場合はC60以降のevidenceを失効させ、旧一時pathをexact cleanupして新しいwheelから再実行する。
 
 ### I387-N05 — distribution非変更
 

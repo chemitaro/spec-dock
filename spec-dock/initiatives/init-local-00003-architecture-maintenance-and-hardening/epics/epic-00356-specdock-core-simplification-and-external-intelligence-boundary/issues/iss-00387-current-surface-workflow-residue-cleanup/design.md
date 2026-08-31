@@ -230,6 +230,8 @@ fresh consumerのinstaller executionは、その場でinventoryした同一wheel
 
 C60-01は最初の一時directory作成前にfailure trapを設定し、`ARTIFACT_DIR`と`CONSUMER`を各`mktemp -d`直後に記録する。nonzero終了時は同checkで作成済みのexact pathだけを削除する。success時だけtrapを解除し、C90-04が同じpath evidenceを照合してcleanupする。
 
+C60-01成功後にtracked contentへ一行でも差分を加えた場合、その時点でC60-01、C60-02、C90-01〜C90-04の旧evidence/statusを失効させる。C60-01のimmediate path evidenceと照合して旧`CONSUMER`と`ARTIFACT_DIR`だけをcleanupし、変更後contentからC60-01以降を再実行する。旧wheelの結果をfinal candidate evidenceとして再利用しない。
+
 after test metricsはstagingへ依存させない。`git ls-files -z -- tests`のうちworking treeに現存するpathだけをLOC/file/fixture指標の母集団とし、non-ignored untracked test pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体の`uv run pytest --collect-only -q`を使い、個別のfilename patternでdiscoveryを再定義しない。
 
 ## 7. Checklistとexecution record
