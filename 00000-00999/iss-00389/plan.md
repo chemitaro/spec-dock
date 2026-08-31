@@ -35,7 +35,7 @@ normal uninstall、任意の独立purge、post-uninstall eligibility / reinstall
 
 1. `src/spec_dock/cli.py`と`managed_distribution.py`からuninstall / purge entrypointと到達経路を抽出する。
 2. text / JSON / exit、dry-run / apply、confirmation、retry / cleanup-pendingを一覧化する。
-3. installation record削除後に独立purgeが使えるtarget evidenceと、preserved-data workspaceのreinstall routeを比較する。
+3. installation record削除後に独立purgeが使えるtarget evidence、fixed operation record、partial-failure state、same-plan retry、record-last順序と、preserved-data workspaceのreinstall routeを比較する。
 4. legacy alias policyとpurge capabilityを独立した二軸で比較し、各組合せのdata-loss risk、compatibility cost、sunset、migration guidanceを示す。
 5. Product ownerへ最推奨と代替を提示し、material choiceを個別に受理する。
 6. accepted ADRまたは追補へcommand contractとdelete authorityを記録する。

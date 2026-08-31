@@ -70,6 +70,7 @@ accepted ADR `20260831t005139z-adr` はper-file historical identityをsteady sta
 - [ ] package / workspace compatibility matrixと、old packageのnew state fail-closed contractが確定している。
 - [ ] exact P0 artifactが満たすmutation-zero policyと、C5 probeが成立しない場合にworkspace format / release sequenceを変更するauthorityが確定している。canonical schema / fixtureの作成・probe実行はC5が所有する。
 - [ ] `package_generation × lifecycle_state × public_operation × execution_mode`の全cellにauthority、evidence、diagnostic、recovery / implementation / removal ownerがある。
+- [ ] `iss-00389`のpurge / alias / result decisionと`iss-00390`のworkflow authorityを正式inputとしてreconcileし、単一matrix digest、全cell coverage 100%、multiple authority 0、decision conflict 0を証明している。
 - [ ] active legacy recoveryをadapterまたはlast-compatible packageのどちらが所有するか確定している。
 - [ ] bridge sunsetをEpic内で行うかfollow-upへ渡すか、owner / expiryを含めて確定している。
 - [ ] unknown stateのdefaultがmutation前のpreserve-and-blockである。

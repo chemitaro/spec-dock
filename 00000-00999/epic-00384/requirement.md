@@ -116,7 +116,7 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 
 ### R5C. lifecycle format and cross-version compatibility
 
-- canonical lifecycle stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2(installed_version=A, candidate_digest=D)`、`updating-v2(desired_version=B, desired_digest=D)`、`legacy-recovery-active`、`blocked`とする。serialized enum / fixture keyはそれぞれ`ready-v2` / `updating-v2`に統一する。`fresh`、`current-supported`、`legacy-supported`、`legacy-expired`、`unknown`はsupport classificationという別axisとし、各classificationからcanonical lifecycle stateへの一意なmappingを持つ。
+- canonical lifecycle stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2(installed_version=A, candidate_digest=D)`、`updating-v2(desired_version=B, desired_digest=D)`、`uninstalling-v2(delete_plan_digest=P)`、`legacy-recovery-active`、`blocked`とする。serialized enum / fixture keyは`ready-v2` / `updating-v2` / `uninstalling-v2`に統一する。`fresh`、`current-supported`、`legacy-supported`、`legacy-expired`、`unknown`はsupport classificationという別axisとし、各classificationからcanonical lifecycle stateへの一意なmappingを持つ。
 - package世代は現行`P0`、uninstall-first bridge`P1`、new install/update writer`P2`、legacy sunset後`P3`として扱う。`package_generation × lifecycle_state × public_operation × execution_mode`の全cellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery owner、implementation owner、sunset / removal ownerを持つ。`public_operation`はinstall、`init --force`、update、uninstall、purge、retry、現存legacy aliasを含み、`execution_mode`はinspect / dry-run / applyを操作から分離する。
 - `P1`はlegacy install/update writerを維持しつつ、legacy stateとfuture `InstallationRecordV2`を読むtooling-only uninstall / purge dual-readerを提供する。同一operationにold/new writerを併存させない。
 - C5でexact record path、serialized schema / version、`InstallationRecordV2`と`SkillSlotMarkerV1`のcanonical fixture、invalid / unknown / future cases、root / slot completenessを`LifecycleCompatibilityContractV1`として固定する。C5 readerがfixtureをconsumeし、C6 writerはその既存contractへのconformanceを証明する。
@@ -126,6 +126,8 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - active legacy recovery stateは、accepted bounded recovery-only adapterまたはlast-compatible package pinのどちらかで扱う。未決状態を新journalへ推測変換しない。
 - bridge sunsetをEpic内で行うかfollow-upへ渡すかを`iss-00388`で確定し、期限なしのdual-readerをsteady stateへ残さない。
 - C6は最初のdestructive stepより前に唯一のauthoritative fixed recordを`state=updating-v2`、`desired_version`、`desired_digest`へatomic replaceする。以後の全faultで`ready-v2` authorityはなく、物理的に残るlegacy markerはnon-authoritative metadataであり、全readerは`InstallationRecordV2`を優先する。全root / current slot配置とretired slot処理後だけ`ready-v2`へatomic replaceする。
+- C5 tooling uninstallは最初のdelete前に同じfixed recordを`state=uninstalling-v2`、exact `delete_plan_digest`へatomic replaceし、recordを最後に削除する。途中停止後は同じdelete planのuninstall rerunだけを許可し、install、update、purge、別plan uninstallをblockする。4 roots、current 2 slots、recordの各delete境界をfault acceptanceに含める。
+- D2がindependent purgeを残す場合、tooling installation recordとは別のfixed `PurgeOperationRecordV1`、target evidence digest、monotonic partial-failure state、same-plan rerun authority、最後にrecordを消す順序をC5で実装する。purgeをretireする場合はこのcontractをN/Aとする。
 
 ### R6. failureを成功扱いしない
 
@@ -146,9 +148,9 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 ### R7A. additive required-check migration
 
 - 新canonical gateは既存required checkを変更・削除せず、non-required shadowとして追加する。
-- shadowの連続GREENとfailure canaryを確認後、GitHub ruleset / branch protectionのauthority、owner、変更前required contextsをreceipt化する。
+- shadowの連続GREENとfailure-detection canaryを確認後、GitHub ruleset / branch protectionのauthority、owner、変更前required contextsをreceipt化する。C7のfailure-detection canaryはnew check自身が意図どおりREDになることだけを証明し、merge blockを要求しない。
 - unrelated effective required contextsを`U`とし、external required-checkは`U + old`から`U + old + new`、`U + new`の順に移す。対象branch / ruleset scope、複数rulesetのeffective state、human review requirementを集合差分で維持する。
-- failure canaryはoldと`U`を全てGREENにし、newだけを意図的にREDにしてmerge blockを証明する。merge queueがactiveならmerge-group eventでも同じcanaryを行う。
+- C8のrequired-set enforcement canaryはnewをrequiredへ追加した`U + old + new`でoldと`U`を全てGREENにし、newだけを意図的にREDにしてmerge blockを証明する。merge queueがactiveならmerge-group eventでも同じcanaryを行う。
 - old workflow / ledger / shard machineryは、new checkだけがrequiredであることを再取得してから別PRで削除する。
 - required-check defect時はold workflowがrepositoryに残る間だけold contextへrollbackできる。workflow不存在のcontextをrequiredへ戻さない。
 

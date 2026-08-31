@@ -39,6 +39,8 @@ Target:
 - platform policy: Linux canonicalとmacOS deltaの対象・trigger・budget。
 - implementation handoff: shipped asset changeはinstall/update Issue、provider CI changeはCI cutover Issueが所有する。
 - required-check handoff: shadow context、old + new required、new-only required、old removalを別transitionとしてexternal ownerへ渡す。
+- canary handoff: C7のnon-required failure-detectionとC8のrequired-set enforcement / merge blockを別authorityとして渡す。
+- receipt binding handoff: C4のadditive non-required producerに必要なPR / main-push events、token / App permission、stable check name、artifact retentionを渡す。
 - effective-set contract: unrelated contexts `U`、ruleset scope、review gateを集合差分でpreserveし、merge queueがactiveならPR / merge-groupを別canaryで検証する。
 
 ## data / failure
