@@ -544,6 +544,8 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
 - **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
 
+**Evidence invalidation rule:** C60-01 PASS後にtracked contentが変更された場合、C60-01、C60-02、C90-01〜C90-04をNOT_RUNへ戻す。旧C60-01のimmediate path evidenceとbyte-for-byte照合した`$CONSUMER`と`$ARTIFACT_DIR`だけを削除・不在確認し、そのcleanup証拠を残す。変更後のtracked contentからC60-01以降を再実行し、旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceに流用しない。
+
 ### C60-02 — Current Full Regression
 
 - **対象 / 目的:** 現行policy内の非回帰。
@@ -576,8 +578,11 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **確認:** repository rootで次のzsh blockをそのまま実行する。
 
   ```zsh
+  export IMPLEMENTATION_BASELINE_SHA='<C00-01に記録した40桁full SHAへ一度だけ置換>'
   (
   set -euo pipefail
+  printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'
+  test "$(git rev-parse --verify "${IMPLEMENTATION_BASELINE_SHA}^{commit}")" = "$IMPLEMENTATION_BASELINE_SHA"
   C90_METRIC_DIR="$(mktemp -d)"
   trap 'status=$?; rm -rf -- "$C90_METRIC_DIR"; exit "$status"' EXIT
   TRACKED_LIST="$C90_METRIC_DIR/tracked-tests.zlist"
@@ -609,15 +614,15 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
   TRACKED_TEST_PY_LOC="$(wc -l "${EXISTING_TRACKED_TEST_PY[@]}" | awk 'END { print $1 }')"
   printf 'COLLECTED_TEST_COUNT=%s\nTRACKED_TEST_PY_LOC=%s\nTRACKED_TEST_FILE_COUNT=%s\nTRACKED_FIXTURE_FILE_COUNT=%s\n' \
     "$COLLECTED_TEST_COUNT" "$TRACKED_TEST_PY_LOC" "${#EXISTING_TRACKED_TESTS[@]}" "${#EXISTING_TRACKED_FIXTURES[@]}"
-  git diff --numstat "<implementation-baseline-sha>"
+  git diff --numstat "$IMPLEMENTATION_BASELINE_SHA"
   rm -rf -- "$C90_METRIC_DIR"
   trap - EXIT
   )
   ```
 
-- **期待結果:** non-ignored untracked path 0。unstaged deletionを含むmissing tracked pathは母集団から除外される。四指標純増なし、candidate coverage=1.0、removable closure=1.0、surviving tests保持。
+- **期待結果:** `IMPLEMENTATION_BASELINE_SHA`がC00-01の40桁full SHAと一致する。non-ignored untracked path 0。unstaged deletionを含むmissing tracked pathは母集団から除外される。四指標純増なし、candidate coverage=1.0、removable closure=1.0、surviving tests保持。
 - **証拠:** existing tracked path数、excluded missing path、collect summary、before/after/delta、`git diff --numstat`によるdeleted production/test LOCと情報比率。
-- **停止条件:** non-ignored untracked path、existing tracked母集団0、collection/parse error、未承認増加、candidate未決、positive coverage欠落、stagingを要求する手順、数字を稼ぐ削除。
+- **停止条件:** baseline SHA未置換・非40桁・C00-01不一致、non-ignored untracked path、existing tracked母集団0、collection/parse error、未承認増加、candidate未決、positive coverage欠落、stagingを要求する手順、数字を稼ぐ削除。
 - **cleanup:** `$C90_METRIC_DIR`だけをblock内で削除し、candidate listをrepository script/helper/testへ保存しない。
 
 ### C90-03 — SpecDock integrity
