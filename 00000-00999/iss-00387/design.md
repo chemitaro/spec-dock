@@ -4,7 +4,7 @@ ID: "iss-00387"
 タイトル: "Current Surface Workflow Residue Cleanup"
 関連GitHub: ["#387"]
 状態: "approved"
-最終更新: "2026-08-31"
+最終更新: "2026-09-01"
 依存: ["requirement.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -232,32 +232,39 @@ C60-01は最初の一時directory作成前にfailure trapを設定し、`ARTIFAC
 
 C50-01開始前に、C00〜C40で承認されたcandidate pathとcurrent IssueのPlan/Reportだけをexplicit pathでGit indexへstageする。`git diff`が空、non-ignored untrackedが0、`git diff --cached`がapproved inventoryだけである状態をcandidate checkpointとする。これにより、C50以降に加えた編集はunstaged/untracked差分として直接観測でき、一時snapshot fileやshell session状態を持たない。
 
-1. **evidence-only:** current IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`と`Evidence reference`だけ、またはcurrent Issue Reportの`Outcome`、`Verification`、`Residual Risks / Follow-ups`本文だけへ、実測済み事実を記録する変更。この変更だけなら既存checkを失効させない。diff hunkを確認後、そのPlan/Report pathだけをstageし、再びunstaged/untracked差分0にする。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しの変更は含めない。
-2. **specification contract:** current IssueのRequirement、Design、Planのcheck本文、またはReport見出しを変更するhunk。production writerは実装を`BLOCKED`としてmain agentへ返し、current candidateを追加stage/commitしない。main agentがcleanな仕様固定点でR/D/P改訂とindependent Strict reviewを完了した後、その新しい固定SHAからC00-01を新規実行する。旧candidateのstatus/evidenceは流用しない。
-3. **other substantive or ambiguous:** 1、2以外のtracked変更、non-ignored untracked追加、または分類不能な変更。C00-03とC00-05〜C90-04を`NOT_RUN`へ戻し、C00-03から再実行する。C00-04だけはoriginal implementation baselineのbefore metricsなのでPASSを保持し、変更後candidateで採り直さない。
+current R/D/P/Reportの`SPECIFICATION_CONTRACT`判定はC00-01開始後の全期間に適用し、C50-01の初回stage前snapshotでも次の境界を確認する。post-checkpointの全変更は三classへ分類する。
 
-2または3を検出した時点で、C60-01が保持した一時directoryがある場合はimmediate path evidenceと照合した旧`CONSUMER`と`ARTIFACT_DIR`だけを先にcleanupし、不在証拠を残す。失効対象の旧wheel、digest、fresh consumer、verifier、audit結果をfinal candidate evidenceに使わない。修正pathをstageするのは、必要な再reviewと再実行が完了し、approved inventoryとの一致を再確認した後だけとする。
+1. **EVIDENCE_ONLY:** current Planの§15に既に存在するC00-01〜C90-03の36 rowについて、`状態`列と`Evidence reference`列のcell valueだけを更新するhunk、またはcurrent Reportの既存`Outcome`、`Verification`、`Residual Risks / Follow-ups`本文へ実測事実だけを記録するhunk。Planのcolumn header、separator、`ID`列、row set/order、ledger前後の本文、およびReportの見出し・構造は含まない。該当hunkだけなら既存checkを失効させず、exact Plan/Report pathだけをstageしてunstaged/untracked 0へ戻せる。
+2. **SPECIFICATION_CONTRACT:** current RequirementとDesignの全hunk、および1のexact二列cell value以外のcurrent Planの全hunk。Planのfront matter、Planning Level、改訂履歴、実装原則、検証分類、test budget、実行規約、milestone、各checkのID・8 field・command、external gate、ledger説明・header・ID・row set/order、Exit / handoffをすべて含む。Reportの見出し・構造変更も同じ扱いとし、許可領域と他領域が混在するhunkはfail-closedでこのclassにする。同一classification snapshotの別hunkに一件でもこのclassがあればsnapshot全体を`SPECIFICATION_CONTRACT`として扱い、他classのhunkもstageしない。production writerは実装を`BLOCKED`としてmain agentへ返し、そのhunkまたはcurrent candidateを追加stage/commitしない。main agentがcleanな仕様固定点でR/D/P改訂をcommit/pushし、fixed full SHAに対するindependent Strict reviewを完了した後、そのSHAからC00-01を新規実行する。旧candidateのstatus/evidenceは流用しない。
+3. **OTHER_SUBSTANTIVE_OR_AMBIGUOUS:** 1、2以外のtracked hunk、non-ignored untracked追加、または分類不能な変更。最初の検出からrepair checkpoint成立までを一つのrepair windowとし、通常のcheck実行と通常のledger/Report evidence editを止める。repairはC00-03で承認済みのinventoryに含まれる既存pathだけに限定する。
+
+`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`の収束順序は一回のrepair windowごとに次で固定する。
+
+1. C60-01 success時の一時directoryが残っていれば、immediate path evidenceとbyte-for-byte照合した旧`CONSUMER`と`ARTIFACT_DIR`だけをcleanupし、不在を確認する。旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceから失効させる。
+2. approved既存path上でrepairを完了する。新規path、rename先を含む未承認path、またはnon-ignored untracked pathが一件でも必要・出現した場合は、repair bundleの一部もstageせず`BLOCKED` handoffとする。
+3. Plan ledgerのC00-03とC00-05〜C90-03を`NOT_RUN`へ戻し、該当`Evidence reference` cellへexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair; see Report Verification`を記録する。C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻し、各Evidence referenceをexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair`とする。C00-04の`PASS`、Evidence reference、original before metricsは変更せず再計測しない。Reportの`Verification`へ`class=OTHER_SUBSTANTIVE_OR_AMBIGUOUS; repair_paths=<approved paths>; invalidated=C00-03,C00-05..C90-05; C00-04=retained; temp_cleanup=<none|exact removed paths>`の一entryだけを記録する。
+4. classified repair hunk、3の失効status、Plan/Reportのinvalidation evidenceを一つのunstaged repair bundleとして一度だけまとめて確認する。各hunkがapproved repairまたは3の記録だけであり、R/D/Pの`SPECIFICATION_CONTRACT` hunk、新規path、未承認pathを含まないことを確認する。
+5. approved repair pathとexact current Plan/Report pathだけを、一回の`git add -- <explicit-path>...`でstageする。`git diff --name-status`が空、`git ls-files --others --exclude-standard`が空、`git diff --cached --name-status <implementation-baseline-sha>`がapproved inventoryだけであることを確認し、これをrepair checkpointとする。部分stage、`git add .`、glob、動的path展開は使わない。
+6. repair checkpoint成立後、C00-03を再実行し、C00-04を飛ばしてC00-05からC90-04までID順に再実行し、そのPASS後にC90-05を先頭から実行する。再実行中の後続`EVIDENCE_ONLY` editは通常規約どおり個別にstageできる。新たな`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`を検出した場合だけ、新しいrepair windowとして同じ有限順序を最初から適用する。
 
 after test metricsはstagingへ依存させない。`git ls-files -z -- tests`のうちworking treeに現存するpathだけをLOC/file/fixture指標の母集団とし、non-ignored untracked test pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体の`uv run pytest --collect-only -q`を使い、個別のfilename patternでdiscoveryを再定義しない。
 
 ## 7. Checklistとexecution record
 
-Planの各checkは次のfieldを持つ。
+Planは38個のcheckを持つ。IDは各checkの見出しとして固定し、各checkは次の8 fieldを一つずつ過不足なく持つ。field外の共通規約はこの8 fieldの構成に数えず、補足規約として扱う。
 
 | Field | 意味 |
 |---|---|
-| ID | milestone内で一意の固定ID |
 | 対象 / 目的 | 何を、なぜ確認するか |
 | 前提 | 実行可能になる条件 |
 | 操作 | production/test/docsへの具体的変更 |
-| 確認command | 一回限りのmanual evidenceまたは既存test |
+| 確認 | 一回限りのmanual evidenceまたは既存test |
 | 期待結果 | PASSの観測可能な条件 |
-| 採取証拠 | Reportへ要約するoutput/diff/metric |
-| fail-closed | 続行せず仕様判断へ戻す条件 |
-| cleanup対象 | temp/build/cache/orphan support |
-| 状態 | `NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)` |
+| 証拠 | Reportへ要約するoutput/diff/metric |
+| 停止条件 | 続行せず仕様判断へ戻す条件 |
+| cleanup | temp/build/cache/orphan support |
 
-command未実行、policy skip、対象test未collectionをPASSにしない。Planのversion管理status ledgerはfinal content writeより前に完了できるC00-01〜C90-03だけを実施時に更新する。ledgerの`状態`と`Evidence reference`、およびReportの3実測欄だけの更新は6.4のevidence-only editとして扱い、記録行為だけでcheckを自己失効させない。candidate freeze C90-04とcommit/push/final validate/Strict/PR C90-05はfinal SHAを変更しないPR/handoff evidenceへ記録する。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
+状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`とする。version管理status ledgerはC00-01〜C90-03の36 rowだけを持ち、C90-04とC90-05はfinal SHAを変更しない二つのexternal gateとしてPR/handoff evidenceへ記録する。command未実行、policy skip、対象test未collectionをPASSにしない。ledgerの既存rowにある`状態`と`Evidence reference`のcell value、およびReportの3実測欄だけの更新は6.4の`EVIDENCE_ONLY` editとして扱い、記録行為だけでcheckを自己失効させない。それ以外のR/D/P hunkはすべて`SPECIFICATION_CONTRACT`である。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
 
 ## 8. Epic #384との境界
 
@@ -291,6 +298,8 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | fresh consumerがinventory済みwheel以外を実行 | `--from .`、sdist、別buildを止め、同一absolute wheel pathとdigestへ再束縛してC60-01を再実行する |
 | C60-01がnonzero終了 | failure trapで作成済みの`CONSUMER`と`ARTIFACT_DIR`だけをexact pathで削除し、残存の有無を記録する |
 | C90-02でnon-ignored untracked test pathを検出 | 四指標の計測前に停止し、stagingで隠さない |
+| Requirement/Design hunk、またはexact ledger二列以外のPlan hunkを検出 | `SPECIFICATION_CONTRACT`としてstageせずBLOCKED handoffし、clean fixed SHA Strict再review後にC00-01から新規実行する |
+| OTHER repairに新規・未承認pathが必要、またはrepair checkpointでunstaged/untracked 0にならない | repair bundleを一部もstageせずBLOCKED handoffする |
 | test candidateがsurviving behaviorの唯一の観測 | 削除を止め、retirement-only assertionだけを分離できるか再設計する |
 | checklistを恒久testへ転記したくなる | 自動化を止め、one-time evidenceとReport記録へ戻す |
 | test budgetが純増 | 新規test/supportを除去する。例外が必要なら実装を止めR/D/Pを再承認する |
