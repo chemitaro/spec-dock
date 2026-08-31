@@ -10,6 +10,7 @@ import pytest
 from scripts.quality.full_regression_baseline import (
     BaselineContractError,
     CandidateObservation,
+    FullRegressionBaseline,
     Outcome,
     RetirementEvidenceObservation,
     evaluate_baseline,
@@ -52,7 +53,7 @@ def _row(
     return value
 
 
-def _baseline(*rows: dict[str, object], schema_version: int = 2):
+def _baseline(*rows: dict[str, object], schema_version: int = 2) -> FullRegressionBaseline:
     return parse_baseline({"schema_version": schema_version, "failure_paths": list(rows)})
 
 

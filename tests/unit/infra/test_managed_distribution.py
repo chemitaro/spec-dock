@@ -113,8 +113,77 @@ EXPECTED_HISTORICAL_CURRENT_IDENTITY = {
 }
 
 
+_RECOVERY_PATHNAMES = (".distribution-retry.json", ".distribution-journal.json", ".uninstall-retry.json")
+_RECOVERY_PATH_MUTATORS = frozenset({"rename", "replace", "touch", "unlink", "write_bytes", "write_text"})
+
+
+def _has_recovery_path_role(node: ast.AST, role_names: set[str]) -> bool:
+    names = {child.id for child in ast.walk(node) if isinstance(child, ast.Name)}
+    literals = (child.value for child in ast.walk(node) if isinstance(child, ast.Constant))
+    return not names.isdisjoint(role_names) or any(
+        isinstance(literal, str) and literal.endswith(_RECOVERY_PATHNAMES) for literal in literals
+    )
+
+
+def _cli_recovery_writer_roles(source: str) -> tuple[str, ...]:
+    """Return CLI functions that mutate a managed recovery pathname."""
+
+    tree = ast.parse(source)
+    module_roles: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and _has_recovery_path_role(node.value, module_roles):
+            module_roles.update(target.id for target in node.targets if isinstance(target, ast.Name))
+
+    violations: set[str] = set()
+    for function in (node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
+        role_names = set(module_roles)
+        for assignment in (node for node in ast.walk(function) if isinstance(node, ast.Assign)):
+            if _has_recovery_path_role(assignment.value, role_names):
+                role_names.update(target.id for target in assignment.targets if isinstance(target, ast.Name))
+
+        for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
+            if not isinstance(call.func, ast.Attribute) or not _has_recovery_path_role(call.func.value, role_names):
+                continue
+            mode = call.args[0] if call.func.attr == "open" and call.args else None
+            writable_open = (
+                isinstance(mode, ast.Constant) and isinstance(mode.value, str) and bool(set(mode.value) & set("wax+"))
+            )
+            if call.func.attr in _RECOVERY_PATH_MUTATORS or writable_open:
+                violations.add(f"{function.name}:{call.func.attr}")
+
+    return tuple(sorted(violations))
+
+
+def test_i372_reference_github_uses_current_uninstall_recovery_metadata() -> None:
+    """I372-T-DOC-001: docs name current writers without promoting legacy evidence."""
+
+    provider = (REPO_ROOT / "src/spec_dock/assets/spec_dock/docs/reference_github.md").read_text(encoding="utf-8")
+    dogfood = (REPO_ROOT / "spec-dock/docs/reference_github.md").read_text(encoding="utf-8")
+
+    assert dogfood == provider
+    assert "current schema 2 の forward guard `spec-dock/.distribution-retry.json`" in provider
+    assert "current journal `spec-dock/.distribution-journal.json`" in provider
+    assert "legacy `spec-dock/.uninstall-retry.json` は reader-only / manual evidence" in provider
+    assert "自動作成も current recovery state への自動変換も行いません" in provider
+
+
+def test_i372_cli_recovery_writer_guard_is_role_based() -> None:
+    """I372-T-AUTH-002: renaming a CLI-owned recovery writer cannot evade the guard."""
+
+    synthetic_source = """
+RETRY_PATH = Path("spec-dock/.distribution-retry.json")
+def _renamed_recovery_reader(root): return (root / RETRY_PATH).exists()
+def _renamed_service_coordinator(root, marker): return execute_recognized_distribution(root, root / RETRY_PATH, marker)
+def _renamed_recovery_publisher(root, payload): (root / RETRY_PATH).open("w").write(payload)
+"""
+
+    assert _cli_recovery_writer_roles(synthetic_source) == ("_renamed_recovery_publisher:open",)
+
+
 def test_i372_cli_has_no_legacy_distribution_writer_or_kernel_seam() -> None:
     """I372-T-AUTH-001: CLI remains an adapter, not a second distribution owner."""
+
+    assert _cli_recovery_writer_roles(inspect.getsource(cli)) == ()
 
     tree = ast.parse(inspect.getsource(cli))
     definitions = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
