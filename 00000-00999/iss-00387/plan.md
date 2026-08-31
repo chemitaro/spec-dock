@@ -52,6 +52,7 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 |---|---|---|
 | 2026-08-31 | initial planはTDDでCurrent drift guard、absence assertion、mutation testを追加する方針だった | implementation未着手のため実施済みstepなし |
 | 2026-08-31 | user判断とChatGPT Use Strict分析により、test-addition drivenからevidence-driven retirementへ変更 | 旧S01/S03/S05/S06は未実施のまま廃止。完了扱いにしない |
+| 2026-09-01 | Strict reviewのP2指摘により、S06専用mypy overrideの条件付きexact-entry cleanupと、C60-01の同一wheel artifact bindingを追加 | implementation未着手のため実施済みcheckなし。checklist数、ledger行、closure gateは不変 |
 
 ## 3. 実装原則
 
@@ -163,8 +164,8 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** 変更可能pathと保護pathを固定する。
 - **前提:** C00-02 PASS。
 - **操作:** Requirement §4とDesign §5のknown candidateを実pathへ解決する。
-- **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue|test_active_set_legacy_flag_reports_parser_error|test_runtime_active_s05|test_runtime_active_s06' tests full-regression-ledger.json full-regression-timing-weights.json`。
-- **期待結果:** candidate path、surviving consumer、no-touch pathが一覧化される。
+- **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue|test_active_set_legacy_flag_reports_parser_error|test_runtime_active_s05|test_runtime_active_s06' tests pyproject.toml full-regression-ledger.json full-regression-timing-weights.json`、`rg -n 'tests\.cli_runtime\.test_delegated_authoring|tests\.cli_runtime\.test_runtime_active_s06|assets/install_root/\.codex/\*\*' pyproject.toml`。
+- **期待結果:** candidate path、surviving consumer、S06 testと専用mypy overrideのcoupling、no-touch pathが一覧化される。
 - **証拠:** inventory表をReportへ要約。
 - **停止条件:** candidateがEpic #384またはauthoritative historyだけに存在する。
 - **cleanup:** なし。
@@ -309,10 +310,10 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** internal checkout compatibility test debtを撤去する。
 - **前提:** issue-start positive ordering/failure testsを保持。
-- **操作:** `test_internal_checkout_request_preserves_issue_start_compatibility`を削除し、test request helperをtarget-onlyへ縮小する。`tests/cli_runtime/test_runtime_active_s06.py`の旧force/dependency/GitHub behavior群をconsumer分類し、surviving behaviorでなければfile/testとledger参照の撤去候補にする。専用Git/GitHub/dependency stub/importはconsumer 0なら削除する。
-- **確認:** candidate symbolごとの`rg`、AST/import review、focused tests。
-- **期待結果:** internal checkout path専用test/supportなし、surviving positive testsは存在。
-- **証拠:** deleted test/helper、retained test names。
+- **操作:** `test_internal_checkout_request_preserves_issue_start_compatibility`を削除し、test request helperをtarget-onlyへ縮小する。`tests/cli_runtime/test_runtime_active_s06.py`の旧force/dependency/GitHub behavior群をconsumer分類し、surviving behaviorでなければfile/test、ledger参照、専用mypy overrideを連動撤去候補にする。専用mypy overrideのexact処理はC30-01、ledger参照はC40-09で行う。専用Git/GitHub/dependency stub/importはconsumer 0なら削除する。
+- **確認:** candidate symbolごとの`rg`、AST/import review、focused tests、S06 fileの`remove`または`retain(reason)` decision。
+- **期待結果:** internal checkout path専用test/supportなし、surviving positive testsは存在し、S06 file decisionがC30-01/C40-09へ一意に渡る。
+- **証拠:** deleted test/helper、retained test names、S06 decision。
 - **停止条件:** stub/helperが他のcurrent failure semanticsで使用中。
 - **cleanup:** orphan imports/classes。
 
@@ -331,13 +332,13 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 ### C30-01 — Stale pyproject entries
 
-- **対象 / 目的:** phantom package/test configを除く。
-- **前提:** C00-07でlive consumerなし。
-- **操作:** `tests.cli_runtime.test_delegated_authoring` mypy overrideと`assets/install_root/.codex/**` package-data globだけを削除する。
-- **確認:** `rg -n 'tests.cli_runtime.test_delegated_authoring|assets/install_root/.codex/\*\*' pyproject.toml`とdiff review。
-- **期待結果:** 対象entryなし、`.agents/**`と`.github/**`は保持。
-- **証拠:** pyproject diff。
-- **停止条件:** live `.codex` asset/consumer、unrelated config変更が必要。
+- **対象 / 目的:** phantom package/test configを除き、S06 testのremove/retain decisionと専用mypy overrideを一致させる。
+- **前提:** C00-07でlive `.codex` consumerなし。C20-04でS06 fileの`remove`または`retain(reason)` decisionが確定。
+- **操作:** 既存の複数module overrideから`tests.cli_runtime.test_delegated_authoring` memberだけを削除し、`assets/install_root/.codex/**` package-data globだけを削除する。S06 fileを削除した場合に限り、`module = "tests.cli_runtime.test_runtime_active_s06"`と`disable_error_code = ["assignment", "var-annotated"]`から成る専用`[[tool.mypy.overrides]]` entry全体を削除する。S06 fileを保持した場合は同entryを変更せず保持する。その他の`pyproject.toml` entryは変更しない。
+- **確認:** `rg -n 'tests\.cli_runtime\.test_delegated_authoring|assets/install_root/\.codex/\*\*' pyproject.toml`が0件であること、S06 fileがある場合は専用overrideがexactly oneで、ない場合は`tests.cli_runtime.test_runtime_active_s06`参照が0件であること、`git diff -- pyproject.toml`で無関係entryに差分がないことを確認する。
+- **期待結果:** delegated memberと`.codex` globなし。S06 fileと専用overrideの存在が一致し、`.agents/**`と`.github/**`および無関係entryは保持。
+- **証拠:** S06 decision、reference count、pyproject exact diff。
+- **停止条件:** S06 file/override不一致、live `.codex` asset/consumer、unrelated config変更が必要。
 - **cleanup:** stale entry absence testは追加しない。
 
 ### C30-02 — Definition-only candidates
@@ -489,14 +490,41 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 ### C60-01 — Clean package/fresh init
 
-- **対象 / 目的:** built packageからCurrent contractを再現する。
+- **対象 / 目的:** inventoryした同一wheel artifactからCurrent contractを再現し、source pathからの暗黙rebuildを排除する。
 - **前提:** C50-02 PASS。
-- **操作:** exact artifactをbuildし、`mktemp -d`配下のconsumerへinitする。
-- **確認:** `uv build`、archive inventory、`uvx --no-cache --from . spec-dock init <exact-temp-consumer>`、consumer `spec-dock validate`、providerとのplaceholder/overview `cmp`、current help目視。
-- **期待結果:** init/validate成功、current二skillと`ci.yml`あり、Current docs一致、retired `.codex`なし。
-- **証拠:** temp path、exit、inventory/cmp summary。
-- **停止条件:** live GitHub操作が必要、managed distribution変更が必要。
-- **cleanup:** temp consumerと本Issue build artifactをC90-04で対象確認後削除。
+- **操作:** 空の専用artifact directoryへ1回だけclean buildし、exactly one wheel/sdistを確定する。両artifactのinventory/digestを採取し、同じ`$WHEEL` absolute pathを`uvx --isolated --no-cache --from`へ渡してfresh consumerをinitする。sdistはinventory evidenceにだけ使う。
+- **確認:** repository rootで次のzsh blockをそのまま実行し、consumer contentを確認する。
+
+  ```zsh
+  set -euo pipefail
+  ARTIFACT_DIR="$(mktemp -d)"
+  CONSUMER="$(mktemp -d)"
+  uv build --clear --out-dir "$ARTIFACT_DIR" .
+  test "$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'spec_dock-*.whl' -print | wc -l | tr -d ' ')" -eq 1
+  test "$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'spec_dock-*.tar.gz' -print | wc -l | tr -d ' ')" -eq 1
+  WHEEL="$(realpath "$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'spec_dock-*.whl' -print -quit)")"
+  SDIST="$(realpath "$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'spec_dock-*.tar.gz' -print -quit)")"
+  python -m zipfile -l "$WHEEL"
+  tar -tf "$SDIST"
+  shasum -a 256 "$WHEEL" "$SDIST"
+  uvx --isolated --no-cache --from "$WHEEL" spec-dock init "$CONSUMER"
+  (cd "$CONSUMER" && ./spec-dock/scripts/spec-dock validate && ./spec-dock/scripts/spec-dock --help)
+  test -f "$CONSUMER/.agents/skills/spec-dock/SKILL.md"
+  test -f "$CONSUMER/.agents/skills/spec-dock-grill-with-docs/SKILL.md"
+  test -f "$CONSUMER/.github/workflows/ci.yml"
+  test ! -e "$CONSUMER/.codex"
+  cmp src/spec_dock/assets/spec_dock/docs/authoring/overview.md "$CONSUMER/spec-dock/docs/authoring/overview.md"
+  for scope in initiative epic issue; do
+    cmp "src/spec_dock/assets/spec_dock/system/active-none/$scope/report.md" "$CONSUMER/spec-dock/system/active-none/$scope/report.md"
+  done
+  shasum -a 256 "$WHEEL" "$SDIST"
+  printf 'ARTIFACT_DIR=%s\nWHEEL=%s\nSDIST=%s\nCONSUMER=%s\n' "$ARTIFACT_DIR" "$WHEEL" "$SDIST" "$CONSUMER"
+  ```
+
+- **期待結果:** one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init/validate/help/cmp成功。current二skillと`ci.yml`あり、retired `.codex`なし。sdistは実行sourceに使われない。
+- **証拠:** artifact dir、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、consumer path、exit、cmp summary。
+- **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要。
+- **cleanup:** `$CONSUMER`と`$ARTIFACT_DIR`をC90-04でexact ownership確認後に削除。
 
 ### C60-02 — Current Full Regression
 
@@ -516,10 +544,10 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** approved scopeだけが変わったことを確認する。
 - **前提:** M5完了。
 - **操作:** 変更しない。
-- **確認:** `git diff --name-status <implementation-baseline-sha>`、Historical authority、current skills/CI、Epic #384 pathsをpath限定diffする。
-- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-09で承認したdeleted-node exact entry以外の差分0。
+- **確認:** `git diff --name-status <implementation-baseline-sha>`、Historical authority、current skills/CI、Epic #384 pathsをpath限定diffし、`git diff <implementation-baseline-sha> -- pyproject.toml`をC30-01のexact decisionと照合する。
+- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-09で承認したdeleted-node exact entry以外の差分0。`pyproject.toml`はdelegated member、`.codex` glob、およびS06 file削除時だけ専用S06 overrideに差分があり、その他entryの差分0。
 - **証拠:** name-statusとno-touch results。
-- **停止条件:** unrelated/unowned diff。
+- **停止条件:** unrelated/unowned diff、S06 file/override不一致。
 - **cleanup:** unintended diffを原因箇所で修正。user変更を消さない。
 
 ### C90-02 — After metrics/test budget
