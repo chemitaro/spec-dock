@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="ja" data-plantuml-status="pending" data-plantuml-contract="2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Epic #384 Provider Test Strategy Simplification — 人間向け全体ガイド</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f3f6fb;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #536273;
+      --border: #d8e0ea;
+      --accent: #175cd3;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --error: #b42318;
+      --error-bg: #fef3f2;
+      --code-bg: #101828;
+      --code-text: #f2f4f7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(100% - 24px, 960px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header, section {
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgb(16 24 40 / 8%);
+    }
+
+    header { margin-top: 0; }
+    h1, h2 { line-height: 1.4; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2.25rem); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.2rem, 4vw, 1.5rem); }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .plantuml-status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .plantuml-status.error { background: var(--error-bg); color: var(--error); }
+    .plantuml-diagram {
+      position: relative;
+      min-height: 160px;
+      margin-top: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      color: #182230;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .plantuml-diagram[data-zoom-ready="true"] { cursor: zoom-in; }
+    .plantuml-diagram[data-zoom-ready="true"]:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .diagram-zoom-hint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgb(16 24 40 / 14%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plantuml-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .muted { color: var(--muted); }
+    .lead { font-size: 1.08rem; }
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--background);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .badge.accepted { border-color: #12b76a; background: #ecfdf3; color: #067647; }
+    .badge.decision { border-color: #f79009; background: #fffaeb; color: #b54708; }
+    .badge.proposal { border-color: #6172f3; background: #eef4ff; color: #3538cd; }
+    .badge.not-done { border-color: #f04438; background: #fef3f2; color: #b42318; }
+    .grid { display: grid; gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--background);
+    }
+    .card h3 { margin: 0 0 6px; line-height: 1.45; }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .metric { font-size: 1.45rem; font-weight: 850; line-height: 1.2; }
+    .metric-label { color: var(--muted); font-size: 0.85rem; }
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 5px solid var(--accent);
+      border-radius: 8px;
+      background: #eef4ff;
+      color: #102a56;
+    }
+    .callout.warning { border-left-color: #f79009; background: #fffaeb; color: #713b12; }
+    .callout.danger { border-left-color: #f04438; background: #fef3f2; color: #7a271a; }
+    .callout.success { border-left-color: #12b76a; background: #ecfdf3; color: #054f31; }
+    table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { padding: 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--background); }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 5px; }
+    .issue-card { margin-top: 16px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; }
+    .issue-card h3 { margin: 0 0 4px; }
+    .issue-meta { color: var(--muted); font-size: 0.88rem; }
+    .rdp { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
+    .rdp > div { padding: 12px; border-radius: 10px; background: var(--background); border: 1px solid var(--border); }
+    .rdp h4 { margin: 0 0 6px; }
+    .status-line { font-weight: 800; }
+    .compact td, .compact th { padding: 8px; }
+    nav a { color: var(--accent); }
+    .toc { columns: 2; }
+    @media (max-width: 760px) {
+      .grid.two, .grid.three, .rdp { grid-template-columns: 1fr; }
+      .toc { columns: 1; }
+      table { display: block; overflow-x: auto; white-space: normal; }
+    }
+    @media (prefers-color-scheme: dark) {
+      .badge.accepted, .badge.decision, .badge.proposal, .badge.not-done,
+      .callout, .callout.warning, .callout.danger, .callout.success {
+        background: #1f2937;
+        color: var(--text);
+      }
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.diagram-zoom-open { overflow: hidden; }
+
+    .diagram-zoom-dialog[hidden] { display: none !important; }
+    .diagram-zoom-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgb(3 10 21 / 78%);
+    }
+
+    .diagram-zoom-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(1800px, 100%);
+      height: min(1200px, 100%);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+    }
+
+    .diagram-zoom-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin: 0;
+      padding: 6px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .diagram-zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diagram-zoom-controls button {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .diagram-zoom-controls button svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .diagram-zoom-controls button:hover,
+    .diagram-zoom-controls button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .diagram-zoom-controls button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .diagram-zoom-level {
+      min-width: 3.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    #diagram-zoom-reset {
+      width: auto;
+      min-width: 58px;
+      padding-inline: 8px;
+    }
+
+    .diagram-zoom-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #ffffff;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .diagram-zoom-canvas {
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 24px;
+    }
+
+    .diagram-zoom-canvas svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .diagram-zoom-dialog { padding: 0; }
+      .diagram-zoom-panel { border-radius: 0; }
+      .diagram-zoom-canvas { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0c111d;
+        --surface: #161b26;
+        --text: #f5f7fa;
+        --muted: #b9c2cf;
+        --border: #333b48;
+        --success-bg: #053321;
+        --error-bg: #55160c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">SpecDock / Epic #384</p>
+      <h1>Provider Test Strategy Simplification<br>人間向け・全体理解ガイド</h1>
+      <p class="lead">この資料は、Epic全体の狙い、10個のIssueスライス、各IssueのRequirement・Design・Plan、依存関係、失敗時の戻り先を、初めて読む人でも一続きで理解できるように説明します。</p>
+      <div class="badge-row">
+        <span class="badge accepted">確定済み: 基本アーキテクチャ</span>
+        <span class="badge decision">正規作成済み: #388〜#390</span>
+        <span class="badge proposal">後続proposal: E384-04〜10</span>
+        <span class="badge not-done">未実装・未実測</span>
+      </div>
+      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
+        図を読み込んでいます。
+      </div>
+      <p class="muted">基準日: 2026-08-31。正本はEpic `epic-00384`のcanonical Requirement / Design / Planです。このHTMLは人間向け説明Artifactであり、正本を置き換えません。</p>
+    </header>
+
+    <section>
+      <h2>1. まず結論</h2>
+      <div class="callout success">
+        <strong>このEpicは「テストを速くする」だけの計画ではありません。</strong><br>
+        大量のテストを生んでいるproduct contractそのものを小さくし、その後で、残すべき契約を一度だけ・正しい層で証明するテスト構成へ変える計画です。
+      </div>
+      <div class="grid three" style="margin-top:14px">
+        <div class="card"><div class="metric">2,708</div><div class="metric-label">観測時点のFull Regression test数</div></div>
+        <div class="card"><div class="metric">約99分</div><div class="metric-label">4 shardでも要した壁時計</div></div>
+        <div class="card"><div class="metric">約5.51時間</div><div class="metric-label">shard-process合計実行量</div></div>
+        <div class="card"><div class="metric">22,332行</div><div class="metric-label"><code>managed_distribution.py</code></div></div>
+        <div class="card"><div class="metric">600秒以内</div><div class="metric-label">target: 5回すべてのtest body</div></div>
+        <div class="card"><div class="metric">1 process</div><div class="metric-label">target: pytest worker 1、shardなし</div></div>
+      </div>
+      <p>並列化は待ち時間を隠せますが、実行量、CPU消費、重複、保守対象は減りません。Epic #384は、per-file identity、historical digest、journal、checkpoint、retry、cross-intent recovery、purgeを一つのengineへ積み上げてきた状態を見直します。</p>
+      <p>安全性は弱めません。安全の置き場所を、膨大な履歴状態の組合せから、固定root、固定skill slot、no-follow binding、unknown時のpreserve-and-blockへ移します。</p>
+    </section>
+
+    <section>
+      <h2>2. この資料の読み方と状態の区別</h2>
+      <nav>
+        <ol class="toc">
+          <li><a href="#problem">問題とtarget</a></li>
+          <li><a href="#terms">用語</a></li>
+          <li><a href="#requirements">Epic要件</a></li>
+          <li><a href="#architecture">確定アーキテクチャ</a></li>
+          <li><a href="#slicing">10 Issueへの分割</a></li>
+          <li><a href="#issues">各IssueのR/D/P</a></li>
+          <li><a href="#failure">失敗時の原則</a></li>
+          <li><a href="#verification">最終検証</a></li>
+        </ol>
+      </nav>
+      <table class="compact">
+        <thead><tr><th>表示</th><th>意味</th><th>今できること</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge accepted">確定済み</span></td><td>accepted ADRで決まったproduct / architecture contract</td><td>後続Issueは変更せず入力として使う</td></tr>
+          <tr><td><span class="badge decision">正規Issue・未決</span></td><td>#388〜#390。IssueとR/D/Pはあるが、Product回答は未受理</td><td>調査・interview・decision受理</td></tr>
+          <tr><td><span class="badge proposal">proposal</span></td><td>E384-04〜10。具体計画はあるが、まだSpecDock Issueではない</td><td>先行gate通過後に正規作成</td></tr>
+          <tr><td><span class="badge not-done">未実装</span></td><td>10分達成、zero failure、rolling 20などはtarget</td><td>完了証拠として扱わない</td></tr>
+        </tbody>
+      </table>
+      <div class="callout warning">「dependency ready」は、Product decisionが済んだことや実装可能であることを意味しません。Epicと#388〜#390はGitHub上でOPEN/readyですが、判断Issueのacceptanceが後続production Issueのgateです。</div>
+    </section>
+
+    <section id="problem">
+      <h2>3. 問題からtargetまで</h2>
+      <p>現在は、一つのcandidateに対してordinary、parity、Full Regressionが重なります。さらにdistribution engineが広い状態空間をpublic contractとして持つため、それを証明するテストも増え続けます。</p>
+      <script type="text/plain" class="plantuml-source" id="source-problem-target" data-target="diagram-problem-target">
+@startuml
+title 現在の問題から目標状態まで
+left to right direction
+
+rectangle "広いproduct contract\nper-file identity / journal / retry / purge" as Contract #FDECEC
+rectangle "多数の状態組合せ\n歴史・path・inode・checkpoint" as States #FDECEC
+rectangle "重複するtest lane\nordinary / parity / Full Regression" as Lanes #FFF3D6
+rectangle "高い実行コスト\nCPU・壁時計・保守費" as Cost #FFF3D6
+
+rectangle "4 fixed roots + 2 fixed slots\nsmall ready marker" as Simple #E8F5E9
+rectangle "契約ownerごとのtest\n一つの責務を一度だけ証明" as Portfolio #E8F5E9
+rectangle "single pytest process\nworker 1 / 600秒以内" as Target #E3F2FD
+
+Contract --> States : 契約が組合せを生む
+States --> Lanes : 各境界で再証明する
+Lanes --> Cost : 実行量が累積する
+Contract --> Simple : product contractを縮小する
+Simple --> Portfolio : 深いinterfaceで証明する
+Portfolio --> Target : 重複を除き計測する
+@enduml
+      </script>
+      <div id="diagram-problem-target" class="plantuml-diagram">問題とtargetの図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-problem-target"></pre></details>
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <h3>変えるもの</h3>
+          <ul>
+            <li>provider root内のper-file reconciliation</li>
+            <li>operation journalとarbitrary checkpoint resume</li>
+            <li>normal uninstallとhistory purgeの統合</li>
+            <li>同じnode・artifact buildのlane間重複</li>
+            <li>approved failure ledger、timing weights、4-shard verifier</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>守り続けるもの</h3>
+          <ul>
+            <li><code>spec-dock/initiatives/**</code>とArtifacts</li>
+            <li>unknown pathと<code>.workbench</code></li>
+            <li>shared <code>.agents/skills</code> parentとunrelated skills</li>
+            <li>symlink・rebind・unexpected typeのpre-write block</li>
+            <li>human PR merge gateとIssue #372の独立性</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="terms">
+      <h2>4. 最初に知る用語</h2>
+      <table>
+        <thead><tr><th>用語</th><th>このEpicでの意味</th></tr></thead>
+        <tbody>
+          <tr><td>candidate</td><td>一回の検証対象となる同一source SHA・同一artifact bytesの候補。</td></tr>
+          <tr><td>contract</td><td>利用者へ約束するbehavior、またはsecurity / safety invariant。実装詳細や過去Issue名そのものではない。</td></tr>
+          <tr><td>disposable root</td><td>providerが内部customizationを保存せず、candidate全体へ置換できる固定root。</td></tr>
+          <tr><td>fixed skill slot</td><td>共有parent配下でSpecDockが所有できるexact leaf。owner markerがauthorityになる。</td></tr>
+          <tr><td>ready marker</td><td>4 rootsとaccepted skill slotsの配置がすべて終わったcandidateだけをreadyと示す小さな記録。</td></tr>
+          <tr><td>removal receipt</td><td>何を、どのauthorityで、どのsuccessorへ置き換え、どのSHA・commandで検証したかを残す削除証拠。</td></tr>
+          <tr><td>policy skip</td><td>collection後にpolicyでtest bodyを実行しない状態。targetではlane ownershipで対象外にし、merge-required selected nodeのskipを0にする。</td></tr>
+          <tr><td>fail closed</td><td>ownershipや証拠を確認できないとき、推測して書換え・削除・成功認定をせず停止すること。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="requirements">
+      <h2>5. Epic全体のRequirement</h2>
+      <div class="grid two">
+        <div class="card"><h3>R1: 一つの実行時間予算</h3><p>single pytest process、worker 1。固定条件の5回すべてが600秒以内。child-inclusive CPU / wall比は各回1.1以下。</p></div>
+        <div class="card"><h3>R2: 重複実行ゼロ</h3><p>同一candidate・OS・contractを複数laneで証明しない。artifact build invocationは1回。</p></div>
+        <div class="card"><h3>R3 / R3A: 追跡可能性</h3><p>全nodeをbaseline SHAへ束縛し、contract、owner、lane、cost、dispositionを持たせる。削除にはsuccessorまたはretirement authorityが必要。</p></div>
+        <div class="card"><h3>R4: 層ごとの証明責務</h3><p>pure/domain、filesystem/service、CLI adapter、artifact lifecycle、platform deltaを分け、同じmatrixを各層で反復しない。</p></div>
+        <div class="card"><h3>R5 / R5A: distribution簡素化</h3><p>4 disposable roots、2 fixed skill slots、one ready markerへ縮小。user dataとshared contentは境界外。</p></div>
+        <div class="card"><h3>R5B: Product decision gate</h3><p>#388〜#390を先にacceptし、legacy、purge、workflow / artifact policyを実装者が推測しない。</p></div>
+        <div class="card"><h3>R6: failureを成功扱いしない</h3><p>active failureをexact nodeごとにfix / retire / successorへ処置し、blanket approvalを残さない。</p></div>
+        <div class="card"><h3>R7: 実行量の可視化</h3><p>wall / CPU、node、subprocess、workspace、copy bytes、duplicate、build countをcandidate SHA付きで報告し、budget超過をfailureにする。</p></div>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>6. 確定済みのアーキテクチャ</h2>
+      <p>accepted ADR <code>20260831t005139z-adr</code>が決めた中心は、ファイル一つずつの歴史を管理する方式から、固定されたownership boundaryへ移ることです。</p>
+      <script type="text/plain" class="plantuml-source" id="source-ownership" data-target="diagram-ownership">
+@startuml
+title 配布対象と保護対象のownership境界
+top to bottom direction
+
+rectangle "利用者データ\nspec-dock/initiatives/**\nArtifacts" as Durable #E8F5E9
+rectangle "不透明なローカル領域\n.workbench / unknown paths" as Opaque #E8F5E9
+rectangle "再生成可能なprojection\nactive / dashboard / tree / ADR mirror" as Generated #FFF3D6
+
+rectangle "provider-owned fixed roots\ndocs / templates / system / scripts" as Roots #E3F2FD
+rectangle "owned fixed skill slots\nspec-dock / spec-dock-grill-with-docs" as Slots #E3F2FD
+rectangle "共有parent\n.agents/skills" as Shared #E8F5E9
+rectangle "installation record / ready marker" as Marker #E3F2FD
+
+Roots --> Marker : 全root配置後にversionを示す
+Slots --> Marker : 全slot配置後にversionを示す
+Shared --> Slots : exact leafだけを管理する
+Roots ..> Durable : 変更authorityなし
+Roots ..> Opaque : 探索・削除しない
+Roots ..> Generated : 配布差分として管理しない
+@enduml
+      </script>
+      <div id="diagram-ownership" class="plantuml-diagram">ownership境界図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-ownership"></pre></details>
+      <table>
+        <thead><tr><th>分類</th><th>対象</th><th>lifecycle contract</th></tr></thead>
+        <tbody>
+          <tr><td>durable user data</td><td><code>spec-dock/initiatives/**</code>、nested Artifacts</td><td>init / update / tooling uninstall / retry / cleanupは変更しない。</td></tr>
+          <tr><td>opaque local data</td><td><code>.workbench</code>、unknown paths</td><td>探索・正規化・削除しない。</td></tr>
+          <tr><td>generated projection</td><td>active、dashboard、tree / deps、ADR mirror</td><td>distribution inventoryへ含めず、各ownerが再生成する。</td></tr>
+          <tr><td>disposable provider roots</td><td>docs、templates、system、scripts</td><td>全candidateをstage / validate後、root単位で置換する。scriptsは最後。</td></tr>
+          <tr><td>fixed skill slots</td><td>2 exact slots</td><td>valid owner markerのleafだけを置換・削除。shared parentは触らない。</td></tr>
+        </tbody>
+      </table>
+      <h3>updateの正常系</h3>
+      <ol>
+        <li>外部installerがcandidateの4 rootsとskill slotsを同一filesystemへstageする。</li>
+        <li>tree digest、required entrypoint、marker、allowlistをtarget mutation前にvalidateする。</li>
+        <li>target root / parent / repository bindingと全skill collisionをno-followで再確認する。</li>
+        <li><code>docs → templates → system → scripts</code>とslotsをfixed orderでreplaceする。</li>
+        <li>すべて終わった後にだけready markerをatomic replaceする。</li>
+      </ol>
+      <div class="callout warning"><strong>約束しないもの:</strong> 4 roots全体のatomic transaction、automatic whole-operation rollback、arbitrary checkpoint resume、old engineへのautomatic fallback。途中停止時はuser dataを守ったまま、外部installerからsame desired versionを再実行して収束させます。</div>
+    </section>
+
+    <section id="slicing">
+      <h2>7. なぜ10個のIssueへ分けるのか</h2>
+      <p>4 rootsと2 slotsは同じstaging・writer・ready markerを共有するため、一つのproduction Issueに統合します。一方、Product判断、inventory、failure disposition、test再編、CI切替、長期安定性は、受入れ可能な成果と失敗時の戻り先が異なるため分けます。</p>
+      <script type="text/plain" class="plantuml-source" id="source-issue-graph" data-target="diagram-issue-graph">
+@startuml
+title Epic #384の10 Issueスライスと依存関係
+top to bottom direction
+
+rectangle "E384-01 / #388\nlegacy・.gitignore判断" as I1 #FFF3D6
+rectangle "E384-02 / #389\nuninstall・purge判断" as I2 #FFF3D6
+rectangle "E384-03 / #390\nworkflow・artifact判断" as I3 #FFF3D6
+rectangle "E384-04 proposal\n全test inventory" as I4 #E3F2FD
+rectangle "E384-05 proposal\nactive failure処置判断" as I5 #FFF3D6
+rectangle "E384-06 proposal\ninstall / update cutover" as I6 #E8F5E9
+rectangle "E384-07 proposal\nuninstall cutover" as I7 #E8F5E9
+rectangle "E384-08 proposal\ntest portfolio cutover" as I8 #E8F5E9
+rectangle "E384-09 proposal\nCI / budget cutover" as I9 #E8F5E9
+rectangle "E384-10 proposal\n5回 + rolling 20証拠" as I10 #E8F5E9
+
+I1 --> I4
+I2 --> I4
+I3 --> I4
+I4 --> I5
+I1 --> I6
+I3 --> I6
+I4 --> I6
+I2 --> I7
+I4 --> I7
+I6 --> I7
+I4 --> I8
+I5 --> I8
+I6 --> I8
+I7 --> I8
+I3 --> I9
+I8 --> I9
+I9 --> I10
+@enduml
+      </script>
+      <div id="diagram-issue-graph" class="plantuml-diagram">Issue依存図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-issue-graph"></pre></details>
+      <div class="callout">順序の核心は、<strong>判断 → inventory → production contract cutover → test削除 → CI切替 → 長期証拠</strong>です。テスト削除を先行させないことが安全性の中心です。</div>
+    </section>
+
+    <section id="issues">
+      <h2>8. 各IssueのRequirement・Design・Plan</h2>
+      <p>ここでは、Requirementを「何が成功か」、Designを「責務をどこへ置くか」、Planを「どの順で証拠を作るか」として整理します。</p>
+
+      <article class="issue-card">
+        <h3>E384-01 / iss-00388 / GitHub #388</h3>
+        <p class="status-line"><span class="badge decision">正規作成済み・decision未受理</span> Legacy Direct Update Window And Gitignore Seed Policy</p>
+        <p class="issue-meta">Planning Level: strict。後続: E384-04、E384-06。</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>legacy direct-updateの有限window、markerless migrationのtree evidenceとsunset、<code>.gitignore</code> collision、<code>init --force</code>、public compatibilityをProduct判断として確定する。</p></div>
+          <div><h4>Design</h4><p><code>fresh | current-supported | legacy-supported | legacy-expired | unknown</code>へ有限分類する。unknownはmutation前にpreserve-and-blockする。</p></div>
+          <div><h4>Plan</h4><p>manifest・parser・assets・known workspace evidenceをinventoryし、選択肢をinterviewで受理する。accepted decisionと、後続が削除するadapter / fixtures / testsのreceiptを作る。</p></div>
+        </div>
+        <p><strong>完了の見え方:</strong> window、sunset、collision matrix、diagnostic、removal ownerが一意。production codeは変更しない。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-02 / iss-00389 / GitHub #389</h3>
+        <p class="status-line"><span class="badge decision">正規作成済み・decision未受理</span> Tooling Uninstall Spec History Purge And Public CLI Compatibility</p>
+        <p class="issue-meta">Planning Level: critical。不可逆なuser data削除authorityを扱う。</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p><code>--remove-specs</code>をremove / deprecate / independent purgeのどれにするか、confirmation、dry-run / apply、text / JSON / exit、sunsetを決める。</p></div>
+          <div><h4>Design</h4><p>tooling uninstall contractとhistory purge authorityをcommand levelで分離する。normal uninstall、update、retryからpurgeへ到達できない構造にする。</p></div>
+          <div><h4>Plan</h4><p>現行parser・intent・result・retry pathをinventoryし、data-loss riskとcompatibility costを比較してProduct受理する。後続E384-07へpublic surface removal receiptを渡す。</p></div>
+        </div>
+        <p><strong>完了の見え方:</strong> destructive aliasがsilent実行されず、unknown ownershipはpreserve-and-block。production codeや実データは変更しない。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-03 / iss-00390 / GitHub #390</h3>
+        <p class="status-line"><span class="badge decision">正規作成済み・decision未受理</span> Retained Workflow Ownership And Artifact Platform Validation Policy</p>
+        <p class="issue-meta">Planning Level: strict。後続: E384-04、E384-06、E384-09。</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>shipped <code>.github/workflows/ci.yml</code>のowner、update / uninstall authority、wheel / sdist / Linux / macOS trigger、build invocation、digest、reuse、retentionを決める。</p></div>
+          <div><h4>Design</h4><p>consumer workflow ownership、provider CI lane ownership、artifact identityを分離する。Linux canonicalとmacOS deltaのcontract ownerを排他的にする。</p></div>
+          <div><h4>Plan</h4><p>current workflow graphとshipped assetをinventoryし、seed / reusable projection / excludedを比較する。artifact receipt schemaとlane policyを受理し、E384-06とE384-09へ別handoffする。</p></div>
+        </div>
+        <p><strong>完了の見え方:</strong> 同じartifact bytesを再利用し、missing / digest / source SHA mismatchをfailできるpolicy。workflow YAMLはまだ変更しない。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-04 proposal — Provider Test Contract Inventory And Removal Receipt Baseline</h3>
+        <p class="status-line"><span class="badge proposal">未作成proposal</span> exact baselineの全node inventory</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>全collected nodeを一度だけinventoryへ載せ、contract、owner layer、current / target lane、cost、disposition、owner Issueを持たせる。</p></div>
+          <div><h4>Design</h4><p>JSON / Markdown Artifactをbaseline full SHAへ束縛する。delete候補にはexact successorまたはretired contract authorityを要求する。</p></div>
+          <div><h4>Plan</h4><p>collection set、lane selectors、ledger、timing evidenceを取得し、set equality、duplicate nodeid 0、missing disposition 0、unknown owner 0を検証する。</p></div>
+        </div>
+        <p><strong>Gate:</strong> #388〜#390 accepted後。production code・test・workflowは変更しない。baseline SHAが変われば全体をstaleにする。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-05 proposal — Active Approved Failure Disposition Authority</h3>
+        <p class="status-line"><span class="badge proposal">未作成proposal</span> failureを成功扱いするauthorityの撤去準備</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>active failureをexact nodeごとにfix、contract retirement、exact successor replacementの一つへ分類する。</p></div>
+          <div><h4>Design</h4><p>各entryにowner、canonical authority、nodeid、disposition、successor / retirement authority、implementation ownerを持たせる。</p></div>
+          <div><h4>Plan</h4><p>E384-04 inventoryとledgerを完全照合する。判断不能nodeだけをProduct interviewへ戻し、approved-no-op、blanket approval、無期限quarantineを0にする。</p></div>
+        </div>
+        <p><strong>Gate:</strong> E384-04 complete後。production fix・test削除はせず、E384-08へのdecision receiptを作る。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-06 proposal — Install Update Cutover To Disposable Roots And Fixed Skill Slots</h3>
+        <p class="status-line"><span class="badge proposal">未作成proposal</span> 最初のproduction cutover</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>fresh / init / updateを4 roots、2 slots、one ready markerへ一括cutoverする。user data、unknown paths、shared skill parentをbyte-identicalに保つ。</p></div>
+          <div><h4>Design</h4><p>model、service、filesystem、finite migrationのdeep interfaceへ分ける。全candidateのstage / validateと全collision preflight後にfixed orderでreplaceする。</p></div>
+          <div><h4>Plan</h4><p>pure model → staging → no-follow binding → fixed replace → ready marker → successor tests → old per-file route / journal / tests削除 → dogfood / built-wheel smokeの順で進める。</p></div>
+        </div>
+        <p><strong>Gate:</strong> E384-01、03、04。root / slotの片方だけをnew readyとして公開しない。old engineへfallbackしない。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-07 proposal — Tooling Only Uninstall And Purge Compatibility Cutover</h3>
+        <p class="status-line"><span class="badge proposal">未作成proposal</span> destructive authorityのproduction cutover</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>normal uninstallを4 roots、valid owned exact slots、installation recordだけへ限定する。history purgeはE384-02のdecisionへ従う。</p></div>
+          <div><h4>Design</h4><p>全targetのbinding / type / markerをmutation前に検証し、typed delete planをdry-run / applyの共通sourceにする。</p></div>
+          <div><h4>Plan</h4><p>delete plan → preflight → CLI切替 → 独立purgeがあれば分離 → reachability negative test → old deprovision / purge / cross-intent route削除。</p></div>
+        </div>
+        <p><strong>Gate:</strong> E384-02、04、06。defect時はuninstall applyを停止し、dry-run diagnosticだけへ戻す。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-08 proposal — Contract Owned Pytest Portfolio And Zero Failure Cutover</h3>
+        <p class="status-line"><span class="badge proposal">未作成proposal</span> production cutover後のtest再編</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>全testをdurable contract ownerへ配置し、selected nodeのfailure 0、active approved failure 0、policy skip 0にする。</p></div>
+          <div><h4>Design</h4><p>pure/domain、filesystem/service、CLI、artifact lifecycle、platform deltaへ責務を分ける。per-file / journal / historical matrixをsteady stateに残さない。</p></div>
+          <div><h4>Plan</h4><p>owner testsへ移動・統合し、E384-05 dispositionを一件ずつ実施する。削除nodeごとにcontract、successor / retirement、command、result SHAをreceipt化する。</p></div>
+        </div>
+        <p><strong>Gate:</strong> E384-04〜07。最終600秒budgetはまだ完了条件にせず、correctness proofとperformance圧力を分離する。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-09 proposal — Single Process CI Graph Artifact Reuse And Budget Gate Cutover</h3>
+        <p class="status-line"><span class="badge proposal">未作成proposal</span> CIとbudgetのcutover</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>one pytest process、worker 1、artifact build invocation 1、Linux canonical + macOS delta、duplicate 0、budget failureをrequired gateにする。</p></div>
+          <div><h4>Design</h4><p>source SHA / artifact digest receipt、executed node receipt、child-inclusive CPU / wall計測を薄いreporterで扱い、新schedulerを作らない。</p></div>
+          <div><h4>Plan</h4><p>build once → Linux gate → metrics → same bytesをmacOSへ → node set比較 → required check切替 → ledger / weights / baseline / 4-shard verifier削除。</p></div>
+        </div>
+        <p><strong>Gate:</strong> E384-03、08とrunner / trigger policy。selector omission時はsingle-process全correctness gateへ戻す。</p>
+      </article>
+
+      <article class="issue-card">
+        <h3>E384-10 proposal — Five Run Reference And Rolling 20 Stability Acceptance</h3>
+        <p class="status-line"><span class="badge proposal">未作成proposal</span> 実装ではなく最終evidence</p>
+        <div class="rdp">
+          <div><h4>Requirement</h4><p>同一final candidateでfixed Linux reference 5回、seeded fault pack、Linux / macOS smoke、rolling 20を完了する。</p></div>
+          <div><h4>Design</h4><p>evidenceをcandidate SHA、artifact digest、runner identityへ束縛する。code、lockfile、artifact、runner class変更でseriesをresetする。</p></div>
+          <div><h4>Plan</h4><p>5 receiptsのschema / SHA equality、CPU比、node set、build receipt、fault matrix、20 run IDs / retries / outcomesを再計算し、Epic reportへ採用する。</p></div>
+        </div>
+        <p><strong>Gate:</strong> E384-09 complete後。一回でもthreshold超過、failure、skip、duplicate、retryがあればEpicをcloseしない。</p>
+      </article>
+    </section>
+
+    <section>
+      <h2>9. testとCIの最終構成</h2>
+      <script type="text/plain" class="plantuml-source" id="source-test-ci" data-target="diagram-test-ci">
+@startuml
+title 一つのcandidateを重複なく証明する流れ
+left to right direction
+
+rectangle "candidateを1回build\nsource SHA + artifact digest" as Build #E3F2FD
+rectangle "Linux canonical gate\none pytest process / worker 1" as Linux #E8F5E9
+rectangle "pure / service / CLI / artifact\n各contract ownerを一度だけ実行" as Portfolio #E8F5E9
+rectangle "macOS platform delta\nOS差だけを実行" as Mac #FFF3D6
+rectangle "receipt比較\nduplicate 0 / build 1" as Compare #E3F2FD
+rectangle "5回reference + rolling 20\n最終acceptance" as Evidence #E8F5E9
+
+Build --> Linux : exact artifactを渡す
+Linux --> Portfolio : canonical collection
+Build --> Mac : 同じbytesを渡す
+Portfolio --> Compare : Linux node receipt
+Mac --> Compare : delta node receipt
+Compare --> Evidence : candidate SHA付きmetrics
+@enduml
+      </script>
+      <div id="diagram-test-ci" class="plantuml-diagram">testとCIの図を描画しています。</div>
+      <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-test-ci"></pre></details>
+      <table>
+        <thead><tr><th>層</th><th>証明すること</th><th>証明しないこと</th><th>目安</th></tr></thead>
+        <tbody>
+          <tr><td>pure / domain</td><td>fixed classification、marker schema、state transition</td><td>filesystem、Git、package build</td><td>30秒以内</td></tr>
+          <tr><td>filesystem / service</td><td>whole-root replace、data不変、rerun convergence、binding block</td><td>historical file cross-product</td><td>3分以内</td></tr>
+          <tr><td>CLI adapter</td><td>parser、confirmation、exit、JSON / text</td><td>service matrixの再実行</td><td>1分以内</td></tr>
+          <tr><td>artifact lifecycle</td><td>exact wheelでinit → update → tooling uninstall</td><td>pure rulesの反復</td><td>Linux 4分以内</td></tr>
+          <tr><td>platform delta</td><td>macOS固有mode、executable、rename差</td><td>Linux共通contract</td><td>macOS 4分以内</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="failure">
+      <h2>10. 失敗時にどう振る舞うか</h2>
+      <table>
+        <thead><tr><th>失敗</th><th>期待する状態</th><th>次の行動</th></tr></thead>
+        <tbody>
+          <tr><td>candidate stage / validate失敗</td><td>target旧stateを維持。mutation 0。</td><td>candidateを修正して再実行。</td></tr>
+          <tr><td>root削除前の失敗</td><td>target旧stateを維持。</td><td>same desired versionを再実行。</td></tr>
+          <tr><td>delete後・rename前</td><td>一root欠落。user data不変。ready markerは旧。</td><td>外部installerから再実行。</td></tr>
+          <tr><td>root間停止</td><td>old/new/missingの混在。new readyではない。</td><td>全root / slotをsame versionへ再置換。</td></tr>
+          <tr><td>scripts後・ready前</td><td>repo-local commandが使えない可能性。</td><td>installed packageまたは<code>uvx</code>から再実行。</td></tr>
+          <tr><td>symlink / rebind / marker mismatch</td><td>write前block。</td><td>人間がownership boundaryを修復。</td></tr>
+          <tr><td>test selector omission</td><td>mergeをblock。</td><td>single-process全correctness gateへ戻す。shardやapproved failureは復活させない。</td></tr>
+          <tr><td>5回 / 20回seriesで失敗</td><td>Epic acceptance未達。</td><td>E384-08または09へ戻り、修正後にseriesをreset。</td></tr>
+        </tbody>
+      </table>
+      <div class="callout danger"><strong>禁止される近道:</strong> unknown ownershipへの書込み、silent purge、old engineへのautomatic fallback、budget達成のためのworker追加、失敗をapproved ledgerでGREEN扱い、Issue #372への横入り。</div>
+    </section>
+
+    <section id="verification">
+      <h2>11. Epicを完了と呼べる最終証拠</h2>
+      <p>同じfinal candidate SHAに対して、5回すべてで次を満たす必要があります。</p>
+      <pre>pytest_process_count = 1
+worker_count = 1
+wall_seconds &lt;= 600
+(child_user_seconds + child_system_seconds) / wall_seconds &lt;= 1.1
+unexpected_failures = 0
+approved_active_failures = 0
+policy_skips = 0
+duplicate_nodes_same_candidate_os = 0
+artifact_build_count = 1</pre>
+      <ul>
+        <li>Linux referenceはdependency install後、networkなし、hard 2-vCPU / 8 GiB。</li>
+        <li>seeded fault packはuser data誤書込み、allowlist外削除、symlink follow、root間failure、skill marker mismatch、artifact欠落を100%検出。</li>
+        <li>Linux / macOS smokeはaccepted policyの範囲で各600秒以内。</li>
+        <li>rolling 20 canonical runsはflake 0、retry 0、unexpected failure 0。</li>
+        <li>削除した全production route、test node、workflow machineryにremoval receiptがある。</li>
+        <li>human PR merge gateを維持し、agentはmergeしない。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>12. 現在地と次の人間判断</h2>
+      <table>
+        <thead><tr><th>項目</th><th>現在地</th></tr></thead>
+        <tbody>
+          <tr><td>Epic #384</td><td>OPEN、active、dependency ready。canonical R/D/Pは10-slice proposalへ具体化済み。</td></tr>
+          <tr><td>#388</td><td>OPEN/ready。legacy、migration sunset、<code>.gitignore</code>、<code>init --force</code>をinterview待ち。</td></tr>
+          <tr><td>#389</td><td>OPEN/ready。purge public contractとdestructive authorityをinterview待ち。</td></tr>
+          <tr><td>#390</td><td>OPEN/ready。workflow ownershipとartifact / platform policyをinterview待ち。</td></tr>
+          <tr><td>E384-04〜10</td><td>詳しいR/D/P相当planはEpic Planにあるが、まだ正規Issueではない。</td></tr>
+          <tr><td>production / tests / CI</td><td>Epic #384としては未実装。10分、zero failure、rolling 20も未実測。</td></tr>
+        </tbody>
+      </table>
+      <h3>次に答える順番</h3>
+      <ol>
+        <li>#388で、どのlegacy workspaceをいつまで支えるか、<code>.gitignore</code> collisionをどう扱うかを決める。</li>
+        <li>#389で、<code>--remove-specs</code>と独立purgeの最終形を決める。</li>
+        <li>#390で、consumer workflow owner、wheel / sdist / macOS trigger、artifact receiptを決める。</li>
+        <li>3件accept後、E384-04を正規Issue化し、exact baseline inventoryを作る。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>13. 正本と確認コマンド</h2>
+      <p>このHTMLは説明用です。変更判断は次のcanonical docsへ反映されて初めてauthorityになります。</p>
+      <ul>
+        <li>Epic: <code>requirement.md</code> / <code>design.md</code> / <code>plan.md</code></li>
+        <li>Decision Issues: <code>iss-00388</code> / <code>iss-00389</code> / <code>iss-00390</code>の各R/D/P</li>
+        <li>Accepted architecture: <code>20260831t005139z-adr-disposable-provider-roots-and-fixed-skill-slots.md</code></li>
+      </ul>
+      <pre>./spec-dock/scripts/spec-dock active show
+./spec-dock/scripts/spec-dock deps check --id epic-00384 --github --json
+./spec-dock/scripts/spec-dock validate
+git status --short --branch</pre>
+      <p class="muted">図はブラウザ内で公式<code>@plantuml/core@1.2026.6</code>を使って描画します。初回表示ではTailscale接続に加えてインターネット接続が必要です。各図はクリック、Enter、Spaceで拡大できます。</p>
+    </section>
+  </main>
+
+  <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
+    <section class="diagram-zoom-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagram-zoom-title">
+      <h2 id="diagram-zoom-title" class="visually-hidden">図を拡大表示</h2>
+      <header class="diagram-zoom-header">
+        <div class="diagram-zoom-controls" aria-label="図の拡大率を操作する">
+          <button type="button" id="diagram-zoom-out" aria-label="図を縮小する" title="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-reset" aria-label="100%に戻す" title="100%に戻す">
+            <span id="diagram-zoom-level" class="diagram-zoom-level" aria-live="polite">100%</span>
+          </button>
+          <button type="button" id="diagram-zoom-in" aria-label="図を拡大する" title="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-close" aria-label="拡大表示を閉じる" title="閉じる">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+      </header>
+      <div id="diagram-zoom-viewport" class="diagram-zoom-viewport" tabindex="0">
+        <div id="diagram-zoom-canvas" class="diagram-zoom-canvas"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const sources = [...document.querySelectorAll(".plantuml-source")];
+      const status = document.getElementById("plantuml-status");
+
+      window.__plantumlDocumentState = {
+        expected: sources.length,
+        rendered: 0,
+        errors: [],
+        completed: false
+      };
+
+      window.__plantumlFail = message => {
+        const state = window.__plantumlDocumentState;
+        state.errors.push(String(message));
+        state.completed = true;
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図の描画に失敗しました: ${message}`;
+      };
+
+      for (const output of document.querySelectorAll("[data-source-copy]")) {
+        const source = document.getElementById(output.dataset.sourceCopy);
+        if (source) output.textContent = source.textContent.trim();
+      }
+
+      document.documentElement.dataset.plantumlStatus = "running";
+    })();
+  </script>
+
+  <script
+    src="https://unpkg.com/@plantuml/core@1.2026.6/viz-global.js"
+    onerror="window.__plantumlFail('viz-global.jsを読み込めませんでした。')"></script>
+
+  <script type="module">
+    const state = window.__plantumlDocumentState;
+    const status = document.getElementById("plantuml-status");
+    const zoomDialog = document.getElementById("diagram-zoom-dialog");
+    const zoomTitle = document.getElementById("diagram-zoom-title");
+    const zoomViewport = document.getElementById("diagram-zoom-viewport");
+    const zoomCanvas = document.getElementById("diagram-zoom-canvas");
+    const zoomLevelOutput = document.getElementById("diagram-zoom-level");
+    const zoomOutButton = document.getElementById("diagram-zoom-out");
+    const zoomInButton = document.getElementById("diagram-zoom-in");
+    const zoomResetButton = document.getElementById("diagram-zoom-reset");
+    const zoomCloseButton = document.getElementById("diagram-zoom-close");
+    let zoomLevel = 1;
+    let zoomBaseWidth = 0;
+    let zoomedSvg = null;
+    let zoomReturnFocus = null;
+
+    const diagramTitle = sourceElement => {
+      const titleLine = sourceElement.textContent.match(/^\s*title\s+(.+)$/m);
+      return titleLine?.[1]?.trim() || "図を拡大表示";
+    };
+
+    const applyDiagramZoom = () => {
+      if (!zoomedSvg || zoomBaseWidth <= 0) return;
+      zoomedSvg.style.width = `${Math.round(zoomBaseWidth * zoomLevel)}px`;
+      zoomedSvg.style.height = "auto";
+      zoomLevelOutput.value = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelOutput.textContent = zoomLevelOutput.value;
+      zoomResetButton.setAttribute("aria-label", `100%に戻す（現在${zoomLevelOutput.value}）`);
+      zoomOutButton.disabled = zoomLevel <= 0.5;
+      zoomInButton.disabled = zoomLevel >= 3;
+    };
+
+    const setDiagramZoom = nextLevel => {
+      zoomLevel = Math.min(3, Math.max(0.5, nextLevel));
+      applyDiagramZoom();
+    };
+
+    const closeDiagramZoom = () => {
+      if (zoomDialog.hidden) return;
+      zoomDialog.hidden = true;
+      document.body.classList.remove("diagram-zoom-open");
+      zoomCanvas.replaceChildren();
+      zoomedSvg = null;
+      zoomBaseWidth = 0;
+      zoomReturnFocus?.focus();
+      zoomReturnFocus = null;
+    };
+
+    const openDiagramZoom = (target, sourceElement) => {
+      const sourceSvg = target.querySelector("svg");
+      if (!sourceSvg) return;
+
+      zoomReturnFocus = target;
+      zoomedSvg = sourceSvg.cloneNode(true);
+      zoomedSvg.removeAttribute("height");
+      zoomedSvg.style.maxWidth = "none";
+      const viewBoxWidth = zoomedSvg.viewBox?.baseVal?.width || 0;
+      const declaredWidth = Number.parseFloat(zoomedSvg.getAttribute("width")) || 0;
+      zoomBaseWidth = Math.max(viewBoxWidth, declaredWidth, sourceSvg.getBoundingClientRect().width);
+      zoomLevel = 1;
+      zoomTitle.textContent = diagramTitle(sourceElement);
+      zoomCanvas.replaceChildren(zoomedSvg);
+      zoomDialog.hidden = false;
+      document.body.classList.add("diagram-zoom-open");
+      zoomViewport.scrollTo({ top: 0, left: 0 });
+      applyDiagramZoom();
+      zoomCloseButton.focus();
+    };
+
+    const prepareDiagramZoom = (target, sourceElement) => {
+      target.dataset.zoomReady = "true";
+      target.tabIndex = 0;
+      target.setAttribute("role", "button");
+      target.setAttribute("aria-label", `${diagramTitle(sourceElement)}を拡大表示する`);
+      const hint = document.createElement("span");
+      hint.className = "diagram-zoom-hint";
+      hint.textContent = "クリックして拡大";
+      hint.setAttribute("aria-hidden", "true");
+      target.append(hint);
+      target.addEventListener("click", () => openDiagramZoom(target, sourceElement));
+      target.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDiagramZoom(target, sourceElement);
+        }
+      });
+    };
+
+    const focusableZoomElements = () => [...zoomDialog.querySelectorAll(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => !element.hidden && element.getClientRects().length > 0);
+
+    zoomOutButton.addEventListener("click", () => setDiagramZoom(zoomLevel - 0.25));
+    zoomInButton.addEventListener("click", () => setDiagramZoom(zoomLevel + 0.25));
+    zoomResetButton.addEventListener("click", () => setDiagramZoom(1));
+    zoomCloseButton.addEventListener("click", closeDiagramZoom);
+    zoomDialog.addEventListener("click", event => {
+      if (event.target === zoomDialog) closeDiagramZoom();
+    });
+    document.addEventListener("keydown", event => {
+      if (zoomDialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDiagramZoom();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableZoomElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    try {
+      const { renderToString } = await import(
+        "https://unpkg.com/@plantuml/core@1.2026.6/plantuml.js"
+      );
+
+      const renderDiagram = lines => new Promise((resolve, reject) => {
+        renderToString(
+          lines,
+          svg => resolve(svg),
+          message => reject(new Error(message))
+        );
+      });
+
+      const normalizeDiagnosticText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+      const inspectRenderedSvg = svgMarkup => {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const root = parsed.documentElement;
+        if (!root || root.localName.toLowerCase() === "parsererror" || parsed.querySelector("parsererror")) {
+          throw new Error("PlantUMLが不正なSVGを返しました。");
+        }
+        if (root.localName.toLowerCase() !== "svg") {
+          throw new Error("PlantUMLの描画結果がSVGではありません。");
+        }
+
+        const fullText = normalizeDiagnosticText(root.textContent);
+        const diagramType = root.getAttribute("data-diagram-type")?.toLowerCase() ?? "";
+        const hasKnownErrorText = /Syntax Error\?|An error has occurred/i.test(fullText);
+        const hasDiagnosticStructure = /PlantUML version\b/i.test(fullText)
+          && /\[From [^\]]*\(line \d+\)\s*\]/i.test(fullText)
+          && /@startuml/i.test(fullText);
+
+        if (diagramType === "error" || hasKnownErrorText || hasDiagnosticStructure) {
+          const diagnosticLines = [...root.querySelectorAll("text")]
+            .filter(element => {
+              const presentation = [
+                element.getAttribute("fill"),
+                element.getAttribute("style"),
+                element.getAttribute("text-decoration")
+              ].filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, "");
+              return /(?:fill:)?(?:#ff0000|#f00|red|rgb\(255,0,0\))/.test(presentation)
+                || presentation.includes("wavy");
+            })
+            .map(element => normalizeDiagnosticText(element.textContent))
+            .filter(Boolean);
+          const reason = [...new Set(diagnosticLines)].join(" / ").slice(0, 500)
+            || (hasKnownErrorText
+              ? fullText.match(/Syntax Error\?|An error has occurred/i)?.[0]
+              : "PlantUMLの診断画面が返されました。");
+          throw new Error(`PlantUMLの診断SVGが検出されました: ${reason}`);
+        }
+
+        return root;
+      };
+
+      for (const sourceElement of document.querySelectorAll(".plantuml-source")) {
+        const target = document.getElementById(sourceElement.dataset.target);
+        if (!target) {
+          state.errors.push(`${sourceElement.id}: 描画先がありません。`);
+          continue;
+        }
+
+        try {
+          const lines = sourceElement.textContent.trim().split(/\r?\n/);
+          const svgMarkup = await renderDiagram(lines);
+          const svg = inspectRenderedSvg(svgMarkup);
+          target.replaceChildren(document.importNode(svg, true));
+          prepareDiagramZoom(target, sourceElement);
+          target.dataset.plantumlStatus = "success";
+          state.rendered += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          state.errors.push(`${sourceElement.id}: ${message}`);
+          target.dataset.plantumlStatus = "error";
+          target.textContent = `この図の描画に失敗しました: ${message}`;
+        }
+      }
+
+      state.completed = true;
+      if (state.rendered === state.expected && state.errors.length === 0) {
+        document.documentElement.dataset.plantumlStatus = "success";
+        status.textContent = `図を${state.rendered}件すべて描画できました。`;
+      } else {
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図を${state.rendered}件描画し、${state.errors.length}件のエラーが発生しました。`;
+      }
+    } catch (error) {
+      window.__plantumlFail(error instanceof Error ? error.message : String(error));
+    }
+  </script>
+</body>
+</html>
