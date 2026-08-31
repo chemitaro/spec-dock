@@ -120,7 +120,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件**: 続行せずmain agentへ返す条件。
 - **cleanup**: 削除するtemporary/orphan item。
 
-状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`だけを使う。各pre-freeze milestone完了時に§15を更新する。post-freeze C90-05は同じ語彙をPR/handoff evidenceで使い、version管理ledgerへ追記しない。長いstdout/stderrをPlanへ貼らず、command、exit、count、主要observed resultをReportへ記録する。
+状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`だけを使う。C00-01〜C90-03の完了時に§15を更新する。final content writeを含むC90-04とpost-freeze C90-05は同じ語彙をPR/handoff evidenceで使い、version管理ledgerへ追記しない。長いstdout/stderrをPlanへ貼らず、command、exit、count、主要observed resultをReportへ記録する。
 
 ## 7. Milestone
 
@@ -544,21 +544,21 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** syncがscope外tracked diffを生成。
 - **cleanup:** scope外diffをcommitしない。
 
-### C90-04 — Final cleanup、checklist completion、Report freeze
+### C90-04 — Final cleanup、Report completion、candidate freeze
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
-- **前提:** C00-01〜C90-03の結果が確定し、全必須項目がPASSまたは理由付きN/A。
-- **操作:** temp consumer、build artifact、cacheをexact ownership確認後に片付ける。§15のC00-01〜C90-03を実測どおり更新し、ReportのOutcome/Verification/Risksを完成させる。同じcandidate writeでC90-04をPASSにしてから、最終内容に対してvalidateとdiff checkを実行し、成功時だけreview candidateをfreezeする。失敗時はC90-04をBLOCKEDへ戻しfreezeしない。
-- **確認:** statusとraw command evidence、`git status --short --untracked-files=all`、`./spec-dock/scripts/spec-dock validate`、`git diff --check`を、最終Plan/Report書込み後に照合する。
-- **期待結果:** C00-01〜C90-04にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、最終内容のvalidate/diff checkが成功し、意図したtracked diffだけが残る。
-- **証拠:** status ledger、Report sections。
-- **停止条件:** raw実行なしのPASS、final SHA自己参照、長いlog複製。
+- **前提:** C00-01〜C90-03のversion管理ledgerが全てPASSまたは理由付きN/A。
+- **操作:** temp consumer、build artifact、cacheをexact ownership確認後に片付ける。ReportのOutcome/Verification/Risksを完成させ、final tracked contentを確定する。C90-04自身のPASSをPlan/Reportへ書かず、この最終contentをcommit candidateとしてfreezeする。
+- **確認:** version管理ledgerとraw command evidence、Report内容、`git status --short --untracked-files=all`、`git diff --check`を照合する。
+- **期待結果:** C00-01〜C90-03にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
+- **証拠:** candidate freezeのPASS/BLOCKEDをPR/handoff evidenceへ記録し、version管理Plan/Reportには追記しない。
+- **停止条件:** raw実行なしのPASS、final SHA自己参照、長いlog複製、unknown temporary/untracked path。
 - **cleanup:** 本Issue所有temporaryとduplicate scratch/logだけ。user-owned/unknown pathが混在する場合は停止する。
 
 ### C90-05 — Commit、push、Strict quality gate、PR
 
 - **対象 / 目的:** human merge判断へ固定candidateを渡す。
-- **前提:** C90-01〜04 PASS、review candidate freeze、identity確認済み。
+- **前提:** version管理ledgerのC00-01〜C90-03が完了し、C90-04 candidate freezeがhandoff evidence上でPASS、identity確認済み。
 - **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。cleanなfinal SHA上でもう一度`spec-dock validate`を実行してから、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、影響milestoneとC90-01〜04を再実行してPlan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
 - **確認:** staged name-status、clean status、remote SHA、final SHA上のvalidate、PR checks、Strict review status。
 - **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
@@ -568,7 +568,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 ## 15. Execution status ledger
 
-初期状態はpre-freeze項目が全て`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceを更新する。C90-05はreview candidate commit後のpost-freeze gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
+初期状態はversion管理対象のC00-01〜C90-03が全て`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceを更新する。C90-04とC90-05はfinal tracked contentの自己参照を避けるclosure gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
 
 | ID | 状態 | Evidence reference |
 |---|---|---|
@@ -608,14 +608,13 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 | C90-01 | NOT_RUN | |
 | C90-02 | NOT_RUN | |
 | C90-03 | NOT_RUN | |
-| C90-04 | NOT_RUN | |
 
 ## 16. Exit / handoff
 
 次をすべて満たしたときだけproduction writerからmain agentへ返す。
 
 - I387-AC01〜AC18のevidenceがある。
-- version管理ledgerのC00-01〜C90-04が全てPASSまたは理由付きN/Aで、post-freeze C90-05がPR/handoff evidence上でPASSしている。
+- version管理ledgerのC00-01〜C90-03が全てPASSまたは理由付きN/Aで、C90-04とC90-05がPR/handoff evidence上でPASSしている。
 - production residueとremovable test/supportが一体で撤去されている。
 - new absence test/scanner/fixture/helperがない。
 - surviving positive behavior、provider/dogfood parity、package outputが確認済み。
