@@ -101,7 +101,27 @@ root内部はcustomization pointではない。updateはinner fileのmodified / 
 
 4 disposable rootsと2 fixed skill slotsは同一candidate staging、同一update orchestration、同一installation record / ready markerを共有する。したがってinstall / update production cutoverは一つのchild Issueが所有し、rootsだけ、またはskillsだけがnew contractへ移行した状態を`ready(new version)`として公開しない。
 
-tooling uninstallはinstall / update cutoverへ依存する別Issueが所有する。test portfolioのold contract削除は対応production cutoverの後に行い、CI execution graphとfinal performance evidenceも別Issueが所有する。
+tooling uninstall / purgeはinstall / updateより先に、legacy stateとfuture `InstallationRecordV2`を読むdual-reader / single-writer bridgeへcutoverする。bridgeはlegacy install / update writerを維持し、new workspaceへのupdateをfail closedにしながら、legacy workspaceとnew workspaceのtooling-only uninstallを安全に提供する。
+
+install / update Issueはbridge merge後にnew writerへcutoverする。これにより、new writerが公開したworkspaceはmerge済みuninstallが必ず理解する。bridgeをProduct contractとして受理できない場合は、install / update / uninstall / purgeを一つのproduction vertical Issueへ統合し、中間状態を公開しない。
+
+behavior testの作成・移動・削除は対応production Issueが所有する。包括的tests-only Issueは置かない。CI execution graph、external required-check transition、old machinery retirement、final performance evidenceは、それぞれ独立したsafe-transition / closeout Issueが所有する。
+
+各production-changing Issueは、単独merge後の`main`でaccepted public lifecycle command matrixをGREENにし、後続Issueを待たない。
+
+## Lifecycle compatibility interface
+
+長期dual engineではなく、有限なreader compatibilityとsingle writerを設計する。名称は実装時にrepository styleへ合わせられるが、責務は次のstable contractへ分ける。
+
+- `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、legacy-recovery-active、blockedをread-only分類する。
+- `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、2 skill slot versionsだけを持つ。arbitrary path、per-file digest、checkpoint listを持たない。
+- `SkillSlotMarkerV1`: schema、owner、exact slot、distribution versionだけを持つ。
+- `ToolingDeletePlanV1`: fixed roots、valid owned exact slots、installation recordだけをtyped targetにする。
+- `PurgeAuthorityV1`: tooling lifecycleから独立したaccepted target evidenceとconfirmationを持つ。
+- `LifecyclePublicResultV1`: dry-run / apply、text / JSON、exit、cleanup-pendingを一意にmappingする。
+- `InventoryHeadV1` / `RemovalReceiptDeltaV1`: merge parent、result SHA、node inventory digestを連鎖する。
+- `CandidateArtifactReceiptV1`: source SHA、build invocation、wheel / sdist digestを固定する。
+- `RequiredCheckTransitionReceiptV1`: external required contexts、review gate、変更owner、検証結果を記録する。
 
 ## Deep interface
 
@@ -179,8 +199,11 @@ Python / Linux / macOSで非空directory同士のcross-platform atomic exchange�
 ### 最小state
 
 - `absent`: provider roots / valid ready markerがない。
+- `legacy-ready`: accepted finite evidenceで現行workspaceを認識できる。
+- `tooling-absent-preserved-data`: provider toolingはなく、user data / generated projectionだけが残り、accepted install routeで再installできる。
 - `ready(version A)`: ready markerとexpected fixed roots / slotsがAを示す。
-- `updating-or-incomplete(desired B)`: stagingまたはold/new/missing rootの混在があり、ready markerがBを証明しない。
+- `updating-v2(desired B, digest D)`: stagingまたはold/new/missing rootが混在し、same desired version / digestのexternal rerunだけを許可する。
+- `legacy-recovery-active`: accepted legacy journal / markerが残り、bounded recovery-only adapterまたはlast-compatible package pinが必要である。
 - `blocked`: root binding、type、shared slot ownership、candidate integrityを証明できない。
 
 per-file checkpoint、intent別journal、quarantine、rollback image、cross-intent resumeをstate modelへ持ち込まない。
@@ -229,6 +252,10 @@ marker以前のcurrent 2 rootsは、一回限りのexact tree recognitionでmark
 
 Linux canonical portfolioはcollection / variance headroomを含め10分以内とする。macOSでpure / CLI共通testを再実行しない。
 
+test ownershipはlayerではなくbehavior ownerへ帰属させる。uninstall / purge bridgeはlegacy admission、tooling-only delete、purge、post-uninstall reinstallを同じIssueで証明する。install / update cutoverはroot replacement、ready / updating state、same-version rerun、skill write lifecycleを同じIssueで証明する。distribution外のactive failureはinventoryが示すdurable contract ownerへfan-outし、current authorityから期待動作を決められないnodeだけ個別decision Issueへ戻す。
+
+CI Issueはlane assignment、selector、metrics、artifact receiptだけを所有し、production behaviorのsuccessor testを後付けしない。behaviorを変えないexact duplicate cleanupはinventoryが独立acceptanceを証明した場合だけsafe-transition Issueにできる。
+
 ### Keep
 
 - allowlist外へ書かない・削除しないnegative proof
@@ -262,7 +289,7 @@ testがslowという理由だけでは削除しない。retired contractまた�
 
 ## Removal receipt
 
-production route、test node、workflow machineryを削除するchangeは、次をbaseline SHAへ束縛して記録する。
+production route、test node、workflow machineryを削除するchangeは、次をlatest inventory head、merge parent SHA、result SHAへ束縛して記録する。
 
 - owner Issue
 - retired contractまたはsuccessor contract
@@ -271,23 +298,55 @@ production route、test node、workflow machineryを削除するchangeは、次�
 - successor test node IDs
 - focused verification command
 - result SHA
+- parent / result node inventory digest
 
-testがslowであることだけをretirement authorityにしない。production contractの廃止authorityをtest portfolio Issueが後付けしない。
+rebase後はdelta receiptを再生成し、並行PRはmerge順確定後に再照合する。testがslowであることだけをretirement authorityにしない。production contractの廃止authorityをtests-only Issueが後付けしない。
 
 ## Migration / compatibility
 
-1. `iss-00388`、`iss-00389`、`iss-00390`のdecision-only Issuesをacceptする。
-2. fixed baseline SHAで全test node inventoryとremoval receipt baselineを作る。
-3. active failure nodesのfix / retirement / successor authorityを個別に確定する。
-4. install / updateを4 roots + 2 slots + one ready markerへcutoverし、同じIssueでold update routeと対応testsを削除する。
-5. tooling-only uninstallとaccepted purge compatibilityへcutoverし、同じIssueでold deprovision / purge / cross-intent routeを削除する。
-6. durable contract ownerごとのpytest portfolioへ再編し、active approved failureとpolicy skipを0にする。
-7. candidate build once、Linux canonical、macOS delta、duplicate 0、single pytest processのCI graphへcutoverする。
-8. fixed reference 5 runsとrolling 20 runsのacceptance evidenceを取得する。
+1. `iss-00388`、`iss-00389`、`iss-00390`のdecision-only Issuesと、fixed baseline SHAのrolling inventoryを並行して完成する。
+2. inventoryがactive failureをdurable behavior ownerへ割り当て、判断不能nodeだけ個別decision gateへ戻す。
+3. legacy install / update writerを維持したまま、tooling-only uninstall / purgeをdual-reader bridgeへcutoverし、post-uninstall reinstallを含むpublic lifecycle matrixをGREENにする。
+4. bridge merge後、install / updateを4 roots + 2 slots + `InstallationRecordV2`へcutoverし、old package / writerのnew workspace mutationをfail closedにする。
+5. 各production Issueがsuccessor testsとold route / test receiptを同じPRで完了する。active failure repairもbehavior ownerごとにmergeする。
+6. new canonical gateをnon-required shadowとして追加し、artifact build once、Linux canonical、macOS delta、metricsを検証する。
+7. external required contextsをold requiredからold + new required、new required + old non-requiredへ移す。
+8. new checkだけがrequiredであることを再取得してから、old Provider CI / Full Regression、ledger、timing weights、shard machineryを別PRで撤去する。
+9. fixed reference 5 runsとrolling 20 runsのacceptance evidenceを取得する。
 
 old / new engineを長期dual modeにしない。destructive safety issueが見つかった場合はapply routeを停止し、read-only diagnosticへ戻す。旧engineへのautomatic fallbackは行わない。
 
 test selector defect時のrollbackはshard / approved failureの再導入ではない。全correctness portfolioをsingle pytest processで実行するfail-closed gateへ戻す。
+
+### Cross-version release sequence
+
+```text
+P0: legacy writer + legacy reader
+  -> P1: legacy install/update writer + new uninstall/purge dual-reader
+  -> P2: new install/update writer + new uninstall/purge dual-reader
+  -> P3: new-only reader/writer after accepted sunset
+```
+
+- `P0 × ready-v2`、`P0 × updating-v2`はmutation前にfail closedにする。
+- `P1 × legacy-ready`はlegacy install/updateとnew uninstall/purgeをGREENにする。
+- `P1 × tooling-absent-preserved-data`はaccepted install routeで再installできる。
+- `P1 × ready-v2`はuninstall / dry-runを許可し、update / init-forceはfail closedにする。
+- `P2 × legacy-ready`はexact finite evidenceがあるone-shot migrationだけを許可する。
+- `P2 × ready-v2`は全accepted lifecycleをGREENにする。
+- `P2 × updating-v2`はsame desired external rerunだけを許可する。
+- `P3 × legacy-ready`はactionable diagnostic付きでfail closedにする。
+
+### CI transition state machine
+
+```text
+OLD_REQUIRED
+  -> OLD_REQUIRED + NEW_SHADOW
+  -> OLD_REQUIRED + NEW_REQUIRED
+  -> NEW_REQUIRED + OLD_NON_REQUIRED
+  -> NEW_REQUIRED_ONLY
+```
+
+new contextはold contextを残したままrequiredへ追加し、failure canaryでmerge blockを確認する。old workflowはnew-only requiredを再取得するまでrepositoryに残す。external settingsとcode PRは同一transactionとみなさず、各transitionにreceiptとrollback条件を持たせる。
 
 ## 変更対象
 
@@ -317,8 +376,9 @@ test selector defect時のrollbackはshard / approved failureの再導入では�
 | allowlist実装誤り | user data削除 | compile-time fixed roots、root / parent binding、negative seeded fault |
 | skill marker spoof / mismatch | foreign skillの上書き・削除 | fixed exact slot、marker schema / slot一致、unknown preserve-and-block |
 | legacy adapterが恒久化 | complexity再増加 | version/date sunsetとadapter/test同時削除をacceptanceにする |
-| old testsを残す | test時間が下がらない | production cutoverとold route / test deletionを同一Issueで受け入れる |
+| behavior testを後続Issueへ送る | merge pointで保護が欠落する | production cutoverとsuccessor proof、old route / test deletionを同一Issueで受け入れる |
 | test削減でOS退行を失う | filesystem/package defect | OS差のあるboundaryだけをbuilt-artifact smokeで残す |
+| required checkの外部設定とworkflow削除がずれる | gate空白または永続pending | additive shadow、old+new required、new-only required、old removalを別transitionにする |
 
 ## Authority / open decisions
 

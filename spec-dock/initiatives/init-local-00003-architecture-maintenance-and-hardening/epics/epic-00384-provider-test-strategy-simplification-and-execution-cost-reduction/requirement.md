@@ -30,6 +30,14 @@ Issue #372 は distribution hard cutover と parity を対象とし、Full Regre
 
 ## 観測可能な要件
 
+### R0. merge-point releasability
+
+- production code、public CLI、workflowのいずれかを変更するchild Issueは、そのIssueだけを依存済み`main`へmergeした直後にreleasableな状態を残す。
+- behavior変更に必要なpublic adapter、docs、successor tests、built-artifact smoke、old contract / test removal receiptを同じbehavior-owning Issueで完了し、tests-onlyの後続Issueへ延期しない。
+- 影響を受けないaccepted public lifecycle commandは全てGREENを維持する。後続Issueが未mergeであることを理由にbroken、skip、approved failure、quarantineを許可しない。
+- production contractを削除する前に、exact successor proofまたはaccepted retirement authorityを同じPRで成立させる。
+- Epic branchへ全implementationを蓄積して最後に一括mergeする運用を採らない。各child PRを依存順に`main`へ統合し、各merge pointを検証する。
+
 ### R1. 一つの実行時間予算
 
 - 開発者向け canonical regression command は、単一の `pytest` processで全ての merge-required contractを実行する。
@@ -41,7 +49,8 @@ Issue #372 は distribution hard cutover と parity を対象とし、Full Regre
 
 ### R2. 重複実行ゼロ
 
-- 同じcandidate・OS・契約について、merge判定までに同じtest nodeを複数laneで実行しない。
+- steady stateでは、同じcandidate・OS・契約について、authoritative lane間で同じtest nodeを複数回実行しない。
+- CI migration中のshadow laneだけは、non-required、owner、expiry、retirement Issueを持ち、duplicateをcandidate SHA付きで明示計測する場合に限り一時重複を許可する。required-check切替完了後はshadow / old laneを撤去し、最終acceptanceでduplicate 0へ戻す。
 - platform固有の差分を確認するtestだけを各OSで実行し、OS非依存のdomain / service contractをLinuxとmacOSの双方で繰り返さない。
 - wheelとsdistはcandidateごとに一度だけbuild・hash固定し、その同じartifactを必要なsmokeで再利用する。
 
@@ -58,6 +67,8 @@ Issue #372 は distribution hard cutover と parity を対象とし、Full Regre
 - delete対象はretired production contractのaccepted authority、またはexact successor nodeを持つ。
 - removal receiptはold node / route、successorまたはretirement authority、owner Issue、verification command、result SHAを持つ。
 - baseline SHA変更後に旧inventoryを黙って再利用しない。
+- baseline inventoryを`S0`へ束縛し、各削除PRはmerge parent SHA、result SHA、node inventory digestのdelta receiptを作る。rebase後はreceiptを再生成する。
+- 次のIssueはlatest inventory headだけをconsumeする。並行PRはmerge順確定後にrebaseし、node set、owner、receiptを再照合する。
 
 ### R4. layerごとの証明責務
 
@@ -103,6 +114,17 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 
 全test inventory作成後、active approved failureのうちcurrent authorityからexpected behaviorを決定できないnodeは、個別のdecision gateへ戻す。
 
+### R5C. lifecycle format and cross-version compatibility
+
+- production cutoverは`legacy-ready`、`tooling-absent-preserved-data`、`ready-v2`、`updating-v2(desired digest)`、`legacy-recovery-active`、`blocked`を区別する。
+- package世代は現行`P0`、uninstall-first bridge`P1`、new install/update writer`P2`、legacy sunset後`P3`として扱い、各package / workspace combinationのallow、fail-closed、recovery ownerをdecision authorityへ束縛する。
+- `P1`はlegacy install/update writerを維持しつつ、legacy stateとfuture `InstallationRecordV2`を読むtooling-only uninstall / purge dual-readerを提供する。同一operationにold/new writerを併存させない。
+- `P2`へcutoverする前に`P1` uninstallが`ready-v2`を安全に処理でき、`P0` / `P1` updateが`ready-v2`をmutation前にfail closedにできることを証明する。
+- `updating-v2`では同じdesired version / digestのexternal updateだけを許可し、uninstall、purge、別version update、old engine fallbackをblockする。
+- tooling-only uninstall後のuser data / generated projectionを保持したworkspaceから、accepted install routeで再installできる。
+- active legacy recovery stateは、accepted bounded recovery-only adapterまたはlast-compatible package pinのどちらかで扱う。未決状態を新journalへ推測変換しない。
+- bridge sunsetをEpic内で行うかfollow-upへ渡すかを`iss-00388`で確定し、期限なしのdual-readerをsteady stateへ残さない。
+
 ### R6. failureを成功扱いしない
 
 - canonical required testはzero unexpected failuresかつzero approved active failuresでGREENになる。
@@ -117,6 +139,15 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - CI summaryはlaneごとのwall time、CPU time、node count、artifact build count、workspace copy bytes、duplicate node countをcandidate SHAに束縛して表示する。
 - `artifact_build_count` はcandidate artifactを生成するbuild command invocation数とし、targetを1とする。一つのinvocationがaccepted policyに応じてwheel / sdistを生成してよいが、各output digestを個別に固定する。
 - budget超過はtest failureとして扱い、timing weight更新やworker追加だけで回避できない。
+- CPUはpytest root processと全descendantのuser / system CPU secondsの総和を`process_tree_cpu_seconds`とし、`process_tree_cpu_seconds / wall_seconds`を平均論理core使用数とする。
+
+### R7A. additive required-check migration
+
+- 新canonical gateは既存required checkを変更・削除せず、non-required shadowとして追加する。
+- shadowの連続GREENとfailure canaryを確認後、GitHub ruleset / branch protectionのauthority、owner、変更前required contextsをreceipt化する。
+- external required-checkは`old required`から`old + new required`、`new required + old non-required`の順に移し、human review requirementを維持する。
+- old workflow / ledger / shard machineryは、new checkだけがrequiredであることを再取得してから別PRで削除する。
+- required-check defect時はold workflowがrepositoryに残る間だけold contextへrollbackできる。workflow不存在のcontextをrequiredへ戻さない。
 
 ## スコープ
 
@@ -151,6 +182,7 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 
 - [x] 4 disposable roots、fixed skill slots、user history保護、external rerun convergenceをaccepted ADR `20260831t005139z-adr` に記録している。
 - [ ] R5Bの残るProduct判断を、影響する実装Issueの開始前にaccepted decisionとして記録している。
+- [ ] production-changing child PRごとに、依存済み`main`上のaccepted public lifecycle command matrixがzero failure、zero policy skipであり、後続Issueなしでもreleasableである。
 - [ ] baseline SHAへ束縛したinventoryが全collected nodeを100%包含する。
 - [ ] 削除した全test node、production route、workflow machineryにremoval receiptがある。
 - [ ] 全test familyのcontract / layer / lane / cost / keep-move-consolidate-delete判定が追跡できる。
@@ -160,6 +192,8 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - [ ] 同一candidate・OSにおけるduplicate test node数が0で、candidate artifact build invocation数が1、accepted wheel / sdist outputの各digestが一意である。
 - [ ] platform不適用nodeはcollection後のpolicy skipではなくlane ownershipによって対象外となる。
 - [ ] install/update cutover前に旧per-file update testsを削除せず、tooling-only uninstall cutover前に旧deprovision / purge testsを削除していない。
+- [ ] uninstall-first bridge merge時にlegacy install / update、tooling-only uninstall、accepted purge surface、post-uninstall reinstallが統合GREENである。
+- [ ] install/update cutover merge時にnew writerとnew uninstallが統合GREENであり、old package / writerはnew workspaceをmutation前にfail closedにする。
 - [ ] default pathでshard runnerを使用せず、test worker concurrencyが1である。
 - [ ] fixed 2-vCPU Linux referenceで同じbudgetを満たし、seeded fault pack（user data誤書込み、allowlist外削除、symlink follow、root間failure、skill marker mismatch、artifact欠落）を100%検出する。
 - [ ] cutover後のrolling 20 canonical runsでflake 0、retry 0である。
@@ -167,6 +201,7 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - [ ] active approved failureが0になり、`full-regression-ledger.json`、timing weights、baseline evaluator、4-shard verifierを削除またはmerge判定外の一時migration toolingへ退役させている。
 - [ ] obsolete / duplicate testsの削除前後で、残すdurable invariantsのtraceabilityとnegative-path proofが維持されている。
 - [ ] budget summaryがcandidate SHA、wall / CPU time、node / subprocess / workspace / duplicate countsを報告する。
+- [ ] required-check transition receiptが`old required`、`old + new required`、`new required only`、old workflow removalの順序とhuman review gate維持を証明する。
 - [ ] human PR merge gateを維持し、Issue #372のcandidate / canonical docs / acceptance evidenceを変更していない。
 
 ## 制約・前提

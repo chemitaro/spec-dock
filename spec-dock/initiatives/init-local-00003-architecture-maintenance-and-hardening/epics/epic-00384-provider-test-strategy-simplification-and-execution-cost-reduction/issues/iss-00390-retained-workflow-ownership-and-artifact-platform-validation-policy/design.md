@@ -30,6 +30,7 @@ Target:
 - consumer workflowのownershipとupdate / uninstall authorityが一意である。
 - artifact policyがcandidate source SHA、build invocation、output digest、reuse、retentionを定義する。
 - Linux canonical laneとmacOS delta laneのcontract ownershipが排他的である。
+- external required-check stateをadditiveに移行し、repository workflowとの非同期境界にreceipt / rollbackを持つ。
 
 ## 責務・Interface
 
@@ -37,10 +38,11 @@ Target:
 - artifact policy: build trigger、invocation count、outputs、digests、transfer owner。
 - platform policy: Linux canonicalとmacOS deltaの対象・trigger・budget。
 - implementation handoff: shipped asset changeはinstall/update Issue、provider CI changeはCI cutover Issueが所有する。
+- required-check handoff: shadow context、old + new required、new-only required、old removalを別transitionとしてexternal ownerへ渡す。
 
 ## data / failure
 
-artifact receiptは少なくともcandidate full SHA、build invocation ID、output kind、SHA-256、builder identity、created-at、consumer lanesを持つ。missing / mismatch / wrong sourceはtest開始前にfailする。lane receiptはexecuted node setとOSを持ち、duplicate判定可能にする。
+artifact receiptは少なくともcandidate full SHA、build invocation ID、output kind、SHA-256、builder identity、created-at、consumer lanesを持つ。missing / mismatch / wrong sourceはtest開始前にfailする。lane receiptはexecuted node setとOSを持ち、duplicate判定可能にする。required-check receiptはexternal authority、before / after contexts、review requirement、owner、canary resultを持つ。
 
 ## 変更対象
 
@@ -56,6 +58,7 @@ workflow ownership decisionにdeprecationが必要なら具体的windowを持つ
 - 各node family / artifact buildのcurrent lane重複をpolicy inputとして可視化する。
 - target ownershipがexisting pathへ一意にmappingできるか確認する。
 - artifact receiptからsource / digest / build count / consumer laneを再計算できるか確認する。
+- required-check state machineの各transitionにprecondition、verification、rollbackがあるか確認する。
 
 ## risk
 
@@ -63,3 +66,4 @@ workflow ownership decisionにdeprecationが必要なら具体的windowを持つ
 - platform差と単なる重複実行を混同すること。
 - build countをoutput file数とcommand invocation数で曖昧にすること。
 - noisy runner上のwall timeをhard quota referenceと混同すること。
+- workflow removalをexternal required context変更より先に行うこと。

@@ -30,6 +30,7 @@ Target:
 - `tooling uninstall`はfixed owned targetsだけを扱う。
 - history purgeを残す場合も独立authority / commandとして扱う。
 - public option、confirmation、result、sunsetがaccepted decisionに束縛される。
+- post-uninstall purge eligibilityとreinstall authorityがinstallation record不存在から推測されない。
 
 ## 責務・Interface
 
@@ -37,10 +38,11 @@ Target:
 - purge contract: existence、command、confirmation、authority、result。
 - compatibility contract: deprecated alias、sunset、breaking / deprecation policy。
 - removal handoff: old intent mapping、journal、tests、docsの後続owner。
+- post-uninstall handoff: purge target evidence、`tooling-absent-preserved-data` admission、reinstall route。
 
 ## data / failure
 
-decision tableは少なくとも`command/option`、`intent`、`confirmation`、`delete authority`、`text`、`JSON`、`exit`、`sunset`を持つ。unknown / foreign / rebound targetでは該当delete前にblockする。cleanup-pendingを成功扱いする場合もuser-visible statusと再実行方法を明示する。
+decision tableは少なくとも`command/option`、`intent`、`confirmation`、`delete authority`、`post-uninstall evidence`、`reinstall route`、`text`、`JSON`、`exit`、`sunset`を持つ。unknown / foreign / rebound targetでは該当delete前にblockする。cleanup-pendingを成功扱いする場合もuser-visible statusと再実行方法を明示する。
 
 ## 変更対象
 
@@ -55,9 +57,11 @@ deprecated aliasを採る場合は、non-destructive diagnosticまたは明示pu
 - 現行parser / intent / text / JSON / exit mappingをread-only inventory化する。
 - target decisionとの全mapping差分とsunsetを確認する。
 - update / retry / tooling uninstallからpurge authorityへ到達しないことを設計上のnegative pathとして確認する。
+- installation record削除後もpurge eligibilityとreinstall routeが一意か確認する。
 
 ## risk
 
 - backward compatibilityを理由に destructive aliasを残すこと。
 - cleanup-pendingとpartial failureを混同すること。
 - purge廃止とuser data保護を、実データ削除手段の不在という別問題と混同すること。
+- installation record不存在をuser history ownershipの証明と誤認すること。

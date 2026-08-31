@@ -28,6 +28,8 @@ current `install_root`は2 managed skillsと`.github/workflows/ci.yml`を配布�
 - platform-independent nodeをmacOSで再実行せず、OS固有boundaryだけをowner laneへ割り当てる。
 - exact same candidate artifact bytesを必要lane間で再利用し、source SHA / digest mismatchをfailureとする。
 - `artifact_build_count`の計数単位とtargetを定義する。
+- GitHub ruleset / branch protection / merge queueのauthority、required context名、変更ownerを定義する。
+- shadow acceptance、old + new required、new-only required、old workflow removalの順序とrollbackを定義する。
 
 ## スコープ
 
@@ -38,6 +40,7 @@ current `install_root`は2 managed skillsと`.github/workflows/ci.yml`を配布�
 - artifact build invocation、digest、source SHA、retention、cross-job reuse
 - public deprecation window
 - 後続install/update IssueとCI Issueへ分けたremoval / change receipt
+- external required-check transition receiptとhuman review gate ownership
 
 対象外:
 
@@ -52,6 +55,7 @@ current `install_root`は2 managed skillsと`.github/workflows/ci.yml`を配布�
 - lane triggerが曖昧だと同じnode / artifact buildを複数laneで繰り返す。
 - artifact digest / source SHAが束縛されないと別candidateのevidenceを混在できる。
 - GitHub-hosted runnerが2 vCPU hard quotaを保証しない場合、reference measurementを別container / runnerへ分離する必要がある。
+- repository workflowとexternal required contextsを同時変更できると仮定すると、gate空白または永続pendingを作り得る。
 
 ## 受け入れ条件
 
@@ -63,6 +67,8 @@ current `install_root`は2 managed skillsと`.github/workflows/ci.yml`を配布�
 - [ ] missing artifact、digest mismatch、source SHA mismatchがfailする契約である。
 - [ ] public deprecation windowが必要な場合はversionまたはdateで確定している。
 - [ ] human PR merge gateを維持する。
+- [ ] required contextのstable name、external authority、変更ownerが確定している。
+- [ ] shadow GREEN / failure canary、old + new required、new-only required、old workflow removalのtransitionとrollbackが確定している。
 - [ ] accepted decisionがEpic Requirement / Design / Planへ反映されている。
 
 ## 制約・前提
