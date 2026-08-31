@@ -72,7 +72,7 @@ Sequence rules:
 1. exact clean `0.2.3` workspaceとmarkerless 2 slotsをbuilt baseline artifactから作る。
 2. clean migration、absent slots、exact slots、modified / foreign slotsを検証する。
 3. active legacy recoveryとunsupported legacyがwrite 0になることを検証する。
-4. target-scoped startup-injected Python audit-hook tripwire付きで旧`0.2.3`の`init --force`、update、tooling uninstall、`--remove-specs`を実行する。最初のmutation attemptをsyscall完了前にfailさせ、tripwire event 0を主証拠、tree digest不変を補助証拠としてmutation 0を証明する。
+4. Python filesystem eventsとexact 0.2.3の`ctypes.CDLL`経由Linux `renameat2` / macOS `renameatx_np`を覆うtarget-scoped startup composite tripwire付きで旧commandsを実行する。platformごとのnative positive controlをcall前に捕捉し、tripwire event 0を主証拠、tree digest不変を補助証拠としてmutation 0を証明する。
 5. mutationがあればfinal marker / formatを変更して再検証する。
 
 ### M5. Old product contract removal

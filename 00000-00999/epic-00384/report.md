@@ -37,7 +37,7 @@ ID: "epic-00384"
 - main push Full Regression、failure ledger、timing、sharder、policy skipsをfinal stateから撤去する。
 - required contextは既存名再利用を優先し、human merge gateを維持する。
 - uninstall後もfixed recordを`state=tooling-absent-preserved-data`として保持し、never-installed `absent`と識別する。reinstallはconsumer seed absenceを保持する。
-- old `0.2.3` mutation-zeroはtarget-scoped startup audit-hook tripwire event 0を主証拠、tree digest不変を補助証拠とする。
+- old `0.2.3` mutation-zeroはPython filesystem eventsとnative `renameat2` / `renameatx_np` callsを覆うtarget-scoped startup composite tripwire event 0を主証拠、native positive controlsの捕捉とtree digest不変を補助証拠とする。
 
 ## Planning verification
 
@@ -55,6 +55,8 @@ ID: "epic-00384"
 - Tailscale URL: `http://100.85.74.8:8765/epic-00384-provider-test-strategy-vertical-slices-guide.html`。sourceは新しいsingle-implementation-unit guideへのlive symlink。
 - first independent Strict specification review（session `required-strict-github-connector-verificati-566`、SHA `638404525610ea08c7b1ba95ed546939bfab6db9`）はP1を2件検出した。uninstall後record削除によるstate識別不能と、tree digestだけでは一時mutation attemptを検出できない点である。
 - 両P1を採用し、durable tooling-absent recordとtarget-scoped startup audit-hook tripwireをRequirement / Design / Plan / ADR / HTMLへ反映した。
+- second independent Strict re-review（same reviewer identity、session run `required-strict-github-connector-verificati-572`、SHA `41ebcd9e068138f7a06ab924b2c2ca977b3af61e`）は、4 roots / 2 slots限定表現がfixed record / seed creationと矛盾する点と、Python audit hookがexact 0.2.3のnative rename pathを捕捉しない点をP1として検出した。
+- 両P1を採用し、固定mutation setを4 roots、2 slots、fixed record、fresh-init-only seed creationへ明確化し、tripwireをnative `renameat2` / `renameatx_np`とpositive controlsまで覆うcomposite detectorへ修正した。
 
 ## Remaining lifecycle gates
 

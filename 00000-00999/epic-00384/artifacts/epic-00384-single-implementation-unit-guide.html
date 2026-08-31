@@ -390,7 +390,7 @@ end note
 
     <section>
       <h2>4. 確定した所有境界</h2>
-      <p>providerは4 roots、2 slots、small recordだけを管理します。user data、unknown paths、shared parentを管理対象へ広げません。small recordはuninstall後も<code>tooling-absent-preserved-data</code>として残り、never-installed <code>absent</code>と区別します。</p>
+      <p>providerの固定mutation setは4 roots、2 slots、small record、fresh init時だけの2 seed作成です。seedは作成後consumer-ownedとなり、update / reinstall / uninstallでは変更しません。user data、unknown paths、shared parentを管理対象へ広げません。small recordはuninstall後も<code>tooling-absent-preserved-data</code>として残り、never-installed <code>absent</code>と区別します。</p>
       <script type="text/plain" class="plantuml-source" id="source-ownership" data-target="diagram-ownership">
 @startuml
 title Provider toolingの所有境界
@@ -494,7 +494,7 @@ end note
         <li><strong>M1 Successor contract freeze:</strong> ownership、record、marker、legacy recognizer、CLI result、lane ownershipをtest-firstで固定します。</li>
         <li><strong>M2 Minimal lifecycle core:</strong> no-follow binding、stage、ready / incomplete / durable tooling-absent record、root / slot replacement、fault seamsを実装します。</li>
         <li><strong>M3 Combined public cutover:</strong> init / update / uninstall / reinstallとpublic docsをfinal servicesへ接続し、reinstallがfresh-init-only seedsを再作成しないことを固定します。</li>
-        <li><strong>M4 Legacy / downgrade proof:</strong> exact 0.2.3 migration、unsupported block、old-package mutation-zeroをbuilt artifactで証明します。mutation-zeroはtarget-scoped startup audit-hook tripwire event 0が主証拠で、tree digest不変は補助証拠です。</li>
+        <li><strong>M4 Legacy / downgrade proof:</strong> exact 0.2.3 migration、unsupported block、old-package mutation-zeroをbuilt artifactで証明します。mutation-zeroはPython filesystem eventsとnative <code>renameat2</code> / <code>renameatx_np</code>を覆うstartup composite tripwire event 0が主証拠です。native positive controlsのcall前捕捉とtree digest不変も必須です。</li>
         <li><strong>M5 Old product / test removal:</strong> successor proof後だけper-file engine、journal、purge、historical testsを削除します。</li>
         <li><strong>M6 Failure / portfolio consolidation:</strong> active 26 nodesをterminal化し、ledgerとpolicy skipをなくします。</li>
         <li><strong>M7 Build-once gate:</strong> one build、Linux canonical、macOS delta、metrics、duplicate detectorを実装します。</li>
@@ -540,12 +540,12 @@ end note
     <section>
       <h2>9. 受け入れ条件</h2>
       <ul>
-        <li>4 roots / 2 slots以外へprovider mutation authorityがありません。</li>
+        <li>provider mutation authorityが4 roots、2 slots、fixed record、fresh-init-onlyの2 seed作成に限定され、seedへのupdate / reinstall / uninstall authorityがありません。</li>
         <li>user history、<code>.workbench</code>、unknown non-target、unrelated skills、consumer seedsがbyte-identicalです。</li>
         <li>fresh、exact 0.2.3 migration、update、tooling uninstall、reinstallがbuilt wheelでGREENです。</li>
         <li>uninstall後のdurable recordがnever-installed absentと識別され、reinstallがconsumer seedsを再作成しません。</li>
         <li>active legacy recovery、unsupported / foreign / symlink stateはmutation 0でblockされます。</li>
-        <li>old 0.2.3 packageのmutating commandsがtarget-scoped audit-hook tripwire event 0かつtree digest不変です。</li>
+        <li>old 0.2.3 packageのmutating commandsがcomposite tripwire event 0かつtree digest不変で、native <code>renameat2</code> / <code>renameatx_np</code> positive controlsがcall前に捕捉されます。</li>
         <li><code>--remove-specs</code>は全modeでmutation 0、exit 2です。</li>
         <li>seeded root / slot fault後にsame-candidate rerunで収束し、cross-intent rerunをblockします。</li>
         <li>unexpected failures、approved failures、policy skips、duplicate nodesがすべて0です。</li>
