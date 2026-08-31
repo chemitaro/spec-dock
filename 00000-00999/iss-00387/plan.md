@@ -3,7 +3,7 @@
 ID: "iss-00387"
 タイトル: "Current Surface Workflow Residue Cleanup"
 関連GitHub: ["#387"]
-状態: "approved"
+状態: "draft"
 最終更新: "2026-08-31"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00356", "init-local-00003"]
@@ -17,463 +17,599 @@ ID: "iss-00387"
 
 **standard**を選択する。
 
-理由:
-
-- public CLIの追加・削除やdata migrationはない。
-- 変更はCurrent docs、placeholder、内部request shape、package/test hygieneに限定される。
-- ただしprovider/dogfood projection、`issue start` checkout ordering、package inventory、Historical/Epic #384境界を横断するためlightでは不足する。
+- public CLIの追加・削除、data migration、distribution architecture変更はない。
+- Current docs、placeholder、内部request、package config、retirement-only test supportを横断する。
+- Historical authorityとtest copy、surviving behaviorとabsence assertionを誤分類すると過剰削除またはtest debtを招くため、lightでは不足する。
 - security、不可逆data、external API、release architectureを変更しないためstrict/criticalは不要である。
 
-再評価条件:
+次のいずれかが判明したら実装を止め、R/D/Pを再評価する。
 
-- `checkout_active_target()`のbehavior変更が必要になる。
-- distribution ownership、uninstall、journal、Full Regression policyの変更が必要になる。
-- user-owned dataまたはHistorical evidenceのmigrationが必要になる。
-- public CLI contractを変更する必要が判明する。
+- `checkout_active_target()`のbehavior変更が必要。
+- public CLI contractを変更する必要がある。
+- test lane、marker、shard、timing、provider workflow、managed distributionの再設計が必要。
+- authoritative Historical evidenceまたはuser-owned dataのmigrationが必要。
+- 新規testでなければ観測できないsurviving behavior riskが判明。
 
-いずれかが成立した場合は実装を止め、本Issueのscope変更ではなくEpic #384または別Issueへのhandoffを優先する。
-
-## 2. 目標と実施状態
+## 2. 目標、現在地、計画改訂
 
 ### 2.1 目標
 
-Current surfaceを親Epic #356の契約へ収束させ、Luna Max coderがTDDで最小実装を行い、human merge gateへ渡せるcandidateを作る。
+Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、退役機能の不在だけを証明するtest、fixture、helper、scanner、mutation、定数も撤去する。残る正のbehaviorだけを既存testで検証し、削除確認は本Planのone-time checklistとReportで完結させる。
 
-### 2.2 現在の状態
+### 2.2 現在地
 
-- Issue作成、依存設定、`issue start`: 実施済み
-- Requirement/Design/Planの具体化: 本計画作成時点で実施中
-- production implementation: 未着手
-- RED/GREEN test: 未着手
-- quality verification、PR: 未着手
+- Issue作成、依存設定、`issue start`: 実施済み。
+- initial Requirement/Design/PlanとStrict review: 実施済み。
+- test-withdrawal方針のStrict分析: SHA `7acaf40fff273c292c12111b81e11d997dbe18cd`で実施済み。
+- 本改訂後のspec review: 未実施。
+- production implementation、test/support撤去、verification、PR: 未着手。
 
-以後の実施結果は本欄を書き換えて捏造せず、`report.md`へ実測として記録する。
+実装結果はこの現在地を過去に遡って書き換えず、§15のstatus ledgerと`report.md`へ実測として追記する。
 
-## 3. 依存と実装原則
+### 2.3 改訂履歴
 
-- `iss-00357`〜`iss-00360`は完了済みで、本Issueのdependency readinessは成立している。
-- production writerは一人とし、step/milestone単位で引き継ぐ。
-- 各behavior stepは必ずRED → GREEN → REFACTORの順で行う。
-- provider sourceを先に編集し、dogfood projectionを同期する。
-- 既存test file/helperを優先し、新しいframeworkやglobal scannerを作らない。
-- 実行していないtestをpassと記録しない。
-- Epic #384所有fileに差分を作らない。
+| 日付 | 変更 | 既実施作業への影響 |
+|---|---|---|
+| 2026-08-31 | initial planはTDDでCurrent drift guard、absence assertion、mutation testを追加する方針だった | implementation未着手のため実施済みstepなし |
+| 2026-08-31 | user判断とChatGPT Use Strict分析により、test-addition drivenからevidence-driven retirementへ変更 | 旧S01/S03/S05/S06は未実施のまま廃止。完了扱いにしない |
 
-## 4. Milestone
+## 3. 実装原則
+
+1. production writerは一人とし、milestone単位で引き継ぐ。
+2. provider sourceを先に編集し、dogfood projectionを同期する。
+3. 廃止機能と、その不在・無視だけを証明するtest supportを一体で撤去する。
+4. 文書、設定、dead residue、retirement-only supportの削除に新しいRED testを作らない。
+5. surviving behaviorは既存のpositive testを保持・最小更新する。既存testが十分なら追加しない。
+6. mixed-purpose testはtest全体を削除せず、retirement-only assertionだけを除く。
+7. test名、旧語彙、Issue番号だけで削除を判断しない。consumer、observed behavior、failure semanticsを確認する。
+8. authoritative Historical evidenceを変更しない。test copy/synthetic fixtureはauthorityではない。
+9. Epic #384所有file、test architecture、distribution semanticsへ差分を作らない。
+10. 実行していないcommand、policy skip、未collection testをPASSにしない。
+11. checklist用の新しいrepository script、scanner、fixture、test helperを作らない。
+12. 一時物はWorkbenchまたは`mktemp -d`に置き、証拠転記後に本Issue所有物だけを片付ける。
+
+## 4. 検証分類と禁止事項
+
+| Class | 例 | このIssueでの扱い |
+|---|---|---|
+| A: surviving positive behavior | selection-only、issue start ordering/failure、retained CLI、parity、package output | 既存automated testを保持・最小更新 |
+| B: one-time retirement evidence | 旧文言、旧field、dead config、orphan ref、no-touch diff | 本checklistで`rg`、AST、diff、build、fresh initを実行しReportへ記録 |
+| C: retirement-only support | removed route/module/field inventory、phrase scanner、Historical exclusion、legacy mutation、test copy | consumer確認後に削除。mixed testはClass A部分だけ残す |
+
+次を新しいautomated testとして追加してはならない。
+
+- README、placeholder、overviewに旧語句がないこと。
+- deleted field、module、path、glob、flagがないこと。
+- removed routeがparser errorになること。
+- Historical fileがscanner対象外であること。
+- detectorがsynthetic旧語句を検出すること。
+- `checkout_active_target()`のsource text/hashが不変であること。
+
+## 5. Test budgetと撤退会計
+
+implementation baselineとfinal candidateで同じ方法により次を記録する。
+
+- collected test count。
+- tracked `tests/**/*.py` LOC。
+- tracked test file数。
+- tracked fixture file数。
+- added/deleted production LOC。
+- added/deleted test/support LOC。
+
+合格条件:
+
+1. test count、test LOC、test file数、fixture file数はいずれも純増しない。
+2. retirement candidate decision coverage `decided / discovered = 1.0`。
+3. `remove`判定candidateのclosure `removed / removable = 1.0`。
+4. surviving behaviorの唯一の観測手段を削除していない。
+5. `deleted test LOC / max(1, deleted production LOC)`を情報として記録する。閾値は設けない。
+6. removable test supportが存在する場合、test/support deletionは0より大きい。
+
+例外は実装前のR/D/P改訂と再reviewを必要とする。本計画では新規test追加例外を予定しない。
+
+## 6. Checklistの実行規約
+
+各checkは次のfieldを持つ。
+
+- **対象 / 目的**: 何を、なぜ確認するか。
+- **前提**: 実行可能になる条件。
+- **操作**: source/docs/testへの変更。
+- **確認**: 実行するcommandまたは目視対象。
+- **期待結果**: PASSの観測可能な条件。
+- **証拠**: Reportへ転記する要約。
+- **停止条件**: 続行せずmain agentへ返す条件。
+- **cleanup**: 削除するtemporary/orphan item。
+
+状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`だけを使う。各milestone完了時に§15を更新する。長いstdout/stderrをPlanへ貼らず、command、exit、count、主要observed resultをReportへ記録する。
+
+## 7. Milestone
 
 | Milestone | 内容 | Exit |
 |---|---|---|
-| M0 | baseline/proof | exact SHA、target path、definition-only/phantom proofを記録 |
-| M1 | Current text convergence | active-none、README、overviewのRED/GREENとparity |
-| M2 | active request contraction | target-only request、selection-only、issue start非回帰 |
-| M3 | package/test hygiene | stale config除去、conditional constants判定、clean build |
-| M4 | integrated guard | Current inventory、Historical exclusion、focused/ordinary checks |
-| M99 | final handoff | current verifier、fresh consumer、diff audit、Report、PR-ready candidate |
-
-## 5. S00 — Baselineと削除proof（M0）
-
-### 5.1 目的
-
-実装開始点とscopeを固定し、条件付き削除を推測で行わない。
-
-### 5.2 Read-only確認
-
-```bash
-git status --short
-git rev-parse HEAD
-git branch --show-current
-git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'
-git rev-parse '@{upstream}'
-./spec-dock/scripts/spec-dock active show
-./spec-dock/scripts/spec-dock deps check --id iss-00387 --github --json
-```
-
-期待:
-
-- branchは`iss-00387-current-surface-workflow-residue-cleanup`。
-- worktreeはimplementation開始前にclean。
-- local HEADとupstreamが一致。
-- active Issueは`iss-00387`。
-- dependency readinessは`true`。
-
-### 5.3 Inventory
-
-```bash
-rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' \
-  README.md src/spec_dock/assets/spec_dock spec-dock tests
-
-rg -n 'tests.cli_runtime.test_delegated_authoring|assets/install_root/.codex/\*\*' \
-  pyproject.toml
-
-rg -n '_ISSUE_359_EXPECTED_CODEX_CONFIG|_REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS' \
-  tests/unit/infra/test_init_update.py
-```
-
-### 5.4 Conditional deletion proof
-
-definition-only候補ごとにASTの`Name(ctx=Load)`とrepository-wide referenceを確認する。dynamic lookupの可能性を否定できなければ保持する。判定と根拠を後でReportへ記録する。
-
-package-data globは次を確認する。
-
-- `src/spec_dock/assets/install_root/.codex`が存在しない。
-- current `.agents`と`.github`が存在する。
-- clean baseline buildのarchiveに`.codex` entryがない。
-
-### 5.5 Exit
-
-- implementation baseline SHAを記録。
-- exact対象pathとno-touch pathを確定。
-- 条件付き候補ごとに`delete`または`retain`を証拠付きで決定。
-
-## 6. S01 — TDD: Current text drift guard（M1 RED）
-
-### 6.1 Test ownership
-
-主に`tests/unit/infra/test_authoring_kit_assets.py`を使う。package projectionに既存assertionがある場合だけ`tests/unit/infra/test_init_update.py`を補助的に使う。
-
-### 6.2 先に追加する失敗test
-
-1. active-none三scopeのprovider contentがminimal placeholderと一致する。
-2. provider/dogfood pairがbyte一致する。
-3. root READMEに`active set --checkout`のCurrent案内とEAL必須説明がない。
-4. root READMEにselection-only、`issue start`、canonical rewrite説明がある。
-5. Authoring overviewが二skillを現在形で案内し、Issue #359未来形を含まない。
-6. Current vocabulary inventoryにHistorical path/fixtureと`docs/migration.md`が含まれない。
-7. `docs/migration.md`はCurrent vocabulary scanから外れても、既存のlink/parity検証対象には残る。
-8. synthetic旧phraseをCurrent detectorへ渡すと違反になり、migration-only sampleはCurrent detectorへ渡されない。
-
-Test名はIssue番号だけでなくdurable contractを表す。例:
-
-```text
-test_active_none_reports_are_minimal_current_placeholders
-test_root_readme_describes_selection_only_active_contract
-test_current_authoring_surfaces_exclude_historical_evidence
-```
-
-### 6.3 RED確認
-
-```bash
-uv run pytest tests/unit/infra/test_authoring_kit_assets.py -q
-```
-
-追加testが現行残滓を理由に失敗することを確認する。test setup errorやpath typoによる失敗はREDとして採用しない。
-
-## 7. S02 — GREEN: Current docs/placeholder（M1 GREEN/REFACTOR）
-
-### 7.1 Provider-first実装
-
-1. provider active-none report三件をDesign §3.3のminimal contentへ縮小する。
-2. root READMEから`active set --checkout`のexample/recovery/normalization案内を除き、`issue start`へ置換する。
-3. root READMEのEAL必須説明をevidence review + canonical rewriteへ置換する。
-4. provider Authoring overviewを二skillの現在形へ更新する。
-5. provider変更を対応dogfood pathへ同期する。
-
-### 7.2 変更禁止
-
-- Historical guide/fixture/initiative history
-- installed skill本文
-- consumer/provider workflow
-- migration-only説明
-- active-none directory/file構造
-
-### 7.3 GREEN
-
-```bash
-uv run pytest tests/unit/infra/test_authoring_kit_assets.py -q
-```
-
-```bash
-cmp src/spec_dock/assets/spec_dock/docs/authoring/overview.md \
-  spec-dock/docs/authoring/overview.md
-
-for scope in initiative epic issue; do
-  cmp \
-    "src/spec_dock/assets/spec_dock/system/active-none/$scope/report.md" \
-    "spec-dock/system/active-none/$scope/report.md"
-done
-```
-
-### 7.4 REFACTOR/Exit
-
-- exact placeholder mappingをtest内で一か所にまとめる。
-- repository-wide raw word banやproduction validatorを作らない。
-- M1の全Current text assertionとparityがgreen。
-
-## 8. S03 — TDD: active selection contract（M2 RED）
-
-### 8.1 Test ownership
-
-- `tests/unit/application/test_set_active.py`
-- `tests/cli_runtime/test_storage_core_cli.py`
-- 必要なordering非回帰だけ`tests/cli_runtime/test_issue_lifecycle.py`
-
-### 8.2 先に追加/更新する失敗test
-
-1. `dataclasses.fields(ActiveSetArgs)`が`target_ref`, `target_display`だけ。
-2. `dataclasses.fields(SetActiveRequest)`が`target`だけ。
-3. fail-fast fake Git/GitHub/dependency portを渡しても`set_active()`が呼ばない。
-4. `set_active()`のresultは`branch is None`。
-5. CLI `active set`のpositional/`--id`/`--github-issue`は従来どおり成功する。
-6. CLI helpに`--checkout`、`--force`、network flagが現れない。
-7. `issue start`はdependency check後にcheckoutし、checkout後にactive writeする。
-
-### 8.3 RED
-
-```bash
-uv run pytest tests/unit/application/test_set_active.py -q
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/cli_runtime/test_storage_core_cli.py -q
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/cli_runtime/test_issue_lifecycle.py -q
-```
-
-field shape testが旧fieldを理由に失敗することを確認する。既存full-regression testはpermission flagを明示して実行する。
-
-## 9. S04 — GREEN: target-only request（M2 GREEN/REFACTOR）
-
-### 9.1 編集順
-
-1. provider `commands/active.py`
-   - `ActiveSetArgs`を二fieldへ縮小。
-   - `_active_set_args()`のhidden default extractionを削除。
-   - `_run_active_set()`は`SetActiveRequest(target=...)`だけを生成。
-2. provider `application/contracts.py`
-   - `SetActiveRequest`を`target`だけへ縮小。
-3. provider `application/set_active.py`
-   - conditional checkout blockを削除。
-   - `branch=None`で既存result shapeを返す。
-   - `checkout_active_target()`は無変更。
-4. provider `application/issue_lifecycle.py`
-   - checkout後のcall siteをtarget-only requestへ更新。
-5. provider runtime変更をdogfood runtimeへ同期。
-6. 全`SetActiveRequest(...)` call siteをrepository searchで更新。
-
-### 9.2 GREEN
-
-S03の三commandを同じpermission flag付きで再実行する。特にCLI testをpolicy skipでGREEN扱いしない。
-
-```bash
-uv run pytest tests/unit/application/test_set_active.py -q
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/cli_runtime/test_storage_core_cli.py -q
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/cli_runtime/test_issue_lifecycle.py -q
-```
-
-加えて:
-
-```bash
-rg -n 'SetActiveRequest\(' src/spec_dock/assets/spec_dock/scripts spec-dock/scripts tests
-
-cmp \
-  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py \
-  spec-dock/scripts/spec_dock_runtime/application/set_active.py
-```
-
-### 9.3 No-change proof
-
-implementation baselineと比較し、`checkout_active_target()`のsignature/body/docstringに差分がないことを確認する。functionを別helperへ移すことも禁止する。
-
-### 9.4 REFACTOR/Exit
-
-- unused imports/fieldsだけを除く。
-- `ActiveSetResult`等のunrelated result shapeを整理しない。
-- M2 test、provider/dogfood parity、helper no-diffがgreen。
-
-## 10. S05 — TDD/GREEN: package/test hygiene（M3）
-
-### 10.1 RED test
-
-既存`tests/unit/infra/test_init_update.py`へ、次を確認するfocused assertionを追加する。
-
-- stale mypy module entryがない。
-- phantom `.codex/**` package-data globがない。
-- current `.agents/**`と`.github/**` package-dataがある。
-- source `install_root/.codex`が存在しない。
-
-```bash
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/unit/infra/test_init_update.py -k 'package_data or install_root' -q
-```
-
-現行stale entryにより追加assertionが失敗することを確認する。
-
-### 10.2 GREEN
-
-1. `pyproject.toml`から対象二entryだけを削除。
-2. S00 proofが成立したdefinition-only constantだけを削除。
-3. unrelated config、Historical path mapping、Full Regression selectorを変更しない。
-
-### 10.3 Verification
-
-```bash
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/unit/infra/test_init_update.py -k 'package_data or install_root' -q
-make lint
-uv run pytest --collect-only -q
-```
-
-clean buildはrepository既存の安全なbuild commandを使う。既存`build/`/`dist/`を削除する必要がある場合は、対象pathを確認し、本Issueのbuild artifactだけであることを確認してから行う。
-
-```bash
-uv build
-python -m zipfile -l dist/*.whl
-tar -tf dist/*.tar.gz
-```
-
-archiveにcurrent二skillと`ci.yml`があり、`install_root/.codex`がないことを確認する。
-
-### 10.4 Exit
-
-- stale configがない。
-- current package inventoryが維持される。
-- definition-only候補のdelete/retain判断が証拠付きで確定。
-- M3 focused test、lint、collection、buildがgreen。
-
-## 11. S06 — Integrated guard refactor（M4）
-
-### 11.1 Consolidation
-
-- Current text inventoryを一つのexplicit tuple/mappingへ整理。
-- Historical path/fixtureと`docs/migration.md`をCurrent vocabulary inventoryから除外するassertionを固定。
-- migration文書の既存link/parity testは保持し、Current vocabulary scanだけを分離する。
-- public CLI、application behavior、issue-start orderingの重複assertionを減らす。
-- source substringだけでbehaviorを証明せずfail-fast port testを残す。
-- Issue-specific temporary helperを増やさない。
-
-### 11.2 Focused verification
-
-```bash
-uv run pytest \
-  tests/unit/infra/test_authoring_kit_assets.py \
-  tests/unit/application/test_set_active.py -q
-
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/cli_runtime/test_issue_lifecycle.py \
-  tests/cli_runtime/test_storage_core_cli.py -q
-
-uv run pytest --run-full-regression --full-regression-shard \
-  tests/unit/infra/test_init_update.py \
-  -k 'active_none or package_data or install_root' -q
-```
-
-`-k`使用時はcollection outputで必要testが選択されていることを確認する。
-
-### 11.3 Exit
-
-- Current violation mutation test、実file test、Historical exclusionがgreen。
-- new production abstractionとtest lane config差分がない。
-
-## 12. S90 — Package/fresh consumer integration
-
-### 12.1 Fresh init
-
-```bash
-TMP_ROOT="$(mktemp -d)"
-CONSUMER="$TMP_ROOT/consumer"
-mkdir -p "$CONSUMER"
-uvx --no-cache --from . spec-dock init "$CONSUMER"
-```
-
-### 12.2 Verification
-
-- consumerのactive-none三件とoverviewがprovider sourceと一致する。
-- `active set --help`はselection-onlyで、`--checkout`を受理しない。
-- `issue start --help`が存在する。
-- installed assetはcurrent二skillとconsumer `ci.yml`。
-- retired `.codex` assetを生成しない。
-- consumer `spec-dock validate`が成功する。
-
-live GitHubを必要とするcommandはfresh consumer smokeで実行しない。
-
-### 12.3 Exit
-
-distribution implementationへ差分を作らず、built packageからCurrent contractを再現できる。
-
-## 13. S99 — Final verificationとhandoff（M99）
-
-### 13.1 Static/focused/ordinary
-
-```bash
-make lint
-git diff --check
-uv run pytest
-```
-
-ordinary laneのpass/skip/failure数とdurationを実測どおり記録する。policy skipをexecuted passと数えない。
-
-### 13.2 SpecDock
-
-```bash
-./spec-dock/scripts/spec-dock validate
-./spec-dock/scripts/spec-dock sync --no-github
-./spec-dock/scripts/spec-dock validate
-```
-
-sync後のtracked diffを確認し、本Issue外のgenerated changeをcommitしない。
-
-### 13.3 Current Full Regression
-
-現行policyを変更せず、repositoryが定めるcurrent verifierを実行する。
-
-```bash
-uv run python -m scripts.quality.verify_full_regression --shards 4
-```
-
-failure時は本Issue差分を修正し、ledger/timing/shard/provider workflowを変更しない。Epic #384の将来計画を理由にfailureを無視しない。
-
-### 13.4 Diff audit
-
-implementation baselineからのchanged pathを列挙する。次に差分がないことを確認する。
-
-- `src/spec_dock/managed_distribution.py`
-- `src/spec_dock/assets/managed_distribution.json`
-- `src/spec_dock/cli.py`
-- current二skillとconsumer CI
-- provider CI/Full Regression workflow
-- ledger/timing/scripts/quality/test lane config
-- Historical guide/fixtureと他Issueの履歴
-
-本Issue historyの許可deltaはR/D/P/Reportだけとする。
-
-### 13.5 Report
-
-`report.md`の薄い三sectionへ実測だけを記録する。
-
-- Outcome: actual changed filesと残滓除去結果
-- Verification: command、pass/skip/failure、package/fresh consumer。version管理Reportへfinal commit SHAは記録しない
-- Residual Risks / Follow-ups: conditional candidate判断、Epic #384 handoff、未実施事項
-
-長いlog、仕様、意思決定履歴をReportへ複製しない。
-
-### 13.6 Delivery
-
-1. commit identityをrepository contractと照合。
-2. explicit pathだけをstage。
-3. focused commitを作成しpush。
-4. このcommit後に確定したfinal candidate SHAを、version管理ReportではなくPR本文またはhandoff evidenceへ記録する。SHA記録のための追加commitは作らない。
-5. Issue #387を参照するPRを作成する。
-6. independent ChatGPT code review/Final Quality Gateを固定SHAで実施し、指摘があればTDDで修正・再reviewする。修正commit後は新しいSHAをPR/handoff evidenceで更新する。
-7. merge-ready状態で停止する。agentはmergeしない。
-8. human merge前に`issue finish`を実行しない。
-
-## 14. Rollback / forward recovery
-
-- docs/placeholder、active request、package hygieneを小さいcommit境界に分け、各境界を独立revert可能にする。
-- active request regressionはpublic `active set --checkout`を復活させず、call siteをforward-fixする。
-- package inventory欠落は対象config変更だけを戻し、managed manifestへad hoc entryを追加しない。
-- Historical false positiveはHistorical contentではなくCurrent inventoryを修正する。
-- Epic #384 overlapは本Issueから除外し、old/new dual modeを作らない。
-
-## 15. Exit / handoff
-
-次をすべて満たしたとき、Luna Max coderからmain orchestratorへ返す。
-
-- I387-AC01〜AC15のevidenceがある。
-- REDを確認したbehavior testがGREENになっている。
-- provider/dogfood parityと`checkout_active_target()` no-diffが確認済み。
+| M0 | admission、baseline、consumer map | exact baseline、test metrics、candidate分類、no-touch pathを確定 |
+| M1 | Current docs/placeholder撤退 | provider-first更新、parity、one-time content review、Historical no-touch |
+| M2 | active request contraction | target-only、legacy checkout seam/test撤去、positive behavior GREEN |
+| M3 | package/config hygiene | stale entry削除、definition proof、clean archive inventory |
+| M4 | retirement-only test/support withdrawal | 全candidateをremove/retain分類し、orphan supportを撤去 |
+| M5 | surviving behavior/integration | focused、lint、ordinary、build、fresh init、current verifier |
+| M99 | audit/handoff | test budget、scope、Report、Strict gate、merge-ready PR |
+
+## 8. M0 — Admission、baseline、consumer map
+
+### C00-01 — Git/Issue固定点
+
+- **対象 / 目的:** implementation baselineを一意にする。
+- **前提:** 改訂R/D/PがStrict reviewを通過し、commit/push済み。
+- **操作:** 変更しない。
+- **確認:** `git status --short`、`git branch --show-current`、`git rev-parse HEAD`、`git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'`、`git rev-parse '@{upstream}'`を別々に実行する。
+- **期待結果:** clean、branch=`iss-00387-current-surface-workflow-residue-cleanup`、HEAD=upstream。HEADを`<implementation-baseline-sha>`として以後のdiffへ使用する。
+- **証拠:** branch、full SHA、clean status。
+- **停止条件:** dirty、detached、upstream不一致、Git operation/lock。
+- **cleanup:** なし。
+
+### C00-02 — Active/dependency readiness
+
+- **対象 / 目的:** 正しいIssueで実装可能か確認する。
+- **前提:** C00-01 PASS。
+- **操作:** 変更しない。
+- **確認:** `./spec-dock/scripts/spec-dock active show`、`./spec-dock/scripts/spec-dock deps check --id iss-00387 --github --json`。
+- **期待結果:** active Issue=`iss-00387`、ready=`true`。
+- **証拠:** resolved canonical path、dependency result。
+- **停止条件:** target ambiguity、not ready、GitHub/local state conflict。
+- **cleanup:** なし。
+
+### C00-03 — Change/no-touch inventory
+
+- **対象 / 目的:** 変更可能pathと保護pathを固定する。
+- **前提:** C00-02 PASS。
+- **操作:** Requirement §4とDesign §5のknown candidateを実pathへ解決する。
+- **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue' tests`。
+- **期待結果:** candidate path、surviving consumer、no-touch pathが一覧化される。
+- **証拠:** inventory表をReportへ要約。
+- **停止条件:** candidateがEpic #384またはauthoritative historyだけに存在する。
+- **cleanup:** なし。
+
+### C00-04 — Before test metrics
+
+- **対象 / 目的:** test純増と撤退量の比較基準を採取する。
+- **前提:** clean baseline。
+- **操作:** 変更しない。
+- **確認:** `uv run pytest --collect-only -q`、`git ls-files tests`、`git ls-files tests/fixtures`。tracked Python test LOCは最初のlistingから明示pathを`wc -l`へ渡して集計する。
+- **期待結果:** collected count、test LOC、test file数、fixture file数が再現可能に記録される。
+- **証拠:** `metrics-before`四値、skip/errorの有無、command。
+- **停止条件:** collection error、generated/untracked testを混入、集計母集団が不明。
+- **cleanup:** pytest cacheはM99で本Issue生成分だけ確認する。
+
+### C00-05 — Retirement candidate decision ledger
+
+- **対象 / 目的:** test/supportを名前だけで削除しない。
+- **前提:** C00-03/04 PASS。
+- **操作:** 各candidateについて定義、参照、fixture input、observed behaviorを調べ、`remove`、`retain(surviving consumer)`、`split`へ分類する。
+- **確認:** `rg -n '<candidate-symbol-or-path>' tests src/spec_dock spec-dock`をcandidateごとに実行し、必要なPython symbolはAST上のLoad/importも確認する。
+- **期待結果:** discovered candidate全件にdecision、consumer、予定操作がある。
+- **証拠:** Reportのdecision ledger。coverage=`1.0`。
+- **停止条件:** dynamic import/discovery、唯一のfailure semantics、canonical authorityか不明。
+- **cleanup:** なし。
+
+### C00-06 — Historical authority/test-copy分類
+
+- **対象 / 目的:** 履歴を保全しつつtest copyを聖域化しない。
+- **前提:** C00-05実行中。
+- **操作:** `spec-dock/initiatives/**`、accepted ADR、Historical guideをauthority、`tests/fixtures/**`とsynthetic mutationをtest infrastructureとして分類する。
+- **確認:** fixture参照とcanonical copy元を`rg`/path inspectionで確認する。
+- **期待結果:** authorityはno-touch、test copyはconsumer有無でremove/retain判断。
+- **証拠:** path別classification。
+- **停止条件:** fixture自体が唯一のcanonical source、runtime input、external compatibility fixture。
+- **cleanup:** なし。
+
+### C00-07 — Baseline package inventory
+
+- **対象 / 目的:** phantom `.codex/**`判定を実物で行う。
+- **前提:** baseline clean。
+- **操作:** clean buildを既存commandで作る。
+- **確認:** `uv build`、`python -m zipfile -l <exact-wheel-path>`、`tar -tf <exact-sdist-path>`。source `install_root`、wheel、sdistを比較する。
+- **期待結果:** current `.agents/**`と`.github/**`があり、live `.codex/**` assetがない。
+- **証拠:** exact artifact pathとinventory summary。
+- **停止条件:** live `.codex` source/consumer、stale artifactをbaselineとして使用、build failure。
+- **cleanup:** baseline build artifactはinventory採取後にownershipを記録し、M99で片付ける。
+
+### C00-08 — Admission decision
+
+- **対象 / 目的:** 推測削除を防ぐ最終gate。
+- **前提:** C00-01〜07完了。
+- **操作:** main agentがcandidate ledgerとstop conditionを確認する。
+- **確認:** checklist目視。
+- **期待結果:** 各milestoneのexact ownershipが確定し、未決candidateがない。
+- **証拠:** `GO`または`BLOCKED(reason)`。
+- **停止条件:** unresolved consumer、scope overlap、新規test例外の必要。
+- **cleanup:** なし。
+
+## 9. M1 — Current docs/placeholder撤退
+
+### C10-01 — active-none minimalization
+
+- **対象 / 目的:** 三scope placeholderから旧workflow schemaを除く。
+- **前提:** C00-08 GO。
+- **操作:** providerのinitiative/epic/issue `report.md`をDesign §3.3のminimal contentへ変更し、対応dogfoodへ同期する。
+- **確認:** providerとdogfood各pairを`cmp`し、6ファイルを目視する。
+- **期待結果:** active未設定、編集禁止、canonical Report pathだけを示し、pairがbyte一致。
+- **証拠:** changed paths、`cmp` exit 0、目視結果。
+- **停止条件:** placeholder構造変更、Historical/fixture変更が必要。
+- **cleanup:** 旧schemaを固定していたretirement-only test/supportはM4候補へ追加。
+
+### C10-02 — root README cleanup
+
+- **対象 / 目的:** Current lifecycleとArtifact authorityを正しく案内する。
+- **前提:** C00-08 GO。
+- **操作:** `active set --checkout`、recovery/normalization、EAL必須説明を削り、selection-only、`issue start`、evidence review + canonical rewriteへ置換する。
+- **確認:** 対象sectionを目視し、`rg -n 'active set .*--checkout|Evidence Adoption Ledger|EAL' README.md`をone-time確認する。
+- **期待結果:** Current手順が一意で、旧案内がCurrent instructionとして残らない。
+- **証拠:** section見出し、rg結果、diff summary。
+- **停止条件:** migration/history文脈まで消す必要がある、public CLI変更が必要。
+- **cleanup:** README phrase absence testは追加しない。
+
+### C10-03 — Authoring overview cleanup
+
+- **対象 / 目的:** 二skillを現在形で案内する。
+- **前提:** C00-08 GO。
+- **操作:** provider overviewのIssue #359未来形をCurrent説明へ変更しdogfoodへ同期する。
+- **確認:** `cmp src/spec_dock/assets/spec_dock/docs/authoring/overview.md spec-dock/docs/authoring/overview.md`と目視。
+- **期待結果:** 現在存在する二skillのpath/役割が現在形で一致。
+- **証拠:** cmp result、reviewed headings。
+- **停止条件:** installed skill本文の変更が必要。
+- **cleanup:** future wording absence testは追加しない。
+
+### C10-04 — Docs no-touch audit
+
+- **対象 / 目的:** authoritative historyとEpic #384境界を守る。
+- **前提:** C10-01〜03実装後。
+- **操作:** 変更しない。
+- **確認:** `<implementation-baseline-sha>`からHistorical guide、他Issue履歴、migration docs、Epic #384 docsをpath限定diffする。
+- **期待結果:** 本Issue R/D/P/Report以外のauthoritative history差分0。
+- **証拠:** diff exit/result。
+- **停止条件:** 一件でも意図しない差分。
+- **cleanup:** unintended diffだけを原因pathで修正する。historyを書き換えて合わせない。
+
+## 10. M2 — Active request contraction
+
+### C20-01 — Existing positive coverage baseline
+
+- **対象 / 目的:** 新規test不要を実証する。
+- **前提:** M1完了。
+- **操作:** 変更前に既存positive testsを特定・実行する。
+- **確認:** `uv run pytest tests/unit/application/test_set_active.py -q`、full-regression permission付きで`tests/cli_runtime/test_issue_lifecycle.py`と`tests/cli_runtime/test_storage_core_cli.py`を実行する。
+- **期待結果:** selection-only、three selector、invalid no-write、issue-start ordering/failureの既存観測点が確認できる。
+- **証拠:** test names、pass/skip/fail/count/duration。
+- **停止条件:** 必要behaviorを既存testが観測せず新規testが必要。
+- **cleanup:** なし。
+
+### C20-02 — Provider target-only implementation
+
+- **対象 / 目的:** internal seamをCurrent responsibilityへ合わせる。
+- **前提:** C20-01でpositive coverage確認済み。
+- **操作:** provider `ActiveSetArgs`を`target_ref,target_display`、`SetActiveRequest`を`target`だけに縮小し、`set_active()`のconditional checkoutを削除する。`issue_lifecycle.py`はcheckout後にtarget-only requestを渡す。
+- **確認:** `rg -n 'SetActiveRequest\(' src/spec_dock/assets/spec_dock/scripts spec-dock/scripts tests`、compile/lint、call-site review。
+- **期待結果:** repository内call siteがtarget-only、`branch=None`、provider-first。
+- **証拠:** changed symbols/call sites。
+- **停止条件:** external/public compatibility requirement、target-only化不能consumer。
+- **cleanup:** unused imports/fieldsのみ。
+
+### C20-03 — Dogfood projection and helper no-change
+
+- **対象 / 目的:** projection一致とcheckout owner維持。
+- **前提:** C20-02完了。
+- **操作:** provider runtimeをdogfoodへ同期する。
+- **確認:** relevant provider/dogfood filesを`cmp`し、baselineから`checkout_active_target()`のsignature/body/docstringをdiffする。
+- **期待結果:** projection一致、helper差分0。
+- **証拠:** cmp/diff result。
+- **停止条件:** helper変更またはdual modeが必要。
+- **cleanup:** なし。
+
+### C20-04 — Legacy checkout test/support withdrawal
+
+- **対象 / 目的:** internal checkout compatibility test debtを撤去する。
+- **前提:** issue-start positive ordering/failure testsを保持。
+- **操作:** `test_internal_checkout_request_preserves_issue_start_compatibility`を削除し、test request helperをtarget-onlyへ縮小する。専用Git stub/importはconsumer 0なら削除する。
+- **確認:** candidate symbolごとの`rg`、AST/import review、focused tests。
+- **期待結果:** internal checkout path専用test/supportなし、surviving positive testsは存在。
+- **証拠:** deleted test/helper、retained test names。
+- **停止条件:** stub/helperが他のcurrent failure semanticsで使用中。
+- **cleanup:** orphan imports/classes。
+
+### C20-05 — M2 positive verification
+
+- **対象 / 目的:** 残存behaviorの非回帰を確認する。
+- **前提:** C20-02〜04完了。
+- **操作:** 既存testを最小更新して実行する。field absence専用testは追加しない。
+- **確認:** C20-01と同じfocused commands。
+- **期待結果:** required testsが実行されGREEN。policy skipをPASSにしない。
+- **証拠:** names/count/durationとconstructor更新内容。
+- **停止条件:** 新しいabsence assertionでなければ通せない、ordering/failure regression。
+- **cleanup:** pytest cacheはM99。
+
+## 11. M3 — Package/config hygiene
+
+### C30-01 — Stale pyproject entries
+
+- **対象 / 目的:** phantom package/test configを除く。
+- **前提:** C00-07でlive consumerなし。
+- **操作:** `tests.cli_runtime.test_delegated_authoring` mypy overrideと`assets/install_root/.codex/**` package-data globだけを削除する。
+- **確認:** `rg -n 'tests.cli_runtime.test_delegated_authoring|assets/install_root/.codex/\*\*' pyproject.toml`とdiff review。
+- **期待結果:** 対象entryなし、`.agents/**`と`.github/**`は保持。
+- **証拠:** pyproject diff。
+- **停止条件:** live `.codex` asset/consumer、unrelated config変更が必要。
+- **cleanup:** stale entry absence testは追加しない。
+
+### C30-02 — Definition-only candidates
+
+- **対象 / 目的:** orphan test constantsを証拠付きで削除する。
+- **前提:** C00-05 ledgerにcandidateあり。
+- **操作:** reference 0、AST Load 0、dynamic discoveryなしの候補だけ削除する。
+- **確認:** candidateごとの`rg`、AST inspection、`uv run pytest --collect-only -q`、lint。
+- **期待結果:** removable candidate削除、retain candidateにはconsumer理由。
+- **証拠:** per-candidate decision。
+- **停止条件:** dynamic/reflection/fixture discoveryが不明。
+- **cleanup:** orphan import/helper。
+
+### C30-03 — Post-change package inventory
+
+- **対象 / 目的:** 配布物を不在testなしで確認する。
+- **前提:** C30-01/02完了。
+- **操作:** clean wheel/sdistを作り、source/wheel/sdist/installed resourceを比較する。
+- **確認:** `uv build`、exact artifactに対するzip/tar listing、既存full install-root inventory testまたはisolated install inspection。
+- **期待結果:** current二skillと`ci.yml`あり、retired `.codex`なし、四surface一致。
+- **証拠:** artifact path、inventory delta、build result。
+- **停止条件:** current asset欠落、Epic #384実装変更が必要。
+- **cleanup:** 本Issueのbuild/temp installのみM99で削除。
+
+## 12. M4 — Retirement-only test/support withdrawal
+
+### C40-01 — Removed CLI/runtime inventory family
+
+- **対象 / 目的:** 削除済み項目の不在リストを恒久維持しない。
+- **前提:** retained registry/import/parity testを特定済み。
+- **操作:** `REMOVED_HELP_ROUTES`、`REMOVED_RUNTIME_MODULES`、`REMOVED_APPLICATION_CONTRACT_SYMBOLS`、`REMOVED_USE_CASE_FIELDS`とabsence部分を削除する。mixed helperはretained imports/parityだけへ縮小する。
+- **確認:** symbol refs、remaining test names、focused storage-core test。
+- **期待結果:** removed inventory/absence assertionなし、retained CLI/runtime positive smokeあり。
+- **証拠:** deleted constants/assertions、retained tests。
+- **停止条件:** removalによりcurrent import/parity観測が消える。
+- **cleanup:** orphan `hashlib/os/subprocess/sys`等は実consumer確認後。
+
+### C40-02 — Removed route/flag negative tests
+
+- **対象 / 目的:** 廃止route/flagを永久に列挙するtestを撤去する。
+- **前提:** retained root/leaf help、selector success、invalid no-write coverageあり。
+- **操作:** `test_removed_routes_are_parser_errors_without_tree_or_state_writes`、direct `active set --checkout` parser-error test、helpの旧flag集合assertionを削除する。positive selector/assertionは残す。
+- **確認:** `rg`で旧route/flag negative assertion familyを確認し、remaining CLI testsを実行する。
+- **期待結果:** positive Current CLI testはGREEN、retirement-only negative testsなし。
+- **証拠:** removed/retained assertion list。
+- **停止条件:** invalid target no-writeやcurrent help inventoryまで失われる。
+- **cleanup:** `_tree_snapshot`等はremaining consumer確認後。
+
+### C40-03 — Authoring phrase scanner family
+
+- **対象 / 目的:** wording debtとscanner保守を撤去する。
+- **前提:** link/parity/current template schemaのpositive testsを分類済み。
+- **操作:** `CURRENT_LEGACY_VOCABULARY_PATTERNS`、`_current_vocabulary_violations()`、retirement-only forbidden detector、synthetic mutation/infix/Historical positive-control testを削除する。mixed testはpositive schema部分だけ残す。
+- **確認:** exact symbols/pattern familyを`rg`し、remaining `test_authoring_kit_assets.py`を実行する。
+- **期待結果:** phrase scanner/mutationなし、current links/parity/schema testsはGREEN。
+- **証拠:** removed helper/test/constantとretained test names。
+- **停止条件:** detectorがsecurity/schema invariantも担う、境界分離不能。
+- **cleanup:** orphan regex/constants/imports。
+
+### C40-04 — Legacy evidence mutation family
+
+- **対象 / 目的:** EAL/Assurance等の旧証跡を人工生成するtest supportを撤去する。
+- **前提:** issue lifecycle/doctorのcurrent positive behaviorを別testが観測。
+- **操作:** `S09_LEGACY_EVIDENCE_MUTATIONS`、`apply_s09_legacy_evidence_mutation` consumerを分類し、retirement-only tests/importsを削除する。consumer 0後に`s09_invariance.py`を削除する。
+- **確認:** `rg -n 'S09_LEGACY_EVIDENCE_MUTATIONS|apply_s09_legacy_evidence_mutation|s09_invariance' tests`、remaining doctor/lifecycle tests。
+- **期待結果:** refs 0、helper fileなし、current positive tests GREEN。
+- **証拠:** consumer map、deleted path。
+- **停止条件:** mutation testがcurrent validate/doctor failure semanticsの唯一の観測。
+- **cleanup:** orphan imports/parametrize data。
+
+### C40-05 — Issue-finish quality-evidence ignore tests
+
+- **対象 / 目的:** removed quality gateを読まないことだけを証明するtestを撤去する。
+- **前提:** ordinary `issue finish` success/failure testsを特定済み。
+- **操作:** `test_issue_finish_does_not_read_quality_evidence`、`test_issue_finish_ignores_heavy_report_and_assurance`等をconsumer分類し、retirement-onlyなら削除する。current lifecycle assertionが混在する場合はpositive部分へ縮小する。
+- **確認:** test bodies、fixtures、remaining finish testsを確認・実行する。
+- **期待結果:** removed gate無視専用testなし、current finish behaviorは観測される。
+- **証拠:** per-test decision。
+- **停止条件:** current no-write/failure behaviorの唯一のtest。
+- **cleanup:** heavy report/EAL fixture builders。
+
+### C40-06 — Historical test-copy machinery
+
+- **対象 / 目的:** authoritative historyを残し、test copy debtを撤去する。
+- **前提:** C00-06 classification、canonical originals存在。
+- **操作:** preservation SHA/copy/mutation constants/helpers/testsをconsumer 0まで削除し、その後`tests/fixtures/authoring_kit/existing_issue/**`を削除する。
+- **確認:** `rg -n 'PRESERVATION_BASELINE_SHA256|PRESERVATION_COPIED_SOURCE_PATHS|PRESERVATION_FIXTURE_ROOT|existing_issue' tests`、canonical source path確認。
+- **期待結果:** test refs 0、fixture copyなし、authoritative originals無変更。
+- **証拠:** deleted path list、canonical no-diff。
+- **停止条件:** fixtureがruntime input、external compatibility contract、唯一のpositive behavior input。
+- **cleanup:** orphan SHA/copy utilities。
+
+### C40-07 — Orphan cleanup and interim metrics
+
+- **対象 / 目的:** test撤退で生じたsupport残滓を閉じる。
+- **前提:** C40-01〜06のdecision完了。
+- **操作:** 本Issueの削除で未使用になったimport、constant、helper、fixtureだけを削除する。
+- **確認:** `make lint`、`uv run pytest --collect-only -q`、beforeと同じtracked test/fixture metrics。
+- **期待結果:** lint/collection成功、test metrics純増なし、candidate coverage/closure=1.0。
+- **証拠:** interim metrics、orphan list。
+- **停止条件:** unrelated refactorが必要、collection対象が予期せず消える。
+- **cleanup:** 本Issue由来orphanのみ。
+
+## 13. M5 — Surviving behavior、build、fresh consumer
+
+### C50-01 — Focused positive suites
+
+- **対象 / 目的:** 残存契約を最小の既存suiteで検証する。
+- **前提:** M1〜M4完了。
+- **操作:** 変更しない。
+- **確認:** `uv run pytest tests/unit/application/test_set_active.py tests/unit/infra/test_authoring_kit_assets.py -q`、full-regression permission付きでstorage-core、issue-lifecycle、init/updateの必要testを実行する。doctor testが残る場合はそれも実行する。
+- **期待結果:** required testsが実行されGREEN。skipは理由付き。
+- **証拠:** command、selected tests、pass/skip/fail、duration。
+- **停止条件:** retirement-only test再導入でしか通らない、selector/ordering/failure/parity regression。
+- **cleanup:** cacheはC90-06。
+
+### C50-02 — Static and ordinary suite
+
+- **対象 / 目的:** repository全体の非回帰。
+- **前提:** C50-01 PASS。
+- **操作:** 変更しない。
+- **確認:** `make lint`、`git diff --check`、`uv run pytest`。
+- **期待結果:** 全command成功。ordinary laneのpolicy skipを実測記録。
+- **証拠:** summary/count/duration。
+- **停止条件:** failure無視、test lane/marker変更で回避。
+- **cleanup:** なし。
+
+### C60-01 — Clean package/fresh init
+
+- **対象 / 目的:** built packageからCurrent contractを再現する。
+- **前提:** C50-02 PASS。
+- **操作:** exact artifactをbuildし、`mktemp -d`配下のconsumerへinitする。
+- **確認:** `uv build`、archive inventory、`uvx --no-cache --from . spec-dock init <exact-temp-consumer>`、consumer `spec-dock validate`、providerとのplaceholder/overview `cmp`、current help目視。
+- **期待結果:** init/validate成功、current二skillと`ci.yml`あり、Current docs一致、retired `.codex`なし。
+- **証拠:** temp path、exit、inventory/cmp summary。
+- **停止条件:** live GitHub操作が必要、managed distribution変更が必要。
+- **cleanup:** temp consumerと本Issue build artifactをC90-06で対象確認後削除。
+
+### C60-02 — Current Full Regression
+
+- **対象 / 目的:** 現行policy内の非回帰。
+- **前提:** C60-01 PASS。
+- **操作:** workflow/ledger/timing/shardを変更せずverifierを実行する。
+- **確認:** `uv run python -m scripts.quality.verify_full_regression --shards 4`。
+- **期待結果:** verifier成功。
+- **証拠:** summary、duration、shard結果。
+- **停止条件:** ledger/timing/shard/provider workflow変更が必要、failureをfuture Epicで無視。
+- **cleanup:** verifier temp outputはownership確認後。
+
+## 14. M99 — Audit、Report、handoff
+
+### C90-01 — Scope/no-touch diff audit
+
+- **対象 / 目的:** approved scopeだけが変わったことを確認する。
+- **前提:** M5完了。
+- **操作:** 変更しない。
+- **確認:** `git diff --name-status <implementation-baseline-sha>`、Historical authority、current skills/CI、Epic #384 pathsをpath限定diffする。
+- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、ledger/timing、scripts/quality差分0。
+- **証拠:** name-statusとno-touch results。
+- **停止条件:** unrelated/unowned diff。
+- **cleanup:** unintended diffを原因箇所で修正。user変更を消さない。
+
+### C90-02 — After metrics/test budget
+
+- **対象 / 目的:** testを含む撤退を数量確認する。
+- **前提:** collection成功。
+- **操作:** C00-04と同じ方法でafter metricsを採取する。
+- **確認:** collect-only、tracked test/fixture listing、explicit LOC aggregation、`git diff --numstat <implementation-baseline-sha>`。
+- **期待結果:** 四指標純増なし、candidate coverage=1.0、removable closure=1.0、surviving tests保持。
+- **証拠:** before/after/delta、deleted production/test LOC、情報比率。
+- **停止条件:** 未承認増加、candidate未決、positive coverage欠落、数字を稼ぐ削除。
+- **cleanup:** metric用temporary fileがあればWorkbenchから除去。
+
+### C90-03 — SpecDock integrity
+
+- **対象 / 目的:** canonical structureとprojectionを検証する。
+- **前提:** diff確定。
+- **操作:** `validate`、`sync --no-github`、再`validate`を実行する。
+- **確認:** 各command outputとsync後status/diff。
+- **期待結果:** 全成功、unrelated generated diffなし。
+- **証拠:** command results。
+- **停止条件:** syncがscope外tracked diffを生成。
+- **cleanup:** scope外diffをcommitしない。
+
+### C90-04 — Checklist completion/Report
+
+- **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
+- **前提:** 全mandatory check結果確定。
+- **操作:** §15を`PASS/BLOCKED/N/A(reason)`へ更新し、ReportのOutcome/Verification/Risksへ実測を要約する。
+- **確認:** statusとraw command evidenceを照合する。
+- **期待結果:** NOT_RUNなし、BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがある。
+- **証拠:** status ledger、Report sections。
+- **停止条件:** raw実行なしのPASS、final SHA自己参照、長いlog複製。
+- **cleanup:** duplicate scratch/log。
+
+### C90-05 — Commit、push、Strict quality gate、PR
+
+- **対象 / 目的:** human merge判断へ固定candidateを渡す。
+- **前提:** C90-01〜04 PASS、identity確認済み。
+- **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。固定SHAでindependent ChatGPT code review/Final Quality Gateを実施し、指摘があれば最小修正と再reviewを行う。
+- **確認:** staged name-status、clean status、remote SHA、PR checks、Strict review status。
+- **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
+- **証拠:** final SHA、PR URL、checks/review summary。
+- **停止条件:** identity不一致、unexpected staged path、review finding、CI failure。
+- **cleanup:** なし。
+
+### C90-06 — Final temporary cleanup
+
+- **対象 / 目的:** build/testの一時物を残さない。
+- **前提:** 証拠転記済み。
+- **操作:** C00/C30/C60で作ったexact temp consumer、build artifact、cacheだけを対象確認して片付ける。
+- **確認:** `git status --short --untracked-files=all`と対象path inspection。
+- **期待結果:** 意図したtracked diffまたはcommit後cleanのみ。
+- **証拠:** final status。
+- **停止条件:** user-owned/unknown pathが混在。
+- **cleanup:** 本Issue所有temporaryのみ。
+
+## 15. Execution status ledger
+
+初期状態は全項目`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceを更新する。実施済みでない項目を過去形にしない。
+
+| ID | 状態 | Evidence reference |
+|---|---|---|
+| C00-01 | NOT_RUN | |
+| C00-02 | NOT_RUN | |
+| C00-03 | NOT_RUN | |
+| C00-04 | NOT_RUN | |
+| C00-05 | NOT_RUN | |
+| C00-06 | NOT_RUN | |
+| C00-07 | NOT_RUN | |
+| C00-08 | NOT_RUN | |
+| C10-01 | NOT_RUN | |
+| C10-02 | NOT_RUN | |
+| C10-03 | NOT_RUN | |
+| C10-04 | NOT_RUN | |
+| C20-01 | NOT_RUN | |
+| C20-02 | NOT_RUN | |
+| C20-03 | NOT_RUN | |
+| C20-04 | NOT_RUN | |
+| C20-05 | NOT_RUN | |
+| C30-01 | NOT_RUN | |
+| C30-02 | NOT_RUN | |
+| C30-03 | NOT_RUN | |
+| C40-01 | NOT_RUN | |
+| C40-02 | NOT_RUN | |
+| C40-03 | NOT_RUN | |
+| C40-04 | NOT_RUN | |
+| C40-05 | NOT_RUN | |
+| C40-06 | NOT_RUN | |
+| C40-07 | NOT_RUN | |
+| C50-01 | NOT_RUN | |
+| C50-02 | NOT_RUN | |
+| C60-01 | NOT_RUN | |
+| C60-02 | NOT_RUN | |
+| C90-01 | NOT_RUN | |
+| C90-02 | NOT_RUN | |
+| C90-03 | NOT_RUN | |
+| C90-04 | NOT_RUN | |
+| C90-05 | NOT_RUN | |
+| C90-06 | NOT_RUN | |
+
+## 16. Exit / handoff
+
+次をすべて満たしたときだけproduction writerからmain agentへ返す。
+
+- I387-AC01〜AC17のevidenceがある。
+- checklist mandatory itemが全てPASSまたは理由付きN/Aである。
+- production residueとremovable test/supportが一体で撤去されている。
+- new absence test/scanner/fixture/helperがない。
+- surviving positive behavior、provider/dogfood parity、package outputが確認済み。
+- test budget、candidate coverage、removable closureが合格している。
+- authoritative Historical evidence、current二skill、consumer CI、Epic #384 surfaceに意図しない差分がない。
 - focused、lint、ordinary、current verifier、package/fresh consumer、validateの実結果がある。
-- Historical、current二skill、consumer CI、Epic #384 surfaceに意図しない差分がない。
-- commit後に確定したfinal candidate SHAがPR/handoff evidenceにあり、pushed branch、merge-ready PR、residual riskが明確。Reportへの自己参照SHA追記はない。
-- 未実施checkをpass扱いしていない。
-- human merge gateを維持している。
+- pushed clean branch、fixed final SHA、merge-ready PR、Strict quality gate pass、residual riskが明確である。
+- human merge前に`issue finish`を実行していない。
