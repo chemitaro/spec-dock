@@ -25,7 +25,8 @@ ID: "epic-00384"
 - 人間向けHTML `disposable-root-replacement-and-skill-lifecycle.html` を4つのPlantUML図付きで作成し、Tailscale限定URLへlive symlinkで配信した。
 - production code、test code、Issue #372 worktreeは変更していない。調査成果はcommit `de54b316...`、PR #386として公開され、mainへmerge済みである。
 - Issue #372完了後のStrict auditを受け、Epic #356配下の `iss-00387 / #387 Current Surface Workflow Residue Cleanup` を外部前提として追加した。#387はcurrent-surface residueとdrift guardを所有し、Epic #384はdistribution / test architectureだけを所有する。
-- `iss-00387` local nodeは本更新時点でmain未収載のため、正式dependencyを先行作成せず、GitHub #387によるtextual handoffとした。
+- `iss-00387`のR/D/Pはbranch `iss-00387-current-surface-workflow-residue-cleanup`、SHA `7acaf40fff273c292c12111b81e11d997dbe18cd` でapprovedとなり、ChatGPT Spec Review Strictはpass、findings 0、confidence 0.99である。
+- `iss-00387` nodeはapproved spec branchへpush済みだが本更新時点でmain未収載のため、正式dependencyを先行作成せず、approved spec SHAとGitHub #387によるtextual handoffとした。
 
 ## Accepted policy
 
@@ -63,7 +64,7 @@ ID: "epic-00384"
 - 初回authoringのpre-publication確認では、branch `codex/epic-00384-disposable-root-replacement` の変更範囲が新規Epic directoryだけであることを確認した。その後commit・pushし、PR #386でmainへmergeした。
 - ADR mirror `spec-dock/adrs/20260831t005139z-adr-disposable-provider-roots-and-fixed-skill-slots.md` がcanonical Artifactへのsymlinkであることを確認した。
 - PR #386がMERGEDで全required checksがSUCCESSであること、Issue #372を含む最新mainが `5f7b7fc11a3e27b0e65cd33630ff939433b25c0d` であることを確認した。
-- GitHub #387がOPENであり、対応する `iss-00387` scaffoldが別worktreeの未コミット作業であることを確認した。そのworktreeは変更していない。
+- GitHub #387がOPENであり、対応する `iss-00387` worktreeがclean、local HEADとremote branchがapproved spec SHA `7acaf40fff273c292c12111b81e11d997dbe18cd` で一致することを確認した。そのworktreeは変更していない。
 
 ## Residual Risks / Follow-ups
 
@@ -77,6 +78,7 @@ ID: "epic-00384"
 - provider root / managed skill内のlocal editsがupdateで失われるbreaking behaviorをpublic docsとdiagnosticへ明記する必要がある。
 - 子Issueはまだ作成していない。各candidate開始前に該当Product gateを確定し、granularityを再評価する。
 - #387をmainへmergeし、current-surface drift guardと変更receiptを固定するまで、Epic #384の実装candidateを開始しない。
+- #387実装と並行するEpic #384の作業はread-only inventory、Product decision、Issue設計、prototypeに限定する。
 - `iss-00387` nodeがmainへ収載された後、本Epicまたは最初のcandidate Issueへ正式dependencyを登録する必要がある。
 
 ## Publication

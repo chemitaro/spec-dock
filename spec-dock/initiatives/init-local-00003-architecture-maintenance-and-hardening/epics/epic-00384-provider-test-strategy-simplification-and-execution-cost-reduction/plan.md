@@ -19,7 +19,7 @@ ID: "epic-00384"
 
 本Planはaccepted ADR `20260831t005139z-adr` を実装境界のauthorityとする。子Issueはまだ作成・開始しない。各候補の開始前に残るProduct判断とcurrent evidenceを固定し、Issue作成時に改めてacceptanceを受理する。
 
-Epic #356配下の `iss-00387 / #387 Current Surface Workflow Residue Cleanup` は本Planの外部前提である。#387はcurrent-surface residueとdrift guardを所有し、本Planは#387完了後のmainをinventory baselineとして受け取る。Epic #384の候補Issueへ#387 cleanupを再分配しない。
+Epic #356配下の `iss-00387 / #387 Current Surface Workflow Residue Cleanup` は本Planの外部前提である。#387はcurrent-surface residueとdrift guardを所有し、approved spec SHA `7acaf40fff273c292c12111b81e11d997dbe18cd` で実装準備済みである。本Planは#387完了後のmainをinventory baselineとして受け取る。Epic #384の候補Issueへ#387 cleanupを再分配しない。
 
 ## Issue granularity assessment
 
@@ -35,7 +35,7 @@ Epic #356配下の `iss-00387 / #387 Current Surface Workflow Residue Cleanup` �
   - legacy no-marker workspaceのsupport windowは未決。
   - `--remove-specs` のdeprecation / replacement shapeは未決。
   - candidateは提案であり、Issueとしてaccepted / created / startedではない。
-  - `iss-00387` nodeは本Plan更新時点でmain未収載のため、正式dependency登録はnode merge後に行う。
+  - `iss-00387` nodeはapproved spec branchへpush済みだが本Plan更新時点でmain未収載のため、正式dependency登録はnode merge後に行う。
 
 ## Parent acceptance coverage
 
@@ -65,6 +65,8 @@ iss-00387 / #387 completed on main
 Candidate 2はshared slot contractだけなら1と並行設計できるが、installation recordとupdate orchestrationのwriter競合を避けるため実装は1のstable service interface後に行う。Candidate 4は1〜3の旧test削除receiptを集約する最終cutoverであり、production contract未変更のまま先行しない。
 
 Candidate 1〜4は#387が変更・削除したcurrent-surface document / symbol / testを重複変更しない。各candidateのinventoryとcost baselineは#387 merge後のmainから採取し、#387のcleanup結果をEpic #384のtest削減実績として二重計上しない。
+
+#387実装と並行して実施できるのは、Epic #384のread-only inventory、Product decision、Issue設計、prototypeまでとする。provider production / testへのmutation、旧route削除、cutoverは#387のmerged stateを再確認してから開始する。
 
 ## Candidate 1 proposal — Disposable provider root lifecycle
 
@@ -235,10 +237,11 @@ merge-required regressionが単一pytest process・worker 1で連続5回各600�
 
 ### Gate 0 — iss-00387 handoff
 
+- branch `iss-00387-current-surface-workflow-residue-cleanup` のapproved R/D/P SHAが `7acaf40fff273c292c12111b81e11d997dbe18cd` で、Strict review pass / findings 0である。
 - `iss-00387 / #387` がmainへmergeされている。
 - current-surface drift guardがGREENである。
 - merge receiptが変更・削除したsymbol、test、documentを列挙している。
-- #387がhistorical specs / docs / fixtures、現行2 skills、consumer `ci.yml`、issue-start checkout helper、Epic #384所有のdistribution / Full Regression machineryを変更していない。
+- #387がhistorical specs / docs / fixtures、現行2 skills、consumer `ci.yml`、`checkout_active_target()`、Epic #384所有のdistribution / Full Regression machineryを変更していない。
 - `iss-00387` nodeがmainへ収載された時点で、本Epicまたは最初のcandidate Issueへ正式dependencyを登録する。
 
 ### Gate A — Candidate 1 start
