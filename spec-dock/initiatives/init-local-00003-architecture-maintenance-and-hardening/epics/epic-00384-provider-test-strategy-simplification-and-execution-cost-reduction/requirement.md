@@ -53,7 +53,8 @@ historical evidenceとして、別candidateのGitHub Full Regressionは2,708 tes
 
 ### R1. Ownership safety
 
-- provider-owned repo-local surfaceを`spec-dock/{docs,templates,system,scripts}`の4 fixed rootsに限定する。
+- provider-owned tooling payloadを`spec-dock/{docs,templates,system,scripts}`の4 fixed rootsと2 fixed skill slotsに限定する。
+- providerの固定mutation setは、4 roots、2 slots、fixed installation record、およびfresh initでabsentの場合だけ作成する`spec-dock/.gitignore`とshipped `.github/workflows/ci.yml`の2 seedsだけとする。seedは作成後consumer-ownedであり、update / reinstall / uninstall authorityを持たない。
 - managed skillsを`.agents/skills/spec-dock`と`.agents/skills/spec-dock-grill-with-docs`の2 fixed slotsに限定する。
 - Initiatives、nested Artifacts、`.workbench`、generated projections、unknown non-target paths、unrelated skillsを探索・正規化・削除しない。
 - mutation targetのunknownはpreserve-and-block、mutation target外のunknownはpreserve-and-ignoreとする。
@@ -74,7 +75,7 @@ historical evidenceとして、別candidateのGitHub Full Regressionは2,708 tes
 - real root binding、version / runtime digest、active legacy recovery absence、markerless current slotsのexact treeをmutation前に確認する。
 - migration後はnew record / markersだけをauthorityとし、legacy recognizerを再度参照しない。
 - active legacy journal / retry / purge recoveryはnew formatへ推測変換せず、exact last-compatible `0.2.3`でclean stateへ戻すguidanceを返す。
-- old `0.2.3`のmutating commandsがfinal workspaceへmutation 0であることをmerge前に証明する。target-scoped startup-injected Python audit-hook tripwireで保護対象配下の最初のmutation attemptをsyscall完了前にfailさせ、tripwire event 0を主証拠、tree digest不変を補助証拠とする。成立しなければfinal marker / formatを修正し、bridge generationを追加しない。
+- old `0.2.3`のmutating commandsがfinal workspaceへmutation 0であることをmerge前に証明する。target-scoped startup-injected composite tripwireでPython filesystem audit eventsに加え、exact 0.2.3が`ctypes.CDLL`から直接呼ぶLinux `renameat2`とmacOS `renameatx_np`をnative symbol呼出し前に遮断する。platformごとのnative positive controlが検出器に捕捉され、target treeを変更しないことを必須とする。tripwire event 0を主証拠、tree digest不変を補助証拠とする。成立しなければfinal marker / formatを修正し、bridge generationを追加しない。
 
 ### R4. Consumer-owned seeds
 
@@ -145,7 +146,7 @@ historical evidenceとして、別candidateのGitHub Full Regressionは2,708 tes
 ## 受け入れ条件
 
 - [ ] `iss-00392`一件が全implementation / verificationを所有し、追加のdecision-only / tests-only / verification-only Issueがない。
-- [ ] 4 roots / 2 slots以外へprovider mutation authorityがない。
+- [ ] provider mutation authorityが4 roots、2 slots、fixed record、fresh-init-onlyの2 seed作成に限定され、seedへのupdate / reinstall / uninstall authorityがない。
 - [ ] user data、unknown non-target、consumer seeds、unrelated skillsがbyte-identicalである。
 - [ ] fresh、exact `0.2.3` migration、update、tooling uninstall、reinstallがbuilt artifactでGREENである。
 - [ ] active legacy recovery、unsupported / foreign / symlink stateがmutation 0でblockされる。

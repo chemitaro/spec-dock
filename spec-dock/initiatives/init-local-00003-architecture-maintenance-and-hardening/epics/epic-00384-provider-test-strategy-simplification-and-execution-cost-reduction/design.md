@@ -173,7 +173,7 @@ public result:
 
 modified / foreign / symlink / unexpected typeではoperation全体をwrite 0でblockする。migration後はnew recordを優先し、legacy recognizerを二度と呼ばない。historical version catalog、range comparison、partial identity、consumer manifest authorityを移植しない。
 
-old `0.2.3` packageのmutating commandsはfinal workspaceにmutation 0でなければならない。baseline `0.2.3` CLI subprocessのprocess startup時にtarget-scoped Python audit hook（例: isolated test environmentの`sitecustomize`）を注入し、保護対象repository配下の`open` write/create/truncate/appendと、`os.remove`、`os.rename`、`os.rmdir`、`os.mkdir`、`os.chmod`、`os.link`、`os.symlink`等のfilesystem mutation eventをsyscall完了前に捕捉して最初のattemptでfailさせる。許可するtarget外writeはvenv/cache/evidence output等へ明示限定する。tripwire event 0を時間的な主証拠、pre/post tree digest不変を補助的な最終状態証拠とする。final marker / record / root evidenceをold engineがunknownとしてblockできるよう設計し、成立しない場合もbridge generationを追加しない。
+old `0.2.3` packageのmutating commandsはfinal workspaceにmutation 0でなければならない。baseline `0.2.3` CLI subprocessのprocess startup時にtarget-scoped composite tripwire（例: isolated test environmentの`sitecustomize`）を注入する。Python audit hookは保護対象repository配下の`open` write/create/truncate/appendと、`os.remove`、`os.rename`、`os.rmdir`、`os.mkdir`、`os.chmod`、`os.link`、`os.symlink`等をsyscall完了前に捕捉する。さらにstartup injectionで`ctypes.CDLL`のsymbol解決をwrapし、exact 0.2.3の`_rename_distribution_no_replace` / `_rename_distribution_swap`が直接呼ぶLinux `renameat2`とmacOS `renameatx_np`をnative関数呼出し前に捕捉してfailさせる。platformごとに利用可能なnative symbolを直接呼ぶpositive controlを実行し、tripwireがcall前に捕捉してtarget treeが不変であることを先に証明する。許可するtarget外writeはvenv/cache/evidence output等へ明示限定する。composite tripwire event 0を時間的な主証拠、pre/post tree digest不変を補助的な最終状態証拠とする。final marker / record / root evidenceをold engineがunknownとしてblockできるよう設計し、成立しない場合もbridge generationを追加しない。
 
 ## Public CLI
 
@@ -205,7 +205,7 @@ argument、text / JSON、exit、mutation_startedと代表happy / fail-closed pat
 
 ### Built artifact
 
-exact `0.2.3 -> final -> tooling uninstall -> reinstall`とdurable uninstall discriminatorを証明する。old-package mutation-zeroはtarget-scoped audit-hook tripwire event 0とtree digest不変の両方で証明する。wheel lifecycle、sdist minimal smokeも同じcandidateで証明する。
+exact `0.2.3 -> final -> tooling uninstall -> reinstall`とdurable uninstall discriminatorを証明する。old-package mutation-zeroはPython filesystem eventsと`renameat2` / `renameatx_np` native callsを覆うtarget-scoped composite tripwire event 0、native positive controlsの捕捉、tree digest不変で証明する。wheel lifecycle、sdist minimal smokeも同じcandidateで証明する。
 
 ### Platform delta
 

@@ -44,7 +44,7 @@ legacy per-file engine
 
 ### Domain / model
 
-- 4 fixed roots、2 fixed slots、operation、installation record、typed resultを定義する。
+- 4 fixed roots、2 fixed slots、fixed installation record、fresh-init-only seed creation、operation、typed resultを定義する。
 - action setはcode-fixedで、arbitrary pathやmanifest pathを受け取らない。
 
 ### Filesystem boundary
@@ -194,7 +194,7 @@ slot delete / replaceでmarker authorityを失わないため、exact fixed tomb
 ### Built artifact
 
 - exact `0.2.3 -> final -> tooling uninstall -> reinstall`を同じfinal wheelで通す。
-- baseline `0.2.3` commandsをtarget-scoped startup-injected Python audit hook（例: isolated test environmentの`sitecustomize`）付きsubprocessで実行する。保護対象repository配下の`open` write/create/truncate/append、`os.remove`、`os.rename`、`os.rmdir`、`os.mkdir`、`os.chmod`、`os.link`、`os.symlink`等をsyscall完了前に最初のattemptでfailさせ、tripwire event 0を主証拠、tree digest不変を補助的な最終状態証拠とする。target外writeはvenv/cache/evidence output等へ明示限定する。
+- baseline `0.2.3` commandsをtarget-scoped startup-injected composite tripwire（例: isolated test environmentの`sitecustomize`）付きsubprocessで実行する。Python audit hookは保護対象repository配下の`open` write/create/truncate/append、`os.remove`、`os.rename`、`os.rmdir`、`os.mkdir`、`os.chmod`、`os.link`、`os.symlink`等をsyscall完了前に捕捉する。startup injectionは`ctypes.CDLL`のsymbol解決もwrapし、exact 0.2.3の`_rename_distribution_no_replace` / `_rename_distribution_swap`が直接呼ぶLinux `renameat2`とmacOS `renameatx_np`をnative関数呼出し前に捕捉する。各platformで利用可能なnative symbolを直接呼ぶpositive controlがcall前に捕捉され、target treeを変更しないことを証明する。composite tripwire event 0を主証拠、tree digest不変を補助的な最終状態証拠とする。target外writeはvenv/cache/evidence output等へ明示限定する。
 - wheel / sdist source SHAとdigest mismatchをfailさせる。
 
 ### Platform / portfolio

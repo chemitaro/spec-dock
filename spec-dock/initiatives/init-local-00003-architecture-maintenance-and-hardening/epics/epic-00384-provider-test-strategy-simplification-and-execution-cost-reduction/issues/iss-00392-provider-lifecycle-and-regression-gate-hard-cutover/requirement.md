@@ -28,6 +28,7 @@ Provider distribution lifecycle、public installer CLI、test portfolio、artifa
 
 - provider root mutation authorityを`spec-dock/{docs,templates,system,scripts}`の4 fixed rootsに限定する。
 - skill mutation authorityを`.agents/skills/spec-dock`と`.agents/skills/spec-dock-grill-with-docs`の2 fixed slotsに限定する。
+- fixed mutation setは4 roots、2 slots、fixed installation record、fresh initでabsentの場合だけ作成する`spec-dock/.gitignore`とshipped `.github/workflows/ci.yml`の2 seedsだけとする。consumer-ownedになったseedへのupdate / reinstall / uninstall authorityは持たない。
 - `spec-dock/initiatives/**`、nested Artifacts、`.workbench/**`、generated projections、unknown non-target paths、unrelated skillsを探索・正規化・削除しない。
 - mutation targetのownership不明、foreign marker、root / parent symlink、unexpected typeでは最初のtarget mutation前にwrite 0 / delete 0でblockする。
 - `spec-dock/.gitignore`とshipped `.github/workflows/ci.yml`をfresh-init-only consumer-owned seedsとし、update / reinstall / uninstallで変更しない。
@@ -57,7 +58,7 @@ Provider distribution lifecycle、public installer CLI、test portfolio、artifa
 - pure/domain testsはfilesystem、Git、package build、CLI subprocessを起動しない。
 - filesystem/service testsは最小synthetic workspaceと注入可能なfaultを使う。
 - CLI testsはarguments、text / JSON、exitと代表happy / fail-closed pathsに限定する。
-- built-artifact testsはexact `0.2.3 -> final -> uninstall -> reinstall`、durable uninstall discriminator、old-package mutation-zero、Linux lifecycle、macOS deltaを証明する。mutation-zeroはtarget-scoped startup-injected Python audit-hook tripwire event 0を主証拠、tree digest不変を補助証拠とする。
+- built-artifact testsはexact `0.2.3 -> final -> uninstall -> reinstall`、durable uninstall discriminator、old-package mutation-zero、Linux lifecycle、macOS deltaを証明する。mutation-zeroはPython filesystem eventsとexact 0.2.3のnative `renameat2` / `renameatx_np` callsを覆うtarget-scoped startup-injected composite tripwire event 0を主証拠、native positive controlsの捕捉とtree digest不変を必須の補助証拠とする。
 - 26 active ledger nodesをfix、current successor、accepted contract retirementのいずれかへterminal化し、approved failure 0、policy skip 0にする。
 - same candidate / OS / contractのduplicate nodeを0にする。
 
@@ -101,17 +102,17 @@ Provider distribution lifecycle、public installer CLI、test portfolio、artifa
 - incomplete recordがある場合、同じoperation・candidateだけを許可する。
 - ready成立前にroot / slot処理が残ればpartial_failure / exit 1とする。
 - ready成立後にvalid owned temporary cleanupだけが残る場合に限りcompleted_with_warnings / exit 0を許可する。
-- old `0.2.3` packageがfinal workspaceへのmutationを一度でもattemptする場合はmergeしない。保護対象配下のwrite/create/truncate/append、remove、rename、rmdir、mkdir、chmod、link、symlink等をsyscall完了前にtripwireでfailさせる。bridge generationを追加せずfinal marker / formatを修正する。
+- old `0.2.3` packageがfinal workspaceへのmutationを一度でもattemptする場合はmergeしない。保護対象配下のPython filesystem mutation eventsに加え、`ctypes.CDLL`からのLinux `renameat2` / macOS `renameatx_np`をnative call前にcomposite tripwireでfailさせる。platformごとのnative positive controlを捕捉できなければ証明失敗とする。bridge generationを追加せずfinal marker / formatを修正する。
 - required contextのlive stateを観測できない場合、外部設定を推測変更しない。
 
 ## 受け入れ条件
 
-- [ ] 4 roots / 2 slots以外へprovider mutation authorityがない。
+- [ ] provider mutation authorityが4 roots、2 slots、fixed record、fresh-init-onlyの2 seed作成に限定され、seedへのupdate / reinstall / uninstall authorityがない。
 - [ ] user history、`.workbench`、unknown non-target、unrelated skills、consumer seedsがbyte-identicalである。
 - [ ] fresh、exact `0.2.3` migration、ready update、tooling uninstall、tooling-absent reinstallがbuilt wheelでGREENである。
 - [ ] uninstall後もdurable `tooling-absent-preserved-data` recordが残り、never-installed `absent`と識別され、reinstallがfresh-init-only seedsを再作成しない。
 - [ ] active legacy recovery、unsupported legacy、foreign / invalid target、root / parent symlinkがmutation 0でblockされる。
-- [ ] old `0.2.3`の`init --force`、update、tooling uninstall、`--remove-specs`がfinal workspaceでaudit-hook tripwire event 0かつtree digest不変である。
+- [ ] old `0.2.3`の`init --force`、update、tooling uninstall、`--remove-specs`がfinal workspaceでcomposite tripwire event 0かつtree digest不変であり、Linux `renameat2` / macOS `renameatx_np`のpositive controlがcall前に捕捉される。
 - [ ] `--remove-specs`がtext / JSONの両modeでremoved-operation error、exit 2、mutation 0を返す。
 - [ ] root / slot境界のseeded faults後にsame-candidate rerunで収束し、cross-intent rerunをblockする。
 - [ ] active ledger 26 nodesがfix / successor / retirementへterminal化し、ledger自体が削除されている。

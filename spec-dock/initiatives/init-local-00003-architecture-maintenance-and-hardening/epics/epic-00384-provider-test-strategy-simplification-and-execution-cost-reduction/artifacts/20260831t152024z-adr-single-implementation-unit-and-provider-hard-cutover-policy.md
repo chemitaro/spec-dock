@@ -48,7 +48,7 @@ Epic #384の旧計画は、調査、Product判断、lifecycle bridge、writer cu
 ### 2. Lifecycle hard cutover
 
 - uninstall-first bridgeや中間package generationを公開せず、legacy lifecycleからfinal simplified lifecycleへcombined hard cutoverする。
-- provider-owned repo-local surfaceは`spec-dock/{docs,templates,system,scripts}`の4 fixed rootsと、`.agents/skills/spec-dock`、`.agents/skills/spec-dock-grill-with-docs`の2 fixed slotsに限定する。
+- provider-owned tooling payloadは`spec-dock/{docs,templates,system,scripts}`の4 fixed rootsと、`.agents/skills/spec-dock`、`.agents/skills/spec-dock-grill-with-docs`の2 fixed slotsに限定する。固定mutation setは4 roots、2 slots、fixed installation record、fresh init時だけの2 consumer seed作成で閉じる。
 - Initiatives、nested Artifacts、`.workbench`、generated projections、unknown non-target paths、unrelated skillsは探索・正規化・削除しない。
 - mutation targetのownershipが不明なら最初のtarget mutation前にpreserve-and-blockする。unknown non-targetはpreserve-and-ignoreする。
 - updateはcandidate全体をstage / validateし、`docs -> templates -> system -> scripts -> skill slots`の順で置換し、ready recordを最後に書く。
@@ -61,7 +61,7 @@ Epic #384の旧計画は、調査、Product判断、lifecycle bridge、writer cu
 - 実root binding、exact version / runtime digest、active legacy recovery不存在、2 skill slotsがabsentまたはexact markerless treeであることをmutation前に確認する。
 - migration成功後はnew installation recordとslot markersをauthorityとし、legacy recognizerを再度参照しない。入力集合を将来拡張しない。
 - active legacy journal / retry / purge recoveryは推測変換せずwrite 0でblockし、exact `0.2.3` packageまたはsource artifactでclean stateへ戻してから再実行する。
-- final formatに対する旧`0.2.3`の`init --force`、`update`、tooling uninstall、`--remove-specs`はmutation-zeroでなければmergeしない。baseline `0.2.3` subprocessをtarget-scoped startup-injected Python audit-hook tripwire付きで実行し、保護対象repository配下のwrite/create/truncate/append、remove、rename、rmdir、mkdir、chmod、link、symlink等をsyscall完了前の最初のmutation attemptでfailさせる。tripwire event 0を主証拠、tree digest不変を補助的な最終状態証拠とする。失敗時はbridgeを追加せず、final marker / formatを旧engineがblockできる形へ修正する。
+- final formatに対する旧`0.2.3`の`init --force`、`update`、tooling uninstall、`--remove-specs`はmutation-zeroでなければmergeしない。baseline `0.2.3` subprocessをtarget-scoped startup-injected composite tripwire付きで実行し、Python filesystem audit eventsに加え、exact 0.2.3が`ctypes.CDLL`から直接呼ぶLinux `renameat2`とmacOS `renameatx_np`をnative call前に遮断する。platformごとのnative positive controlをcall前に捕捉しtarget tree不変を証明した上で、composite tripwire event 0を主証拠、tree digest不変を補助的な最終状態証拠とする。失敗時はbridgeを追加せず、final marker / formatを旧engineがblockできる形へ修正する。
 
 ### 4. Consumer-owned seeds
 

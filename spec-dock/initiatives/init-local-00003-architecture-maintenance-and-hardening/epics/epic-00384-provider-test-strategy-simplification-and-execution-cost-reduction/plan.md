@@ -115,7 +115,7 @@ milestoneはIssueではなく、`iss-00392`内のexecution orderである。
 - exact `0.2.3` migration
 - active / unsupported / modified legacy block
 - old-package mutation-zero
-- target-scoped startup audit-hook tripwire event 0と補助tree digest不変
+- Python filesystem eventsと`renameat2` / `renameatx_np`を覆うstartup composite tripwire event 0、native positive controls、補助tree digest不変
 
 ### M5. Old product / test removal
 
