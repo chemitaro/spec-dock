@@ -120,7 +120,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件**: 続行せずmain agentへ返す条件。
 - **cleanup**: 削除するtemporary/orphan item。
 
-状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`だけを使う。各milestone完了時に§15を更新する。長いstdout/stderrをPlanへ貼らず、command、exit、count、主要observed resultをReportへ記録する。
+状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`だけを使う。各pre-freeze milestone完了時に§15を更新する。post-freeze C90-05は同じ語彙をPR/handoff evidenceで使い、version管理ledgerへ追記しない。長いstdout/stderrをPlanへ貼らず、command、exit、count、主要observed resultをReportへ記録する。
 
 ## 7. Milestone
 
@@ -163,7 +163,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** 変更可能pathと保護pathを固定する。
 - **前提:** C00-02 PASS。
 - **操作:** Requirement §4とDesign §5のknown candidateを実pathへ解決する。
-- **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue|test_active_set_legacy_flag_reports_parser_error|test_runtime_active_s06' tests full-regression-ledger.json full-regression-timing-weights.json`。
+- **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue|test_active_set_legacy_flag_reports_parser_error|test_runtime_active_s05|test_runtime_active_s06' tests full-regression-ledger.json full-regression-timing-weights.json`。
 - **期待結果:** candidate path、surviving consumer、no-touch pathが一覧化される。
 - **証拠:** inventory表をReportへ要約。
 - **停止条件:** candidateがEpic #384またはauthoritative historyだけに存在する。
@@ -277,7 +277,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** 新規test不要を実証する。
 - **前提:** M1完了。
 - **操作:** 変更前に既存positive testsを特定・実行する。
-- **確認:** `uv run pytest tests/unit/application/test_set_active.py -q`、full-regression permission付きで`tests/cli_runtime/test_issue_lifecycle.py`と`tests/cli_runtime/test_storage_core_cli.py`を実行する。
+- **確認:** `uv run pytest tests/unit/application/test_set_active.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_issue_lifecycle.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_storage_core_cli.py -q`。
 - **期待結果:** selection-only、three selector、invalid no-write、issue-start ordering/failureの既存観測点が確認できる。
 - **証拠:** test names、pass/skip/fail/count/duration。
 - **停止条件:** 必要behaviorを既存testが観測せず新規testが必要。
@@ -321,7 +321,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** 残存behaviorの非回帰を確認する。
 - **前提:** C20-02〜04完了。
 - **操作:** 既存testを最小更新して実行する。field absence専用testは追加しない。
-- **確認:** C20-01と同じfocused commands。
+- **確認:** C20-01と同じ3 commandを、同じ`--run-full-regression --full-regression-shard` modeで実行する。global ledger completenessはここでは評価せずC60-02だけで評価する。
 - **期待結果:** required testsが実行されGREEN。policy skipをPASSにしない。
 - **証拠:** names/count/durationとconstructor更新内容。
 - **停止条件:** 新しいabsence assertionでなければ通せない、ordering/failure regression。
@@ -441,10 +441,21 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** unrelated refactorが必要、collection対象が予期せず消える。
 - **cleanup:** 本Issue由来orphanのみ。
 
-### C40-08 — Full Regression/fast-node referential integrity
+### C40-08 — Legacy active S05 context-pack contracts
+
+- **対象 / 目的:** 旧Authority、grants、Promotion、EALをCurrent context-pack contractとして固定するtestを撤去する。
+- **前提:** Current `ActiveManifestEntry(id,path)`とstructural context-pack behaviorを観測するpositive testを特定済み。
+- **操作:** `tests/cli_runtime/test_runtime_active_s05.py`の4 ledger nodeを含むtestを分類し、retirement-only test/assertionを削除する。mixed testはCurrent structural assertionだけへ縮小する。
+- **確認:** `rg -n 'test_runtime_active_s05|Authority|grants|Promotion|EAL' tests/cli_runtime/test_runtime_active_s05.py full-regression-ledger.json`とremaining focused test。
+- **期待結果:** old authority/evidence contract専用testなし、Current structural behaviorは観測される。
+- **証拠:** 4 nodeを含むper-test remove/retain/split decisionとretained assertion。
+- **停止条件:** active state write、sync failure、Current structural context packの唯一の観測手段で分離不能。
+- **cleanup:** retirement-only fixture/helper/importと、削除nodeへのexact ledger参照をC40-09へ渡す。
+
+### C40-09 — Full Regression/fast-node referential integrity
 
 - **対象 / 目的:** test撤去と現行verifier inventoryを矛盾させない。
-- **前提:** C20-04、C40-01〜06で実際に削除するnode IDが確定。
+- **前提:** C20-04、C40-01〜08で実際に削除するnode IDが確定。
 - **操作:** 削除node IDに一致する`full-regression-ledger.json` failure row/command input、`full-regression-timing-weights.json` weight、`tests/conftest.py`の`REQUIRED_FAST_NODE_IDS`だけを削除または現存successorへ最小更新する。
 - **確認:** 削除node IDごとに3ファイルを`rg`し、ledger parser/current verifier、collectionを実行する。
 - **期待結果:** deleted node参照0、現存nodeのledger/timing/required classificationは整合、verifier成功。
@@ -459,11 +470,11 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** 残存契約を最小の既存suiteで検証する。
 - **前提:** M1〜M4完了。
 - **操作:** 変更しない。
-- **確認:** `uv run pytest tests/unit/application/test_set_active.py tests/unit/infra/test_authoring_kit_assets.py -q`、full-regression permission付きでstorage-core、issue-lifecycle、init/updateの必要testを実行する。doctor testが残る場合はそれも実行する。
+- **確認:** `uv run pytest tests/unit/application/test_set_active.py tests/unit/infra/test_authoring_kit_assets.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_storage_core_cli.py tests/cli_runtime/test_issue_lifecycle.py tests/cli_runtime/test_doctor.py -q`、`uv run pytest --run-full-regression --full-regression-shard tests/unit/infra/test_init_update.py -q`。削除済みfileはcommandから除き、残存focused fileを明示する。
 - **期待結果:** required testsが実行されGREEN。skipは理由付き。
 - **証拠:** command、selected tests、pass/skip/fail、duration。
 - **停止条件:** retirement-only test再導入でしか通らない、selector/ordering/failure/parity regression。
-- **cleanup:** cacheはC90-06。
+- **cleanup:** cacheはC90-04。
 
 ### C50-02 — Static and ordinary suite
 
@@ -485,17 +496,17 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **期待結果:** init/validate成功、current二skillと`ci.yml`あり、Current docs一致、retired `.codex`なし。
 - **証拠:** temp path、exit、inventory/cmp summary。
 - **停止条件:** live GitHub操作が必要、managed distribution変更が必要。
-- **cleanup:** temp consumerと本Issue build artifactをC90-06で対象確認後削除。
+- **cleanup:** temp consumerと本Issue build artifactをC90-04で対象確認後削除。
 
 ### C60-02 — Current Full Regression
 
 - **対象 / 目的:** 現行policy内の非回帰。
 - **前提:** C60-01 PASS。
-- **操作:** C40-08でreview済みのdeleted-node exact参照更新を固定し、それ以外のworkflow/ledger/timing/shardを変更せずverifierを実行する。
+- **操作:** C40-09でreview済みのdeleted-node exact参照更新を固定し、それ以外のworkflow/ledger/timing/shardを変更せずverifierを実行する。
 - **確認:** `uv run python -m scripts.quality.verify_full_regression --shards 4`。
 - **期待結果:** verifier成功。
 - **証拠:** summary、duration、shard結果。
-- **停止条件:** C40-08以外のledger/timing、shard、provider workflow変更が必要、failureをfuture Epicで無視。
+- **停止条件:** C40-09以外のledger/timing、shard、provider workflow変更が必要、failureをfuture Epicで無視。
 - **cleanup:** verifier temp outputはownership確認後。
 
 ## 14. M99 — Audit、Report、handoff
@@ -506,7 +517,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **前提:** M5完了。
 - **操作:** 変更しない。
 - **確認:** `git diff --name-status <implementation-baseline-sha>`、Historical authority、current skills/CI、Epic #384 pathsをpath限定diffする。
-- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-08で承認したdeleted-node exact entry以外の差分0。
+- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-09で承認したdeleted-node exact entry以外の差分0。
 - **証拠:** name-statusとno-touch results。
 - **停止条件:** unrelated/unowned diff。
 - **cleanup:** unintended diffを原因箇所で修正。user変更を消さない。
@@ -533,42 +544,31 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** syncがscope外tracked diffを生成。
 - **cleanup:** scope外diffをcommitしない。
 
-### C90-04 — Checklist completion/Report
+### C90-04 — Final cleanup、checklist completion、Report freeze
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
-- **前提:** 全mandatory check結果確定。
-- **操作:** §15を`PASS/BLOCKED/N/A(reason)`へ更新し、ReportのOutcome/Verification/Risksへ実測を要約する。
-- **確認:** statusとraw command evidenceを照合する。
-- **期待結果:** NOT_RUNなし、BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがある。
+- **前提:** C00-01〜C90-03の結果が確定し、全必須項目がPASSまたは理由付きN/A。
+- **操作:** temp consumer、build artifact、cacheをexact ownership確認後に片付ける。§15のC00-01〜C90-04を`PASS/BLOCKED/N/A(reason)`へ更新し、ReportのOutcome/Verification/Risksへ実測を要約してreview candidateをfreezeする。
+- **確認:** statusとraw command evidence、`git status --short --untracked-files=all`を照合する。
+- **期待結果:** C00-01〜C90-04にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
 - **証拠:** status ledger、Report sections。
 - **停止条件:** raw実行なしのPASS、final SHA自己参照、長いlog複製。
-- **cleanup:** duplicate scratch/log。
+- **cleanup:** 本Issue所有temporaryとduplicate scratch/logだけ。user-owned/unknown pathが混在する場合は停止する。
 
 ### C90-05 — Commit、push、Strict quality gate、PR
 
 - **対象 / 目的:** human merge判断へ固定candidateを渡す。
-- **前提:** C90-01〜04 PASS、identity確認済み。
+- **前提:** C90-01〜04 PASS、review candidate freeze、identity確認済み。
 - **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。固定SHAでindependent ChatGPT code review/Final Quality Gateを実施し、`review_status=fail`またはP0/P1 findingがあれば最小修正と再reviewを行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
 - **確認:** staged name-status、clean status、remote SHA、PR checks、Strict review status。
 - **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
-- **証拠:** final SHA、PR URL、checks/review summary。
+- **証拠:** final SHA、PR URL、checks/review summaryをversion管理Plan/ReportではなくPR/handoff evidenceへ記録する。これらの記録のためにreviewed SHAを変更しない。
 - **停止条件:** identity不一致、unexpected staged path、`review_status=fail`、P0/P1 finding、CI failure。
 - **cleanup:** なし。
 
-### C90-06 — Final temporary cleanup
-
-- **対象 / 目的:** build/testの一時物を残さない。
-- **前提:** 証拠転記済み。
-- **操作:** C00/C30/C60で作ったexact temp consumer、build artifact、cacheだけを対象確認して片付ける。
-- **確認:** `git status --short --untracked-files=all`と対象path inspection。
-- **期待結果:** 意図したtracked diffまたはcommit後cleanのみ。
-- **証拠:** final status。
-- **停止条件:** user-owned/unknown pathが混在。
-- **cleanup:** 本Issue所有temporaryのみ。
-
 ## 15. Execution status ledger
 
-初期状態は全項目`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceを更新する。実施済みでない項目を過去形にしない。
+初期状態はpre-freeze項目が全て`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceを更新する。C90-05はreview candidate commit後のpost-freeze gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
 
 | ID | 状態 | Evidence reference |
 |---|---|---|
@@ -600,6 +600,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 | C40-06 | NOT_RUN | |
 | C40-07 | NOT_RUN | |
 | C40-08 | NOT_RUN | |
+| C40-09 | NOT_RUN | |
 | C50-01 | NOT_RUN | |
 | C50-02 | NOT_RUN | |
 | C60-01 | NOT_RUN | |
@@ -608,15 +609,13 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 | C90-02 | NOT_RUN | |
 | C90-03 | NOT_RUN | |
 | C90-04 | NOT_RUN | |
-| C90-05 | NOT_RUN | |
-| C90-06 | NOT_RUN | |
 
 ## 16. Exit / handoff
 
 次をすべて満たしたときだけproduction writerからmain agentへ返す。
 
 - I387-AC01〜AC18のevidenceがある。
-- checklist mandatory itemが全てPASSまたは理由付きN/Aである。
+- version管理ledgerのC00-01〜C90-04が全てPASSまたは理由付きN/Aで、post-freeze C90-05がPR/handoff evidence上でPASSしている。
 - production residueとremovable test/supportが一体で撤去されている。
 - new absence test/scanner/fixture/helperがない。
 - surviving positive behavior、provider/dogfood parity、package outputが確認済み。

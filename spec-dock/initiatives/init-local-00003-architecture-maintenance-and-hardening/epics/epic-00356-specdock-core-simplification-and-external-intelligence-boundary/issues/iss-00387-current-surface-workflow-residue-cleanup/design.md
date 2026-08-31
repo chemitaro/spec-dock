@@ -161,6 +161,7 @@ Class BをClass Aへ昇格させることは原則禁止する。すなわち、
 | removed CLI/runtime inventory | `REMOVED_HELP_ROUTES`、`REMOVED_RUNTIME_MODULES`、`REMOVED_APPLICATION_CONTRACT_SYMBOLS`、`REMOVED_USE_CASE_FIELDS`、関連absence test/helper | retained registry/import/parityだけを残して削除・分離 |
 | removed flag rejection | direct `active set --checkout` parser-error test、helpの旧flag集合assertion | selector success/no-writeを残して削除 |
 | authoring scanner | `CURRENT_LEGACY_VOCABULARY_PATTERNS`、`_current_vocabulary_violations()`、forbidden phrase detector、mutation/infix/Historical positive control | link/parity/current schemaのpositive testと分離して削除 |
+| legacy active context pack | `tests/cli_runtime/test_runtime_active_s05.py`のAuthority、grants、Promotion、EAL contract test群とledger row | Current structural context-pack assertionを分離し、retirement-only test/assertionとexact ledger参照を撤去 |
 | legacy active behavior | `tests/cli_runtime/test_runtime_active_s06.py`のforce/dependency/GitHub behavior test群とledger row | surviving selection-only/issue-start testを保持し、file/testとexact ledger参照を一体撤去 |
 | legacy flag fast node | `test_active_set_legacy_flag_reports_parser_error`と`REQUIRED_FAST_NODE_IDS`/timing weight entry | positive selector smokeを保持し、testとexact参照を一体撤去 |
 | legacy evidence mutation | `S09_LEGACY_EVIDENCE_MUTATIONS`、`apply_s09_legacy_evidence_mutation`、`s09_invariance.py`とconsumer tests | current lifecycle/doctor behaviorの唯一の観測でなければ削除 |
@@ -234,7 +235,7 @@ Planの各checkは次のfieldを持つ。
 | cleanup対象 | temp/build/cache/orphan support |
 | 状態 | `NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)` |
 
-command未実行、policy skip、対象test未collectionをPASSにしない。Planのstatus ledgerは実施時に更新し、詳細な長いlogはReportへ複製せず要約と参照だけを残す。
+command未実行、policy skip、対象test未collectionをPASSにしない。Planのversion管理status ledgerはreview candidate freezeまでのcheckを実施時に更新する。commit/push/Strict/PRのpost-freeze gateはreviewed SHAを変更しないPR/handoff evidenceへ記録する。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
 
 ## 8. Epic #384との境界
 
@@ -269,7 +270,7 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | test budgetが純増 | 新規test/supportを除去する。例外が必要なら実装を止めR/D/Pを再承認する |
 | Epic #384 file変更が必要 | 本Issueから除外しEpic #384へhandoffする |
 | 削除nodeへのledger/timing/required-node参照 | exact entryだけを同時に除去し、他entryまたはpolicyへ波及するなら停止する |
-| Full Regression failure | C40-08のdeleted-node exact参照更新をfailure前に確定し、それ以外のledger/timing/shardを変更せず原因diffを修正する |
+| Full Regression failure | C40-09のdeleted-node exact参照更新をfailure前に確定し、それ以外のledger/timing/shardを変更せず原因diffを修正する |
 
 ### 9.3 Rollback
 
