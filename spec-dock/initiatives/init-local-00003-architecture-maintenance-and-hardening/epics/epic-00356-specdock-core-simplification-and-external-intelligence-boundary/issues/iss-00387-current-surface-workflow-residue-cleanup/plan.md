@@ -492,13 +492,29 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** inventoryした同一wheel artifactからCurrent contractを再現し、source pathからの暗黙rebuildを排除する。
 - **前提:** C50-02 PASS。
-- **操作:** 空の専用artifact directoryへ1回だけclean buildし、exactly one wheel/sdistを確定する。両artifactのinventory/digestを採取し、同じ`$WHEEL` absolute pathを`uvx --isolated --no-cache --from`へ渡してfresh consumerをinitする。sdistはinventory evidenceにだけ使う。
+- **操作:** 空の専用artifact directoryへ1回だけclean buildし、exactly one wheel/sdistを確定する。両artifactのinventory/digestを採取し、同じ`$WHEEL` absolute pathを`uvx --isolated --no-cache --from`へ渡してfresh consumerをinitする。sdistはinventory evidenceにだけ使う。各一時pathを作成直後に出力し、nonzero終了時は同check内で作成済みexact pathだけをcleanupする。
 - **確認:** repository rootで次のzsh blockをそのまま実行し、consumer contentを確認する。
 
   ```zsh
+  (
   set -euo pipefail
+  typeset ARTIFACT_DIR=''
+  typeset CONSUMER=''
+  cleanup_c60_01_failure() {
+    local exit_status=$?
+    trap - EXIT
+    set +e
+    [[ -z "$CONSUMER" ]] || { printf 'C60-01_FAILURE_CLEANUP_CONSUMER=%s\n' "$CONSUMER" >&2; rm -rf -- "$CONSUMER"; }
+    [[ -z "$ARTIFACT_DIR" ]] || { printf 'C60-01_FAILURE_CLEANUP_ARTIFACT_DIR=%s\n' "$ARTIFACT_DIR" >&2; rm -rf -- "$ARTIFACT_DIR"; }
+    [[ -z "$CONSUMER" || ! -e "$CONSUMER" ]] || printf 'C60-01_FAILURE_CLEANUP_REMAINS_CONSUMER=%s\n' "$CONSUMER" >&2
+    [[ -z "$ARTIFACT_DIR" || ! -e "$ARTIFACT_DIR" ]] || printf 'C60-01_FAILURE_CLEANUP_REMAINS_ARTIFACT_DIR=%s\n' "$ARTIFACT_DIR" >&2
+    exit "$exit_status"
+  }
+  trap cleanup_c60_01_failure EXIT
   ARTIFACT_DIR="$(mktemp -d)"
+  printf 'ARTIFACT_DIR=%s\n' "$ARTIFACT_DIR"
   CONSUMER="$(mktemp -d)"
+  printf 'CONSUMER=%s\n' "$CONSUMER"
   uv build --clear --out-dir "$ARTIFACT_DIR" .
   test "$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'spec_dock-*.whl' -print | wc -l | tr -d ' ')" -eq 1
   test "$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'spec_dock-*.tar.gz' -print | wc -l | tr -d ' ')" -eq 1
@@ -519,12 +535,14 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
   done
   shasum -a 256 "$WHEEL" "$SDIST"
   printf 'ARTIFACT_DIR=%s\nWHEEL=%s\nSDIST=%s\nCONSUMER=%s\n' "$ARTIFACT_DIR" "$WHEEL" "$SDIST" "$CONSUMER"
+  trap - EXIT
+  )
   ```
 
-- **期待結果:** one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init/validate/help/cmp成功。current二skillと`ci.yml`あり、retired `.codex`なし。sdistは実行sourceに使われない。
-- **証拠:** artifact dir、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、consumer path、exit、cmp summary。
-- **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要。
-- **cleanup:** `$CONSUMER`と`$ARTIFACT_DIR`をC90-04でexact ownership確認後に削除。
+- **期待結果:** 一時pathが各作成直後に出力される。one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init/validate/help/cmp成功。current二skillと`ci.yml`あり、retired `.codex`なし。success時はtrapが解除され、二directoryがC90-04まで残る。
+- **証拠:** immediate path lines、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、exit、cmp summary。nonzero時はfailure cleanup pathと残存有無。
+- **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
+- **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
 
 ### C60-02 — Current Full Regression
 
@@ -552,14 +570,55 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 ### C90-02 — After metrics/test budget
 
-- **対象 / 目的:** testを含む撤退を数量確認する。
-- **前提:** collection成功。
-- **操作:** C00-04と同じ方法でafter metricsを採取する。
-- **確認:** collect-only、tracked test/fixture listing、explicit LOC aggregation、`git diff --numstat <implementation-baseline-sha>`。
-- **期待結果:** 四指標純増なし、candidate coverage=1.0、removable closure=1.0、surviving tests保持。
-- **証拠:** before/after/delta、deleted production/test LOC、情報比率。
-- **停止条件:** 未承認増加、candidate未決、positive coverage欠落、数字を稼ぐ削除。
-- **cleanup:** metric用temporary fileがあればWorkbenchから除去。
+- **対象 / 目的:** stagingに依存しないworking-tree母集団で、testを含む撤退を数量確認する。
+- **前提:** C90-01完了。C90-02のためのstaging/index mutationは行わない。
+- **操作:** `git ls-files -z -- tests`からworking treeに現存するtracked pathだけを明示listへ残し、missing tracked pathは除外する。`tests`配下のnon-ignored untracked pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体のcollect-only、残る三指標は同じexisting tracked listから算出する。
+- **確認:** repository rootで次のzsh blockをそのまま実行する。
+
+  ```zsh
+  (
+  set -euo pipefail
+  C90_METRIC_DIR="$(mktemp -d)"
+  trap 'status=$?; rm -rf -- "$C90_METRIC_DIR"; exit "$status"' EXIT
+  TRACKED_LIST="$C90_METRIC_DIR/tracked-tests.zlist"
+  UNTRACKED_LIST="$C90_METRIC_DIR/untracked-tests.zlist"
+  COLLECT_OUTPUT="$C90_METRIC_DIR/collect-only.txt"
+  git ls-files -z -- tests > "$TRACKED_LIST"
+  typeset -a EXISTING_TRACKED_TESTS=()
+  typeset -a EXISTING_TRACKED_TEST_PY=()
+  typeset -a EXISTING_TRACKED_FIXTURES=()
+  while IFS= read -r -d '' path; do
+    if [[ ! -e "$path" ]]; then
+      printf 'C90-02_EXCLUDED_MISSING_TRACKED=%s\n' "$path"
+      continue
+    fi
+    EXISTING_TRACKED_TESTS+=("$path")
+    [[ "$path" != *.py ]] || EXISTING_TRACKED_TEST_PY+=("$path")
+    [[ "$path" != tests/fixtures/* ]] || EXISTING_TRACKED_FIXTURES+=("$path")
+  done < "$TRACKED_LIST"
+  git ls-files -z --others --exclude-standard -- tests > "$UNTRACKED_LIST"
+  if [[ -s "$UNTRACKED_LIST" ]]; then
+    while IFS= read -r -d '' path; do printf 'C90-02_NON_IGNORED_UNTRACKED=%s\n' "$path" >&2; done < "$UNTRACKED_LIST"
+    exit 1
+  fi
+  (( ${#EXISTING_TRACKED_TESTS[@]} > 0 ))
+  (( ${#EXISTING_TRACKED_TEST_PY[@]} > 0 ))
+  uv run pytest --collect-only -q | tee "$COLLECT_OUTPUT"
+  COLLECTED_TEST_COUNT="$(sed -nE 's/^([0-9]+) tests? collected.*$/\1/p' "$COLLECT_OUTPUT" | tail -n 1)"
+  [[ -n "$COLLECTED_TEST_COUNT" ]]
+  TRACKED_TEST_PY_LOC="$(wc -l "${EXISTING_TRACKED_TEST_PY[@]}" | awk 'END { print $1 }')"
+  printf 'COLLECTED_TEST_COUNT=%s\nTRACKED_TEST_PY_LOC=%s\nTRACKED_TEST_FILE_COUNT=%s\nTRACKED_FIXTURE_FILE_COUNT=%s\n' \
+    "$COLLECTED_TEST_COUNT" "$TRACKED_TEST_PY_LOC" "${#EXISTING_TRACKED_TESTS[@]}" "${#EXISTING_TRACKED_FIXTURES[@]}"
+  git diff --numstat "<implementation-baseline-sha>"
+  rm -rf -- "$C90_METRIC_DIR"
+  trap - EXIT
+  )
+  ```
+
+- **期待結果:** non-ignored untracked path 0。unstaged deletionを含むmissing tracked pathは母集団から除外される。四指標純増なし、candidate coverage=1.0、removable closure=1.0、surviving tests保持。
+- **証拠:** existing tracked path数、excluded missing path、collect summary、before/after/delta、`git diff --numstat`によるdeleted production/test LOCと情報比率。
+- **停止条件:** non-ignored untracked path、existing tracked母集団0、collection/parse error、未承認増加、candidate未決、positive coverage欠落、stagingを要求する手順、数字を稼ぐ削除。
+- **cleanup:** `$C90_METRIC_DIR`だけをblock内で削除し、candidate listをrepository script/helper/testへ保存しない。
 
 ### C90-03 — SpecDock integrity
 
@@ -576,12 +635,12 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
 - **前提:** C00-01〜C90-03のversion管理ledgerが全てPASSまたは理由付きN/A。
-- **操作:** temp consumer、build artifact、cacheをexact ownership確認後に片付ける。ReportのOutcome/Verification/Risksを完成させ、final tracked contentを確定する。C90-04自身のPASSをPlan/Reportへ書かず、この最終contentをcommit candidateとしてfreezeする。
-- **確認:** version管理ledgerとraw command evidence、Report内容、`git status --short --untracked-files=all`、`git diff --check`を照合する。
-- **期待結果:** C00-01〜C90-03にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
+- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。その他の本Issue所有cacheもexact ownership確認後に片付ける。ReportのOutcome/Verification/Risksを完成させ、final tracked contentを確定する。C90-04自身のPASSをPlan/Reportへ書かず、この最終contentをcommit candidateとしてfreezeする。
+- **確認:** `test -n "$ARTIFACT_DIR"`、`test -n "$CONSUMER"`、`test "$ARTIFACT_DIR" != "$CONSUMER"`、各`test -d`、cleanup前後のexact path出力、各`test ! -e`を実行する。その後、version管理ledgerとraw command evidence、Report内容、`git status --short --untracked-files=all`、`git diff --check`を照合する。
+- **期待結果:** C60-01 success時に保持された二つのmktemp-owned directoryだけがexact pathで削除される。C00-01〜C90-03にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
 - **証拠:** candidate freezeのPASS/BLOCKEDをPR/handoff evidenceへ記録し、version管理Plan/Reportには追記しない。
-- **停止条件:** raw実行なしのPASS、final SHA自己参照、長いlog複製、unknown temporary/untracked path。
-- **cleanup:** 本Issue所有temporaryとduplicate scratch/logだけ。user-owned/unknown pathが混在する場合は停止する。
+- **停止条件:** C60-01 evidenceとcleanup変数の不一致、empty/same/missing/unknown path、raw実行なしのPASS、final SHA自己参照、長いlog複製、unknown temporary/untracked path。
+- **cleanup:** C60-01がsuccess時に保持したexact `$CONSUMER`と`$ARTIFACT_DIR`、およびownershipを証明できる本Issue所有temporary/duplicate scratch/logだけ。glob、prefix、parent directory、user-owned/unknown pathは削除しない。
 
 ### C90-05 — Commit、push、Strict quality gate、PR
 

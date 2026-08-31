@@ -149,7 +149,7 @@ definition-only、phantom package-data、Epic #384 ownershipを証明できな�
 
 ### I387-N04 — 比例的検証と再現性
 
-TDDは、現在残るbehaviorに実質的変更があり、既存testで期待する失敗を再現できない場合だけ適用する。文書、設定、dead residue、retirement-only test supportの削除には新しいRED/absence testを作らず、Planのone-time checklistを使う。既存testで残存behaviorを十分に観測できる場合は新規testを追加しない。実行したcommand、結果、未実施checkを区別してReportへ記録する。fresh consumerはclean buildで一意に確定し、inventoryとdigestを採取した同一wheelのabsolute pathを`uvx --isolated --no-cache --from <exact-wheel-path>`へ渡して実行する。sdistは同じbuildのinventory evidenceとして検査するが、fresh consumer executionには使用しない。
+TDDは、現在残るbehaviorに実質的変更があり、既存testで期待する失敗を再現できない場合だけ適用する。文書、設定、dead residue、retirement-only test supportの削除には新しいRED/absence testを作らず、Planのone-time checklistを使う。既存testで残存behaviorを十分に観測できる場合は新規testを追加しない。実行したcommand、結果、未実施checkを区別してReportへ記録する。fresh consumerはclean buildで一意に確定し、inventoryとdigestを採取した同一wheelのabsolute pathを`uvx --isolated --no-cache --from <exact-wheel-path>`へ渡して実行する。sdistは同じbuildのinventory evidenceとして検査するが、fresh consumer executionには使用しない。C60-01は一時directoryを各作成直後に記録し、非0終了時は同check内で作成済みexact pathだけを削除する。成功時だけfailure trapを解除し、C90-04へexact ownershipを渡す。
 
 ### I387-N05 — distribution非変更
 
@@ -157,7 +157,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 
 ### I387-N06 — test budget
 
-原則としてcollected test count、tracked test Python LOC、tracked test file数、tracked fixture file数をimplementation baselineより増やさない。新しいtest file、fixture、scanner、mutation framework、Issue固有helperを追加しない。残存behaviorに未検出riskがあり新規test以外で観測できない場合は、実装前にRequirement/Design/Planを改訂して理由、最小範囲、相殺するretirementを承認し直す。本Issueの現行分析ではこの例外を予定しない。
+原則としてcollected test count、tracked test Python LOC、tracked test file数、tracked fixture file数をimplementation baselineより増やさない。新しいtest file、fixture、scanner、mutation framework、Issue固有helperを追加しない。C90-02のafter metricsはstagingを前提にせず、`git ls-files tests`を起点にworking treeで現存するtracked pathだけを明示母集団とする。`tests`配下のnon-ignored untracked pathが一件でもあれば計測前に停止し、unstaged deletionを含む現存しないtracked pathは除外する。残存behaviorに未検出riskがあり新規test以外で観測できない場合は、実装前にRequirement/Design/Planを改訂して理由、最小範囲、相殺するretirementを承認し直す。本Issueの現行分析ではこの例外を予定しない。
 
 ## 7. 境界・失敗条件
 
@@ -166,6 +166,8 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 - `.codex`のlive sourceまたはpackage consumerが見つかった場合、package-data entryを削除せず再調査する。
 - `tests/cli_runtime/test_runtime_active_s06.py`のremove/retain判断と専用mypy overrideのremove/retainが一致しない場合は停止する。
 - fresh consumerがinventory済みwheel以外、project path `.`、またはsdistを`--from`へ渡す場合は停止し、同一wheel artifactへ再束縛する。
+- C60-01の非0終了時に作成済みexact pathが残る、またはそれ以外をcleanupする場合は停止する。成功時はC90-04が同じpath evidenceのみをcleanupする。
+- C90-02で`tests`配下のnon-ignored untracked pathを検出した場合は四指標の計測前に停止し、metricsのためにstageしない。
 - test assetがauthoritative Historical evidenceまたはsurviving behaviorの唯一の観測手段である場合、その項目の削除を止め、混合責務を分離できるか再判定する。
 - checklist確認を自動化するために新しいabsence test/scannerが必要になった場合、その自動化を止め、one-time evidenceとして実行する。
 - Epic #384所有fileの変更が必要になった場合、その作業を本Issueへ取り込まずEpic #384へ返す。
@@ -188,9 +190,9 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 | I387-AC10 | `tests.cli_runtime.test_delegated_authoring` module memberとphantom package-data globがなく、S06 testを削除した場合だけ専用mypy override全体もなく、S06 testを保持した場合は同overrideが不変で残る。その他の`pyproject.toml` entryとcurrent install assetsは保持される |
 | I387-AC11 | definition-only候補がproof成立時だけ削除され、判断結果がReportに残る |
 | I387-AC12 | retirement-only test/support候補が100%分類され、削除可能項目とそのorphan supportが撤去され、保持項目にはsurviving consumerと理由がある |
-| I387-AC13 | 新しいabsence test/scanner/fixture/helperを追加せず、collected test count、test LOC、test file数、fixture file数がbaselineから純増しない |
+| I387-AC13 | 新しいabsence test/scanner/fixture/helperを追加せず、collected test count、test LOC、test file数、fixture file数がbaselineから純増しない。C90-02はstagingなしで現存tracked pathだけを列挙し、non-ignored untrackedがあれば計測前に停止する |
 | I387-AC14 | version管理ledgerのC00-01〜C90-03がPASSまたは理由付きN/AでReportに追跡でき、candidate freeze C90-04とcommit/push/final validate/Strict/PR C90-05はfinal SHAを変えないPR/handoff evidenceで追跡できる |
-| I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean packageの実結果が記録され、fresh consumerはinventory/digest採取済みの同一exact wheelを`uvx --isolated --no-cache --from`で実行する。sdistはinventory evidenceとして検査され、project path `.`またはsdistをfresh consumerのexecution sourceにしない |
+| I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean packageの実結果が記録され、fresh consumerはinventory/digest採取済みの同一exact wheelを`uvx --isolated --no-cache --from`で実行する。sdistはinventory evidenceとして検査され、project path `.`またはsdistをfresh consumerのexecution sourceにしない。C60-01はpathを作成直後に記録し、失敗時は同check内、成功時はC90-04でexact cleanupする |
 | I387-AC16 | current二skill、consumer CI、authoritative Historical evidence、Epic #384所有surfaceに意図しない差分がない |
 | I387-AC17 | final candidate内容を含むSHAで`spec-dock validate`が成功し、Issue #387のR/D/P/Reportが履歴を捏造しない |
 | I387-AC18 | 削除testを参照していたledger/timing/required-node entryが同じ変更で整合し、その他のFull Regression schema、policy、shard、workflow、weight算出方法に差分がない |
