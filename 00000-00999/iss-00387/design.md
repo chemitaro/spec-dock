@@ -230,7 +230,13 @@ fresh consumerのinstaller executionは、その場でinventoryした同一wheel
 
 C60-01は最初の一時directory作成前にfailure trapを設定し、`ARTIFACT_DIR`と`CONSUMER`を各`mktemp -d`直後に記録する。nonzero終了時は同checkで作成済みのexact pathだけを削除する。success時だけtrapを解除し、C90-04が同じpath evidenceを照合してcleanupする。
 
-C60-01成功後にtracked contentへ一行でも差分を加えた場合、その時点でC60-01、C60-02、C90-01〜C90-04の旧evidence/statusを失効させる。C60-01のimmediate path evidenceと照合して旧`CONSUMER`と`ARTIFACT_DIR`だけをcleanupし、変更後contentからC60-01以降を再実行する。旧wheelの結果をfinal candidate evidenceとして再利用しない。
+C60-01成功直後にimplementation baselineからのtracked diffを一時fileへ保存してSHA-256を記録する。以後のtracked editは、直前snapshotと編集後snapshotの差分に現れた新しいpath/hunkだけを次の三分類で扱う。baselineからの累積diff全体を再分類しない。evidence-only editを受理したら編集後snapshotを次の比較基準へ昇格する。substantive editなら両snapshotをexact cleanupし、指定checkからの再実行で新しいC60 snapshotを作る。
+
+1. **evidence-only:** current IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`と`Evidence reference`だけ、またはcurrent Issue Reportの`Outcome`、`Verification`、`Residual Risks / Follow-ups`本文だけへ、実測済み事実を記録する変更。この変更だけなら既存checkを失効させない。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しの変更は含めない。
+2. **Markdown-only substantive:** evidence-only以外の差分がtracked `*.md`だけに限定される変更。C50-01は有効のまま、C50-02〜C90-04を失効させ、C50-02から再実行する。
+3. **non-Markdown or ambiguous:** Markdown以外を一つでも変更する、または上記二分類を証明できない変更。C50-01〜C90-04を失効させ、C50-01から再実行する。
+
+2または3を検出した時点で、失効対象を`NOT_RUN`へ戻す。C60-01が保持した一時directoryがある場合はimmediate path evidenceと照合した旧`CONSUMER`と`ARTIFACT_DIR`だけを先にcleanupし、不在証拠を残す。再実行の途中で作成した新しいwheel、digest、fresh consumer、verifier、audit結果だけをfinal candidate evidenceに使う。この分類により、実測記録は有限回で完了でき、実装・test・config・inventoryの変更はfocused、lint、ordinary suiteを含め最終candidateへ再束縛される。
 
 after test metricsはstagingへ依存させない。`git ls-files -z -- tests`のうちworking treeに現存するpathだけをLOC/file/fixture指標の母集団とし、non-ignored untracked test pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体の`uv run pytest --collect-only -q`を使い、個別のfilename patternでdiscoveryを再定義しない。
 
@@ -251,7 +257,7 @@ Planの各checkは次のfieldを持つ。
 | cleanup対象 | temp/build/cache/orphan support |
 | 状態 | `NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)` |
 
-command未実行、policy skip、対象test未collectionをPASSにしない。Planのversion管理status ledgerはfinal content writeより前に完了できるC00-01〜C90-03だけを実施時に更新する。candidate freeze C90-04とcommit/push/final validate/Strict/PR C90-05はfinal SHAを変更しないPR/handoff evidenceへ記録する。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
+command未実行、policy skip、対象test未collectionをPASSにしない。Planのversion管理status ledgerはfinal content writeより前に完了できるC00-01〜C90-03だけを実施時に更新する。ledgerの`状態`と`Evidence reference`、およびReportの3実測欄だけの更新は6.4のevidence-only editとして扱い、記録行為だけでcheckを自己失効させない。candidate freeze C90-04とcommit/push/final validate/Strict/PR C90-05はfinal SHAを変更しないPR/handoff evidenceへ記録する。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
 
 ## 8. Epic #384との境界
 

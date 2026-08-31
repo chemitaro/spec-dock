@@ -544,7 +544,13 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
 - **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
 
-**Evidence invalidation rule:** C60-01 PASS後にtracked contentが変更された場合、C60-01、C60-02、C90-01〜C90-04をNOT_RUNへ戻す。旧C60-01のimmediate path evidenceとbyte-for-byte照合した`$CONSUMER`と`$ARTIFACT_DIR`だけを削除・不在確認し、そのcleanup証拠を残す。変更後のtracked contentからC60-01以降を再実行し、旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceに流用しない。
+**Evidence recording and invalidation rule:** C60-01 PASS直後、`C60_TRACKED_SNAPSHOT="$(mktemp)"`で本Issue所有の空fileを作り、そのexact pathを出力する。`git diff --binary "$IMPLEMENTATION_BASELINE_SHA" -- . > "$C60_TRACKED_SNAPSHOT"`と`shasum -a 256 "$C60_TRACKED_SNAPSHOT"`で、その時点のtracked candidateを保存する。以後tracked contentを編集するたびに、同じ方法で別の`C60_TRACKED_AFTER`を作り、`diff -u "$C60_TRACKED_SNAPSHOT" "$C60_TRACKED_AFTER"`に現れた新しいpath/hunkだけを次の順で一度分類する。baselineからの累積diff全体を分類対象にしない。
+
+1. 新しいhunkがcurrent IssueのPlanにあるC00-01〜C90-03 ledgerの`状態`・`Evidence reference`、およびcurrent Issue Reportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文への実測事実の記録だけなら`EVIDENCE_ONLY`とする。check定義、command、期待結果、停止条件、cleanup、R/D/P契約、Report見出しを一文字でも変えた場合は該当しない。`EVIDENCE_ONLY`は既存status/evidenceを失効させない。旧`C60_TRACKED_SNAPSHOT`だけを削除し、`C60_TRACKED_AFTER`を`C60_TRACKED_SNAPSHOT`へ置き換えてpathとSHA-256を再記録してから次checkへ進む。
+2. `EVIDENCE_ONLY`ではなく、変更pathが全てtracked `*.md`なら`MARKDOWN_SUBSTANTIVE`とする。C50-02〜C90-04を`NOT_RUN`へ戻し、C50-02から再実行する。C50-01の既存PASSだけは保持できる。
+3. Markdown以外のtracked pathが一つでも変わる、または分類に迷う場合は`NON_MARKDOWN_OR_AMBIGUOUS`とする。C50-01〜C90-04を`NOT_RUN`へ戻し、C50-01から再実行する。
+
+2または3では`C60_TRACKED_SNAPSHOT`と`C60_TRACKED_AFTER`をexact pathで削除・不在確認する。さらにC60-01 success時の一時directoryが残っている場合は、再実行前に旧C60-01のimmediate path evidenceとbyte-for-byte照合した`$CONSUMER`と`$ARTIFACT_DIR`だけを削除・不在確認し、そのcleanup証拠をReportへ記録する。旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceへ流用しない。再実行中のledger/Report更新は1の`EVIDENCE_ONLY`なので再失効を発生させない。
 
 ### C60-02 — Current Full Regression
 
@@ -640,12 +646,12 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
 - **前提:** C00-01〜C90-03のversion管理ledgerが全てPASSまたは理由付きN/A。
-- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。その他の本Issue所有cacheもexact ownership確認後に片付ける。ReportのOutcome/Verification/Risksを完成させ、final tracked contentを確定する。C90-04自身のPASSをPlan/Reportへ書かず、この最終contentをcommit candidateとしてfreezeする。
+- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。Plan ledgerの`状態`・`Evidence reference`とReportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`だけに実測事実を記録し、Evidence recording and invalidation ruleの`EVIDENCE_ONLY`であることを直前snapshotとの差分hunkごとに確認してfinal tracked contentを確定する。最後の`C60_TRACKED_SNAPSHOT`とその他の本Issue所有cacheもexact ownership確認後に削除・不在確認する。C90-04自身のPASSをPlan/Reportへ書かず、この最終contentをcommit candidateとしてfreezeする。
 - **確認:** `test -n "$ARTIFACT_DIR"`、`test -n "$CONSUMER"`、`test "$ARTIFACT_DIR" != "$CONSUMER"`、各`test -d`、cleanup前後のexact path出力、各`test ! -e`を実行する。その後、version管理ledgerとraw command evidence、Report内容、`git status --short --untracked-files=all`、`git diff --check`を照合する。
 - **期待結果:** C60-01 success時に保持された二つのmktemp-owned directoryだけがexact pathで削除される。C00-01〜C90-03にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
 - **証拠:** candidate freezeのPASS/BLOCKEDをPR/handoff evidenceへ記録し、version管理Plan/Reportには追記しない。
 - **停止条件:** C60-01 evidenceとcleanup変数の不一致、empty/same/missing/unknown path、raw実行なしのPASS、final SHA自己参照、長いlog複製、unknown temporary/untracked path。
-- **cleanup:** C60-01がsuccess時に保持したexact `$CONSUMER`と`$ARTIFACT_DIR`、およびownershipを証明できる本Issue所有temporary/duplicate scratch/logだけ。glob、prefix、parent directory、user-owned/unknown pathは削除しない。
+- **cleanup:** C60-01がsuccess時に保持したexact `$CONSUMER`と`$ARTIFACT_DIR`、最後のexact `C60_TRACKED_SNAPSHOT`、およびownershipを証明できる本Issue所有temporary/duplicate scratch/logだけ。glob、prefix、parent directory、user-owned/unknown pathは削除しない。
 
 ### C90-05 — Commit、push、Strict quality gate、PR
 
@@ -660,7 +666,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 ## 15. Execution status ledger
 
-初期状態はversion管理対象のC00-01〜C90-03が全て`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceを更新する。C90-04とC90-05はfinal tracked contentの自己参照を避けるclosure gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
+初期状態はversion管理対象のC00-01〜C90-03が全て`NOT_RUN`である。実装者は各milestone終了時に状態と短いEvidence referenceだけを更新する。この二列の実測更新は`EVIDENCE_ONLY`であり、既にPASSしたcheckを失効させない。check本文や三列以外を同時に変えた場合はevidence-onlyとして扱わない。C90-04とC90-05はfinal tracked contentの自己参照を避けるclosure gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
 
 | ID | 状態 | Evidence reference |
 |---|---|---|
