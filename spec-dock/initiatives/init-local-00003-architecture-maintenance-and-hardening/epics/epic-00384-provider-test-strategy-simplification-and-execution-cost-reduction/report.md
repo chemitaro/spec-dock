@@ -36,6 +36,8 @@ ID: "epic-00384"
 - one packaging invocationでwheel / sdistをbuildし、Linux canonical / macOS deltaがsame wheelを使う。
 - main push Full Regression、failure ledger、timing、sharder、policy skipsをfinal stateから撤去する。
 - required contextは既存名再利用を優先し、human merge gateを維持する。
+- uninstall後もfixed recordを`state=tooling-absent-preserved-data`として保持し、never-installed `absent`と識別する。reinstallはconsumer seed absenceを保持する。
+- old `0.2.3` mutation-zeroはtarget-scoped startup audit-hook tripwire event 0を主証拠、tree digest不変を補助証拠とする。
 
 ## Planning verification
 
@@ -51,13 +53,13 @@ ID: "epic-00384"
 - `managed_distribution.py` 999,468 bytes、主要tests 774,072 / 454,511 bytes。
 - HTML validation: static 4 sources、official `@plantuml/core@1.2026.6`、browser 4/4 inline SVG、zoom interaction PASS。
 - Tailscale URL: `http://100.85.74.8:8765/epic-00384-provider-test-strategy-vertical-slices-guide.html`。sourceは新しいsingle-implementation-unit guideへのlive symlink。
+- first independent Strict specification review（session `required-strict-github-connector-verificati-566`、SHA `638404525610ea08c7b1ba95ed546939bfab6db9`）はP1を2件検出した。uninstall後record削除によるstate識別不能と、tree digestだけでは一時mutation attemptを検出できない点である。
+- 両P1を採用し、durable tooling-absent recordとtarget-scoped startup audit-hook tripwireをRequirement / Design / Plan / ADR / HTMLへ反映した。
 
 ## Remaining lifecycle gates
 
-- #388〜#390を「Epicへ統合され、実装前にsuperseded」としてGitHub closeする。
-- GitHub #384 / #392 bodyをcanonical docsへ同期する。
-- SpecDock sync / validate / dependency checkを実行する。
-- planning changesをcommit / pushし、clean exact branchへindependent Strict reviewを実行する。
+- P1修正版をGitHub #384 / #392へ再同期し、SpecDock validateを実行する。
+- planning修正版をcommit / pushし、同じStrict review sessionで再審査してP0 / P1 = 0を確認する。
 - implementationは#392の別lifecycleで開始し、final acceptanceまでIssueをopenに保つ。
 
 ## Residual dynamic evidence

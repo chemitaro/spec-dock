@@ -38,6 +38,7 @@ Provider distribution lifecycle、public installer CLI、test portfolio、artifa
 - exact `0.2.3`だけをone-shot migrateし、migration後はnew installation recordとslot markersだけをauthorityとする。
 - active legacy recovery、unsupported legacy、modified / foreign markerless slotは推測変換せずmutation前にblockする。
 - candidateを全てstage / validateしてから、`docs -> templates -> system -> scripts -> skill slots`の順で置換し、ready recordを最後に書く。
+- uninstall完了時はfixed recordを削除せず、`state=tooling-absent-preserved-data`へatomic replaceする。record不在のnever-installed `absent`と識別し、reinstallでfresh-init-only seedsを再作成しない。
 - root / slot間failure後は同じoperation・同じcandidateのexternal rerunだけで収束し、別candidate / cross-intent rerunをblockする。
 - automatic rollback、arbitrary checkpoint、old engine fallbackをpublic contractにしない。
 
@@ -56,7 +57,7 @@ Provider distribution lifecycle、public installer CLI、test portfolio、artifa
 - pure/domain testsはfilesystem、Git、package build、CLI subprocessを起動しない。
 - filesystem/service testsは最小synthetic workspaceと注入可能なfaultを使う。
 - CLI testsはarguments、text / JSON、exitと代表happy / fail-closed pathsに限定する。
-- built-artifact testsはexact `0.2.3 -> final -> uninstall -> reinstall`、old-package mutation-zero、Linux lifecycle、macOS deltaを証明する。
+- built-artifact testsはexact `0.2.3 -> final -> uninstall -> reinstall`、durable uninstall discriminator、old-package mutation-zero、Linux lifecycle、macOS deltaを証明する。mutation-zeroはtarget-scoped startup-injected Python audit-hook tripwire event 0を主証拠、tree digest不変を補助証拠とする。
 - 26 active ledger nodesをfix、current successor、accepted contract retirementのいずれかへterminal化し、approved failure 0、policy skip 0にする。
 - same candidate / OS / contractのduplicate nodeを0にする。
 
@@ -100,7 +101,7 @@ Provider distribution lifecycle、public installer CLI、test portfolio、artifa
 - incomplete recordがある場合、同じoperation・candidateだけを許可する。
 - ready成立前にroot / slot処理が残ればpartial_failure / exit 1とする。
 - ready成立後にvalid owned temporary cleanupだけが残る場合に限りcompleted_with_warnings / exit 0を許可する。
-- old `0.2.3` packageがfinal workspaceを一つでも変更する場合はmergeしない。bridge generationを追加せずfinal marker / formatを修正する。
+- old `0.2.3` packageがfinal workspaceへのmutationを一度でもattemptする場合はmergeしない。保護対象配下のwrite/create/truncate/append、remove、rename、rmdir、mkdir、chmod、link、symlink等をsyscall完了前にtripwireでfailさせる。bridge generationを追加せずfinal marker / formatを修正する。
 - required contextのlive stateを観測できない場合、外部設定を推測変更しない。
 
 ## 受け入れ条件
@@ -108,8 +109,9 @@ Provider distribution lifecycle、public installer CLI、test portfolio、artifa
 - [ ] 4 roots / 2 slots以外へprovider mutation authorityがない。
 - [ ] user history、`.workbench`、unknown non-target、unrelated skills、consumer seedsがbyte-identicalである。
 - [ ] fresh、exact `0.2.3` migration、ready update、tooling uninstall、tooling-absent reinstallがbuilt wheelでGREENである。
+- [ ] uninstall後もdurable `tooling-absent-preserved-data` recordが残り、never-installed `absent`と識別され、reinstallがfresh-init-only seedsを再作成しない。
 - [ ] active legacy recovery、unsupported legacy、foreign / invalid target、root / parent symlinkがmutation 0でblockされる。
-- [ ] old `0.2.3`の`init --force`、update、tooling uninstall、`--remove-specs`がfinal workspaceにmutation 0である。
+- [ ] old `0.2.3`の`init --force`、update、tooling uninstall、`--remove-specs`がfinal workspaceでaudit-hook tripwire event 0かつtree digest不変である。
 - [ ] `--remove-specs`がtext / JSONの両modeでremoved-operation error、exit 2、mutation 0を返す。
 - [ ] root / slot境界のseeded faults後にsame-candidate rerunで収束し、cross-intent rerunをblockする。
 - [ ] active ledger 26 nodesがfix / successor / retirementへterminal化し、ledger自体が削除されている。

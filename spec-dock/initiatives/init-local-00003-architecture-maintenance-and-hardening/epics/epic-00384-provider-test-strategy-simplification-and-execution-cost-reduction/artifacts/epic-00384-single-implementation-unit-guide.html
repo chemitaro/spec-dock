@@ -390,7 +390,7 @@ end note
 
     <section>
       <h2>4. 確定した所有境界</h2>
-      <p>providerは4 roots、2 slots、small recordだけを管理します。user data、unknown paths、shared parentを管理対象へ広げません。</p>
+      <p>providerは4 roots、2 slots、small recordだけを管理します。user data、unknown paths、shared parentを管理対象へ広げません。small recordはuninstall後も<code>tooling-absent-preserved-data</code>として残り、never-installed <code>absent</code>と区別します。</p>
       <script type="text/plain" class="plantuml-source" id="source-ownership" data-target="diagram-ownership">
 @startuml
 title Provider toolingの所有境界
@@ -438,11 +438,14 @@ state "tooling absent" as Absent
 state "exact 0.2.3" as Legacy
 state "incomplete\n(operation, candidate)" as Incomplete
 state "ready\n(version, digest)" as Ready
+state "tooling absent\npreserved data record" as ToolingAbsent
 state "blocked\n算出状態" as Blocked
-Absent --> Incomplete : install / reinstall
+Absent --> Incomplete : fresh install
 Legacy --> Incomplete : one-shot migration
 Ready --> Incomplete : update / uninstall
 Incomplete --> Ready : roots・slots完了後\nready recordを書く
+Incomplete --> ToolingAbsent : uninstall完了後\nrecordをatomic replace
+ToolingAbsent --> Incomplete : reinstall\nconsumer seedsはpreserve
 Incomplete --> Incomplete : 同じoperation・candidateを再実行
 Incomplete --> Blocked : 別operation / candidate
 Legacy --> Blocked : active recovery / evidence不一致
@@ -476,7 +479,7 @@ end note
           <tr><td><code>init --force</code></td><td>install / update alias。追加の破壊authorityなし</td></tr>
           <tr><td><code>update</code></td><td>readyまたはsame incomplete candidateをupdate / resume</td></tr>
           <tr><td><code>uninstall</code></td><td>tooling-only dry-run</td></tr>
-          <tr><td><code>uninstall --apply</code></td><td>4 roots、valid 2 slots、recordだけを削除</td></tr>
+          <tr><td><code>uninstall --apply</code></td><td>4 roots、valid 2 slotsを削除し、recordを<code>tooling-absent-preserved-data</code>へatomic replace</td></tr>
           <tr><td><code>--keep-specs</code></td><td>default uninstallと同義のcompatibility alias</td></tr>
           <tr><td><code>--remove-specs</code></td><td>permanent non-mutating trap。error code、exit 2</td></tr>
         </tbody>
@@ -489,9 +492,9 @@ end note
       <p>次はIssue分割ではなく、同じ実装ユニットの内部順序です。</p>
       <ol>
         <li><strong>M1 Successor contract freeze:</strong> ownership、record、marker、legacy recognizer、CLI result、lane ownershipをtest-firstで固定します。</li>
-        <li><strong>M2 Minimal lifecycle core:</strong> no-follow binding、stage、record、root / slot replacement、fault seamsを実装します。</li>
-        <li><strong>M3 Combined public cutover:</strong> init / update / uninstall / reinstallとpublic docsをfinal servicesへ接続します。</li>
-        <li><strong>M4 Legacy / downgrade proof:</strong> exact 0.2.3 migration、unsupported block、old-package mutation-zeroをbuilt artifactで証明します。</li>
+        <li><strong>M2 Minimal lifecycle core:</strong> no-follow binding、stage、ready / incomplete / durable tooling-absent record、root / slot replacement、fault seamsを実装します。</li>
+        <li><strong>M3 Combined public cutover:</strong> init / update / uninstall / reinstallとpublic docsをfinal servicesへ接続し、reinstallがfresh-init-only seedsを再作成しないことを固定します。</li>
+        <li><strong>M4 Legacy / downgrade proof:</strong> exact 0.2.3 migration、unsupported block、old-package mutation-zeroをbuilt artifactで証明します。mutation-zeroはtarget-scoped startup audit-hook tripwire event 0が主証拠で、tree digest不変は補助証拠です。</li>
         <li><strong>M5 Old product / test removal:</strong> successor proof後だけper-file engine、journal、purge、historical testsを削除します。</li>
         <li><strong>M6 Failure / portfolio consolidation:</strong> active 26 nodesをterminal化し、ledgerとpolicy skipをなくします。</li>
         <li><strong>M7 Build-once gate:</strong> one build、Linux canonical、macOS delta、metrics、duplicate detectorを実装します。</li>
@@ -540,8 +543,9 @@ end note
         <li>4 roots / 2 slots以外へprovider mutation authorityがありません。</li>
         <li>user history、<code>.workbench</code>、unknown non-target、unrelated skills、consumer seedsがbyte-identicalです。</li>
         <li>fresh、exact 0.2.3 migration、update、tooling uninstall、reinstallがbuilt wheelでGREENです。</li>
+        <li>uninstall後のdurable recordがnever-installed absentと識別され、reinstallがconsumer seedsを再作成しません。</li>
         <li>active legacy recovery、unsupported / foreign / symlink stateはmutation 0でblockされます。</li>
-        <li>old 0.2.3 packageのmutating commandsがfinal workspaceへmutation 0です。</li>
+        <li>old 0.2.3 packageのmutating commandsがtarget-scoped audit-hook tripwire event 0かつtree digest不変です。</li>
         <li><code>--remove-specs</code>は全modeでmutation 0、exit 2です。</li>
         <li>seeded root / slot fault後にsame-candidate rerunで収束し、cross-intent rerunをblockします。</li>
         <li>unexpected failures、approved failures、policy skips、duplicate nodesがすべて0です。</li>

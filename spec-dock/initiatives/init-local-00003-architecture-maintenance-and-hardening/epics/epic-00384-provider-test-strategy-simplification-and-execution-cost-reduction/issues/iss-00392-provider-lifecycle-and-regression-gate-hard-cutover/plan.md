@@ -54,7 +54,7 @@ Sequence rules:
 
 1. no-follow repository / parent bindingとfixed action setを実装する。
 2. candidate staging / validationとtree digestを実装する。
-3. incomplete / ready recordのatomic replaceを実装する。
+3. incomplete / ready recordとuninstall後も残る`tooling-absent-preserved-data` recordのatomic replaceを実装する。
 4. fixed roots replacement、fixed slot marker、exact tombstone cleanupを実装する。
 5. same-operation / same-candidate rerunとcross-intent blockを実装する。
 6.各mutation境界へfault injection seamを置く。
@@ -65,14 +65,14 @@ Sequence rules:
 2. `init`、`init --force`、`update`、`uninstall`をnew servicesへ接続する。
 3. default dry-run、`--apply`、`--keep-specs`、rejected `--remove-specs`を実装する。
 4. text / JSON / exit mappingとmigration / recovery guidanceを更新する。
-5. tooling-absent-preserved-dataからのreinstallを実装する。
+5. durable `tooling-absent-preserved-data` recordからのreinstallを実装し、never-installed `absent`と区別してfresh-init-only seedsを再作成しない。
 
 ### M4. Legacy / downgrade proof
 
 1. exact clean `0.2.3` workspaceとmarkerless 2 slotsをbuilt baseline artifactから作る。
 2. clean migration、absent slots、exact slots、modified / foreign slotsを検証する。
 3. active legacy recoveryとunsupported legacyがwrite 0になることを検証する。
-4. final workspaceへ旧`0.2.3`の`init --force`、update、tooling uninstall、`--remove-specs`を実行し、tree mutation 0を証明する。
+4. target-scoped startup-injected Python audit-hook tripwire付きで旧`0.2.3`の`init --force`、update、tooling uninstall、`--remove-specs`を実行する。最初のmutation attemptをsyscall完了前にfailさせ、tripwire event 0を主証拠、tree digest不変を補助証拠としてmutation 0を証明する。
 5. mutationがあればfinal marker / formatを変更して再検証する。
 
 ### M5. Old product contract removal

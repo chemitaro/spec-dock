@@ -52,6 +52,7 @@ Epic #384の旧計画は、調査、Product判断、lifecycle bridge、writer cu
 - Initiatives、nested Artifacts、`.workbench`、generated projections、unknown non-target paths、unrelated skillsは探索・正規化・削除しない。
 - mutation targetのownershipが不明なら最初のtarget mutation前にpreserve-and-blockする。unknown non-targetはpreserve-and-ignoreする。
 - updateはcandidate全体をstage / validateし、`docs -> templates -> system -> scripts -> skill slots`の順で置換し、ready recordを最後に書く。
+- uninstallは4 rootsとvalid owned 2 slotsを除去した後もfixed installation recordを削除せず、`state=tooling-absent-preserved-data`へatomic replaceする。このdurable discriminatorにより、never-installed `absent`とuninstalled stateを区別する。
 - automatic rollback、arbitrary checkpoint、cross-intent recoveryをpublic contractにしない。同じoperation・同じcandidateのexternal rerunだけを許可する。
 
 ### 3. Legacy compatibility
@@ -60,7 +61,7 @@ Epic #384の旧計画は、調査、Product判断、lifecycle bridge、writer cu
 - 実root binding、exact version / runtime digest、active legacy recovery不存在、2 skill slotsがabsentまたはexact markerless treeであることをmutation前に確認する。
 - migration成功後はnew installation recordとslot markersをauthorityとし、legacy recognizerを再度参照しない。入力集合を将来拡張しない。
 - active legacy journal / retry / purge recoveryは推測変換せずwrite 0でblockし、exact `0.2.3` packageまたはsource artifactでclean stateへ戻してから再実行する。
-- final formatに対する旧`0.2.3`の`init --force`、`update`、tooling uninstall、`--remove-specs`はmutation-zeroでなければmergeしない。失敗時はbridgeを追加せず、final marker / formatを旧engineがblockできる形へ修正する。
+- final formatに対する旧`0.2.3`の`init --force`、`update`、tooling uninstall、`--remove-specs`はmutation-zeroでなければmergeしない。baseline `0.2.3` subprocessをtarget-scoped startup-injected Python audit-hook tripwire付きで実行し、保護対象repository配下のwrite/create/truncate/append、remove、rename、rmdir、mkdir、chmod、link、symlink等をsyscall完了前の最初のmutation attemptでfailさせる。tripwire event 0を主証拠、tree digest不変を補助的な最終状態証拠とする。失敗時はbridgeを追加せず、final marker / formatを旧engineがblockできる形へ修正する。
 
 ### 4. Consumer-owned seeds
 
@@ -76,7 +77,7 @@ Epic #384の旧計画は、調査、Product判断、lifecycle bridge、writer cu
 - spec-history purge capabilityを廃止し、独立purge commandも作らない。
 - `--keep-specs`はdefault tooling-only uninstallと同義のcompatibility aliasとして残す。
 - `--remove-specs`はpermanent non-mutating compatibility trapとして残し、全modeでmutation 0、error code `spec-history-purge-removed`、exit 2を返す。
-- tooling uninstall後の`tooling-absent-preserved-data`から、user dataとconsumer seedsを保持したままreinstallできる。
+- tooling uninstall後もfixed recordの`state=tooling-absent-preserved-data`を保持し、never-installed `absent`と区別する。このrecordからuser dataとconsumer seedsを保持したままreinstallし、fresh-init-only seedを再作成しない。
 
 ### 6. Artifact / platform / CI
 

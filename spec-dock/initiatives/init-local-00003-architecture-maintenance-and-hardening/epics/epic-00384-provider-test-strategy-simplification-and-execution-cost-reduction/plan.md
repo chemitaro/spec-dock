@@ -100,6 +100,7 @@ milestoneはIssueではなく、`iss-00392`内のexecution orderである。
 - no-follow binding、fixed action set
 - candidate stage / validate
 - incomplete / ready record
+- uninstall後も残る`tooling-absent-preserved-data` recordとnever-installed `absent`の識別
 - root / slot replacement、fixed tombstone
 - same-candidate rerun、fault seams
 
@@ -114,6 +115,7 @@ milestoneはIssueではなく、`iss-00392`内のexecution orderである。
 - exact `0.2.3` migration
 - active / unsupported / modified legacy block
 - old-package mutation-zero
+- target-scoped startup audit-hook tripwire event 0と補助tree digest不変
 
 ### M5. Old product / test removal
 
@@ -152,6 +154,7 @@ new gateのGREEN / intentional RED block確認後だけ撤去する。
 - rolling 20
 - Linux / macOS artifact smoke
 - old package mutation-zero
+- durable uninstall discriminatorとfresh-init-only seed非再作成
 - required set final state
 - human merge、merged tree equality
 
