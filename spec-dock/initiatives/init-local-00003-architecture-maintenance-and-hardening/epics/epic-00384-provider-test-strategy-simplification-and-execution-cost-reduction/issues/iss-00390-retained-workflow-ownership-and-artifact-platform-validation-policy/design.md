@@ -39,6 +39,7 @@ Target:
 - platform policy: Linux canonicalとmacOS deltaの対象・trigger・budget。
 - implementation handoff: shipped asset changeはinstall/update Issue、provider CI changeはCI cutover Issueが所有する。
 - required-check handoff: shadow context、old + new required、new-only required、old removalを別transitionとしてexternal ownerへ渡す。
+- effective-set contract: unrelated contexts `U`、ruleset scope、review gateを集合差分でpreserveし、merge queueがactiveならPR / merge-groupを別canaryで検証する。
 
 ## data / failure
 
@@ -59,6 +60,7 @@ workflow ownership decisionにdeprecationが必要なら具体的windowを持つ
 - target ownershipがexisting pathへ一意にmappingできるか確認する。
 - artifact receiptからsource / digest / build count / consumer laneを再計算できるか確認する。
 - required-check state machineの各transitionにprecondition、verification、rollbackがあるか確認する。
+- `U + old -> U + old + new -> U + new`でunrelated contextsとreview gateが不変か確認する。
 
 ## risk
 

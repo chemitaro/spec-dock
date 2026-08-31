@@ -47,9 +47,10 @@ ID: "epic-00384"
 | D2 | `iss-00389` / #389 | Decision-only safe-transition | Tooling Uninstall Spec History Purge And Public CLI Compatibility |
 | D3 | `iss-00390` / #390 | Decision-only safe-transition | Retained Workflow Ownership And Artifact Platform Validation Policy |
 | C4 | proposal | Evidence safe-transition | Rolling Test Contract Inventory And Removal Receipt Head |
-| C5 | proposal | Production vertical | Tooling-Only Uninstall And Purge Dual-Reader Bridge |
+| C5 | proposal | Production vertical | Lifecycle Compatibility Guard And Tooling-Uninstall Bridge |
 | C6 | proposal | Production vertical | Install And Update Cutover To Disposable Roots And Fixed Slots |
 | FIX-* | conditional proposals | Production / test vertical | Behavior-Owned Active Failure Repair Or Contract Retirement |
+| DEC-* | conditional proposals | Decision-only safe-transition | Behavior-Owned Expected-Behavior Decision |
 | C7 | proposal | CI safe-transition | Canonical Portfolio And Shadow Provider Contract Gate |
 | C8 | proposal | External-state safe-transition | Required Check Set Cutover |
 | C9 | proposal | CI safe-transition | Legacy Provider CI And Full Regression Retirement |
@@ -63,6 +64,7 @@ ID: "epic-00384"
 ```text
 D1 ─┐
 D2 ─┼─> C5 Tooling-Only Uninstall / Purge Bridge
+D3 ─┤
 C4 ─┘
 
 D1 ─┐
@@ -70,13 +72,14 @@ D3 ─┼─> C6 Install / Update Cutover
 C4 ─┤
 C5 ─┘
 
-C4 ─> FIX-<contract>*
+C4 ─> DEC-<contract>*（expected behavior未決時）
+C4 + matching DEC-* ─> FIX/RETIRE-<contract>*
 
 D3 ─┐
 C4 ─┼─> C7 Shadow Provider Contract Gate
 C5 ─┤
 C6 ─┤
-FIX-* complete ─┘
+all active failure dispositions terminal ─┘
 
 C7 ─> C8 Required Check Set Cutover
 C8 ─> C9 Legacy CI Retirement
@@ -99,6 +102,7 @@ D1〜D3とC4は並行可能である。production writerはC5、C6を直列に�
 | uninstall-first compatibility bridge / post-uninstall reinstall | C5 |
 | 4 roots + 2 slots + `InstallationRecordV2` / new writer | C6 |
 | active failure fix / retirement / successor | matching `FIX-*`、C5またはC6 |
+| expected behaviorを決定できないactive failure | matching `DEC-*` |
 | behavior test ownership / removal receipt | each behavior-owning production Issue |
 | single-process gate / build once / metrics / lane ownership | C7 |
 | external required-check transition / human gate | C8 |
@@ -169,29 +173,33 @@ exact baseline SHAの全collected nodeをdurable contract、owner layer、curren
 
 - collected node setとinventory node setが一致し、missing disposition / unknown ownerが0。
 - active failure nodeをdurable behavior ownerへ割り当て、判断不能nodeだけ個別decision candidateにする。
+- production route / manifest / journal symbolのconsumer graphを記録し、C5で削除候補となるsymbolがlegacy install / updateから非参照かを判定する。
 - `InventoryHeadV1`と`RemovalReceiptDeltaV1`がparent SHA、result SHA、node digestを持つ。
 - rebase後の再生成、parallel PRのmerge-order再照合、latest head consumptionを検証する。
 
 production code、tests、workflowは変更しない。
 
-## C5 proposal — Tooling-Only Uninstall And Purge Dual-Reader Bridge
+## C5 proposal — Lifecycle Compatibility Guard And Tooling-Uninstall Bridge
 
 ### Observable outcome
 
-legacy install / update writerを維持したまま、tooling-only uninstall / accepted purge surfaceをnew fixed-target serviceへcutoverし、legacy workspaceとfuture `InstallationRecordV2`を安全に読む。
+legacy install / update writerを維持したまま、exact lifecycle compatibility contract、legacy update / `init --force` admission guard、tooling-only uninstall / accepted purge surfaceを一つのvertical compatibility bridgeとしてcutoverする。
 
 ### Creation / start gate
 
-- D1、D2がaccepted。
+- D1、D2、D3がaccepted。
 - C4 latest inventory headがcomplete。
+- exact P0 artifact / version / digestを固定し、new fixtureでmutation-zeroにできるtechnical feasibilityを証明する。証明できない場合はworkspace format / release sequenceを親へ戻し、C5を開始しない。
+- C4 production symbol graphで削除候補journal / manifest symbolsがlegacy install / updateから非参照である。分離不能ならC5 / C6をcombined vertical Issueへ置換する。
 - bridgeをProduct contractとして受理。拒否された場合はC5 / C6をcombined vertical Issueへ置換する。
 
 ### Stable contract
 
-- `LifecycleStateReaderV1`、`ToolingDeletePlanV1`、`PurgeAuthorityV1`、`LifecyclePublicResultV1`。
+- `LifecycleCompatibilityContractV1`、`InstallationRecordV2`、`LifecycleStateReaderV1`、`ToolingDeletePlanV1`、`PurgeAuthorityV1`、`LifecyclePublicResultV1`。
+- C5がexact record path、serialized schema / version、canonical ready-v2 / updating-v2 fixtures、invalid / unknown / future cases、root / slot completenessを固定する。C6はfixture producerではなくconformance ownerである。
 - dual-reader / single-writer。old/new uninstall writerをruntime toggleで併存させない。
 - legacy-readyとfuture ready-v2をread-only分類する。
-- ready-v2はuninstall / dry-runを許可し、legacy update / init-forceはfail closedにする。
+- ready-v2はuninstall / dry-runを許可し、P1 legacy update / init-forceはC5が追加するadmission guardでfail closedにする。
 - updating-v2、unknown roots、foreign / invalid slots、active unresolved recoveryではdestructive actionをblockする。
 
 ### Vertical acceptance
@@ -199,9 +207,12 @@ legacy install / update writerを維持したまま、tooling-only uninstall / a
 - legacy install / updateが引き続きGREEN。
 - new tooling-only uninstall、accepted purge、confirmation、JSON / text / exitがGREEN。
 - tooling-only uninstall後にuser data / generated projectionがbyte-identicalで残り、accepted legacy install routeで再installできる。
-- C6が公開するfuture ready-v2 fixtureをnew uninstallが処理できる。
-- successor tests成立後に限り、old deprovision / purge routes、journals、testsをreceipt付きで削除する。
+- C5が固定したcanonical ready-v2 / updating-v2 fixtureをnew uninstallとP1 admission guardが処理する。C6は同じfixtureへconformする。
+- exact P0 artifactがcanonical new fixturesをmutation-zeroでblockする。不能ならdecisionで上書きしない。
+- exact successor node IDsをcurrent authoritative required command / contextで実行し、collected = executed、policy skip 0、affected package / platform smoke GREENを証明する。
+- successor tests成立後に限り、legacy install / updateから非参照とC4が証明したold deprovision / purge専用routes、journals、testsだけをreceipt付きで削除する。shared symbolはC6またはcombined Issueまで残す。
 - built artifactでinstall → tooling uninstall → reinstallの代表lifecycleを通す。
+- exact tooling-uninstall allowlistは4 roots、valid owned 2 slots、fixed installation recordだけとする。shipped workflowは常にpreserveする。D3がdeleteを選ぶ場合はparent ADRを改定し、C5 scope / testsへ明示追加するまで開始しない。
 
 ### Recovery / rollback
 
@@ -220,16 +231,20 @@ C5 bridge上でfresh / init / update writerを4 disposable roots、2 fixed skill
 
 - D1、D3がaccepted。
 - C4 latest inventory headがcomplete。
-- C5がmerge済みで、future ready-v2 uninstall proofがGREEN。
+- C5がmerge済みで、C5-owned canonical ready-v2 / updating-v2 fixturesに対するuninstall / admission proofがGREEN。
+- C5-owned `LifecycleCompatibilityContractV1`が固定され、C6 writerが変更せずconformできる。
 
 ### Vertical acceptance
 
 - fresh、legacy one-shot migration、ready-v2 update、tooling-only uninstall、accepted purge、post-uninstall reinstallが一つのpublic lifecycle matrixでGREEN。
 - 4 roots / 2 slotsを完全stage・validateし、全配置後だけready recordをatomic replaceする。
 - root間failure後はsame desired version / digestのexternal rerunだけで収束する。
+- 最初のdestructive step前にfixed recordをupdating-v2 / desired version / digestへatomic replaceし、全配置後だけready-v2へ遷移する。
 - user data、generated projections、unknown paths、shared skill parent、unrelated skillsがbyte-identical。
 - `P0` / `P1` updateはready-v2 / updating-v2をmutation前にfail closedにする。
 - successor tests、package smoke成立後にold per-file update、historical manifest、update journal / checkpoint、対応testsをreceipt付きで削除する。
+- exact successor node IDsをcurrent authoritative required command / contextで実行し、collected = executed、policy skip 0、affected package / platform smoke GREENを証明する。
+- updating record前後、最初のroot削除前、各root delete / rename間、全root後 / ready前、stale staging mismatch、ready write failureをfault acceptanceに含める。
 
 ### Recovery / rollback
 
@@ -238,9 +253,9 @@ C5 bridge上でfresh / init / update writerを4 disposable roots、2 fixed skill
 - defect時はnew apply routeを停止し、C5 uninstall / diagnosticを維持する。
 - old update engineへautomatic fallbackしない。
 
-## FIX-<contract> conditional proposals — Behavior-Owned Failure Repair
+## DEC-<contract> / FIX-<contract> conditional proposals
 
-C4 inventoryが確認したactive failureを、durable contract ownerごとの最小vertical Issueへfan-outする。
+C4 inventoryが確認したactive failureを、durable contract ownerごとの最小decision / vertical Issueへfan-outする。expected behaviorがcurrent authorityから決まらない場合は先に`DEC-<contract>`を作り、accepted authorityを`FIX/RETIRE-<contract>`へ渡す。
 
 各candidateは次を持つ。
 
@@ -248,8 +263,10 @@ C4 inventoryが確認したactive failureを、durable contract ownerごとの�
 - production fix、public adapter、docs、successor testsを同じIssueで完了する。
 - exact old node、fix / retirement / successor、focused command、parent / result SHA receipt。
 - matching Issue単独merge後にzero failure / zero policy skip。
+- actual Issue ID、dependency、owned node set、terminal dispositionをlatest inventory headへ記録する。
+- exact successor nodeをmerge時点のauthoritative required command / contextで実行し、collected = executed、policy skip 0を証明する。
 
-current authorityからexpected behaviorを決定できないnodeは、実装Issueを作らず個別decision gateへ戻す。unrelated contractを一つのfailure cleanup Issueへ集約しない。
+current authorityからexpected behaviorを決定できないnodeは、実装Issueを作らず個別`DEC-*`へ戻す。C7開始前にbaseline上の全active failure nodeが`fixed and GREEN`、`retired by accepted authority`、`replaced by exact successor and GREEN`のいずれかへterminal化し、`active_failure_count = 0`でなければならない。unrelated contractを一つのfailure cleanup Issueへ集約しない。
 
 ## C7 proposal — Canonical Portfolio And Shadow Provider Contract Gate
 
@@ -260,8 +277,8 @@ candidate build once、Linux canonical single-process portfolio、macOS platform
 ### Creation / start gate
 
 - D3 accepted。
-- C5、C6、全blocking `FIX-*`がmerge済み。
-- C4 latest inventory headでzero unresolved owner。
+- C5、C6、全`DEC-*` / `FIX-*`がterminal。
+- C4 latest inventory headでzero unresolved ownerかつ`active_failure_count = 0`。
 
 ### Acceptance
 
@@ -272,24 +289,27 @@ candidate build once、Linux canonical single-process portfolio、macOS platform
 - shadowはnon-required、owner、expiry、C9 retirement ownerを持つ。
 - D3で決めた連続GREENとfailure canaryを満たす。
 - selector omission時は全correctness portfolioをsingle processで実行し、shard / approved failureへ戻さない。
+- C5 / C6 / FIXで既にauthoritative実行済みのnodeだけを非重複laneへ移す。未実行successor proofや新behavior testをC7で初めて有効化しない。
 
 ## C8 proposal — Required Check Set Cutover
 
 ### Observable outcome
 
-GitHub external stateを`old required`から`old + new required`、`new required + old non-required`へ移し、human review requirementを維持する。
+unrelated effective required contextsを`U`として、GitHub external stateを`U + old`から`U + old + new`、`U + new`へ移し、human review requirementを維持する。
 
 ### Creation / start gate
 
 - C7 shadow acceptance complete。
 - current ruleset / branch protection / merge queue、required contexts、review requirement、ownerをlive取得する。
+- resolved ownerが各transitionを実行できる権限を持つことを確認する。
 
 ### Acceptance
 
-- oldを残したままnew contextをrequiredへ追加する。
-- canary PRでold + newの両方がrequiredであることを確認する。
-- new checkを意図的にREDにしhuman mergeがblockされ、GREEN復帰後に進める。
-- old contextをrequired setから外し、newだけがrequiredかつreview gateが残ることを確認する。
+- before / afterのeffective required set全体、対象branch / ruleset scope、review requirementをreceipt化し、`U`を集合差分でpreserveする。
+- oldと`U`を残したままnew contextをrequiredへ追加する。
+- canary PRで`U`とoldを全てGREEN、新だけを意図的にREDにしhuman mergeがblockされ、GREEN復帰後に進める。
+- merge queueがactiveならmerge-group eventでもcontext生成と同じblockを確認する。
+- old contextをrequired setから外し、`U + new`だけがeffective required setでreview gateも残ることを確認する。
 - `RequiredCheckTransitionReceiptV1`を保存する。
 
 ### Rollback
@@ -316,7 +336,7 @@ new check名を維持したまま、old Provider CI duplicate lanes、post-merge
 
 ### Rollback
 
-旧contextへ戻す必要がある場合は、先にold workflowをrepositoryへ復元してGREENを確認し、その後external required setを変更する。
+旧contextへ戻す必要がある場合に備え、C9 merge前にold workflow restoration patch / branch、expected old context、digest、実行手順を固定し、restoration PR上でold checkがGREENになるcanaryを行う。new checkが全面RED / pendingでも、restoration PRのold checkをnon-requiredで起動し、`U + old + new`へ追加、oldと`U`のGREENを確認してから`U + old`へ戻す。その後human reviewを維持したままrestoration PRをmergeする。required testが0になる瞬間を作らない。
 
 ## C10 proposal — Fixed-Runner Budget And Stability Closeout
 
@@ -346,6 +366,13 @@ artifact_build_count = 1
 
 final candidateはcommit SHA、artifact digest、node inventory digest、runner classの組で定義する。一つでも変わればseriesをresetする。一回でもthreshold超過、failure、skip、duplicate、retryがあればEpicをcloseせず、matching behavior owner、C7またはC9へ戻す。
 
+- local canonical command 5 runsとPR critical-path 5 runsを別seriesとして全回記録する。
+- rolling 20のtrigger、candidate tuple、reset条件、全20 resultを記録する。
+- seeded fault packの各faultとowner nodeを列挙し、100% detectionを確認する。
+- Linux / macOS各accepted smokeのtest bodyが600秒以内である。
+- latest final `InventoryHeadV1`を再生成し、全node / removal receipt coverage 100%、active failure 0を確認する。
+- C11をEpic外へ送る場合はactual follow-up Issue ID、owner、expiryをclose gateで再確認する。
+
 ## C11 conditional proposal — Legacy Lifecycle Bridge Sunset
 
 D1がEpic内sunsetを選んだ場合だけ作成する。
@@ -373,11 +400,13 @@ D1がsunsetをEpic後へ送る場合、Requirementはfinite bridgeが残った�
 | fixed skill write lifecycle | C6 |
 | fixed skill delete lifecycle | C5 |
 | `.gitignore` / `init --force` | C6、decisionはD1 |
-| shipped workflow asset ownership | C6またはpreserve owner、decisionはD3 |
+| shipped workflow asset ownership | decisionはD3。既定はpreserve、update mutationを選ぶ場合はC6、uninstall deleteを選ぶ場合はADR改定後のC5 |
 | distribution外active failure | matching `FIX-*` |
 | built artifact init → update → uninstall lifecycle | C6を主ownerとしC5 contractも同じsmokeで通す |
 | macOS固有filesystem / mode / executable | behavior-owning Issueでnode作成、lane assignmentはC7 |
-| selector / duplicate / metrics / artifact receipt | C7 |
+| user data誤書込み / allowlist外削除 / marker mismatch / destructive recovery faults | C5 |
+| root間failure / same-digest rerun / staging-record mismatch | C6 |
+| artifact欠落 / digest mismatch / selector / duplicate / metrics | C7 |
 | ledger / timing / shard / policy skip meta-tests | C9 |
 
 旧testを削除する各PRは、old node ID、durable contract、exact successorまたはaccepted retirement authority、owner Issue、focused command、parent SHA、result SHAを同じreceiptへ持つ。
@@ -398,7 +427,7 @@ C6を単独mergeし、P2 lifecycleとP0 / P1 fail-closed downgrade matrixをGREE
 
 ### Gate 4 — Behavior-owned failure repairs
 
-`FIX-*`をcontract ownerごとにmergeし、active approved failureを0にする。各merge後のmainをGREENに保つ。
+必要な`DEC-*`をacceptした後、`FIX/RETIRE-*`をcontract ownerごとにmergeし、baseline上の全nodeをterminal dispositionへ移してactive approved failureを0にする。各merge後のmainをGREENに保つ。
 
 ### Gate 5 — Additive shadow gate
 
@@ -439,7 +468,7 @@ C10でsame-candidate 5-run referenceとrolling 20 acceptanceを完了する。
 
 - Requirementの全受け入れ条件を同一final candidateのevidenceで満たす。
 - 各production-changing child Issueを依存順に`main`へmergeし、各merge pointのreleasabilityを証明する。
-- 4 disposable rootsとfixed skill slots以外へprovider delete authorityを持たない。
+- tooling uninstallのdelete authorityは4 disposable roots、valid owned fixed skill slots、fixed installation recordだけに限定する。shipped workflowはparent ADR改定とC5 acceptance追加なしに削除しない。
 - canonical regressionがsingle process / 10分以内 / zero failure / zero policy skipである。
 - duplicate nodes、approved failure ledger、4-shard runner、timing weightsが残っていない。
 - distribution contractとtest ownershipをcode / test name / CI commandから理解できる。

@@ -30,19 +30,20 @@ ID: "iss-00388"
 5. accepted decision Artifactを作成し、Epic docsへ反映する。
 6. 後続uninstall-first bridge / install-update Issueのstart gateとremoval receiptを確定する。
 
-`iss-00389`、`iss-00390`とはdecision inputが独立しており並行可能。後続inventoryとinstall/update cutoverは本Issueのaccepted decisionへ依存する。
+`iss-00389`、`iss-00390`とはdecision inputが独立しており並行可能。後続inventoryのcollection / cost取得は並行可能だが、disposition、target lane、ownerのfinalizationとproduction cutoverは本Issueのaccepted decisionへ依存する。
 
 ## 実装step
 
 1. `src/spec_dock/assets/managed_distribution.json`、`src/spec_dock/cli.py`、`.gitignore` asset、現行testsから状態分類とpublic surfaceを抽出する。
 2. legacy候補ごとにexact version/date/tree evidence、識別不能条件、support endを記録する。
-3. `P0` / `P1` / `P2` / `P3`とworkspace stateの全組合せにallow、fail-closed、recovery owner、diagnosticを割り当てる。
-4. active legacy recoveryをbounded adapterまたはlast-compatible pinへ割り当て、bridge sunsetのEpic内 / follow-up境界を決める。
-5. `.gitignore`の5状態と`init --force`を直積にせず、必要なcollision rowsだけを明示する。
-6. 各material choiceについて最推奨、代替、利用者影響、migration cost、failure modeを提示してinterviewする。
-7. 回答をdecision-candidateへ反映し、整合確認後にaccepted ADRまたは既存ADRの追補として受理する。
-8. 後続Issueが削除するmanifest section、adapter、fixture、test familyをremoval receiptへ固定する。
-9. Epic Requirement / Design / Planのgateとcandidate定義をactual decisionへ更新する。
+3. support classificationをcanonical lifecycle stateへ一意にmappingし、`P0` / `P1` / `P2` / `P3`、全state、全public operationのcellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery / implementation / removal ownerを割り当てる。
+4. exact P0 artifact / version / digestを固定し、canonical new fixtureへのmutation-zeroを確認する。失敗時はformat / release sequenceを再審議する。
+5. active legacy recoveryをbounded adapterまたはlast-compatible pinへ割り当て、bridge sunsetのEpic内 / follow-up境界を決める。
+6. `.gitignore`の5状態と`init --force`を直積にせず、必要なcollision rowsだけを明示する。
+7. 各material choiceについて最推奨、代替、利用者影響、migration cost、failure modeを提示してinterviewする。
+8. 回答をdecision-candidateへ反映し、整合確認後にaccepted ADRまたは既存ADRの追補として受理する。
+9. 後続Issueが削除するmanifest section、adapter、fixture、test familyをremoval receiptへ固定する。
+10. Epic Requirement / Design / Planのgateとcandidate定義をactual decisionへ更新する。
 
 ## 検証
 

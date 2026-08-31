@@ -29,7 +29,7 @@ normal uninstall、任意の独立purge、post-uninstall eligibility / reinstall
 4. accepted decisionとremoval receiptを作る。
 5. Epic docsと後続uninstall Issue gateへ反映する。
 
-`iss-00388`、`iss-00390`とは並行可能。後続test inventoryとuninstall cutoverは本Issueのacceptanceへ依存する。
+`iss-00388`、`iss-00390`とは並行可能。後続inventoryのcollection / cost取得は並行可能だが、disposition / owner finalizationとuninstall cutoverは本Issueのacceptanceへ依存する。
 
 ## 実装step
 
