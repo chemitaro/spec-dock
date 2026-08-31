@@ -4,7 +4,7 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-08-31"
+最終更新: "2026-09-01"
 親: ["init-local-00003"]
 ---
 
@@ -14,210 +14,155 @@ ID: "epic-00384"
 
 ## 目的
 
-SpecDock provider のテストを、並列実行で待ち時間だけを隠す仕組みから、必要な契約を最小の実行量で証明する仕組みへ置き換える。開発者が通常使う回帰確認は、shard や `pytest-xdist` を使わない単一の `pytest` process で10分以内に完了し、同じ candidate・OS で同じ契約を重複実行しない状態を成果とする。
+SpecDock providerのdistribution product contractとtest execution graphを一体で簡素化し、必要な契約を最小の実行量で証明する。4 fixed provider rootsと2 fixed skill slotsだけを管理するminimal lifecycleへhard cutoverし、user dataとshared contentを守りながら、merge-required regressionをsingle pytest process、worker 1、各600秒以内、zero failures、zero policy skips、duplicate node 0、artifact build invocation 1へ移行する。
 
-テストだけを削るのではなく、テスト件数を生んでいる install / update / uninstall / spec-history purge の product contract も見直す。安全上必要な不変条件は残し、利用者価値を持たない自動復旧、歴史的互換性、状態の組合せは product contract から縮小してからテストを廃止する。
+本ProductではIssueを「実装とその検証を一体で完了・受入する一つの実装ユニット」と定義する。調査・分析・Product判断はIssue作成前のEpic / Issue authoringで完了し、decision-only、tests-only、verification-onlyのIssueを作らない。
 
-## 背景
+## 背景とplanning baseline
 
-Issue #372 は distribution hard cutover と parity を対象とし、Full Regression を4 shardで実行する仕組みを導入している。この仕組みは証拠を分割して壁時計を短縮するが、テスト実行量そのものは減らさない。最新 branch の実測では、2,708 tests の GitHub Full Regression が約99分の壁時計と約5.51 shard-process-hoursを使った。別のローカル実測でも約27分の壁時計に対して約87.65 shard-process-minutesを使っている。利用者からは、別時点の逐次実行が約4時間、並列実行中は約10分にわたりCPUがほぼ100%になるとの観測がある。
+Issue #372はdistribution parityを4-shard Full Regressionで証明したが、実行量自体は削減しない。現行productionはfresh / update / deprovision / purge、per-file identity、journal、retry、historical compatibilityを同じ巨大なdistribution engineで扱い、testsはそのstate spaceを反映している。
 
-通常の PR gate も `1567 passed, 1141 skipped in 650.55s` であり、すでに目標の10分を超える。Full Regression はこの1,567 fast testsを再度実行する。distribution parity は Ubuntu 上で通常 gate と同じ575件の `test_managed_distribution.py` を再実行し、さらに Linux / macOS で cutover と package parity を繰り返す。
+2026-09-01にbranch `codex/epic-00384-provider-test-strategy-planning`、base SHA `d8f9d02f2400cbc084e5ee92a5fbba339f93f015`で次を確認した。
 
-テスト量は production design と分離できない。`src/spec_dock/managed_distribution.py` は22,332行、41 classes、454 functions / methodsを持ち、provider Python sourceのおよそ44%を占める。対応する4つの主要 test filesだけで約35,000行ある。単純なローカルツールという product goal に対し、per-path identity、journal、retry marker、crash checkpoint、historical compatibility、deprovision、spec-history purge の組合せが永続的な契約になっていることが、テスト肥大化の主因候補である。
+- `managed_distribution.py`: 999,468 bytes
+- `test_managed_distribution.py`: 774,072 bytes
+- `test_init_update.py`: 454,511 bytes
+- full collection: 2,710 nodes
+- sorted node-set SHA-256: `f607b007d167231ed27f2a17391b0d8b3aa452d67ce6532565463e193486a04c`
+- ordinary gate: `1574 passed, 1136 skipped in 57.02s`
+- resource reference: wall 58.42s、user 24.41s、system 31.29s、CPU/wall約0.953
+- failure ledger: 27 entries、26 active、1 resolved
+- active cohort rerun: 26 failed in 14.69s
+- current package / recognized workspace: exact `0.2.3`
+- provider PR CIはordinary、Ubuntu parity、macOS parityでdistribution familyを重複実行し、main pushでさらに4-shard Full Regressionを実行する。
 
-本 Epic は親 Initiative の architecture hardening 方針を維持しつつ、「安全であること」と「すべての歴史的・異常状態を自動回復すること」を分離する。Issue #372 の candidate を直接変更せず、独立した product / test architecture outcome として扱う。
+historical evidenceとして、別candidateのGitHub Full Regressionは2,708 tests、約99分wall、約5.51 shard-process-hoursを使用し、ordinary gateは650.55秒だった。これらは現SHAの性能証拠ではなく、根本原因の比較材料として扱う。
 
-## 観測可能な要件
+## Issue unit policy
 
-### R0. merge-point releasability
+### R0. One implementation unit
 
-- production code、public CLI、workflowのいずれかを変更するchild Issueは、そのIssueだけを依存済み`main`へmergeした直後にreleasableな状態を残す。
-- behavior変更に必要なpublic adapter、docs、successor tests、built-artifact smoke、old contract / test removal receiptを同じbehavior-owning Issueで完了し、tests-onlyの後続Issueへ延期しない。
-- 影響を受けないaccepted public lifecycle commandは全てGREENを維持する。後続Issueが未mergeであることを理由にbroken、skip、approved failure、quarantineを許可しない。
-- production contractを削除する前に、exact successor proofまたはaccepted retirement authorityを同じPRで成立させる。
-- Epic branchへ全implementationを蓄積して最後に一括mergeする運用を採らない。各child PRを依存順に`main`へ統合し、各merge pointを検証する。
+- Epicのimplementation-and-verification Issueは`iss-00392 Provider Lifecycle And Regression Gate Hard Cutover`の1件だけとする。
+- investigation、Product decision、inventory、required-context operation、final verificationを独立Issueにしない。
+- `iss-00388`〜`iss-00390`のdecision内容はaccepted ADR `20260831t152024z-adr`と本Epicへ統合し、future execution unitとしてcloseする。
+- C4〜C11、`DEC-*`、`FIX-*`を作らない。
+- `iss-00392`はproduction、public CLI、tests、workflow、migration、old machinery removal、performance / stability acceptanceを一体で所有する。
+- 内部milestoneや複数PRを使ってよいが、各main merge pointをreleasableにし、successor proofを後続Issueへ延期しない。
 
-### R1. 一つの実行時間予算
+## 確定Product contract
 
-- 開発者向け canonical regression command は、単一の `pytest` processで全ての merge-required contractを実行する。
-- 同一条件で連続5回計測した各回が、dependency installとlintを除く test bodyで600秒以内となる。
-- CIのreference measurementはdependency install完了後、fresh workspace、network accessなし、Linux 2 vCPU hard quota、8 GiB memoryを基本とする。GitHub-hosted runnerがhard quotaを保証できない場合は2 vCPU containerまたはdedicated runnerでreferenceを取得する。
-- canonical commandは内部でshard、`pytest-xdist`、並列test workerを起動しない。テストが起動するCLI subprocessも、1 test内で明示的に必要なものを除き直列とする。
-- 計測はwall secondsだけでなく、user + system CPU seconds、subprocess数、temp workspace作成数、同一nodeの重複実行数を残す。
-- child processを含む `user + system CPU seconds / wall seconds` を平均論理core使用数として扱い、canonical local regressionの5回すべてで1.1以下とする。これにより、短い起動overlapを許しつつ、複数coreを長時間使い切る設計を禁止する。
+### R1. Ownership safety
 
-### R2. 重複実行ゼロ
+- provider-owned repo-local surfaceを`spec-dock/{docs,templates,system,scripts}`の4 fixed rootsに限定する。
+- managed skillsを`.agents/skills/spec-dock`と`.agents/skills/spec-dock-grill-with-docs`の2 fixed slotsに限定する。
+- Initiatives、nested Artifacts、`.workbench`、generated projections、unknown non-target paths、unrelated skillsを探索・正規化・削除しない。
+- mutation targetのunknownはpreserve-and-block、mutation target外のunknownはpreserve-and-ignoreとする。
+- root / parent binding、symlink、unexpected type、foreign markerをdestructive step直前に検証する。
 
-- steady stateでは、同じcandidate・OS・契約について、authoritative lane間で同じtest nodeを複数回実行しない。
-- CI migration中のshadow laneだけは、non-required、owner、expiry、retirement Issueを持ち、duplicateをcandidate SHA付きで明示計測する場合に限り一時重複を許可する。required-check切替完了後はshadow / old laneを撤去し、最終acceptanceでduplicate 0へ戻す。
-- platform固有の差分を確認するtestだけを各OSで実行し、OS非依存のdomain / service contractをLinuxとmacOSの双方で繰り返さない。
-- wheelとsdistはcandidateごとに一度だけbuild・hash固定し、その同じartifactを必要なsmokeで再利用する。
+### R2. Minimal lifecycle
 
-### R3. 契約追跡可能性
+- combined hard cutoverを採用し、uninstall-first bridge、P1 generation、old/new runtime toggleを公開しない。
+- fixed installation recordはknown schema、state、operation、version、candidate digest、2 slot versionsだけを持つ。
+- arbitrary path、per-file digest、action list、progress bit、rollback image、historical catalogをrecordへ持たせない。
+- candidateを全てstage / validateした後、`docs -> templates -> system -> scripts -> slots`の順で処理し、ready recordを最後に書く。
+- same operation / same candidateのexternal rerunだけでpartial failureから収束させ、cross-intent recoveryとautomatic rollbackをpublic contractにしない。
 
-- 残すすべてのtest familyは、現在のpublic behaviorまたはsecurity invariant、責務を持つlayer、実行lane、代表する失敗を一つ以上持つ。
-- historical Issue / Step 名だけを根拠とするtestは、durable invariantへ改名・統合するか、対応契約とともに削除する。
-- test削除は、同じ invariant をより低い層で証明するtest、または product contract の廃止記録に結び付ける。
+### R3. Legacy / downgrade
 
-### R3A. baseline-bound inventory and removal receipt
+- 自動recognizeするlegacy cohortをexact clean `0.2.3` workspaceに限定する。
+- real root binding、version / runtime digest、active legacy recovery absence、markerless current slotsのexact treeをmutation前に確認する。
+- migration後はnew record / markersだけをauthorityとし、legacy recognizerを再度参照しない。
+- active legacy journal / retry / purge recoveryはnew formatへ推測変換せず、exact last-compatible `0.2.3`でclean stateへ戻すguidanceを返す。
+- old `0.2.3`のmutating commandsがfinal workspaceへmutation 0であることをmerge前に証明する。成立しなければfinal marker / formatを修正し、bridge generationを追加しない。
 
-- production route、test node、workflow、ledger、selectorを削除する前に、full baseline SHAへ束縛したnode inventoryを作成する。
-- inventoryは全collected nodeについて、durable contract、owner layer、current lane、target lane、cost evidence、keep / move / consolidate / delete-after-retirement、owner Issueを持つ。
-- delete対象はretired production contractのaccepted authority、またはexact successor nodeを持つ。
-- removal receiptはold node / route、successorまたはretirement authority、owner Issue、verification commandを持つ。repository内receiptには自己参照になるresult SHAを書かず、merge parent SHA、inventory before / after digest、change manifest digest、verification result digestを保存する。
-- baseline SHA変更後に旧inventoryを黙って再利用しない。
-- baseline inventoryを`S0`へ束縛し、各削除PRはmerge parent SHA、node inventory before / after digest、change manifest digest、verification result digestのdelta receiptを作る。out-of-band authorityはresult commit上のGitHub Actions check run `Provider Receipt Binding`とし、result SHA、repository内receipt digest、check_run_id、content-addressed artifact_id、retention_daysを記録する。次IssueはGitHub APIで取得・digest照合し、check / artifact消失、期限切れ、SHA / digest不一致ならfail closedにする。rebase後はrepository内receiptとbindingを再生成する。
-- 次のIssueはlatest inventory headだけをconsumeする。並行PRはmerge順確定後にrebaseし、node set、owner、receiptを再照合する。
+### R4. Consumer-owned seeds
 
-### R4. layerごとの証明責務
+- `spec-dock/.gitignore`とshipped `.github/workflows/ci.yml`をfresh-init-only consumer-owned seedsとする。
+- absent時だけfresh initで作成し、existing regular / custom / symlink / unexpected typeをfollow / overwrite / deleteしない。
+- update、reinstall、tooling uninstallで変更しない。
+- installation completeness、candidate digest、legacy ownership anchor、uninstall allowlistから除外する。
 
-- domain testは純粋な状態遷移・validation・propertyを網羅し、filesystem、Git、package build、CLI processを起動しない。
-- filesystem / application contract testは、最小synthetic workspaceと注入可能なfaultを使い、OS境界の代表ケースだけを扱う。
-- CLI testはargument / exit code / JSON・text mappingと、代表的なhappy path・fail-closed pathに限定する。
-- package / platform testはbuilt artifactのprovenanceと、init・update・uninstallの最小end-to-end smokeだけを扱う。
+### R5. Public CLI / user data
 
-### R5. distribution product contractの簡素化
+- `init --force`をstate別install / update aliasとし、update以上のauthorityを与えない。
+- uninstallはtooling-only、default dry-run、`--apply`を唯一のconfirmationとする。
+- `--keep-specs`をdefault uninstallと同義のcompatibility aliasにする。
+- spec-history purge capabilityと独立purge commandを廃止する。
+- `--remove-specs`をpermanent non-mutating compatibility trapとして残し、mutation 0、code `spec-history-purge-removed`、exit 2を返す。
+- tooling-absent-preserved-dataからuser data / seedsを保持してreinstallできる。
 
-- `spec-dock/initiatives/**` とnested Artifactsをdurable user dataとし、init / update / tooling uninstall / retry / cleanupの変更対象にしない。
-- `spec-dock/active/**`、`spec-dock/.agent/**`、dashboard、tree / deps図、ADR mirrorなどの再生成可能なprojectionをprovider file inventoryやhistorical identityの管理対象にしない。
-- provider-owned repo-local contentは `spec-dock/{docs,templates,system,scripts}` の4 fixed rootsとし、updateではcandidateを全てstage・validateした後、root内部を保存せずroot単位で全量置換する。`scripts` は最後に置換する。
-- disposable root内部のuser editは保存しないことをpublic contractにする。inner fileごとのmodified / unknown / historical identityを判定しない。
-- root allowlistはcodeに固定し、root / parent binding、symlink、unexpected typeをdestructive step直前に検証する。shared parentやallowlist外pathへ削除authorityを広げない。
-- 4 root全体のatomic transaction、自動rollback、per-file checkpoint resume、cross-intent recoveryをpublic contractにしない。partial failure後は外部installerから同じdesired versionを再実行して収束させる。
-- small installation record / ready markerは1つだけとし、schema、version、candidate digest、fixed skill slot versionを持つ。per-file stateや任意pathを持たない。
-- installation recordはfresh workspaceでも親作成を要しないalready-bound repository root直下のfixed exact pathに置き、4 disposable roots、skill parent、durable user dataの外側とする。foreign collisionではroot / slot mutation前にblockする。
-- 通常uninstallはprovider toolingだけを削除し、user-owned spec historyを常に保持する。spec history purgeは通常uninstallから分離する。
+## Test / CI contract
 
-### R5A. managed skill contract
+### R6. Contract-owned test portfolio
 
-- `.agents/skills` 親全体を置換・探索・削除しない。
-- managed skillを `.agents/skills/spec-dock` と `.agents/skills/spec-dock-grill-with-docs` の2 fixed slotsに限定する。
-- 各slot rootへowner / slot / schema versionの小さなmarkerを置き、valid markerがあるexact slotだけをroot単位でupdate / uninstallする。
-- marker欠落・不正・別ownerのslotは上書きも削除もせず、書込み前にblockする。unrelated skillsは常に保持する。
-- retired skillはcodeに固定された有限のexact-slot allowlistとvalid old markerでだけ削除し、prefix match、arbitrary manifest path、per-file historical digestを削除authorityに使わない。
-- marker導入前のcurrent 2 skill rootsは期限付きone-shot migrationでのみ認識し、移行終了後は旧identityとtestsを削除する。
+- durable invariantごとにowner layer、authoritative lane、representative failureを一つ以上持つ。
+- pure/domain、filesystem/service、CLI adapter、built artifact、macOS deltaの責務を分離する。
+- 26 active failuresをexact nodeごとにfix / current successor / accepted retirementへterminal化する。
+- approved failure 0、unexpected failure 0、policy skip 0をGREENの定義にする。
+- retired historical step名だけを根拠とするtestをdurable invariantへ統合または削除する。
+- same candidate / OS / contractのduplicate nodeを0にする。
 
-### R5B. Product decision status
+### R7. Execution budget
 
-accepted ADR `20260831t005139z-adr` により、次を確定した。
+- canonical Linux regressionをsingle pytest process、worker 1で実行し、shard / xdist / parallel test workerを起動しない。
+- fixed Linux 2 vCPU / 8 GiB referenceで連続5回すべてtest body 600秒以内とする。
+-各回のprocess-tree CPU seconds / wall secondsを1.1以下とする。
+- node count、subprocess count、temp workspace count、copy bytes、duplicate countをcandidate SHAへ束縛する。
+- seeded fault detection 100%、rolling 20 flakes 0 / retries 0をclose条件にする。
 
-1. user historyは常にuser-ownedであり、tooling lifecycleからpurge authorityを除外する。
-2. repo-local runtime layoutは4 disposable rootsを維持し、immutable version payload / activation pointerではなくroot replacementを使う。
-3. automatic rollback / arbitrary checkpoint resumeを廃止し、external rerun convergenceをfailure contractにする。
-4. `.agents/skills` はfixed slot marker方式で管理する。
+### R8. Artifact / platform / workflow
 
-次のdecision-only child Issuesを、影響する実装Issueの作成・開始前にacceptedにする。未回答を実装者が推測しない。
-
-1. `iss-00388`: legacy direct-update window、markerless migration sunset、`.gitignore` collision / customization、`init --force`。
-2. `iss-00389`: `--remove-specs` removal / deprecation / independent purge、confirmation、JSON / text / exit、sunset。
-3. `iss-00390`: `.github/workflows/ci.yml` ownership、wheel / sdist / macOS trigger、artifact build count / digest / reuse。
-
-全test inventory作成後、active approved failureのうちcurrent authorityからexpected behaviorを決定できないnodeは、個別のdecision gateへ戻す。
-
-### R5C. lifecycle format and cross-version compatibility
-
-- canonical lifecycle stateは`absent`、`legacy-ready`、`tooling-absent-preserved-data`、`placing-v2(desired_version=B, desired_digest=D, origin=install|reinstall)`、`ready-v2(installed_version=A, candidate_digest=D)`、`updating-v2(desired_version=B, desired_digest=D)`、`uninstalling-v2(delete_plan_digest=P)`、`legacy-recovery-active`、`blocked`とする。serialized enum / fixture keyは`placing-v2` / `ready-v2` / `updating-v2` / `uninstalling-v2`に統一する。`fresh`、`current-supported`、`legacy-supported`、`legacy-expired`、`unknown`はsupport classificationという別axisとし、各classificationからcanonical lifecycle stateへの一意なmappingを持つ。
-- package世代は現行`P0`、uninstall-first bridge`P1`、new install/update writer`P2`、legacy sunset後`P3`として扱う。`cutover_path × package_generation × lifecycle_state × public_operation × execution_mode`の全cellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery owner、implementation owner、sunset / removal ownerを持つ。`cutover_path`はsplit / combinedで、combinedではP1をunpublished / N/Aにする。`public_operation`はinstall、`init --force`、update、uninstall、purge、retry、現存legacy aliasを含み、`execution_mode`はinspect / dry-run / applyを操作から分離する。
-- `P1`はlegacy install/update writerを維持しつつ、legacy stateとfuture `InstallationRecordV2`を読むtooling-only uninstall / purge dual-readerを提供する。同一operationにold/new writerを併存させない。
-- C5でexact record path、serialized schema / version、`InstallationRecordV2`と`SkillSlotMarkerV1`のcanonical `placing-v2` / `ready-v2` / `updating-v2` / `uninstalling-v2` / slot fixtures、invalid / unknown / future cases、root / slot completenessを`LifecycleCompatibilityContractV1`として固定する。`placing-v2` fixtureはrecord-only、各root配置後、current slot marker付き配置後、2 slots間、全配置後・ready書込み失敗を含む。`uninstalling-v2` fixtureはcomplete、各root削除後、current / retired slot rename後・progress前、progress後・marker削除後、record delete failureを含む。C5 readerがfixtureをconsumeし、C6 writerはその既存contractへのconformanceを証明する。
-- D1はP0が満たすpolicyと、成立しない場合にformat / release sequenceを再審議するauthorityだけを決める。C5内部でcontract / fixtureを先にfreezeし、そのexact fixtureへimmutable P0 artifact / version / digestのmutation-zero probeを実行する。probe failure時はproduction mutationへ進まず親へ戻し、probe success後だけbridgeを実装する。
-- `updating-v2`では同じdesired version / digestのexternal updateだけを許可し、uninstall、purge、別version update、old engine fallbackをblockする。
-- tooling-only uninstall後のuser data / generated projectionを保持したworkspaceから、accepted install routeで再installできる。
-- active legacy recovery stateは、accepted bounded recovery-only adapterまたはlast-compatible package pinのどちらかで扱う。未決状態を新journalへ推測変換しない。
-- bridge sunsetをEpic内で行うかfollow-upへ渡すかを`iss-00388`で確定し、期限なしのdual-readerをsteady stateへ残さない。
-- C6は最初のdestructive stepより前に唯一のauthoritative fixed recordを`state=updating-v2`、`desired_version`、`desired_digest`へatomic replaceする。以後の全faultで`ready-v2` authorityはなく、物理的に残るlegacy markerはnon-authoritative metadataであり、全readerは`InstallationRecordV2`を優先する。全root / current slot配置とretired slot処理後だけ`ready-v2`へatomic replaceする。
-- C6 fresh install / post-uninstall reinstallはfixed recordのatomic persistを最初のtarget mutationとし、root / slot mutationより前に`state=placing-v2`、`desired_version`、`desired_digest`、`origin`を保存する。途中停止後はsame version / digest / originのinstallまたはreinstall rerunだけを許可し、別operationをblockする。全root / current slot配置後だけ`ready-v2`へ遷移する。
-- C5 tooling uninstallは最初のdelete前に同じfixed recordを`state=uninstalling-v2`、exact `delete_plan_digest`へatomic replaceし、recordを最後に削除する。途中停止後は同じdelete planのuninstall rerunだけを許可し、install、update、purge、別plan uninstallをblockする。4 roots、current 2 slots、finite retired slots、recordの各delete境界をfault acceptanceに含める。
-- D2がindependent purgeを残す場合、tooling installation recordとは別のfixed `PurgeOperationRecordV1`、target evidence digest、monotonic partial-failure state、same-plan rerun authority、最後にrecordを消す順序をC5で実装する。purgeをretireする場合はこのcontractをN/Aとする。
-
-### R6. failureを成功扱いしない
-
-- canonical required testはzero unexpected failuresかつzero approved active failuresでGREENになる。
-- 26件のactive failure signatureを成功として受理するledgerは、各nodeを「修正」「現行契約外として削除」「有効なsuccessorへ置換」のいずれかで処理した後に撤去する。
-- active failureはexact nodeごとにfix / contract retirement / successor replacementを決定し、family単位のblanket approval、`approved-no-op`、無期限quarantineをsteady stateへ残さない。
-- distribution以外のcurrent contractをEpic #384の都合だけでretireしない。
-- quarantineが一時的に必要な場合はowner、reason、expiry、successorを必須とし、merge-required GREENの定義には含めない。
-- cutover後のrolling 20 canonical runsでflake retryなし・unexpected failureなしを確認する。
-
-### R7. 実行量の可視化
-
-- CI summaryはlaneごとのwall time、CPU time、node count、artifact build count、workspace copy bytes、duplicate node countをcandidate SHAに束縛して表示する。
-- `artifact_build_count` はcandidate artifactを生成するbuild command invocation数とし、targetを1とする。一つのinvocationがaccepted policyに応じてwheel / sdistを生成してよいが、各output digestを個別に固定する。
-- budget超過はtest failureとして扱い、timing weight更新やworker追加だけで回避できない。
-- CPUはpytest root processと全descendantのuser / system CPU secondsの総和を`process_tree_cpu_seconds`とし、`process_tree_cpu_seconds / wall_seconds`を平均論理core使用数とする。
-
-### R7A. additive required-check migration
-
-- 新canonical gateは既存required checkを変更・削除せず、non-required shadowとして追加する。
-- shadowの連続GREENとfailure-detection canaryを確認後、GitHub ruleset / branch protectionのauthority、owner、変更前required contextsをreceipt化する。C7のfailure-detection canaryはnew check自身が意図どおりREDになることだけを証明し、merge blockを要求しない。
-- unrelated effective required contextsを`U`とし、external required-checkは`U + old`から`U + old + new`、`U + new`の順に移す。対象branch / ruleset scope、複数rulesetのeffective state、human review requirementを集合差分で維持する。
-- C8のrequired-set enforcement canaryはnewをrequiredへ追加した`U + old + new`でoldと`U`を全てGREENにし、newだけを意図的にREDにしてmerge blockを証明する。merge queueがactiveならmerge-group eventでも同じcanaryを行う。
-- old workflow / ledger / shard machineryは、new checkだけがrequiredであることを再取得してから別PRで削除する。
-- required-check defect時はold workflowがrepositoryに残る間だけold contextへrollbackできる。workflow不存在のcontextをrequiredへ戻さない。
+- authoritative PR candidateごとに一つのpackaging command invocationでwheel / sdistを生成し、source SHAと各digestを固定する。
+- LinuxとmacOSが同じwheel bytesを使う。
+- Linux canonicalはOS非依存contract、Linux boundary、wheel lifecycle、sdist minimal smokeを所有する。
+- macOS deltaはexecutable mode、symlink/no-follow、rename/replacement、installed entry pointだけを所有する。
+- main pushの4-shard Full Regression、ledger、timing weights、sharder、policy-skip machineryを撤去する。
+- required contextは既存名の再利用を第一選択とし、unrelated contextsとhuman review gateを保持する。
+- context名変更が不可避な場合だけ、同じIssue / PRでold+new required、intentional RED canary、new-only requiredへ遷移する。
 
 ## スコープ
 
 対象:
 
-- provider test portfolio全体のinventory、重複・cost・contract ownershipの確定
-- `managed_distribution.py` が公開しているper-file reconciliation / journal / recovery契約を4 root replacementへ縮小
-- fixed skill slot marker、tooling-only uninstall、有限one-shot migration
-- unit、service contract、CLI smoke、package / platform smokeへの再配置
-- Full Regression ledger、timing weights、4-shard runnerの段階的撤去
-- Provider CI / Provider Full Regressionの実行graph、artifact reuse、budget gate
-- obsolete test、duplicate test、historical-step testの安全な削除
+- distribution product contractとprovider implementation
+- 4 roots、2 slots、installation / slot markers
+- exact `0.2.3` one-shot migration
+- init / update / tooling uninstall / reinstallとpublic result
+- test portfolio、active failure cohort、built artifacts、platform delta
+- provider CI、metrics、required context transition、old machinery removal
+- public docs、migration guidance、Issue / Epic evidence
 
 対象外:
 
-- Issue #372 candidateへの横入り修正
-- test時間短縮だけを目的としたworker数の増加、CI machineの大型化、恒久的なtiming-weight tuning
-- Product判断なしでfail-closed path protectionを弱めること
-- user-owned spec historyの自動削除範囲を黙って拡大すること
-- このEpicの調査段階で全実装Issueを開始すること
-
-## 失敗・境界条件
-
-- production contractを残したままtestだけを削ると、path substitution、partial update、drift、destructive deleteの退行を見逃す。契約縮小とtest削除は同じIssueまたは明示的な依存で結ぶ。
-- 逆に、すべてのcurrent testを安全要件とみなすと、歴史的実装詳細が永久にproduct contractとなる。public behavior / invariantへ追跡できないtestは保持理由を満たさない。
-- filesystem挙動にはLinux / macOS差がある。pure/domainを両OSで繰り返すのではなく、差が生じるsyscall境界を選んでplatform smokeを残す。
-- cold dependency install、GitHub runnerのnoisy-neighbor、network downloadをtest bodyと混同しない。artifact buildとtest実行を別計測する。
-- wall timeだけを満たしてprocess-hoursが増える変更は失敗とする。
-- R5Bの未決事項はProduct判断であり、影響する下位Issueが推測で決めない。
+- Issue #372のcandidate / evidence変更
+- user data purge
+- arbitrary historical compatibilityの追加
+- release publication workflow
+- machine増強だけによるbudget回避
+- future decision / investigation / verification Issueの予約
 
 ## 受け入れ条件
 
-- [x] 4 disposable roots、fixed skill slots、user history保護、external rerun convergenceをaccepted ADR `20260831t005139z-adr` に記録している。
-- [ ] R5Bの残るProduct判断を、影響する実装Issueの開始前にaccepted decisionとして記録している。
-- [ ] production-changing child PRごとに、依存済み`main`上のaccepted public lifecycle command matrixがzero failure、zero policy skipであり、後続Issueなしでもreleasableである。
-- [ ] 各production-changing child PRのexact successor node IDsがmerge時点のauthoritative required command / contextでcollection・executionされ、collected count = executed count、policy skip 0である。
-- [ ] baseline SHAへ束縛したinventoryが全collected nodeを100%包含する。
-- [ ] 削除した全test node、production route、workflow machineryにremoval receiptがある。
-- [ ] 全test familyのcontract / layer / lane / cost / keep-move-consolidate-delete判定が追跡できる。
-- [ ] canonical local regressionを単一pytest processで連続5回実行し、各回600秒以内、zero failures、zero policy skipsである。
-- [ ] 上記5回のchild-inclusive平均論理core使用数が各1.1以下であり、同時pytest worker数が1である。
-- [ ] canonical PR test bodyのcritical pathが同一runner classの連続5 successful runsで各600秒以内である。
-- [ ] 同一candidate・OSにおけるduplicate test node数が0で、candidate artifact build invocation数が1、accepted wheel / sdist outputの各digestが一意である。
-- [ ] platform不適用nodeはcollection後のpolicy skipではなくlane ownershipによって対象外となる。
-- [ ] install/update cutover前に旧per-file update testsを削除せず、tooling-only uninstall cutover前に旧deprovision / purge testsを削除していない。
-- [ ] uninstall-first bridge merge時にlegacy install / update、tooling-only uninstall、accepted purge surface、post-uninstall reinstallが統合GREENである。
-- [ ] install/update cutover merge時にnew writerとnew uninstallが統合GREENであり、old package / writerはnew workspaceをmutation前にfail closedにする。
-- [ ] `updating-v2` recordを最初のdestructive step前に永続化し、record前後、各root delete / rename間、ready遷移前、stale staging mismatch、ready write failureのfaultをsame-digest rerun contractで検出する。
-- [ ] default pathでshard runnerを使用せず、test worker concurrencyが1である。
-- [ ] fixed 2-vCPU Linux referenceで同じbudgetを満たし、seeded fault pack（user data誤書込み、allowlist外削除、symlink follow、root間failure、skill marker mismatch、artifact欠落）を100%検出する。
-- [ ] cutover後のrolling 20 canonical runsでflake 0、retry 0である。
-- [ ] platform固有smokeがLinuxとmacOSでGREENになり、各OSのtest bodyが600秒以内である。
-- [ ] active approved failureが0になり、`full-regression-ledger.json`、timing weights、baseline evaluator、4-shard verifierを削除またはmerge判定外の一時migration toolingへ退役させている。
-- [ ] obsolete / duplicate testsの削除前後で、残すdurable invariantsのtraceabilityとnegative-path proofが維持されている。
-- [ ] budget summaryがcandidate SHA、wall / CPU time、node / subprocess / workspace / duplicate countsを報告する。
-- [ ] required-check transition receiptが`old required`、`old + new required`、`new required only`、old workflow removalの順序とhuman review gate維持を証明する。
-- [ ] human PR merge gateを維持し、Issue #372のcandidate / canonical docs / acceptance evidenceを変更していない。
+- [ ] `iss-00392`一件が全implementation / verificationを所有し、追加のdecision-only / tests-only / verification-only Issueがない。
+- [ ] 4 roots / 2 slots以外へprovider mutation authorityがない。
+- [ ] user data、unknown non-target、consumer seeds、unrelated skillsがbyte-identicalである。
+- [ ] fresh、exact `0.2.3` migration、update、tooling uninstall、reinstallがbuilt artifactでGREENである。
+- [ ] active legacy recovery、unsupported / foreign / symlink stateがmutation 0でblockされる。
+- [ ] old `0.2.3` packageがfinal workspaceへmutation 0である。
+- [ ] purge capabilityがなく、`--remove-specs`が全modeでmutation 0 / exit 2である。
+- [ ] seeded root / slot faults後にsame-candidate rerunで収束し、cross-intent rerunをblockする。
+- [ ] active failure 0、approved failure 0、policy skip 0、duplicate node 0である。
+- [ ] final candidate artifact build invocation count 1である。
+- [ ] single-process 5 runsが各600秒以内、CPU/wall 1.1以下である。
+- [ ] seeded fault detection 100%、rolling 20 flakes 0 / retries 0である。
+- [ ] macOS deltaとLinux canonicalのplatform-independent node intersectionが0である。
+- [ ] old Full Regression / ledger / timing / sharder / skip machineryが削除されている。
+- [ ] canonical provider contextがrequiredで、unrelated contextsとhuman review gateが維持されている。
+- [ ] human merge後のtreeがverified PR treeと同一である。
 
 ## 制約・前提
 
-- 現時点の計測はlatest concurrent branch `iss-00372-distribution-hard-cutover-and-parity` の `7af12c54...`、実装candidate `bc156009...`、GitHub candidate `53f309a4...` を区別して記録する。
-- user-reported「約4時間」「CPUほぼ100%」は重要な問題入力だが、同一SHA・同一machineで今回再測定した数値ではない。
-- 10分budgetはtest bodyの目標であり、初回dependency downloadなど外部network時間は別表示する。ただしartifactをlaneごとに再buildする時間は重複costとして対象に含める。
-- destructive operationは既定でfail closedとし、path ownershipを証明できない対象を削除しない。
-- 既存のhuman PR merge gateを維持する。
-- accepted ADR `20260831t005139z-adr` の範囲は確定済みとし、R5Bの未決事項だけを実装上の既成事実にしない。
+- Product判断はaccepted ADR `20260831t152024z-adr`で完了しており、実装者が推測しない。
+- classic branch protection / effective required contextsはcurrent tokenで403となり未観測である。CI transition直前にread-only取得し、未確認なら外部設定を変更しない。
+- old-package mutation-zero、final metrics、rolling 20はfinal formatが存在しない現在は証明不能であり、調査の先送りではなく`iss-00392`の実装後acceptance evidenceである。
+- PR mergeは人間が行う。
