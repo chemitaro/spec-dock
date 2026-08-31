@@ -115,9 +115,9 @@ behavior testの作成・移動・削除は対応production Issueが所有する
 
 - `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、uninstalling-v2、legacy-recovery-active、blockedをread-only分類する。
 - `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、`InstallationRecordV2` / `SkillSlotMarkerV1`のcanonical ready / updating / slot fixtures、invalid / unknown / future schema cases、root / slot completeness ruleを固定する。C5がownerとなり、contract freeze後にexact P0 artifact probeを行い、C6は変更せずconformする。
-- `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、delete plan digest、2 skill slot versionsだけを持つ。arbitrary path、per-file digest、checkpoint listを持たない。
+- `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、delete plan digest、2 skill slot versions、fixed current 2 slotsとcode-versioned finite retired slotsだけのbounded tombstone progress bitsetを持つ。arbitrary path、per-file digest、可変checkpoint listを持たない。
 - `SkillSlotMarkerV1`: schema、owner、exact slot、distribution versionだけを持つ。
-- `ToolingDeletePlanV1`: fixed roots、valid owned exact slots、installation recordだけをtyped targetにし、canonical digestを持つ。
+- `ToolingDeletePlanV1`: fixed roots、valid owned current 2 slots、code-fixed finite retired slots、installation recordだけをtyped targetにし、canonical digestを持つ。
 - `PurgeOperationRecordV1`: D2がindependent purgeを残す場合だけ、tooling recordと別のfixed pathにtarget evidence digest、state、plan digestを持ち、same-plan rerunだけを許可する。
 - `PurgeAuthorityV1`: tooling lifecycleから独立したaccepted target evidenceとconfirmationを持つ。
 - `LifecyclePublicResultV1`: dry-run / apply、text / JSON、exit、cleanup-pendingを一意にmappingする。
@@ -145,6 +145,7 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 - `docs` → `templates` → `system` → `scripts` の順で全量置換する。
 - valid owner markerを持つcurrent skill slotは、marker検証後に同一filesystem上のfixed bounded tombstoneへatomic renameし、candidateをexact slotへrenameしてからtombstoneをcleanupする。
 - finite retired slotもexact name + valid marker確認後にbounded tombstoneへatomic renameし、cleanup failureはauthorityを失わないcleanup-pendingとして扱う。
+- 各slotはderived tombstone absence確認とno-replace rename後、cleanup前に`InstallationRecordV2`のfixed progress bitをatomic persistする。rename後・progress前だけはtombstone内markerで回復し、progress後はrecord bit + plan digestをcleanup authorityにする。
 - 全配置後にsmall ready markerをatomic file replaceする。
 - cleanup failureをrollbackせず、診断付き成功またはbounded cleanup pendingとして扱う。
 - rootsだけ、またはskillsだけがnew contractへ移行した状態をreadyとして扱わない。
@@ -153,7 +154,7 @@ product behaviorをper-file action APIではなく、次の3 service boundaryへ
 ### `uninstall_tooling(target)`
 
 - 最初のdelete前にinstallation recordを`uninstalling-v2(delete_plan_digest=P)`へatomic replaceする。
-- fixed provider roots、owned fixed / retired skill slots、installation recordだけを削除する。
+- fixed provider roots、valid owned current 2 slots、exact name + valid old markerを持つcode-fixed finite retired slots、installation recordだけを削除する。
 - valid owned skill slotはmarker検証後にfixed bounded tombstoneへatomic renameしてからcleanupし、recursive delete途中でmarker authorityを失わない。
 - durable user data、`.workbench`、generated projections、unrelated skills、unknown pathsを変更しない。
 - spec history purge authorityを持たない。
@@ -215,7 +216,7 @@ Python / Linux / macOSで非空directory同士のcross-platform atomic exchange�
 
 per-file checkpoint、intent別journal、quarantine、rollback image、cross-intent resumeをstate modelへ持ち込まない。
 
-`fresh | current-supported | legacy-supported | legacy-expired | unknown`はsupport classificationでありlifecycle stateではない。D1は各classificationをcanonical lifecycle stateへ一意にmappingする。authorityは`package_generation × lifecycle_state × public_operation × execution_mode` matrixだけから決める。public operationにはretryとlegacy aliasを含め、inspect / dry-run / applyは独立axisにする。
+`fresh | current-supported | legacy-supported | legacy-expired | unknown`はsupport classificationでありlifecycle stateではない。D1は各classificationをcanonical lifecycle stateへ一意にmappingする。authorityは`cutover_path × package_generation × lifecycle_state × public_operation × execution_mode` matrixだけから決める。splitはP1を公開し、combinedはP1をunpublished / N/Aにする。public operationにはretryとlegacy aliasを含め、inspect / dry-run / applyは独立axisにする。
 
 ### Failure contract
 
@@ -239,7 +240,7 @@ per-file checkpoint、intent別journal、quarantine、rollback image、cross-int
 
 whole-operation rollbackは提供しない。provider toolingの一時availabilityより、user dataとshared contentを削除しないことを優先する。
 
-tooling uninstallでは`uninstalling-v2` record書込み前のfailureはtarget旧stateを維持する。書込み後の各root delete前後、scripts delete後、各current slot tombstone rename / cleanup前後、record delete失敗ではrecordとdelete plan digestをauthorityとして保持し、same-plan rerunだけを許可する。bounded tombstoneはrecord + plan digest + validated markerでだけ再認識し、foreign tombstoneはblockする。record削除成功後だけ`tooling-absent-preserved-data`になる。independent purgeを残す場合も`PurgeOperationRecordV1`で同じmonotonic原則を適用し、tooling uninstall recordをpurge authorityに流用しない。
+tooling uninstallでは`uninstalling-v2` record書込み前のfailureはtarget旧stateを維持する。書込み後の各root delete前後、scripts delete後、current / retired slot tombstone rename / cleanup前後、record delete失敗ではrecordとdelete plan digestをauthorityとして保持し、same-plan rerunだけを許可する。slot marker検証、derived tombstone pathのno-follow absence確認、no-replace renameの後、cleanup開始前にfixed progress bitをatomic persistする。rename後・progress前の停止ではtombstone内markerを再検証してprogressを確定でき、progress後はrecord bit + plan digestがcleanup authorityとなるためmarker削除後も収束する。progressのないforeign / pre-existing tombstoneはblockする。record削除成功後だけ`tooling-absent-preserved-data`になる。independent purgeを残す場合も`PurgeOperationRecordV1`で同じmonotonic原則を適用し、tooling uninstall recordをpurge authorityに流用しない。
 
 ## Skill lifecycle
 
