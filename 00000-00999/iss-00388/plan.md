@@ -36,8 +36,8 @@ ID: "iss-00388"
 
 1. `src/spec_dock/assets/managed_distribution.json`、`src/spec_dock/cli.py`、`.gitignore` asset、現行testsから状態分類とpublic surfaceを抽出する。
 2. legacy候補ごとにexact version/date/tree evidence、識別不能条件、support endを記録する。
-3. support classificationをcanonical lifecycle stateへ一意にmappingし、`P0` / `P1` / `P2` / `P3`、全state、全public operationのcellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery / implementation / removal ownerを割り当てる。
-4. exact P0 artifact / version / digestを固定し、canonical new fixtureへのmutation-zeroを確認する。失敗時はformat / release sequenceを再審議する。
+3. support classificationをcanonical lifecycle stateへ一意にmappingし、`P0` / `P1` / `P2` / `P3`、全state、retry / legacy aliasを含む全public operation、inspect / dry-run / applyの全cellにallow / fail-closed / N/A、mutation authority、evidence、diagnostic、recovery / implementation / removal ownerを割り当てる。
+4. exact P0 artifact / version / digestが満たすmutation-zero policyと、C5のcontract / fixture freeze後probeが失敗した場合にformat / release sequenceを再審議するauthorityを固定する。D1では未作成のcanonical fixtureに対する実行証拠をacceptanceにしない。
 5. active legacy recoveryをbounded adapterまたはlast-compatible pinへ割り当て、bridge sunsetのEpic内 / follow-up境界を決める。
 6. `.gitignore`の5状態と`init --force`を直積にせず、必要なcollision rowsだけを明示する。
 7. 各material choiceについて最推奨、代替、利用者影響、migration cost、failure modeを提示してinterviewする。

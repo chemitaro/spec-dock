@@ -114,15 +114,15 @@ behavior testの作成・移動・削除は対応production Issueが所有する
 長期dual engineではなく、有限なreader compatibilityとsingle writerを設計する。名称は実装時にrepository styleへ合わせられるが、責務は次のstable contractへ分ける。
 
 - `LifecycleStateReaderV1`: legacy-ready、tooling-absent-preserved-data、ready-v2、updating-v2、legacy-recovery-active、blockedをread-only分類する。
-- `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、canonical ready / updating fixtures、invalid / unknown / future schema cases、root / slot completeness rule、exact P0 artifact evidenceを固定する。C5がownerとなり、C6は変更せずconformする。
+- `LifecycleCompatibilityContractV1`: exact record path、serialized schema / version、`InstallationRecordV2` / `SkillSlotMarkerV1`のcanonical ready / updating / slot fixtures、invalid / unknown / future schema cases、root / slot completeness ruleを固定する。C5がownerとなり、contract freeze後にexact P0 artifact probeを行い、C6は変更せずconformする。
 - `InstallationRecordV2`: fixed pathにschema、state、installed / desired version、candidate digest、2 skill slot versionsだけを持つ。arbitrary path、per-file digest、checkpoint listを持たない。
 - `SkillSlotMarkerV1`: schema、owner、exact slot、distribution versionだけを持つ。
 - `ToolingDeletePlanV1`: fixed roots、valid owned exact slots、installation recordだけをtyped targetにする。
 - `PurgeAuthorityV1`: tooling lifecycleから独立したaccepted target evidenceとconfirmationを持つ。
 - `LifecyclePublicResultV1`: dry-run / apply、text / JSON、exit、cleanup-pendingを一意にmappingする。
-- `InventoryHeadV1` / `RemovalReceiptDeltaV1`: merge parent、result SHA、node inventory digestを連鎖する。
+- `InventoryHeadV1` / `RemovalReceiptDeltaV1`: repository内ではmerge parent、inventory before / after digest、change manifest digest、verification result digestを連鎖する。result SHAは自己参照を避けてGit historyとout-of-band immutable bindingでreceipt digestへ束縛する。
 - `CandidateArtifactReceiptV1`: source SHA、build invocation、wheel / sdist digestを固定する。
-- `RequiredCheckTransitionReceiptV1`: external required contexts、review gate、変更owner、検証結果を記録する。
+- `RequiredCheckTransitionReceiptV1`: C8が`U + old -> U + old + new -> U + new`を記録し、C9がold workflow removalとpost-removal live stateを追記し、C10がruleset scope、human review、merge queue behaviorをlive再照合してfinalizeするappend-only chainとする。
 
 ## Deep interface
 
@@ -190,8 +190,8 @@ arbitrary historical catalog、scheduler、baseline、journal state machineを�
 1. root bindingを再確認する。
 2. 最初のdestructive stepより前にinstallation recordを`state=updating-v2`、`desired_version`、`desired_digest`へatomic replaceする。
 3. 4 provider rootsを固定順でdelete + renameする。
-4. skill slotをfixed exact pathごとにreplaceする。
-5. 全root / slot配置後にinstallation recordを`ready-v2`へatomic replaceする。
+4. current skill slotをfixed exact pathごとにreplaceし、finite retired slotをexact name + valid markerで削除する。
+5. 全root / current slot配置とretired slot処理後にinstallation recordを`ready-v2`へatomic replaceする。
 6. staging残存をbest effortでcleanupする。recordとstaging digestが一致しない場合はstagingをauthorityにせずblockする。
 
 Python / Linux / macOSで非空directory同士のcross-platform atomic exchangeはpublic guaranteeにしない。各rootのdelete + renameと、複数rootの順次置換を正直なfailure modelとして受け入れる。
@@ -203,25 +203,29 @@ Python / Linux / macOSで非空directory同士のcross-platform atomic exchange�
 - `absent`: provider roots / valid ready markerがない。
 - `legacy-ready`: accepted finite evidenceで現行workspaceを認識できる。
 - `tooling-absent-preserved-data`: provider toolingはなく、user data / generated projectionだけが残り、accepted install routeで再installできる。
-- `ready(version A)`: ready markerとexpected fixed roots / slotsがAを示す。
+- `ready-v2(installed_version=A, candidate_digest=D)`: authoritative installation recordとexpected fixed roots / slotsがA / Dを示す。serialized enumとfixture keyは`ready-v2`とする。
 - `updating-v2(desired B, digest D)`: stagingまたはold/new/missing rootが混在し、same desired version / digestのexternal rerunだけを許可する。
 - `legacy-recovery-active`: accepted legacy journal / markerが残り、bounded recovery-only adapterまたはlast-compatible package pinが必要である。
 - `blocked`: root binding、type、shared slot ownership、candidate integrityを証明できない。
 
 per-file checkpoint、intent別journal、quarantine、rollback image、cross-intent resumeをstate modelへ持ち込まない。
 
-`fresh | current-supported | legacy-supported | legacy-expired | unknown`はsupport classificationでありlifecycle stateではない。D1は各classificationをcanonical lifecycle stateへ一意にmappingする。operation authorityは`package_generation × lifecycle_state × operation` matrixだけから決める。
+`fresh | current-supported | legacy-supported | legacy-expired | unknown`はsupport classificationでありlifecycle stateではない。D1は各classificationをcanonical lifecycle stateへ一意にmappingする。authorityは`package_generation × lifecycle_state × public_operation × execution_mode` matrixだけから決める。public operationにはretryとlegacy aliasを含め、inspect / dry-run / applyは独立axisにする。
 
 ### Failure contract
+
+`updating-v2` recordのatomic replace成功後は、下表のどのfaultでもauthoritative recordは`state=updating-v2`、exact `desired_version` / `desired_digest`を保持し、`ready-v2` authorityは存在しない。物理的に残るlegacy ready markerはnon-authoritative metadataであり、全readerは`InstallationRecordV2`を優先する。許可するmutationはsame version / same digest updateだけである。
 
 | failure | result | next action |
 |---|---|---|
 | stage / validate failure | target旧stateを維持 | candidate修正後に再実行 |
 | updating record書込み失敗 | target旧stateを維持 | candidate / filesystem修正後に再実行 |
 | updating record後・root削除前 | target content旧state、recordはupdating | same desired version / digestだけを再実行 |
-| root削除前のfailure | target旧stateを維持 | 再実行 |
+| final root binding recheck failure（updating record前） | target旧stateを維持 | binding修復後に再実行 |
 | delete後・rename前 | 一root欠落、user data不変 | external updaterから再実行 |
-| root間の停止 | mixed roots、ready markerは旧 | desired versionを再実行して全root再置換 |
+| root間の停止 | mixed roots、authoritative recordはupdating-v2、旧markerはnon-authoritative | same desired version / digestを再実行して全root再置換 |
+| current slot delete後・rename前 / slot間 | mixed roots / slots、authoritative recordはupdating-v2 | same desired version / digestを再実行して全root / slot再置換 |
+| retired slot削除前後 | finite retired slotが残存または削除済み、authoritative recordはupdating-v2 | same desired version / digestを再実行し、invalid / foreign / markerless slotはpreserve-and-block |
 | scripts後・ready前 | repo-local復旧不能の可能性 | installed package / `uvx`から再実行 |
 | ready後cleanup failure | candidateはready、staging残存 | update成功。bounded cleanupを後実行 |
 | record / staging digest mismatch | mutation前block | authorityを推測せず人間がstale stagingを診断 |
@@ -296,7 +300,7 @@ testがslowという理由だけでは削除しない。retired contractまた�
 
 ## Removal receipt
 
-production route、test node、workflow machineryを削除するchangeは、次をlatest inventory head、merge parent SHA、result SHAへ束縛して記録する。
+production route、test node、workflow machineryを削除するchangeは二層receiptにする。repository内receiptはcommit自己参照を避け、次をlatest inventory headとmerge parent SHAへ束縛して同じchangeに保存する。
 
 - owner Issue
 - retired contractまたはsuccessor contract
@@ -304,8 +308,11 @@ production route、test node、workflow machineryを削除するchangeは、次�
 - removed test node IDs
 - successor test node IDs
 - focused verification command
-- result SHA
-- parent / result node inventory digest
+- inventory before / after digest
+- change manifest digest
+- verification result digest
+
+out-of-band authorityはresult commit上のGitHub Actions check run `Provider Receipt Binding`とする。check summaryはresult commit SHA、repository内receipt digest、check_run_id、content-addressed artifact_id、retention_daysを持つ。次IssueはGitHub APIでGit history、check、artifact digestを照合してlatest headを解決し、bindingが欠落・期限切れ・SHA / digest不一致ならfail closedにする。同じartifact_idの上書きや別runからの代用を認めない。
 
 rebase後はdelta receiptを再生成し、並行PRはmerge順確定後に再照合する。testがslowであることだけをretirement authorityにしない。production contractの廃止authorityをtests-only Issueが後付けしない。
 
@@ -334,7 +341,7 @@ P0: legacy writer + legacy reader
   -> P3: new-only reader/writer after accepted sunset
 ```
 
-- exact P0 artifactがcanonical ready-v2 / updating-v2 fixtureをmutation-zeroでblockできるformat / guardをC5で証明する。成立しない場合はP0に能力があると仮定せず、workspace format / release sequenceを親へ戻す。
+- D1はP0 policyとrelease sequence再設計authorityを決める。C5がrecord / marker contractとcanonical fixturesをfreezeした後、production mutationより前にexact P0 artifactのmutation-zero probeを行う。成立しない場合はP0に能力があると仮定せず、workspace format / release sequenceを親へ戻す。
 - `P1 × legacy-ready`はlegacy install/updateとnew uninstall/purgeをGREENにする。
 - `P1 × tooling-absent-preserved-data`はaccepted install routeで再installできる。
 - `P1 × ready-v2`はuninstall / dry-runを許可し、update / init-forceはfail closedにする。
