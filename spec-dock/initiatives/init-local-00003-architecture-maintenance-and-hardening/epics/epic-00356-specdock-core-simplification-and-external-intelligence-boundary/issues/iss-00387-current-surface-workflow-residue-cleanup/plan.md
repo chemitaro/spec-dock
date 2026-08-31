@@ -138,8 +138,9 @@ package-data globは次を確認する。
 3. root READMEに`active set --checkout`のCurrent案内とEAL必須説明がない。
 4. root READMEにselection-only、`issue start`、canonical rewrite説明がある。
 5. Authoring overviewが二skillを現在形で案内し、Issue #359未来形を含まない。
-6. Current inventoryにHistorical path/fixtureが含まれない。
-7. synthetic旧phraseをdetectorへ渡すと違反になる。
+6. Current vocabulary inventoryにHistorical path/fixtureと`docs/migration.md`が含まれない。
+7. `docs/migration.md`はCurrent vocabulary scanから外れても、既存のlink/parity検証対象には残る。
+8. synthetic旧phraseをCurrent detectorへ渡すと違反になり、migration-only sampleはCurrent detectorへ渡されない。
 
 Test名はIssue番号だけでなくdurable contractを表す。例:
 
@@ -220,7 +221,8 @@ done
 
 ```bash
 uv run pytest tests/unit/application/test_set_active.py -q
-uv run pytest tests/cli_runtime/test_storage_core_cli.py -q
+uv run pytest --run-full-regression --full-regression-shard \
+  tests/cli_runtime/test_storage_core_cli.py -q
 uv run pytest --run-full-regression --full-regression-shard \
   tests/cli_runtime/test_issue_lifecycle.py -q
 ```
@@ -248,7 +250,17 @@ field shape testが旧fieldを理由に失敗することを確認する。既�
 
 ### 9.2 GREEN
 
-S03の三commandを再実行する。加えて:
+S03の三commandを同じpermission flag付きで再実行する。特にCLI testをpolicy skipでGREEN扱いしない。
+
+```bash
+uv run pytest tests/unit/application/test_set_active.py -q
+uv run pytest --run-full-regression --full-regression-shard \
+  tests/cli_runtime/test_storage_core_cli.py -q
+uv run pytest --run-full-regression --full-regression-shard \
+  tests/cli_runtime/test_issue_lifecycle.py -q
+```
+
+加えて:
 
 ```bash
 rg -n 'SetActiveRequest\(' src/spec_dock/assets/spec_dock/scripts spec-dock/scripts tests
@@ -323,7 +335,8 @@ archiveにcurrent二skillと`ci.yml`があり、`install_root/.codex`がない�
 ### 11.1 Consolidation
 
 - Current text inventoryを一つのexplicit tuple/mappingへ整理。
-- Historical exclusionをpath assertionで固定。
+- Historical path/fixtureと`docs/migration.md`をCurrent vocabulary inventoryから除外するassertionを固定。
+- migration文書の既存link/parity testは保持し、Current vocabulary scanだけを分離する。
 - public CLI、application behavior、issue-start orderingの重複assertionを減らす。
 - source substringだけでbehaviorを証明せずfail-fast port testを残す。
 - Issue-specific temporary helperを増やさない。
@@ -428,7 +441,7 @@ implementation baselineからのchanged pathを列挙する。次に差分がな
 `report.md`の薄い三sectionへ実測だけを記録する。
 
 - Outcome: actual changed filesと残滓除去結果
-- Verification: command、pass/skip/failure、package/fresh consumer、final SHA
+- Verification: command、pass/skip/failure、package/fresh consumer。version管理Reportへfinal commit SHAは記録しない
 - Residual Risks / Follow-ups: conditional candidate判断、Epic #384 handoff、未実施事項
 
 長いlog、仕様、意思決定履歴をReportへ複製しない。
@@ -438,10 +451,11 @@ implementation baselineからのchanged pathを列挙する。次に差分がな
 1. commit identityをrepository contractと照合。
 2. explicit pathだけをstage。
 3. focused commitを作成しpush。
-4. Issue #387を参照するPRを作成する。
-5. independent ChatGPT code review/Final Quality Gateを固定SHAで実施し、指摘があればTDDで修正・再reviewする。
-6. merge-ready状態で停止する。agentはmergeしない。
-7. human merge前に`issue finish`を実行しない。
+4. このcommit後に確定したfinal candidate SHAを、version管理ReportではなくPR本文またはhandoff evidenceへ記録する。SHA記録のための追加commitは作らない。
+5. Issue #387を参照するPRを作成する。
+6. independent ChatGPT code review/Final Quality Gateを固定SHAで実施し、指摘があればTDDで修正・再reviewする。修正commit後は新しいSHAをPR/handoff evidenceで更新する。
+7. merge-ready状態で停止する。agentはmergeしない。
+8. human merge前に`issue finish`を実行しない。
 
 ## 14. Rollback / forward recovery
 
@@ -460,6 +474,6 @@ implementation baselineからのchanged pathを列挙する。次に差分がな
 - provider/dogfood parityと`checkout_active_target()` no-diffが確認済み。
 - focused、lint、ordinary、current verifier、package/fresh consumer、validateの実結果がある。
 - Historical、current二skill、consumer CI、Epic #384 surfaceに意図しない差分がない。
-- final candidate SHA、pushed branch、merge-ready PR、residual riskが明確。
+- commit後に確定したfinal candidate SHAがPR/handoff evidenceにあり、pushed branch、merge-ready PR、residual riskが明確。Reportへの自己参照SHA追記はない。
 - 未実施checkをpass扱いしていない。
 - human merge gateを維持している。
