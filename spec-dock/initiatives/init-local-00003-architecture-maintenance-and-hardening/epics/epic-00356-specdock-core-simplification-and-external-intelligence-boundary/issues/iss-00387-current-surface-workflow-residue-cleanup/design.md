@@ -3,7 +3,7 @@
 ID: "iss-00387"
 タイトル: "Current Surface Workflow Residue Cleanup"
 関連GitHub: ["#387"]
-状態: "approved"
+状態: "draft"
 最終更新: "2026-08-31"
 依存: ["requirement.md"]
 親: ["epic-00356", "init-local-00003"]
@@ -21,7 +21,8 @@ ID: "iss-00387"
 2. `active set`のpublic behaviorとinternal request shapeをselection-onlyに一致させる。
 3. provider sourceを正本とし、dogfood projectionとのparityを維持する。
 4. Historical evidenceとEpic #384所有surfaceを変更対象から隔離する。
-5. drift guardは明示的なCurrent inventoryだけを検査し、全repository scanをproduction化しない。
+5. 廃止機能専用のtest supportをproduction residueと同時に撤退させ、削除の不在を監視する新しい恒久testを作らない。
+6. Planをone-time manual verification checklist兼execution recordとして使い、確認漏れを恒久scannerではなく証拠付き手順で防ぐ。
 
 ## 2. Current / Target
 
@@ -35,7 +36,8 @@ ID: "iss-00387"
 | set_active use case | `checkout=True`ならGit操作可能 | active stateのselection/writeだけを行う |
 | issue start | helperでcheckout後、旧shape requestを生成 | helperでcheckout後、target-only requestを生成 |
 | package config | stale mypy overrideとphantom glob | live inventoryだけを列挙 |
-| drift guard | Current path coverageが不足 | explicit Current inventory + Historical exclusion |
+| retirement test support | removed route/module/field、旧語彙、Historical exclusion、旧evidence mutationを恒久監視 | consumerを分類し、retirement-only部分を削除 |
+| verification | absence test追加によるRED/GREEN | surviving behaviorは既存test、削除確認はone-time checklist |
 
 ## 3. Authorityとprojection
 
@@ -65,7 +67,7 @@ ID: "iss-00387"
 実際の Report は `<canonical-node-path>/report.md` にあります。
 ```
 
-exact wordingは既存の日本語primary contractに合わせてtestで一元化してよい。ただし新しいtemplate engineは作らない。
+exact wordingはprovider sourceを正本とし、実装時の`cmp`とfresh consumerで一回だけ確認する。文言を固定する新しいtest fixture、required/forbidden phrase assertion、template engineは作らない。
 
 ## 4. Active selectionの責務境界
 
@@ -126,40 +128,50 @@ unfinished active guard
 - repository内のdirect `SetActiveRequest` call siteはcompile/testで全てtarget-onlyへ更新する。
 - repository外のPython internal importはpublic stability保証の対象としない。新しいdeprecated wrapperは作らない。
 
-## 5. Current-facing drift guard
+## 5. 検証設計: surviving behaviorとone-time evidence
 
-### 5.1 Explicit inventory
+### 5.1 三つの検証分類
 
-test-only inventoryは次を列挙する。
+| Class | 対象 | 手段 | durableか |
+|---|---|---|---|
+| A: surviving behavior | selection-only、issue start ordering/failure、current CLI、provider/dogfood parity、current package output | 既存のpositive automated testを保持・最小更新 | durable |
+| B: retirement evidence | 旧文言、旧field、dead config、orphan support、no-touch boundary | `rg`、AST、`git diff`、`cmp`、build/archive inventory、fresh init | one-time。Plan/Reportへ記録 |
+| C: retirement-only support | removed route/module/fieldの不在、phrase scanner、Historical exclusion、legacy mutation、test copy | consumerを確認して削除。混合testはpositive部分だけ残す | 撤退対象 |
 
-- root `README.md`
-- provider/dogfood active-none report 3 pair
-- provider/dogfood Authoring overview
-- `ActiveSetArgs`/`SetActiveRequest` field shape
-- public CLI help/negative behavior
+Class BをClass Aへ昇格させることは原則禁止する。すなわち、旧語句がないこと、旧pathがないこと、旧flagがparser errorになること、Historicalがscanner対象外であることを新しいpytestへしない。
 
-### 5.2 Semantic assertions
+### 5.2 Durable automated testとして残す契約
 
-raw word countではなく、surfaceごとのrequired/forbidden assertionを使う。
+- `active set`の三selectorが成功し、invalid targetでwriteしない。
+- `set_active()`がselection/writeを行い、Git/GitHub/dependency portを呼ばず`branch is None`を返す。
+- `issue start`がguard、dependency readiness、checkout、active write、syncの順を守り、checkout/write failureで安全に止まる。
+- retained root help、registry、leaf helpがCurrent CLIを提示する。
+- provider/dogfood runtimeとshipped assetが一致する。
+- source、wheel、sdist、installed resourcesがCurrent install-root inventoryを保持する。
 
-- README: `issue start`とselection-only説明が必要、`active set --checkout`とEAL必須説明は禁止。
-- active-none: exact minimal contentが必要、旧schema heading/fieldは禁止。
-- overview: 二skill pathが必要、Issue #359未来形は禁止。
-- contracts: dataclass field tupleをexact matchする。
-- behavior: fail-fast fake portで`set_active()`がGit/GitHub/depsを呼ばないことを示す。
+同じ観測点を既存testが覆う場合、新規testを追加しない。既存testがretirement-only assertionを併せ持つ場合、そのassertionだけを削り、positive behaviorへ名前と責務を合わせる。
 
-### 5.3 Historical exclusion
+### 5.3 Known retirement candidates
 
-次をCurrent inventoryへ入れない。
+実装者はPlanのconsumer inventoryを先に行い、次を機械的に削除せず、各候補を`remove`または`retain(reason)`へ分類する。
 
-- `spec-dock/initiatives/**`（本Issue自身のdocs validationを除く）
-- `docs/authoring/historical.md`
-- `tests/fixtures/authoring_kit/existing_issue/**`
-- migration-only wording
-- removed-route negative test
-- Epic #384 canonical docs
+| Family | Known candidate | 推奨処置 |
+|---|---|---|
+| set-active compatibility | `test_internal_checkout_request_preserves_issue_start_compatibility`、legacy request helper args、専用Git stub | issue-startのpositive ordering testを保持したうえで削除・縮小 |
+| removed CLI/runtime inventory | `REMOVED_HELP_ROUTES`、`REMOVED_RUNTIME_MODULES`、`REMOVED_APPLICATION_CONTRACT_SYMBOLS`、`REMOVED_USE_CASE_FIELDS`、関連absence test/helper | retained registry/import/parityだけを残して削除・分離 |
+| removed flag rejection | direct `active set --checkout` parser-error test、helpの旧flag集合assertion | selector success/no-writeを残して削除 |
+| authoring scanner | `CURRENT_LEGACY_VOCABULARY_PATTERNS`、`_current_vocabulary_violations()`、forbidden phrase detector、mutation/infix/Historical positive control | link/parity/current schemaのpositive testと分離して削除 |
+| legacy evidence mutation | `S09_LEGACY_EVIDENCE_MUTATIONS`、`apply_s09_legacy_evidence_mutation`、`s09_invariance.py`とconsumer tests | current lifecycle/doctor behaviorの唯一の観測でなければ削除 |
+| Historical test copy | preservation SHA/copy/mutation machinery、`tests/fixtures/authoring_kit/existing_issue/**` | authoritative originalを保持し、test-only copyであれば削除 |
+| definition-only | Issue/Profile-era constants、orphan imports/helpers | reference、AST、dynamic discovery proof後に削除 |
 
-detector自体はsynthetic textに旧phraseを入れるmutation testで検証できる。Historical file本文を書き換えてtestを通さない。
+### 5.4 Historical boundary
+
+`spec-dock/initiatives/**`、accepted ADR、provider/dogfood `docs/authoring/historical.md`はauthoritative Historical evidenceとして変更しない。一方、`tests/fixtures/**`のcopyやsynthetic mutationはtest infrastructureであり、自動的な保存対象ではない。canonical source、runtime input、surviving positive testのconsumerがなければ撤去できる。
+
+### 5.5 新規testの例外gate
+
+新規testを許可するのは、現在残るbehaviorに新しいobservable riskがあり、既存testの最小更新、compile/type/lint、one-time evidenceのいずれでも検出できない場合だけである。実装者はcode追加前にR/D/Pへ、risk、失敗例、既存testで不足する理由、最小test、test budgetへの影響を追記し、再reviewする。本Issueの現行計画では例外を使わない。
 
 ## 6. Package/test hygiene
 
@@ -183,7 +195,46 @@ detector自体はsynthetic textに旧phraseを入れるmutation testで検証で
 
 proofが成立しない候補は残し、理由をReportに記載する。このcleanupを理由に一般dead-code sweepを行わない。
 
-## 7. Epic #384との境界
+### 6.3 Test budgetと撤退会計
+
+implementation baselineとfinal candidateで次を同じcommandにより採取する。
+
+- collected test count
+- tracked `tests/**/*.py` LOC
+- tracked test file数
+- tracked fixture file数
+- added/deleted production LOCとtest/support LOC
+
+品質ゲートは次とする。
+
+1. test count、test LOC、test file数、fixture file数はいずれも純増しない。
+2. retirement candidate decision coverageは`decided / discovered = 1.0`。
+3. `remove`判定したcandidateのclosureは`removed / removable = 1.0`。
+4. surviving behaviorを観測するtestを誤って削除していない。
+5. `deleted test LOC / max(1, deleted production LOC)`は情報として記録するが、値を稼ぐためにtestを削ることを防ぐため合否閾値にはしない。
+
+削除可能なtest supportが発見された場合はtest/support deletionが0でないことを要求する。候補を全てretainする場合は、各項目にsurviving consumerの具体的証拠が必要である。
+
+## 7. Checklistとexecution record
+
+Planの各checkは次のfieldを持つ。
+
+| Field | 意味 |
+|---|---|
+| ID | milestone内で一意の固定ID |
+| 対象 / 目的 | 何を、なぜ確認するか |
+| 前提 | 実行可能になる条件 |
+| 操作 | production/test/docsへの具体的変更 |
+| 確認command | 一回限りのmanual evidenceまたは既存test |
+| 期待結果 | PASSの観測可能な条件 |
+| 採取証拠 | Reportへ要約するoutput/diff/metric |
+| fail-closed | 続行せず仕様判断へ戻す条件 |
+| cleanup対象 | temp/build/cache/orphan support |
+| 状態 | `NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)` |
+
+command未実行、policy skip、対象test未collectionをPASSにしない。Planのstatus ledgerは実施時に更新し、詳細な長いlogはReportへ複製せず要約と参照だけを残す。
+
+## 8. Epic #384との境界
 
 本IssueはCurrent contentと内部selection seamをcleanにし、Epic #384が扱うdistribution/test redesignの入力を単純化するだけである。次には触れない。
 
@@ -197,13 +248,13 @@ proofが成立しない候補は残し、理由をReportに記載する。この
 
 package buildとcurrent full-regression verifierは非回帰確認として実行するが、その構成やpolicyを変更しない。
 
-## 8. Data、failure、recovery
+## 9. Data、failure、recovery
 
-### 8.1 Data migration
+### 9.1 Data migration
 
 不要。node metadata、consumer user data、Historical document、schema、distribution stateを変更しない。
 
-### 8.2 Failure handling
+### 9.2 Failure handling
 
 | Failure | 処置 |
 |---|---|
@@ -211,45 +262,53 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | active setがGit portを呼ぶ | request contractionを未完了とし、application testから修正する |
 | issue start regression | public `active set --checkout`を復活させず、call site/orderingをforward-fixする |
 | live `.codex` assetを発見 | phantom判定を撤回しpackage config削除を止める |
-| Historical false positive | Historicalを直さずCurrent inventoryを修正する |
+| test candidateがsurviving behaviorの唯一の観測 | 削除を止め、retirement-only assertionだけを分離できるか再設計する |
+| checklistを恒久testへ転記したくなる | 自動化を止め、one-time evidenceとReport記録へ戻す |
+| test budgetが純増 | 新規test/supportを除去する。例外が必要なら実装を止めR/D/Pを再承認する |
 | Epic #384 file変更が必要 | 本Issueから除外しEpic #384へhandoffする |
 | Full Regression failure | ledger/timing/shardを変更せず原因diffを修正する |
 
-### 8.3 Rollback
+### 9.3 Rollback
 
 変更をdocs/placeholder、active request、package hygieneの小さいcommit境界に分ける。data migrationがないため各境界を独立revertできる。旧workflow schemaや`active set --checkout`をfallbackとして再導入しない。
 
-## 9. Testability
+## 10. Verification matrix
 
 | 設計観測点 | Test surface |
 |---|---|
-| placeholder/README/overview | `tests/unit/infra/test_authoring_kit_assets.py`、init/update parity test |
-| request field shape/selection-only | `tests/unit/application/test_set_active.py`、`tests/cli_runtime/test_storage_core_cli.py` |
+| placeholder/README/overview | one-time content review、`cmp`、fresh init。新しいphrase testは作らない |
+| request shape | `rg`/AST/call-site audit、compile。field absence専用testは作らない |
+| selection-only | 既存`tests/unit/application/test_set_active.py`のpositive behavior |
 | issue start ordering | `tests/cli_runtime/test_issue_lifecycle.py` |
-| package config/archive | `tests/unit/infra/test_init_update.py`、clean `uv build` |
+| package config/archive | clean `uv build`とsource/wheel/sdist/installed inventory。stale path不在testは作らない |
 | source/projection parity | existing `cmp`/parity assertions |
 | overall non-regression | ordinary `uv run pytest`、current verifier、fresh init、`spec-dock validate` |
-| no-touch boundary | implementation baselineからのpath diff audit |
+| retirement test support | consumer map、deletion diff、before/after metrics、remaining positive suite |
+| no-touch boundary | implementation baselineからのpath diff audit。恒久exclusion testは作らない |
 
-## 10. 代替案と却下理由
+## 11. 代替案と却下理由
 
 | 案 | 判断 | 理由 |
 |---|---|---|
 | docsだけ直す | 却下 | internal checkout capabilityとrequest driftが残る |
 | internal seamだけ直す | 却下 | Current利用者への誤案内が残る |
 | repository-wide旧語彙ban | 却下 | Historical evidenceとmigration説明を破壊する |
+| Current surface限定drift guard | 却下 | 廃止のたびにinventory、negative assertion、mutation testが増える |
+| 削除確認を一切しない | 却下 | orphan support、配布欠落、責務回帰を見逃す |
+| 全削除をTDD化 | 却下 | 一回限りの不在確認を恒久test debtへ変える |
+| manual checklist + surviving positive tests | 採用 | 撤退確認を完結させながらdurable suiteを小さくできる |
 | `checkout_active_target()`も削除 | 却下 | `issue start`のCurrent behaviorを壊す |
 | Epic #384と同時実装 | 却下 | owner、failure boundary、review範囲が混ざる |
 | compatibility wrapper/feature flag | 却下 | public surfaceは既に削除済みで、複雑性を再導入する |
 | 本設計の限定cleanup | 採用 | Current contractを一つのIssueで最小に収束できる |
 
-## 11. 要件対応
+## 12. 要件対応
 
 | 要件 | 設計 |
 |---|---|
-| R01〜R04, R08 | §3、§5 |
+| R01〜R04, R08, R09 | §3、§5、§7 |
 | R05 | §4 |
 | R06 | §6 |
-| R07 | §5 |
-| N01〜N05 | §3〜§8 |
-| AC01〜AC15 | §9とPlanのverification matrix |
+| R07 | §5、§6 |
+| N01〜N06 | §3〜§9 |
+| AC01〜AC17 | §10とPlanのchecklist/status ledger |
