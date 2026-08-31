@@ -65,6 +65,7 @@ historical evidenceとして、別candidateのGitHub Full Regressionは2,708 tes
 - fixed installation recordはknown schema、state、operation、version、candidate digest、2 slot versionsだけを持つ。
 - arbitrary path、per-file digest、action list、progress bit、rollback image、historical catalogをrecordへ持たせない。
 - candidateを全てstage / validateした後、`docs -> templates -> system -> scripts -> slots`の順で処理し、ready recordを最後に書く。
+- uninstall完了時はfixed recordを削除せず、`state=tooling-absent-preserved-data`へatomic replaceする。never-installed `absent`とuninstalled stateをdurableに識別し、reinstallでfresh-init-only seedを再作成しない。
 - same operation / same candidateのexternal rerunだけでpartial failureから収束させ、cross-intent recoveryとautomatic rollbackをpublic contractにしない。
 
 ### R3. Legacy / downgrade
@@ -73,7 +74,7 @@ historical evidenceとして、別candidateのGitHub Full Regressionは2,708 tes
 - real root binding、version / runtime digest、active legacy recovery absence、markerless current slotsのexact treeをmutation前に確認する。
 - migration後はnew record / markersだけをauthorityとし、legacy recognizerを再度参照しない。
 - active legacy journal / retry / purge recoveryはnew formatへ推測変換せず、exact last-compatible `0.2.3`でclean stateへ戻すguidanceを返す。
-- old `0.2.3`のmutating commandsがfinal workspaceへmutation 0であることをmerge前に証明する。成立しなければfinal marker / formatを修正し、bridge generationを追加しない。
+- old `0.2.3`のmutating commandsがfinal workspaceへmutation 0であることをmerge前に証明する。target-scoped startup-injected Python audit-hook tripwireで保護対象配下の最初のmutation attemptをsyscall完了前にfailさせ、tripwire event 0を主証拠、tree digest不変を補助証拠とする。成立しなければfinal marker / formatを修正し、bridge generationを追加しない。
 
 ### R4. Consumer-owned seeds
 
@@ -89,7 +90,7 @@ historical evidenceとして、別candidateのGitHub Full Regressionは2,708 tes
 - `--keep-specs`をdefault uninstallと同義のcompatibility aliasにする。
 - spec-history purge capabilityと独立purge commandを廃止する。
 - `--remove-specs`をpermanent non-mutating compatibility trapとして残し、mutation 0、code `spec-history-purge-removed`、exit 2を返す。
-- tooling-absent-preserved-dataからuser data / seedsを保持してreinstallできる。
+- durable recordの`tooling-absent-preserved-data`からuser data / seedsを保持してreinstallでき、fresh-init-only seedを再作成しない。
 
 ## Test / CI contract
 

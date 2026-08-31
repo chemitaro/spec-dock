@@ -100,7 +100,7 @@ ready recordは少なくとも次を持つ。
 }
 ```
 
-incomplete recordは`state=incomplete`、`operation=install|update|uninstall`、desired / installed version、candidate digestを持つ。arbitrary path、per-file digest、action list、checkpoint、progress bit、rollback image、historical catalogは持たない。
+incomplete recordは`state=incomplete`、`operation=install|update|uninstall`、desired / installed version、candidate digestを持つ。uninstall完了時は同じfixed pathへ`state=tooling-absent-preserved-data`をatomic replaceし、record不在のnever-installed `absent`とdurableに区別する。arbitrary path、per-file digest、action list、checkpoint、progress bit、rollback image、historical catalogは持たない。
 
 ### Protocol
 
@@ -128,8 +128,8 @@ Uninstall:
 2. apply時だけincomplete uninstall record
 3. 4 roots
 4. valid owned 2 slots
-5. record削除
-6. tooling-absent-preserved-data
+5. recordを`state=tooling-absent-preserved-data`へatomic replace
+6. durable tooling-absent-preserved-data成立
 
 ### Failure result
 
@@ -170,6 +170,7 @@ slot delete / replaceでmarker authorityを失わないため、exact fixed tomb
 - exact clean `0.2.3`だけをone-shot migrateする。new recordがあればlegacy recognizerを呼ばない。
 - active legacy recoveryはwrite 0でblockし、last-compatible `0.2.3`でclean stateへ戻すguidanceを返す。
 - `.gitignore` / consumer `ci.yml`はfresh initでabsentの場合だけseedし、それ以外はpreserveする。
+- reinstallはdurable `tooling-absent-preserved-data` recordを識別し、consumer seed absenceを意図としてpreserveする。
 - old package mutation-zeroが成立しなければfinal marker / formatを変更し、旧engineがunknownとしてblockするまでmergeしない。
 - pre-merge rollbackはPRをmergeせず、変更したrequired setがあればcaptured before stateへ戻す。
 - post-merge defectはhuman-reviewed revertを使う。runtimeでold engineへautomatic fallbackしない。
@@ -193,7 +194,7 @@ slot delete / replaceでmarker authorityを失わないため、exact fixed tomb
 ### Built artifact
 
 - exact `0.2.3 -> final -> tooling uninstall -> reinstall`を同じfinal wheelで通す。
-- old `0.2.3` commandsがfinal workspaceにmutation 0であることをtree digestで証明する。
+- baseline `0.2.3` commandsをtarget-scoped startup-injected Python audit hook（例: isolated test environmentの`sitecustomize`）付きsubprocessで実行する。保護対象repository配下の`open` write/create/truncate/append、`os.remove`、`os.rename`、`os.rmdir`、`os.mkdir`、`os.chmod`、`os.link`、`os.symlink`等をsyscall完了前に最初のattemptでfailさせ、tripwire event 0を主証拠、tree digest不変を補助的な最終状態証拠とする。target外writeはvenv/cache/evidence output等へ明示限定する。
 - wheel / sdist source SHAとdigest mismatchをfailさせる。
 
 ### Platform / portfolio

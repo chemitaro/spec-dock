@@ -87,7 +87,7 @@ blocked
 
 `blocked`はserialized stateではなく、binding / type / marker / digest / active recoveryの観測結果である。
 
-fixed installation recordはrepository rootへ置き、known schema、state、operation、version、candidate digest、2 slot versionsだけを持つ。exact pathはimplementationでold-engine mutation-zeroとforeign collisionを検証して固定する。
+fixed installation recordはrepository rootへ置き、known schema、state、operation、version、candidate digest、2 slot versionsだけを持つ。`ready`、`incomplete`に加え、uninstall後も`tooling-absent-preserved-data`をserialized stateとして保持する。record不在のnever-installed `absent`とdurableに区別し、reinstall時にconsumer seed absenceを意図として保存する。exact pathはimplementationでold-engine mutation-zeroとforeign collisionを検証して固定する。
 
 recordへ持たせないもの:
 
@@ -132,8 +132,8 @@ CLIはservice内部のfilesystem planを知らず、typed resultをtext / JSON /
 2. apply時だけincomplete uninstall record
 3. 4 roots
 4. valid owned 2 slots
-5. record delete
-6. tooling-absent-preserved-data
+5. recordを`state=tooling-absent-preserved-data`へatomic replace
+6. durable tooling-absent-preserved-data成立
 
 skill slot処理でmarker authorityを失わないため、exact fixed tombstoneへのno-replace renameを許可する。arbitrary tombstone名、catalog、progress bitは持たず、rerunはexact tombstoneとvalid markerだけを認識する。
 
@@ -173,7 +173,7 @@ public result:
 
 modified / foreign / symlink / unexpected typeではoperation全体をwrite 0でblockする。migration後はnew recordを優先し、legacy recognizerを二度と呼ばない。historical version catalog、range comparison、partial identity、consumer manifest authorityを移植しない。
 
-old `0.2.3` packageのmutating commandsはfinal workspaceにmutation 0でなければならない。final marker / record / root evidenceをold engineがunknownとしてblockできるよう設計し、成立しない場合もbridge generationを追加しない。
+old `0.2.3` packageのmutating commandsはfinal workspaceにmutation 0でなければならない。baseline `0.2.3` CLI subprocessのprocess startup時にtarget-scoped Python audit hook（例: isolated test environmentの`sitecustomize`）を注入し、保護対象repository配下の`open` write/create/truncate/appendと、`os.remove`、`os.rename`、`os.rmdir`、`os.mkdir`、`os.chmod`、`os.link`、`os.symlink`等のfilesystem mutation eventをsyscall完了前に捕捉して最初のattemptでfailさせる。許可するtarget外writeはvenv/cache/evidence output等へ明示限定する。tripwire event 0を時間的な主証拠、pre/post tree digest不変を補助的な最終状態証拠とする。final marker / record / root evidenceをold engineがunknownとしてblockできるよう設計し、成立しない場合もbridge generationを追加しない。
 
 ## Public CLI
 
@@ -205,7 +205,7 @@ argument、text / JSON、exit、mutation_startedと代表happy / fail-closed pat
 
 ### Built artifact
 
-exact `0.2.3 -> final -> tooling uninstall -> reinstall`、old-package mutation-zero、wheel lifecycle、sdist minimal smokeを証明する。
+exact `0.2.3 -> final -> tooling uninstall -> reinstall`とdurable uninstall discriminatorを証明する。old-package mutation-zeroはtarget-scoped audit-hook tripwire event 0とtree digest不変の両方で証明する。wheel lifecycle、sdist minimal smokeも同じcandidateで証明する。
 
 ### Platform delta
 
