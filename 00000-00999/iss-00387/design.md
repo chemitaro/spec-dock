@@ -228,6 +228,10 @@ C60-01は専用の空の一時artifact directoryへ`uv build --clear --out-dir "
 
 fresh consumerのinstaller executionは、その場でinventoryした同一wheelのabsolute pathだけを`uvx --isolated --no-cache --from "$WHEEL" spec-dock init "$CONSUMER"`へ渡す。`--from .`、別build、sdist、artifact directoryだけを指定する代替は認めない。sdistはinventory evidenceとして保持するが、installation/execution sourceにはしない。Reportにはwheel/sdistのpathとdigest、exact `uvx` command、init/validate/cmp結果を対応付ける。
 
+C60-01は最初の一時directory作成前にfailure trapを設定し、`ARTIFACT_DIR`と`CONSUMER`を各`mktemp -d`直後に記録する。nonzero終了時は同checkで作成済みのexact pathだけを削除する。success時だけtrapを解除し、C90-04が同じpath evidenceを照合してcleanupする。
+
+after test metricsはstagingへ依存させない。`git ls-files -z -- tests`のうちworking treeに現存するpathだけをLOC/file/fixture指標の母集団とし、non-ignored untracked test pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体の`uv run pytest --collect-only -q`を使い、個別のfilename patternでdiscoveryを再定義しない。
+
 ## 7. Checklistとexecution record
 
 Planの各checkは次のfieldを持つ。
@@ -277,6 +281,8 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | live `.codex` assetを発見 | phantom判定を撤回しpackage config削除を止める |
 | S06 testと専用mypy overrideのremove/retain不一致 | C20-04のtest decisionとC30-01のexact entry処理を一致させ、無関係overrideを変更せず再確認する |
 | fresh consumerがinventory済みwheel以外を実行 | `--from .`、sdist、別buildを止め、同一absolute wheel pathとdigestへ再束縛してC60-01を再実行する |
+| C60-01がnonzero終了 | failure trapで作成済みの`CONSUMER`と`ARTIFACT_DIR`だけをexact pathで削除し、残存の有無を記録する |
+| C90-02でnon-ignored untracked test pathを検出 | 四指標の計測前に停止し、stagingで隠さない |
 | test candidateがsurviving behaviorの唯一の観測 | 削除を止め、retirement-only assertionだけを分離できるか再設計する |
 | checklistを恒久testへ転記したくなる | 自動化を止め、one-time evidenceとReport記録へ戻す |
 | test budgetが純増 | 新規test/supportを除去する。例外が必要なら実装を止めR/D/Pを再承認する |
