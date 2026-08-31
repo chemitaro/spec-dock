@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 import shlex
 import shutil
-import stat
 import threading
 import time
 
@@ -31,10 +30,10 @@ CURRENT_INSTALL_ROOT_FILES = frozenset({
     ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
     ".github/workflows/ci.yml",
 })
-CURRENT_SKILL_SHA256 = {
-    ".agents/skills/spec-dock/SKILL.md": "7d722020bc4666dd523ddb48d454d5af40367b1d712299e3d5c7dbc88319ae71",
-    ".agents/skills/spec-dock-grill-with-docs/SKILL.md": "83a63630c54be938158dc6a8eca89fa71dfe48c8f6025c7223322c55b4124db8",
-}
+CURRENT_RETAINED_SKILL_FILES = (
+    ".agents/skills/spec-dock/SKILL.md",
+    ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+)
 
 REMOVED_INSTALL_ROOT_PREFIXES = (
     ".agents/host-adapters/",
@@ -132,10 +131,14 @@ def test_s40b_provider_install_root_is_current_catalog_only() -> None:
     )
 
 
-def test_s40b_retained_skill_identity_matches_issue359_final_source() -> None:
-    for relative_path, expected_sha256 in CURRENT_SKILL_SHA256.items():
-        actual_sha256 = hashlib.sha256((INSTALL_ROOT / relative_path).read_bytes()).hexdigest()
-        assert actual_sha256 == expected_sha256
+def test_s40b_retained_skill_identity_matches_current_provider_and_dogfood() -> None:
+    for relative_path in CURRENT_RETAINED_SKILL_FILES:
+        provider = INSTALL_ROOT / relative_path
+        dogfood = REPO_ROOT / relative_path
+        assert provider.is_file() and not provider.is_symlink()
+        assert dogfood.is_file() and not dogfood.is_symlink()
+        assert provider.read_bytes() == dogfood.read_bytes()
+        assert provider.stat().st_mode & 0o777 == dogfood.stat().st_mode & 0o777
 
 
 def test_s40b_legacy_bootstrap_and_skill_apply_paths_are_retired() -> None:
@@ -603,33 +606,6 @@ def test_s45_scaffold_copy_rejects_file_symlink_race_without_external_write(
     assert external.read_text(encoding="utf-8") == "external sentinel\n"
 
 
-def test_s45_make_executable_rejects_symlink_without_external_chmod(tmp_path: Path) -> None:
-    external = tmp_path / "external.sh"
-    external.write_text("external sentinel\n", encoding="utf-8")
-    external.chmod(0o600)
-    link = tmp_path / "managed-script"
-    link.symlink_to(external)
-
-    with pytest.raises(RuntimeError, match="safe regular file"):
-        cli._make_executable(link)
-
-    assert stat.S_IMODE(external.stat().st_mode) == 0o600
-
-
-def test_s45_make_readonly_tree_rejects_symlink_without_external_chmod(tmp_path: Path) -> None:
-    external = tmp_path / "external.md"
-    external.write_text("external sentinel\n", encoding="utf-8")
-    external.chmod(0o600)
-    managed = tmp_path / "managed"
-    managed.mkdir()
-    (managed / "placeholder.md").symlink_to(external)
-
-    with pytest.raises(RuntimeError, match="unsafe entry"):
-        cli._make_readonly_tree(managed)
-
-    assert stat.S_IMODE(external.stat().st_mode) == 0o600
-
-
 def test_s45_fresh_rerun_through_force_converges(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
     before = _filesystem_snapshot(tmp_path)
@@ -877,7 +853,7 @@ def test_s60_marker_published_before_temporary_cleanup_failure_is_partial(
     monkeypatch,
     capsys,
 ) -> None:
-    original_rename = cli._rename_distribution_no_replace
+    original_rename = managed_distribution._rename_distribution_no_replace
     failed = False
 
     def fail_marker_publish_once(source_parent_fd, source_name, destination_parent_fd, destination_name):
@@ -1308,32 +1284,6 @@ def test_i368_journal_removal_failure_is_forward_recoverable(
     assert not journal.exists()
 
 
-def test_s60_marker_removal_preserves_replacement_marker(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    specdock = tmp_path / "spec-dock"
-    specdock.mkdir()
-    marker = specdock / ".distribution-retry.json"
-    marker.write_bytes(b"original\n")
-    original_stat = cli.os.stat
-    replaced = False
-
-    def replace_after_first_observation(path, *args, **kwargs):
-        nonlocal replaced
-        observed = original_stat(path, *args, **kwargs)
-        if not replaced and kwargs.get("dir_fd") is not None and path == marker.name:
-            marker.write_bytes(b"replacement\n")
-            replaced = True
-        return observed
-
-    monkeypatch.setattr(cli.os, "stat", replace_after_first_observation)
-    with pytest.raises(RuntimeError, match="identity changed"):
-        cli._remove_distribution_retry_marker(tmp_path)
-
-    assert marker.read_bytes() == b"replacement\n"
-
-
 def test_s60_distribution_retry_command_runs_for_special_explicit_target(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1361,154 +1311,6 @@ def test_s60_distribution_retry_command_runs_for_special_explicit_target(
 
     assert main(shlex.split(retry.removeprefix("retry="))[1:]) == 0
     assert not (target / "spec-dock/.distribution-journal.json").exists()
-
-
-def test_s60_atomic_regular_file_does_not_replace_racing_destination(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    destination = tmp_path / ".distribution-retry.json"
-    original_rename = cli._rename_distribution_no_replace
-
-    def race_publish(source_parent_fd, source_name, destination_parent_fd, destination_name):
-        Path(destination).write_bytes(b"user replacement\n")
-        return original_rename(source_parent_fd, source_name, destination_parent_fd, destination_name)
-
-    monkeypatch.setattr(cli, "_rename_distribution_no_replace", race_publish)
-
-    with pytest.raises(RuntimeError, match="managed file write failed"):
-        cli._write_atomic_regular_file(destination, b"managed\n", mode=0o600)
-
-    assert destination.read_bytes() == b"user replacement\n"
-
-
-def test_s60_atomic_regular_file_does_not_replace_racing_existing_destination(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    destination = tmp_path / ".distribution-retry.json"
-    destination.write_bytes(b"managed old value\n")
-    original_swap = cli._swap_regular_distribution_target_if_bound
-
-    def race_swap(*args, **kwargs):
-        destination.unlink()
-        destination.write_bytes(b"user replacement\n")
-        return original_swap(*args, **kwargs)
-
-    monkeypatch.setattr(cli, "_swap_regular_distribution_target_if_bound", race_swap)
-
-    with pytest.raises(RuntimeError, match="managed file destination identity changed"):
-        cli._write_atomic_regular_file(destination, b"managed new value\n", mode=0o600)
-
-    assert destination.read_bytes() == b"user replacement\n"
-    assert not list(tmp_path.glob("..distribution-retry.json.*"))
-
-
-def test_s60_atomic_regular_file_rejects_parent_rebind_before_staging(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    parent = tmp_path / "spec-dock"
-    parent.mkdir()
-    destination = parent / ".distribution-retry.json"
-    displaced = tmp_path / "spec-dock-displaced"
-    external = tmp_path / "external"
-    external.mkdir()
-    original_open_chain = cli._open_managed_parent_chain
-
-    def rebind_after_parent_open(path: Path) -> tuple[int, ...]:
-        chain = original_open_chain(path)
-        parent.rename(displaced)
-        parent.symlink_to(external, target_is_directory=True)
-        return chain
-
-    monkeypatch.setattr(cli, "_open_managed_parent_chain", rebind_after_parent_open)
-
-    with pytest.raises(RuntimeError, match="managed file parent identity changed"):
-        cli._write_atomic_regular_file(destination, b"managed\n", mode=0o600)
-
-    assert not list(external.iterdir())
-    assert not list(displaced.iterdir())
-
-
-def test_s60_active_pathfile_does_not_follow_dangling_symlink(
-    tmp_path: Path,
-) -> None:
-    active_dir = tmp_path / "spec-dock" / "active"
-    active_dir.mkdir(parents=True)
-    external = tmp_path / "external.path"
-    pathfile = active_dir / "issue.path"
-    pathfile.symlink_to(external)
-
-    with pytest.raises(RuntimeError, match="not a safe regular file"):
-        cli._write_active_pathfile(active_dir, "issue", tmp_path / "spec-dock/system/active-none/issue")
-
-    assert pathfile.is_symlink()
-    assert not external.exists()
-
-
-def test_s60_atomic_retry_rejects_hard_link_replacement_before_truncate(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    parent = tmp_path / "spec-dock"
-    parent.mkdir()
-    temporary = parent / "..distribution-retry.json.temp"
-    temporary.write_bytes(b"managed old payload\n")
-    expected_identity = (temporary.stat().st_dev, temporary.stat().st_ino)
-    destination = parent / ".distribution-retry.json"
-    external = tmp_path / "external.txt"
-    external.write_bytes(b"must remain intact\n")
-    original_stat = cli.os.stat
-    swapped = False
-
-    def race_temporary_stat(path, *args, **kwargs):
-        nonlocal swapped
-        result = original_stat(path, *args, **kwargs)
-        if not swapped and path == temporary.name:
-            swapped = True
-            temporary.unlink()
-            temporary.hardlink_to(external)
-        return result
-
-    monkeypatch.setattr(cli.os, "stat", race_temporary_stat)
-
-    assert cli._retry_unpublished_atomic_regular_file(
-        temporary,
-        destination,
-        b"managed replacement\n",
-        mode=0o600,
-        expected_identity=expected_identity,
-    ) == (False, False)
-    assert external.read_bytes() == b"must remain intact\n"
-    assert not destination.exists()
-
-
-def test_s60_atomic_root_workbench_seed_does_not_leave_partial_destination(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    destination = tmp_path / ".workbench" / "README.md"
-    payload = b"seed content\n" * 1024
-    original_write = cli.os.write
-    calls = 0
-
-    def fail_after_partial_write(fd, view):
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            partial = max(1, len(view) // 2)
-            return original_write(fd, view[:partial])
-        raise OSError("no space left on device")
-
-    monkeypatch.setattr(cli.os, "write", fail_after_partial_write)
-
-    with pytest.raises(RuntimeError, match="managed file write failed"):
-        destination.parent.mkdir(parents=True)
-        cli._write_atomic_regular_file(destination, payload, mode=0o644)
-
-    assert not destination.exists()
-    assert not list(destination.parent.glob(".README.md.*"))
 
 
 def test_s60_root_rebind_during_marker_publication(

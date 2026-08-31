@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00382",
+  "title": "Full Regression Baseline Lifecycle And Successor Evidence",
+  "slug": "full-regression-baseline-lifecycle-and-successor-evidence",
+  "created_at": "2026-08-30T17:50:20+09:00",
+  "updated_at": "2026-08-30T17:50:20+09:00",
+  "parent_id": "epic-00365",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00365",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 382,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

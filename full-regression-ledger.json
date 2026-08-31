@@ -1,0 +1,367 @@
+{
+  "schema_version": 2,
+  "kind": "issue368_full_regression_failure_ledger",
+  "issue_id": "iss-00368",
+  "fixed_point_sha": "7588d54114a2b8be7661353952f65741169320bd",
+  "current_head_sha": "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2",
+  "commands": {
+    "current_full": "uv run python -m scripts.quality.verify_full_regression --shards 4",
+    "fixed_point_full": "uv run pytest --run-full-regression"
+  },
+  "fixed_point_verification": {
+    "working_tree_sha": "7588d54114a2b8be7661353952f65741169320bd",
+    "materialization": "detached worktree under a codex-tmp managed session",
+    "failed": 27,
+    "passed": 1999,
+    "skipped": 50,
+    "duration": "15m59s"
+  },
+  "current_head_verification": {
+    "working_tree_sha": "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2",
+    "failed": 27,
+    "passed": 2346,
+    "skipped": 48,
+    "duration": "8m13.945s",
+    "runtime_signature_verification": {
+      "verified_failure_signatures": 27,
+      "unexpected_failures": 0,
+      "unexpected_errors": 0,
+      "verifier_exit_code": 0
+    }
+  },
+  "subset_comparison": {
+    "current_failure_paths": 27,
+    "fixed_point_failure_paths": 27,
+    "same_failure_behavior": 27,
+    "expected_retirement_paths": 0,
+    "comparison_incomplete_paths": 0,
+    "fixed_point_subset_total": 27
+  },
+  "classification_policy": {
+    "approved-no-op": {
+      "rationale": "Issue 368 fixed pointでも同一node IDが失敗し、Issue 368の変更で新規発生していない既存失敗",
+      "owner": "既存runtime/import/active/shellおよびretained-skill基線の保守担当",
+      "follow_up": "Issue 368では修正せず、各既存契約のowner issueで追跡する"
+    }
+  },
+  "failure_paths": [
+    {
+      "nodeid": "tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "0d6c418e8c531ed77662b5bb0f166c6370f1b4d995a1ec6ac23452382c34869f",
+      "current_signature_sha256": "0d6c418e8c531ed77662b5bb0f166c6370f1b4d995a1ec6ac23452382c34869f",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "8742959a307d18594743f6bec12a056268baab34024279dbeb4e57458b3a7637",
+      "current_signature_sha256": "8742959a307d18594743f6bec12a056268baab34024279dbeb4e57458b3a7637",
+      "failure_signature_match": true,
+      "lifecycle": "resolved",
+      "resolution_mode": "superseded",
+      "successor_nodeid": "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_import.py::TestCliImport::test_import_accepts_canonical_url_when_origin_is_credentialed_https_remote",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "f149be56ae07e7b774137b1f8f5912076a82838250be9750c886aca7a8392a5f",
+      "current_signature_sha256": "f149be56ae07e7b774137b1f8f5912076a82838250be9750c886aca7a8392a5f",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_render_context_pack_states_entry_default_and_escalation_contract",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "88a470cf10de911a0cc467dbf9a872689fd7126ae543ae2ffad00d8b343ea0ca",
+      "current_signature_sha256": "88a470cf10de911a0cc467dbf9a872689fd7126ae543ae2ffad00d8b343ea0ca",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_context_pack_marks_proposed_active_artifact_non_authoritative",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "8cca85a0280051a5a2e98ef5101d4b47603dfc282ed8ad6f44ef8d9de1d6dace",
+      "current_signature_sha256": "8cca85a0280051a5a2e98ef5101d4b47603dfc282ed8ad6f44ef8d9de1d6dace",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "8cca85a0280051a5a2e98ef5101d4b47603dfc282ed8ad6f44ef8d9de1d6dace",
+      "current_signature_sha256": "8cca85a0280051a5a2e98ef5101d4b47603dfc282ed8ad6f44ef8d9de1d6dace",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s05.py::TestRuntimeActiveS05::test_sync_auto_update_from_branch_writes_authority_context_pack",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "c677546d7a10751f1e5a80133e319652ab7c075f88476eaef8f958bb25ee8d71",
+      "current_signature_sha256": "c677546d7a10751f1e5a80133e319652ab7c075f88476eaef8f958bb25ee8d71",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_blocked_without_force_fails_before_snapshot",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "f5f895b159f95a46d5c868eb14d9f3f786485f797f1ec60d4dbb03ac5a856da5",
+      "current_signature_sha256": "f5f895b159f95a46d5c868eb14d9f3f786485f797f1ec60d4dbb03ac5a856da5",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_force_commits_and_order_is_authoritative",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "c074e342afb1d9047bcde6d3d2e49dff2f151e327f21cb2d581aa2c91679d30a",
+      "current_signature_sha256": "c074e342afb1d9047bcde6d3d2e49dff2f151e327f21cb2d581aa2c91679d30a",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_absorbs_github_issue_index_failure_as_warning",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "b7d59944f1a444c0d2d6ee4fe8685885aad6ab5bdf3e976b540a0dadf01b75cf",
+      "current_signature_sha256": "b7d59944f1a444c0d2d6ee4fe8685885aad6ab5bdf3e976b540a0dadf01b75cf",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_github_resolves_current_unscoped_issue_with_current_repo_slug",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "f5f895b159f95a46d5c868eb14d9f3f786485f797f1ec60d4dbb03ac5a856da5",
+      "current_signature_sha256": "f5f895b159f95a46d5c868eb14d9f3f786485f797f1ec60d4dbb03ac5a856da5",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_skips_same_repo_repo_scoped_view_fetch_when_index_contains_key",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "current_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_falls_back_to_same_repo_repo_scoped_view_when_index_missing_key",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "current_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_falls_back_to_current_repo_view_for_unscoped_linked_initiative_when_index_missing_key",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "current_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_active_s06.py::TestRuntimeActiveS06::test_set_active_github_prefers_foreign_snapshot_under_same_number_collision",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "current_signature_sha256": "23c33661669278ce159e442edc402d631a8ba836ecdf1fcb2a922e68883574e8",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "3f7d32388f2d60f77ec1740aac53fd6d6481f7cb04ef3f3ae7ef09463a29a980",
+      "current_signature_sha256": "3f7d32388f2d60f77ec1740aac53fd6d6481f7cb04ef3f3ae7ef09463a29a980",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_load_active_manifest_chain_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "55f2d59d2e1ce7b337462feefbde5c5a84423d07f039ff5fb5dd7bc8b10762ce",
+      "current_signature_sha256": "55f2d59d2e1ce7b337462feefbde5c5a84423d07f039ff5fb5dd7bc8b10762ce",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_re_resolves_inside_lock_when_parent_drifts_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "ab1f703094ed3335d43ff943cb9194266ee2c162758b3c732b47c1c1cee9256a",
+      "current_signature_sha256": "ab1f703094ed3335d43ff943cb9194266ee2c162758b3c732b47c1c1cee9256a",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_numeric_target_uses_resolved_current_repo_slug_for_github_read",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "ea4df2e82010c5a2058e5bfd5b31bb7ada7f4776f8cff44a2457fb50b8a1df70",
+      "current_signature_sha256": "ea4df2e82010c5a2058e5bfd5b31bb7ada7f4776f8cff44a2457fb50b8a1df70",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_issue_uses_target_repo_slug_for_same_repo_url_when_present",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "22d80f8db459620d13f14e34c9a7fc2ee60b73f4080ac7d181b3a7c69ab1d4f3",
+      "current_signature_sha256": "22d80f8db459620d13f14e34c9a7fc2ee60b73f4080ac7d181b3a7c69ab1d4f3",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_then_sync_artifact_path_name_content_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "0dbf9314fa763929461775d43ae3e56c51bddcb742e2e329317736f5b1194ef7",
+      "current_signature_sha256": "0dbf9314fa763929461775d43ae3e56c51bddcb742e2e329317736f5b1194ef7",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_post_import_sync_negative_path_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "541c15d4ba9564d9256cb2651fe180c2e230760c2fa56ecb389f145fb8723d00",
+      "current_signature_sha256": "541c15d4ba9564d9256cb2651fe180c2e230760c2fa56ecb389f145fb8723d00",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_execute_create_plan_reuse_seam",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "44894dc46328aad1a9352cb69a93975a99701b9a9e14f8d5c9dc25470dcf6efd",
+      "current_signature_sha256": "44894dc46328aad1a9352cb69a93975a99701b9a9e14f8d5c9dc25470dcf6efd",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "0c1088f1a15dd18d672fe5707d9add3ffe1593b6ead070d90ba553019c498790",
+      "current_signature_sha256": "0c1088f1a15dd18d672fe5707d9add3ffe1593b6ead070d90ba553019c498790",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_sync.py::TestCliSync::test_new_and_active_and_sync",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "f9b206f85a7c0ee352b4019eaed232ee02dcf896c150659fa7e8191f125951a6",
+      "current_signature_sha256": "f9b206f85a7c0ee352b4019eaed232ee02dcf896c150659fa7e8191f125951a6",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_tree_puml_ready_board_at_spec_dock_root",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "3d1b673b92516964bd29b91cf29c8e03c553988dc9e0df7f0a9aee16dc545619",
+      "current_signature_sha256": "3d1b673b92516964bd29b91cf29c8e03c553988dc9e0df7f0a9aee16dc545619",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    },
+    {
+      "nodeid": "tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands",
+      "current_status": "failed",
+      "fixed_point_status": "failed",
+      "disposition": "approved-no-op",
+      "fixed_point_signature_sha256": "20d53420c38ab501c64346e6e22a0b309b2358191fe74a54ed9c20717ddb09b9",
+      "current_signature_sha256": "20d53420c38ab501c64346e6e22a0b309b2358191fe74a54ed9c20717ddb09b9",
+      "failure_signature_match": true,
+      "lifecycle": "active"
+    }
+  ],
+  "conclusion": "現行mainのclean baselineでfixed-pointと同一の27件をapproved-no-opとして記録し、Full Regression failure repairは行わない",
+  "failure_signature_comparison": {
+    "kind": "issue368_full_regression_failure_signature_comparison",
+    "scope": {
+      "selection": "the nine test files containing all 27 full-regression ledger failures",
+      "command": "uv run pytest --run-full-regression -q --junitxml=<run.xml> tests/cli_runtime/test_delete.py tests/cli_runtime/test_distribution_cutover.py tests/cli_runtime/test_import.py tests/cli_runtime/test_runtime_active_s05.py tests/cli_runtime/test_runtime_active_s06.py tests/cli_runtime/test_runtime_import_s10.py tests/cli_runtime/test_runtime_shell_s11.py tests/cli_runtime/test_sync.py tests/cli_runtime/test_workbench.py"
+    },
+    "signature_contract": {
+      "source": "JUnit testcase/failure message attribute",
+      "normalization": [
+        "remove pytest '+ where' diagnostic suffix",
+        "replace fixed-point and candidate checkout prefixes with <repo>",
+        "replace macOS per-run temporary paths with placeholders",
+        "replace checkout-local Python executable paths with <python>",
+        "collapse whitespace"
+      ],
+      "digest": "sha256(normalized_failure_message_utf8)",
+      "aggregate_digest": "sha256(canonical_json_object_of_nodeid_to_signature)"
+    },
+    "runs": {
+      "fixed_point": {
+        "sha": "7588d54114a2b8be7661353952f65741169320bd",
+        "failed": 27,
+        "passed": 269,
+        "skipped": 2,
+        "duration": "2m55s",
+        "junit_sha256": "cb501743939349fc4896527d538d75cfe2bc1b3bdaf2c02390e7c5d238db3a0f",
+        "aggregate_signature_sha256": "6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8"
+      },
+      "current": {
+        "sha": "2715c0bfbbe4b7ac5583cb2af37117810bb05ae3",
+        "failed": 27,
+        "passed": 271,
+        "skipped": 2,
+        "duration": "3m26s",
+        "junit_sha256": "9f1db89d47cbfb73d5a70b7d171f02ba2614f9a21fd949785158c8c092b6d711",
+        "aggregate_signature_sha256": "6ee128836773e80ca6c07e17f0b45bf75cb9901976205cf37ab23844bb6c1dc8"
+      }
+    },
+    "comparison": {
+      "same_node_ids": true,
+      "same_failure_signatures": true,
+      "compared_nodes": 27,
+      "mismatched_nodes": []
+    }
+  }
+}

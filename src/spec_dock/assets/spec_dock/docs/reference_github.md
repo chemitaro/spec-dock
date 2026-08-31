@@ -22,7 +22,7 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 - runtime uninstall は installer uninstall の wrapper で、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock uninstall <target>` として実行します。repo-local runtime が削除済みの場合の retry / reinstall / refresh は installer CLI の `spec-dock uninstall <target>` / `spec-dock init <target>` / `spec-dock update <target>` を使います
 - dependency metadata の canonical storage は `.meta.json` top-level `depends_on` であり、追加/削除/確認は `./spec-dock/scripts/spec-dock deps add/remove/check` の command-first mutation を使います（詳細: `reference_deps.md`）
 - legacy `meta.json`（旧名）、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で推測修復せず preserve-and-block します。partial apply は `.distribution-journal.json` の root・intent・authority・contract・plan・protocol・exact pre/postcondition 束縛から同一または compatible newer package で forward recovery し、不一致、downgrade、incompatible package、dual recovery state は追加 mutation 前に拒否します
-- `uninstall` は dry-run が既定です。`--apply` は全計画の検証後にだけ mutation を開始し、部分失敗時は legacy `.uninstall-retry.json` を保持します。`--keep-specs` では spec history を削除せず、削除には `--remove-specs` が必要です
+- `uninstall` は dry-run が既定です。`--apply` は全計画の検証後にだけ mutation を開始し、部分失敗時の forward recovery には current schema 2 の forward guard `spec-dock/.distribution-retry.json` と current journal `spec-dock/.distribution-journal.json` を使います。legacy `spec-dock/.uninstall-retry.json` は reader-only / manual evidence であり、自動作成も current recovery state への自動変換も行いません。`--keep-specs` では spec history を削除せず、削除には `--remove-specs` が必要です
 
 代表的な解決材料（`gh` 側）:
 - カレントディレクトリが Git リポジトリであること

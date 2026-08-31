@@ -1,13 +1,24 @@
 from collections.abc import Mapping
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+from types import SimpleNamespace
+from typing import cast
 
 import pytest
+from scripts.quality.full_regression_baseline import (
+    CandidateObservation,
+    evaluate_baseline,
+    failure_signature,
+    normalize_failure_message,
+    parse_baseline,
+)
 
-from tests.conftest import _normalize_failure_message
+from tests.conftest import build_candidate_observation
 
 REQUIRED_FAST_NODE_IDS = frozenset({
     "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_legacy_flag_reports_parser_error",
@@ -29,6 +40,64 @@ FULL_REGRESSION_VERIFIER = (
     "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
     "iss-00368-recognized-workspace-reconciliation/artifacts/verify-full-regression.py"
 )
+FULL_REGRESSION_HISTORICAL_LEDGER = (
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
+    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
+    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
+)
+FULL_REGRESSION_HISTORICAL_TIMING_WEIGHTS = (
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/"
+    "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues/"
+    "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-timing-weights.json"
+)
+FULL_REGRESSION_ROOT_LEDGER = "full-regression-ledger.json"
+FULL_REGRESSION_ROOT_TIMING_WEIGHTS = "full-regression-timing-weights.json"
+FULL_REGRESSION_LEDGER = FULL_REGRESSION_ROOT_LEDGER
+ISSUE368_HISTORICAL_LEDGER_SHA256 = "3fb3192110ad9981a6826dae8a5eea30f12bc9f5b65106173dc5777749a8ea3b"
+ISSUE368_HISTORICAL_TIMING_WEIGHTS_SHA256 = "b647b3a0ee3f24202c954e0dd367809dc8981ba686bf6a67f349868ab01da5fc"
+PRE_MIGRATION_LEDGER_CURRENT_HEAD = "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2"
+PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256 = "f997de22e6507e6a27ce76284df079c9dd1e65bb015e309801b4aa041ea3dfcf"
+RETAINED_SKILL_HISTORICAL_NODE = (
+    "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source"
+)
+RETAINED_SKILL_SUCCESSOR_NODE = "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood"
+
+
+def test_full_regression_authority_is_root_and_issue368_history_is_frozen() -> None:
+    repository = _repo_root()
+
+    root_ledger = repository / FULL_REGRESSION_ROOT_LEDGER
+    root_timing_weights = repository / FULL_REGRESSION_ROOT_TIMING_WEIGHTS
+    assert root_ledger.is_file()
+    assert root_timing_weights.is_file()
+
+    canonical_sources = (
+        repository / "tests/conftest.py",
+        repository / "scripts/quality/verify_full_regression.py",
+        repository / ".github/workflows/provider-full-regression.yml",
+    )
+    for source_path in canonical_sources:
+        source = source_path.read_text(encoding="utf-8")
+        assert "iss-00368-recognized-workspace-reconciliation" not in source
+
+    historical_artifacts = (
+        (
+            repository / FULL_REGRESSION_HISTORICAL_LEDGER,
+            ISSUE368_HISTORICAL_LEDGER_SHA256,
+        ),
+        (
+            repository / FULL_REGRESSION_HISTORICAL_TIMING_WEIGHTS,
+            ISSUE368_HISTORICAL_TIMING_WEIGHTS_SHA256,
+        ),
+    )
+    for artifact_path, expected_sha256 in historical_artifacts:
+        assert hashlib.sha256(artifact_path.read_bytes()).hexdigest() == expected_sha256
+
+
+def test_full_regression_root_ledger_records_canonical_runner_command() -> None:
+    payload = json.loads((_repo_root() / FULL_REGRESSION_ROOT_LEDGER).read_text(encoding="utf-8"))
+
+    assert payload["commands"]["current_full"] == "uv run python -m scripts.quality.verify_full_regression --shards 4"
 
 
 def test_full_regression_signature_normalization_is_platform_independent() -> None:
@@ -53,14 +122,351 @@ def test_full_regression_signature_normalization_is_platform_independent() -> No
         "  - [('/repo', 10000)]"
     )
 
-    assert _normalize_failure_message(macos_runtime_error, repository) == _normalize_failure_message(
+    assert normalize_failure_message(macos_runtime_error, repository) == normalize_failure_message(
         linux_runtime_error,
         repository,
     )
-    assert _normalize_failure_message(compact_assertion, repository) == _normalize_failure_message(
+    assert normalize_failure_message(compact_assertion, repository) == normalize_failure_message(
         expanded_assertion,
         repository,
     )
+
+
+def test_full_regression_ledger_migration_preserves_schema1_history() -> None:
+    payload = json.loads((_repo_root() / FULL_REGRESSION_LEDGER).read_text(encoding="utf-8"))
+    rows = payload["failure_paths"]
+    assert isinstance(rows, list)
+
+    schema1_projection = [
+        {
+            "nodeid": row["nodeid"],
+            "fixed_point_signature_sha256": row["fixed_point_signature_sha256"],
+            "rationale": row.get("rationale", ""),
+        }
+        for row in rows
+    ]
+    projection_bytes = json.dumps(
+        schema1_projection,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+    assert payload["schema_version"] == 2
+    assert payload["current_head_sha"] == PRE_MIGRATION_LEDGER_CURRENT_HEAD
+    assert hashlib.sha256(projection_bytes).hexdigest() == PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256
+
+    resolved_rows = [row for row in rows if row.get("lifecycle") == "resolved"]
+    assert [row["nodeid"] for row in resolved_rows] == [RETAINED_SKILL_HISTORICAL_NODE]
+    assert resolved_rows[0]["resolution_mode"] == "superseded"
+    assert resolved_rows[0]["successor_nodeid"] == RETAINED_SKILL_SUCCESSOR_NODE
+    assert all(row.get("lifecycle") == "active" for row in rows if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE)
+    assert not any(row.get("lifecycle") == "retired" for row in rows)
+
+
+def _fake_report(
+    nodeid: str,
+    *,
+    when: str = "call",
+    outcome: str,
+    wasxfail: str | None = None,
+    message: str = "",
+) -> pytest.TestReport:
+    return cast(
+        "pytest.TestReport",
+        SimpleNamespace(
+            nodeid=nodeid,
+            when=when,
+            outcome=outcome,
+            passed=outcome == "passed",
+            failed=outcome == "failed",
+            skipped=outcome == "skipped",
+            wasxfail=wasxfail,
+            longrepr=SimpleNamespace(reprcrash=SimpleNamespace(message=message)) if message else "",
+        ),
+    )
+
+
+def test_pytest_adapter_builds_typed_observation_for_xfail_and_phase_errors() -> None:
+    repository = Path("/repo")
+    passed = "tests/sample.py::test_passed"
+    failed = "tests/sample.py::test_failed"
+    skipped = "tests/sample.py::test_skipped"
+    xfailed = "tests/sample.py::test_xfailed"
+    xpassed = "tests/sample.py::test_xpassed"
+    setup_error = "tests/sample.py::test_setup_error"
+    teardown_error = "tests/sample.py::test_teardown_error"
+    reports = (
+        _fake_report(passed, outcome="passed"),
+        _fake_report(failed, outcome="failed", message="AssertionError: fixed failure"),
+        _fake_report(skipped, outcome="skipped"),
+        _fake_report(xfailed, outcome="skipped", wasxfail="expected failure"),
+        _fake_report(xpassed, outcome="passed", wasxfail="unexpected pass"),
+        _fake_report(setup_error, when="setup", outcome="failed", message="fixture setup failed"),
+        _fake_report(teardown_error, when="teardown", outcome="failed", message="teardown failed"),
+    )
+
+    observation = build_candidate_observation(
+        (passed, failed, skipped, xfailed, xpassed, setup_error, teardown_error),
+        reports,
+        repository=repository,
+    )
+
+    assert isinstance(observation, CandidateObservation)
+    assert observation.executed == (passed, failed, skipped, xfailed, xpassed, setup_error, teardown_error)
+    assert observation.outcomes == {
+        passed: "passed",
+        failed: "failed",
+        skipped: "skipped",
+        xfailed: "xfailed",
+        xpassed: "xpassed",
+        setup_error: "error",
+        teardown_error: "error",
+    }
+    assert observation.failure_signatures == {
+        failed: failure_signature("AssertionError: fixed failure", repository),
+    }
+
+
+def test_pytest_adapter_preserves_duplicate_and_missing_coverage_for_shared_evaluator() -> None:
+    duplicate = "tests/sample.py::test_duplicate"
+    missing = "tests/sample.py::test_missing"
+    observation = build_candidate_observation(
+        (duplicate, duplicate, missing),
+        (_fake_report(duplicate, outcome="passed"),),
+        repository=Path("/repo"),
+    )
+    baseline = parse_baseline({
+        "schema_version": 2,
+        "failure_paths": [
+            {
+                "nodeid": duplicate,
+                "fixed_point_signature_sha256": "a" * 64,
+                "rationale": "historical",
+                "lifecycle": "resolved",
+                "resolution_mode": "fixed-in-place",
+            },
+            {
+                "nodeid": missing,
+                "fixed_point_signature_sha256": "b" * 64,
+                "rationale": "historical",
+                "lifecycle": "resolved",
+                "resolution_mode": "fixed-in-place",
+            },
+        ],
+    })
+
+    result = evaluate_baseline(baseline, observation)
+
+    assert not result.verified
+    assert any(item.code == "coverage_mismatch" for item in result.violations)
+
+
+def test_pytest_and_standalone_adapters_return_identical_evaluation() -> None:
+    from scripts.quality.verify_full_regression import observation_from_json, observation_to_json
+
+    repository = Path("/repo")
+    active = "tests/sample.py::test_active"
+    historical = "tests/sample.py::test_historical"
+    successor = "tests/sample.py::test_successor"
+    unexpected = "tests/sample.py::test_unexpected"
+    active_message = "AssertionError: active baseline failure"
+    reports = (
+        _fake_report(active, outcome="failed", message=active_message),
+        _fake_report(successor, outcome="passed"),
+        _fake_report(unexpected, outcome="failed", message="AssertionError: unexpected failure"),
+    )
+    pytest_observation = build_candidate_observation(
+        (active, successor, unexpected),
+        reports,
+        repository=repository,
+    )
+    standalone_observation = observation_from_json(observation_to_json(pytest_observation))
+    baseline = parse_baseline({
+        "schema_version": 2,
+        "failure_paths": [
+            {
+                "nodeid": active,
+                "fixed_point_signature_sha256": failure_signature(active_message, repository),
+                "rationale": "historical active failure",
+                "lifecycle": "active",
+            },
+            {
+                "nodeid": historical,
+                "fixed_point_signature_sha256": "b" * 64,
+                "rationale": "historical successor",
+                "lifecycle": "resolved",
+                "resolution_mode": "superseded",
+                "successor_nodeid": successor,
+            },
+        ],
+    })
+
+    pytest_result = evaluate_baseline(baseline, pytest_observation)
+    standalone_result = evaluate_baseline(baseline, standalone_observation)
+
+    assert standalone_observation == pytest_observation
+    assert standalone_result.to_dict() == pytest_result.to_dict()
+
+
+def test_standalone_observation_round_trip_and_merge_use_typed_shared_result() -> None:
+    from scripts.quality.verify_full_regression import (
+        merge_observations,
+        observation_from_json,
+        observation_to_json,
+    )
+
+    first = CandidateObservation(
+        collected=("tests/sample.py::test_first",),
+        executed=("tests/sample.py::test_first",),
+        outcomes={"tests/sample.py::test_first": "xpassed"},
+        failure_signatures={},
+        retirement_evidence={},
+    )
+    second = CandidateObservation(
+        collected=("tests/sample.py::test_second",),
+        executed=("tests/sample.py::test_second",),
+        outcomes={"tests/sample.py::test_second": "passed"},
+        failure_signatures={},
+        retirement_evidence={},
+    )
+
+    round_tripped = observation_from_json(observation_to_json(first))
+    merged = merge_observations((round_tripped, second))
+
+    assert round_tripped == first
+    assert merged.collected == ("tests/sample.py::test_first", "tests/sample.py::test_second")
+    assert merged.outcomes["tests/sample.py::test_first"] == "xpassed"
+    assert merged.outcomes["tests/sample.py::test_second"] == "passed"
+    baseline = parse_baseline({
+        "schema_version": 2,
+        "failure_paths": [
+            {
+                "nodeid": "tests/sample.py::test_first",
+                "fixed_point_signature_sha256": "a" * 64,
+                "rationale": "historical",
+                "lifecycle": "resolved",
+                "resolution_mode": "fixed-in-place",
+            }
+        ],
+    })
+    assert not evaluate_baseline(baseline, round_tripped).verified
+
+
+def test_standalone_runner_uses_hook_observation_without_junit_inference(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from scripts.quality import verify_full_regression as verifier
+
+    candidate_sha = "a" * 40
+    nodeid = "tests/sample.py::test_failure"
+    artifact_root = tmp_path / "artifacts"
+    verifier.LEDGER = tmp_path / "ledger.json"
+    verifier.LEDGER.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "current_head_sha": candidate_sha,
+            "failure_paths": [
+                {
+                    "nodeid": nodeid,
+                    "fixed_point_signature_sha256": "0" * 64,
+                    "rationale": "historical",
+                }
+            ],
+        }),
+        encoding="utf-8",
+    )
+    verifier.TIMING_WEIGHTS = tmp_path / "timing-weights.json"
+    verifier.TIMING_WEIGHTS.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verifier.sys,
+        "argv",
+        ["verify_full_regression.py", "--artifact-dir", str(artifact_root), "--shards", "1"],
+    )
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 0.0)
+
+    commands: list[list[str]] = []
+
+    def fake_run_streamed(
+        argv: list[str],
+        *,
+        cwd: Path,
+        output_path: Path,
+        stream: bool = True,
+    ) -> int:
+        del cwd, stream
+        commands.append(argv)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if "--collect-only" in argv:
+            output_path.write_text(f"[   0.0s] {nodeid}\n", encoding="utf-8")
+            return 0
+        observation_path = Path(
+            next(arg.split("=", 1)[1] for arg in argv if arg.startswith("--full-regression-observation="))
+        )
+        observation_path.write_text(
+            json.dumps({
+                "schema_version": 1,
+                "collected": [nodeid],
+                "executed": [nodeid],
+                "outcomes": {nodeid: "failed"},
+                "failure_signatures": {nodeid: "0" * 64},
+                "retirement_evidence": {},
+            }),
+            encoding="utf-8",
+        )
+        output_path.write_text("", encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(verifier, "_run_streamed", fake_run_streamed)
+    monkeypatch.setattr(verifier, "_load_timing_weights", lambda repository, head: ({}, 1.0))
+
+    def fake_subprocess_run(argv, **kwargs):
+        if argv[:2] == ["git", "rev-parse"]:
+            return subprocess.CompletedProcess(argv, 0, stdout=f"{candidate_sha}\n")
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(verifier.subprocess, "run", fake_subprocess_run)
+
+    assert verifier.main() == 0
+    result_paths = list(artifact_root.glob("*/result.json"))
+    assert len(result_paths) == 1
+    result = json.loads(result_paths[0].read_text(encoding="utf-8"))
+    assert result["status"] == "verified"
+    assert any("--full-regression-observation=" in arg for command in commands for arg in command)
+    assert not any("--junitxml=" in arg for command in commands for arg in command)
+
+
+def test_manual_full_regression_shard_without_observation_keeps_pytest_exit_status(
+    tmp_path: Path,
+) -> None:
+    project = _prepare_mini_project(
+        tmp_path,
+        {
+            "tests/unit/test_manual_shard.py": (
+                "import pytest\n\n"
+                "@pytest.mark.full_regression\n"
+                "def test_passes():\n"
+                "    pass\n\n"
+                "@pytest.mark.full_regression\n"
+                "def test_fails():\n"
+                "    assert False\n"
+            )
+        },
+    )
+    result = _run_pytest(
+        project,
+        "--run-full-regression",
+        "--full-regression-shard",
+        "-p",
+        "no:cacheprovider",
+        "tests/unit/test_manual_shard.py::test_passes",
+        "tests/unit/test_manual_shard.py::test_fails",
+    )
+
+    assert result.returncode == 1, _result_output(result)
+    assert "full-regression shard observation path is missing" not in _result_output(result)
 
 
 def _repo_root() -> Path:
@@ -135,6 +541,14 @@ def test_full_regression_workflow_has_no_execution_time_caps() -> None:
     assert "--timeout-seconds" not in workflow
     assert "--max-total-seconds" not in workflow
     assert "--shards 4" in workflow
+
+
+def test_full_regression_workflow_uses_canonical_runner_without_issue368_fallback() -> None:
+    workflow = (_repo_root() / ".github/workflows/provider-full-regression.yml").read_text(encoding="utf-8")
+    flattened = " ".join(workflow.split())
+
+    assert "uv run python -m scripts.quality.verify_full_regression --shards 4" in flattened
+    assert "verify-full-regression.py" not in workflow
 
 
 def test_full_regression_main_keeps_verified_status_after_long_observation(
@@ -392,6 +806,18 @@ def _prepare_mini_project(
     *,
     ledger_guard: bool = False,
 ) -> Path:
+    shared_quality_root = _repo_root() / "scripts"
+    mini_quality_root = tmp_path / "scripts"
+    (mini_quality_root / "quality").mkdir(parents=True)
+    shutil.copy2(shared_quality_root / "__init__.py", mini_quality_root / "__init__.py")
+    shutil.copy2(
+        shared_quality_root / "quality" / "__init__.py",
+        mini_quality_root / "quality" / "__init__.py",
+    )
+    shutil.copy2(
+        shared_quality_root / "quality" / "full_regression_baseline.py",
+        mini_quality_root / "quality" / "full_regression_baseline.py",
+    )
     classifier_path = _repo_root() / "tests" / "conftest.py"
     assert classifier_path.is_file(), f"S01 classifier is missing: {classifier_path}"
 
@@ -422,15 +848,10 @@ def _prepare_mini_project(
 
 
 def _write_full_regression_ledger(project: Path, nodeids: tuple[str, ...]) -> None:
-    ledger = (
-        project
-        / "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics"
-        / "epic-00365-specdock-structural-integrity-rearchitecture-and-regression-baseline-recovery/issues"
-        / "iss-00368-recognized-workspace-reconciliation/artifacts/full-regression-ledger.json"
-    )
-    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger = project / "full-regression-ledger.json"
     ledger.write_text(
         json.dumps({
+            "schema_version": 1,
             "failure_paths": [
                 {
                     "nodeid": nodeid,
@@ -442,7 +863,7 @@ def _write_full_regression_ledger(project: Path, nodeids: tuple[str, ...]) -> No
                     "fixed_point_signature_sha256": "0" * 64,
                 }
                 for nodeid in nodeids
-            ]
+            ],
         }),
         encoding="utf-8",
     )

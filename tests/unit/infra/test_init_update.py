@@ -41,6 +41,20 @@ _REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS = tuple(
 )
 
 
+def _workflow_job_lines(workflow_text: str, job_key: str) -> list[str]:
+    lines = workflow_text.splitlines()
+    start = lines.index(f"  {job_key}:")
+    end = next(
+        (
+            index
+            for index, line in enumerate(lines[start + 1 :], start=start + 1)
+            if re.fullmatch(r"  [A-Za-z0-9_-]+:.*", line)
+        ),
+        len(lines),
+    )
+    return lines[start:end]
+
+
 def _i370_public_tree_evidence(root: Path) -> dict[str, tuple[object, ...]]:
     evidence: dict[str, tuple[object, ...]] = {}
     for path in (root, *root.rglob("*")):
@@ -659,18 +673,28 @@ def test_i370_docs_describe_deprovision_authority_recovery_and_parity() -> None:
         "compatible newer package",
         ".distribution-retry.json",
         "schema 2",
+        "schema 1",
+        "legacy migration input",
+        "same pathname",
+        "current forward guard",
         ".distribution-journal.json",
         "prepared → executing → verifying → completed",
         "DistributionProcessResult",
         ".uninstall-retry.json",
+        "legacy reader-only/manual evidence",
         "自動変換しない",
+        "forward recovery is not code rollback",
+        "current explicit spec-history purge authority",
         "--keep-specs",
         "--remove-specs",
-        "Issue 371",
         "root・intent・authority・contract・plan・protocol",
         "unknown / modified",
     ):
         assert literal in japanese_docs
+
+    assert "Issue 371 の compatibility owner" not in japanese_docs
+    assert "Issue 371 が所有するcompatibility route" not in japanese_docs
+    assert "future/compatibility owner" not in japanese_docs
 
     root_readme = (repo_root / "README.md").read_text(encoding="utf-8")
     for literal in (
@@ -679,7 +703,12 @@ def test_i370_docs_describe_deprovision_authority_recovery_and_parity() -> None:
         "protocol-2 journal",
         "typed `DistributionProcessResult`",
         "legacy `.uninstall-retry.json` is never converted automatically",
-        "`--remove-specs` is the explicit two-part authority for shared",
+        "schema 1 as a legacy migration input",
+        "schema 2 as the current forward guard",
+        "same pathname",
+        "legacy reader-only/manual evidence",
+        "forward recovery is not code rollback",
+        "`--remove-specs` is the\n  current explicit spec-history purge authority for shared",
     ):
         assert literal in root_readme
 
@@ -1662,6 +1691,30 @@ class TestInitUpdate(CliRuntimeHarness):
         command.extend(requirements)
         self._issue_69_run_subprocess(command)
 
+    def _issue_69_install_build_backend_packages(
+        self,
+        *,
+        python_executable: Path,
+        requirements: list[str],
+        wheelhouse: Path | None = None,
+    ) -> None:
+        command = [
+            str(python_executable),
+            "-m",
+            "pip",
+            "install",
+            "--no-cache-dir",
+            "--upgrade",
+        ]
+        if wheelhouse is not None:
+            command.extend([
+                "--no-index",
+                "--find-links",
+                str(wheelhouse),
+            ])
+        command.extend(requirements)
+        self._issue_69_run_subprocess(command)
+
     def _issue_69_create_fallback_runtime_env(self, env_root: Path) -> Path:
         assert os.name != "nt", "issue-69 fallback runtime env is only implemented for POSIX"
         bin_dir = env_root / "bin"
@@ -1716,6 +1769,7 @@ class TestInitUpdate(CliRuntimeHarness):
         venv_dir = build_context.parent / "build-venv"
         fallback_env_dir = build_context.parent / "build-wrapper-env"
         dist_dir = build_context.parent / "dist"
+        native_build_venv = False
         venv_result = subprocess.run(
             [sys.executable, "-m", "venv", str(venv_dir)],
             capture_output=True,
@@ -1733,15 +1787,25 @@ class TestInitUpdate(CliRuntimeHarness):
             )
             if pip_result.returncode != 0:
                 venv_python = self._issue_69_create_fallback_runtime_env(fallback_env_dir)
+            else:
+                native_build_venv = True
         else:
             venv_python = self._issue_69_create_fallback_runtime_env(fallback_env_dir)
 
-        self._issue_69_install_target_packages(
-            python_executable=venv_python,
-            target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
-            requirements=list(self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS),
-            wheelhouse=wheelhouse,
-        )
+        backend_requirements = list(self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS)
+        if native_build_venv:
+            self._issue_69_install_build_backend_packages(
+                python_executable=venv_python,
+                requirements=backend_requirements,
+                wheelhouse=wheelhouse,
+            )
+        else:
+            self._issue_69_install_target_packages(
+                python_executable=venv_python,
+                target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
+                requirements=backend_requirements,
+                wheelhouse=wheelhouse,
+            )
 
         self._issue_69_run_subprocess(
             [
@@ -2577,6 +2641,112 @@ class TestInitUpdate(CliRuntimeHarness):
             assert f'"{package_data_pattern}"' in pyproject_text, (
                 f"missing exclude-package-data guard for stale build artifact: {package_data_pattern}"
             )
+
+    def test_issue_69_native_build_venv_installs_backend_requirements_in_place(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        build_context = tmp_path / "build-context"
+        wheel_dir = tmp_path / "wheel"
+        sdist_dir = tmp_path / "sdist"
+        wheelhouse = tmp_path / "wheelhouse"
+        build_context.mkdir()
+        wheelhouse.mkdir()
+        commands: list[list[str]] = []
+        native_python = tmp_path / "build-venv" / "bin" / "python"
+
+        def fake_run(args, **kwargs):
+            command = [str(argument) for argument in args]
+            commands.append(command)
+            if command[:3] == [sys.executable, "-m", "venv"]:
+                native_python.parent.mkdir(parents=True, exist_ok=True)
+                native_python.write_text("native python placeholder\n", encoding="utf-8")
+                return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+            if command == [str(native_python), "-m", "pip", "--version"]:
+                return subprocess.CompletedProcess(command, 0, stdout="pip 25\n", stderr="")
+            raise AssertionError(f"unexpected subprocess probe: {command}")
+
+        def fake_run_subprocess(args, *, cwd=None, env=None):
+            command = [str(argument) for argument in args]
+            commands.append(command)
+            if command[1:3] == ["-m", "build"]:
+                dist_dir = Path(command[command.index("--outdir") + 1])
+                dist_dir.mkdir(parents=True, exist_ok=True)
+                (dist_dir / "spec_dock-0.0.0-py3-none-any.whl").write_bytes(b"wheel")
+                (dist_dir / "spec_dock-0.0.0.tar.gz").write_bytes(b"sdist")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        monkeypatch.setattr(self, "_issue_69_resolve_wheelhouse", lambda repo_root: wheelhouse)
+        monkeypatch.setattr(self, "_issue_69_run_subprocess", fake_run_subprocess)
+
+        self._issue_69_build_artifacts_with_local_wheelhouse(
+            repo_root=tmp_path / "repo",
+            build_context=build_context,
+            wheel_dir=wheel_dir,
+            sdist_dir=sdist_dir,
+        )
+
+        install_commands = [
+            command for command in commands if command[:4] == [str(native_python), "-m", "pip", "install"]
+        ]
+        assert install_commands == [
+            [
+                str(native_python),
+                "-m",
+                "pip",
+                "install",
+                "--no-cache-dir",
+                "--upgrade",
+                "--no-index",
+                "--find-links",
+                str(wheelhouse),
+                *self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS,
+            ]
+        ]
+        assert "--target" not in install_commands[0]
+
+    def test_issue_69_pip_unavailable_fallback_keeps_target_install_semantics(
+        self,
+        monkeypatch,
+        tmp_path: Path,
+    ) -> None:
+        python_executable = tmp_path / "python"
+        target_dir = tmp_path / "target"
+        wheelhouse = tmp_path / "wheelhouse"
+        wheelhouse.mkdir()
+        captured: list[list[str]] = []
+
+        def pip_probe(args, **kwargs):
+            return subprocess.CompletedProcess(args, 1, stdout="", stderr="pip unavailable")
+
+        def capture_install(args, *, cwd=None, env=None):
+            captured.append([str(argument) for argument in args])
+
+        monkeypatch.setattr(subprocess, "run", pip_probe)
+        monkeypatch.setattr(shutil, "which", lambda executable: "/fake/uv")
+        monkeypatch.setattr(self, "_issue_69_run_subprocess", capture_install)
+
+        self._issue_69_install_target_packages(
+            python_executable=python_executable,
+            target_dir=target_dir,
+            requirements=["build==1.2.2"],
+            wheelhouse=wheelhouse,
+        )
+
+        assert captured == [
+            [
+                "/fake/uv",
+                "pip",
+                "install",
+                "--python",
+                str(python_executable),
+                "--target",
+                str(target_dir),
+                "--no-index",
+                "--find-links",
+                str(wheelhouse),
+                "build==1.2.2",
+            ]
+        ]
 
     def test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -6562,13 +6732,41 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         }
 
         assert "name: Provider CI" in workflow_lines["fast"]
-        assert section_keys(workflow_lines["fast"], "jobs:") == {"provider-tests"}
+        assert section_keys(workflow_lines["fast"], "jobs:") == {
+            "provider-tests",
+            "provider-distribution-parity",
+        }
         assert section_keys(workflow_lines["full"], "jobs:") == {"provider-full-regression"}
         assert "python -m pip install uv" in workflow_texts["fast"]
-        assert "        run: make lint" in workflow_lines["fast"]
-        assert workflow_lines["fast"].count("        run: uv run pytest") == 1
-        assert "--run-full-regression" not in workflow_texts["fast"]
-        assert "verify-full-regression.py" in workflow_texts["full"]
+        provider_test_lines = _workflow_job_lines(workflow_texts["fast"], "provider-tests")
+        assert "        run: make lint" in provider_test_lines
+        assert provider_test_lines.count("        run: uv run pytest") == 1
+        assert "--run-full-regression" not in "\n".join(provider_test_lines)
+        provider_parity_lines = _workflow_job_lines(workflow_texts["fast"], "provider-distribution-parity")
+        provider_parity_text = "\n".join(provider_parity_lines)
+        assert "    runs-on: ${{ matrix.os }}" in provider_parity_lines
+        assert "        os: [ubuntu-latest, macos-latest]" in provider_parity_lines
+        assert "          ref: ${{ github.event.pull_request.head.sha }}" in provider_parity_lines
+        assert "          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}" in provider_parity_lines
+        assert provider_parity_text.count("${{ github.event.pull_request.head.sha }}") == 2
+        assert '        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"' in provider_parity_lines
+        assert "continue-on-error:" not in provider_parity_text
+        expected_provider_parity_commands = (
+            "        run: uv run pytest tests/unit/infra/test_managed_distribution.py",
+            (
+                "        run: uv run pytest --run-full-regression --full-regression-shard "
+                "tests/cli_runtime/test_distribution_cutover.py"
+            ),
+            (
+                "        run: uv run pytest --run-full-regression --full-regression-shard "
+                "tests/integration/test_epic_00343_distribution.py"
+            ),
+        )
+        for command in expected_provider_parity_commands:
+            assert command in provider_parity_lines
+        full_workflow_flattened = " ".join(workflow_texts["full"].split())
+        assert "uv run python -m scripts.quality.verify_full_regression --shards 4" in full_workflow_flattened
+        assert "verify-full-regression.py" not in workflow_texts["full"]
         assert "timeout-minutes" not in workflow_texts["full"]
         assert "--timeout-seconds" not in workflow_texts["full"]
         assert "--max-total-seconds" not in workflow_texts["full"]

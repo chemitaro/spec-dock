@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import replace
 import errno
 import hashlib
@@ -110,6 +111,189 @@ EXPECTED_HISTORICAL_CURRENT_IDENTITY = {
     "mode": 0o644,
     "source": {"kind": "git-provider-source", "ref": HISTORICAL_COMMIT},
 }
+
+
+_RECOVERY_PATHNAMES = (".distribution-retry.json", ".distribution-journal.json", ".uninstall-retry.json")
+_RECOVERY_PATH_MUTATORS = frozenset({"rename", "replace", "touch", "unlink", "write_bytes", "write_text"})
+_RECOVERY_OS_MUTATORS = frozenset({"open", "remove", "rename", "replace", "unlink"})
+_RECOVERY_SAFE_SERVICE_CALLS = frozenset({
+    "execute_deprovision_distribution",
+    "execute_explicit_spec_history_purge_distribution",
+    "execute_fresh_distribution",
+    "execute_recognized_distribution",
+})
+
+
+def _has_recovery_path_role(node: ast.AST, roles: set[str] | frozenset[str]) -> bool:
+    return any(
+        (isinstance(child, ast.Name) and child.id in roles)
+        or (
+            isinstance(child, ast.Constant)
+            and isinstance(child.value, str)
+            and child.value.endswith(_RECOVERY_PATHNAMES)
+        )
+        for child in ast.walk(node)
+    )
+
+
+def _cli_recovery_writer_roles(source: str) -> tuple[str, ...]:
+    """Return CLI functions that mutate a managed recovery pathname."""
+
+    tree = ast.parse(source)
+    module_roles: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and _has_recovery_path_role(node.value, module_roles):
+            module_roles.update(target.id for target in node.targets if isinstance(target, ast.Name))
+
+    functions = tuple(node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)))
+    role_factories = frozenset(
+        function.name
+        for function in functions
+        if any(
+            isinstance(node, ast.Return)
+            and node.value is not None
+            and not isinstance(node.value, ast.Call)
+            and _has_recovery_path_role(node.value, module_roles)
+            for node in ast.walk(function)
+        )
+    )
+    violations: set[str] = set()
+    for function in functions:
+        role_names = set(module_roles | role_factories)
+        for assignment in (node for node in ast.walk(function) if isinstance(node, ast.Assign)):
+            if _has_recovery_path_role(assignment.value, role_names):
+                role_names.update(target.id for target in assignment.targets if isinstance(target, ast.Name))
+
+        for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
+            arguments = (*call.args, *(keyword.value for keyword in call.keywords))
+            has_role_argument = any(_has_recovery_path_role(value, role_names) for value in arguments)
+            if isinstance(call.func, ast.Name):
+                if has_role_argument and call.func.id not in role_factories | _RECOVERY_SAFE_SERVICE_CALLS:
+                    violations.add(f"{function.name}:{call.func.id}")
+            elif isinstance(call.func, ast.Attribute):
+                if (
+                    isinstance(call.func.value, ast.Name)
+                    and call.func.value.id == "os"
+                    and call.func.attr in _RECOVERY_OS_MUTATORS
+                    and has_role_argument
+                ):
+                    violations.add(f"{function.name}:os.{call.func.attr}")
+                    continue
+                if not _has_recovery_path_role(call.func.value, role_names):
+                    continue
+                mode = (
+                    call.args[0]
+                    if call.func.attr == "open" and call.args
+                    else next((keyword.value for keyword in call.keywords if keyword.arg == "mode"), None)
+                )
+                writable_open = (
+                    isinstance(mode, ast.Constant)
+                    and isinstance(mode.value, str)
+                    and bool(set(mode.value) & set("wax+"))
+                )
+                if call.func.attr in _RECOVERY_PATH_MUTATORS or writable_open:
+                    violations.add(f"{function.name}:{call.func.attr}")
+
+    return tuple(sorted(violations))
+
+
+def test_i372_reference_github_uses_current_uninstall_recovery_metadata() -> None:
+    """I372-T-DOC-001: docs name current writers without promoting legacy evidence."""
+
+    provider = (REPO_ROOT / "src/spec_dock/assets/spec_dock/docs/reference_github.md").read_text(encoding="utf-8")
+    dogfood = (REPO_ROOT / "spec-dock/docs/reference_github.md").read_text(encoding="utf-8")
+
+    assert dogfood == provider
+    assert "current schema 2 の forward guard `spec-dock/.distribution-retry.json`" in provider
+    assert "current journal `spec-dock/.distribution-journal.json`" in provider
+    assert "legacy `spec-dock/.uninstall-retry.json` は reader-only / manual evidence" in provider
+    assert "自動作成も current recovery state への自動変換も行いません" in provider
+
+
+_RENAMED_RECOVERY_CLI_PREFIX = """
+RETRY_PATH = Path("spec-dock/.distribution-retry.json")
+def _renamed_recovery_path(root): return root / RETRY_PATH
+def _renamed_recovery_reader(root): return os.lstat(_renamed_recovery_path(root))
+def _renamed_service_coordinator(root): return execute_recognized_distribution(root, legacy_marker=_renamed_recovery_path(root))
+"""
+
+
+def test_i372_cli_recovery_writer_guard_is_role_based() -> None:
+    """I372-T-AUTH-002: renaming a CLI-owned recovery writer cannot evade the guard."""
+
+    writer_source = """
+def _renamed_atomic_writer(path, payload): path.write_text(payload)
+def _renamed_recovery_publisher(root, payload):
+    marker = _renamed_recovery_path(root)
+    _renamed_atomic_writer(marker, payload)
+def _renamed_recovery_remover(root): os.unlink(_renamed_recovery_path(root))
+def _renamed_recovery_stream_writer(root): _renamed_recovery_path(root).open(mode="w")
+def _renamed_fd_writer(root): os.open(_renamed_recovery_path(root), os.O_WRONLY)
+"""
+
+    assert _cli_recovery_writer_roles(_RENAMED_RECOVERY_CLI_PREFIX + writer_source) == (
+        "_renamed_fd_writer:os.open",
+        "_renamed_recovery_publisher:_renamed_atomic_writer",
+        "_renamed_recovery_remover:os.unlink",
+        "_renamed_recovery_stream_writer:open",
+    )
+
+
+def test_i372_cli_has_no_legacy_distribution_writer_or_kernel_seam() -> None:
+    """I372-T-AUTH-001: CLI remains an adapter, not a second distribution owner."""
+
+    assert _cli_recovery_writer_roles(inspect.getsource(cli)) == ()
+
+    tree = ast.parse(inspect.getsource(cli))
+    definitions = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    forbidden_writer_definitions = {
+        "_write_atomic_regular_file",
+        "_write_active_pathfile",
+        "_write_spec_dock_version",
+        "_write_distribution_retry_marker",
+        "_remove_distribution_retry_marker",
+        "_install_repo_root_shortcut",
+    }
+    assert definitions.isdisjoint(forbidden_writer_definitions)
+
+    forbidden_kernel_edges = {
+        "_rename_distribution_no_replace",
+        "_swap_regular_distribution_target_if_bound",
+        "_remove_distribution_target_if_bound",
+        "DistributionStageOwnership",
+        "apply_distribution_plan",
+    }
+    imported_from_managed_distribution = {
+        alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "spec_dock.managed_distribution"
+        for alias in node.names
+    }
+    assert imported_from_managed_distribution.isdisjoint(forbidden_kernel_edges)
+
+    direct_private_calls = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in forbidden_writer_definitions | forbidden_kernel_edges
+    }
+    assert not direct_private_calls
+
+    managed_tree = ast.parse(inspect.getsource(managed_distribution))
+    managed_definitions = {
+        node.name for node in managed_tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert {
+        "execute_fresh_distribution",
+        "execute_recognized_distribution",
+        "execute_deprovision_distribution",
+        "execute_explicit_spec_history_purge_distribution",
+        "apply_distribution_plan",
+    }.issubset(managed_definitions)
+    assert any(
+        isinstance(node, ast.ClassDef) and node.name == "DistributionStageOwnership" for node in managed_tree.body
+    )
 
 
 def _manifest_with(**overrides: object) -> dict[str, object]:
