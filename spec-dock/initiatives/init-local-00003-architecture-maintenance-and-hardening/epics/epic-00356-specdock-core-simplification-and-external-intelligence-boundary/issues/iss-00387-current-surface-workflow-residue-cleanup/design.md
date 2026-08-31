@@ -161,6 +161,8 @@ Class BをClass Aへ昇格させることは原則禁止する。すなわち、
 | removed CLI/runtime inventory | `REMOVED_HELP_ROUTES`、`REMOVED_RUNTIME_MODULES`、`REMOVED_APPLICATION_CONTRACT_SYMBOLS`、`REMOVED_USE_CASE_FIELDS`、関連absence test/helper | retained registry/import/parityだけを残して削除・分離 |
 | removed flag rejection | direct `active set --checkout` parser-error test、helpの旧flag集合assertion | selector success/no-writeを残して削除 |
 | authoring scanner | `CURRENT_LEGACY_VOCABULARY_PATTERNS`、`_current_vocabulary_violations()`、forbidden phrase detector、mutation/infix/Historical positive control | link/parity/current schemaのpositive testと分離して削除 |
+| legacy active behavior | `tests/cli_runtime/test_runtime_active_s06.py`のforce/dependency/GitHub behavior test群とledger row | surviving selection-only/issue-start testを保持し、file/testとexact ledger参照を一体撤去 |
+| legacy flag fast node | `test_active_set_legacy_flag_reports_parser_error`と`REQUIRED_FAST_NODE_IDS`/timing weight entry | positive selector smokeを保持し、testとexact参照を一体撤去 |
 | legacy evidence mutation | `S09_LEGACY_EVIDENCE_MUTATIONS`、`apply_s09_legacy_evidence_mutation`、`s09_invariance.py`とconsumer tests | current lifecycle/doctor behaviorの唯一の観測でなければ削除 |
 | Historical test copy | preservation SHA/copy/mutation machinery、`tests/fixtures/authoring_kit/existing_issue/**` | authoritative originalを保持し、test-only copyであれば削除 |
 | definition-only | Issue/Profile-era constants、orphan imports/helpers | reference、AST、dynamic discovery proof後に削除 |
@@ -243,10 +245,10 @@ command未実行、policy skip、対象test未collectionをPASSにしない。Pl
 - journal/checkpoint/recovery
 - legacy identity catalog
 - uninstall/purge semantics
-- Full Regression shard/ledger/timing/provider workflow
+- Full Regression schema、failure disposition、shard、provider workflow、timing weight算出方法、およびdeleted-node exact参照以外のledger/timing entry
 - provider test portfolioの削減・統合
 
-package buildとcurrent full-regression verifierは非回帰確認として実行するが、その構成やpolicyを変更しない。
+package buildとcurrent full-regression verifierは非回帰確認として実行するが、その構成やpolicyを変更しない。一方、削除したtest nodeを参照する`full-regression-ledger.json`、`full-regression-timing-weights.json`、`tests/conftest.py`のexact entryはreferential-integrity projectionとして同時に除去する。これはschema、failure disposition、marker、shard、workflow、weight算出方法の再設計を許可しない。
 
 ## 9. Data、failure、recovery
 
@@ -266,7 +268,8 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | checklistを恒久testへ転記したくなる | 自動化を止め、one-time evidenceとReport記録へ戻す |
 | test budgetが純増 | 新規test/supportを除去する。例外が必要なら実装を止めR/D/Pを再承認する |
 | Epic #384 file変更が必要 | 本Issueから除外しEpic #384へhandoffする |
-| Full Regression failure | ledger/timing/shardを変更せず原因diffを修正する |
+| 削除nodeへのledger/timing/required-node参照 | exact entryだけを同時に除去し、他entryまたはpolicyへ波及するなら停止する |
+| Full Regression failure | C40-08のdeleted-node exact参照更新をfailure前に確定し、それ以外のledger/timing/shardを変更せず原因diffを修正する |
 
 ### 9.3 Rollback
 
@@ -311,4 +314,4 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | R06 | §6 |
 | R07 | §5、§6 |
 | N01〜N06 | §3〜§9 |
-| AC01〜AC17 | §10とPlanのchecklist/status ledger |
+| AC01〜AC18 | §10とPlanのchecklist/status ledger |

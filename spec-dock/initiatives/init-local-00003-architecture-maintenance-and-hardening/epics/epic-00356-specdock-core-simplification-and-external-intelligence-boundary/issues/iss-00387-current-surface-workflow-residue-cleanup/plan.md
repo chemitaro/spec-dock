@@ -63,7 +63,7 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 6. mixed-purpose testはtest全体を削除せず、retirement-only assertionだけを除く。
 7. test名、旧語彙、Issue番号だけで削除を判断しない。consumer、observed behavior、failure semanticsを確認する。
 8. authoritative Historical evidenceを変更しない。test copy/synthetic fixtureはauthorityではない。
-9. Epic #384所有file、test architecture、distribution semanticsへ差分を作らない。
+9. Epic #384のtest architecture、distribution semanticsを再設計しない。ただし削除test nodeへのledger/timing/required-node exact参照は同時に除去する。
 10. 実行していないcommand、policy skip、未collection testをPASSにしない。
 11. checklist用の新しいrepository script、scanner、fixture、test helperを作らない。
 12. 一時物はWorkbenchまたは`mktemp -d`に置き、証拠転記後に本Issue所有物だけを片付ける。
@@ -163,7 +163,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **対象 / 目的:** 変更可能pathと保護pathを固定する。
 - **前提:** C00-02 PASS。
 - **操作:** Requirement §4とDesign §5のknown candidateを実pathへ解決する。
-- **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue' tests`。
+- **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue|test_active_set_legacy_flag_reports_parser_error|test_runtime_active_s06' tests full-regression-ledger.json full-regression-timing-weights.json`。
 - **期待結果:** candidate path、surviving consumer、no-touch pathが一覧化される。
 - **証拠:** inventory表をReportへ要約。
 - **停止条件:** candidateがEpic #384またはauthoritative historyだけに存在する。
@@ -309,7 +309,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** internal checkout compatibility test debtを撤去する。
 - **前提:** issue-start positive ordering/failure testsを保持。
-- **操作:** `test_internal_checkout_request_preserves_issue_start_compatibility`を削除し、test request helperをtarget-onlyへ縮小する。専用Git stub/importはconsumer 0なら削除する。
+- **操作:** `test_internal_checkout_request_preserves_issue_start_compatibility`を削除し、test request helperをtarget-onlyへ縮小する。`tests/cli_runtime/test_runtime_active_s06.py`の旧force/dependency/GitHub behavior群をconsumer分類し、surviving behaviorでなければfile/testとledger参照の撤去候補にする。専用Git/GitHub/dependency stub/importはconsumer 0なら削除する。
 - **確認:** candidate symbolごとの`rg`、AST/import review、focused tests。
 - **期待結果:** internal checkout path専用test/supportなし、surviving positive testsは存在。
 - **証拠:** deleted test/helper、retained test names。
@@ -379,8 +379,8 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 廃止route/flagを永久に列挙するtestを撤去する。
 - **前提:** retained root/leaf help、selector success、invalid no-write coverageあり。
-- **操作:** `test_removed_routes_are_parser_errors_without_tree_or_state_writes`、direct `active set --checkout` parser-error test、helpの旧flag集合assertionを削除する。positive selector/assertionは残す。
-- **確認:** `rg`で旧route/flag negative assertion familyを確認し、remaining CLI testsを実行する。
+- **操作:** `test_removed_routes_are_parser_errors_without_tree_or_state_writes`、direct `active set --checkout` parser-error test、`test_active_set_legacy_flag_reports_parser_error`、helpの旧flag集合assertionを削除する。positive selector/assertionは残す。削除fast nodeに対応する`REQUIRED_FAST_NODE_IDS`とtiming weightのexact entryを同時に削除する。
+- **確認:** `rg`で`--checkout`、`--issue`を含むremoved flag/route専用test全体とnode ID参照を確認し、remaining CLI testsを実行する。
 - **期待結果:** positive Current CLI testはGREEN、retirement-only negative testsなし。
 - **証拠:** removed/retained assertion list。
 - **停止条件:** invalid target no-writeやcurrent help inventoryまで失われる。
@@ -441,6 +441,17 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **停止条件:** unrelated refactorが必要、collection対象が予期せず消える。
 - **cleanup:** 本Issue由来orphanのみ。
 
+### C40-08 — Full Regression/fast-node referential integrity
+
+- **対象 / 目的:** test撤去と現行verifier inventoryを矛盾させない。
+- **前提:** C20-04、C40-01〜06で実際に削除するnode IDが確定。
+- **操作:** 削除node IDに一致する`full-regression-ledger.json` failure row/command input、`full-regression-timing-weights.json` weight、`tests/conftest.py`の`REQUIRED_FAST_NODE_IDS`だけを削除または現存successorへ最小更新する。
+- **確認:** 削除node IDごとに3ファイルを`rg`し、ledger parser/current verifier、collectionを実行する。
+- **期待結果:** deleted node参照0、現存nodeのledger/timing/required classificationは整合、verifier成功。
+- **証拠:** node ID別before/after entry、parser/verifier result。
+- **停止条件:** schema、failure disposition、marker、shard、workflow、weight算出方法の変更、無関係nodeへの波及。
+- **cleanup:** orphan exact entriesだけ。ledger/timing全体の再生成はしない。
+
 ## 13. M5 — Surviving behavior、build、fresh consumer
 
 ### C50-01 — Focused positive suites
@@ -480,11 +491,11 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** 現行policy内の非回帰。
 - **前提:** C60-01 PASS。
-- **操作:** workflow/ledger/timing/shardを変更せずverifierを実行する。
+- **操作:** C40-08でreview済みのdeleted-node exact参照更新を固定し、それ以外のworkflow/ledger/timing/shardを変更せずverifierを実行する。
 - **確認:** `uv run python -m scripts.quality.verify_full_regression --shards 4`。
 - **期待結果:** verifier成功。
 - **証拠:** summary、duration、shard結果。
-- **停止条件:** ledger/timing/shard/provider workflow変更が必要、failureをfuture Epicで無視。
+- **停止条件:** C40-08以外のledger/timing、shard、provider workflow変更が必要、failureをfuture Epicで無視。
 - **cleanup:** verifier temp outputはownership確認後。
 
 ## 14. M99 — Audit、Report、handoff
@@ -495,7 +506,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 - **前提:** M5完了。
 - **操作:** 変更しない。
 - **確認:** `git diff --name-status <implementation-baseline-sha>`、Historical authority、current skills/CI、Epic #384 pathsをpath限定diffする。
-- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、ledger/timing、scripts/quality差分0。
+- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-08で承認したdeleted-node exact entry以外の差分0。
 - **証拠:** name-statusとno-touch results。
 - **停止条件:** unrelated/unowned diff。
 - **cleanup:** unintended diffを原因箇所で修正。user変更を消さない。
@@ -537,11 +548,11 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 - **対象 / 目的:** human merge判断へ固定candidateを渡す。
 - **前提:** C90-01〜04 PASS、identity確認済み。
-- **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。固定SHAでindependent ChatGPT code review/Final Quality Gateを実施し、指摘があれば最小修正と再reviewを行う。
+- **操作:** explicit pathだけstage/commit/pushし、Issue #387参照PRを作る。固定SHAでindependent ChatGPT code review/Final Quality Gateを実施し、`review_status=fail`またはP0/P1 findingがあれば最小修正と再reviewを行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
 - **確認:** staged name-status、clean status、remote SHA、PR checks、Strict review status。
 - **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
 - **証拠:** final SHA、PR URL、checks/review summary。
-- **停止条件:** identity不一致、unexpected staged path、review finding、CI failure。
+- **停止条件:** identity不一致、unexpected staged path、`review_status=fail`、P0/P1 finding、CI failure。
 - **cleanup:** なし。
 
 ### C90-06 — Final temporary cleanup
@@ -588,6 +599,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 | C40-05 | NOT_RUN | |
 | C40-06 | NOT_RUN | |
 | C40-07 | NOT_RUN | |
+| C40-08 | NOT_RUN | |
 | C50-01 | NOT_RUN | |
 | C50-02 | NOT_RUN | |
 | C60-01 | NOT_RUN | |
@@ -603,7 +615,7 @@ implementation baselineとfinal candidateで同じ方法により次を記録す
 
 次をすべて満たしたときだけproduction writerからmain agentへ返す。
 
-- I387-AC01〜AC17のevidenceがある。
+- I387-AC01〜AC18のevidenceがある。
 - checklist mandatory itemが全てPASSまたは理由付きN/Aである。
 - production residueとremovable test/supportが一体で撤去されている。
 - new absence test/scanner/fixture/helperがない。

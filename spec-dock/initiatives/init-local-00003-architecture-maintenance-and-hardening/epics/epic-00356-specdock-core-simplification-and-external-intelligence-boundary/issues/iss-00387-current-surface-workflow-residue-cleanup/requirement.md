@@ -49,7 +49,7 @@ Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cl
 | 用語 | 定義 |
 |---|---|
 | Current surface | 現在の利用者またはagentがCurrent contractとして読む、実行する、または導入先へ配布されるsurface |
-| Historical evidence | 過去のIssue、Artifact、ADR、Report、Discussion、fixture、Historical guide等、変更せず保持すべき証跡 |
+| Historical evidence | 過去状態を説明する資料の総称。保護対象かどうかはauthoritative evidenceとtest copyの分類に従う |
 | residue | 退役済みbehaviorをCurrent instruction、schema、API capabilityまたはinventoryとして見せる残存物 |
 | selection-only | nodeを解決してactive stateを更新するだけで、checkout、GitHub照会、dependency判定、unfinished guardを行わないこと |
 | provider source | shipped assetまたはruntimeの正本である`src/spec_dock/assets/**` |
@@ -80,7 +80,7 @@ Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cl
 - 現在の二つのinstalled skillとconsumer `ci.yml`。
 - `checkout_active_target()`のsignature、body、docstring、behavior。`issue start`が使用するCurrent coreとして保持する。
 - `managed_distribution.py`、`managed_distribution.json`、journal/checkpoint/recovery、legacy identity catalog、uninstall/purge。
-- `full-regression-ledger.json`、`full-regression-timing-weights.json`、provider workflow、shard、test lane policy、provider test portfolio再編。
+- provider workflow、shard、test lane policy、provider test portfolio再編。`full-regression-ledger.json`、`full-regression-timing-weights.json`、`tests/conftest.py`は原則対象外だが、本Issueで実際に削除するtest nodeへの参照を除くためのexact entry更新だけをreferential-integrity例外として許可する。
 - Epic #384のfixed skill slot、distribution root replacement、test simplificationの先取り。
 - public CLI command、flag、JSON schema、exit codeの変更。
 - repository全体をscanする新しいproduction linterやpolicy engine。
@@ -138,7 +138,7 @@ Planは、各確認項目に一意のID、対象、目的、前提、操作、�
 
 ### I387-N02 — 履歴保全
 
-Historical evidenceのbyteを本Issueのcleanup理由で変更しない。Current scanのfalse positiveは履歴を直さずinventory境界を直す。
+authoritative Historical evidenceのbyteを本Issueのcleanup理由で変更しない。test copy/synthetic fixtureはauthorityではなく、I387-R07のconsumer分類に従う。
 
 ### I387-N03 — fail-closed
 
@@ -150,7 +150,7 @@ TDDは、現在残るbehaviorに実質的変更があり、既存testで期待�
 
 ### I387-N05 — distribution非変更
 
-Epic #384が所有するdistribution semanticsとprovider test architectureに差分を作らない。build/fresh initは変更の検証にだけ用いる。
+Epic #384が所有するdistribution semanticsとprovider test architectureを再設計しない。build/fresh initは変更の検証にだけ用いる。ただし、本Issueで削除するtest nodeを参照するledger/timing/required-nodeのexact entry削除または現存nodeへの最小更新は、現行verifierの参照整合を保つため本Issueが所有する。schema、policy、marker、shard、workflow、weight算出方法は変更しない。
 
 ### I387-N06 — test budget
 
@@ -164,7 +164,8 @@ Epic #384が所有するdistribution semanticsとprovider test architectureに�
 - test assetがauthoritative Historical evidenceまたはsurviving behaviorの唯一の観測手段である場合、その項目の削除を止め、混合責務を分離できるか再判定する。
 - checklist確認を自動化するために新しいabsence test/scannerが必要になった場合、その自動化を止め、one-time evidenceとして実行する。
 - Epic #384所有fileの変更が必要になった場合、その作業を本Issueへ取り込まずEpic #384へ返す。
-- Full Regression failureをledger/timing/shard変更で回避しない。
+- 削除testのnode IDが`full-regression-ledger.json`、`full-regression-timing-weights.json`、`tests/conftest.py`に存在する場合、そのexact参照だけを同じcommitで除去する。別node、schema、policyへ影響する場合は停止する。
+- Full Regression failureをledger/timing/shard変更で回避しない。I387-N05のdeleted-node exact参照更新はtest削除と同時に完了させ、failure後のsignature合わせやbaseline緩和には使わない。
 
 ## 8. 受け入れ条件
 
@@ -187,6 +188,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureに�
 | I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean package/fresh initの実結果が記録される |
 | I387-AC16 | current二skill、consumer CI、authoritative Historical evidence、Epic #384所有surfaceに意図しない差分がない |
 | I387-AC17 | `spec-dock validate`が成功し、Issue #387のR/D/P/Reportが履歴を捏造しない |
+| I387-AC18 | 削除testを参照していたledger/timing/required-node entryが同じ変更で整合し、その他のFull Regression schema、policy、shard、workflow、weight算出方法に差分がない |
 
 ## 9. Traceability
 
@@ -196,5 +198,5 @@ Epic #384が所有するdistribution semanticsとprovider test architectureに�
 | active selection | R05, N01, N04 | existing positive application/CLI/lifecycle tests、call-site audit |
 | package/test hygiene | R06, R09, N03, N05 | AST/reference proof、clean wheel/sdist inventory |
 | retirement-only test support | R07, R09, N04, N06 | consumer map、before/after metrics、deleted/retained decision ledger |
-| Historical / Epic #384境界 | R07, N02, N05 | baseline diff audit。恒久exclusion testは作らない |
+| Historical / Epic #384境界 | R07, N02, N05 | baseline diff auditと削除node参照のexact-entry audit。恒久exclusion testは作らない |
 | Issue完了 | 全要件 | ordinary suite、current verifier、validate、actual Report、human PR gate |
