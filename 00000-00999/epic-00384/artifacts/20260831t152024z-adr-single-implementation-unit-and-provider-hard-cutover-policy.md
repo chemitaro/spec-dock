@@ -9,130 +9,84 @@ ID: "20260831t152024z-adr"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
+  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
 
 ## Context
 
-Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。旧案ではdecision、test restructuring、implementation、verificationを複数Issueへ横分割し、uninstall-first bridgeやintermediate generationを挟む可能性があった。
+Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。Current repository evidence `e47c1356892857e61388c7aefb2539d2061d1b9c`ではlegacy per-file engine、purge、journal、failure ledger、timing sharder、main-push Full Regression、stale operator guidanceが実在する。Issue #387は別のCurrent-surface cleanupであり、これらのProduct semanticsを変更しない。
 
-しかし、この分割は次の問題を生む。
-
-- Product判断がimplementation Issueへ持ち越される。
-- old/new writerとrecord formatが並存し、cross-generation recoveryを増やす。
-- tests-only / verification-only Issueが、実装を受け入れられない独立unitになる。
-- bridge generationをmainへmergeするたび、consumer migration matrixとdowngrade riskが増える。
-- provider CIがold contractとnew contractを重複実行し、failure approvalを温存する。
-
-Current exact revision `91667235c6892f025a1d9ee69cf37525537a3c9e`では、legacy per-file engine、purge、journal、failure ledger、timing sharderが実在する。Issue #387は別のCurrent-surface cleanupであり、これらを変更しない。
+Strict reviewにより、main merge boundary、temporary policy consumers、resume seed intent、fresh container bootstrap、specification admission、evidence self-reference、required-context order、qualification environment、root operator guidanceをcross-documentで一意にする必要が確認された。
 
 ## Decision
 
 ### ADR-D1 — One implementation-and-verification Issue
 
-Epic #384の唯一のimplementation-and-verification Issueを#392とする。investigation、Product decision、tests、CI transition、final verificationを別Issueへ分割しない。internal step、commit、複数PRは許可するが、全て#392の内部実行単位とする。
+Epic #384の唯一のimplementation-and-verification Issueを#392とする。Investigation、Product decision、tests、CI transition、final verificationを別Issueへ分割しない。Internal step、commit、PR、canary PRは全て#392の内部手段。
 
-### ADR-D2 — Combined hard cutover
+### ADR-D2 — Combined hard cutover and exact main gates
 
-Final public generationへ一度に切り替える。次を採用しない。
+Public routeはoldまたはcomplete final lifecycleのどちらか。PR-AはS30後だけmerge、PR-BはS40/S50 internalかつS60後だけmerge、PR-CはS70 internalかつS80後だけmerge。S40/S50/S70単独merge、uninstall-first bridge、runtime toggle、dual writer、automatic old fallbackを禁止する。
 
-- uninstall-first bridge
-- intermediate package generation
-- runtime toggle
-- old/new dual writer
-- automatic old engine fallback
+### ADR-D3 — Fixed lifecycle and immutable seed policy
 
-Dormant successor codeを先にmergeしてもよいが、public routeはoldまたはfinalのどちらかであり、中間Product contractを公開しない。Public route cutoverを開始するPR-Bでは、I392-S40とI392-S50を同一branch/PR内のnon-main checkpointとし、いずれのcommitもmainへmergeしない。I392-S40、I392-S50、I392-S60の全proofが完了した後だけPR-Bをhuman mergeでき、mainはold public productからcomplete final lifecycleへ一度だけ遷移する。
+Persistent tooling authorityは4 roots、2 slots、`spec-dock/spec-dock.version`。Fresh `init`だけ2 seedsをabsent時に作成。Strict recordへ`seed_policy`を追加し、`(operation,candidate_digest,seed_policy)`をresume identityとする。Create-if-absentはnever-installed absentへのfresh initだけ。Update-on-absent、reinstall、legacy migration、update、uninstallはpreserve-only。Seed presenceからpolicyを推測しない。
 
-### ADR-D3 — Fixed lifecycle contract
+### ADR-D4 — Safe shared-container bootstrap
 
-Persistent mutation authorityは4 roots、2 slots、`spec-dock/spec-dock.version`に限定する。fresh `init`だけ2 consumer seedをabsent時に作成できる。uninstall後はrecordを`tooling-absent-preserved-data`として保持する。purgeを削除し、`--remove-specs`をmutation-zero compatibility trapとする。
+`spec-dock`はshared containerでwhole-directory ownership/delete authorityを持たない。Fresh absent時だけcandidate stage/preflight後にdescriptor-bound `mkdirat`、no-follow open、identity captureを行う。Record前failureではexact empty identityだけcleanup。Cleanup不能はstage-owner-bound partial failure。Uninstallはcontainerを削除しない。
 
-### ADR-D4 — Exact legacy boundary
+### ADR-D5 — Exact legacy boundary
 
-exact clean `0.2.3`だけをsingle-version digest fixtureで認識する。active recovery、unsupported legacy、modified/foreign markerless slotは推測変換しない。final versionは`0.2.4`とし、legacy plain-text recordをstrict JSON recordへ置換する。
+Exact clean `0.2.3`だけをsingle-version root/slot digest fixtureで認識する。Active recovery、unsupported legacy、modified/foreign markerless slotは推測変換しない。Final versionは`0.2.4`、migration seed policyはpreserve-only。
 
-### ADR-D5 — Build-once provider gate
+### ADR-D6 — No broken gate merge state
 
-Wheelとsdistをone packaging invocationでbuildし、Linux canonicalとmacOS deltaへ同じwheelを配布する。Linux canonicalはsingle pytest process、worker 1。main-push 4-shard Full Regression、failure ledger、timing weights、sharder、policy skipをfinal stateから除去する。human PR merge gateは維持する。
+PR-B/S60はold engine/testsを削除しactive failuresをterminalizeするが、current `tests/conftest.py`、ledger、timing、quality scripts、main-push workflowをintact/workingに保つ。S60はS70-only provider gate toolへ依存しない。PR-C/S70でreplacement gate/environment/workflow/AGENTSを先に同一branchへ追加し、そのchange setでold policy/workflowを削除する。S80後だけmerge。
 
-## Alternatives considered
+### ADR-D7 — Build-once and stable Linux environment
 
-### A. Decision/implementation/test/verificationを別Issueへ分割する
+One packaging invocationでwheel/sdist。Linux/macOS same wheel。Linux environment ID `specdock-linux-qualification-v1`をtracked descriptor、pinned base digest、2 CPU、8 GiB、architecture、Python/uv/lock、observed fingerprintへ束縛する。20-run中mismatchは全series invalid。
 
-**Rejected.** 各Issueが単独でend-to-end acceptanceを持たず、未決Product判断とcross-Issue dependencyを増やす。#388〜#390はこの構造を持つためsuperseded historical nodeとして維持し、reopenしない。
+### ADR-D8 — Deterministic specification admission
 
-### B. Uninstall-first bridge generationを先にreleaseする
+Repository evidence SHAはresearch provenance。本pack manifest hashesをexact canonical/support blobsへ照合し、owner-recorded `SPEC_FREEZE_COMMIT`を固定する。#387 driftは#387 own PR/merge graphから検証し、stale repository evidence SHAからfuture main tipへのblanket diffを使わない。
 
-**Rejected.** consumerへ一時的なmigration順序を強制し、bridgeからfinalへの追加migrationとsupport期間を作る。tooling uninstallはfinal package自身がexact legacy stateに対して直接提供する。
+### ADR-D9 — Non-cyclic evidence and tree equality
 
-### C. Old/new runtime toggleを置く
+Tracked reportはpre-merge contentだけを持ち、own hash/final head/post-merge factsを含めない。Final head固定後のbuild/qualificationはcontent-addressed external pre-merge attestation。Human merge後はverified PR head tree OIDとmerge commit tree OIDを比較。SpecDock finish/Issue/Epic closeはexternal closure attestationsで、tracked reportへwritebackしない。
 
-**Rejected.** two writers、two records、two recovery semanticsを同一binaryに残し、hard cutoverの複雑性削減を失う。rollbackはhuman-reviewed Git revertであり、runtime toggleではない。
+### ADR-D10 — No-gap required-context transition
 
-### D. Historical per-file engineを縮小して再利用する
+Old requiredを保持したままnew contextをrequiredへ追加/read-backし、その後dedicated non-merge canary REDでblockingを証明する。Canary close、implementation GREEN後だけold provider-only contextを除去。Unrelated contextsとhuman review requirementを維持。
 
-**Rejected.** arbitrary historical catalog、per-action journal、purge authority、per-file identityがfixed-root Product contractと不整合である。single exact legacy adapterだけを新設する。
+### ADR-D11 — Root operator guidance is part of cutover
 
-### E. Full Regressionをshardのまま高速化する
+Root `AGENTS.md`はPR-Cでfinal provider-gate commands、single-process policy、no ledger/skip/shard/main-push-full、provider-first/dogfood、human-only mergeへ更新する。
 
-**Rejected.** duplicate execution、timing weights、approved failure、policy skipを構造的に残す。single-process budgetを満たすようtest portfolio自体を所有契約へ再編する。
+## Rejected alternatives
 
-### F. Uninstall時にrecordを削除する
-
-**Rejected.** never-installed absentとtooling-uninstalled workspaceを区別できず、reinstallがfresh-only seedを再作成し得る。
+- Additional decision/test/verification Issues。
+- S40/S50/S70 single merge handoff。
+- PR-Bでpolicy consumersを削除しS70-only toolへ依存するtemporary broken state。
+- Seed policyをCLI alias、seed existence、stateから再推測。
+- Generic recursive `spec-dock` bootstrap/cleanup。
+- Repository evidence SHAからpost-#387 mainまでのsingle allowlist diff。
+- Tracked reportへのfinal/post-merge evidence writeback。
+- Merge strategyを固定せずcommit SHA equalityを要求。
+- New context required化前のRED proofまたはold gate先行除去。
+- Different Linux environmentsのmetrics混合。
+- Final AGENTSにretired commandsを残す。
+- Runtime toggle、bridge、old fallback、shard/skip/ledger approval。
 
 ## Consequences
 
-### Positive
+Mainの各merge pointはworking product/gateを持つ。Resume seed authorityはdurable。Fresh empty repositoryをsafeにbootstrapできる。Specificationと#387 implementation driftを混同しない。Evidence graphはself-referenceせずmerge strategyを正しく扱う。Required transitionにgapがない。Qualification driftを検出でき、operator guidanceがactual final systemへ一致する。
 
-- mutation authorityがcode-fixed pathsへ限定される。
-- recoveryはsame-operation / same-candidate rerunだけになる。
-- old package downgradeはrecord parser boundaryでpre-mutation blockできる。
-- user history purgeのdestructive surfaceが消える。
-- test failureをledgerで成功扱いする仕組みが消える。
-- one artifact / one owner laneのtraceが明確になる。
-- Issue #392だけでacceptanceとclosureを判断できる。
+CostはPR-B/PR-C internal checkpointsをmainへmergeできないこと、external attestations/human settings operation、Linux descriptor maintenance、native primitive依存、exact `0.2.3`以外のmanual recoveryである。
 
-### Negative / cost
+## Supersession and consistency
 
-- #392は大きなcross-cutting changeであり、critical planning、fault injection、built-artifact proofを要する。
-- Linux/macOS native rename primitiveへ明示的に依存する。
-- exact `0.2.3`以外のlegacy workspaceはmanual recoveryが必要になる。
-- combined cutover後はold engineへautomatic rollbackできない。
-- required-context transitionにはhuman repository admin操作が必要である。
-
-### Risk controls
-
-- #387 post-merge deterministic admission
-- successor-first direct proof
-- stage-before-mutate
-- ready-last record
-- root/slot boundary fault injection
-- old-package startup composite tripwire
-- same-wheel Linux/macOS binding
-- intentional RED required-context canary
-- human-only merge
-- forward-fix / fail-closed policy
-
-## Supersession
-
-- GitHub #388〜#390は実装前にIssue boundaryとしてsupersededされたhistorical nodeである。
-- それらのdecision contentは本ADR、Epic R/D/P、Issue #392 R/D/Pへ統合する。
-- close状態はimplementation completedを意味しない。
-- reopen、reassignment、new work acceptanceに使用しない。
-
-## Consistency contract
-
-本ADRのdecisionは次と一致しなければならない。
-
-- Epic `requirement.md`: E384-RQ-001〜016
-- Epic `design.md`: E384-D-001〜019
-- Epic `plan.md`: E384-P-001〜007
-- Issue #392 `requirement.md`: I392-RQ-001〜020
-- Issue #392 `design.md`: I392-D-001〜018
-- Issue #392 `plan.md`: I392-S00〜I392-S80
-
-矛盾が生じた場合はimplementationを停止し、canonical R/D/Pを先に整合させる。implementation agentが別案を選択してはならない。
+#388〜#390はsuperseded historical nodesでありreopenしない。本ADRはEpic/Issue R/D/PとLuna handoffへ反映する。矛盾時はimplementationを停止しcanonical contractを先に整合させる。Owner decision listはempty。

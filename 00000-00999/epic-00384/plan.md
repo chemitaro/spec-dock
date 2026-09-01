@@ -10,7 +10,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
+  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
@@ -21,152 +21,130 @@ Epic #384はProduct判断、scope、acceptance、implementation unit boundaryを
 
 ### E384-P-001 — Single-Issue boundary
 
-- Authorized implementation-and-verification unit: `iss-00392` / GitHub #392。
-- Internal step、commit、PRは#392の実行単位であり、新しいIssueではない。
-- #392が未達の間はEpicをopenのままにする。
-- failureをledgerで承認してEpicをcloseしない。
+- Authorized unit: `iss-00392` / GitHub #392。
+- Internal step、commit、PR、canary PRは#392の実行手段であり新Issueではない。
+- Failureをledger/skip/retryで承認しない。
 
-### E384-P-002 — Dependency gate
+### E384-P-002 — Specification and dependency gate
 
-#392 implementation startより前に#387のhuman mergeとdeterministic post-merge admissionを完了する。admissionがfailした場合は実装を開始せず、exact evidenceをrepository ownerへ返す。unclassified driftをimplementation agentの裁量で吸収しない。
+Implementation開始前に、replacement manifest hashes、owner-recorded `SPEC_FREEZE_COMMIT`、#387 own merge delta、implementation base ancestry、baseline `0.2.3` artifacts/current gatesをS00で検証する。Repository evidence SHAは調査起点に限り、future mainへのblanket diff baseにしない。
 
 ## 2. Ordered execution
 
-Epic-level orderは次のとおりである。詳細なpath/symbol/commandは#392 `plan.md`を正本とする。
+1. **S00 Admission and baseline**: specification lineageと#387 deltaを分離検証。
+2. **PR-A S10-S30 dormant successor**: seed policy、candidate、container bootstrap、install/update/resume。S30だけmerge gate、mainはold public product。
+3. **PR-B S40-S60 combined public cutover**: S40/S50 internal、S60だけmerge gate。Complete lifecycle、legacy proof、old engine removal、active failure terminalization。Current gateはintact。
+4. **PR-C S70-S80 gate cutover**: S70 internalでreplacement tooling/environment/workflow/AGENTSを追加しold machineryを同じbranchで削除。S80でqualification/context/attestation後だけmerge。
+5. **Human merge and external closure**: tree OID equality、SpecDock finish、Issue/Epic closeをexternal attestationsへ記録。
 
-1. **Admission and baseline**
-   #387 merge SHA、allowed drift、current gates、baseline old artifactを固定する。
-2. **Dormant successor proof**
-   fixed model、candidate、filesystem、serviceをold public routeに接続せず追加し、direct testsで証明する。
-3. **Combined public hard cutover**
-   `0.2.4`へversion bumpし、CLI、record、legacy migration、uninstall compatibilityを同一generationで切り替える。
-4. **Old contract terminalization**
-   successor proof後にper-file engine、purge、journal、legacy catalog、duplicate old testsを削除する。
-5. **Portfolio and gate cutover**
-   active failuresをterminal化し、build-once Linux/macOS gateへ切り替え、old Full Regression machineryを削除する。
-6. **Qualification and handoff**
-   five-run、CPU ratio、fault pack、rolling 20、dogfood、fresh consumer、required context、exact PR treeを同一candidateへ束縛する。
-7. **Human merge and closure**
-   human merge後にmerged SHAとverified PR SHAを照合し、Issue finish、その後Epic closeを行う。
+## 3. Multi-PR policy and exact merge points
 
-## 3. Multi-PR policy
+| PR | Internal steps | Only permitted main merge gate | Main state after merge |
+|---|---|---|---|
+| PR-A | S10 -> S20 -> S30 | S30 all proof GREEN | Old public product + dormant successor。Current test/workflow intact。 |
+| PR-B | S40 -> S50 -> S60 | S60 all proof GREEN | Complete final `0.2.4` lifecycle、legacy proof、old engine removed、active approved failure 0。Current legacy provider gate/main-push workflow remain intact and GREEN。 |
+| PR-C | S70 -> S80 | S80 all proof + required transition + external attestation | Final build-once provider gate、old workflow/policy/ledger/timing/sharder removed、root AGENTS final。 |
 
-複数PRを使用する場合の推奨境界は次のとおりである。
-
-| PR | Permitted content | Merge-point invariant |
-|---|---|---|
-| PR-A | dormant successor modules、single-version legacy fixture、direct tests | public CLIはold behaviorのまま。new runtime toggleなし。ordinary/current full gatesがGREEN。 |
-| PR-B | I392-S40〜S60を同一branch/PRで連続実行する。`0.2.4` public route cutover、CLI/service wiring、migration/downgrade proof、purge trap、old engine removal、active failure terminalization、test ownership、successor tests | S40/S50はnon-main checkpointでありmerge禁止。S60の全proof完了後だけhuman mergeできる。merge後のmainはcomplete final lifecycleで、old engine fallback、approved failure、policy skipを持たない。 |
-| PR-C | I392-S70〜S80のbuild-once CI、old Full Regression removal、docs/dogfood、qualification、final evidence | final gateだけがrequired provider authority。main-push rebuild/shardなし。 |
-
-PR-A〜Cは例であり、必須数ではない。ただしpublic cutoverをbridge generationへ分割してはならない。PR-Bを使用する場合、S40でpublic routeを切り替えたbranchをS50、S60まで同じPRで進め、S40後またはS50後のcommitをmainへmergeしてはならない。PR-Bの唯一のmain merge gateはS60完了後である。
+S40、S50、S70をmain merge candidateとしてhandoffしない。PR-B merge時にS70-only toolへ依存せず、current main-push workflow consumerを削除しない。PR-Cではreplacement workflow/toolingを追加した同一change setでold consumers/workflowを除去する。
 
 ## 4. Human gates
 
-### E384-P-003 — Review gate
+### E384-P-003 — Review and merge
 
-各PRはhuman reviewを必要とする。agentはmerge、required context変更、branch protection変更を行わない。
+各PRはhuman review必須。Agentはmerge、required context、branch protectionを変更しない。
 
-### E384-P-004 — CI transition gate
+### E384-P-004 — No-gap required-context transition
 
-Required-context transitionはhuman repository adminが次の順で行う。
+Human repository adminは次の順序を厳守する。
 
-1. existing classic protection、ruleset、required context、review requirement、merge queueをread-only captureする。
-2. new `Provider CI / provider-gate`を追加し、old required contextを保持したままGREENを確認する。
-3. controlled canaryでnew gateをintentional REDにし、merge blockingを確認する。
-4. new gateをGREENへ戻す。
-5. new gateをrequiredへ追加する。
-6. required setが有効であることを再取得する。
-7. old provider-only contextだけをremoveする。unrelated contextとreview requirementは変更しない。
-8. before/after JSONとoperatorを#392 reportへ記録する。
+1. before required contexts、review requirement、merge queueをcapture。
+2. new `Provider CI / provider-gate`をGREEN、old requiredを維持。
+3. new contextをrequiredへ追加し、oldを外さない。
+4. old+new requiredをread-back。
+5. dedicated non-merge canary PRでnew gateだけintentional RED。
+6. canary merge blockedを確認。
+7. canaryを閉じ、implementation PRをGREENへ戻す。
+8. implementation PR new gate GREENをread-back。
+9. old provider-only contextをremove。
+10. final required set/review requirementをread-back。
 
-settingsを読めない、new contextが出現しない、REDがblockしない、unrelated setting差分がある場合は停止する。
+Step 9を5〜8より前に実行しない。Settings unreadable、RED not blocking、unrelated diffはhard stop。
 
 ## 5. Evidence contract
 
-### E384-P-005 — Evidence identity
+### E384-P-005 — Tracked versus external evidence
 
-全evidenceは少なくとも次へ束縛する。
+Tracked #392 `report.md`はmethod、pre-freeze implementation facts、terminalization rationale、external schema/locationを含む。Own hash、final PR head/tree、final source-bound artifact hashes、human merge、SpecDock finish/GitHub close/Epic closeを含めない。
 
-- repository
-- full source SHA
-- wheel filename / SHA-256
-- sdist filename / SHA-256
-- candidate digest
-- OS / architecture / Python version
-- exact command
-- exit code
-- wall time
-- process-tree CPU time where applicable
-- test node inventory digest
-- generated timestamp
+Final report commit後にPR headをfreezeし、build/qualification/context resultsを`pre-merge-attestation-v1` canonical JSONとして新規GitHub comment/check artifactへ投稿する。Post-merge factsは`post-merge-closure-v1`、Epic closeは`epic-closure-v1`へ記録し、tracked treeへ書き戻さない。
 
-Evidence artifactはcanonical R/D/Pを上書きせず、#392 `report.md`に結果とdigestを記録する。一時logやbinary artifactをcanonical directoryへcommitしない。
+### E384-P-006 — Evidence identity
 
-### E384-P-006 — Acceptance evidence groups
+External pre-merge attestationはrepository、Issue/PR、`SPEC_FREEZE_COMMIT`、implementation base、final PR head/tree、tracked report blob OID（external observation）、wheel/sdist hashes、candidate digest、build count、environment ID/descriptor hash/fingerprint、OS/Python/uv、commands/exits、node inventory、wall/CPU、fault/flake、required contexts before/both/final、canonical JSON SHA-256を持つ。
 
-- #387 post-merge admission
-- fixed path / state / result contract
-- candidate stage-before-mutate and atomic publication
-- install/update/uninstall/reinstall matrix
-- same-candidate convergence / cross-intent block
-- exact `0.2.3` migration / active recovery block
-- old-package composite tripwire / native controls
-- public CLI and compatibility trap
-- active failure terminalization
-- duplicate ownership zero
-- one build invocation / same wheel
-- Linux canonical / macOS delta
-- required-context transition
-- five-run / CPU / fault / rolling-20
-- dogfood / fresh consumer / exact PR tree
+### E384-P-007 — Stable qualification environment
+
+Environment IDは`specdock-linux-qualification-v1`。Tracked descriptor、pinned base digest、x86_64、2 CPU、8 GiB、Python/uv/lock、observed fingerprintを全20 runsへ束縛する。一件でもmismatchならseries invalid。別environmentのmetricsを混合しない。
 
 ## 6. Stop and forward-fix policy
 
-### E384-P-007 — Fail closed
+次の場合、main merge gateへ進まない。
 
-次の場合、当該step以降を実行しない。
-
-- #387 admission mismatch
+- spec hash/commit mismatch、#387 delta mismatch
+- fresh container authority/cleanupが証明不能
+- record/request/stage seed policy mismatch
 - fixed path外のmutation authorityが必要
-- old packageがtarget mutationをattempt
-- atomic rename primitiveまたはno-follow bindingが利用不能
-- candidate/source/stage digest mismatch
-- active failureをfix/successor/retirementへterminal化できない
-- duplicate contract ownerが残る
-- build invocation countが1でない
-- Linux/macOS wheel digestが異なる
-- budget/fault/rolling acceptance未達
-- required-context stateが読めない、またはhuman gateが弱まる
+- old package mutation attempt
+- native primitive/no-follow binding unavailable
+- active failure not terminalized
+- S60がS70-only toolへ依存、またはcurrent workflow consumerを削除
+- S70 old removal前にreplacement gate unavailable
+- environment fingerprint mismatch、build/hash/budget/fault/flake failure
+- new context required前にoldを外す、RED not blocking、settings unreadable
+- tracked report self-reference/post-merge writeback
+- tree OID mismatch
+- root AGENTS still documents retired policy
 
-未達は同じ#392でforward-fixする。shard追加、approved failure、policy skip、old engine fallbackで回避しない。
+同じ#392でforward-fixし、新Issue、shard、skip、approved failure、old fallbackで回避しない。
 
 ## 7. Closure states
 
-### Implementation completion
+### Specification frozen
 
-Final PR headでRequirementの全technical acceptanceとevidenceが揃った状態。まだmerge済みとは扱わない。
+Manifest hashesと`SPEC_FREEZE_COMMIT`が一致した状態。
 
-### PR merge readiness
+### Implementation complete
 
-New required gate、human review requirement、exact PR SHA、rollback informationが揃い、humanがmerge判断できる状態。
+PR-C tracked changesとnon-self-referential reportがcomplete。Final source-bound evidenceはまだexternal取得中でもよい。
+
+### Pre-merge attested
+
+Final headを変更せずbuild/qualification/required gateがGREENで、content-addressed pre-merge attestationが投稿済み。
+
+### PR merge ready
+
+Pre-merge attested、human review、new required context、rollback情報が揃う。
 
 ### Human PR merge
 
-Humanだけが実行する外部状態変更。agentは完了を主張しない。
+Humanだけが実行。Merge commitを許容し、commit SHA equalityではなくtree OID equalityを検証。
 
-### Issue finish
+### Issue finished
 
-Human merge後、merged SHAがverified PR SHAと一致し、#392 reportがcompleteで、SpecDock lifecycle上finish可能な状態。
+Merge tree equality後、SpecDock `issue finish`とGitHub #392 closeをexternal closure attestationへ記録。Tracked reportへ追記しない。
 
-### Epic close
+### Epic closed
 
-#392がfinished/closedで、Epic acceptanceが全て満たされ、追加implementation Issueが存在しない状態。#388〜#390はhistorical supersededのまま保持する。
+#392 finished後、GitHub #384 closeをexternal Epic closure attestationへ記録。
 
 ## 8. Epic completion criteria
 
-- Epic Requirement / Design / Plan / ADRと#392 R/D/Pが同じdecisionを表す。
-- #387 dependency admissionがreportに記録される。
-- #392だけでimplementationとverificationが受入可能である。
-- human merge後のexact treeがverified PR treeと一致する。
-- remaining owner decisionがない。execution時にstop conditionが発火した場合だけrepository ownerへescalateする。
+- Epic/Issue R/D/P、ADR、handoffがsame eight correction contractsを表す。
+- #387 dependencyとspecification lineageを独立検証。
+- Only main gates are S30/S60/S80。
+- PR-Bにbroken workflow/S70-only dependencyなし。
+- Seed policy、fresh container、stable Linux environment、non-cyclic evidenceがtraceされる。
+- Required context transitionにgate gapなし。
+- Root AGENTS final policy。
+- Human merge tree equals verified PR tree。
+- Owner decision list empty。
