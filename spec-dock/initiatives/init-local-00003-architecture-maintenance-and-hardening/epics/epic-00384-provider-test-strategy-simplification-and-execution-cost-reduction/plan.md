@@ -10,7 +10,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
+  sha: "eaddf76806c338ee05463741f15fd3967bbceb57"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
@@ -28,10 +28,12 @@ Epic #384はProduct判断、scope、acceptance、implementation unit boundaryを
 - Internal step、commit、PR、canary PRは#392の実行手段であり新Issueではない。
 - Failureをledger/skip/retryで承認しない。
 
-### E384-P-002 — Specification and dependency gate
 
-Implementation開始前に、replacement manifest hashes、owner-recorded `SPEC_FREEZE_COMMIT`、#387 own merge delta、implementation base ancestry、baseline `0.2.3` artifacts/current gatesをS00で検証する。Repository evidence SHAは調査起点に限り、future mainへのblanket diff baseにしない。
+### E384-P-002 — Specification, #387, register, and dogfood admission gate
 
+Before S10, S00 separately verifiesreplacement manifest/`SPEC_FREEZE_COMMIT` lineage and#387 own merge delta。It then parses the exact #387 completion-report disposition block, comparesall12 conditional original identities againstpost-merge tree/ledger/collection, andmaterializes the formula-derived admission JSON defined bythe failure register。No fixed expected post-#387 row count isused。
+
+S00 also records current dogfood evidence: exact bytes `0.2.3\n` at`spec-dock/spec-dock.version`、absence oftwo slot markers、andprotected data/seed witness。Missing report mapping、unmapped node、signature drift、non-exact dogfood legacy evidence orprotected drift stops before S10 andrequirescanonical spec owner update plusStrict re-review。
 ## 2. Ordered execution
 
 1. **S00 Admission and baseline**: specification lineageと#387 deltaを分離検証。
@@ -89,24 +91,25 @@ External pre-merge attestationはrepository、Issue/PR、`SPEC_FREEZE_COMMIT`、
 
 Environment IDは`specdock-linux-qualification-v1`。Tracked descriptor、pinned base digest、x86_64、2 CPU、8 GiB、Python/uv/lock、observed fingerprintを全20 runsへ束縛する。一件でもmismatchならseries invalid。別environmentのmetricsを混合しない。
 
-### E384-P-008 — PR-B documentation and contract gates
 
-S40/S60 own lifecycle docs listed byE384-D-025。S60 must passprovider/dogfood `cmp` andthe retired-lifecycle grep overroot README andcurrent provider/dogfood docs。`provider-lifecycle-wire-contract.md` goldens and`active-failure-disposition-register.md` exact rows aretest inputs; Luna maynotchange enum/disposition toobtainGREEN。
+### E384-P-008 — PR-B documentation, wire, register, workflow, and dogfood gates
 
-### E384-P-009 — Authoritative artifact workflow
+S40/S60 ownroot README lifecycle text、provider/dogfood migration docs、provider/dogfood docs README、wire implementation tests andcurrent workflow retarget。AtS60, repository-wide lifecycle grep、provider/dogfood `cmp`、wire goldens、conditional register admission/terminalization、current PR workflow、current main-push verifier、andcomplete dogfood migration mustallbeGREEN。
 
-S70 validates provider-gate tooling locally beforehead freeze andlabels everylocal artifact non-authoritative。S80 startsfromaclean frozenhead andusesonlythe final Provider CI workflow:
+S60 runs the newlifecycle service against repository root andcommitsfour dogfood roots、two fixed slots、seven-key ready record andtwo slot markers matchingthe S60 candidate digest。Protected initiatives/artifacts/workbench/seeds/user data remain byte-identical。No partial projection ormodified legacy state ismergeable。
 
-1. dispatch qualification run for exactcandidate SHA;
-2. wait forconclusion;
-3. verifyone `provider-build-artifacts` job andone immutable artifact identity;
-4. download wheel/sdist/manifest;
-5. verifyhash/source/tree andeach downstream receipt'sbuild count 0;
-6. consume workflow evidence forqualification、macOS、sdist、attestation;
-7. no local final build。
+### E384-P-009 — Authoritative CI artifact and receipt workflow
 
-Any local output、different workflow run、re-upload、second producer isinvalid acceptance evidence。
+S70 validates provider-gate tooling locally butdoes not createfinal accepted bytes。AfterallS70 tracked code/docs/test-policy andcandidate-wide dogfood update arecommitted, S80 freezeshead/tree andperformszero tracked edits。It dispatchesfinal Provider CI for thathead, waits fortheunique run, downloads`provider-candidate-<sha>` and`provider-evidence-<sha>`, andruns the exact `verify-downloaded-artifact` command。
 
+The run musthaveone producer build invocation、consumer build count0、four exact receipts、one provider evidence upload、same wheel/sdist bytes、stable environment andGREEN aggregate gate。Any local final build、tracked update/sync、zero/multiple run、missing/duplicate receipt、wrong `needs` orartifact identity invalidatesS80。
+
+### E384-P-010 — Candidate-changing dogfood checkpoints
+
+- S60: migrateexact legacy dogfood toS60 candidate andcommitcomplete state beforePR-B handoff。
+- S70: after allcandidate-byte changes, runcandidate-wide update andcommitnew digest/record/markers beforehead freeze。
+- S80: read-only`validate`/digest verification only; no`spec-dock update`、`sync` ortracked write。
+- Both checkpoints recordpre/post protected witness、seed hashes、root/slot digests、record/marker parsing andfresh consumer result。
 ## 6. Stop and forward-fix policy
 
 次の場合、main merge gateへ進まない。

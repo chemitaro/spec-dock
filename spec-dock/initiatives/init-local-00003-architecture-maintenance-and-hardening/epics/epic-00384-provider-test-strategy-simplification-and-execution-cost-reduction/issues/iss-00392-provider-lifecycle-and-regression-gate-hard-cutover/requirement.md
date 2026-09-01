@@ -10,7 +10,7 @@ ID: "iss-00392"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
+  sha: "eaddf76806c338ee05463741f15fd3967bbceb57"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
@@ -58,7 +58,7 @@ Fresh requiresrecord/root/slots absent andcontainer absent orreal dir。Unknown 
 
 ### I392-RQ-009 — Classification
 
-States `absent|legacy-0.2.3|ready|incomplete|tooling-absent-preserved-data|blocked`。Read-only evaluation ofrecord/container/binding/slot/candidate/stage/legacy recovery。Invalid JSON doesnotfall backtolegacy。
+States `absent|legacy-0.2.3|ready|incomplete|tooling-absent-preserved-data|blocked`。Read-only evaluation ofrecord/container/binding/slot/candidate/stage/legacy recovery。Invalid JSON does notfall backtolegacy。
 
 ### I392-RQ-010 — Install semantics
 
@@ -100,32 +100,23 @@ Grammar preserved。Init-force state alias。Uninstall apply withoutspec mode。
 
 Statuses/exits fixed: planned/completed/completed_with_warnings=0、blocked/partial=1、error=2。Additive JSON fields `code,seed_policy,mutation_started,bootstrap_rolled_back`。Actions fixed-set only。
 
-### I392-RQ-020 — Test portfolio and PR-B transitional gate continuity
 
-Pure/filesystem/CLI/artifact/macOS ownershipをuniqueにし、all active failure rowsをterminalizeしてPR-B merge時点でactive approved failures 0とする。S60 exact owned pathsには`.github/workflows/provider-ci.yml`と`tests/unit/test_provider_test_lanes.py`を含める。
+### I392-RQ-020 — Conditional register terminalization and PR-B gate continuity
 
-S60 `provider-ci.yml`はcurrent workflow name/event/job IDs/matrix/setupを維持し、次だけをbehavior-preservingに変更する。
+S00 admitsall source ledger identities using the normative register。Rows4〜15 follow#387 report-driven removed/retained/split branches; nofixed post-#387 row count。S60 fixes everyadmitted active row toanormal pass oruses the registered supersession, requiresactive0/approved0, andupdates`tests/unit/test_provider_test_lanes.py` accordingly。
 
-- `tests/unit/infra/test_managed_distribution.py` -> existing provider lifecycle model/candidate/filesystem/service/public-result/fault/assets/ownership unit tests。
-- `tests/cli_runtime/test_distribution_cutover.py` -> `test_provider_lifecycle.py`、`test_uninstall.py`、`test_update.py` with current full-regression permission flags。
-- `tests/integration/test_epic_00343_distribution.py` -> `test_provider_lifecycle_artifacts.py`、`test_provider_lifecycle_tripwire.py` with current permission flags。
-- macOS matrix additionally runs `tests/platform/macos/test_provider_lifecycle_macos.py` only on macOS。
-
-`tests/unit/test_provider_test_lanes.py` must assert ledger active rows `[]`、all 15 remaining rows `resolved` under current evaluator、fixed-in-place node or exact superseding successor is collected、rows 4〜15 remain absent after #387、deleted test path references are absent、workflow successor paths exist、and pytest/standalone adapters agree。The exact relation comes from `active-failure-disposition-register.md`; no generated synthetic or implementation-selected successor is permitted。S60 retains `tests/unit/test_full_regression_baseline.py` and all current policy providers。Ordinary suite、workflow-equivalent successor commands、current 4-shard verifier must all GREEN。No `scripts/provider_gate.py` dependency。
+S60 owns`.github/workflows/provider-ci.yml` andretargetsonlydeleted distribution test paths toexisting S10〜S50 successor unit/CLI/artifact/macOS tests whilepreservingthe current workflow topology。Current PR workflow andcurrent main-push verifier independentlyGREEN。S60 does notusefinal provider-gate tooling。
 
 ### I392-RQ-021 — Consumer-first atomic PR-C gate transition
 
-S70 same branch adds replacement tooling/workflow/environment/AGENTS and final replacement tests before old removal。Before deleting `tests/conftest.py`、`scripts/quality/full_regression_baseline.py`、`scripts/quality/verify_full_regression.py`, it must retire or replace every remaining consumer, explicitly including `tests/unit/test_provider_test_lanes.py` and `tests/unit/test_full_regression_baseline.py`。The transitional `.github/workflows/provider-ci.yml` is rewritten to final provider-gate topology rather than deleted。
-
-An exact pre/post inventory must prove zero imports/references to old policy modules、pytest options、ledger/timing paths in runtime/CI/tests/operator guidance, excluding Historical `spec-dock/initiatives/**`。After consumer 0, delete providers、old main-push workflow、ledger/timing/sharder/conftest/markers。Run final import absence、collection、workflow command and provider-gate tests。S70 not mergeable; S80 after qualification/context/attestation only merge。Main never broken and PR-C final gate GREEN is independent of PR-B current-gate GREEN。
-
+S70 addsreplacement provider gate、environment、final workflow、root AGENTS/final test-policy docs first。Before deletingproviders, itretires/replacesallpolicy consumers including`tests/unit/test_provider_test_lanes.py` and`tests/unit/test_full_regression_baseline.py` andprovesconsumer0 byimport/AST/grep/collection/workflow structural tests。Then itdeletes old providers、ledger、timing、sharder、conftest、marker policy andmain-push workflow inthesame non-main branch。S80 aloneisPR-C merge gate。
 ### I392-RQ-022 — Build-once and platform ownership
 
 One build invocation wheel+sdist。Linux/macOS same wheel。Linux one pytest/worker1、macOS delta only、sdist Linux smoke。Hash/source mismatch fail。
 
 ### I392-RQ-023 — Stable Linux qualification environment
 
-ID `specdock-linux-qualification-v1`。Tracked descriptor hash、pinned base digest、runner label、x86_64、2 CPU、8GiB、Python/uv/lock、observed fingerprint。Any run mismatch invalidatesseries。First5 <=600s andCPU/wall <=1.1; all20 flake0/retry0;fault detection100%。
+ID `specdock-linux-qualification-v1`。Tracked descriptor hash、pinned base digest、runner label、x86_64、2 CPU、8GiB、Python/uv/lock、observed fingerprint。Any run mismatch invalidatesseries。First5 <=600s andCPU/wall <=1.1; all 20 flake0/retry0;fault detection100%。
 
 ### I392-RQ-024 — Required-context transition
 
@@ -133,7 +124,7 @@ Old required retained whilenew added required/read-back。Dedicated non-merge ca
 
 ### I392-RQ-025 — Tracked report and external attestations
 
-Tracked report committed beforehead freeze andcontainsnoown hash/final head/final source-bound hash/post-merge fact。Afterfreeze build/qualification -> canonical content-addressed pre-merge external attestation。Human merge -> tree OID equality -> post-merge closure attestation。No tracked writeback。
+Tracked report committed beforehead freeze andcontains noown hash/final head/final source-bound hash/post-merge fact。Afterfreeze build/qualification -> canonical content-addressed pre-merge external attestation。Human merge -> tree OID equality -> post-merge closure attestation。No tracked writeback。
 
 ### I392-RQ-026 — Root AGENTS and closure
 
@@ -143,32 +134,36 @@ PR-C updatesroot AGENTS tofinal commands/policy、removesretired guidance、pres
 
 S40/S60 exact owned paths are `README.md` lifecycle sections、`src/spec_dock/assets/spec_dock/docs/migration.md`、`src/spec_dock/assets/spec_dock/docs/README.md`、`spec-dock/docs/migration.md`、`spec-dock/docs/README.md`。Provider source first、projection byte parity。PR-B merge時点でlegacy journal/retry、purge authority、same-compatible-newer、empty-boundary guidanceを除き、strict record、same operation/candidate/seed policy resume、tooling-only uninstall、preserve-only update/reinstall/migrationへ同期する。Root README/AGENTS/docs README test-policy textはS70。S80 content edits禁止。
 
-### I392-RQ-028 — Exact wire contract
 
-`../../artifacts/provider-lifecycle-wire-contract.md`のseven-key record、observed-only state、operation wire、resume/terminal relation、slot marker、service/public result field、status/code/action enum、nullability、text/JSON/exit goldenをexactに実装する。`tests/unit/infra/test_provider_lifecycle_wire_contract.py`がnormative valuesを検証し、unknown enum/default mappingをrejectする。
+### I392-RQ-028 — Exact closed wire contract
 
-### I392-RQ-029 — Exact failure disposition register
+Production enums/dataclasses/serializers/tests mustmatch`provider-lifecycle-wire-contract.md` exactly: seven-key record、phase andlast-completed adjacency、operation/seed policy、action category/status/reason、full code relation matrix、nullability、fixed `TARGET_PATH_ORDER`、compact JSON andtext goldens。Unknown/additional token、catch-all code/reason、filesystem/dictionary ordering areinvalid。
 
-`../../artifacts/active-failure-disposition-register.md`の27 row registerをS00とS60のauthorityにする。S00でsource ledgerとpost-#387 expected deltaを照合し、expected 12-row removal以外のnew/missing/signature/successor changeはS10前に停止する。S60でremaining 15 rowsをregisterどおりall resolved、active 0へ変更する。Lunaはfix/successor/retirementを再選択しない。
+### I392-RQ-029 — Exact conditional failure disposition register
 
-### I392-RQ-030 — CI-only frozen-head artifact production
+The register fixes27 original node/signature identities andtheclosed#387 three-way rule。S00 requires the#387 report evidence block andcross-checks post tree/ledger/collection。Removed、retained unchanged、split/renamed outcomes mapmechanically tothe register's S60 terminal rules。Expected row count is not fixed。Missing/unmapped/drifted evidence stopsbefore S10 andrequirescanonical amendment + Strict review。Final activecount0、owner decisions empty。
 
-Final frozen PR headのpackaging producerはLinux `provider-build-artifacts` job exactly one。One invocationでwheel/sdist/manifestを生成し`provider-candidate-<sha>`としてimmutable upload。`provider-linux-canonical`、`provider-sdist-smoke`、`provider-macos-delta`、`provider-attestation`はsame run artifactをdownload/hash-verifyし、build invocation count 0。S70 local buildはpre-freeze non-authoritative smoke。S80はworkflow dispatch/wait/download/verifyだけでlocal final buildなし。
+### I392-RQ-030 — CI-only frozen-head production, receipts, and downloaded verification
 
+OnlyLinux`provider-build-artifacts` packages thefrozenhead once。Three consumers downloadthesame candidate andbuild0。Everyjob emits the exact receipt schema。`provider-attestation` hasexactneeds onproducer/Linux/sdist/macOS, downloads candidate/API metadata/four receipts, runs`verify-downloaded-artifact`, anduploads exactly one`provider-evidence-<sha>`。S80 uses thesame command/artifact names ondownloaded files anddoes notbuild locally。
+
+### I392-RQ-031 — Dogfood convergence at S60 and S70
+
+S00 provescurrent dogfood isexact legacy: record bytes`0.2.3\n` andno fixed-slot markers。S60 applies the S60 newlifecycle candidate tothe repository root andcommitscomplete 0.2.4 four roots、two slots、seven-key ready record、two markers andmatching digest。S70 performsasecond complete update after allcandidate-byte changes andcommits the new digest。Both preserveinitiatives/artifacts/workbench/seeds/user data byte-for-byte andrunvalidate/fresh consumer checks。S80 makesno tracked dogfood edits。
 ## 3. Command/state/seed-policy matrix
 
 | State | Invocation | Operation | Policy |
 |---|---|---|---|
 | absent | init / init --force | install | create-if-absent |
 | absent | update | install | preserve-only |
-| legacy | init-force/update | migrate | preserve-only |
+| legacy | init-force/update | install (`legacy-migration-*` public code) | preserve-only |
 | legacy | uninstall | uninstall | preserve-only |
 | ready | init-force/update | update | preserve-only |
 | ready | uninstall | uninstall | preserve-only |
 | incomplete | exact tuple | resume | recorded exact |
 | incomplete | mismatched tuple | blocked | N/A |
 | tooling-absent | init/init-force/update | reinstall | preserve-only |
-| tooling-absent | uninstall | idempotent | preserve-only |
+| tooling-absent | uninstall apply | uninstall (`uninstall-already-absent`) | preserve-only |
 | any | uninstall --remove-specs | error trap | no target observation |
 
 ## 4. Merge and closure distinction

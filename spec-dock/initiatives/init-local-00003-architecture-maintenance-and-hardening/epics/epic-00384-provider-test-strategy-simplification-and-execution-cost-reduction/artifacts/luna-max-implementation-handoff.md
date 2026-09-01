@@ -6,7 +6,7 @@ Issue: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
+  sha: "eaddf76806c338ee05463741f15fd3967bbceb57"
 ---
 
 # Luna Max Implementation Handoff
@@ -67,114 +67,67 @@ tests/unit/infra/test_provider_lifecycle_faults.py
 tests/unit/infra/test_provider_assets.py
 ```
 
+
 ### S40-S60 modify/create/delete
+
+S60 exact ownership additionally includes thetransitional workflow andcomplete dogfood migration:
 
 ```text
 pyproject.toml
 src/spec_dock/cli.py
 src/spec_dock/context_pack.py
 src/spec_dock/provider_lifecycle/**
-provider/dogfood runtime uninstall wrapper pair
-README.md
+README.md lifecycle sections
 src/spec_dock/assets/spec_dock/docs/migration.md
-spec-dock/docs/migration.md
 src/spec_dock/assets/spec_dock/docs/README.md
+spec-dock/docs/migration.md
 spec-dock/docs/README.md
-tests/unit/infra/test_provider_lifecycle_wire_contract.py
-tests/unit/infra/test_provider_lifecycle_public_result.py
-tests/unit/infra/test_provider_test_ownership.py
-tests/cli_runtime/test_provider_lifecycle.py
-tests/cli_runtime/test_uninstall.py
-tests/cli_runtime/test_update.py
-tests/integration/test_provider_lifecycle_artifacts.py
-tests/integration/test_provider_lifecycle_tripwire.py
-tests/platform/macos/test_provider_lifecycle_macos.py
-tests/support/provider_lifecycle_tripwire/**
-tests/provider_test_ownership.json
-```
-
-S60 exact additional owned paths:
-
-```text
-.github/workflows/provider-ci.yml                 # transitional command retarget only
-tests/unit/test_provider_test_lanes.py            # zero active/all terminal/workflow path checks
-tests/conftest.py                                 # stale node refs only
-full-regression-ledger.json                       # zero active, all resolved
-full-regression-timing-weights.json               # stale node refs only
-```
-
-S60 workflow mapping:
-
-```text
-tests/unit/infra/test_managed_distribution.py
-  -> provider_lifecycle model/candidate/filesystem/service/public_result/faults
-     + provider_assets + provider_test_ownership
-
-tests/cli_runtime/test_distribution_cutover.py
-  -> test_provider_lifecycle.py + test_uninstall.py + test_update.py
-
-tests/integration/test_epic_00343_distribution.py
-  -> test_provider_lifecycle_artifacts.py + test_provider_lifecycle_tripwire.py
-
-macOS matrix
-  -> additionally test_provider_lifecycle_macos.py
-```
-
-S60 retains and proves GREEN:
-
-```text
-tests/unit/test_full_regression_baseline.py
-tests/conftest.py
+.github/workflows/provider-ci.yml
+tests/unit/test_provider_test_lanes.py
 full-regression-ledger.json
 full-regression-timing-weights.json
-scripts/quality/**
-.github/workflows/provider-full-regression.yml
-current pytest policy/options/markers
+tests/conftest.py
+old distribution test deletion + successor tests
+tests/provider_test_ownership.json
+spec-dock/{docs,templates,system,scripts}
+.agents/skills/spec-dock
+.agents/skills/spec-dock-grill-with-docs
+spec-dock/spec-dock.version
+two .spec-dock-provider-slot.json files
 ```
+
+Keepthrough S60: `scripts/quality/**`、`.github/workflows/provider-full-regression.yml`、fast/full policy。S60 retargetscurrent Provider CI only;itdoes notimplementfinalbuild-once workflow。Run`uvx --no-cache --from . spec-dock update .` once after provider-first candidate/docs settle andcommitcomplete 0.2.4 dogfood state。
 
 ### S70-S80 PR-C ownership
 
-Create/update first:
+S70 ownsallfinal gate/policy/doc candidate changes andthe second complete dogfood update:
 
 ```text
 scripts/provider_gate.py
 ci/linux-qualification.Dockerfile
 ci/linux-qualification-environment.json
 tests/unit/infra/test_provider_gate.py
-tests/unit/infra/test_provider_test_ownership.py
+tests/unit/infra/test_provider_workflow.py
 scripts/static_analysis/run.sh
 Makefile
 .github/workflows/provider-ci.yml
 AGENTS.md
-README.md
-provider/dogfood final pairs
-#392 report.md pre-merge content
+README.md test-policy sections
+src/spec_dock/assets/spec_dock/docs/README.md
+spec-dock/docs/README.md
+all remaining policy consumers, including:
+  tests/unit/test_provider_test_lanes.py
+  tests/unit/test_full_regression_baseline.py
+old policy providers/ledger/timing/workflow deletion
+spec-dock/{docs,templates,system,scripts}
+.agents/skills/spec-dock
+.agents/skills/spec-dock-grill-with-docs
+spec-dock/spec-dock.version
+two slot markers
+#392 report.md pre-freeze content
 ```
 
-Explicit consumer retirement before provider deletion:
-
-```text
-tests/unit/test_provider_test_lanes.py            # delete after final successor assertions GREEN
-tests/unit/test_full_regression_baseline.py       # delete after final successor assertions GREEN
-.github/workflows/provider-ci.yml                 # rewrite transitional -> final topology
-.github/workflows/provider-full-regression.yml    # delete after final workflow-equivalent GREEN
-AGENTS.md / Makefile / pyproject.toml / static-analysis callsites
-all additional consumers found by mandatory grep
-```
-
-Delete providers/data only after consumer 0:
-
-```text
-tests/conftest.py
-full-regression-ledger.json
-full-regression-timing-weights.json
-scripts/quality/full_regression_baseline.py
-scripts/quality/verify_full_regression.py
-scripts/quality/__init__.py if empty
-fast/full marker policy
-.github/workflows/provider-full-regression.yml
-```
-
+Aftercandidate bytes settle, S70 runs`uvx --no-cache --from . spec-dock update .` andcommitscomplete digest/record/markers。S80 ownsno trackedpath, runs no build/update/sync, andusesdownloaded CI artifacts only。
 ### No-touch
 
 ```text
@@ -322,7 +275,7 @@ Every evidence row includes operation/candidate/seed policy。Fresh create polic
 
 ## 9. Specification admission
 
-Do not use `ef183ae46febe52f0152431cb3a8b4846c9972fc..POST_387_SHA` as one allowlist diff。
+Do not use `eaddf76806c338ee05463741f15fd3967bbceb57..POST_387_SHA` as one allowlist diff。
 
 Use:
 
@@ -461,46 +414,92 @@ Tracked `report.md` contains:
 
 It does not contain its own hash、final head/tree、final source-bound artifact hashes、merge result、Issue/Epic close result。
 
+
 ## 17. Normative artifacts
 
-Do not reinterpret:
+### Wire authority
+
+`provider-lifecycle-wire-contract.md` closes allrecord、phase、action reason、code、retry/text/JSON andordering values。Use`TARGET_PATH_ORDER`;do notsortlexically ordependondict order。No`other/unknown/internal/generic` token。Tests mustenumerateallclosedrows andgoldens。
+
+### Failure authority
+
+`active-failure-disposition-register.md` fixes27 source identities andthe#387 three-wayrule。S00 reads#387 report/merge tree/post ledger/collection。Rows4〜15 are not assumedremoved。Applyonly:
+
+- removed -> register supersession toexact report successors;
+- retained unchanged -> same node fixed-in-place;
+- split/renamed -> exact mapped positives + optional single failure-lineage node。
+
+Any missing/unmapped/signature-drifted branch stopsbefore S10 forspec-owner amendment + Strict review。No fixed post row count。
+
+## 18. Exact CI receipt graph
 
 ```text
-provider-lifecycle-wire-contract.md
-active-failure-disposition-register.md
+provider-build-artifacts
+  -> provider-linux-canonical
+  -> provider-sdist-smoke
+  -> provider-macos-delta
+all four -> provider-attestation -> provider-gate
 ```
 
-Wire artifact fixesrecord/result/enum/nullability/goldens。Failure register fixesall27 rows、#387 delta、final successor/owner。Any mismatch stops;noequivalent substitution。
-
-## 18. PR-B documentation ownership
-
-S40/S60 ownroot README lifecycle andprovider/dogfood migration/docs README pairs。Provider-first then`cmp`。S60 lifecycle grep mustremovejournal/retry/purge/compatible-newer/empty-boundary guidance。Do notremoveFull Regression test-policy wording untilS70。S80 makesno doc edits。
-
-## 19. S60 failure/workflow register
-
-- Runregister source/post-#387 checker beforeS10。
-- S60 remaining ledger: 15 rows、active0、resolved15、retired0。
-- Row2 successor: `tests/unit/infra/test_provider_assets.py::test_fixed_skill_slots_match_provider_and_dogfood`。
-- Rows1、3、16〜27 normalpass sameID。
-- Rows4〜15 absent after#387 andnotreinserted。
-- Transitional`provider-ci.yml` retargetsonlydeleted3 paths;keepname/events/jobs/matrix anddo notintroducefinal gate。
-
-## 20. Frozen-head artifact producer
-
-Final authority beginsafterS70 content/reportfreeze。Onlyworkflow job`provider-build-artifacts` maypackage。Its artifact name is`provider-candidate-<candidate_sha>`。Linux canonical、sdist smoke、macOS delta、attestation downloadsameartifact andrecordbuild0。S70 localbuild uses`--authority pre-freeze-tooling-smoke` andisdeleted。S80 hasno local build command;use`gh workflow run/watch/view/download` andAPI artifact receipt。
-
-## 21. S70 consumer deletion order
-
-Exact current consumers retired/replaced beforeproviders:
+Artifact names areexact:
 
 ```text
-tests/unit/test_provider_test_lanes.py
-tests/unit/test_full_regression_baseline.py
-.github/workflows/provider-full-regression.yml
+provider-candidate-<sha>
+provider-receipt-producer-<sha>
+provider-receipt-linux-canonical-<sha>
+provider-receipt-sdist-smoke-<sha>
+provider-receipt-macos-delta-<sha>
+provider-evidence-<sha>
 ```
 
-Then proveonlyscheduledproviders/data remain beforedeleting`tests/conftest.py`、quality modules、ledger、timing。Unknown consumer path iscanonical-spec stop, notLuna classification。
+Only `provider-build-artifacts` builds。All consumers have build count 0。Each receipt fixes role、job name/ID、receipt artifact name、candidate artifact ID/name/digest、source SHA/tree、run ID、manifest/wheel/sdist hashes、role evidence filename/hash。Attestation has exact `needs` on all four jobs, computes downloaded receipt SHA-256 values, verifies I392-D-013, and uploads exactly one evidence artifact。S80 uses the same `verify-downloaded-artifact` CLI and does not build locally。
 
-## 17. Owner decisions
+## 19. Dogfood checkpoints
 
-Machine-readable owner decision list in replacement manifest is `[]`。No open decision remains。Dynamic evidence mismatch triggers stop; it does not delegate a choice to Luna。
+### S60
+
+- Source evidence: exactplain`0.2.3\n`, two markerless fixed slots。
+- Afterprovider-first code/lifecycle docs: `uvx --no-cache --from . spec-dock update .`。
+- Commitfour roots、two slots、seven-key ready record、two markers matchingS60 candidate。
+- Preserveinitiatives/artifacts/workbench/seeds/user databytes。
+- Verifycurrent PR workflow + current main-push workflow separately。
+
+### S70
+
+- Completeallcandidate docs/test-policy changes andfinal gate code first。
+- Retireallold policy consumers/providers inconsumer-first order。
+- Runthesame candidate-wide dogfood update andcommitnew digest/record/markers。
+- S70 isinternal;S80 isread-only。
+
+## 20. Exact downloaded verifier
+
+```bash
+uv run python scripts/provider_gate.py verify-downloaded-artifact \
+  --repository chemitaro/spec-dock \
+  --candidate-dir <dir> \
+  --evidence-dir <dir> \
+  --run-json <file> \
+  --artifacts-json <file> \
+  --source-sha <sha> \
+  --source-tree <tree> \
+  --workflow-run-id <id> \
+  --json
+```
+
+Useexact exits/codes/stdout/JSON fromIssue Design I392-D-013。Do notaddconfigurable job/artifact names orcatch-all code。
+
+## 21. Additional hard stops
+
+| Condition | Action |
+|---|---|
+| fixed15-row assumption ormandatory rows4〜15 deletion | stop;useconditional register |
+| #387 report mapping missing/unmapped/signature drift | stop before S10;spec owner + Strict review |
+| wire token/reason/code/order notinArtifact | failtest;do notinvent |
+| more thanone frozen-head packager | blockPR-C |
+| wrong/missing receipt/needs/provider-evidence count | blockPR-C |
+| S60/S70 dogfood partial orprotected drift | blockrespective merge gate |
+| S80 localbuild/update/sync/tracked edit | invalidateS80;returnS70 |
+
+## 22. Owner decisions
+
+`owner_decisions_required=[]`。Dynamic evidence selects onlyaclosed branch orastop;itdoes notdelegateProduct/Policy/Security judgment toLuna。

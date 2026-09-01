@@ -9,7 +9,7 @@ ID: "20260831t152024z-adr"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
+  sha: "eaddf76806c338ee05463741f15fd3967bbceb57"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
@@ -19,7 +19,7 @@ Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifa
 
 ## Context
 
-Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。Current repository evidence `ef183ae46febe52f0152431cb3a8b4846c9972fc`ではlegacy per-file engine、purge、journal、failure ledger、timing sharder、main-push Full Regression、stale operator guidanceが実在する。Issue #387は別のCurrent-surface cleanupであり、これらのProduct semanticsを変更しない。
+Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。Current repository evidence `eaddf76806c338ee05463741f15fd3967bbceb57`ではlegacy per-file engine、purge、journal、failure ledger、timing sharder、main-push Full Regression、stale operator guidanceが実在する。Issue #387は別のCurrent-surface cleanupであり、これらのProduct semanticsを変更しない。
 
 Strict reviewにより、main merge boundary、temporary policy consumers、resume seed intent、fresh container bootstrap、specification admission、evidence self-reference、required-context order、qualification environment、root operator guidanceをcross-documentで一意にする必要が確認された。
 
@@ -75,20 +75,24 @@ Root `AGENTS.md`はPR-Cでfinal provider-gate commands、single-process policy�
 
 ### ADR-D12 — Documentation ships with the public cutover
 
-PR-B/S60 merge includes final lifecycle guidance inroot README andprovider/dogfood migration/docs README。Legacy journal/retry、purge authority、empty-boundary language doesnot survive thefinal `0.2.4` public code。Test-policy guidance remainscurrent untilPR-C/S70, whereREADME/docs README/root AGENTS areupdated withthe final gate。S80 cannoteditdocs afterfreeze。
+PR-B/S60 merge includes final lifecycle guidance inroot README andprovider/dogfood migration/docs README。Legacy journal/retry、purge authority、empty-boundary language does not survive the final `0.2.4` public code。Test-policy guidance remainscurrent untilPR-C/S70, whereREADME/docs README/root AGENTS areupdated withthe final gate。S80 cannoteditdocs after freeze。
 
-### ADR-D13 — Exact wire contract artifact
 
-`provider-lifecycle-wire-contract.md` isaccepted normative authority forthe seven-key record、operation/state relations、resume identity、public result/action/status/code enums、nullability、JSON/text/exit goldens。Implementation doesnotinventfallback values。
+### ADR-D13 — Closed wire contract artifact
 
-### ADR-D14 — Exact active failure register
+`provider-lifecycle-wire-contract.md` isthenormative closed-world wire authority。It fixesrecord fields/relations、operation values、observed states、phase andlast-completed transitions、action category/status/reason、all code/status/operation/apply/mutation/retry/exit relations、`TARGET_PATH_ORDER`、JSON/text goldens。Implementation-defined/catch-all values andunknown fallback are rejected。
 
-`active-failure-disposition-register.md` fixesall27 current ledger rows、#387 expected 12-row removal、andfinal fixed-in-place/superseded successor perrow。Unexpected post-#387 delta blocksbeforeS10 andrequirescanonical update plusStrict re-review。Luna doesnotchoose dispositions。
+### ADR-D14 — Conditional active failure register
 
-### ADR-D15 — Linux CI is the sole final packaging producer
+`active-failure-disposition-register.md` fixes all 27 original node/signature identities andpre-decides three allowed #387 outcomes forrows4〜15。#387 R/D/P remainsunchanged。S00 consumes#387 report + merge tree + post ledger + collection andapplies theclosed branch。Post-#387 row count isformula-derived, not15。Missing mapping、signature drift orcontract-external result stops before S10 forspec-owner amendment andStrict re-review。S60 mechanically reachesactive0 withoutLuna choosingadisposition。
 
-Aftertracked headfreeze, onlyfinal `provider-build-artifacts` Linux job mayinvoke packaging。It buildsonewheel+sdist+manifest anduploadsoneimmutable Actions artifact。Linux qualification、macOS delta、sdist smoke、attestation download thesamebytes withbuild count0。S70 local build ispre-freeze tooling smoke; S80 neverbuilds locally。
+### ADR-D15 — Linux CI is the sole final packaging producer and receipt aggregator
 
+Afterhead freeze, only`provider-build-artifacts` maypackage。It uploadsone candidate artifact andproducer receipt。Linux canonical、sdist smoke andmacOS delta downloadthesame candidate andemitbuild-0 receipts。`provider-attestation` hasexactneeds onallfour jobs, verifiescandidate/API/receipts withtheclosed verifier, anduploadsone`provider-evidence-<sha>`。`provider-gate` depends onlyonattestation。S70 local build istool validation;S80 local final build isforbidden。
+
+### ADR-D16 — Dogfood converges at S60 and S70
+
+The checked-in dogfood workspace ispart ofeachcandidate-changing merge contract。S60 migratescurrent exact legacy evidence tocomplete 0.2.4 andcommitsallfixed roots/slots/record/markers。S70 performsasecond candidate-wide update afterfinal docs/policy candidate changes andcommits the new digest。S80 isread-only。Protected user data/seeds remain byte-identical;partial projection isnevermergeable。
 ## Rejected alternatives
 
 - Additional decision/test/verification Issues。

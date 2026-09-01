@@ -9,7 +9,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
+  sha: "eaddf76806c338ee05463741f15fd3967bbceb57"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
@@ -37,7 +37,7 @@ Outcomeはコード量削減そのものではない。管理権限、失敗時�
 
 ## 2. Current evidence and problem statement
 
-本書は`chemitaro/spec-dock`のbranch `codex/epic-00384-provider-test-strategy-planning`、full SHA `ef183ae46febe52f0152431cb3a8b4846c9972fc`を調査基準とする。このrevisionでは次を直接確認した。
+本書は`chemitaro/spec-dock`のbranch `codex/epic-00384-provider-test-strategy-planning`、full SHA `eaddf76806c338ee05463741f15fd3967bbceb57`を調査基準とする。このrevisionでは次を直接確認した。
 
 - `src/spec_dock/managed_distribution.py`がfresh、update、deprovision、purge、historical identity、journal、recovery、native rename、result modelを一つの巨大なmoduleで所有している。
 - `src/spec_dock/assets/managed_distribution.json`がrecognized version、historical current identity、obsolete exact fileを列挙している。
@@ -135,12 +135,14 @@ Final workspaceに対するold exact `0.2.3` packageの`init --force`、`update`
 
 各durable invariantは一つのowner layer、一つのauthoritative lane、少なくとも一つのrepresentative failureを持つ。Pure/domain、filesystem/service、CLI、built artifact、macOS deltaを分離し、same candidate/OS/contractのduplicate ownershipを0にする。
 
-### E384-RQ-013 — Failure terminalization with transitional workflow continuity
 
-Post-#387 baselineのactive failure ledger entryをfix、current successor、accepted contract retirementのいずれかへ全件terminal化し、PR-B merge時点でactive approved failureを0にする。S60は`.github/workflows/provider-ci.yml`をexact owned pathとし、workflow名、event、job IDs、Ubuntu/macOS matrix、checkout、Python/uv install、static-analysis topologyを維持したまま、削除する3 test pathだけをS10〜S50で成立したsuccessor test groupsへ置換する。これはtemporary current-gate repairであり、S70のbuild-once provider-gate redesignではない。
+### E384-RQ-013 — Conditional #387 admission and failure terminalization
 
-S60は`tests/unit/test_provider_test_lanes.py`もowned pathとし、`tests/conftest.py`のcurrent policyと整合するよう、active row 0、all ledger rows terminal、deleted test path参照0、workflow successor path実在、pytest adapter/standalone evaluator parityを検証する。Rows 4〜15は#387でledgerから除去済みのまま再挿入せず、残る15行は`active-failure-disposition-register.md`で事前決定したfixed-in-placeまたはsuperseded relationへ更新する。`tests/unit/test_full_regression_baseline.py`、`tests/conftest.py`、ledger、timing、quality modules、`.github/workflows/provider-full-regression.yml`はS70まで保持する。
+`artifacts/active-failure-disposition-register.md`はrepository evidence ledgerの全27 original row identitiesを固定する。Issue #387 canonical R/D/Pは変更せず、#387 completion report、merge tree、post-merge ledger、pytest collectionをauthority inputとして、rows 4〜15へ`removed | retained-unchanged | split-or-renamed`のclosed three-way ruleを適用する。Expected post-#387 row countは固定しない。
 
+S00は各conditional rowをreport mappingとtree/ledger/collectionへ照合し、unmapped node、signature drift、missing report entry、multiple failure-lineage node、#387 contract外resultをS10前に停止する。S60はadmitted ledger rowsをregisterのmechanical ruleだけでnormal passへ修正し、active count 0、approved failure 0へterminalizeする。Lunaはremove/retain/split、successor、failure lineage、dispositionを選択しない。
+
+S60は`.github/workflows/provider-ci.yml`、`tests/unit/test_provider_test_lanes.py`、transitional ledger/timing/conftestをowned pathとし、削除testのworkflow参照を既存successorへretargetする。Current PR workflowとmain-push Full Regression workflowはPR-B merge時に独立してGREENである。Final provider-gate redesignはS70まで前倒ししない。
 ### E384-RQ-014 — Build-once artifact binding
 
 Authoritative source SHAごとに一つのpackaging invocationでwheelとsdistを生成し、source SHA、filename、size、SHA-256、build invocation countをmanifestへ固定する。Linux canonicalとmacOS deltaは同じwheel bytesを使用し、sdistはLinux minimal smokeだけが所有する。
@@ -149,10 +151,12 @@ Authoritative source SHAごとに一つのpackaging invocationでwheelとsdist�
 
 Linux canonicalはworker 1、one pytest process。Qualificationはenvironment ID `specdock-linux-qualification-v1`、tracked descriptor SHA-256、pinned container base digest、built image ID、x86_64、2.0 CPU quota、8 GiB memory、Python/uv/lock hashesへ束縛する。20-run series中のfingerprint mismatchは全seriesを無効にする。First 5各600秒以内、CPU/wall <=1.1、fault detection 100%、all 20 flake 0/retry 0。
 
+
 ### E384-RQ-016 — Atomic provider-gate cutover and complete consumer closure
 
-PR-B/S60 merge後は、successor pathsへretarget済みのcurrent `.github/workflows/provider-ci.yml`と、current main-push Full Regression workflowの双方がGREENでなければならない。PR-C/S70ではreplacement `scripts/provider_gate.py`、Linux environment descriptor、final provider workflow、root `AGENTS.md`を同一branchへ先に追加する。その後、policy providersを削除する前に`tests/unit/test_provider_test_lanes.py`、`tests/unit/test_full_regression_baseline.py`を含む全remaining policy-module consumersをexplicitにretireまたはfinal gate testsへ置換し、import/grep/collection/workflowでconsumer 0を証明する。続いてold workflow、ledger、timing、sharder、`tests/conftest.py`、marker policyを同じPR-C branchで削除する。S70はnon-main checkpoint、S80後だけmergeし、mainはbroken workflowまたはmissing consumerを観測しない。
+PR-B/S60 merge後は、successor pathsへretarget済みのcurrent `.github/workflows/provider-ci.yml`と、current main-push Full Regression workflowの双方が独立にGREENでなければならない。PR-C/S70ではreplacement `scripts/provider_gate.py`、Linux environment descriptor、final provider workflow、root `AGENTS.md`、final provider test-policy docsを同一branchへ先に追加する。
 
+Policy providersを削除する前に、`tests/unit/test_provider_test_lanes.py`、`tests/unit/test_full_regression_baseline.py`を含む全remaining policy-module consumersをexplicitにretireまたはfinal gate testsへ置換し、import/grep/collection/workflow structural testsでconsumer 0を証明する。続いてold workflow、ledger、timing、sharder、`tests/conftest.py`、marker policyを同じPR-C branchで削除する。S70はnon-main checkpoint、S80後だけmergeし、mainはbroken workflowまたはmissing consumerを観測しない。
 ### E384-RQ-017 — Required-context transition without a gap
 
 Old required contextsを保持したままnew contextをrequiredへ追加し、old+new required stateをread-backする。次にdedicated non-merge canary PRのintentional REDでnew contextがmergeをblockすることを証明し、canary closeとimplementation PR GREEN復帰後だけold provider-only contextを除去する。Unrelated contextsとhuman review requirementを変更しない。
@@ -173,18 +177,30 @@ Root `AGENTS.md`をPR-Cでfinal pytest/provider-gate commands、no-policy-skip/n
 
 PR-B/S60 main merge時点でfinal `0.2.4` code、root README lifecycle、provider-shipped docs、dogfood docsを一致させる。S40/S60 exact ownershipは`README.md`のlifecycle sections、`src/spec_dock/assets/spec_dock/docs/migration.md`、`src/spec_dock/assets/spec_dock/docs/README.md`と対応する`spec-dock/docs/**` projectionである。Legacy journal/retry、current purge authority、compatible-newer retry、empty-boundary guidanceをtooling-only uninstall、strict record、same tuple resume、preserve-only lifecycleへ置換する。Root README/AGENTS/docsのtest-policy textはS70でfinal gateへ更新し、S80はcontentを編集せずfreeze/verificationだけを行う。
 
-### E384-RQ-022 — Normative provider lifecycle wire
 
-`artifacts/provider-lifecycle-wire-contract.md`をrecord、operation、observed state、resume relation、slot marker、typed result、public JSON/text/exitの唯一のnormative wire contractとする。Implementation/test/docsはexact seven-key record、enum、nullability、field relation、golden bytesへ一致し、unknown valueをfallbackしない。
+### E384-RQ-022 — Closed normative provider lifecycle wire
 
-### E384-RQ-023 — Pre-decided active failure dispositions
+`artifacts/provider-lifecycle-wire-contract.md`をrecord、operation、observed state、resume relation、slot marker、phase/last-completed transition、typed result、action category/status/reason、public code/status/operation/apply/mutation/retry/exit、JSON/text、array orderingの唯一のnormative authorityとする。
 
-`artifacts/active-failure-disposition-register.md`をrepository evidence ledger全27行のnormative disposition authorityとする。#387後のexpected deltaはrows 4〜15のexact removalだけで、その他のnode/signatureは不変。Unexpected new/missing/signature/successor deltaはS10前に停止し、canonical spec owner updateとStrict re-reviewを要求する。S60の残存15行はall resolved、active 0へterminalizeし、Lunaはdispositionを選択しない。
+Implementation/test/docsはexact seven-key record、closed enums、nullability、relation matrices、`TARGET_PATH_ORDER`、compact JSON/text goldensへ一致する。Implementation-defined token、reason、code、catch-all、unknown fallbackを0にする。
 
-### E384-RQ-024 — Final frozen-head packaging producer
+### E384-RQ-023 — Pre-decided conditional active failure dispositions
 
-Final frozen PR headのwheel、sdist、candidate manifestを生成できる主体はfinal `.github/workflows/provider-ci.yml`のLinux `provider-build-artifacts` job一つだけとする。Head freeze後、同jobがone packaging invocationでbuildし、immutable Actions artifact identityへuploadする。Linux qualification、macOS delta、sdist smoke、attestationは同じdownloaded bytesをbuild 0でconsumeする。S70 local buildはpre-freeze tooling validationのみで、S80はlocal final buildを行わずexact workflow dispatch/wait/download/verifyを実行する。
+`artifacts/active-failure-disposition-register.md`はsource ledger全27 original identities、authority、rationale、verification ownerを固定する。Rows 4〜15について#387が許容する`removed`、`retained-unchanged`、`split-or-renamed`をすべて事前にclosed rule化し、#387 report mappingを機械検証する。Removedならpositive successor/absence evidenceへsuperseded、retained unchangedならsame node fixed-in-place、split/renamedならexact report mappingに従いpositive successorへsupersededし、唯一のfailure-lineage nodeがあればそのnodeをfixed-in-placeする。
 
+Post-#387 row countはformula-derivedであり15固定ではない。Report欠落、unmapped new node、signature drift、#387 contract外resultはS10前に停止し、canonical spec owner updateとindependent Strict re-reviewを要求する。S60 final active countは0。Owner decisions requiredは空である。
+
+### E384-RQ-024 — Sole frozen-head packaging producer and receipt graph
+
+Final frozen PR headのwheel、sdist、candidate manifestを生成できる主体はfinal `.github/workflows/provider-ci.yml`のLinux `provider-build-artifacts` job一つだけとする。同jobはone packaging invocationを実行し、`provider-candidate-<sha>`と`provider-receipt-producer-<sha>`をimmutable Actions artifactsとしてuploadする。
+
+`provider-linux-canonical`、`provider-sdist-smoke`、`provider-macos-delta`はcandidate artifactをdownloadしbuild count 0でconsumeし、各receiptをuploadする。`provider-attestation`はproducer + three consumer jobsをexact `needs`とし、candidate/receipts/API metadataを`verify-downloaded-artifact`で検証してexact one `provider-evidence-<sha>`をuploadする。Aggregate `provider-gate`はattestationだけに依存する。S70 local buildはpre-freeze tooling validationのみ。S80はlocal final buildを行わず、workflow dispatch/wait/download/verify/evidenceだけを実行する。
+
+### E384-RQ-025 — Dogfood convergence at each candidate-changing gate
+
+Current dogfood evidenceはplain `spec-dock/spec-dock.version=0.2.3\n`、two fixed slots markerlessであり、exact legacy migration sourceとして扱う。PR-B/S60はprovider-first変更後にnew lifecycle serviceをrepository rootへ適用し、dogfood four roots、two slots、seven-key ready record、two slot markersをcandidate digestへ一致させてcommitする。Initiatives、Artifacts、`.workbench`、seeds、unknown/user dataはbyte-preserveする。
+
+PR-C/S70でprovider docs/test-policy等のcandidate bytesが変わった後、same branchでcandidate-wide dogfood updateを再実行し、新candidate digest、record、markers、four roots、two slotsをcommitする。S60/S70のpartial projection、modified legacy evidence、digest mismatch、seed/user-data driftをmainへmergeしない。S80はtracked dogfood edit、`spec-dock update`、`spec-dock sync`を行わずread-only verificationだけを行う。
 ## 6. Non-scope
 
 - user-owned spec historyを削除する機能。
@@ -211,12 +227,14 @@ Final frozen PR headのwheel、sdist、candidate manifestを生成できる主�
 11. PR-B merge時点でroot README lifecycleとprovider/dogfood migration/docs READMEがfinal codeへ一致する。
 12. `provider-lifecycle-wire-contract.md`と`active-failure-disposition-register.md`はnormative accepted artifactsであり、implementation時に再決定しない。
 13. Final frozen-head packaging authorityはLinux Provider CI build jobだけで、local artifactをacceptanceへ昇格しない。
+14. Public arraysはwire Artifactの`TARGET_PATH_ORDER`だけを使う。
+15. S60とS70の各candidate-changing gateはcomplete dogfood record/markers/digestをcommitし、S80はtracked edit zero。
 
 ## 8. Dependency on Issue #387
 
 #392は#387がhuman mergeされる前に開始してはならない。S00は次を別々に検証する。
 
-1. Repository evidence SHA `ef183ae46febe52f0152431cb3a8b4846c9972fc`は調査起点として記録する。
+1. Repository evidence SHA `eaddf76806c338ee05463741f15fd3967bbceb57`は調査起点として記録する。
 2. Replacement manifestのcanonical/support payload hashesを、owner-recorded `SPEC_FREEZE_COMMIT`のexact repository blobsへ一致させる。
 3. #387 merge deltaを#387 own PR/merge graphからexact allowlist/content restrictionへ照合する。
 4. Implementation baseが`SPEC_FREEZE_COMMIT`と#387 mergeをancestorに持つことを要求する。
@@ -276,5 +294,6 @@ Epicは次のすべてが同一final PR treeと同一artifact identityに対し�
 | E384-RQ-022 | `provider-lifecycle-wire-contract.md` exact wire implementation/tests |
 | E384-RQ-023 | `active-failure-disposition-register.md`、S00 delta gate、S60 fixed dispositions |
 | E384-RQ-024 | Linux CI-only final producer、downloaded-byte fan-out、S80 dispatch evidence |
+| E384-RQ-025 | S60 exact legacy dogfood migration、S70 candidate-wide update、S80 read-only verification |
 
 No other implementation Issue is authorized。
