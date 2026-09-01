@@ -4,97 +4,86 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-01"
+最終更新: "2026-09-02"
 依存: ["requirement.md", "design.md", "artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md", "artifacts/provider-lifecycle-wire-contract.md", "artifacts/active-failure-disposition-register.md"]
 親: ["init-local-00003"]
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d145f0f0d6f35535eebc0da89b7b708824279f1f"
+  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
 
 ## 1. Governance
 
-Epic #384 authorizes one implementation-and-verification Issue only: `iss-00392` / GitHub #392. #388–#390 remain superseded historical nodes. Research, decisions, test restructuring, CI proof and final verification are performed inside #392 rather than delegated to new Issues. Human review and merge remain mandatory.
+GitHub #392 is the sole implementation-and-verification unit. #387 must be human-merged and admitted before S10. #388–#390 remain superseded. Internal PRs, a canary PR and evidence operations do not create additional Issues. Human review/merge and required-context writes remain external gates.
 
-### E384-P-001 — Dependency gate
+## 2. Ordered execution
 
-No #392 implementation begins before #387 human merge. S00 verifies replacement manifest and `SPEC_FREEZE_COMMIT`, then independently verifies #387 repository/PR/head/tree/merge/tree equality and lineage. It parses the #387 pre-merge report mapping and the register, then derives post-merge admission from the actual merge tree, ledger and collection. Any unsupported outcome stops before S10.
-
-### E384-P-002 — External evidence root
-
-Before S00 reads or writes any temporary evidence, it creates a dedicated owner-bound OS temporary directory outside repository realpath. Every baseline build, admission JSON, protected witness, API snapshot, downloaded artifact, receipt and attestation file is beneath that directory. Repository `spec-dock/.workbench` is read-only protected input and is never created, modified or cleaned by #392.
-
-## 2. Ordered execution and merge points
-
-| PR | Internal steps | Sole main gate | State after human merge |
+| PR | Steps | Sole main gate | Main state |
 |---|---|---|---|
-| PR-A | S10 -> S20 -> S30 | S30 | Old public lifecycle and exact legacy dogfood remain; dormant successor is tested; current gates are releasable. |
-| PR-B | S40 -> S50 -> S60 | S60 | Complete `0.2.4` public lifecycle/wire/docs/AGENTS lifecycle guidance; exact old-package proof; old engine removed; admitted failures terminal; current PR and main-push gates independently GREEN; complete S60 dogfood migration. |
-| PR-C | S70 -> S80 | S80 | Final consumer-first provider gate, stable environment, self-contained evidence, final AGENTS/test-policy docs, old machinery absent and S70 complete dogfood update; S80 final proof GREEN. |
+| PR-A | S00 admission; S10 model/wire; S20 filesystem/stage; S30 update/resume | S30 | Old public product and exact legacy dogfood; dormant successor; current gates GREEN. |
+| PR-B | S40 public cutover/docs; S50 legacy/tripwire; S60 terminalization/current-gate repair/complete dogfood migration | S60 | Complete `0.2.4`, closed wire, current workflows externalized and GREEN, active failures zero, complete dogfood. |
+| PR-C | S70 final gate/policy removal/second dogfood update/compatibility head; S80 context transition/final head/evidence | S80 | Final new required gate, old context/job absent, final evidence on final head, old machinery absent. |
 
-S40, S50 and S70 are internal checkpoints and are not merge candidates. Main never observes an intermediate public generation, partial dogfood projection, broken workflow or missing provider/consumer.
+S40, S50 and S70 are non-main checkpoints.
 
-## 3. Step governance
+## 3. S00 admission
 
-### E384-P-003 — PR-A
+S00 creates an ephemeral external `admission` workspace and external witnesses. It validates manifest/`SPEC_FREEZE_COMMIT`, exact baseline, dogfood legacy identity and `ISS387-THREE-WAY-V2`.
 
-S10 implements model/candidate/record/marker and closed wire tables. S20 implements descriptor-safe external stage, shared-container bootstrap and fresh install. S30 implements update and exact resume convergence. Public route and checked-in dogfood are unchanged. PR-A may merge only after current ordinary/full gates remain GREEN.
+For #387 it reads the report candidate/mapping, discovers the unique merged PR by intersecting GitHub candidate-associated PRs with Issue #387 timeline links, verifies candidate ancestry and the exact two-path evidence tail, and then evaluates final-head/merge tree, ledger and collection. The report PR number is never an input.
 
-### E384-P-004 — PR-B
+All Full Regression commands use:
 
-S40 hard-cuts public CLI, uninstall and lifecycle docs on the PR-B branch, but explicitly leaves checked-in dogfood roots, slots, record and markers untouched. S50 proves exact migration and downgrade mutation-zero on external synthetic consumers only. S60 terminalizes the actual post-#387 admitted rows, retargets current workflow references, removes old engine/tests, updates lifecycle docs and only the lifecycle/uninstall sections of root AGENTS, then performs one complete checked-in dogfood migration. S60 is the only PR-B handoff.
+```bash
+uv run python -m scripts.quality.verify_full_regression \
+  --shards 4 \
+  --artifact-dir "$ISS392_EXTERNAL_ROOT/full-regression-s00"
+```
 
-### E384-P-005 — PR-C
+## 4. PR-A and PR-B
 
-S70 adds replacement gate/environment/tests/workflow and final test-policy docs/AGENTS sections, inventories and removes all old consumers before old providers, deletes old policy machinery on the same non-main branch and performs the second complete dogfood update. Local S70 builds are tool smoke only. S80 owns no tracked path: it freezes the head, dispatches final Provider CI, downloads actual candidate/evidence bytes into the external workspace, runs the exact verifier, completes qualification/context transition/external attestation and hands off the merge-ready PR.
+- S10 implements the strict model, all 123 wire rows and valid 4/16 goldens.
+- S20 implements descriptor-safe target operations, persistent stage namespace, ACTIVE index and bootstrap recovery.
+- S30 proves cross-process exact-tuple convergence and runs ordinary/current Full Regression with purpose `full-regression-s30` externally.
+- S40 connects final public lifecycle and provider-side lifecycle docs but does not touch checked-in dogfood.
+- S50 uses only external synthetic consumers and tripwire workspaces.
+- S60 fixes/supersedes admitted failures, retargets current Provider CI, updates lane/ledger/timing references, minimally externalizes the retained main-push workflow, updates lifecycle docs/AGENTS lifecycle text, removes old engine/tests and performs one complete dogfood migration.
 
-## 4. Evidence contract
+S60 local Full Regression uses purpose `full-regression-s60`; the retained workflow uses the same helper below `${{ runner.temp }}`. PR-B cannot merge if either current PR gate or current main-push verifier is not independently GREEN.
 
-### E384-P-006 — Tracked report
+## 5. PR-C two-head plan
 
-The tracked #392 report records static methodology, admission identities available at authoring/implementation time, step RED/GREEN summaries, path ownership, terminalization rationale, dogfood/protection summaries and external attestation schemas/locations. It excludes its own hash, final frozen head/tree, final source-bound artifact hashes, future merge identity and post-merge closure facts.
+### E384-P-001 — S70 candidate and compatibility head
 
-### E384-P-007 — External evidence
+S70 adds final provider-gate code, exact evidence schemas, `EVIDENCE-FIXTURE-V1` byte/size/hash conformance tests, stable environment, structural tests and final test-policy docs. It retires/replaces every old consumer before deleting old providers/data/workflow. It performs the second complete dogfood update and finalizes the tracked #392 report.
 
-After report commit and head freeze, all final data is external and content-addressed. The pre-merge attestation binds the frozen head/tree, report blob observed externally, exact Actions run/jobs/needs/artifact metadata, candidate and nine-file evidence bytes, environment/qualification, dogfood read-only identity and required-context snapshots. Post-merge closure binds the pre-attestation hash, human merge commit/tree, tree equality, SpecDock issue finish and GitHub #392 close. Epic closure references the post-merge record and #384 close.
+The first pushed source identity is `PRC_COMPAT_HEAD`. Final workflow includes all authoritative jobs plus exact compatibility job `provider-tests`, which needs `provider-attestation`, downloads/verifies provider evidence and succeeds independently of the `provider-gate` canary check.
 
-### E384-P-008 — Protected witness
+### E384-P-002 — Context transition
 
-S00 captures a complete external witness for repository `spec-dock/.workbench` and all other protected paths. S40/S50/S60/S70/S80 compare it at their boundaries. The witness captures types, modes, ownership, symlink targets and regular-file bytes. Its storage path is outside the repository and therefore cannot alter the witnessed tree.
+1. require both contexts GREEN on `PRC_COMPAT_HEAD`;
+2. human adds `Provider CI / provider-gate` as required while `Provider CI / provider-tests` remains required;
+3. read back both and review requirements;
+4. open dedicated canary PR with only `.github/provider-gate-canary-red` added;
+5. prove new context RED and old context GREEN, with merge blocked;
+6. close canary without merge and restore implementation PR compatibility head GREEN;
+7. human removes only old required context and reads back new-only required.
 
-## 5. Required-context transition
+### E384-P-003 — Final head and authoritative rerun
 
-Human admin executes exactly:
+Create `PRC_FINAL_HEAD` as one descendant commit removing only job `provider-tests` from `.github/workflows/provider-ci.yml`. No candidate/dogfood/report change is allowed. Freeze this final head/tree, rerun final Provider CI from scratch, download and verify actual bytes against the closed schemas and `EVIDENCE-FIXTURE-V1` serializer contracts, repeat qualification and final required-context readback, then emit pre-merge attestation. Only `PRC_FINAL_HEAD` may be merged.
 
-1. capture current required contexts/reviews;
-2. run the new provider gate GREEN while old contexts remain;
-3. add the new context as required without removing old;
-4. read back old+new required;
-5. create a dedicated non-merge canary where only the new gate is RED;
-6. prove merge blocked;
-7. close canary and restore implementation PR GREEN;
-8. read back new GREEN;
-9. remove only the old provider context;
-10. read back final contexts and review requirement.
+## 6. Evidence and closure
 
-Any unreadable state, unblocked RED or unrelated setting drift stops the transition.
+Tracked report contains only pre-freeze methodology/implementation facts. External pre-merge attestation binds final head/tree, final run, candidate/evidence bytes, role receipts/evidence, qualification, compatibility/final context snapshots and report blob observed externally.
 
-## 6. Stop and forward-fix policy
+`emit-attestation` renders canonical JSON/comment bytes. Human posts one append-only comment to #392 and verifies comment identity/hash/no edit. Human merge follows. Post-merge #392 comment records final-head/merge tree equality and lifecycle close. #384 receives a separate Epic closure comment. Any changed head or comment edit invalidates dependent evidence.
 
-Stop the relevant gate for: spec/hash/lineage mismatch; #387 report/merge/ledger/collection mismatch; any repository workbench write; unsafe external temp identity; fixed-path or seed-policy ambiguity; unavailable native primitive; unexpected old-package mutation; unknown wire token; partial or modified dogfood; protected drift; active/unmapped failure; S60 dependency on S70 tooling; broken current workflow; old consumer remaining at S70; additional final packager; candidate/evidence/receipt byte mismatch; environment/budget/fault/flake failure; context gap; tracked report cycle; merge-tree mismatch; or stale AGENTS guidance.
+## 7. Stop policy
 
-The remedy is forward-fix in #392 from the appropriate prior step. Do not create a new Issue, add a runtime toggle, restore the old engine, approve a failure, introduce a skip or shard the gate.
+Stop the relevant gate for: specification/#387 identity mismatch; invalid evidence tail; repository workbench mutation; unapproved report/meta exclusion; persistent stage namespace/index drift; wire count/golden mismatch; legacy dogfood drift at S40/S50; partial S60/S70 dogfood; retained workflow writing repository workbench; active/unmapped failure; broken current/final gate; extra packager or incomplete actual-byte evidence; environment drift; context-order violation; final-head diff beyond compatibility job removal; attestation schema/comment mismatch; or merge-tree mismatch.
 
-## 7. Closure
-
-- **Implementation complete**: S70 tracked branch is complete, report committed and no tracked change remains.
-- **Pre-merge attested**: S80 frozen-head Provider CI, downloaded byte verifier, qualification and context transition are GREEN; immutable attestation exists.
-- **PR merge ready**: human review and rollback information are complete.
-- **Human merged**: human performs merge; PR-head tree equals merge-commit tree.
-- **Issue finished**: external closure attestation records SpecDock finish and GitHub #392 close.
-- **Epic closed**: #392 is finished, all Epic acceptance is rechecked and GitHub #384 closure is externally recorded.
-
-Owner decisions required: none.
+Forward-fix in #392 only. Do not add a new Issue, feature toggle, old fallback, skip, approved failure, sharding workaround or agent merge. Owner decisions required: none.

@@ -4,98 +4,88 @@ ID: "20260831t152024z-adr"
 タイトル: "Single Implementation Unit and Provider Hard Cutover Policy"
 状態: "accepted"
 決定日: "2026-08-31"
-最終更新: "2026-09-01"
+最終更新: "2026-09-02"
 対象: ["epic-00384", "iss-00392"]
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d145f0f0d6f35535eebc0da89b7b708824279f1f"
+  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
 
-Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md`.
+Normative artifacts are `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md`.
 
 ## Context
 
-Epic #384 changes managed provider ownership, migration, uninstall, public wire, dogfood, test failure disposition and CI artifact production. Splitting these decisions across implementation/research/test-only Issues or publishing an intermediate generation would create multiple writers, ambiguous recovery and broken merge points. Independent Strict review also established that temporary evidence cannot live under protected repository workbench, #387's tracked report cannot contain future merge facts, S40/S50 must preserve exact legacy dogfood, provider evidence must include actual role-evidence bytes, and operator guidance must match each main merge state.
+Epic #384 changes provider ownership, migration, uninstall, dogfood, public wire, failure disposition, operator guidance and CI evidence. Publishing any bridge generation or splitting decisions into research/test-only Issues would create multiple writers and unverifiable merge states. Strict review additionally established that Issue #387's semantic candidate precedes its report-only tail, lifecycle staging must survive process exit without scanning, retained Full Regression must not write repository workbench, protected-report exclusions must be exact, evidence schemas must be fixed now and required-context cutover needs an explicit compatibility and final head.
 
-## Decision
+## Decisions
 
-### ADR-D1 — One Issue
+### ADR-D1 — Single Issue and dependency
 
-GitHub #392 is the sole implementation-and-verification Issue. Internal PRs, steps and a required-context canary are execution mechanisms, not new Issues. #387 remains a separate blocking dependency and its canonical documents are not changed by #392.
+GitHub #392 remains the sole implementation-and-verification Issue and starts only after #387 merge/admission. #387 canonical documents are not modified. Human alone merges and changes required contexts.
 
-### ADR-D2 — Combined hard cutover and three main gates
+### ADR-D2 — Three safe main gates
 
-PR-A merges only at S30 with old public product. PR-B keeps S40/S50 internal and merges only at S60 with complete final lifecycle. PR-C keeps S70 internal and merges only at S80 with final provider gate. No uninstall-first bridge, intermediate public generation, runtime toggle, dual writer or automatic old-engine fallback.
+S30, S60 and S80 are the only main gates. S40/S50/S70 are non-main. Main sees old public product after PR-A, complete `0.2.4` with coherent retained current gates after PR-B, and final build-once gate after PR-C. No bridge, runtime toggle, dual writer or automatic old fallback.
 
-### ADR-D3 — Fixed lifecycle and immutable seed policy
+### ADR-D3 — Fixed lifecycle, immutable policy and closed wire
 
-Durable authority is four roots, two slots and one strict record. Fresh init alone may create absent seeds and shared container. The seven-key record includes immutable `seed_policy`; resume identity is `(operation,candidate_digest,seed_policy)`. Update-on-absent, migration, reinstall, update and uninstall are preserve-only. Uninstall is tooling-only, retains a tooling-absent record and never purges consumer history.
+Four roots, two slots, one record, bounded fresh bootstrap/seeds. Record includes immutable seed policy and exact resume tuple. The wire artifact's 36 codes, 123 context rows, phase/action/path rules and valid goldens are the only public values.
 
-### ADR-D4 — Closed public wire
+### ADR-D4 — Persistent process-independent staging
 
-`provider-lifecycle-wire-contract.md` is the only wire authority. It enumerates every record relation, observed state, public code context, candidate/policy nullability, phase/last-completed pair, action reason/status/category, array ordering, retry, message, JSON/text golden and exit. Unknown/catch-all values and implementation choices are invalid.
+Lifecycle staging lives in same-filesystem sibling namespace `.spec-dock-provider-stages-v1`, bound by namespace/repository sentinels and one `ACTIVE.json`. Tuple-key lookup is deterministic; no repository temp, temp-root scan or arbitrary-stage adoption. ACTIVE state covers allocation, ready stage, cleanup and bootstrap-before-record recovery.
 
-### ADR-D5 — Exact legacy and safe filesystem
+### ADR-D5 — Ephemeral evidence outside repository
 
-Only exact clean `0.2.3` is migrated. Shared container bootstrap and root/slot publication are descriptor-bound, no-follow and native-atomic. Active recovery, unsafe type/binding, unsupported version and modified legacy block. Old package mutation-zero is proved by composite Python/native pre-call tripwire.
+Evidence/build/download work uses owner-bound OS-temp directories. Repository `spec-dock/.workbench/**` is fully protected and never output/cleanup authority. S00/S30/S60 and retained main-push workflow pass explicit external `--artifact-dir`.
 
-### ADR-D6 — #387 pre-merge and post-merge evidence separation
+### ADR-D6 — Exact protected exclusions
 
-Issue #387 tracked report records only pre-merge candidate head/tree and remove/retain/split mappings. It does not predict a merge commit/tree or post-merge ledger. After human merge, S00 independently queries GitHub, verifies exact repository/PR/head/tree/merge/tree equality and ancestry, then cross-checks merged report, ledger and collection. `active-failure-disposition-register.md` defines every admitted branch and S60 consequence; row count is formula-derived and Luna chooses nothing.
+Only #392 `report.md` and `.meta.json` are excluded from main protected equality. A separate external ledger limits report to pre-merge evidence content and meta to `updated_at`. All other initiatives/artifacts remain byte/type/mode/link-target protected.
 
-### ADR-D7 — External owner-bound temporary workspaces
+### ADR-D7 — `ISS387-THREE-WAY-V2`
 
-Every #392 temporary file is stored below a freshly-created OS temporary directory whose real path is outside repository realpath and whose device/inode/UID/mode/sentinel are captured. Cleanup is limited to that exact identity and registered contents. Collision or unknown content fails closed. Repository `spec-dock/.workbench/**` is protected read-only and never a temp or cleanup location. Protected witnesses are external and compare the complete original tree, including kinds, modes and symlink targets.
+#387 report contains semantic candidate identity and mappings but no PR number or future merge facts. Candidate must be an ancestor of the final PR head. The only tail is report plus optional meta updated-at. S00 discovers exactly one merged PR from GitHub candidate/timeline evidence, verifies tail and final-head/merge tree equality, then applies the register. No fixed post-row count or implementer choice.
 
-### ADR-D8 — Dogfood transition boundaries
+### ADR-D8 — Exact legacy, uninstall and dogfood
 
-S40 and S50 preserve the checked-in exact legacy dogfood bytes, all roots, both slots, record and marker absence. S60 performs the one complete legacy migration and commits four roots, two slots, record and markers for one candidate digest. S70 performs the second complete candidate-wide update after final candidate changes. S80 has no tracked ownership and performs no update, sync or build. Partial dogfood projection is never mergeable.
+Only clean `0.2.3` migrates. Uninstall is tooling-only and durable. S40/S50 preserve checked-in legacy dogfood; S60 commits one complete migration; S70 commits one complete update; S80 is read-only. Partial projection is never mergeable.
 
-### ADR-D9 — Operator documentation split
+### ADR-D9 — Current gate continuity
 
-S60 changes root AGENTS lifecycle/uninstall sections to describe tooling-only uninstall, removed purge trap and exact retry while retaining current test-policy sections. S70 changes test-policy/provider-gate sections to final one-process/same-wheel policy and removes old ledger/shard/main-push instructions. README/provider/dogfood lifecycle docs converge at S60; final test-policy docs converge at S70.
+S60 repairs current Provider CI references and failure consumers, leaves final gate redesign to S70, and minimally changes retained Full Regression output to external runner temp. Current PR and main-push gates are independently GREEN.
 
-### ADR-D10 — Transitional current-gate continuity
+### ADR-D10 — One frozen-head producer and exact byte graph
 
-S60 removes old product engine/tests and terminalizes failures, but retargets current provider CI and keeps current full-regression consumers/providers coherent. Current PR and main-push gates are independently GREEN. S60 does not require final provider-gate tooling. S70 adds replacement consumers/providers before removing all old consumers and then old providers in one non-main change set.
+Only Linux `provider-build-artifacts` packages final head once. Three consumers build zero. Attestation downloads candidate, four receipts and four role evidence byte files, verifies exact schemas/metadata/hashes and uploads one nine-file evidence artifact. Filename-only assertions do not count.
 
-### ADR-D11 — Sole frozen-head packaging producer
+### ADR-D11 — Stable environment and fixed attestation schemas
 
-Only final Linux job `provider-build-artifacts` packages the frozen head, exactly once. Linux canonical, sdist and macOS jobs download the same immutable candidate and build zero times. Attestation needs exactly all four jobs. Local S70 build is pre-freeze tool smoke only; S80 never builds locally.
+Qualification binds `specdock-linux-qualification-v1` and the full pinned fingerprint. Candidate, receipt, role, aggregate, pre-merge, post-merge and Epic closure schemas have exact ordered keys/types/units/canonical bytes and parent-child hashes. `EVIDENCE-FIXTURE-V1` fixes canonical fixture bytes, sizes and SHA-256 values. `emit-attestation` and append-only GitHub comment verification are fixed in Issue Design.
 
-### ADR-D12 — Self-contained downloaded evidence
+### ADR-D12 — Two-head required-context cutover
 
-`provider-evidence-<sha>` contains exactly nine files: provider-evidence, four receipts and four role evidence files. Provider evidence hashes actual receipt and role-evidence bytes and binds source/tree, run/jobs/artifacts, candidate files, build counts, environment and metrics. The same `verify-downloaded-artifact` command is used in attestation and S80 and validates actual downloaded bytes, not assertions alone.
+`PRC_COMPAT_HEAD` emits both old/new contexts. New is added as required while old remains. A canary makes only new RED and proves blocking. Old is then removed from required settings. `PRC_FINAL_HEAD` removes only compatibility job and reruns all authoritative evidence. Only the final head can merge.
 
-### ADR-D13 — Stable environment and no-gap context transition
+### ADR-D13 — Documentation/evidence closure
 
-Qualification is bound to `specdock-linux-qualification-v1`, pinned descriptor/image/resource/toolchain fingerprint. Any mismatch invalidates all runs. Human adds new required context while old remains, proves RED blocking, restores GREEN, then removes only old provider context.
-
-### ADR-D14 — Non-cyclic evidence and human merge
-
-Tracked report ends before head freeze and contains no self-referential/future facts. Final evidence is immutable external data. Human merge is verified by tree OID equality, not commit SHA equality. SpecDock finish and GitHub Issue/Epic close facts are external post-merge records.
+S60 updates lifecycle docs and AGENTS lifecycle text; S70 updates final test policy. Tracked #392 report stops before final head evidence. Append-only external attestations hold final/pre/post closure facts. Merge equality is tree equality.
 
 ## Rejected alternatives
 
-- New investigation, decision, tests-only or verification-only Issues.
-- S40, S50 or S70 main merge.
-- Seed policy inferred from files or aliases.
-- Repository workbench as temporary evidence storage.
-- #387 report predicting a future merge identity.
-- Fixed 15-row post-#387 assumption or implementer-selected successor.
-- Partial dogfood sync at S40/S50/S60/S70.
-- More than one frozen-head packager or local final build.
-- Evidence bundle without role-evidence bytes.
-- Old required context removal before new required RED proof.
-- Runtime toggle, fallback engine, approved failure, skip or sharding workaround.
+- Additional research, decision, test-only or verification-only Issues.
+- Report PR-number input or candidate-equals-final-head requirement.
+- Arbitrary external temp scan, random orphan adoption or repository `.workbench` staging.
+- Retained Full Regression default artifact path.
+- Broad initiative/artifact exclusion.
+- Evidence schemas deferred to implementation or evidence without actual role bytes.
+- Removing old required context before new required RED proof.
+- Merging compatibility head without final-head evidence rerun.
+- S40/S50/S70 merge, partial dogfood, multiple packagers, local final build, skip/ledger approval or old-engine fallback.
 
 ## Consequences
 
-Main remains releasable at each merge boundary; lifecycle/data authority is closed; #387 results are admitted without modifying #387; protected workbench cannot be polluted by evidence; dogfood matches every candidate-changing main state; final artifacts and metrics are reproducible and byte-verifiable. Costs are larger non-main PR checkpoints, native filesystem dependency, external evidence handling and exact Linux environment maintenance.
-
-## Supersession and consistency
-
-#388–#390 remain superseded historical nodes. Epic/Issue R/D/P, this ADR, both normative artifacts and Luna handoff must state the same decisions. Any contradiction stops implementation for canonical correction and Strict rereview. `owner_decisions_required=[]`.
+Implementation has more explicit filesystem/evidence code and a temporary PR-C compatibility head, but each main point is independently releasable and every recovery, wire, evidence and gate transition is reproducible. `owner_decisions_required=[]`.
