@@ -11,7 +11,7 @@ Planning Level: "critical"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
+  sha: "eaddf76806c338ee05463741f15fd3967bbceb57"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
@@ -54,53 +54,45 @@ S00 admission
   -> human merge -> external closure attestations
 ```
 
-## I392-S00 — Deterministic specification/#387 admission and baseline
+
+## I392-S00 — Deterministic specification/#387/dogfood admission and baseline
 
 **Objective and contract-visible outcome**
 
-Specification lineageと#387 implementation driftを別々に証明し、implementation base、old `0.2.3` artifacts、current gate/failure inventoryを固定する。Stale repository evidence SHAからfuture mainへself-rejecting diffを行わない。
+Verify specification lineage、#387 permitted three-way outcomes、source ledger all 27 identities、implementation base、exact legacy dogfood evidence andcurrent gates before anyproduction change。Materialize aformula-derived `post-387-admission.json`;do not assume15 rows。
 
 **Exact owned repository paths and symbols**
 
-- Read-only repository/GitHub。
-- Tracked write: #392 `report.md`のpre-merge admission summaryのみ。
-- Ignored: `spec-dock/.workbench/iss-00392/admission/**`。
+- Read-only repository/GitHub and#387 R/D/P/report/merge tree。
+- Tracked write: #392 `report.md` pre-merge admission summary only。
+- Ignored: `spec-dock/.workbench/iss-00392/admission/**` includingadmission JSON、protected witness、baseline artifacts。
 - No production symbol change。
 
 **Explicit non-owned and no-touch paths**
 
-All production/tests/workflows/settings。#387 diffを修正しない。
+Allproduction/tests/workflows/settings and#387 canonical R/D/P/report content。S00 parses #387 evidence butdoes notrepair it。
 
 **Prerequisites and dependency**
 
-- 本pack imported。
-- Owner records replacement manifest hash/location and`SPEC_FREEZE_COMMIT`。
-- #387 closed/human merged。
-- Implementation base containsboth lineages。
-- Clean worktree。
+- This pack imported and`SPEC_FREEZE_COMMIT` recorded。
+- #387 human merge complete。
+- Implementation base contains bothlineages andisclean。
+- #387 report contains one exact disposition block betweenregister markers。
 
 **RED evidence or justified no-new-test rule**
 
-No product test。Temporary read-only checker mustrejectsynthetic wrong spec hash、wrong #387 path、protected drift。Checker isnotcommitted unlessgeneric code islaterowned byprovider gate。
+Temporary read-only admission checker mustreject: missing/duplicate report entry、invalid outcome、removed node stillpresent、retained node/signature drift、split mapping mismatch、multiple/no-declared failure lineage、unmapped new ledger row、outside-scope delta、wrongspec hash、non-exact dogfood record orunexpected slot marker。No production test isadded in S00。
 
 **Smallest implementation action**
 
-1. Verifymanifest exact payload hashes against`SPEC_FREEZE_COMMIT` blobs。
-2. Verifycommit ancestry。
-3. Obtain#387 PR base/head/merge andvalidateits own delta/content restrictions。
-4. Verifyprotected paths fromspec freeze toimplementation base, accounting onlyvalidated #387 delta。
-5. Capturecurrent lint/ordinary/full/dogfood gates。
-6. Buildbaseline `0.2.3` wheel+sdist once andhash。
-7. Generatelegacy root/slot digests andtest/failure inventory。
-
-**Normative register admission**
-
-Before anyS10 file iscreated, parse`../../artifacts/active-failure-disposition-register.md` betweenexact JSON markers andperformtwo comparisons:
-
-1. `git show "$REPOSITORY_EVIDENCE_SHA:full-regression-ledger.json"` equalsall27 register node/signature pairs andsource blob identity。
-2. post-#387 working tree ledger equalsregister `expected_post_387`: 15 rows、active14、resolved1、exact removals4〜15、nootherfield/signature/new row delta。
-
-Expected #387 successor node IDs listed inthe register mustcollect。Any mismatch stopsIssue start/S10, requirescanonical register update byspec owner, andrequiresfresh Strict re-review。Luna doesnotselectan equivalent node。
+1. Verifyreplacement manifest hashes against`SPEC_FREEZE_COMMIT` blobs andancestry。
+2. Obtain#387 base/head/merge/tree;validateits ownallowlist/content restrictions without changing#387 docs。
+3. Parsecurrent register source block andverify all 27 original node/signature identities against theevidence ledger。
+4. Parse#387 report block andcross-checkpost-merge tree、ledger、full collection using`ISS387-THREE-WAY-V1`。
+5. Emitignored `post-387-admission.json` withformula-derived admitted rows;require allnew ledger rows mapped。
+6. Capturecurrent lint/ordinary/current full workflows。
+7. Buildbaseline0.2.3 wheel+sdist once forlegacy fixture only。
+8. Provedogfood record bytes are exact `0.2.3\n` andbothfixed slots have no marker;capturefour-root/two-slot/protected/seed digests。
 
 **Focused verification commands**
 
@@ -109,10 +101,13 @@ test -z "$(git status --short)"
 git merge-base --is-ancestor "$SPEC_FREEZE_COMMIT" "$IMPLEMENTATION_BASE_SHA"
 git show "$SPEC_FREEZE_COMMIT:<canonical-path>" | sha256sum
 git diff --name-status "$ISSUE_387_MERGE^1" "$ISSUE_387_MERGE"
-python3 spec-dock/.workbench/iss-00392/admission/verify_failure_register.py \
-  --register spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/artifacts/active-failure-disposition-register.md \
-  --source-ledger <(git show "$REPOSITORY_EVIDENCE_SHA:full-regression-ledger.json") \
-  --post-387-ledger full-regression-ledger.json
+uv run python spec-dock/.workbench/iss-00392/admission/check_register.py   --register spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/artifacts/active-failure-disposition-register.md   --issue-387-report spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/report.md   --ledger full-regression-ledger.json   --output spec-dock/.workbench/iss-00392/admission/post-387-admission.json
+python - <<'PY'
+from pathlib import Path
+assert Path('spec-dock/spec-dock.version').read_bytes() == b'0.2.3\n'
+for p in (Path('.agents/skills/spec-dock/.spec-dock-provider-slot.json'), Path('.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json')):
+    assert not p.exists() and not p.is_symlink()
+PY
 make lint
 uv run pytest -q
 uv run python -m scripts.quality.verify_full_regression --shards 4
@@ -124,28 +119,27 @@ test -z "$(git status --short)"
 
 **Expected observable result**
 
-Spec hashes/ancestry/#387 delta/protected drift exact、current gates GREEN、exact one 0.2.3 wheel andsdist、legacy fixture inputs fixed。
+Spec/#387 lineages exact、all 27 source identities accounted、eachconditional row hasonevalid report-driven branch、no unmapped row、formula-derived admitted ledger、current gatesGREEN、baselineartifact hashesfixed、dogfood exactlegacy/protected witness recorded。
 
 **Evidence to record in Issue report.md**
 
-Repository evidence SHA、manifest hash/location、SPEC_FREEZE_COMMIT、path blob OIDs/content hashes、#387 base/head/merge/tree/delta、implementation base、commands、baseline artifacts、node/failure inventory。No final PR head/self hash。
+Repository evidence/current SHA、manifest/SPEC_FREEZE、#387 base/head/merge/tree/report blob、register/ledger blob、27identity digest、conditional branch table、admitted row formula/result、baseline artifacts、dogfood record/marker/root/slot/protected/seed digests、commands/exits。
 
 **Stop conditions and escalation owner**
 
-Missing identity/hash mismatch/#387 mismatch/protected drift/baseline failure。Owner: Product/repository owner。Do notwiden allowlist。
+Any missing report marker/entry、unmapped newnode、signature drift、#387 contract-external result、wrong dogfood legacy evidence、protected drift、baseline failure。Stop before S10;canonical spec owner updatesregister/spec andobtainsindependent Strict re-review。Luna must notchooseadisposition。Owner:spec/Product/repository owner。
 
 **Cleanup**
 
-Detached worktree、venv、temporary checker。Keepignored baseline artifacts throughS50。
+Detached worktree/venv/temp checker afterevidence capture。Keepignored baseline/admission/protected witness through S60。
 
 **Merge-point invariant**
 
-No code diff。Not a merge point。
+No code diff。Not amerge point。
 
 **Requirement and design trace IDs**
 
-I392-RQ-001、I392-D-014。
-
+I392-RQ-001、I392-RQ-029、I392-RQ-031、I392-D-014、I392-D-018、I392-D-020。
 ## I392-S10 — Fixed model, strict record/seed policy, candidate, legacy fixture
 
 **Objective and contract-visible outcome**
@@ -382,11 +376,11 @@ Old engine file retained untilS60、current pytest policy/workflows、root`AGENT
 
 **Prerequisites and dependency**
 
-S30 GREEN。S40 startsPR-B samebranch/PR; S40/S50 cannot beoffered formerge。Wire artifact hash isverified throughSPEC_FREEZE_COMMIT。
+S30 GREEN。S40 startsPR-B same branch/PR; S40/S50 cannot beoffered formerge。Wire artifact hash isverified throughSPEC_FREEZE_COMMIT。
 
 **RED evidence**
 
-- Wire tests fail againstmissing`migrate-0.2.3` operation、exactcode/action/nullability/golden mappings。
+- Wire tests fail until durable `operation=install` plus `legacy-migration-*` public codes, exact action/nullability relations, and all goldens match the normative wire artifact。
 - Uninstall apply/default/aliases/trap tests fail againstold purge/journal behavior。
 - One-time docs grep findslegacy journal/retry/purge/compatible-newer/empty-boundary text inroot/provider/dogfood docs。
 - Provider/dogfood migration/docs README `cmp` fails untilprojection isupdated。
@@ -435,7 +429,7 @@ Temporary snapshots; no generated docs beyondexact projection pair。
 
 **Internal checkpoint invariant**
 
-S40 isnot a main merge point。Same PR-B branch continuesS50/S60。No S40-only handoff。
+S40 is not a main merge point。Same PR-B branch continuesS50/S60。No S40-only handoff。
 
 **Requirement and design trace IDs**
 
@@ -505,21 +499,22 @@ Venv/workspaces/probes。
 
 **Internal checkpoint invariant**
 
-S50 isnot a main merge point。Same branch continuesS60。No S50-only handoff。
+S50 is not a main merge point。Same branch continuesS60。No S50-only handoff。
 
 **Requirement and design trace IDs**
 
 I392-RQ-016〜017。
 
-## I392-S60 — Old engine/test terminalization, docs convergence, transitional workflow repair, and PR-B main gate
+
+## I392-S60 — Terminalization, current workflow repair, complete dogfood migration, and PR-B gate
 
 **Objective and contract-visible outcome**
 
-Removeold per-file/journal/purge engine andduplicate tests、applytheexact failure register、finishPR-B docs、andkeepbothcurrentprovider workflows independentlyGREEN。Transitional `provider-ci.yml` isretargetedtoexisting successors withoutadvancingS70 final redesign。NoS70-only tool isused。
+Removeold lifecycle engine/tests aftersuccessor proof、mechanically terminalize the formula-derived post-#387 admitted failure set、keep bothcurrent workflows independentlyGREEN、convergeallPR-B docs andchecked-in dogfood tocomplete 0.2.4。This is the onlyPR-B main merge gate anddoes notintroducefinal S70 provider-gate design。
 
 **Exact owned repository paths and symbols**
 
-Delete:
+Deleteold product/tests:
 
 ```text
 src/spec_dock/managed_distribution.py
@@ -530,183 +525,162 @@ tests/cli_runtime/test_distribution_cutover.py
 tests/integration/test_epic_00343_distribution.py
 ```
 
-Create/update:
+Create/update successor andtransitional gate:
 
 ```text
 src/spec_dock/context_pack.py
 src/spec_dock/cli.py
-README.md                                              # final lifecycle, current test-policy retained
-src/spec_dock/assets/spec_dock/docs/migration.md
-spec-dock/docs/migration.md
-src/spec_dock/assets/spec_dock/docs/README.md           # final lifecycle, current test-policy retained
-spec-dock/docs/README.md
-tests/unit/infra/test_provider_assets.py
-tests/unit/infra/test_provider_lifecycle_wire_contract.py
-tests/unit/infra/test_provider_test_ownership.py
-tests/provider_test_ownership.json
-tests/unit/test_provider_test_lanes.py
+src/spec_dock/provider_lifecycle/**
 .github/workflows/provider-ci.yml
+tests/unit/test_provider_test_lanes.py
+tests/unit/infra/test_provider_assets.py
+tests/provider_test_ownership.json
 full-regression-ledger.json
 full-regression-timing-weights.json
 tests/conftest.py
-tests/** exact fixed-in-place/successor nodes named in active-failure-disposition-register.md
-pyproject.toml only deleted-file mypy references
+exact failure-owner tests from post-387-admission.json
+README.md lifecycle sections
+src/spec_dock/assets/spec_dock/docs/migration.md
+src/spec_dock/assets/spec_dock/docs/README.md
+spec-dock/docs/migration.md
+spec-dock/docs/README.md
+spec-dock/{docs,templates,system,scripts}
+.agents/skills/spec-dock
+.agents/skills/spec-dock-grill-with-docs
+spec-dock/spec-dock.version
+.agents/skills/spec-dock/.spec-dock-provider-slot.json
+.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
+#392 report.md pre-merge implementation summary
 ```
 
-Must remainpresent/functionally current throughPR-B:
+Retainworking throughPR-C:
 
 ```text
-tests/unit/test_full_regression_baseline.py
-tests/conftest.py
 scripts/quality/full_regression_baseline.py
 scripts/quality/verify_full_regression.py
-scripts/quality/__init__.py
-full-regression-ledger.json
-full-regression-timing-weights.json
 .github/workflows/provider-full-regression.yml
-pytest fast/full options/markers
-root AGENTS.md current test-policy text
-```
-
-**Transitional `.github/workflows/provider-ci.yml` exact repair**
-
-Preserveworkflow name`Provider CI`、`pull_request` event、job IDs、Ubuntu/macOS matrix、checkout/head check、Python/uv install、static-analysis topology。Replaceonlydeleted test commands:
-
-```text
-old: tests/unit/infra/test_managed_distribution.py
-new: tests/unit/infra/test_provider_lifecycle_model.py
-     tests/unit/infra/test_provider_lifecycle_candidate.py
-     tests/unit/infra/test_provider_lifecycle_filesystem.py
-     tests/unit/infra/test_provider_lifecycle_service.py
-     tests/unit/infra/test_provider_lifecycle_public_result.py
-     tests/unit/infra/test_provider_lifecycle_wire_contract.py
-     tests/unit/infra/test_provider_lifecycle_faults.py
-     tests/unit/infra/test_provider_assets.py
-     tests/unit/infra/test_provider_test_ownership.py
-
-old: tests/cli_runtime/test_distribution_cutover.py
-new: tests/cli_runtime/test_provider_lifecycle.py
-     tests/cli_runtime/test_uninstall.py
-     tests/cli_runtime/test_update.py
-
-old: tests/integration/test_epic_00343_distribution.py
-new: tests/integration/test_provider_lifecycle_artifacts.py
-     tests/integration/test_provider_lifecycle_tripwire.py
-
-macOS-only: tests/platform/macos/test_provider_lifecycle_macos.py
-```
-
-Currentpermission flags remainwherecurrently required。Do notbuildartifacts、addaggregate job、renamecontexts、remove matrix、orchangeevent; those belongS70。
-
-**Failure register contract**
-
-Normative source`../../artifacts/active-failure-disposition-register.md`。S60 ledger containsonlypost-#387 remaining15 rows。Row2 isresolved/superseded to`tests/unit/infra/test_provider_assets.py::test_fixed_skill_slots_match_provider_and_dogfood`。Rows1、3、16〜27 areresolved/fixed-in-place withsame node normalpass。Rows4〜15 stayabsent。Active0、resolved15、retired0。No disposition choice remains。
-
-`tests/unit/test_provider_test_lanes.py` exact tests:
-
-```text
-test_s60_register_source_and_post_387_delta_are_exact
-test_s60_full_regression_ledger_has_zero_active_rows_and_exact_resolved_relations
-test_s60_terminal_successor_nodes_are_collected_and_normally_pass
-test_s60_provider_ci_references_only_existing_successor_tests
-test_s60_pytest_adapter_and_standalone_evaluator_are_equivalent
+fast/full marker policy
 ```
 
 **Explicit non-owned and no-touch paths**
 
-Final provider-gate redesign、Linux environment files、rootAGENTS/test-policy update、policy provider deletion、human settings、consumer data/seeds、release。
+#387 canonical docs/report、S70 provider gate/environment/finalAGENTS test-policy redesign、consumer seeds、initiatives/artifacts/workbench/unknown user data、release/settings。
 
 **Prerequisites and dependency**
 
-S50 allproof GREEN。All exact successor nodescollectbeforeold deletion。S40 lifecycle docs/wire areGREEN。NoS40/S50 separate merge。
+S50GREEN。`post-387-admission.json` isvalid andbinds#387 merge/report/ledger/collection。S60 branch includesS40/S50;no intermediate merge。
 
 **RED evidence**
 
-- Old workflow commands fail afterold test paths aredeleted butbeforeretarget。
-- Lane tests fail withactive rows、wrongregister delta、stale successors/workflow paths。
-- Full verifier fails onanydeleted node reference。
-- Lifecycle docs grep fails onanyold journal/retry/purge text。
-- Fixed-in-place nodes failbeforetheirsource/test repair; superseded successors fail/absent beforecreation。
+- Transitional provider CI failswhiledeleted old test paths remain。
+- Lane test fails forfixed15 assumption、missing report mapping、active row、wrong terminal rule、unmapped successor orstale workflow path。
+- Current main-push verifier failswhenledger/timing/conftest referencesdeleted nodes。
+- Wire goldens fail foranyphase/reason/code/order mismatch。
+- Dogfood verification failsbeforemigration、onpartial root/slot、marker absence、record mismatch、digest mismatch、seed/protected drift。
+- Docs grep fails forlegacy journal、compatible-newer recovery、purge authority、empty-boundary guidance。
 
 **Smallest implementation action**
 
-1. Extractcontext behavior andmoveprovider asset assertions。
-2. Implementallregister fixed-in-place repairs andexact successors;do notreclassify。
-3. Deleteold engine/manifest/tests。
-4. Updateledger/timing/conftest exact references andall remaining15 rows toterminal relations。
-5. Update`test_provider_test_lanes.py` toregister/current-policy contract。
-6. Retargettransitional `provider-ci.yml` exactly asabove。
-7. Re-runprovider-first docs sync andlifecycle grep。
-8. Runordinary, transitional PR workflow commands, andcurrent main-push verifier independently。
+1. Extractremainingnon-lifecycle context behavior andmoveasset assertions。
+2. Applyregister branches from`post-387-admission.json`: outside rows perfixed rule; conditional retained/failure-lineage nodes fixed-in-place; removed/no-lineage identities remain terminal inregister;active0。
+3. Updateledger/timing/conftest exact admitted rows andmake`tests/unit/test_provider_test_lanes.py` validateformula andcurrent evaluator parity。
+4. Deleteold engine/manifest/duplicate tests。
+5. Retargetcurrent`.github/workflows/provider-ci.yml` only:
+   - unit -> existingprovider lifecycle model/candidate/filesystem/service/result tests;
+   - CLI -> `test_provider_lifecycle.py`、`test_uninstall.py`、`test_update.py`;
+   - artifact -> `test_provider_lifecycle_artifacts.py`、tripwire;
+   - macOS matrix -> `test_provider_lifecycle_macos.py`。
+   Preserveworkflow name/event/job IDs/matrix/setup/static topology;no build-once redesign。
+6. Finishroot README lifecycle andprovider docs;sync exact dogfood docs projection。
+7. Snapshotprotected dogfood paths/seeds fromS00 witness。
+8. Run`uvx --no-cache --from . spec-dock update .` against repository root。This performs exact legacy migration withseed policy preserve-only。
+9. Parsecandidate、record、markers;requirecompleteS60 digest identity andno incomplete/stage residue。
+10. Verifyprotected witness/seed hashesbyte-identical、validate andfresh consumer。
+11. Runcurrent PR workflow-equivalent suite andcurrent4-shard verifier independently。
 
 **Focused verification commands**
 
 ```bash
-python3 spec-dock/.workbench/iss-00392/admission/verify_failure_register.py \
-  --register spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/artifacts/active-failure-disposition-register.md \
-  --post-387-ledger full-regression-ledger.json \
-  --expect-s60-terminal
-uv run pytest -q \
-  tests/unit/infra/test_provider_lifecycle_wire_contract.py \
-  tests/unit/infra/test_provider_assets.py \
-  tests/unit/infra/test_provider_test_ownership.py \
-  tests/unit/test_provider_test_lanes.py \
-  tests/unit/test_full_regression_baseline.py
-# Run exact transitional Provider CI test commands locally.
-uv run pytest -q tests/unit/infra/test_provider_lifecycle_model.py \
-  tests/unit/infra/test_provider_lifecycle_candidate.py \
-  tests/unit/infra/test_provider_lifecycle_filesystem.py \
-  tests/unit/infra/test_provider_lifecycle_service.py \
-  tests/unit/infra/test_provider_lifecycle_public_result.py \
-  tests/unit/infra/test_provider_lifecycle_wire_contract.py \
-  tests/unit/infra/test_provider_lifecycle_faults.py \
-  tests/unit/infra/test_provider_assets.py \
-  tests/unit/infra/test_provider_test_ownership.py
-uv run pytest --run-full-regression --full-regression-shard -q \
-  tests/cli_runtime/test_provider_lifecycle.py tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_update.py \
-  tests/integration/test_provider_lifecycle_artifacts.py tests/integration/test_provider_lifecycle_tripwire.py
-uv run pytest -q
-uv run python -m scripts.quality.verify_full_regression --shards 4
+uv run pytest -q tests/unit/test_provider_test_lanes.py   tests/unit/infra/test_provider_assets.py   tests/unit/infra/test_provider_lifecycle_model.py   tests/unit/infra/test_provider_lifecycle_public_result.py
+uv run pytest --run-full-regression --full-regression-shard -q   tests/cli_runtime/test_provider_lifecycle.py   tests/cli_runtime/test_uninstall.py   tests/cli_runtime/test_update.py   tests/integration/test_provider_lifecycle_artifacts.py   tests/integration/test_provider_lifecycle_tripwire.py
+python - <<'PY'
+from pathlib import Path
+import hashlib, json
+protected = [Path('spec-dock/initiatives'), Path('spec-dock/.workbench'), Path('spec-dock/.gitignore'), Path('.github/workflows/ci.yml')]
+def snap(path):
+    if path.is_symlink(): return ['symlink', path.readlink().as_posix()]
+    if path.is_file(): return ['file', hashlib.sha256(path.read_bytes()).hexdigest()]
+    rows=[]
+    if path.is_dir():
+        for p in sorted(path.rglob('*'), key=lambda x:x.as_posix().encode()):
+            rel=p.relative_to(path).as_posix()
+            rows.append([rel, 'symlink', p.readlink().as_posix()] if p.is_symlink() else [rel, 'file', hashlib.sha256(p.read_bytes()).hexdigest()] if p.is_file() else [rel, 'dir', ''])
+    return ['dir', rows] if path.is_dir() else ['absent', None]
+Path('spec-dock/.workbench/iss-00392').mkdir(parents=True, exist_ok=True)
+Path('spec-dock/.workbench/iss-00392/s60-protected-before.json').write_text(json.dumps({p.as_posix():snap(p) for p in protected}, sort_keys=True)+'\n')
+PY
+uvx --no-cache --from . spec-dock update .
+uv run python - <<'PY'
+from pathlib import Path
+from spec_dock.provider_lifecycle.candidate import build_packaged_candidate
+from spec_dock.provider_lifecycle.model import parse_install_record, parse_slot_marker
+candidate = build_packaged_candidate(Path('src/spec_dock/assets'), '0.2.4')
+record = parse_install_record(Path('spec-dock/spec-dock.version').read_bytes())
+assert record.state.value == 'ready' and record.operation is None
+assert record.version == '0.2.4' and record.seed_policy.value == 'preserve-only'
+assert record.candidate_digest == candidate.digest
+for slot in ('spec-dock','spec-dock-grill-with-docs'):
+    marker=parse_slot_marker(Path('.agents/skills')/slot/'.spec-dock-provider-slot.json')
+    assert marker.slot == slot and marker.version == '0.2.4' and marker.candidate_digest == candidate.digest
+PY
 cmp src/spec_dock/assets/spec_dock/docs/migration.md spec-dock/docs/migration.md
 cmp src/spec_dock/assets/spec_dock/docs/README.md spec-dock/docs/README.md
-test -z "$(git grep -nE 'distribution-(journal|retry)|uninstall-retry|current explicit spec-history purge authority|--apply([^`]|`[^`]*`)*--remove-specs|compatible newer package|protocol 2 journal|空の `spec-dock/`|empty spec-dock boundary' -- README.md src/spec_dock/assets/spec_dock/docs spec-dock/docs || true)"
-python3 - <<'PY_WORKFLOW_PATHS'
-# Parse provider-ci.yml run commands and assert every tests/... argument exists.
-# Assert old three paths are absent and final S70 job IDs are not introduced.
-PY_WORKFLOW_PATHS
+! rg -n 'distribution-journal|compatible newer|current explicit spec-history purge authority|empty spec-dock.*reinitial' README.md src/spec_dock/assets/spec_dock/docs spec-dock/docs
 make lint
+uv run pytest -q
+uv run python -m scripts.quality.verify_full_regression --shards 4
+python3 ./spec-dock/scripts/spec-dock validate
+uv run python spec-dock/.workbench/iss-00392/admission/compare_protected.py \
+  --before spec-dock/.workbench/iss-00392/s60-protected-before.json \
+  --root .
+fresh="$(mktemp -d)"
+uvx --no-cache --from . spec-dock init "$fresh"
+python3 "$fresh/spec-dock/scripts/spec-dock" validate
+rm -rf "$fresh"
 git diff --check
 ```
 
+The implementation adds an exact protected-after comparison against the S00/S60 snapshot anddeletesonlytheignored snapshot afterreport transcription。Thefresh consumer path iscaptured andremoved。
+
 **Expected observable result**
 
-Old engine/tests absent。Wire anddocs final。Register dispositions exact。Active approved failures0。TransitionalPRworkflow referencesonlyexisting successors andisGREEN。Currentmain-push verifier remainsGREEN withallproviders/consumers present。NoS70 tool orfinaljob topology appears。
+Alladmitted failures normally pass;transitional ledgeractive0;current PR workflow successor paths exist/GREEN;current main-push verifierGREEN;old engine/testsabsent;docs final;dogfood four roots/two slots/record/markers allmatchS60 candidate;protected witness andseedsunchanged;validate/fresh consumerGREEN。
 
 **Evidence to record in Issue report.md**
 
-Deletion table、27-row register validation、15-row terminal ledger、fixed/successor test outputs、transitionalworkflow diff/run identity、main-push verifier output、docs hashes/grep/cmp、wire goldens。Final head-bound values remainexternal。
+Conditional branch/admitted/final mapping、active/resolved counts、deleted/retargeted path table、bothcurrent workflow commands/results、wire golden results、docs grep/parity、dogfood pre/postrecord/marker/root/slot/candidate digests、protected/seed witness、validate/fresh consumer。
 
 **Stop conditions and escalation owner**
 
-Unexpectedregister delta、missing successor、unresolved row、wire/docs mismatch、current workflow failure、deleted consumer、S70-only dependency、orS60 mergebeforeallproof。Owner: Product/spec/test/CI owners。No disposition substitution。
+Unmappedconditional node、signature drift、active row、workflow missing/deleted path、current verifier failure、S70-only tooling needed、wire mismatch、docs stale、dogfood modified legacy/partial/digest mismatch、protected/seed drift。No merge。Owner:Product/spec/test/CI/filesystem asapplicable。
 
 **Cleanup**
 
-Obsoletefixtures/imports/mypy entries only。Keepallcurrent policy infrastructure intentionally forPR-B main。
+Removeobsolete fixtures/imports/mypy entries andignoredtemp consumers/snapshots afterevidence transcription。Retaincurrent policy infrastructure intentionally。
 
 **PR-B main merge invariant**
 
-S60 is theonly PR-B main merge gate。S40+S50+S60 allGREEN。Afterhuman merge, main hascompletefinal`0.2.4` lifecycle、final lifecycle docs/wire、register-applied active0、noold engine fallback、workingtransitional Provider CI、andworkingcurrent main-push Full Regression。No bridge/toggle/final-gate redesign。
+S60 is the onlyPR-B gate。S40/S50/S60 all proofGREEN。Main afterhuman merge hascomplete 0.2.4 lifecycle/docs/wire、complete checked-in dogfood candidate、no old engine、active0、working current PR workflow andworking current main-push verifier。No bridge/toggle/finalS70 gate redesign。
 
 **Requirement and design trace IDs**
 
-I392-RQ-018〜020、I392-RQ-027〜029、I392-D-011、I392-D-016〜018。
+I392-RQ-018〜020、I392-RQ-027〜029、I392-RQ-031、I392-D-011、I392-D-017〜018、I392-D-020。
 
-## I392-S70 — Consumer-first final provider gate, sole CI producer, test-policy docs, and atomic old policy removal
+## I392-S70 — Consumer-first final gate, receipt graph, second dogfood update, and atomic policy removal
 
 **Objective and contract-visible outcome**
 
-PR-C branchでfinal Provider CI tooling/environment/workflow/test-policy documentationを先に成立させ、allcurrent policy consumersをretire/replaceした後にold providers/data/workflowを削除する。Local build ispre-freeze tooling smoke only。S70 isinternal; no main merge。
+Onone PR-C branch, add the final provider gate/environment/receipt verifier/workflow/AGENTS/docs, retireallold policy consumers, deletetheproviders, thenconvergedogfood tothe newcandidate。S70 isanon-main checkpoint;no authoritative final package isaccepted fromlocal validation。
 
 **Exact owned repository paths and symbols**
 
@@ -717,222 +691,192 @@ scripts/provider_gate.py
 ci/linux-qualification.Dockerfile
 ci/linux-qualification-environment.json
 tests/unit/infra/test_provider_gate.py
-tests/unit/infra/test_provider_artifact_flow.py
-tests/unit/infra/test_provider_test_ownership.py
+tests/unit/infra/test_provider_workflow.py
 tests/provider_test_ownership.json
 scripts/static_analysis/run.sh
 Makefile
 .github/workflows/provider-ci.yml
 AGENTS.md
-README.md                                              # test-policy sections only
-src/spec_dock/assets/spec_dock/docs/README.md           # test-policy sections only
-spec-dock/docs/README.md                                # synced projection
-pyproject.toml
+README.md test-policy sections
+src/spec_dock/assets/spec_dock/docs/README.md test-policy/provider-gate sections
+spec-dock/docs/README.md
+provider lifecycle code/tests needed bywire and receipts
+spec-dock/{docs,templates,system,scripts}
+.agents/skills/spec-dock
+.agents/skills/spec-dock-grill-with-docs
+spec-dock/spec-dock.version
+two slot marker files
+#392 report.md pre-freeze summary
 ```
 
-Retire/replace before provider deletion:
+Retire/delete afterconsumer-zero proof:
 
 ```text
 tests/unit/test_provider_test_lanes.py
 tests/unit/test_full_regression_baseline.py
-.github/workflows/provider-full-regression.yml          # consumer of old verifier; delete after replacement GREEN
-```
-
-Delete only afterconsumer inventory proveszero:
-
-```text
+allother imports of tests.conftest or scripts.quality full-regression modules
+.github/workflows/provider-full-regression.yml
 tests/conftest.py
-scripts/quality/full_regression_baseline.py
-scripts/quality/verify_full_regression.py
-scripts/quality/__init__.py if empty
 full-regression-ledger.json
 full-regression-timing-weights.json
-pytest fast/full marker declarations/decorators/options
+scripts/quality/full_regression_baseline.py
+scripts/quality/verify_full_regression.py
+scripts/quality/__init__.py ifempty
+fast/full marker declarations/decorators/options
 ```
-
-Exact known policy module consumers atrepository evidence:
-
-```text
-tests/conftest.py -> scripts.quality.full_regression_baseline + ledger
-tests/unit/test_provider_test_lanes.py -> tests.conftest + both quality modules + ledger/timing/workflows
-tests/unit/test_full_regression_baseline.py -> scripts.quality.full_regression_baseline
-scripts/quality/verify_full_regression.py -> baseline + ledger + timing + pytest legacy options
-.github/workflows/provider-full-regression.yml -> scripts.quality.verify_full_regression
-.github/workflows/provider-ci.yml -> legacy pytest permission flags
-pyproject.toml -> marker declarations
-AGENTS.md / README.md / docs README -> retired operator policy text
-```
-
-Ifpre-deletion grep findsany path outside thisexact list, stop forcanonical spec owner update + Strict review; Luna doesnotclassifyit。
-
-**Final workflow exact topology**
-
-```text
-provider-build-artifacts          # Linux, sole final packaging producer
-provider-linux-canonical          # download same artifact, build 0
-provider-sdist-smoke              # download same artifact, build 0
-provider-macos-delta              # download same artifact, build 0
-provider-attestation              # download artifacts/receipts, build 0
-provider-gate                     # aggregate only
-```
-
-`provider-build-artifacts` acceptsworkflow input`candidate_sha`、checksoutexactSHA、verifiesHEAD/tree、runsone`uv build --wheel --sdist` invocation、writesmanifest、uploads`provider-candidate-<candidate_sha>`。Downstream uses`actions/download-artifact@v4` fromsame run andverifieshashes。Nootherjob invokespackaging。
 
 **Explicit non-owned and no-touch paths**
 
-Lifecycle docs content alreadyfinal atS60 excepttest-policy paragraphs、consumer seed workflows、commit-identity workflow、human settings、release、canonical specs。
+Consumer seeds、initiatives/artifacts/workbench/user data、unrelatedskills、human settings、release/tag/PyPI、canonical R/D/P and#387 docs/report。
 
 **Prerequisites and dependency**
 
-PR-C basesexactlyonS60 main tree。Transitional PR/main workflows areGREEN beforechange。S70 continuesS80 withoutmerge。
+PR-C isbased onexactS60 merged tree withworking current gates andcompleteS60 dogfood。No S70 commit isoffered formerge;branch continuestoS80。
 
 **RED evidence**
 
-- Provider gate tests rejectsecond producer、downstream build command、hash/source/tree/upload identity mismatch。
-- Workflow tests fail untilallconsumer jobs download same artifact andrecordbuild0。
-- `test_provider_test_lanes.py` and`test_full_regression_baseline.py` still importold providers before retirement。
-- Pre-provider-deletion grep identifiesexact known consumers; anyunknown path ishardstop。
-- Root AGENTS/README/docs README grep findsretired policy text。
-- Environment fingerprint/budget evaluator negative cases failclosed。
+- Workflow structural tests fail foradditional producer、downstream build、wrong/missing `needs`、receipt name/schema/role、source/job/run/hash/buildcount、zero/multiple evidence upload。
+- `verify-downloaded-artifact` table tests cover exits2〜12、stdout/JSON/stderr andsymlink/path/hash/API mismatch。
+- Consumer inventory test fails ifanyold policy import/reference remainsbeforeprovider deletion。
+- Provider deletion withremaining`test_provider_test_lanes.py` or`test_full_regression_baseline.py` isRED。
+- AGENTS/docs stale policy isRED。
+- Candidate-wide dogfood update isRED before S70 andonpartial/digest/marker/protected drift。
 
 **Smallest implementation action**
 
-1. Implementprovider gate、artifact-flow tests、environment descriptor/Dockerfile。
-2. Rewriteprovider-ci final topology withoneproducer/fourdownload consumers/aggregate。
-3. UpdateMakefile/static analysis。
-4. UpdateAGENTS andREADME/docs README test-policy sections;syncprojection。
-5. Replacefinal behavior assertions from`test_provider_test_lanes.py` in`test_provider_gate.py`/`test_provider_test_ownership.py`/`test_provider_artifact_flow.py`;deleteold lane test。
-6. Delete`test_full_regression_baseline.py`;do notportfailure approval evaluator。
-7. Runconsumer grep;onlyscheduled providers/data/workflow mayremain。
-8. Deleteold workflow/providers/ledger/timing/conftest/marker policy。
-9. Runpost-deletion import/grep/collection/finalworkflow tests。
-10. Runlocalpre-freeze tooling smoke with`--authority pre-freeze-tooling-smoke`;deleteoutput。Do notfreezehead oracceptthisartifact。
+1. Implementprovider gate subcommands includingexactI392-D-013 verifier and receipts。
+2. Freezeenvironment descriptor andaddDockerfile limits。
+3. Rewritefinalworkflow withI392-D-019 jobs/needs/artifact names/receipt schemas。Only`provider-build-artifacts` packages。
+4. Addworkflow structural tests andprovider gate tests;local `build` ispre-freeze tool validation only。
+5. UpdateMakefile/static analysis/root AGENTS/root README test policy/provider docs test policy。
+6. Replace/retireeveryremaining policy consumer, explicitly`test_provider_test_lanes.py` and`test_full_regression_baseline.py`;verifyconsumer0。
+7. Deleteoldproviders/ledger/timing/sharder/workflow/markers inthesame branch;runfull collection/tests。
+8. Afterallcandidate bytes settle, snapshotprotected witness andrun`uvx --no-cache --from . spec-dock update .`。
+9. Verifyfour roots/two slots/seven-key record/two markers equalthe S70 candidate digest andprotected/seedsunchanged。
+10. Complete tracked report pre-freeze summary andcommitall tracked content。Do notstartS80 untilclean。
 
 **Focused verification commands**
 
 ```bash
-uv run pytest -q \
-  tests/unit/infra/test_provider_gate.py \
-  tests/unit/infra/test_provider_artifact_flow.py \
-  tests/unit/infra/test_provider_test_ownership.py
-uv run python scripts/provider_gate.py freeze-linux-environment \
-  --descriptor ci/linux-qualification-environment.json \
-  --dockerfile ci/linux-qualification.Dockerfile
-# Non-authoritative tooling validation only.
-uv run python scripts/provider_gate.py build \
-  --authority pre-freeze-tooling-smoke \
-  --source-sha "$(git rev-parse HEAD)" \
-  --out spec-dock/.workbench/provider-gate/pre-freeze-smoke
-rm -rf spec-dock/.workbench/provider-gate/pre-freeze-smoke
-# Before provider deletion, only the exact scheduled set may match.
-git grep -nE 'tests\.conftest|scripts\.quality\.full_regression_baseline|scripts\.quality\.verify_full_regression|--run-full-regression|--full-regression-shard|--full-regression-observation|POLICY_SKIP_REASON|full-regression-ledger\.json|full-regression-timing-weights\.json' -- \
-  .github scripts tests AGENTS.md README.md src/spec_dock/assets/spec_dock/docs Makefile pyproject.toml
-# Exact test consumers must be gone before providers.
+uv run pytest -q tests/unit/infra/test_provider_gate.py tests/unit/infra/test_provider_workflow.py
+uv run python scripts/provider_gate.py freeze-linux-environment   --descriptor ci/linux-qualification-environment.json   --dockerfile ci/linux-qualification.Dockerfile
+# Pre-freeze tool validation only; output is notacceptance evidence.
+uv run python scripts/provider_gate.py build   --source-sha "$(git rev-parse HEAD)"   --out spec-dock/.workbench/provider-gate/pre-freeze
+uv run python scripts/provider_gate.py verify-environment   --descriptor ci/linux-qualification-environment.json
+uv run python scripts/provider_gate.py verify-node-ownership   --map tests/provider_test_ownership.json
+! rg -n 'tests\.conftest|scripts\.quality\.full_regression_baseline|scripts\.quality\.verify_full_regression|--run-full-regression|--full-regression-shard|POLICY_SKIP_REASON|full-regression-ledger|full-regression-timing'   --glob '!spec-dock/initiatives/**' .
 test ! -e tests/unit/test_provider_test_lanes.py
 test ! -e tests/unit/test_full_regression_baseline.py
-# After deletion, no non-Historical match remains.
-test -z "$(git grep -nE 'tests\.conftest|scripts\.quality\.full_regression_baseline|scripts\.quality\.verify_full_regression|--run-full-regression|--full-regression-shard|--full-regression-observation|POLICY_SKIP_REASON|provider-full-regression|full-regression-ledger\.json|full-regression-timing-weights\.json' -- . ':!spec-dock/initiatives/**' || true)"
-uv run python -c 'import importlib.util; assert importlib.util.find_spec("scripts.quality.full_regression_baseline") is None; assert importlib.util.find_spec("scripts.quality.verify_full_regression") is None'
+test ! -e tests/conftest.py
+test ! -e .github/workflows/provider-full-regression.yml
 uv run pytest --collect-only -q
 uv run pytest -q
 make lint
-cmp src/spec_dock/assets/spec_dock/docs/README.md spec-dock/docs/README.md
+uvx --no-cache --from . spec-dock update .
+uv run python - <<'PY'
+from pathlib import Path
+from spec_dock.provider_lifecycle.candidate import build_packaged_candidate
+from spec_dock.provider_lifecycle.model import parse_install_record, parse_slot_marker
+candidate=build_packaged_candidate(Path('src/spec_dock/assets'),'0.2.4')
+record=parse_install_record(Path('spec-dock/spec-dock.version').read_bytes())
+assert record.state.value=='ready' and record.operation is None
+assert record.candidate_digest==candidate.digest and record.seed_policy.value=='preserve-only'
+for slot in ('spec-dock','spec-dock-grill-with-docs'):
+    marker=parse_slot_marker(Path('.agents/skills')/slot/'.spec-dock-provider-slot.json')
+    assert marker.candidate_digest==candidate.digest
+PY
+python3 ./spec-dock/scripts/spec-dock validate
+uv run python spec-dock/.workbench/iss-00392/admission/compare_protected.py \
+  --before spec-dock/.workbench/iss-00392/admission/protected-baseline.json \
+  --root .
+fresh="$(mktemp -d)"
+uvx --no-cache --from . spec-dock init "$fresh"
+python3 "$fresh/spec-dock/scripts/spec-dock" validate
+rm -rf "$fresh"
 grep -F 'make provider-test' AGENTS.md
 grep -F 'make provider-qualify' AGENTS.md
-python3 - <<'PY_FINAL_WORKFLOW'
-# Parse provider-ci.yml:
-# - exact job IDs
-# - only provider-build-artifacts contains a packaging command
-# - all consumers need/download provider-candidate-${ inputs.candidate_sha }
-# - each consumer emits build_invocation_count=0
-# - provider-gate has no checkout/build/test
-PY_FINAL_WORKFLOW
 git diff --check
 ```
 
+Aseparate exact protected-before/after digest comparison andfresh consumer from current S70 source aremandatory andrecorded。Local pre-freeze artifacts aredeleted beforehead freeze。
+
 **Expected observable result**
 
-Final workflow/tooling/env/docs arepresent。Knownconsumer tests retiredbeforeproviders。Noold policy imports/paths/options。Local smoke removed/non-authoritative。Workflow hasexactlyonepackaging producer anddownload-only consumers。Ordinarytests/collection/lintGREEN。AGENTS/test-policy docs final。
+Final tooling/workflow structural testsGREEN、sole producer enforced、verifier exits/goldensGREEN、allold policy consumers/providersabsent、full suiteGREEN、AGENTS/docsfinal、S70dogfood complete/new digest/protectedunchanged、tracked tree clean aftercommit。No authoritative final package yet。
 
 **Evidence to record in Issue report.md**
 
-Consumer inventory/retirement mapping、provider deletion order、workflow structural test、environment descriptor、pre-freeze smoke label/deletion、AGENTS/README/docs hashes andgrep、ordinary collection/tests。No final artifact hashes yet。
+Consumer inventory/removal、workflow needs/artifact graph、verifier table results、environment descriptor、local tool-validation disclaimer、old machinery absence、AGENTS/docs grep、S60->S70 candidate/dogfood digest transition、protected/seed witness、validate/fresh consumer、finaltracked commit readiness。
 
 **Stop conditions and escalation owner**
 
-Unknownconsumer、provider deletedbeforeconsumer0、more thanoneproducer、downstream build、workflow missing download/hash check、stale policy docs、resource limits unenforceable、orS70 merge handoff。Owner: CI/Product/spec/test owner。
+Anyremaining consumer、wrong workflow needs/receipt/upload、more thanonepackager、verifier catch-all、environment mismatch、old machinery reference、AGENTS/docsstale、dogfood partial/digest/marker/protected drift、tracked tree notclean。No merge;fixsame#392。Owner:CI/Product/spec/filesystem。
 
 **Cleanup**
 
-Deletepre-freeze artifact/caches。Keeptracked final tooling/env/tests/docs only。
+Removepre-freeze builds、temporary consumers/witnesses afterreport summary。Keeptracked descriptor/tests/docs/dogfood final state。NoS70-only handoff。
 
 **Internal checkpoint invariant**
 
-S70 isnot a main merge point。Main stillhasworkingS60 transitional gates。PR-C branch hasworkingfinal replacement andno danglingconsumer/provider;it mustcontinueS80 withouttracked content changes exceptreturningtoS70 onfailure。
+S70 is not amain merge point。PR-C branch itself hasworking replacement gate andcomplete dogfood butmustcontinue toS80 frozen-head workflow proof/context/attestation。Main remainsatworkingS60 state untilhuman PR-C merge。
 
 **Requirement and design trace IDs**
 
-I392-RQ-021〜024、I392-RQ-026、I392-RQ-030、I392-D-012〜013、I392-D-019。
+I392-RQ-021〜023、I392-RQ-026、I392-RQ-028、I392-RQ-030〜031、I392-D-012〜013、I392-D-017、I392-D-019〜020。
 
-## I392-S80 — Frozen-head Provider CI qualification, downloaded-byte evidence, required transition, and PR-C gate
+## I392-S80 — Frozen-head Provider CI receipts, downloaded verification, context transition, and PR-C gate
 
 **Objective and contract-visible outcome**
 
-S70-finalized tracked treeをread-only freezeし、final Provider CIをexact candidate SHAでdispatchする。OnlyLinux`provider-build-artifacts` produceswheel/sdist/manifest。Linux qualification、sdist smoke、macOS delta、attestation consume thesame immutable downloaded bytes withbuild0。Then complete no-gap required-context transition andexternal pre-merge attestation。S80 doesnotedittracked content anddoesnotbuild locally。
+FreezeS70 tracked head/tree, dispatchtheauthoritative Provider CI run, consumeonlydownloaded candidate/evidence bytes, verifythe exactreceipt graph, completequalification/required-context transition/external attestation, andproducePR-C merge handoff。S80 ownsno tracked path andperformsnolocal build、dogfood update orsync。
 
 **Exact owned repository paths and symbols**
 
-Tracked paths: none。S80 isverification/freeze only。
+Tracked paths: none。
 
-Ignored/external evidence only:
+Ignored/external only:
 
 ```text
 spec-dock/.workbench/provider-gate/final-run/**
-GitHub Actions workflow run/jobs/artifacts/checks
-new never-edited pre-merge-attestation-v1 GitHub comment/check artifact
+GitHub Actions run/job/artifact API snapshots
+provider-candidate-<sha> download
+provider-evidence-<sha> download
+pre-merge-attestation-v1 external object
 required-context before/both/final snapshots
 ```
 
-Anyrequired tracked correction returns toS70, createsanewhead, andinvalidatesallS80 evidence。
+Anyrequired tracked correction returns toS70, createsanewhead andinvalidatesallS80 evidence。
 
 **Explicit non-owned and no-touch paths**
 
-Alltracked source/tests/docs/specs/report afterfreeze、dogfood seeds/user data/unrelated skills、human settings excepthuman-admin transition、release。
+Alltracked code/tests/docs/specs/report/dogfood after freeze、consumer seeds/user data、settings excepthuman-admin transition、release。
 
 **Prerequisites and dependency**
 
-- S70 final branch GREEN andclean。
-- Root/provider/dogfood docs andAGENTS alreadyfinal;`cmp`/grepGREEN。
-- Tracked#392 report alreadycontainsnon-self-referential method/pre-freeze facts andiscommitted。
-- PR branchhead willremainimmutable throughattestation。
-- Human admin available;dedicated canary PR permitted butnevermerged。
+S70 branchGREEN、tracked report finalized/committed、completeS70 dogfood digest verified、workingtreeclean、human adminavailable、dedicatedcanary allowed butnevermerged。
 
 **RED evidence**
 
-- Workflow structural tests rejecttwo producers/downstream build/artifact name/hash/source mismatch。
-- `verify-downloaded-artifact` rejectswrong run/head/tree/Actions artifact ID/digest/file hashes/build count。
-- Environment、budget、CPU、flake、retry、fault mismatch cases failclosed。
-- Context transition state machine rejectsold removal beforenew-required RED proof。
-- Attestation hash/edit mismatch andtracked-head change failclosed。
+- Workflow tests rejectmissing/duplicateproducer、wrong `needs`、consumer build、receipt/upload/name/schema/hash/source/run/job/buildcount。
+- `verify-downloaded-artifact` rejectsalltyped fail cases/exits2〜12 andnon-exactstdout/JSON。
+- Qualification rejects environment/fingerprint/budget/CPU/fault/flake/retry mismatch。
+- Context state machine rejectsold removal beforenew-required RED proof。
+- Head/tree/tracked write、local build、`spec-dock update`、`spec-dock sync` invalidateS80。
 
 **Smallest implementation action**
 
-1. Confirmclean tree;set`VERIFIED_PR_HEAD`、`VERIFIED_PR_TREE`、`PR_BRANCH`。No furthertracked writes。
-2. Runread-only local lint/collection/docs/dogfood validation;onfailure returnS70。
-3. Dispatchfinal workflow on`PR_BRANCH` withinputs`candidate_sha=$VERIFIED_PR_HEAD` and`qualification=true`。
-4. Selecttheunique run whosehead SHA/input/receipt equalsfrozenhead;waitwith`gh run watch --exit-status`。
-5. Fetchrun/jobs andActions artifact metadata。Requireonejob`provider-build-artifacts` andoneartifact`provider-candidate-$VERIFIED_PR_HEAD`。
-6. Downloadcandidate artifact andallconsumer receipts toignored evidence dir。
-7. Verifycandidate manifest source SHA/tree、wheel/sdist hashes、build count1、Actions artifact ID/digest/name/run ID。VerifyLinux/macOS/sdist/attestation receipts referenceexact hashes andbuild count0。
-8. VerifyLinux environment fingerprint samefor20 runs、first5 budget/CPU、all20flake/retry0、fault100%。Verify macOS samewheel andexclusive nodes。
-9. Verifyfresh consumer、dogfood sync/validate evidence fromworkflow receipts;local read-only validate mayconfirmbutcannot replaceworkflow evidence。
-10. Human capturesrequired before-state。New gate isalreadyGREEN whileold remainsrequired。
-11. Human addsnewcontext required, keepsold, read-back both。
-12. Dedicated non-merge canary setsnew gateRED;proveblocking;closewithoutmerge。
-13. Re-run/confirmimplementation PR new gateGREEN onthefrozenhead;read-back。
-14. Human removesold provider-only context;read-backfinal unrelated/review unchanged。
-15. Generatecanonical`pre-merge-attestation-v1` fromdownloaded receipts/API snapshots;postnew never-edited object withJSON SHA-256。
-16. ReconfirmHEAD/tree/working tree unchanged。
+1. Confirmclean;freeze`VERIFIED_PR_HEAD`/`VERIFIED_PR_TREE`/branch。No furthertracked writes。
+2. Runread-only lint/collection/tests/docs/dogfood record/marker/digest/validate checks。Failure returnsS70。
+3. Snapshotexisting workflow-dispatch run IDs。
+4. Dispatch`provider-ci.yml` onfrozenbranch with`candidate_sha=<head>` and`qualification=true`。
+5. Selectexactly one newrun matchinghead/input;waitterminal success;fetchrun/jobs/artifact metadata。
+6. Requireexact job/needs graph fromI392-D-019 andexact oneofeachartifact name。
+7. Download`provider-candidate-<sha>` and`provider-evidence-<sha>` only;theevidence artifact containsfour verified receipts。
+8. RunexactI392-D-013 command ondownloaded files。Itmustreturnexit0/code`downloaded-artifact-verified` andproveproducer1/consumers0/same bytes。
+9. VerifyLinux20-run environment/budget/CPU/fault/flake、sdist smoke、macOS delta fromreceipts。
+10. Human keepsold required, addsnew required andread-backsboth;dedicatednon-mergecanary makesnew gateRED andprovesblock;closecanary;implementationheadGREEN;thenremove oldprovider-only/read-backfinal。
+11. Emitcontent-addressed`pre-merge-attestation-v1` from downloaded evidence/API snapshots;postnewnever-editedobject。
+12. Reconfirmhead/tree/status unchanged and dogfood record/markers stillmatchfrozen candidate receipt。
 
 **Focused verification commands**
 
@@ -950,85 +894,55 @@ uv run pytest -q
 cmp src/spec_dock/assets/spec_dock/docs/migration.md spec-dock/docs/migration.md
 cmp src/spec_dock/assets/spec_dock/docs/README.md spec-dock/docs/README.md
 python3 ./spec-dock/scripts/spec-dock validate
-# Dispatch the authoritative build/qualification run. No local build command is permitted below.
-gh run list --workflow provider-ci.yml --branch "$PR_BRANCH" --event workflow_dispatch --limit 100 \
-  --json databaseId --jq '.[].databaseId' > spec-dock/.workbench/provider-gate/final-run/before-run-ids.txt
-gh workflow run provider-ci.yml --ref "$PR_BRANCH" \
-  -f candidate_sha="$VERIFIED_PR_HEAD" \
-  -f qualification=true
-for _ in $(seq 1 60); do
-  gh run list --workflow provider-ci.yml --branch "$PR_BRANCH" --event workflow_dispatch --limit 100 \
-    --json databaseId,headSha,status,conclusion,createdAt > spec-dock/.workbench/provider-gate/final-run/run-list.json
-  RUN_ID="$(jq -r --slurpfile before <(jq -Rsc 'split("\n") | map(select(length>0)|tonumber)' spec-dock/.workbench/provider-gate/final-run/before-run-ids.txt) \
-    --arg sha "$VERIFIED_PR_HEAD" \
-    '[.[] | select(.headSha==$sha and ((.databaseId as $id | $before[0] | index($id))|not))] | if length==1 then .[0].databaseId else empty end' \
-    spec-dock/.workbench/provider-gate/final-run/run-list.json)"
-  test -n "$RUN_ID" && break
-  sleep 5
-done
-test -n "$RUN_ID"
-test "$(jq --arg sha "$VERIFIED_PR_HEAD" --slurpfile before <(jq -Rsc 'split("\n") | map(select(length>0)|tonumber)' spec-dock/.workbench/provider-gate/final-run/before-run-ids.txt) \
-  '[.[] | select(.headSha==$sha and ((.databaseId as $id | $before[0] | index($id))|not))] | length' \
-  spec-dock/.workbench/provider-gate/final-run/run-list.json)" = 1
+# No uv build, provider_gate.py build, spec-dock update, or spec-dock sync ispermitted in S80.
+gh run list --workflow provider-ci.yml --branch "$PR_BRANCH" --event workflow_dispatch --limit 100   --json databaseId --jq '.[].databaseId' > spec-dock/.workbench/provider-gate/final-run/before-run-ids.txt
+gh workflow run provider-ci.yml --ref "$PR_BRANCH"   -f candidate_sha="$VERIFIED_PR_HEAD"   -f qualification=true
+# Poll API until exactly one newrun matchesfrozen head; zero/multiple ishard stop.
 gh run watch "$RUN_ID" --exit-status
-gh run view "$RUN_ID" --json databaseId,headSha,status,conclusion,jobs > spec-dock/.workbench/provider-gate/final-run/run.json
-test "$(jq -r .headSha spec-dock/.workbench/provider-gate/final-run/run.json)" = "$VERIFIED_PR_HEAD"
-gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" > spec-dock/.workbench/provider-gate/final-run/artifacts.json
-ARTIFACT_NAME="provider-candidate-$VERIFIED_PR_HEAD"
-test "$(jq --arg n "$ARTIFACT_NAME" '[.artifacts[] | select(.name==$n)] | length' spec-dock/.workbench/provider-gate/final-run/artifacts.json)" = 1
-gh run download "$RUN_ID" -n "$ARTIFACT_NAME" -D spec-dock/.workbench/provider-gate/final-run/candidate
-gh run download "$RUN_ID" -n "provider-evidence-$VERIFIED_PR_HEAD" -D spec-dock/.workbench/provider-gate/final-run/evidence
-uv run python scripts/provider_gate.py verify-downloaded-artifact \
-  --candidate-dir spec-dock/.workbench/provider-gate/final-run/candidate \
-  --evidence-dir spec-dock/.workbench/provider-gate/final-run/evidence \
-  --run-json spec-dock/.workbench/provider-gate/final-run/run.json \
-  --artifacts-json spec-dock/.workbench/provider-gate/final-run/artifacts.json \
-  --source-sha "$VERIFIED_PR_HEAD" \
-  --source-tree "$VERIFIED_PR_TREE" \
-  --expected-producer-job provider-build-artifacts \
-  --expected-consumer-build-count 0
-uv run python scripts/provider_gate.py emit-attestation \
-  --type pre-merge-attestation-v1 \
-  --source-sha "$VERIFIED_PR_HEAD" \
-  --workflow-run-id "$RUN_ID" \
-  --input spec-dock/.workbench/provider-gate/final-run/evidence \
-  --output spec-dock/.workbench/provider-gate/final-run/pre-merge-attestation.json
+gh run view "$RUN_ID" --json databaseId,headSha,status,conclusion,jobs   > spec-dock/.workbench/provider-gate/final-run/run.json
+gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts"   > spec-dock/.workbench/provider-gate/final-run/artifacts.json
+test "$(jq --arg n "provider-candidate-$VERIFIED_PR_HEAD" '[.artifacts[]|select(.name==$n)]|length' spec-dock/.workbench/provider-gate/final-run/artifacts.json)" = 1
+test "$(jq --arg n "provider-evidence-$VERIFIED_PR_HEAD" '[.artifacts[]|select(.name==$n)]|length' spec-dock/.workbench/provider-gate/final-run/artifacts.json)" = 1
+gh run download "$RUN_ID" -n "provider-candidate-$VERIFIED_PR_HEAD"   -D spec-dock/.workbench/provider-gate/final-run/candidate
+gh run download "$RUN_ID" -n "provider-evidence-$VERIFIED_PR_HEAD"   -D spec-dock/.workbench/provider-gate/final-run/evidence
+uv run python scripts/provider_gate.py verify-downloaded-artifact   --repository chemitaro/spec-dock   --candidate-dir spec-dock/.workbench/provider-gate/final-run/candidate   --evidence-dir spec-dock/.workbench/provider-gate/final-run/evidence   --run-json spec-dock/.workbench/provider-gate/final-run/run.json   --artifacts-json spec-dock/.workbench/provider-gate/final-run/artifacts.json   --source-sha "$VERIFIED_PR_HEAD"   --source-tree "$VERIFIED_PR_TREE"   --workflow-run-id "$RUN_ID"   --json > spec-dock/.workbench/provider-gate/final-run/download-verification.json
+jq -e '.status=="verified" and .code=="downloaded-artifact-verified"'   spec-dock/.workbench/provider-gate/final-run/download-verification.json
+uv run python scripts/provider_gate.py emit-attestation   --type pre-merge-attestation-v1   --source-sha "$VERIFIED_PR_HEAD"   --workflow-run-id "$RUN_ID"   --input spec-dock/.workbench/provider-gate/final-run/evidence   --output spec-dock/.workbench/provider-gate/final-run/pre-merge-attestation.json
 test "$(git rev-parse HEAD)" = "$VERIFIED_PR_HEAD"
 test "$(git rev-parse 'HEAD^{tree}')" = "$VERIFIED_PR_TREE"
 test -z "$(git status --short)"
 ```
 
-`gh run list` selection mustalso becheckedagainstthe downloaded build receipt's`candidate_sha`; ifzero/multiplematching runs, stop。Workflow jobs themselves, notlocalcommands, ownfinalpackage/five-run/macOS/sdist evidence。
+The run selector additionally verifiesdispatch input`candidate_sha` fromproducer receipt。Run/jobs exact names、IDs、needs andallreceipt fields arechecked bytheverifier, not manually assumed。
 
 **Expected observable result**
 
-One frozenhead、oneLinux packaging invocation、oneimmutable candidate artifact、samewheel/sdist bytes everywhere、allconsumer build counts0、stable environment20 runs、budget/CPU/fault/flake acceptance、new required beforeRED、canary blocked、implementationGREEN、old context removedafterproof、external attestation hashverified、tracked head/tree clean/unchanged。
+Onefrozenhead、oneLinux packaging invocation、sameimmutablewheel/sdist inalljobs、consumer build0、fourvalidreceipts、exactoneprovider-evidence upload、stable20-runqualification、macOS/sdistGREEN、dogfood digest equalsreceipt candidate、new required beforeRED、canaryblocked、implementationGREEN、oldremovedafterproof、externalattestationhashverified、trackedhead/treeclean。
 
 **Evidence to record**
 
-Tracked report receivesnothing afterfreeze。External pre-merge attestation containsfinalhead/tree、report blob observedexternally、workflow run/job IDs、Actions artifact ID/name/digest、candidate manifest/file hashes、producer count1、consumer build0 receipts、environment/runs/faults/macOS/sdist、required snapshots、commands/conclusions。
+Tracked report receivesnothing after freeze。External attestation containshead/tree/report blob、run/job/needs、Actions artifact IDs/names/digests、manifest/files、fourreceipts、producer1/consumer0、environment/runs/faults/macOS/sdist、dogfood record/markers/digest、required snapshots、commands/conclusions。
 
 **Stop conditions and escalation owner**
 
-Anytracked edit、local final build、zero/multiple run、wronghead/tree、producer countnot1、consumerbuildnot0、artifact reupload/hash mismatch、environment/budget/fault/flake/seed/docs/context/RED/attestation mismatch。Return toS70/newhead andrerunallsource-bound evidence。Owners: CI/Product/spec;settings:humanadmin。
+Anytracked edit、localfinalbuild/update/sync、zero/multiplerun、wrong head/tree/needs/artifact/receipt、producer!=1、consumer!=0、hash mismatch、environment/budget/fault/flake/dogfood/context/attestation mismatch。ReturnS70/newhead andrerun all source-bound evidence。Owners:CI/Product/spec;settings:human admin。
 
 **Cleanup**
 
-Closecanary withoutmerge。KeepGitHub immutable evidence perretention;localignored downloads mayberemoved afterattestation verification。Do notmodifytrackedtree。
+Closecanarywithoutmerge。KeepimmutableGitHubevidence;localignoreddownloads mayberemoved afterattestation verification。Do notmodifytracked tree。
 
 **PR-C main merge invariant**
 
-S80 is theonly PR-C main merge gate。S70 replacement/consumer closure andS80 authoritativeworkflow proof/context/attestation/human review allGREEN。Main afterhuman merge hascompletefinal lifecycle/docs/wire/register closure、final build-once gate、noold machinery、final AGENTS。Agent doesnotmerge。
+S80 is the onlyPR-C gate。S70 replacement/consumer closure/dogfood andS80 authoritativeworkflow receipts/context/attestation/human review all GREEN。Main afterhuman merge hascompletefinal lifecycle/docs/wire/register/dogfood、final build-once gate、no oldmachinery、finalAGENTS。Agentdoes notmerge。
 
 **Requirement and design trace IDs**
 
-I392-RQ-021〜030、I392-D-012〜019。
-
+I392-RQ-021〜031、I392-D-012〜020。
 ## 4. Human merge and external closure protocol
 
 ### Pre-merge handoff
 
-External pre-merge attestation providesPR URL、head SHA/tree OID、report blob OID、artifact/environment/test/context hashes。Tracked report doesnotself-reference。
+External pre-merge attestation providesPR URL、head SHA/tree OID、report blob OID、artifact/environment/test/context hashes。Tracked report does notself-reference。
 
 ### Human merge
 
@@ -1054,4 +968,4 @@ After#392 finish, generate`epic-closure-v1` referencingpost-merge attestation an
 
 ## 5. Definition of done
 
-All I392-RQ-001〜030 verified。S30/S60/S80 areonly main merge gates。Machine-readable owner decision list remains`[]`。
+All I392-RQ-001〜031 verified。S30/S60/S80 areonly main merge gates。Machine-readable owner decision list remains`[]`。
