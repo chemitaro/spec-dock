@@ -54,6 +54,7 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 | 2026-08-31 | user判断とChatGPT Use Strict分析により、test-addition drivenからevidence-driven retirementへ変更 | 旧S01/S03/S05/S06は未実施のまま廃止。完了扱いにしない |
 | 2026-09-01 | Strict reviewのP2指摘により、S06専用mypy overrideの条件付きexact-entry cleanupと、C60-01の同一wheel artifact bindingを追加 | implementation未着手のため実施済みcheckなし。checklist数、ledger行、closure gateは不変 |
 | 2026-09-01 | fixed SHA `f3b6c2b6f1db2c3b7e54966496f76a74db34d689`のStrict review P1指摘により、`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`のfinite repair checkpointと、exact ledger二列以外のR/D/P全hunkを覆う`SPECIFICATION_CONTRACT`境界を追加 | implementation未着手のため失効させる実測なし。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
+| 2026-09-01 | fixed SHA `7f4ec536e34b35fe1dfe250ee786cef5ed59bc6d`のC00独立監査とChatGPT Use Strict Extra High分析により、scripts READMEと三scopeのartifacts/discussions rulesの7 provider/dogfood pairをapproved Current surfaceへ追加 | production/test/config未着手。旧C00 evidenceは破棄してNOT_RUNへ戻した。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
 
 ## 3. 実装原則
 
@@ -170,9 +171,9 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 
 - **対象 / 目的:** 変更可能pathと保護pathを固定する。
 - **前提:** C00-02 PASS。
-- **操作:** Requirement §4とDesign §5のknown candidateを実pathへ解決する。
+- **操作:** Requirement §4とDesign §2/§5のknown candidateを実pathへ解決し、provider/dogfoodの`scripts/README.md`と`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`の14 pathsをapproved inventoryへ明示する。
 - **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue|test_active_set_legacy_flag_reports_parser_error|test_runtime_active_s05|test_runtime_active_s06' tests pyproject.toml full-regression-ledger.json full-regression-timing-weights.json`、`rg -n 'tests\.cli_runtime\.test_delegated_authoring|tests\.cli_runtime\.test_runtime_active_s06|assets/install_root/\.codex/\*\*' pyproject.toml`。
-- **期待結果:** candidate path、surviving consumer、S06 testと専用mypy overrideのcoupling、no-touch pathが一覧化される。
+- **期待結果:** candidate path、追加した14 Current paths、surviving consumer、S06 testと専用mypy overrideのcoupling、no-touch pathが一覧化される。
 - **証拠:** inventory表をReportへ要約。
 - **停止条件:** candidateがEpic #384またはauthoritative historyだけに存在する。
 - **cleanup:** なし。
@@ -245,15 +246,15 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **停止条件:** placeholder構造変更、Historical/fixture変更が必要。
 - **cleanup:** 旧schemaを固定していたretirement-only test/supportはM4候補へ追加。
 
-### C10-02 — root README cleanup
+### C10-02 — Current lifecycle / Artifact authority docs cleanup
 
-- **対象 / 目的:** Current lifecycleとArtifact authorityを正しく案内する。
+- **対象 / 目的:** root README、scripts README、三scopeのartifacts/discussions rulesでCurrent lifecycleとArtifact authorityを正しく案内する。
 - **前提:** C00-08 GO。
-- **操作:** `active set --checkout`、recovery/normalization、EAL必須説明を削り、selection-only、`issue start`、evidence review + canonical rewriteへ置換する。
-- **確認:** 対象sectionを目視し、`rg -n 'active set .*--checkout|Evidence Adoption Ledger|EAL' README.md`をone-time確認する。
-- **期待結果:** Current手順が一意で、旧案内がCurrent instructionとして残らない。
-- **証拠:** section見出し、rg結果、diff summary。
-- **停止条件:** migration/history文脈まで消す必要がある、public CLI変更が必要。
+- **操作:** root `README.md`では`active set --checkout`、recovery/normalization、EAL必須説明を削り、selection-only、`issue start`、evidence review + canonical rewriteへ置換する。providerの`scripts/README.md`は旧checkout exampleをselection-onlyと`issue start`の二経路へ置換する。providerの三scopeのartifacts/discussions rulesはEAL/report ledgerをCurrent adoption authorityとする文だけをR/D/Pまたはaccepted ADRへの明示的再記述へ置換し、Historical grandfathering/catalogを保持する。7 provider filesをdogfoodへ同期する。
+- **確認:** 対象sectionを目視し、14 provider/dogfood pathsのpairを`cmp`する。`rg -n 'active set .*--checkout|Evidence Adoption Ledger|EAL|report ledger' README.md src/spec_dock/assets/spec_dock/scripts/README.md src/spec_dock/assets/spec_dock/docs/rules spec-dock/scripts/README.md spec-dock/docs/rules`をone-time確認し、Historical文脈とCurrent instructionを区別する。
+- **期待結果:** Current手順が一意で、旧checkout exampleとCurrent EAL/report-ledger adoption authorityが残らず、7 pairがbyte一致する。Historical grandfathering/catalogは保持される。
+- **証拠:** section見出し、14 changed paths、7 pairの`cmp` exit 0、rg結果、diff summary。
+- **停止条件:** migration/history originalsまで消す必要がある、列挙外のsibling Current docs変更、public CLI変更が必要。
 - **cleanup:** README phrase absence testは追加しない。
 
 ### C10-03 — Authoring overview cleanup
@@ -273,7 +274,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **前提:** C10-01〜03実装後。
 - **操作:** 変更しない。
 - **確認:** `<implementation-baseline-sha>`からHistorical guide、他Issue履歴、migration docs、Epic #384 docsをpath限定diffする。
-- **期待結果:** 本Issue R/D/P/Report以外のauthoritative history差分0。
+- **期待結果:** C10-01〜03のapproved Current docsと本Issue R/D/P/Report以外のauthoritative history差分0。scripts READMEと三scopeのartifacts/discussions rulesの7 pair以外のsibling rules差分0。
 - **証拠:** diff exit/result。
 - **停止条件:** 一件でも意図しない差分。
 - **cleanup:** unintended diffだけを原因pathで修正する。historyを書き換えて合わせない。
@@ -537,8 +538,12 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   test -f "$CONSUMER/.github/workflows/ci.yml"
   test ! -e "$CONSUMER/.codex"
   cmp src/spec_dock/assets/spec_dock/docs/authoring/overview.md "$CONSUMER/spec-dock/docs/authoring/overview.md"
+  cmp src/spec_dock/assets/spec_dock/scripts/README.md "$CONSUMER/spec-dock/scripts/README.md"
   for scope in initiative epic issue; do
     cmp "src/spec_dock/assets/spec_dock/system/active-none/$scope/report.md" "$CONSUMER/spec-dock/system/active-none/$scope/report.md"
+    for rule in artifacts discussions; do
+      cmp "src/spec_dock/assets/spec_dock/docs/rules/$scope/$rule.md" "$CONSUMER/spec-dock/docs/rules/$scope/$rule.md"
+    done
   done
   shasum -a 256 "$WHEEL" "$SDIST"
   printf 'ARTIFACT_DIR=%s\nWHEEL=%s\nSDIST=%s\nCONSUMER=%s\n' "$ARTIFACT_DIR" "$WHEEL" "$SDIST" "$CONSUMER"
@@ -546,7 +551,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   )
   ```
 
-- **期待結果:** 一時pathが各作成直後に出力される。one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init/validate/help/cmp成功。current二skillと`ci.yml`あり、retired `.codex`なし。success時はtrapが解除され、二directoryがC90-04まで残る。
+- **期待結果:** 一時pathが各作成直後に出力される。one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init/validate/help/cmp成功。current二skillと`ci.yml`あり、retired `.codex`なし。overview、active-none、scripts README、三scopeのartifacts/discussions rulesがprovider sourceと一致する。success時はtrapが解除され、二directoryがC90-04まで残る。
 - **証拠:** immediate path lines、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、exit、cmp summary。nonzero時はfailure cleanup pathと残存有無。
 - **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
 - **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
@@ -582,7 +587,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **前提:** M5完了。
 - **操作:** 変更しない。
 - **確認:** `git diff --name-status <implementation-baseline-sha>`、Historical authority、current skills/CI、Epic #384 pathsをpath限定diffし、`git diff <implementation-baseline-sha> -- pyproject.toml`をC30-01のexact decisionと照合する。
-- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-09で承認したdeleted-node exact entry以外の差分0。`pyproject.toml`はdelegated member、`.codex` glob、およびS06 file削除時だけ専用S06 overrideに差分があり、その他entryの差分0。
+- **期待結果:** changed pathはC00-03のapproved inventoryのみ。追加したscripts READMEと三scopeのartifacts/discussions rulesの14 pathsは7 pairでbyte一致し、列挙外のsibling rules差分0。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-09で承認したdeleted-node exact entry以外の差分0。`pyproject.toml`はdelegated member、`.codex` glob、およびS06 file削除時だけ専用S06 overrideに差分があり、その他entryの差分0。
 - **証拠:** name-statusとno-touch results。
 - **停止条件:** unrelated/unowned diff、S06 file/override不一致。
 - **cleanup:** unintended diffを原因箇所で修正。user変更を消さない。
