@@ -11,7 +11,7 @@ Planning Level: "critical"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
@@ -27,7 +27,8 @@ Planning Level: "critical"
 7. agentはmerge、required-context変更、Issue closeを実行しない。human operationはexact handoffとして提示する。
 8. evidenceはIssue directoryの`report.md`へ記録する。canonical R/D/Pをimplementation中に書き換えない。
 9. stop condition発火時は同じ#392をopenのまま停止し、指定ownerへevidenceを渡す。
-10. 各merge pointでmainはreleasableでなければならない。
+10. 各main merge pointでmainはreleasableでなければならない。
+11. I392-S40とI392-S50はPR-B内部のnon-main checkpointであり、完了commitをmainへmergeしてはならない。PR-Bの唯一のmain merge gateは、同一branch/PR上でI392-S40、I392-S50、I392-S60の全proofが完了した後である。
 
 ## 2. Common no-touch boundary
 
@@ -49,9 +50,10 @@ I392-S00 admission
   -> I392-S10 model/classifier/candidate
   -> I392-S20 fresh install/atomic publication
   -> I392-S30 update/convergence
-  -> I392-S40 uninstall/reinstall/public CLI
-  -> I392-S50 legacy migration/downgrade tripwire
-  -> I392-S60 old engine removal/failure terminalization
+  -> PR-B: one branch / one PR / no main merge until S60
+       I392-S40 uninstall/reinstall/public CLI [internal checkpoint]
+       -> I392-S50 legacy migration/downgrade tripwire [internal checkpoint]
+       -> I392-S60 old engine removal/failure terminalization [PR-B only main merge gate]
   -> I392-S70 build-once CI transition/old CI removal
   -> I392-S80 qualification/dogfood/final handoff
 ```
@@ -80,7 +82,7 @@ I392-S00 admission
 - GitHub #387 closed。
 - #387 merge commitがmainへhuman merge済み。
 - clean working tree。
-- exact authoring SHA `d18ca60b2a6ff11571ee366f71c4528dcd668d99`を取得可能。
+- exact authoring SHA `91667235c6892f025a1d9ee69cf37525537a3c9e`を取得可能。
 - implementation branchは`POST_387_SHA`から作成する。
 
 **Deterministic allowed drift**
@@ -152,7 +154,7 @@ Admissionのためnew product testは作らない。REDはallowlist checkerが�
 
 1. GitHub/APIとGitで#387 state、merge commit、main ancestryを取得する。
 2. `POST_387_SHA`をfull SHAで固定する。
-3. `git diff --name-status d18ca60b2a6ff11571ee366f71c4528dcd668d99..$POST_387_SHA`をallowlistへ通す。
+3. `git diff --name-status 91667235c6892f025a1d9ee69cf37525537a3c9e..$POST_387_SHA`をallowlistへ通す。
 4. restricted filesのzero-context diffをcontent ruleへ通す。
 5. current commandsを実行する。
 6. clean detached worktreeからbaseline wheel/sdistをone invocationでbuildしhashする。
@@ -164,7 +166,7 @@ Admissionのためnew product testは作らない。REDはallowlist checkerが�
 ```bash
 test -z "$(git status --short)"
 git merge-base --is-ancestor "$ISSUE_387_MERGE_SHA" "$POST_387_SHA"
-git diff --name-status d18ca60b2a6ff11571ee366f71c4528dcd668d99.."$POST_387_SHA"
+git diff --name-status 91667235c6892f025a1d9ee69cf37525537a3c9e.."$POST_387_SHA"
 uv run python -c 'import tomllib; p=tomllib.load(open("pyproject.toml","rb")); assert p["project"]["version"]=="0.2.3"'
 make lint
 uv run pytest -q
@@ -449,7 +451,7 @@ I392-RQ-009〜010、I392-RQ-013、I392-RQ-018、I392-D-009〜013。
 
 **Objective and contract-visible outcome**
 
-Uninstall/reinstallを完成し、package versionを`0.2.4`へ上げ、`init`/`update`/`uninstall`をnew servicesへ一度に接続する。`--remove-specs`をpermanent mutation-zero trapへ変更する。これはcombined public hard cutover pointである。
+Uninstall/reinstallを完成し、package versionを`0.2.4`へ上げ、`init`/`update`/`uninstall`をnew servicesへ一度に接続する。`--remove-specs`をpermanent mutation-zero trapへ変更する。これはPR-B branch内部でcombined public hard cutoverを開始するcheckpointであり、mainへのcutover pointではない。S40のcommitを単独でmainへmergeしてはならない。
 
 **Exact owned paths and symbols**
 
@@ -475,7 +477,7 @@ User history、seed bytes、provider workflows、managed engine file（まだsuc
 
 **Prerequisites and dependency**
 
-I392-S30 GREEN。Public cutover PRはI392-S40〜S50のrequired proofを含め、old engine fallbackなしでmerge可能にする。
+I392-S30 GREEN。I392-S40、I392-S50、I392-S60を同一branch/PRで連続実行する。S40でpublic routeを切り替えても、S50のmigration/downgrade proofとS60のold engine/test terminalizationが完了するまでPR-Bはmerge不可能である。
 
 **RED evidence**
 
@@ -506,7 +508,7 @@ Before implementation these tests must fail against old semantics、特に`unins
 
 **Focused verification commands**
 
-Current root policy still marks CLI runtime asfull-regression; use explicit current flags until I392-S60:
+Current root policy still marks CLI runtime as full-regression; use explicit current flags until I392-S60:
 
 ```bash
 uv run pytest -q tests/unit/infra/test_provider_lifecycle_public_result.py
@@ -534,9 +536,9 @@ Public route needs runtime toggle/bridge、purge compatibility requires mutation
 
 Remove temporary snapshots not used as test fixtures。Ensure provider/dogfood runtime wrapper pair identical。
 
-**Merge-point invariant**
+**Internal checkpoint invariant (PR-B; no main merge)**
 
-If merged, public product is fully final `0.2.4` lifecycle for implemented states; old engine is unreachable and cannot be fallback。All existing/current gates plus new focused tests GREEN。
+PR-B branch上ではnew `0.2.4` public routeがfocused GREENで、old engineはunreachableかつfallback不可である。ただしlegacy migration/downgrade proofとold engine/test terminalizationが未完了のため、このcommitをmainへmergeしない。許可される次の遷移は同じbranch/PR上のI392-S50だけである。
 
 **Trace IDs**
 
@@ -566,7 +568,7 @@ Legacy consumer history/seeds、baseline old artifact bytes、provider CI settin
 
 **Prerequisites and dependency**
 
-I392-S40 public cutover GREEN。S00 baseline wheel/hash available。Final wheel can be built locally。
+同一PR-B branch上でI392-S40 internal checkpointがGREENであり、S40 commitはmainへ未mergeである。S00 baseline wheel/hash available。Final wheel can be built locally。
 
 **RED evidence**
 
@@ -617,9 +619,9 @@ Old command event > 0、positive control not intercepted、baseline fixture mism
 
 Delete isolated venv、temporary workspaces、native probes。Retain only hash/evidence references in report。
 
-**Merge-point invariant**
+**Internal checkpoint invariant (PR-B; no main merge)**
 
-Public `0.2.4` is releasable and exact `0.2.3` migration/downgrade-safe。Old engine remains unreachable only until S60 deletion。
+PR-B branch上でS40 public routeとS50 exact `0.2.3` migration/downgrade proofがGREENである。Old engineはunreachableだがS60でのphysical removal、active failure terminalization、unskipped canonical proofが未完了であるため、このcommitをmainへmergeしない。許可される次の遷移は同じbranch/PR上のI392-S60だけである。
 
 **Trace IDs**
 
@@ -629,7 +631,7 @@ I392-RQ-014〜015、I392-RQ-020、I392-D-006、I392-D-014、I392-D-017。
 
 **Objective and contract-visible outcome**
 
-Successor proofをauthorityに、old per-file/journal/purge engineとduplicate testsを削除する。Post-#387 active failuresを全件terminal化し、canonical pytestにapproved failure/policy skipを残さない。
+Successor proofをauthorityに、old per-file/journal/purge engineとduplicate testsを削除する。Post-#387 active failuresを全件terminal化し、canonical pytestにapproved failure/policy skipを残さない。S40〜S60を同一branch/PRで完了し、PR-Bをcomplete final lifecycleとしてhuman merge可能にする。
 
 **Exact owned paths and symbols**
 
@@ -665,7 +667,7 @@ Current product behavior unrelated to accepted retirement、Issue #372、consume
 
 **Prerequisites and dependency**
 
-I392-S50 all successor/artifact/tripwire proof GREEN。No old public callsite。
+同一PR-B branch上でI392-S40とI392-S50の全proofがGREENで、いずれもmainへ未mergeである。No old public callsite。S60のremoval/terminalization/canonical proofを同じPRで完了する。
 
 **RED evidence**
 
@@ -717,9 +719,9 @@ Active entry cannot be terminalized、surviving behavior depends on old journal/
 
 Remove obsolete fixtures/helpers/imports/mypy overrides。Delete empty `scripts/quality` only in S70 after sharder removal。Run `git diff --check`。
 
-**Merge-point invariant**
+**PR-B main merge gate invariant**
 
-Final public lifecycle has no old engine fallback。All tests pass unskipped under current provider workflow even before workflow rewrite。Main remains releasable。
+同一branch/PR上でS40 public route cutover、S50 legacy migration/downgrade proof、S60 old engine removal・active failure terminalization・unskipped canonical proofが全て完了している。Final public lifecycleはold engine fallback、approved failure、policy skipを持たず、current provider workflow下でも全testがGREENである。ここがPR-Bの唯一のmain merge gateであり、human merge後のmainはold public productからcomplete final lifecycleへ直接遷移してreleasableである。
 
 **Trace IDs**
 
@@ -951,6 +953,10 @@ Final PR head is releasable、all acceptance evidence is bound to same head/arti
 I392-RQ-002〜003、I392-RQ-015、I392-RQ-019〜020、I392-D-016〜018。
 
 ## 4. Completion and human handoff
+
+### PR-B internal checkpoints and main merge handoff
+
+I392-S40とI392-S50の完了はbranch内evidence checkpointであり、merge-ready state、main merge point、human merge handoffを生成しない。PR-Bのhuman merge handoffはI392-S60のPR-B main merge gate invariantが成立した後だけ作成する。S40後またはS50後のSHAがmerge対象になった場合はhandoffを撤回し、同じbranch/PRでS60まで完了する。
 
 ### Implementation completion
 

@@ -10,7 +10,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
@@ -56,10 +56,10 @@ Epic-level orderは次のとおりである。詳細なpath/symbol/commandは#39
 | PR | Permitted content | Merge-point invariant |
 |---|---|---|
 | PR-A | dormant successor modules、single-version legacy fixture、direct tests | public CLIはold behaviorのまま。new runtime toggleなし。ordinary/current full gatesがGREEN。 |
-| PR-B | `0.2.4` hard cutover、CLI/service wiring、migration、purge trap、old engine removal、successor tests | public productはfinal lifecycle。old engineへfallbackしない。provider workflowは既存でも全testがfinal behaviorを検証する。 |
-| PR-C | failure terminalization、test ownership、build-once CI、old Full Regression removal、docs/dogfood/final evidence | final gateだけがrequired provider authority。main-push rebuild/shardなし。 |
+| PR-B | I392-S40〜S60を同一branch/PRで連続実行する。`0.2.4` public route cutover、CLI/service wiring、migration/downgrade proof、purge trap、old engine removal、active failure terminalization、test ownership、successor tests | S40/S50はnon-main checkpointでありmerge禁止。S60の全proof完了後だけhuman mergeできる。merge後のmainはcomplete final lifecycleで、old engine fallback、approved failure、policy skipを持たない。 |
+| PR-C | I392-S70〜S80のbuild-once CI、old Full Regression removal、docs/dogfood、qualification、final evidence | final gateだけがrequired provider authority。main-push rebuild/shardなし。 |
 
-PR-A〜Cは例であり、必須数ではない。ただしpublic cutoverをbridge generationへ分割してはならない。
+PR-A〜Cは例であり、必須数ではない。ただしpublic cutoverをbridge generationへ分割してはならない。PR-Bを使用する場合、S40でpublic routeを切り替えたbranchをS50、S60まで同じPRで進め、S40後またはS50後のcommitをmainへmergeしてはならない。PR-Bの唯一のmain merge gateはS60完了後である。
 
 ## 4. Human gates
 

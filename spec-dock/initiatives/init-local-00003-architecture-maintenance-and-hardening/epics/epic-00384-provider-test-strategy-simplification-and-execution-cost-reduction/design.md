@@ -10,7 +10,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
@@ -357,7 +357,7 @@ Non-distribution behaviorが`managed_distribution.py`に残っている場合は
 
 Admissionは次をrecordする。
 
-- `AUTHORING_SHA=d18ca60b2a6ff11571ee366f71c4528dcd668d99`
+- `AUTHORING_SHA=91667235c6892f025a1d9ee69cf37525537a3c9e`
 - `POST_387_SHA`
 - #387 issue state/merge evidence
 - exact diff path list
