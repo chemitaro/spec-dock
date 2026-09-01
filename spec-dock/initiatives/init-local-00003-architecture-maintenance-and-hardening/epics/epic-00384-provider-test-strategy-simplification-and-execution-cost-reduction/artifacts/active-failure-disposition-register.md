@@ -1,6 +1,6 @@
 ---
 種別: Normative Artifact
-ID: "active-failure-disposition-register-v4"
+ID: "active-failure-disposition-register-v5"
 タイトル: "Active Failure Disposition Register"
 状態: "accepted"
 最終更新: "2026-09-01"
@@ -8,7 +8,7 @@ ID: "active-failure-disposition-register-v4"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
+  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
 source_ledger:
   path: "full-regression-ledger.json"
   git_blob_sha1: "efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4"
@@ -21,47 +21,61 @@ source_ledger:
 
 This Artifact fixes the 27 original source-ledger node/signature identities and the deterministic Issue #387 admission/Issue #392 terminalization rule. Issue #387 canonical Requirement, Design and Plan remain unchanged. The only conditional rule ID is `ISS387-THREE-WAY-V2`.
 
-The Issue #387 tracked report contains only pre-merge facts. It identifies the last production/test/config candidate commit and the remove, retain(reason), or split mapping. It does not contain a pull-request number or future merge identity. After human merge, S00 discovers the unique merged PR from GitHub commit-association and Issue #387 timeline evidence, verifies the exact evidence-only tail, verifies final-head/merge tree equality and then applies this register. Luna selects no PR, successor, lineage, or disposition.
+The Issue #387 tracked report contains only a schema/rule declaration and the 12 deterministic remove, retain(reason), or split mappings. It contains no repository, pull-request number, candidate/head/tree identity, evidence-tail identity or future merge fact. After human merge, S00 derives all GitHub and Git identities independently and then applies this register. Luna selects no PR, successor, lineage or disposition.
 
 ## 2. Source ledger and row-count rule
 
 - Repository: `chemitaro/spec-dock`
-- Source commit: `3c24bae76e86651f958bde7c716c5453fff73e56`
+- Source commit: `f96d031ea86d3757374f3de14d588f1ba09a0864`
 - Source ledger blob: `efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4`
 - Original identities: exactly 27
-- Post-#387 row count: formula-derived, never fixed to 15 or any other literal
+- Conditional identities: source rows 4–15, exactly 12
+- Post-#387 row count: formula-derived, never fixed to 15 or another literal
 - S60 final state: active count 0 and approved-failure count 0
 
-## 3. `ISS387-THREE-WAY-V2` tracked report and evidence-only tail
+## 3. `ISS387-THREE-WAY-V2` tracked report mapping contract
 
-The report contains exactly one JSON object between `<!-- ISSUE-00387-DISPOSITION-BEGIN -->` and `<!-- ISSUE-00387-DISPOSITION-END -->`. Required report keys and per-entry keys are fixed in the machine block. `pull_request_number`, final PR head, merge SHA/tree/time and close facts are forbidden.
+The completed #387 tracked report contains exactly one compact JSON object between `<!-- ISSUE-00387-DISPOSITION-BEGIN -->` and `<!-- ISSUE-00387-DISPOSITION-END -->`. Its exact top-level keys are:
 
-`implementation_candidate_head_sha` is the final Issue #387 commit that changes any production, test, workflow/config, package metadata, provider/dogfood asset or operator-policy byte. It must be an ancestor, not necessarily the head, of the eventual PR.
+```text
+schema_version,kind,issue_id,rule_id,entries
+```
 
-The only allowed candidate-to-final-head tail is:
+Values are `schema_version=4`, `kind="iss-00387-pre-merge-disposition"`, `issue_id="iss-00387"`, `rule_id="ISS387-THREE-WAY-V2"`, and exactly 12 entries, one for each source row 4–15. It contains no repository, PR number, branch, commit SHA, tree OID, merge identity, timestamp, ledger hash or collection hash.
 
-| Path | Required | Allowed role |
-|---|---:|---|
-| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/report.md` | yes | Result Summary, Verification, Residual Risks/Follow-ups and exact disposition block only |
-| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/.meta.json` | no | only existing `updated_at` scalar; every other canonical field/value unchanged |
+Each entry has exact keys:
 
-Every other path is forbidden. Both allowed paths remain regular mode 100644. The tail may not change production, tests, workflows, TOML/lock/config, Makefile, root AGENTS/README, provider assets or dogfood assets.
+```text
+baseline_nodeid,outcome,retain_reason,removed_nodeids,mapped_nodes,
+positive_successor_nodes,failure_lineage_node,absence_evidence_id
+```
 
-## 4. Unique merged PR and post-merge verification
+Arrays are unique UTF-8-bytewise sorted. Allowed outcomes are exactly `removed`, `retained-unchanged`, `split-or-renamed`. All fields and branch relations are defined in the machine block. The report is pre-merge and does not predict or identify its future GitHub PR or merge.
 
-S00 intersects two GitHub evidence sets: PRs associated with the candidate commit and PR numbers connected/cross-referenced by Issue #387 timeline. Exactly one entry may remain after filtering to repository `chemitaro/spec-dock`, base `main`, merged state, candidate ancestry and the exact evidence-only tail. Zero or multiple candidates is a hard stop. Report PR-number input is prohibited.
+## 4. Unique merged PR discovery and merge-tree authority
 
-For that PR, S00 requires candidate ancestry, exact candidate/tree match to the report, exact tail, human merge, merge reachability from admitted main and equality of final PR-head tree with merge-commit tree. The merged report blob, ledger and full collection are then evaluated by the closed branches below.
+After #387 is human merged, S00 performs this closed algorithm without using a report identity:
+
+1. Read the GitHub Issue #387 timeline/cross-reference collection and collect same-repository pull-request numbers only.
+2. Fetch each referenced PR object and its exact head SHA, head repository, base branch, state, merge commit and changed paths.
+3. For each distinct head SHA, call `GET /repos/chemitaro/spec-dock/commits/{head_sha}/pulls` and retain the PR only when that association includes the same PR number.
+4. Filter to repository `chemitaro/spec-dock`, base `main`, merged state, a report path in the merged tree, and a merge commit reachable from the admitted main/implementation base.
+5. Require exactly one PR. Zero or multiple candidates stop before S10.
+6. Fetch the PR head commit/tree and merge commit/tree; require `pr_head_tree == merge_commit_tree`.
+7. Read the exact #387 report blob, `full-regression-ledger.json`, and pytest collection from the merge tree, not from a report-provided SHA.
+8. Validate the report block and apply `ISS387-THREE-WAY-V2` to the merge-tree ledger/collection.
+
+No extra #387 commit boundary or report-to-merge identity/tail rule exists. The current #387 one-implementation-plus-evidence-commit plan remains satisfiable without modification.
 
 ## 5. Closed outcome rules
 
-| #387 outcome | Required post-merge evidence | Admitted failure row | S60 terminal rule |
+| #387 outcome | Required merge-tree evidence | Admitted failure row | S60 terminal rule |
 |---|---|---|---|
-| `removed` | old node absent; exact removed list; nonempty passing positives; absence evidence; no lineage | none | original superseded to exact positives; no ledger reinsertion |
-| `retained-unchanged` | same node/signature; nonempty retain reason; no mapping/removal fields | same source identity | same node fixed in place to normal pass |
-| `split-or-renamed` | exact old-to-new mapping; passing positives; zero or one exact-signature lineage | optional one lineage | original superseded to positives; lineage fixed in place |
+| `removed` | old node absent from ledger/collection; `removed_nodeids=[old]`; mapped nodes empty; positive successors nonempty/passing; exact absence evidence; no lineage row | none | original identity is superseded to exact positive successors; no ledger row is reinserted |
+| `retained-unchanged` | same node remains with exact source signature; nonempty retain reason; removal/mapping/successor arrays empty | same source node/signature | same node is fixed in place to a normal pass and recorded resolved/fixed-in-place |
+| `split-or-renamed` | old node absent; mapped nodes exact/nonempty; positive successor subset passes; zero or one exact lineage node carrying source signature | optional one mapped lineage row | original is superseded to positives; optional lineage row is fixed in place to normal pass |
 
-Missing mapping, signature drift, unaccounted node, multiple lineage nodes, failed positive, invalid tail or merge mismatch stops before S10 and requires canonical spec-owner amendment plus independent Strict rereview.
+Missing report block/entry, report identity field, unmapped new row, signature drift, multiple lineage rows, failed/missing positive successor or #387-contract-external merge-tree result stops before S10 and requires canonical spec-owner amendment plus independent Strict re-review.
 
 ## 6. Original identity table
 
@@ -100,12 +114,12 @@ Missing mapping, signature drift, unaccounted node, multiple lineage nodes, fail
 <!-- BEGIN ACTIVE_FAILURE_DISPOSITION_REGISTER_JSON -->
 ```json
 {
-  "schema_version": 4,
-  "kind": "active-failure-disposition-register",
+  "schema_version": 5,
+  "kind": "epic384_active_failure_disposition_register_v5",
   "source": {
     "repository": "chemitaro/spec-dock",
     "branch": "codex/epic-00384-provider-test-strategy-planning",
-    "commit": "3c24bae76e86651f958bde7c716c5453fff73e56",
+    "commit": "f96d031ea86d3757374f3de14d588f1ba09a0864",
     "path": "full-regression-ledger.json",
     "git_blob_sha1": "efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4",
     "original_row_count": 27,
@@ -137,7 +151,7 @@ Missing mapping, signature drift, unaccounted node, multiple lineage nodes, fail
     "plan_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/plan.md"
   },
   "tracked_report_contract": {
-    "schema_version": 3,
+    "schema_version": 4,
     "kind": "iss-00387-pre-merge-disposition",
     "report_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/report.md",
     "block_begin": "<!-- ISSUE-00387-DISPOSITION-BEGIN -->",
@@ -146,20 +160,10 @@ Missing mapping, signature drift, unaccounted node, multiple lineage nodes, fail
       "schema_version",
       "kind",
       "issue_id",
-      "repository",
-      "implementation_candidate_head_sha",
-      "implementation_candidate_tree_sha",
+      "rule_id",
       "entries"
     ],
-    "forbidden_top_level_keys": [
-      "pull_request_number",
-      "pull_request_head_sha",
-      "pull_request_head_tree",
-      "merge_sha",
-      "merge_tree",
-      "merged_at",
-      "issue_closed_at"
-    ],
+    "additional_top_level_keys_allowed": false,
     "entries_count": 12,
     "entry_keys": [
       "baseline_nodeid",
@@ -171,42 +175,25 @@ Missing mapping, signature drift, unaccounted node, multiple lineage nodes, fail
       "failure_lineage_node",
       "absence_evidence_id"
     ],
-    "candidate_identity_meaning": "last commit that changes production, tests, workflow/config, package metadata, provider assets, dogfood assets or operator policy for Issue #387",
     "node_array_order": "UTF-8 bytewise ascending and unique"
   },
   "s00_github_merge_verification": {
     "rule_id": "ISS387-THREE-WAY-V2",
-    "unique_pull_request_discovery": {
-      "candidate_associated_endpoint": "GET /repos/chemitaro/spec-dock/commits/{implementation_candidate_head_sha}/pulls",
-      "issue_timeline_endpoint": "GET /repos/chemitaro/spec-dock/issues/387/timeline",
-      "intersection_rule": "exactly one merged pull request in chemitaro/spec-dock, base main, whose commit set contains the candidate and whose number appears in the Issue #387 connected/cross-referenced timeline",
-      "report_pull_request_number_forbidden": true
-    },
-    "evidence_only_tail": {
-      "candidate_must_be_ancestor_of_final_pull_request_head": true,
-      "required_changed_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/report.md",
-      "optional_changed_paths": [
-        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/.meta.json"
-      ],
-      "all_other_changed_paths_forbidden": true,
-      "report_role": "pre-merge Result Summary, Verification, Residual Risks/Follow-ups and the exact disposition JSON block only; no production/test/config/operator instruction",
-      "meta_role": "only the existing updated_at scalar may change; schema, type, IDs, title, parent, GitHub binding and _spec_dock object remain byte-equivalent after JSON canonicalization",
-      "mode_contract": "report and optional meta remain regular mode 100644; no symlink/submodule",
-      "semantic_proof": "candidate..final-head diff contains no Python, workflow, TOML, lock, Makefile, AGENTS, README, provider asset, dogfood asset or test/config change"
-    },
+    "issue_timeline_endpoint": "GET /repos/chemitaro/spec-dock/issues/387/timeline",
+    "pull_request_endpoint": "GET /repos/chemitaro/spec-dock/pulls/{pull_request_number}",
+    "head_commit_association_endpoint": "GET /repos/chemitaro/spec-dock/commits/{pull_request_head_sha}/pulls",
+    "discovery_rule": "collect same-repository PR references from Issue #387 timeline; fetch each PR; require its exact head commit association to include the same PR; filter repo chemitaro/spec-dock, base main, merged, report present; exactly one",
     "required_relations": [
       "repository equals chemitaro/spec-dock",
-      "tracked report candidate SHA/tree equal the candidate commit/tree discovered in the final PR ancestry",
-      "candidate is an ancestor of final pull-request head",
-      "candidate-to-final-head diff satisfies the exact evidence-only tail",
-      "pull request is human merged and merge commit is reachable from admitted main",
-      "final pull-request head tree equals merge commit tree",
+      "pull request is human merged and merge commit is reachable from admitted main and implementation base",
+      "pull-request head tree equals merge-commit tree",
       "implementation base contains SPEC_FREEZE_COMMIT and the Issue #387 merge commit",
-      "merged report block, post-merge ledger and full collection satisfy ISS387-THREE-WAY-V2"
+      "report blob, post-merge ledger and full collection are read from the merge tree",
+      "merged report block, ledger and collection satisfy ISS387-THREE-WAY-V2"
     ],
     "forbidden": [
-      "report PR-number dependency",
-      "candidate equals final PR head requirement",
+      "report identity dependency",
+      "new Issue #387 commit boundary",
       "future merge identity in tracked report",
       "trusting report prose without GitHub verification",
       "blanket repository-evidence-SHA diff"
@@ -261,19 +248,15 @@ Missing mapping, signature drift, unaccounted node, multiple lineage nodes, fail
     }
   },
   "post_387_admission_schema": {
-    "schema_version": 3,
+    "schema_version": 4,
     "required_keys": [
       "repository",
-      "issue_387_candidate_head_sha",
-      "issue_387_candidate_tree_sha",
-      "issue_387_final_pull_request_number",
-      "issue_387_final_pull_request_head_sha",
-      "issue_387_final_pull_request_head_tree",
-      "issue_387_evidence_tail_paths",
-      "issue_387_evidence_tail_sha256",
+      "issue_387_pull_request_number",
+      "issue_387_pull_request_head_sha",
+      "issue_387_pull_request_head_tree",
       "issue_387_merge_sha",
       "issue_387_merge_tree",
-      "issue_387_final_head_merge_tree_equality",
+      "issue_387_head_merge_tree_equality",
       "issue_387_report_blob_sha1",
       "post_387_ledger_blob_sha1",
       "post_387_collection_sha256",
@@ -287,15 +270,14 @@ Missing mapping, signature drift, unaccounted node, multiple lineage nodes, fail
     "stop_codes": [
       "issue-387-report-block-missing",
       "issue-387-report-schema-invalid",
+      "issue-387-report-identity-field-forbidden",
       "issue-387-report-entry-missing",
       "issue-387-report-entry-duplicate",
       "issue-387-outcome-invalid",
-      "issue-387-associated-pr-zero-or-multiple",
-      "issue-387-candidate-not-in-pr-ancestry",
-      "issue-387-evidence-tail-path-invalid",
-      "issue-387-evidence-tail-content-invalid",
+      "issue-387-timeline-pr-zero-or-multiple",
+      "issue-387-head-association-mismatch",
       "issue-387-merge-lineage-invalid",
-      "issue-387-final-head-merge-tree-equality-failed",
+      "issue-387-head-merge-tree-equality-failed",
       "issue-387-removal-unproven",
       "issue-387-retain-node-or-signature-drift",
       "issue-387-split-mapping-invalid",

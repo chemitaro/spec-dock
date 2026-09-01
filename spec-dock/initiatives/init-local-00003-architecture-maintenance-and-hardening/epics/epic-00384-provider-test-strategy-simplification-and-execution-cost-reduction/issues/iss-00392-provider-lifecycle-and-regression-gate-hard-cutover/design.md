@@ -10,7 +10,7 @@ ID: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
+  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
@@ -20,8 +20,8 @@ repository_evidence:
 ```text
 src/spec_dock/
   cli.py
-  context_pack.py                                  new
-  provider_lifecycle/                              new
+  context_pack.py
+  provider_lifecycle/
     __init__.py
     model.py
     candidate.py
@@ -31,167 +31,178 @@ src/spec_dock/
     legacy_023.py
     service.py
     public_result.py
-  assets/legacy_0_2_3.json                         new
-scripts/provider_gate.py                           new at S70
-ci/linux-qualification.Dockerfile                  new at S70
-ci/linux-qualification-environment.json            new at S70
+  assets/legacy_0_2_3.json
+scripts/provider_gate.py                    S70
+ci/linux-qualification.Dockerfile           S70
+ci/linux-qualification-environment.json     S70
 ```
 
-Final removes `managed_distribution.py`, `assets/managed_distribution.json`, old distribution tests, root lane hook, ledger/timing/sharder and old main-push workflow only at their specified steps.
+Exact exported symbols include fixed path constants; lifecycle state/operation/status/seed-policy/result-family enums; `ResumeIdentity`; strict record/marker/result/action types; candidate capture/digest/materialize; descriptor/native filesystem; workspace handles; namespace/ACTIVE/stage owner types; classification/install/update/uninstall/resume/terminal-cleanup; and table-driven wire rendering.
 
-Exact model exports include path constants; `LifecycleState`, `LifecycleOperation`, `LifecycleStatus`, `SeedPolicy`; `ResumeIdentity`; strict record/marker/result/action types; phase/reason/code enums generated from the wire artifact. Candidate module owns capture/digest/materialize. Filesystem owns bound descriptors/native rename/bootstrap. Stage namespace owns persistent discovery. External workspace owns ephemeral evidence directories. Service owns classification/dispatch/install/update/uninstall/resume. Public result owns only table-driven wire rendering.
+## 2. Lifecycle, candidate and closed wire
 
-## 2. Lifecycle, candidate and public wire
+### I392-D-001 — Model
 
-### I392-D-001 — Target/state model
+The strict record and public result are defined only by `provider-lifecycle-wire-contract.md`. Candidate digest includes final version plus sorted logical path/kind/mode/content entries for four roots/two slots, excluding seeds/record/generated markers. Unknown enum/value cannot be represented.
 
-Targets and state relations are fixed by Issue Requirement and the wire artifact. Record/marker parsing is strict and no unknown enum is representable. Candidate digest includes version and sorted path/kind/mode/content entries for four roots/two slots; source/stage digests match; seeds/record/generated markers are excluded.
+Private `LifecycleResultFamily` is exact `install|legacy-migration|update|uninstall`. It is stored in ACTIVE/stage owner but not in the durable record, resume tuple or public result.
 
-### I392-D-002 — Operation protocols
+### I392-D-002 — Protocol order
 
-Install/update and uninstall follow the exact wire phase sequences. The first target-state publication is incomplete record after any required container bootstrap. Terminal record is last. Same tuple resume derives remaining work from descriptor-bound target observations, not a stored progress list. Cross tuple blocks before mutation.
+Every invocation:
 
-### I392-D-003 — Public wire integration
+```text
+repository lock/bind
+-> recover_terminal_cleanup
+-> classify/admit requested operation
+-> candidate/stage/target preflight as applicable
+-> incomplete record
+-> fixed target publication/detach
+-> verify
+-> terminal record
+-> attempt terminal stage cleanup
+-> result
+```
 
-`provider-lifecycle-wire-contract.md` is parsed into generated constants during tests and mirrored by typed source constants. Tests assert 36 code values, 123 complete relation rows, 4 record goldens and 16 public JSON review goldens. Each service result must select exactly one row. Unknown or multiple row selection raises a programming defect; no generic code catches it.
+The terminal cleanup prelude never interprets a new request until old cleanup is safely complete.
+
+### I392-D-003 — Wire integration
+
+Tests parse the normative artifact and assert 37 codes, 123 rows, four record goldens, sixteen public review goldens, phase/reason/order inventories and exact JSON/text bytes. A typed result selects exactly one row; zero/multiple match is a programming defect.
 
 ## 3. Persistent lifecycle stage namespace
 
-### I392-D-004 — Exact path and identity derivation
+### I392-D-004 — Paths and identities
 
 ```text
 namespace = repository_realpath.parent / ".spec-dock-provider-stages-v1"
-repository_key = sha256(repo_realpath_utf8 + NUL + st_dev + NUL + st_ino)
+repository_key = sha256(repo_realpath_utf8 + NUL + st_dev_decimal + NUL + st_ino_decimal)
 tuple_key = sha256(operation + NUL + candidate_digest + NUL + seed_policy)
 repo_dir = namespace / "repositories" / repository_key
 active = repo_dir / "ACTIVE.json"
 stage = repo_dir / "stages" / tuple_key
 ```
 
-All hashes are lowercase hex; decimal device/inode contain no padding. Namespace and stage must be on repository `st_dev`. Directory modes are 0700; JSON modes 0600; current UID; no symlink component; regular JSON link count one.
+All directories are real/current-UID/mode0700/same filesystem; JSON files regular/link-count-one/mode0600. No scan or glob is used.
 
-### I392-D-005 — Sentinel schemas
+### I392-D-005 — Exact sentinels
 
-`NAMESPACE.json` exact ordered keys:
+`NAMESPACE.json` keys:
 
 ```text
 schema_version,kind,purpose,owner_uid,parent_device,parent_inode,created_at
 ```
 
-Values: schema1, kind `spec-dock-stage-namespace`, purpose `provider-lifecycle-stage-v1`.
+Kind `spec-dock-stage-namespace`, purpose `provider-lifecycle-stage-v1`.
 
-`REPOSITORY.json` exact keys:
+`REPOSITORY.json` keys:
 
 ```text
 schema_version,kind,repository_key,repository_realpath_sha256,
 repository_device,repository_inode,owner_uid
 ```
 
-`ACTIVE.json` exact keys:
+`ACTIVE.json` keys:
 
 ```text
 schema_version,kind,state,repository_key,operation,candidate_digest,
-seed_policy,tuple_key,stage_relative_path,created_at,updated_at
+seed_policy,result_family,tuple_key,stage_relative_path,created_at,updated_at
 ```
 
-State enum is `allocating|ready|terminal-cleanup`. `stage_relative_path` is exact `stages/<tuple-key>`.
+State `allocating|ready|terminal-cleanup`; result family exact private enum; stage path exact `stages/<tuple-key>`.
 
-`STAGE-OWNER.json` exact keys:
+`STAGE-OWNER.json` keys:
 
 ```text
 schema_version,kind,purpose,repository_key,repository_realpath_sha256,
 repository_device,repository_inode,operation,candidate_digest,seed_policy,
-tuple_key,stage_device,stage_inode,created_spec_dock,registered_entries
+result_family,tuple_key,stage_device,stage_inode,created_spec_dock,
+registered_entries
 ```
 
-Purpose exact `provider-lifecycle-stage-v1`; `created_spec_dock` is null or `{device,inode}`; registered entries are unique UTF-8 bytewise relative paths.
+`created_spec_dock` is null or exact `{device,inode}`. Registered entries are unique UTF-8-bytewise relative paths.
 
-### I392-D-006 — Allocation, discovery and cleanup
+### I392-D-006 — Allocation, lifecycle resume and terminal cleanup
 
-1. validate/create namespace and repository sentinels descriptor-safely;
-2. read exact `ACTIVE.json`; no directory scan;
-3. absent ACTIVE: atomically no-replace publish `state=allocating` for requested tuple;
-4. create/open deterministic stage; absent/empty exact stage is initialized, unsafe/nonempty unowned stage blocks;
-5. write/fsync stage owner, then atomically update ACTIVE to ready;
-6. same tuple process restart reopens exact ACTIVE/stage/owner and resumes;
-7. mismatched tuple returns `stage-owner-mismatch`;
-8. bootstrap-before-record uses ACTIVE+owner created identity;
-9. terminal cleanup updates ACTIVE to terminal-cleanup, removes only registered stage entries/stage, then exact content-bound ACTIVE; crash at any point is deterministic cleanup resume;
-10. namespace/repository sentinels are retained. Unknown siblings/content are never scanned or removed.
+1. Validate/create namespace/repository sentinels descriptor-safely.
+2. Read exact ACTIVE only.
+3. No ACTIVE: no-replace publish allocating for requested tuple/family, create exact stage, write owner, promote ready.
+4. ACTIVE allocating/ready with nonterminal operation: same tuple/family resumes; mismatched request returns `stage-owner-mismatch`.
+5. Terminal record + ACTIVE ready: atomically promote same bytes to terminal-cleanup and fsync.
+6. Terminal-cleanup validates ACTIVE/owner/record identity, removes only registered entries and exact stage. Stage already absent is valid.
+7. Remove ACTIVE only by expected-byte/content binding and fsync repo_dir. ACTIVE already absent causes repo_dir fsync and success.
+8. Crash after ACTIVE unlink before fsync is recovered by step 7 next invocation.
+9. Safe cleanup proceeds to any new requested operation; old tuple no longer gates dispatch.
+10. Cleanup failure keeps exact recoverable evidence and returns `terminal-cleanup-failed`, using result family to select retry.
+11. Namespace/repository sentinels remain; unknown siblings are never inspected or removed.
 
-Tests kill/restart subprocesses after ACTIVE allocation, stage creation, owner write, container mkdir and terminal-record publication on Linux and macOS.
+Tests kill/restart subprocesses after ACTIVE allocation, owner write, container mkdir, terminal record, ACTIVE terminal-cleanup write, stage removal and ACTIVE unlink.
 
-## 4. Ephemeral external workspace and protected witness
+## 4. Independent ephemeral workspaces and protected witness
 
-### I392-D-007 — Workspace helper
+### I392-D-007 — Workspace helper and exact variables
 
-`external_workspace.py` exposes `create_external_workspace(repository,purpose,parent=None)` and `cleanup_external_workspace(handle)`. Purpose enum is exactly:
+`create_external_workspace(repository,purpose,parent=None) -> ExternalWorkspace` returns a path and non-serializable handle holding parent/root FDs, device/inode/UID/mode, exact sentinel bytes, nonce and registered child set. `cleanup_external_workspace(handle)` accepts no path argument.
 
-```text
-admission
-baseline-build
-protected-witness
-full-regression-s00
-full-regression-s30
-full-regression-s60
-tripwire
-fresh-consumer
-workflow-api
-artifact-download
-attestation-draft
-```
+Exact purpose/env mapping:
 
-Creation uses `tempfile.mkdtemp(prefix="spec-dock-iss-00392-",dir=validated_parent)`, mode0700. It resolves parent/workspace/repository, rejects repository/equal/descendant, symlink components, wrong UID, group/other write and identity drift. `OWNER.json` exact keys are schema_version,kind,issue_id,purpose,repository_realpath_sha256,owner_uid,nonce,root_device,root_inode,created_at; mode0600/O_EXCL/O_NOFOLLOW, canonical compact LF, fsynced.
+| Purpose | Environment variable |
+|---|---|
+| admission | `ISS392_WS_ADMISSION` |
+| baseline-build | `ISS392_WS_BASELINE_BUILD` |
+| protected-witness | `ISS392_WS_PROTECTED_WITNESS` |
+| full-regression-s00 | `ISS392_WS_FULL_REGRESSION_S00` |
+| full-regression-s30 | `ISS392_WS_FULL_REGRESSION_S30` |
+| full-regression-s60 | `ISS392_WS_FULL_REGRESSION_S60` |
+| tripwire | `ISS392_WS_TRIPWIRE` |
+| fresh-consumer | `ISS392_WS_FRESH_CONSUMER` |
+| workflow-api | `ISS392_WS_WORKFLOW_API` |
+| artifact-download | `ISS392_WS_ARTIFACT_DOWNLOAD` |
+| attestation-draft | `ISS392_WS_ATTESTATION_DRAFT` |
 
-Cleanup receives a non-serializable handle with captured parent/root fds/identity and exact sentinel bytes; it deletes only registered relative paths. Unknown entry, missing/replaced sentinel or containment change preserves all and returns hard failure.
+Each path is independently created by `tempfile.mkdtemp(prefix="spec-dock-iss-00392-",dir=validated_parent)`. No aggregate root env variable or implicit subdirectory purpose exists. An orchestrator keeps multiple handles in memory and exports paths only to child commands.
 
-### I392-D-008 — Protected and exclusion manifests
+`OWNER.json` exact keys: `schema_version,kind,issue_id,purpose,repository_realpath_sha256,owner_uid,nonce,root_device,root_inode,created_at`; mode0600/O_EXCL/O_NOFOLLOW/canonical LF. Cleanup reopens exact parent/root, verifies outside-repository relation, device/inode/UID/mode/sentinel, rejects unknown entries, deletes registered entries then root and fsyncs parent.
 
-`protected-manifest.json` outside repository captures every protected entry. Sort is UTF-8 bytes. Row exact keys: path,kind,mode,uid,gid,size,sha256,link_target_hex,device_major,device_minor. Non-applicable scalar is null. Directory itself is included.
+### I392-D-008 — Protected/exclusion manifests
 
-Exclude exactly:
+`protected-manifest.json` lives only in `ISS392_WS_PROTECTED_WITNESS`. It includes every repository workbench and all protected paths, sorted by UTF-8 bytes. Entry keys: `path,kind,mode,uid,gid,size,sha256,link_target_hex,device_major,device_minor` with null for nonapplicable values.
 
-```text
-spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/report.md
-spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/.meta.json
-```
-
-`authorized-exclusions.json` exact keys: schema_version,repository,base_tree,current_tree,entries. Entry keys: path,kind,mode_before,mode_after,blob_before,blob_after,parent_commits,authorized_step,allowed_role,semantic_diff_sha256. Report role allows only front matter plus Result Summary/Verification/Residual Risks/step evidence and forbids final-source/post-merge facts. Meta role allows only parsed `updated_at` difference. No missing/additional field, path or mode change.
+Excluded only exact #392 report and meta. `authorized-exclusions.json` exact keys are `schema_version,repository,base_tree,current_tree,entries`; entries bind path/kind/modes/blobs/parents/step/role/semantic-diff hash. Report permits only pre-freeze method/step evidence and explicitly forbids actual compatibility/final identities. Meta permits only `updated_at`.
 
 ## 5. Issue #387 `ISS387-THREE-WAY-V2`
 
-### I392-D-009 — Report and tail
+### I392-D-009 — Mapping-only report
 
-Report block schema is the register's schema3. It has candidate SHA/tree and entries, no PR number/merge facts. Candidate is last semantic #387 commit. Tail changed paths are required report and optional meta only. Report remains regular 100644 and contains evidence sections/block only; meta remains canonical schema with only updated_at changed.
-
-### I392-D-010 — Unique PR discovery
-
-S00 fetches:
+Exact report block top-level keys are:
 
 ```text
-GET /repos/chemitaro/spec-dock/commits/<candidate>/pulls
-GET /repos/chemitaro/spec-dock/issues/387/timeline
+schema_version,kind,issue_id,rule_id,entries
 ```
 
-It intersects PR numbers, then filters exact repo, base main, merged, candidate ancestry, exact tail and final-head/merge tree equality. Exactly one result is required. It records final PR/head/tree/merge after merge externally; none are required in the pre-merge report. Then merged report/ledger/collection are evaluated by the register.
+Schema4, kind `iss-00387-pre-merge-disposition`, issue `iss-00387`, rule `ISS387-THREE-WAY-V2`, entries12. Entry schema is the register. Identity/timestamp/hash fields are rejected.
+
+### I392-D-010 — Unique merged PR discovery
+
+S00 fetches Issue #387 timeline. For every same-repository PR reference, fetch PR object and `GET /repos/chemitaro/spec-dock/commits/<pr-head-sha>/pulls`; keep only exact association with same PR number, base main, merged, report present and merge reachable. Require one. Fetch head/merge commits and require tree equality. Read report/ledger/collection from merge tree and apply register. No report PR/candidate identity and no extra #387 commit boundary.
 
 ## 6. PR-B current gate and dogfood
 
-### I392-D-011 — S40/S50/S60 ownership
+### I392-D-011 — S40/S50/S60
 
-S40 does not touch checked-in dogfood. S50 uses external consumers. S60 owns current `provider-ci.yml`, `provider-full-regression.yml`, ledger/timing/conftest/lane consumers, old engine/test removal, lifecycle docs/AGENTS lifecycle paragraphs, admitted behavior fixes and complete dogfood migration.
+S40/S50 preserve checked-in dogfood. S60 owns current provider-ci retarget, retained workflow external output, ledger/timing/conftest/lane consumers, old engine/test removal, lifecycle docs/AGENTS paragraphs, admitted fixes and complete dogfood migration.
 
-Retained Full Regression workflow adds step `Create external full-regression workspace`, using the external helper with parent `${{ runner.temp }}` and purpose `full-regression-s60`; step output `artifact_dir` is passed to verifier and upload-artifact path. Name, push/main+dispatch triggers, concurrency, job id and evaluator remain otherwise unchanged.
+The retained workflow creates its own full-regression-s60 workspace below `${{ runner.temp }}` using the same helper, retains the handle in the job process, passes exact path to verifier, uploads exact path, and handle-cleans after upload. It does not use repository workbench or an aggregate workspace.
 
-### I392-D-012 — Complete S60/S70 dogfood
+### I392-D-012 — Complete dogfood checkpoints
 
-S60 migrates exact legacy dogfood once after all PR-B candidate bytes settle. S70 updates once after all final candidate bytes settle. At each checkpoint record/markers/candidate digest/root/slot parity are complete, seeds/protected witnesses unchanged, no ACTIVE/stage residue remains, validate and fresh-consumer pass. S80 is read-only.
+S60 migrates once after all PR-B candidate bytes settle; S70 updates once after all final candidate bytes settle. Each has complete root/slot/record/marker parity, protected witness equality, seed equality, no ACTIVE/stage residue, validate and fresh-consumer proof. S80 is read-only.
 
 ## 7. Final Provider CI topology
 
-### I392-D-013 — Exact jobs and two workflow heads
+### I392-D-013 — Compatibility and final jobs
 
-Authoritative jobs:
+Compatibility exact graph:
 
 ```text
 provider-build-artifacts: []
@@ -200,30 +211,24 @@ provider-sdist-smoke: [provider-build-artifacts]
 provider-macos-delta: [provider-build-artifacts]
 provider-attestation: [provider-build-artifacts,provider-linux-canonical,provider-sdist-smoke,provider-macos-delta]
 provider-gate: [provider-attestation]
+provider-tests: [provider-build-artifacts,provider-attestation]
 ```
 
-`PRC_COMPAT_HEAD` additionally has:
+Compatibility `provider-tests`:
 
-```text
-provider-tests: [provider-attestation]
-```
+- permissions exact `actions:read`, `contents:read`, `pull-requests:read`;
+- creates independent workflow-api and artifact-download workspaces/handles;
+- downloads `provider-candidate-${SOURCE_SHA}` and `provider-evidence-${SOURCE_SHA}`;
+- GETs and writes exact run, jobs and artifacts API response bytes;
+- invokes I392-D-020 with candidate/evidence/API inputs and exact source/run identity;
+- invokes no packaging and does not read the canary marker;
+- cleans through its handles after verification.
 
-Compatibility job downloads `provider-evidence-SOURCE_SHA`, runs `verify-downloaded-artifact` against API metadata, and exits by that verifier. It ignores canary marker. `provider-gate` fails exact if `.github/provider-gate-canary-red` exists. Thus canary proves new required context while old remains GREEN. `PRC_FINAL_HEAD` removes only this job block; all other workflow bytes are identical.
+Only `provider-gate` reads `.github/provider-gate-canary-red`. Final head removes only provider-tests and is distinct. All other workflow bytes stay equal; final run reruns all authority.
 
-### I392-D-014 — Artifact names and file sets
+### I392-D-014 — Artifacts
 
-For `SOURCE_SHA`:
-
-```text
-provider-candidate-SOURCE_SHA
-provider-receipt-producer-SOURCE_SHA
-provider-receipt-linux-canonical-SOURCE_SHA
-provider-receipt-sdist-smoke-SOURCE_SHA
-provider-receipt-macos-delta-SOURCE_SHA
-provider-evidence-SOURCE_SHA
-```
-
-Candidate artifact: exactly candidate-manifest.json, one wheel, one sdist. Each receipt artifact: exact receipt JSON plus exact role evidence JSON. Evidence artifact: exact nine files in this order:
+Candidate artifact exact files: candidate manifest, one wheel, one sdist. Each receipt artifact has one receipt and one role evidence file. `provider-evidence-<sha>` has exactly nine files in this order:
 
 ```text
 provider-evidence.json
@@ -239,303 +244,260 @@ macos-delta-evidence.json
 
 ## 8. Exact evidence byte schemas
 
-### I392-D-015 — Canonical JSON convention
+### I392-D-015 — Canonical JSON
 
-All evidence JSON is UTF-8, no NUL, `ensure_ascii=False`, separators comma/colon, declared key insertion order, no additional/duplicate keys and exactly one LF. Timestamp type is UTC RFC3339 seconds `YYYY-MM-DDTHH:MM:SSZ`. IDs are positive JSON integers. Sizes are integer bytes; times/ratios are finite nonnegative JSON numbers with units encoded in field names. SHA-256 is 64 lowercase hex; Git SHA/tree is 40 lowercase hex. Child hashes are SHA-256 of the complete canonical child file bytes including LF.
+All JSON is UTF-8, no NUL, declared key order, `ensure_ascii=False,separators=(",",":")`, no extras/duplicates, one final LF. Timestamps are UTC seconds. IDs positive integers. Sizes bytes. Hashes include child LF.
 
-### I392-D-016 — Candidate manifest schema
+### I392-D-016 — Candidate manifest
 
-Exact ordered keys/types:
+Exact ordered keys: `schema_version,kind,repository,source_sha,source_tree,workflow_run_id,workflow_run_attempt,build_job_id,build_job_name,build_invocation_count,candidate_digest,wheel,sdist,files_order`. Kind/name/counts are fixed; wheel/sdist child keys are `filename,size_bytes,sha256`.
 
-| Key | Type/value |
-|---|---|
-| schema_version | integer 1 |
-| kind | `provider-candidate-manifest` |
-| repository | `chemitaro/spec-dock` |
-| source_sha | Git SHA |
-| source_tree | Git tree |
-| workflow_run_id | positive integer |
-| workflow_run_attempt | positive integer |
-| build_job_id | positive integer |
-| build_job_name | `provider-build-artifacts` |
-| build_invocation_count | integer 1 |
-| candidate_digest | SHA-256 |
-| wheel | object keys `filename,size_bytes,sha256` |
-| sdist | object keys `filename,size_bytes,sha256` |
-| files_order | exact `['wheel','sdist']` |
+### I392-D-017 — Receipt
 
-### I392-D-017 — Receipt schema
+Exact keys: `schema_version,kind,role,repository,source_sha,source_tree,workflow_run_id,workflow_run_attempt,job_id,job_name,needs,status,build_invocation_count,candidate_artifact,candidate_manifest,wheel,sdist,evidence,started_at,completed_at`. Role enum producer/linux-canonical/sdist-smoke/macos-delta. Needs and build count are graph-fixed. Child objects and filenames are exact.
 
-Every receipt has exact keys:
+### I392-D-018 — Role evidence
 
-```text
-schema_version,kind,role,repository,source_sha,source_tree,
-workflow_run_id,workflow_run_attempt,job_id,job_name,needs,status,
-build_invocation_count,candidate_artifact,candidate_manifest,wheel,sdist,
-evidence,started_at,completed_at
-```
+Common exact keys: `schema_version,kind,role,repository,source_sha,source_tree,workflow_run_id,workflow_run_attempt,job_id,job_name,status,started_at,completed_at,build_invocation_count,candidate_manifest_sha256,wheel_sha256,sdist_sha256,details`. Role-specific details and stable Linux metrics are exactly represented by EVIDENCE-FIXTURE-V1 and table-driven schema tests.
 
-- kind `provider-job-receipt`; role enum producer,linux-canonical,sdist-smoke,macos-delta; status `passed`.
-- `needs` exact: producer `[]`; each consumer `['provider-build-artifacts']`.
-- build count producer1, consumers0.
-- candidate_artifact keys `id,name,digest`; name exact; digest API SHA-256 format.
-- candidate_manifest/wheel/sdist/evidence keys `filename,size_bytes,sha256`.
-- evidence filenames are role-fixed. Receipt parent artifact metadata is bound later by provider aggregate to avoid self-reference.
+### I392-D-019 — Provider aggregate
 
-### I392-D-018 — Role evidence common envelope
+Exact keys: `schema_version,kind,repository,source_sha,source_tree,workflow_run_id,workflow_run_attempt,status,candidate_artifact,receipt_artifacts,roles,file_manifest,aggregate`. It hashes each of eight subordinate actual byte files, binds four receipt artifacts, role jobs, candidate, build counts and Linux qualification. Provider-attestation reopens/revalidates all nine output files before upload.
 
-Every role evidence exact keys:
-
-```text
-schema_version,kind,role,repository,source_sha,source_tree,
-workflow_run_id,workflow_run_attempt,job_id,job_name,status,started_at,
-completed_at,build_invocation_count,candidate_manifest_sha256,
-wheel_sha256,sdist_sha256,details
-```
-
-Kind `provider-role-evidence`, status `passed`; identity equals its receipt. `details` schemas:
-
-- producer ordered keys: `packaging_argv,packaging_exit_code,output_file_count,candidate_digest`; argv exact `['uv','build','--sdist','--wheel','--out-dir',<job external dir>]`, exit0, output2.
-- linux-canonical ordered keys: `environment_id,environment_descriptor_sha256,environment_fingerprint_sha256,runner_image,container_image_id,kernel_release,cgroup_cpu_quota,cgroup_memory_limit_bytes,python_version,uv_version,lock_sha256,pytest_process_count,worker_count,run_count,budget_run_count,wall_seconds,process_tree_cpu_seconds,cpu_wall_ratios,unexpected_failure_count,flake_count,retry_count,seeded_fault_total,seeded_fault_detected,node_inventory_sha256`. Metric arrays are exact length20 in run order; process/worker1; run20; budget5; faults equal/detected; failure/flake/retry0.
-- sdist-smoke ordered keys: `installed_from_filename,metadata_name,metadata_version,package_data_sha256,smoke_argv,smoke_exit_code`; filename equals manifest, metadata `spec-dock`/`0.2.4`, exit0.
-- macos-delta ordered keys: `runner_image,macos_version,architecture,python_version,pytest_process_count,node_inventory_sha256,native_positive_control_total,native_positive_control_detected,platform_check_ids,failed_count`; process1, controls equal, failed0, check IDs exact sorted owner map.
-
-### I392-D-019 — Provider aggregate schema
-
-`provider-evidence.json` exact keys:
-
-```text
-schema_version,kind,repository,source_sha,source_tree,workflow_run_id,
-workflow_run_attempt,status,candidate_artifact,receipt_artifacts,roles,
-file_manifest,aggregate
-```
-
-Kind `provider-evidence`, status `passed`. Candidate artifact object keys `id,name,digest,manifest_sha256,wheel_sha256,sdist_sha256`. Receipt artifacts is four objects in role order with keys `role,id,name,digest`. Roles is four objects with `role,job_id,job_name,receipt_filename,receipt_sha256,evidence_filename,evidence_sha256`. `file_manifest` lists the eight subordinate files in exact evidence-file order, each `filename,size_bytes,sha256`. `aggregate` keys are `producer_build_invocation_count,consumer_build_invocation_count,role_count,file_count,environment_id,environment_fingerprint_sha256,qualification_run_count,budget_run_count,seeded_fault_total,seeded_fault_detected,status`; values 1,0,4,9,stable ID/fingerprint,20,5,equal/equal,passed.
-
-Provider-attestation downloads actual candidate/receipts/evidence/API bytes, validates, copies the exact role bytes and writes aggregate. It reopens and rehashes all nine output files before upload.
-
-## 9. Download verifier and attestations
+## 9. Download verifier and external attestations
 
 ### I392-D-020 — `verify-downloaded-artifact`
 
-Exact invocation:
+Exact interface used by provider-attestation, compatibility provider-tests and S80:
 
 ```bash
-uv run python scripts/provider_gate.py verify-downloaded-artifact \
-  --repository chemitaro/spec-dock \
-  --candidate-dir "$EXTERNAL/candidate" \
-  --evidence-dir "$EXTERNAL/evidence" \
-  --run-json "$EXTERNAL/api/run.json" \
-  --jobs-json "$EXTERNAL/api/jobs.json" \
-  --artifacts-json "$EXTERNAL/api/artifacts.json" \
-  --source-sha "$PRC_FINAL_HEAD" \
-  --source-tree "$PRC_FINAL_TREE" \
-  --workflow-run-id "$RUN_ID" \
-  --json
+uv run python scripts/provider_gate.py verify-downloaded-artifact   --repository chemitaro/spec-dock   --candidate-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/candidate"   --evidence-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/evidence"   --run-json "$ISS392_WS_WORKFLOW_API/run.json"   --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json"   --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json"   --source-sha "$SOURCE_SHA"   --source-tree "$SOURCE_TREE"   --workflow-run-id "$RUN_ID"   --json
 ```
 
-Required directory/API inputs are real, owner-bound, no-follow paths. The verifier reads candidate manifest, wheel, sdist, all nine evidence files and all API JSON bytes; validates exact names/order/counts, schemas, source/run/job/needs/artifact identities, sizes/hashes, build counts and role metrics; and rejects stated hashes without matching bytes.
-
-Success stdout is one compact LF JSON with exact keys `schema_version,status,code,repository,workflow_run_id,source_sha,source_tree,candidate_artifact,evidence_artifact,receipt_roles,evidence_files`; status is `verified`, code is `downloaded-artifact-verified`. Non-JSON success is exact `provider-gate: downloaded artifact verified sha=SOURCE_SHA run=RUN_ID\n`. Failure stdout is empty and stderr is `provider-gate: CODE: MESSAGE\n`. Exit/code mapping is: 2 `invalid-arguments`, 3 `input-invalid`, 4 `run-identity-mismatch`, 5 `artifact-set-mismatch`, 6 `artifact-metadata-mismatch`, 7 `candidate-manifest-invalid`, 8 `candidate-bytes-mismatch`, 9 `receipt-invalid`, 10 `receipt-set-or-needs-mismatch`, 11 `build-count-mismatch`, 12 `evidence-bytes-or-relation-mismatch`. No generic exit/code is valid.
+It reads actual candidate/evidence/API bytes, validates exact names/counts/schemas/source/run/job/needs/artifact identities, sizes/hashes/build counts/metrics and independent byte links. Success JSON keys `schema_version,status,code,repository,workflow_run_id,source_sha,source_tree,candidate_artifact,evidence_artifact,receipt_roles,evidence_files`; code `downloaded-artifact-verified`. Failure exits 2–12 retain the previously accepted exact typed mapping; no generic code.
 
 ### I392-D-021 — Attestation payload schemas
 
-Pre-merge payload exact ordered keys:
+Pre-merge exact ordered keys:
 
 ```text
 schema_version,kind,repository,issue_number,pull_request_number,
-spec_freeze_commit,implementation_base_sha,compatibility_head_sha,
-final_head_sha,final_head_tree,compatibility_to_final_paths,
-tracked_report_blob_sha1,provider_workflow_run_id,candidate_artifact,
-evidence_artifact,provider_evidence_sha256,environment_fingerprint_sha256,
-required_contexts_before,required_contexts_both,canary_pull_request_number,
-canary_block_verified,required_contexts_after_old_removed,
-required_contexts_final_head,human_review_state,generated_at
+spec_freeze_commit,implementation_base_sha,
+compatibility_head_sha,compatibility_head_tree,compatibility_workflow_run_id,
+final_head_sha,final_head_tree,final_workflow_run_id,
+compatibility_to_final_paths,tracked_report_blob_sha1,
+candidate_artifact,evidence_artifact,provider_evidence_sha256,
+environment_fingerprint_sha256,required_contexts_before,
+required_contexts_both,canary_pull_request_number,canary_block_verified,
+required_contexts_after_old_removed,required_contexts_final_head,
+human_review_state,generated_at
 ```
 
-Values: schema1, kind pre-merge-attestation-v1, issue392; compatibility-to-final exact `['.github/workflows/provider-ci.yml']`; context arrays unique UTF-8 sorted; booleans exact; human_review_state `approved`; artifact objects `id,name,digest`.
+Actual compatibility/final identities are distinct and external. Payload contains no future comment ID.
 
-Post-merge payload keys:
+Post-merge exact keys:
 
 ```text
 schema_version,kind,repository,issue_number,pre_merge_comment_id,
 pre_merge_payload_sha256,final_head_sha,final_head_tree,merge_commit_sha,
 merge_commit_tree,tree_equal,merge_actor,merged_at,spec_dock_finish_status,
-github_issue_closed_event_id,github_issue_closed_at,generated_at
+spec_dock_finish_observed_at,github_issue_closed_event_id,
+github_issue_closed_at,generated_at
 ```
 
-Kind post-merge-closure-v1, issue392, tree_equal true, finish status `finished`, IDs positive.
+This payload is constructed only after finish and #392 close event are measured. It contains no own future comment ID.
 
-Epic closure payload keys:
+Epic exact keys:
 
 ```text
 schema_version,kind,repository,epic_issue_number,implementation_issue_number,
 post_merge_comment_id,post_merge_payload_sha256,
-implementation_issue_closed_event_id,epic_acceptance_status,
-github_epic_closed_event_id,github_epic_closed_at,generated_at
+implementation_issue_closed_event_id,implementation_issue_closed_at,
+epic_acceptance_status,github_epic_closed_event_id,github_epic_closed_at,
+generated_at
 ```
 
-Kind epic-closure-v1, epic384, implementation392, acceptance `accepted`.
+It is constructed only after #384 close event is measured.
 
-### I392-D-022 — `emit-attestation` and append-only GitHub Issue comment
+### I392-D-022 — `emit-attestation`, posting and comment receipt
 
-Exact pure-local invocation:
+Exact pure-local interface:
 
 ```bash
-uv run python scripts/provider_gate.py emit-attestation \
-  --kind pre-merge-attestation-v1 \
-  --input-json "$EXTERNAL/input.json" \
-  --output-json "$EXTERNAL/pre-merge-attestation.json" \
-  --output-comment "$EXTERNAL/pre-merge-attestation-comment.md" \
-  --json
+uv run python scripts/provider_gate.py emit-attestation   --kind "$KIND"   --input-json "$ISS392_WS_ATTESTATION_DRAFT/input.json"   --output-json "$ISS392_WS_ATTESTATION_DRAFT/payload.json"   --output-comment "$ISS392_WS_ATTESTATION_DRAFT/comment.md"   --json
 ```
 
-Kinds are exactly the three I392-D-021 schemas. Input is an exact-key JSON object for that kind; the command rejects unknown/missing/duplicate keys, noncanonical scalar types and relation violations. It writes with `O_CREAT|O_EXCL|O_NOFOLLOW`, mode 0600, refuses existing/symlink/output-outside-owner-workspace paths, fsyncs files/directories and rereads exact bytes. Output JSON is the canonical payload. Comment bytes are exactly:
+It validates exact schema/relation, O_EXCL/no-follow writes, fsyncs/rereads, and emits canonical payload and four-line comment envelope. Accepted kinds are pre-merge-attestation-v1, post-merge-closure-v1, epic-closure-v1. Existing typed exits 2–6 remain exact.
 
-````text
-<!-- spec-dock-attestation:KIND:PAYLOAD_SHA256 -->
-```json
-CANONICAL_JSON_WITHOUT_FINAL_LF
-```
-````
+Posting: pre/post are new comments on #392; Epic is a new comment on #384. Human issues:write posts; issues:read verifies. Payload never contains its own comment identity.
 
-The comment ends with exactly one LF. Success JSON keys are `schema_version,status,code,kind,payload_path,comment_path,payload_sha256,target_issue_number`; status `emitted`, code `attestation-emitted`, exit 0. Typed failures are exit 2 `attestation-invalid-arguments`, 3 `attestation-input-invalid`, 4 `attestation-relation-invalid`, 5 `attestation-output-unsafe`, 6 `attestation-serialization-mismatch`. Failure stdout is empty; stderr is exact `provider-gate: CODE: MESSAGE\n`; no generic code.
-
-The immutable external object type is only a GitHub **Issue comment**. Pre/post comments target Issue #392; Epic closure targets Issue #384. Posting uses `POST /repos/chemitaro/spec-dock/issues/{issue_number}/comments` with a human operator credential having `issues:write`. Verification uses `GET /repos/chemitaro/spec-dock/issues/comments/{comment_id}` with `issues:read` and requires exact repository/issue, positive comment ID, expected operator login, exact body bytes and marker/payload hash, `created_at == updated_at`, and nondeleted visibility. PATCH/edit/delete, a different actor, changed timestamps/body/hash or ambiguous comment lookup invalidates dependent closure evidence.
-
-### I392-D-023 — Stable environment
-
-Descriptor and Linux evidence satisfy Requirement. All 20 metric arrays share one fingerprint and exact source/candidate. Cross-run fingerprint difference is schema/relation failure, not a warning.
-
-## 10. Required-context two-head state machine
-
-States are exact:
+After POST/readback, create external `comment-receipt-v1` with exact keys:
 
 ```text
-compat-head-both-green
-new-added-both-required
-canary-new-red-old-green-blocked
-implementation-both-green
-old-removed-new-required
-final-head-new-only-green
+schema_version,kind,attestation_kind,repository,target_issue_number,
+comment_id,comment_url,author_login,created_at,updated_at,payload_sha256,
+body_sha256,body_size_bytes,verified_at
 ```
 
-Transitions occur only in this order. Canary diff is exactly add `.github/provider-gate-canary-red`; never merged. Final implementation diff from compatibility head is exactly removal of `provider-tests` job in `provider-ci.yml`. Any other tracked change creates a new compatibility head and repeats transition/evidence.
+Require exact target, actor, body/marker/payload hash, positive ID, nondeleted visibility and `created_at==updated_at`. Receipt is not embedded in payload or tracked tree.
 
-## 11. Canonical evidence and attestation byte fixtures
+### I392-D-023 — Closure execution
 
-### I392-D-024 — `EVIDENCE-FIXTURE-V1`
+1. Pre-merge payload/comment/receipt on #392.
+2. Human merge.
+3. Fetch merge commit; compare final-head tree to merge tree.
+4. Run `python3 ./spec-dock/scripts/spec-dock issue finish`; verify result.
+5. Run `python3 ./spec-dock/scripts/spec-dock close --id iss-00392`; read #392 close event.
+6. Build/post/read back post-merge payload/comment/receipt on #392.
+7. Re-evaluate Epic acceptance.
+8. Run `python3 ./spec-dock/scripts/spec-dock close --id epic-00384`; read #384 close event.
+9. Build/post/read back Epic payload/comment/receipt on #384.
 
-This fixture set is normative serializer test data, not runtime evidence. Runtime values vary only where the schemas above permit, but key order, types, enum/nullability, units, nested order and LF rule remain exact. Every hash below is SHA-256 over the complete displayed compact UTF-8 file bytes including the final LF.
+### I392-D-024 — Stable environment and context heads
+
+Qualification uses `specdock-linux-qualification-v1` and exact fingerprint for all runs. Tracked report has neither compatibility nor final identity. `PRC_COMPAT_HEAD`/tree and `PRC_FINAL_HEAD`/tree are external and distinct. Context sequence is compatibility both-green -> new added/both required -> canary new-red/old-green/blocked -> compatibility both-green -> old removed -> final distinct head/new-only GREEN with all evidence rerun.
+
+## 10. Canonical evidence and attestation fixtures
+
+### I392-D-025 — `EVIDENCE-FIXTURE-V1`
+
+Fixture identity constants are exact and distinct:
+
+```text
+spec_freeze_commit = 8888888888888888888888888888888888888888
+implementation_base_sha = 9999999999999999999999999999999999999999
+compatibility_head_sha/tree = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa / bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+final_head_sha/tree = cccccccccccccccccccccccccccccccccccccccc / dddddddddddddddddddddddddddddddddddddddd
+merge_commit_sha = eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+tracked_report_blob_sha1 = ffffffffffffffffffffffffffffffffffffffff
+```
+
+Every table hash is SHA-256 of the complete displayed compact UTF-8 bytes including final LF. Comment hashes cover the four-line envelope. The three comment receipts are generated only after their comment fixtures and are not included in attestation payloads.
 
 | File | Size bytes | SHA-256 |
 |---|---:|---|
-| `candidate-manifest.json` | 757 | `122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b` |
-| `producer-build-evidence.json` | 937 | `1733bd8d54b0f7b9ed65b636dbfec735139985fb4821decabdd01069fb238a8a` |
-| `linux-canonical-evidence.json` | 1894 | `4b65c3c463c33c7a6407b2f351bfb007679fffadcdfee306f23049a3889c87c8` |
-| `sdist-smoke-evidence.json` | 977 | `599c7d8b9efc4b2fcb2d51fdd574b0188d5882dbdfd5169f6cf8962904e3cf88` |
-| `macos-delta-evidence.json` | 1102 | `88d9f20248ec33162ced7bd39282635137f9500db44ad8517e9d9f233b3f8f2e` |
-| `provider-receipt-producer.json` | 1227 | `abad22d4051082e74a9eccf1140d0b09c6026bb8118ee4f4a3759c378042b9f0` |
-| `provider-receipt-linux-canonical.json` | 1262 | `a5edd22f555f82c7e1f70200c059c12a8c4c774fc314bf175dd24efd8fc0dc5b` |
-| `provider-receipt-sdist-smoke.json` | 1249 | `f4e04a3447eb4a2ba5b9c852ca7d8a6c578fa23482d7b4618a53512f62487cc7` |
-| `provider-receipt-macos-delta.json` | 1250 | `b03cf780550b6b08c0b651fe21bc17614b880923d406f3c2d2e5b9bf2a261152` |
-| `provider-evidence.json` | 4421 | `94272066af6b6abb1968f8128ca1cc1acf634f6846cd42824ef0bbc9bd920e42` |
-| `pre-merge-attestation-v1.json` | 1603 | `4e9ed28d018491c401b632d413b53bd630d0e4403d30c064f89494c2d2722103` |
-| `post-merge-closure-v1.json` | 712 | `e1c6154b5a09c17b7d1e3eb391473e7a8f821485a9bf4fe2f982561404a89d3b` |
-| `epic-closure-v1.json` | 463 | `75af5796dd0efc8bc50ee51a592db8142d63263d66b89f56dd81f58190d2765b` |
-| `pre-merge-attestation-v1.comment.md` | 1736 | `1b743daff62ce1892c7c683a608510ad5dbaf819e9a946a4560942954bb22035` |
-| `post-merge-closure-v1.comment.md` | 842 | `aa99ecad273b0de5adf9819361bd2274b4928f269e14d3b28c2fb987462237a7` |
-| `epic-closure-v1.comment.md` | 587 | `098761c85afada8ccb11ecc7f68e877b426950d7831ae209c3b852d5e4d49611` |
-
-Type and unit closure: all IDs/counts/byte sizes are nonnegative integers except IDs, which are positive; `cgroup_cpu_quota`, wall/CPU seconds and ratios are finite JSON numbers; timestamp fields are UTC RFC3339 seconds; hash/commit/tree/image values use the scalar formats in I392-D-015; arrays have the exact lengths/order stated in I392-D-016–019 and I392-D-021. None of these fixture schemas contains a nullable field. A runtime nullable field is invalid unless explicitly declared elsewhere in the same schema.
+| `candidate-manifest.json` | 757 | `b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e` |
+| `producer-build-evidence.json` | 937 | `9792877d94a0276cb7d8ebf44220e317cbdc99d58e42537b9f8682507ab53e82` |
+| `linux-canonical-evidence.json` | 1894 | `3c109642984e5ca0310398bf45a77600ebd1a7bb7c3147f19fed5904ff7bbf7e` |
+| `sdist-smoke-evidence.json` | 977 | `a19970d40b87690b7815c45d6e18d81d034fed545e28fce5219ad2bc2e6a5d86` |
+| `macos-delta-evidence.json` | 1102 | `67a9e3e52b41e7adae4ce4911fd0d896a93db60dc0e6d47d96b1357c700f6039` |
+| `provider-receipt-producer.json` | 1227 | `316a81dffeaba2a4c6189c71deb7cb357c2afe43bf875cf96abad677151e64ea` |
+| `provider-receipt-linux-canonical.json` | 1262 | `216a01f2144ad784da3b49e67b4dbb8f5af0e4f80fd570df30ae1e7441674552` |
+| `provider-receipt-sdist-smoke.json` | 1249 | `c8ffcbf098b9bd36043801a9350c0c73d13dddf81bb97ce2f57728a0d8206e0f` |
+| `provider-receipt-macos-delta.json` | 1250 | `151d0e8ec6185cd4a44ce4fc3938f0e664e0fe2004e539fd7f60218077cecec3` |
+| `provider-evidence.json` | 4421 | `c286d143438ffcaf5c4877c809cba372f947495663507c8ab3f171edf11e00ab` |
+| `pre-merge-attestation-v1.json` | 1706 | `a1f8cd2d0d5dcc21ddc83021c89d6bb754b57eafd8df846bdb9625e54f5f2ad4` |
+| `post-merge-closure-v1.json` | 766 | `fd5f0731da069f2db9612006116c93cec674860cff618c8a8290fa26faf40a30` |
+| `epic-closure-v1.json` | 519 | `d5fd9ce5208a5829f35abce7e073909351c2a23be97c2d3447aa5d5fc7696f88` |
+| `comment-receipt-pre-merge.json` | 584 | `0b0c3303ce1fafeac7b5e9b80f8f766edc0e374288e5df3e9aebefcc0d501174` |
+| `comment-receipt-post-merge.json` | 580 | `ad61bc75102377f21e327b4155e2bc7c07df64c6caf847cebca341dcf24c1a7b` |
+| `comment-receipt-epic.json` | 574 | `22d9ddd17fab4961eb4ee8761aaa28fbbb988144c8777adb5c1bd0ba8631b6f0` |
+| `pre-merge-attestation-v1.comment.md` | 1839 | `30d7421e38be3ef2f394d459e1ae9e3f540b705c29ba056692a3b12457651dc9` |
+| `post-merge-closure-v1.comment.md` | 896 | `ce1568399ba026f8001c988c49e2cb01b1184bc4879f9d3ae3f39825d292b640` |
+| `epic-closure-v1.comment.md` | 643 | `d7b251faeec80e0c06b47074abb80c6d6b4450aa7d3f7394753f6b6fb27b59c8` |
 
 #### `candidate-manifest.json`
 
 ```json
-{"schema_version":1,"kind":"provider-candidate-manifest","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"build_job_id":2001,"build_job_name":"provider-build-artifacts","build_invocation_count":1,"candidate_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},"files_order":["wheel","sdist"]}
+{"schema_version":1,"kind":"provider-candidate-manifest","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"build_job_id":2101,"build_job_name":"provider-build-artifacts","build_invocation_count":1,"candidate_digest":"1111111111111111111111111111111111111111111111111111111111111111","wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"2222222222222222222222222222222222222222222222222222222222222222"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"3333333333333333333333333333333333333333333333333333333333333333"},"files_order":["wheel","sdist"]}
 ```
 
 #### `producer-build-evidence.json`
 
 ```json
-{"schema_version":1,"kind":"provider-role-evidence","role":"producer","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2001,"job_name":"provider-build-artifacts","status":"passed","started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z","build_invocation_count":1,"candidate_manifest_sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b","wheel_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","sdist_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","details":{"packaging_argv":["uv","build","--sdist","--wheel","--out-dir","/runner/_temp/spec-dock-build"],"packaging_exit_code":0,"output_file_count":2,"candidate_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}}
+{"schema_version":1,"kind":"provider-role-evidence","role":"producer","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2101,"job_name":"provider-build-artifacts","status":"passed","started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z","build_invocation_count":1,"candidate_manifest_sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e","wheel_sha256":"2222222222222222222222222222222222222222222222222222222222222222","sdist_sha256":"3333333333333333333333333333333333333333333333333333333333333333","details":{"packaging_argv":["uv","build","--sdist","--wheel","--out-dir","/runner/_temp/spec-dock-build"],"packaging_exit_code":0,"output_file_count":2,"candidate_digest":"1111111111111111111111111111111111111111111111111111111111111111"}}
 ```
 
 #### `linux-canonical-evidence.json`
 
 ```json
-{"schema_version":1,"kind":"provider-role-evidence","role":"linux-canonical","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2002,"job_name":"provider-linux-canonical","status":"passed","started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z","build_invocation_count":0,"candidate_manifest_sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b","wheel_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","sdist_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","details":{"environment_id":"specdock-linux-qualification-v1","environment_descriptor_sha256":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","environment_fingerprint_sha256":"1111111111111111111111111111111111111111111111111111111111111111","runner_image":"ubuntu-24.04","container_image_id":"sha256:2222222222222222222222222222222222222222222222222222222222222222","kernel_release":"6.8.0","cgroup_cpu_quota":2.0,"cgroup_memory_limit_bytes":8589934592,"python_version":"3.11.9","uv_version":"0.8.14","lock_sha256":"3333333333333333333333333333333333333333333333333333333333333333","pytest_process_count":1,"worker_count":1,"run_count":20,"budget_run_count":5,"wall_seconds":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"process_tree_cpu_seconds":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],"cpu_wall_ratios":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],"unexpected_failure_count":0,"flake_count":0,"retry_count":0,"seeded_fault_total":27,"seeded_fault_detected":27,"node_inventory_sha256":"4444444444444444444444444444444444444444444444444444444444444444"}}
+{"schema_version":1,"kind":"provider-role-evidence","role":"linux-canonical","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2102,"job_name":"provider-linux-canonical","status":"passed","started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z","build_invocation_count":0,"candidate_manifest_sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e","wheel_sha256":"2222222222222222222222222222222222222222222222222222222222222222","sdist_sha256":"3333333333333333333333333333333333333333333333333333333333333333","details":{"environment_id":"specdock-linux-qualification-v1","environment_descriptor_sha256":"4444444444444444444444444444444444444444444444444444444444444444","environment_fingerprint_sha256":"5555555555555555555555555555555555555555555555555555555555555555","runner_image":"ubuntu-24.04","container_image_id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","kernel_release":"6.8.0","cgroup_cpu_quota":2.0,"cgroup_memory_limit_bytes":8589934592,"python_version":"3.11.9","uv_version":"0.8.14","lock_sha256":"6666666666666666666666666666666666666666666666666666666666666666","pytest_process_count":1,"worker_count":1,"run_count":20,"budget_run_count":5,"wall_seconds":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"process_tree_cpu_seconds":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],"cpu_wall_ratios":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],"unexpected_failure_count":0,"flake_count":0,"retry_count":0,"seeded_fault_total":27,"seeded_fault_detected":27,"node_inventory_sha256":"7777777777777777777777777777777777777777777777777777777777777777"}}
 ```
 
 #### `sdist-smoke-evidence.json`
 
 ```json
-{"schema_version":1,"kind":"provider-role-evidence","role":"sdist-smoke","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2003,"job_name":"provider-sdist-smoke","status":"passed","started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z","build_invocation_count":0,"candidate_manifest_sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b","wheel_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","sdist_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","details":{"installed_from_filename":"spec_dock-0.2.4.tar.gz","metadata_name":"spec-dock","metadata_version":"0.2.4","package_data_sha256":"5555555555555555555555555555555555555555555555555555555555555555","smoke_argv":["python","-m","spec_dock.cli","--help"],"smoke_exit_code":0}}
+{"schema_version":1,"kind":"provider-role-evidence","role":"sdist-smoke","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2103,"job_name":"provider-sdist-smoke","status":"passed","started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z","build_invocation_count":0,"candidate_manifest_sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e","wheel_sha256":"2222222222222222222222222222222222222222222222222222222222222222","sdist_sha256":"3333333333333333333333333333333333333333333333333333333333333333","details":{"installed_from_filename":"spec_dock-0.2.4.tar.gz","metadata_name":"spec-dock","metadata_version":"0.2.4","package_data_sha256":"8888888888888888888888888888888888888888888888888888888888888888","smoke_argv":["python","-m","spec_dock.cli","--help"],"smoke_exit_code":0}}
 ```
 
 #### `macos-delta-evidence.json`
 
 ```json
-{"schema_version":1,"kind":"provider-role-evidence","role":"macos-delta","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2004,"job_name":"provider-macos-delta","status":"passed","started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z","build_invocation_count":0,"candidate_manifest_sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b","wheel_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","sdist_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","details":{"runner_image":"macos-15","macos_version":"15.0","architecture":"arm64","python_version":"3.11.9","pytest_process_count":1,"node_inventory_sha256":"6666666666666666666666666666666666666666666666666666666666666666","native_positive_control_total":2,"native_positive_control_detected":2,"platform_check_ids":["executable-mode","installed-entry-point","no-follow","renameatx-np"],"failed_count":0}}
+{"schema_version":1,"kind":"provider-role-evidence","role":"macos-delta","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2104,"job_name":"provider-macos-delta","status":"passed","started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z","build_invocation_count":0,"candidate_manifest_sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e","wheel_sha256":"2222222222222222222222222222222222222222222222222222222222222222","sdist_sha256":"3333333333333333333333333333333333333333333333333333333333333333","details":{"runner_image":"macos-15","macos_version":"15.0","architecture":"arm64","python_version":"3.11.9","pytest_process_count":1,"node_inventory_sha256":"9999999999999999999999999999999999999999999999999999999999999999","native_positive_control_total":2,"native_positive_control_detected":2,"platform_check_ids":["executable-mode","installed-entry-point","no-follow","renameatx-np"],"failed_count":0}}
 ```
 
 #### `provider-receipt-producer.json`
 
 ```json
-{"schema_version":1,"kind":"provider-job-receipt","role":"producer","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2001,"job_name":"provider-build-artifacts","needs":[],"status":"passed","build_invocation_count":1,"candidate_artifact":{"id":3000,"name":"provider-candidate-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},"evidence":{"filename":"producer-build-evidence.json","size_bytes":937,"sha256":"1733bd8d54b0f7b9ed65b636dbfec735139985fb4821decabdd01069fb238a8a"},"started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z"}
+{"schema_version":1,"kind":"provider-job-receipt","role":"producer","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2101,"job_name":"provider-build-artifacts","needs":[],"status":"passed","build_invocation_count":1,"candidate_artifact":{"id":3100,"name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"2222222222222222222222222222222222222222222222222222222222222222"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"3333333333333333333333333333333333333333333333333333333333333333"},"evidence":{"filename":"producer-build-evidence.json","size_bytes":937,"sha256":"9792877d94a0276cb7d8ebf44220e317cbdc99d58e42537b9f8682507ab53e82"},"started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z"}
 ```
 
 #### `provider-receipt-linux-canonical.json`
 
 ```json
-{"schema_version":1,"kind":"provider-job-receipt","role":"linux-canonical","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2002,"job_name":"provider-linux-canonical","needs":["provider-build-artifacts"],"status":"passed","build_invocation_count":0,"candidate_artifact":{"id":3000,"name":"provider-candidate-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},"evidence":{"filename":"linux-canonical-evidence.json","size_bytes":1894,"sha256":"4b65c3c463c33c7a6407b2f351bfb007679fffadcdfee306f23049a3889c87c8"},"started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z"}
+{"schema_version":1,"kind":"provider-job-receipt","role":"linux-canonical","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2102,"job_name":"provider-linux-canonical","needs":["provider-build-artifacts"],"status":"passed","build_invocation_count":0,"candidate_artifact":{"id":3100,"name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"2222222222222222222222222222222222222222222222222222222222222222"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"3333333333333333333333333333333333333333333333333333333333333333"},"evidence":{"filename":"linux-canonical-evidence.json","size_bytes":1894,"sha256":"3c109642984e5ca0310398bf45a77600ebd1a7bb7c3147f19fed5904ff7bbf7e"},"started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z"}
 ```
 
 #### `provider-receipt-sdist-smoke.json`
 
 ```json
-{"schema_version":1,"kind":"provider-job-receipt","role":"sdist-smoke","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2003,"job_name":"provider-sdist-smoke","needs":["provider-build-artifacts"],"status":"passed","build_invocation_count":0,"candidate_artifact":{"id":3000,"name":"provider-candidate-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},"evidence":{"filename":"sdist-smoke-evidence.json","size_bytes":977,"sha256":"599c7d8b9efc4b2fcb2d51fdd574b0188d5882dbdfd5169f6cf8962904e3cf88"},"started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z"}
+{"schema_version":1,"kind":"provider-job-receipt","role":"sdist-smoke","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2103,"job_name":"provider-sdist-smoke","needs":["provider-build-artifacts"],"status":"passed","build_invocation_count":0,"candidate_artifact":{"id":3100,"name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"2222222222222222222222222222222222222222222222222222222222222222"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"3333333333333333333333333333333333333333333333333333333333333333"},"evidence":{"filename":"sdist-smoke-evidence.json","size_bytes":977,"sha256":"a19970d40b87690b7815c45d6e18d81d034fed545e28fce5219ad2bc2e6a5d86"},"started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z"}
 ```
 
 #### `provider-receipt-macos-delta.json`
 
 ```json
-{"schema_version":1,"kind":"provider-job-receipt","role":"macos-delta","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"job_id":2004,"job_name":"provider-macos-delta","needs":["provider-build-artifacts"],"status":"passed","build_invocation_count":0,"candidate_artifact":{"id":3000,"name":"provider-candidate-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},"evidence":{"filename":"macos-delta-evidence.json","size_bytes":1102,"sha256":"88d9f20248ec33162ced7bd39282635137f9500db44ad8517e9d9f233b3f8f2e"},"started_at":"2026-09-01T00:00:00Z","completed_at":"2026-09-01T00:10:00Z"}
+{"schema_version":1,"kind":"provider-job-receipt","role":"macos-delta","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"job_id":2104,"job_name":"provider-macos-delta","needs":["provider-build-artifacts"],"status":"passed","build_invocation_count":0,"candidate_artifact":{"id":3100,"name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"candidate_manifest":{"filename":"candidate-manifest.json","size_bytes":757,"sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e"},"wheel":{"filename":"spec_dock-0.2.4-py3-none-any.whl","size_bytes":123456,"sha256":"2222222222222222222222222222222222222222222222222222222222222222"},"sdist":{"filename":"spec_dock-0.2.4.tar.gz","size_bytes":234567,"sha256":"3333333333333333333333333333333333333333333333333333333333333333"},"evidence":{"filename":"macos-delta-evidence.json","size_bytes":1102,"sha256":"67a9e3e52b41e7adae4ce4911fd0d896a93db60dc0e6d47d96b1357c700f6039"},"started_at":"2026-09-02T00:00:00Z","completed_at":"2026-09-02T00:10:00Z"}
 ```
 
 #### `provider-evidence.json`
 
 ```json
-{"schema_version":1,"kind":"provider-evidence","repository":"chemitaro/spec-dock","source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_run_id":1001,"workflow_run_attempt":1,"status":"passed","candidate_artifact":{"id":3000,"name":"provider-candidate-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777","manifest_sha256":"122f30ab0179d47b01932b30ddb3eca77a7244e53191cdc2fc49f8839b73ae3b","wheel_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","sdist_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},"receipt_artifacts":[{"role":"producer","id":3001,"name":"provider-receipt-producer-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"},{"role":"linux-canonical","id":3002,"name":"provider-receipt-linux-canonical-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},{"role":"sdist-smoke","id":3003,"name":"provider-receipt-sdist-smoke-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333"},{"role":"macos-delta","id":3004,"name":"provider-receipt-macos-delta-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:4444444444444444444444444444444444444444444444444444444444444444"}],"roles":[{"role":"producer","job_id":2001,"job_name":"provider-build-artifacts","receipt_filename":"provider-receipt-producer.json","receipt_sha256":"abad22d4051082e74a9eccf1140d0b09c6026bb8118ee4f4a3759c378042b9f0","evidence_filename":"producer-build-evidence.json","evidence_sha256":"1733bd8d54b0f7b9ed65b636dbfec735139985fb4821decabdd01069fb238a8a"},{"role":"linux-canonical","job_id":2002,"job_name":"provider-linux-canonical","receipt_filename":"provider-receipt-linux-canonical.json","receipt_sha256":"a5edd22f555f82c7e1f70200c059c12a8c4c774fc314bf175dd24efd8fc0dc5b","evidence_filename":"linux-canonical-evidence.json","evidence_sha256":"4b65c3c463c33c7a6407b2f351bfb007679fffadcdfee306f23049a3889c87c8"},{"role":"sdist-smoke","job_id":2003,"job_name":"provider-sdist-smoke","receipt_filename":"provider-receipt-sdist-smoke.json","receipt_sha256":"f4e04a3447eb4a2ba5b9c852ca7d8a6c578fa23482d7b4618a53512f62487cc7","evidence_filename":"sdist-smoke-evidence.json","evidence_sha256":"599c7d8b9efc4b2fcb2d51fdd574b0188d5882dbdfd5169f6cf8962904e3cf88"},{"role":"macos-delta","job_id":2004,"job_name":"provider-macos-delta","receipt_filename":"provider-receipt-macos-delta.json","receipt_sha256":"b03cf780550b6b08c0b651fe21bc17614b880923d406f3c2d2e5b9bf2a261152","evidence_filename":"macos-delta-evidence.json","evidence_sha256":"88d9f20248ec33162ced7bd39282635137f9500db44ad8517e9d9f233b3f8f2e"}],"file_manifest":[{"filename":"provider-receipt-producer.json","size_bytes":1227,"sha256":"abad22d4051082e74a9eccf1140d0b09c6026bb8118ee4f4a3759c378042b9f0"},{"filename":"producer-build-evidence.json","size_bytes":937,"sha256":"1733bd8d54b0f7b9ed65b636dbfec735139985fb4821decabdd01069fb238a8a"},{"filename":"provider-receipt-linux-canonical.json","size_bytes":1262,"sha256":"a5edd22f555f82c7e1f70200c059c12a8c4c774fc314bf175dd24efd8fc0dc5b"},{"filename":"linux-canonical-evidence.json","size_bytes":1894,"sha256":"4b65c3c463c33c7a6407b2f351bfb007679fffadcdfee306f23049a3889c87c8"},{"filename":"provider-receipt-sdist-smoke.json","size_bytes":1249,"sha256":"f4e04a3447eb4a2ba5b9c852ca7d8a6c578fa23482d7b4618a53512f62487cc7"},{"filename":"sdist-smoke-evidence.json","size_bytes":977,"sha256":"599c7d8b9efc4b2fcb2d51fdd574b0188d5882dbdfd5169f6cf8962904e3cf88"},{"filename":"provider-receipt-macos-delta.json","size_bytes":1250,"sha256":"b03cf780550b6b08c0b651fe21bc17614b880923d406f3c2d2e5b9bf2a261152"},{"filename":"macos-delta-evidence.json","size_bytes":1102,"sha256":"88d9f20248ec33162ced7bd39282635137f9500db44ad8517e9d9f233b3f8f2e"}],"aggregate":{"producer_build_invocation_count":1,"consumer_build_invocation_count":0,"role_count":4,"file_count":9,"environment_id":"specdock-linux-qualification-v1","environment_fingerprint_sha256":"1111111111111111111111111111111111111111111111111111111111111111","qualification_run_count":20,"budget_run_count":5,"seeded_fault_total":27,"seeded_fault_detected":27,"status":"passed"}}
+{"schema_version":1,"kind":"provider-evidence","repository":"chemitaro/spec-dock","source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","workflow_run_id":1101,"workflow_run_attempt":1,"status":"passed","candidate_artifact":{"id":3100,"name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","manifest_sha256":"b9b35fceeeb498afd125a7afdf46cf22bbb1da6890749f262cc71f60d6c6b42e","wheel_sha256":"2222222222222222222222222222222222222222222222222222222222222222","sdist_sha256":"3333333333333333333333333333333333333333333333333333333333333333"},"receipt_artifacts":[{"role":"producer","id":3101,"name":"provider-receipt-producer-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},{"role":"linux-canonical","id":3102,"name":"provider-receipt-linux-canonical-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},{"role":"sdist-smoke","id":3103,"name":"provider-receipt-sdist-smoke-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},{"role":"macos-delta","id":3104,"name":"provider-receipt-macos-delta-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}],"roles":[{"role":"producer","job_id":2101,"job_name":"provider-build-artifacts","receipt_filename":"provider-receipt-producer.json","receipt_sha256":"316a81dffeaba2a4c6189c71deb7cb357c2afe43bf875cf96abad677151e64ea","evidence_filename":"producer-build-evidence.json","evidence_sha256":"9792877d94a0276cb7d8ebf44220e317cbdc99d58e42537b9f8682507ab53e82"},{"role":"linux-canonical","job_id":2102,"job_name":"provider-linux-canonical","receipt_filename":"provider-receipt-linux-canonical.json","receipt_sha256":"216a01f2144ad784da3b49e67b4dbb8f5af0e4f80fd570df30ae1e7441674552","evidence_filename":"linux-canonical-evidence.json","evidence_sha256":"3c109642984e5ca0310398bf45a77600ebd1a7bb7c3147f19fed5904ff7bbf7e"},{"role":"sdist-smoke","job_id":2103,"job_name":"provider-sdist-smoke","receipt_filename":"provider-receipt-sdist-smoke.json","receipt_sha256":"c8ffcbf098b9bd36043801a9350c0c73d13dddf81bb97ce2f57728a0d8206e0f","evidence_filename":"sdist-smoke-evidence.json","evidence_sha256":"a19970d40b87690b7815c45d6e18d81d034fed545e28fce5219ad2bc2e6a5d86"},{"role":"macos-delta","job_id":2104,"job_name":"provider-macos-delta","receipt_filename":"provider-receipt-macos-delta.json","receipt_sha256":"151d0e8ec6185cd4a44ce4fc3938f0e664e0fe2004e539fd7f60218077cecec3","evidence_filename":"macos-delta-evidence.json","evidence_sha256":"67a9e3e52b41e7adae4ce4911fd0d896a93db60dc0e6d47d96b1357c700f6039"}],"file_manifest":[{"filename":"provider-receipt-producer.json","size_bytes":1227,"sha256":"316a81dffeaba2a4c6189c71deb7cb357c2afe43bf875cf96abad677151e64ea"},{"filename":"producer-build-evidence.json","size_bytes":937,"sha256":"9792877d94a0276cb7d8ebf44220e317cbdc99d58e42537b9f8682507ab53e82"},{"filename":"provider-receipt-linux-canonical.json","size_bytes":1262,"sha256":"216a01f2144ad784da3b49e67b4dbb8f5af0e4f80fd570df30ae1e7441674552"},{"filename":"linux-canonical-evidence.json","size_bytes":1894,"sha256":"3c109642984e5ca0310398bf45a77600ebd1a7bb7c3147f19fed5904ff7bbf7e"},{"filename":"provider-receipt-sdist-smoke.json","size_bytes":1249,"sha256":"c8ffcbf098b9bd36043801a9350c0c73d13dddf81bb97ce2f57728a0d8206e0f"},{"filename":"sdist-smoke-evidence.json","size_bytes":977,"sha256":"a19970d40b87690b7815c45d6e18d81d034fed545e28fce5219ad2bc2e6a5d86"},{"filename":"provider-receipt-macos-delta.json","size_bytes":1250,"sha256":"151d0e8ec6185cd4a44ce4fc3938f0e664e0fe2004e539fd7f60218077cecec3"},{"filename":"macos-delta-evidence.json","size_bytes":1102,"sha256":"67a9e3e52b41e7adae4ce4911fd0d896a93db60dc0e6d47d96b1357c700f6039"}],"aggregate":{"producer_build_invocation_count":1,"consumer_build_invocation_count":0,"role_count":4,"file_count":9,"environment_id":"specdock-linux-qualification-v1","environment_fingerprint_sha256":"5555555555555555555555555555555555555555555555555555555555555555","qualification_run_count":20,"budget_run_count":5,"seeded_fault_total":27,"seeded_fault_detected":27,"status":"passed"}}
 ```
 
 #### `pre-merge-attestation-v1.json`
 
 ```json
-{"schema_version":1,"kind":"pre-merge-attestation-v1","repository":"chemitaro/spec-dock","issue_number":392,"pull_request_number":500,"spec_freeze_commit":"8888888888888888888888888888888888888888","implementation_base_sha":"9999999999999999999999999999999999999999","compatibility_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","final_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","final_head_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","compatibility_to_final_paths":[".github/workflows/provider-ci.yml"],"tracked_report_blob_sha1":"cccccccccccccccccccccccccccccccccccccccc","provider_workflow_run_id":1001,"candidate_artifact":{"id":3000,"name":"provider-candidate-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777"},"evidence_artifact":{"id":3010,"name":"provider-evidence-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","digest":"sha256:8888888888888888888888888888888888888888888888888888888888888888"},"provider_evidence_sha256":"94272066af6b6abb1968f8128ca1cc1acf634f6846cd42824ef0bbc9bd920e42","environment_fingerprint_sha256":"1111111111111111111111111111111111111111111111111111111111111111","required_contexts_before":["Provider CI / provider-tests"],"required_contexts_both":["Provider CI / provider-gate","Provider CI / provider-tests"],"canary_pull_request_number":501,"canary_block_verified":true,"required_contexts_after_old_removed":["Provider CI / provider-gate"],"required_contexts_final_head":["Provider CI / provider-gate"],"human_review_state":"approved","generated_at":"2026-09-01T01:00:00Z"}
+{"schema_version":1,"kind":"pre-merge-attestation-v1","repository":"chemitaro/spec-dock","issue_number":392,"pull_request_number":500,"spec_freeze_commit":"8888888888888888888888888888888888888888","implementation_base_sha":"9999999999999999999999999999999999999999","compatibility_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","compatibility_head_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","compatibility_workflow_run_id":1001,"final_head_sha":"cccccccccccccccccccccccccccccccccccccccc","final_head_tree":"dddddddddddddddddddddddddddddddddddddddd","final_workflow_run_id":1101,"compatibility_to_final_paths":[".github/workflows/provider-ci.yml"],"tracked_report_blob_sha1":"ffffffffffffffffffffffffffffffffffffffff","candidate_artifact":{"id":3100,"name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"evidence_artifact":{"id":3110,"name":"provider-evidence-cccccccccccccccccccccccccccccccccccccccc","digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"},"provider_evidence_sha256":"c286d143438ffcaf5c4877c809cba372f947495663507c8ab3f171edf11e00ab","environment_fingerprint_sha256":"5555555555555555555555555555555555555555555555555555555555555555","required_contexts_before":["Provider CI / provider-tests"],"required_contexts_both":["Provider CI / provider-gate","Provider CI / provider-tests"],"canary_pull_request_number":501,"canary_block_verified":true,"required_contexts_after_old_removed":["Provider CI / provider-gate"],"required_contexts_final_head":["Provider CI / provider-gate"],"human_review_state":"approved","generated_at":"2026-09-02T01:00:00Z"}
 ```
 
 #### `post-merge-closure-v1.json`
 
 ```json
-{"schema_version":1,"kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","issue_number":392,"pre_merge_comment_id":6001,"pre_merge_payload_sha256":"4e9ed28d018491c401b632d413b53bd630d0e4403d30c064f89494c2d2722103","final_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","final_head_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","merge_commit_sha":"dddddddddddddddddddddddddddddddddddddddd","merge_commit_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","tree_equal":true,"merge_actor":"chemitaro","merged_at":"2026-09-01T02:00:00Z","spec_dock_finish_status":"finished","github_issue_closed_event_id":7001,"github_issue_closed_at":"2026-09-01T02:10:00Z","generated_at":"2026-09-01T02:11:00Z"}
+{"schema_version":1,"kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","issue_number":392,"pre_merge_comment_id":6001,"pre_merge_payload_sha256":"a1f8cd2d0d5dcc21ddc83021c89d6bb754b57eafd8df846bdb9625e54f5f2ad4","final_head_sha":"cccccccccccccccccccccccccccccccccccccccc","final_head_tree":"dddddddddddddddddddddddddddddddddddddddd","merge_commit_sha":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","merge_commit_tree":"dddddddddddddddddddddddddddddddddddddddd","tree_equal":true,"merge_actor":"chemitaro","merged_at":"2026-09-02T02:00:00Z","spec_dock_finish_status":"finished","spec_dock_finish_observed_at":"2026-09-02T02:05:00Z","github_issue_closed_event_id":7001,"github_issue_closed_at":"2026-09-02T02:10:00Z","generated_at":"2026-09-02T02:11:00Z"}
 ```
 
 #### `epic-closure-v1.json`
 
 ```json
-{"schema_version":1,"kind":"epic-closure-v1","repository":"chemitaro/spec-dock","epic_issue_number":384,"implementation_issue_number":392,"post_merge_comment_id":6002,"post_merge_payload_sha256":"e1c6154b5a09c17b7d1e3eb391473e7a8f821485a9bf4fe2f982561404a89d3b","implementation_issue_closed_event_id":7001,"epic_acceptance_status":"accepted","github_epic_closed_event_id":7002,"github_epic_closed_at":"2026-09-01T02:20:00Z","generated_at":"2026-09-01T02:21:00Z"}
+{"schema_version":1,"kind":"epic-closure-v1","repository":"chemitaro/spec-dock","epic_issue_number":384,"implementation_issue_number":392,"post_merge_comment_id":6002,"post_merge_payload_sha256":"fd5f0731da069f2db9612006116c93cec674860cff618c8a8290fa26faf40a30","implementation_issue_closed_event_id":7001,"implementation_issue_closed_at":"2026-09-02T02:10:00Z","epic_acceptance_status":"accepted","github_epic_closed_event_id":7002,"github_epic_closed_at":"2026-09-02T02:20:00Z","generated_at":"2026-09-02T02:21:00Z"}
 ```
 
-The three comment fixtures use this exact four-line envelope: marker line, opening `json` fence, the compact payload without its final LF, closing fence; the comment itself ends with one LF. Their byte hashes are in the table. No prose, blank line or alternate fence is permitted.
+#### `comment-receipt-pre-merge.json`
 
-Fixture verification regenerates every object from typed constructors, compares exact bytes/size/hash, parses every JSON file, verifies all child hashes against actual bytes, and verifies each attestation comment marker/hash/body. A fixture drift requires canonical specification amendment; tests do not rewrite the expected hash table.
+```json
+{"schema_version":1,"kind":"comment-receipt-v1","attestation_kind":"pre-merge-attestation-v1","repository":"chemitaro/spec-dock","target_issue_number":392,"comment_id":6001,"comment_url":"https://api.github.com/repos/chemitaro/spec-dock/issues/comments/6001","author_login":"chemitaro","created_at":"2026-09-02T01:01:00Z","updated_at":"2026-09-02T01:01:00Z","payload_sha256":"a1f8cd2d0d5dcc21ddc83021c89d6bb754b57eafd8df846bdb9625e54f5f2ad4","body_sha256":"30d7421e38be3ef2f394d459e1ae9e3f540b705c29ba056692a3b12457651dc9","body_size_bytes":1839,"verified_at":"2026-09-02T01:01:00Z"}
+```
 
+#### `comment-receipt-post-merge.json`
 
-## 12. Traceability
+```json
+{"schema_version":1,"kind":"comment-receipt-v1","attestation_kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","target_issue_number":392,"comment_id":6002,"comment_url":"https://api.github.com/repos/chemitaro/spec-dock/issues/comments/6002","author_login":"chemitaro","created_at":"2026-09-02T02:12:00Z","updated_at":"2026-09-02T02:12:00Z","payload_sha256":"fd5f0731da069f2db9612006116c93cec674860cff618c8a8290fa26faf40a30","body_sha256":"ce1568399ba026f8001c988c49e2cb01b1184bc4879f9d3ae3f39825d292b640","body_size_bytes":896,"verified_at":"2026-09-02T02:12:00Z"}
+```
 
-- D-001–003 implement RQ-008–016.
-- D-004–006 implement RQ-006–007/010–012.
-- D-007–010 implement RQ-001–006 and #387 RQ-002–003.
-- D-011–012 implement RQ-017–020.
-- D-013–024 implement RQ-021–027.
+#### `comment-receipt-epic.json`
+
+```json
+{"schema_version":1,"kind":"comment-receipt-v1","attestation_kind":"epic-closure-v1","repository":"chemitaro/spec-dock","target_issue_number":384,"comment_id":6003,"comment_url":"https://api.github.com/repos/chemitaro/spec-dock/issues/comments/6003","author_login":"chemitaro","created_at":"2026-09-02T02:22:00Z","updated_at":"2026-09-02T02:22:00Z","payload_sha256":"d5fd9ce5208a5829f35abce7e073909351c2a23be97c2d3447aa5d5fc7696f88","body_sha256":"d7b251faeec80e0c06b47074abb80c6d6b4450aa7d3f7394753f6b6fb27b59c8","body_size_bytes":643,"verified_at":"2026-09-02T02:22:00Z"}
+```
+
+Comment bodies use exactly marker line, opening `json` fence, compact payload without its LF, closing fence and one final LF. Tests regenerate every object and receipt, compare bytes/size/hash, parse every JSON and verify every parent-child/comment relation. They never rewrite fixture expectations.
+
+## 11. Traceability
+
+- D-001–006 implement RQ-008–017 including terminal cleanup.
+- D-007–010 implement RQ-001–007 and #387 admission.
+- D-011–014 implement RQ-018–024.
+- D-015–025 implement RQ-023–031.
+- S10–S80 implement the operational gates; `owner_decisions_required=[]`.
