@@ -10,10 +10,13 @@ ID: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "b094771e089c1f31618116e84be32fcf78704409"
+  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
+
+Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md` (Issue documents use `../../artifacts/...`). Their exact wire/disposition data is not delegated to implementation.
+
 
 ## 1. Exact production topology
 
@@ -145,7 +148,7 @@ The workflow remains `Provider CI` on `pull_request` with job IDs `provider-test
 2. `test_s60_terminal_rows_are_resolved_by_collected_current_or_successor_nodes`: every row resolved/fixed-in-place or resolved/superseded; successor collected/passing; old superseded node absent。
 3. `test_s60_provider_ci_references_only_existing_successor_tests`: all workflow test paths exist/collect; the three deleted paths and other missing paths are absent。
 
-For accepted contract retirement, `tests/unit/infra/test_provider_test_ownership.py` creates unique passing absence-proof nodes using `pytest.param(id=f"retire-{sha256(old_nodeid.encode()).hexdigest()[:12]}")`; ledger maps the old row to that exact collected successor。This satisfies the current evaluator without adding retirement-evidence transport。
+Rows 4〜15 are removed by #387 and are not reinserted into the S60 ledger。For the remaining 15 rows, `tests/unit/test_provider_test_lanes.py` and `tests/unit/infra/test_provider_test_ownership.py` validate only the exact fixed-in-place/superseded relations declared in `active-failure-disposition-register.md`。No generated synthetic successor or implementation-selected replacement is allowed。
 
 `tests/unit/test_full_regression_baseline.py` remains unchanged except mechanical import formatting if needed and continues validating the temporary provider module。Current ordinary、workflow-equivalent、and main-push verifier commands all pass before PR-B merge。
 
@@ -205,6 +208,68 @@ Tree compare exact PR head tree OID vsmerge commit tree OID。
 ## 15. Root AGENTS
 
 S70 updatesroot AGENTS。Final positive commands andprovider-first/human gate required;old flags/ledger/shard/main-push guidance forbidden。S80 validates。
+
+## 16. PR-B documentation design
+
+### I392-D-016 — Exact lifecycle documentation set
+
+S40 changes lifecycle semantics onthePR-B branch; S60 ismerge-ready owner of:
+
+```text
+README.md                                      # lifecycle subsections
+src/spec_dock/assets/spec_dock/docs/migration.md
+legacy projection: spec-dock/docs/migration.md
+src/spec_dock/assets/spec_dock/docs/README.md
+legacy projection: spec-dock/docs/README.md
+```
+
+Despite the label `legacy projection` above, the two `spec-dock/docs/**` paths arecurrent dogfood projections, nothistorical evidence。Provider files areeditedfirst; `cmp` provespair equality。Exact forbidden active-lifecycle phrases atS60:
+
+```text
+spec-dock/.distribution-journal.json
+spec-dock/.distribution-retry.json
+spec-dock/.uninstall-retry.json
+current explicit spec-history purge authority
+--apply --remove-specs
+compatible newer package
+protocol 2 journal
+empty spec-dock boundary / 空の spec-dock
+```
+
+Historical `spec-dock/initiatives/**` isexcluded。README/docs test-policy text remainsuntilS70; S70 replaces`--run-full-regression`/main-push guidance。S80 performsread-only drift verification only。
+
+## 17. Normative wire implementation
+
+### I392-D-017 — Wire source and tests
+
+`../../artifacts/provider-lifecycle-wire-contract.md` isread-only normative source。Implementation symbols serializeexactlyits record/marker/result contracts。Exact wire operation enum is`install|update|migrate-0.2.3|uninstall`; terminal record operation isnull。`test_provider_lifecycle_wire_contract.py` ownsfield/type/nullability/enum/relation/golden bytes; model/public-result/CLI tests ownbehavioral integration。No catch-all code/status/action value。
+
+## 18. Failure register implementation
+
+### I392-D-018 — Register admission and terminalization
+
+`../../artifacts/active-failure-disposition-register.md` containsmachine JSON markers。S00 extractor rejectsduplicate/missing markers andcompares source27 rows pluspost-#387 expected15 rows。Rows4〜15 areexpectedremoved by#387 andstayabsent fromroot ledger。S60 updatesremaining15: row2 superseded toprovider-assets successor; rows1、3、16〜27 fixed-in-place normalpass。Temporary lane test assertsactive0/resolved15。S70 deletesledger/lane/baseline consumers beforeproviders。
+
+## 19. Frozen-head packaging dataflow
+
+### I392-D-019 — Workflow jobs and artifact receipts
+
+Final workflow exact job IDs:
+
+```text
+provider-build-artifacts
+provider-linux-canonical
+provider-sdist-smoke
+provider-macos-delta
+provider-attestation
+provider-gate
+```
+
+`provider-build-artifacts` runsUbuntu、checksout`inputs.candidate_sha`、verifies40-hex HEAD、invokes`uv build --wheel --sdist` once、writes`candidate-manifest.json`、uploadsartifact name`provider-candidate-<sha>`。Upload Actions artifact ID/digest/run ID arecapturedbyAPI receipt, notwritten backintothealready uploadedmanifest。
+
+Everyconsumer has`needs: provider-build-artifacts`、uses`actions/download-artifact@v4` forsame name/run、verifiesmanifest/file hashes/source tree、writes`consumer_build_invocation_count=0` receipt。Noconsumer invokes`uv build`, `python -m build`, `pip wheel`, orbackend hooks。`provider-gate` aggregatesconclusions only。
+
+S70 local `scripts/provider_gate.py build` isallowed onlywith`--authority pre-freeze-tooling-smoke`; output isdeleted beforeheadfreeze andcannot beusedbyS80。S80 dispatchesexact workflowinput、waitsrun、downloadsartifact/receipts、verifiesoneproducer/samebytes/build0, andusesworkflow attestation。A local final build iscontract violation。
 
 ## 16. Traceability
 

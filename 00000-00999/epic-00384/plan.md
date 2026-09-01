@@ -10,10 +10,13 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "b094771e089c1f31618116e84be32fcf78704409"
+  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
+
+Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md` (Issue documents use `../../artifacts/...`). Their exact wire/disposition data is not delegated to implementation.
+
 
 ## 1. Governance
 
@@ -33,8 +36,8 @@ Implementation開始前に、replacement manifest hashes、owner-recorded `SPEC_
 
 1. **S00 Admission and baseline**: specification lineageと#387 deltaを分離検証。
 2. **PR-A S10-S30 dormant successor**: seed policy、candidate、container bootstrap、install/update/resume。S30だけmerge gate、mainはold public product。
-3. **PR-B S40-S60 combined public cutover**: S40/S50 internal、S60だけmerge gate。Complete lifecycle、legacy proof、old engine removal、active failure terminalizationに加え、S60でcurrent `provider-ci.yml`をsuccessor testsへretargetし、`test_provider_test_lanes.py`をzero-active/all-terminal contractへ更新する。Current PR workflowとmain-push verifierの双方を独立にGREENとする。
-4. **PR-C S70-S80 gate cutover**: S70 internalでreplacement tooling/environment/workflow/AGENTS/final testsを追加し、`test_provider_test_lanes.py`、`test_full_regression_baseline.py`を含む全policy consumersをretire/replaceした後にproviders/old machineryを同じbranchで削除する。S80でfinal workflow GREEN、qualification/context/attestation後だけmerge。
+3. **PR-B S40-S60 combined public cutover**: S40/S50 internal、S60だけmerge gate。Complete lifecycle、`provider-lifecycle-wire-contract.md`、legacy proof、old engine removal、`active-failure-disposition-register.md`どおりのfailure terminalization、root/provider/dogfood lifecycle docs convergence、transitional `provider-ci.yml` retargetを同一PRで完了する。Current PR workflowとmain-push verifierを独立にGREENとする。
+4. **PR-C S70-S80 gate cutover**: S70 internalでreplacement tooling/environment/workflow/AGENTS/test-policy docs/final testsを追加し、全policy consumersをretire/replaceした後にproviders/old machineryを同じbranchで削除する。S70 local buildはpre-freeze tooling smokeだけ。S80はtracked contentを編集せずhead freeze、final Provider CI dispatch、single Linux build artifactのdownloaded-byte qualification/macOS/sdist/attestation、required-context transitionだけを行い、その後merge。
 5. **Human merge and external closure**: tree OID equality、SpecDock finish、Issue/Epic closeをexternal attestationsへ記録。
 
 ## 3. Multi-PR policy and exact merge points
@@ -42,8 +45,8 @@ Implementation開始前に、replacement manifest hashes、owner-recorded `SPEC_
 | PR | Internal steps | Only permitted main merge gate | Main state after merge |
 |---|---|---|---|
 | PR-A | S10 -> S20 -> S30 | S30 all proof GREEN | Old public product + dormant successor。Current test/workflow intact。 |
-| PR-B | S40 -> S50 -> S60 | S60 all proof GREEN | Complete final `0.2.4` lifecycle、legacy proof、old engine removed、active approved failure 0。Transitional `provider-ci.yml` references only existing successor tests; current PR workflow and main-push verifier are independently GREEN。 |
-| PR-C | S70 -> S80 | S80 all proof + required transition + external attestation | All old policy consumers retired before provider deletion、final build-once provider gate GREEN、old workflow/policy/ledger/timing/sharder removed、root AGENTS final。 |
+| PR-B | S40 -> S50 -> S60 | S60 all proof GREEN | Complete final `0.2.4` lifecycle、wire contract、legacy proof、old engine removed、`active-failure-disposition-register.md` applied、root/provider/dogfood lifecycle docs final、active approved failure 0。Transitional `provider-ci.yml` and current main-push verifier independently GREEN。 |
+| PR-C | S70 -> S80 | S80 exact final workflow run + required transition + external attestation | All old policy consumers retired before provider deletion、Linux `provider-build-artifacts` is the sole frozen-head producer、all consumers download identical bytes/build 0、old workflow/policy removed、root AGENTS/test-policy docs final。 |
 
 S40、S50、S70をmain merge candidateとしてhandoffしない。PR-B merge時にS70-only toolへ依存せず、`.github/workflows/provider-ci.yml`と`tests/unit/test_provider_test_lanes.py`をS60 ownershipへ含め、current PR/main-push workflowsの全consumerを実在する状態に保つ。PR-Cではreplacement workflow/tooling/testsを追加し、`tests/unit/test_provider_test_lanes.py`と`tests/unit/test_full_regression_baseline.py`を含むall policy consumersをprovidersより先にretire/replaceした同一change setでold providers/workflowを除去する。
 
@@ -86,6 +89,24 @@ External pre-merge attestationはrepository、Issue/PR、`SPEC_FREEZE_COMMIT`、
 
 Environment IDは`specdock-linux-qualification-v1`。Tracked descriptor、pinned base digest、x86_64、2 CPU、8 GiB、Python/uv/lock、observed fingerprintを全20 runsへ束縛する。一件でもmismatchならseries invalid。別environmentのmetricsを混合しない。
 
+### E384-P-008 — PR-B documentation and contract gates
+
+S40/S60 own lifecycle docs listed byE384-D-025。S60 must passprovider/dogfood `cmp` andthe retired-lifecycle grep overroot README andcurrent provider/dogfood docs。`provider-lifecycle-wire-contract.md` goldens and`active-failure-disposition-register.md` exact rows aretest inputs; Luna maynotchange enum/disposition toobtainGREEN。
+
+### E384-P-009 — Authoritative artifact workflow
+
+S70 validates provider-gate tooling locally beforehead freeze andlabels everylocal artifact non-authoritative。S80 startsfromaclean frozenhead andusesonlythe final Provider CI workflow:
+
+1. dispatch qualification run for exactcandidate SHA;
+2. wait forconclusion;
+3. verifyone `provider-build-artifacts` job andone immutable artifact identity;
+4. download wheel/sdist/manifest;
+5. verifyhash/source/tree andeach downstream receipt'sbuild count 0;
+6. consume workflow evidence forqualification、macOS、sdist、attestation;
+7. no local final build。
+
+Any local output、different workflow run、re-upload、second producer isinvalid acceptance evidence。
+
 ## 6. Stop and forward-fix policy
 
 次の場合、main merge gateへ進まない。
@@ -103,6 +124,9 @@ Environment IDは`specdock-linux-qualification-v1`。Tracked descriptor、pinned
 - new context required前にoldを外す、RED not blocking、settings unreadable
 - tracked report self-reference/post-merge writeback
 - tree OID mismatch
+- root/provider/dogfood lifecycle docs retain journal/retry/purge/empty-boundary guidance at S60
+- wire enum/golden mismatch or failure register row/signature/successor mismatch
+- S80 local final build、more than one frozen-head producer、downstream build invocation、artifact upload/download hash mismatch
 - root AGENTS still documents retired policy
 
 同じ#392でforward-fixし、新Issue、shard、skip、approved failure、old fallbackで回避しない。
@@ -143,7 +167,9 @@ Merge tree equality後、SpecDock `issue finish`とGitHub #392 closeをexternal 
 - #387 dependencyとspecification lineageを独立検証。
 - Only main gates are S30/S60/S80。
 - PR-Bにbroken workflow/S70-only dependencyなし。
-- Seed policy、fresh container、stable Linux environment、non-cyclic evidenceがtraceされる。
+- Seed policy、fresh container、stable Linux environment、non-cyclic evidence、`provider-lifecycle-wire-contract.md`、`active-failure-disposition-register.md`がtraceされる。
+- PR-B docs are final for lifecycle; PR-C docs are final for test policy。
+- Frozen-head artifact producer is exactly one Linux CI job; all downstream consumers build 0。
 - Required context transitionにgate gapなし。
 - Root AGENTS final policy。
 - Human merge tree equals verified PR tree。

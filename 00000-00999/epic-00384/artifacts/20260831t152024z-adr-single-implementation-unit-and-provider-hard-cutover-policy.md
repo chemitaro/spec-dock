@@ -9,14 +9,17 @@ ID: "20260831t152024z-adr"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "b094771e089c1f31618116e84be32fcf78704409"
+  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
 
+Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md` (Issue documents use `../../artifacts/...`). Their exact wire/disposition data is not delegated to implementation.
+
+
 ## Context
 
-Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。Current repository evidence `b094771e089c1f31618116e84be32fcf78704409`ではlegacy per-file engine、purge、journal、failure ledger、timing sharder、main-push Full Regression、stale operator guidanceが実在する。Issue #387は別のCurrent-surface cleanupであり、これらのProduct semanticsを変更しない。
+Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。Current repository evidence `ef183ae46febe52f0152431cb3a8b4846c9972fc`ではlegacy per-file engine、purge、journal、failure ledger、timing sharder、main-push Full Regression、stale operator guidanceが実在する。Issue #387は別のCurrent-surface cleanupであり、これらのProduct semanticsを変更しない。
 
 Strict reviewにより、main merge boundary、temporary policy consumers、resume seed intent、fresh container bootstrap、specification admission、evidence self-reference、required-context order、qualification environment、root operator guidanceをcross-documentで一意にする必要が確認された。
 
@@ -69,6 +72,22 @@ Old requiredを保持したままnew contextをrequiredへ追加/read-backし、
 ### ADR-D11 — Root operator guidance is part of cutover
 
 Root `AGENTS.md`はPR-Cでfinal provider-gate commands、single-process policy、no ledger/skip/shard/main-push-full、provider-first/dogfood、human-only mergeへ更新する。
+
+### ADR-D12 — Documentation ships with the public cutover
+
+PR-B/S60 merge includes final lifecycle guidance inroot README andprovider/dogfood migration/docs README。Legacy journal/retry、purge authority、empty-boundary language doesnot survive thefinal `0.2.4` public code。Test-policy guidance remainscurrent untilPR-C/S70, whereREADME/docs README/root AGENTS areupdated withthe final gate。S80 cannoteditdocs afterfreeze。
+
+### ADR-D13 — Exact wire contract artifact
+
+`provider-lifecycle-wire-contract.md` isaccepted normative authority forthe seven-key record、operation/state relations、resume identity、public result/action/status/code enums、nullability、JSON/text/exit goldens。Implementation doesnotinventfallback values。
+
+### ADR-D14 — Exact active failure register
+
+`active-failure-disposition-register.md` fixesall27 current ledger rows、#387 expected 12-row removal、andfinal fixed-in-place/superseded successor perrow。Unexpected post-#387 delta blocksbeforeS10 andrequirescanonical update plusStrict re-review。Luna doesnotchoose dispositions。
+
+### ADR-D15 — Linux CI is the sole final packaging producer
+
+Aftertracked headfreeze, onlyfinal `provider-build-artifacts` Linux job mayinvoke packaging。It buildsonewheel+sdist+manifest anduploadsoneimmutable Actions artifact。Linux qualification、macOS delta、sdist smoke、attestation download thesamebytes withbuild count0。S70 local build ispre-freeze tooling smoke; S80 neverbuilds locally。
 
 ## Rejected alternatives
 

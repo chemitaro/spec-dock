@@ -10,10 +10,13 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "b094771e089c1f31618116e84be32fcf78704409"
+  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
+
+Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md` (Issue documents use `../../artifacts/...`). Their exact wire/disposition data is not delegated to implementation.
+
 
 ## 1. Design intent
 
@@ -222,7 +225,7 @@ S60 removes old product engine and duplicate tests、terminalizes all active fai
 | `tests/integration/test_epic_00343_distribution.py` | `uv run pytest --run-full-regression --full-regression-shard tests/integration/test_provider_lifecycle_artifacts.py tests/integration/test_provider_lifecycle_tripwire.py` |
 | platform-specific parity formerly embedded in old files | macOS-only conditional `uv run pytest --run-full-regression --full-regression-shard tests/platform/macos/test_provider_lifecycle_macos.py` |
 
-`tests/unit/test_provider_test_lanes.py` removes constants/assertions pointing to deleted files、removes deleted `test_init_update.py` IDs from its mirrored required-fast set、and adds exact tests `test_s60_full_regression_ledger_has_zero_active_rows`、`test_s60_terminal_rows_are_resolved_by_collected_current_or_successor_nodes`、`test_s60_provider_ci_references_only_existing_successor_tests`。Accepted retirement rows use unique absence-proof successor nodes in `tests/unit/infra/test_provider_test_ownership.py` with pytest IDs `retire-<sha256(old_nodeid)[:12]>`; the temporary ledger encodes them as resolved/superseded because current observations carry no retirement evidence。
+`tests/unit/test_provider_test_lanes.py` removes constants/assertions pointing to deleted files、removes deleted `test_init_update.py` IDs from its mirrored required-fast set、and adds exact tests `test_s60_register_source_and_post_387_delta_are_exact`、`test_s60_full_regression_ledger_has_zero_active_rows_and_exact_resolved_relations`、`test_s60_terminal_successor_nodes_are_collected_and_normally_pass`、`test_s60_provider_ci_references_only_existing_successor_tests`。Rows 4〜15 remain absent after #387; the temporary ledger contains only the remaining 15 rows and encodes the exact fixed-in-place/superseded relations from `active-failure-disposition-register.md`。
 
 S60 retains current `tests/conftest.py`、`tests/unit/test_full_regression_baseline.py`、ledger、timing、quality scripts、`provider-full-regression.yml`。Deleted node references are updated mechanically。Active approved failure 0。Both PR workflow-equivalent commands and current main-push verifier must pass。No `scripts/provider_gate.py` dependency。PR-B main remains releasable。
 
@@ -244,9 +247,31 @@ S70 is non-main。S80 is the only PR-C merge gate。PR-B current gates and PR-C 
 
 ## 9. Final provider gate and environment
 
-### E384-D-019 — Gate topology
+### E384-D-019 — Gate topology and single final producer
 
-Linux job verifies PR head、builds wheel/sdist once、verifies manifest/environment、runs one canonical pytest process/worker1、sdist smoke。macOS downloads same wheel andrunsdelta only。Aggregate `Provider CI / provider-gate` runsno tests/rebuild。No main-push Full Regression afterPR-C。
+Final `.github/workflows/provider-ci.yml` has exact jobs:
+
+```text
+provider-build-artifacts (ubuntu)
+  checkout exact candidate_sha
+  -> one `uv build --wheel --sdist` invocation
+  -> candidate-manifest.json
+  -> upload immutable `provider-candidate-<40-sha>`
+
+provider-linux-canonical
+provider-sdist-smoke
+provider-macos-delta
+provider-attestation
+  each needs provider-build-artifacts
+  each downloads the exact artifact
+  each verifies source SHA/file SHA-256/Actions artifact identity
+  each has packaging build invocation count 0
+
+provider-gate
+  aggregate only; no checkout/build/test
+```
+
+`provider-build-artifacts` is the only authoritative final frozen-head packaging producer. Local S70 build is explicitly `authority=pre-freeze-tooling-smoke` and is deleted beforehead freeze. S80 dispatches/waits/downloads the final workflow artifact and never executes a local final build。No main-push Full Regression afterPR-C。
 
 ### E384-D-020 — Stable Linux qualification
 
@@ -288,6 +313,47 @@ Tracked report hasnoown hash/final head/post-merge facts。External canonical JS
 
 PR-C updatesroot `AGENTS.md` toretainprovider-first/dogfood andhuman-only merge、document`make lint`/`make provider-test`/`make provider-qualify` anddirect gate commands、one-process Linux/same-wheel macOS delta、human-admin required transition。Removeold flags、policy skip、ledger、shard、main-push Full Regression instructions。
 
+## 12. PR-B documentation and normative artifacts
+
+### E384-D-025 — Documentation ownership split
+
+S40 updates final lifecycle semantics on its non-main PR-B branch。S60 owns merge-ready convergence for:
+
+```text
+README.md                                  # lifecycle sections only
+src/spec_dock/assets/spec_dock/docs/migration.md
+repo projection: spec-dock/docs/migration.md
+src/spec_dock/assets/spec_dock/docs/README.md
+repo projection: spec-dock/docs/README.md
+```
+
+Provider source is edited first andprojection is byte-equal。At S60, lifecycle docs contain no active journal/retry/purge/empty-boundary guidance。Root README anddocs README test-policy paragraphs remaincurrent untilS70。S70 owns root README/AGENTS/docs README test-policy replacement。S80 isread-only fordocs; drift returns work toS70 beforefreeze。
+
+### E384-D-026 — Wire contract integration
+
+`provider-lifecycle-wire-contract.md` defines exact record fields/state relations、operation wire、service/public result、action enums、text/JSON/exit goldens。`test_provider_lifecycle_wire_contract.py`、model/result/CLI tests implement this without reinterpreting prose。Any mismatch isdesign failure, not an implementation choice。
+
+### E384-D-027 — Failure disposition register integration
+
+`active-failure-disposition-register.md` contains machine-readable 27 rows。S00 validates source ledger andpost-#387 exact 15-row state。S60 appliesfixed dispositions toremaining 15 rows andvalidates exact successors for#387-removed rows without reinserting them。S70 retires temporary ledger/policy consumers only after final tests own current behavior。
+
+### E384-D-028 — Frozen-head artifact dataflow
+
+The final candidate is frozen beforeworkflow dispatch。The Linux build job emits:
+
+```json
+{
+  "schema_version": 1,
+  "source_sha": "<40 hex>",
+  "source_tree_oid": "<40 hex>",
+  "build_invocation_count": 1,
+  "wheel": {"filename": "...whl", "size": 0, "sha256": "<64 hex>"},
+  "sdist": {"filename": "...tar.gz", "size": 0, "sha256": "<64 hex>"}
+}
+```
+
+Actions artifact ID/digest/name/run ID areexternal immutable upload receipt fields。Downstream jobs record`build_invocation_count=0` andverifydownloaded hashes。Attestation consumes receipts; it doesnot rebuild。A branch move、head mismatch、duplicate producer、second build invocation、downloaded hash mismatch invalidates the run。
+
 ## 13. Traceability
 
 | Requirement | Design |
@@ -300,3 +366,7 @@ PR-C updatesroot `AGENTS.md` toretainprovider-first/dogfood andhuman-only merge�
 | E384-RQ-017 | D-021 |
 | E384-RQ-018〜019 | D-022〜023 |
 | E384-RQ-020 | D-024 |
+| E384-RQ-021 | D-025 |
+| E384-RQ-022 | D-026 |
+| E384-RQ-023 | D-027 |
+| E384-RQ-024 | D-019、D-028 |
