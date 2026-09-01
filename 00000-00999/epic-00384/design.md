@@ -10,7 +10,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
@@ -211,13 +211,36 @@ Startup `sitecustomize`はtarget-scoped Python mutation auditと`ctypes.CDLL`の
 
 Pure/model ownsstate/record/policy/result。Filesystem/service ownscontainer/no-follow/atomic/fault。CLI ownsparser/text/JSON/exit。Built artifact ownsmigration/lifecycle/tripwire/artifact identity。macOS ownsplatform delta only。
 
-### E384-D-017 — PR-B continuity
+### E384-D-017 — PR-B transitional current-gate contract
 
-S60 removesold product engine andduplicate tests、terminalizesall active failures、but retains current `tests/conftest.py`、ledger、timing、quality scripts、`provider-full-regression.yml`。Deleted node references areupdated mechanically。Active approved failure 0。S60 usescurrent verifier andself-contained `tests/unit/infra/test_provider_test_ownership.py`;no `scripts/provider_gate.py` dependency。PR-B main remainsreleasable。
+S60 removes old product engine and duplicate tests、terminalizes all active failures、and owns the temporary current-gate repair paths `.github/workflows/provider-ci.yml` and `tests/unit/test_provider_test_lanes.py`。The workflow preserves its name、`pull_request` trigger、job IDs `provider-tests` / `provider-distribution-parity`、Ubuntu/macOS matrix、checkout/head verification、Python/uv setup、static analysis。Only deleted test references are retargeted:
 
-### E384-D-018 — PR-C atomic replacement
+| Deleted S60 reference | Required S60 successor command |
+|---|---|
+| `tests/unit/infra/test_managed_distribution.py` | `uv run pytest tests/unit/infra/test_provider_lifecycle_model.py tests/unit/infra/test_provider_lifecycle_candidate.py tests/unit/infra/test_provider_lifecycle_filesystem.py tests/unit/infra/test_provider_lifecycle_service.py tests/unit/infra/test_provider_lifecycle_public_result.py tests/unit/infra/test_provider_lifecycle_faults.py tests/unit/infra/test_provider_assets.py tests/unit/infra/test_provider_test_ownership.py` |
+| `tests/cli_runtime/test_distribution_cutover.py` | `uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_provider_lifecycle.py tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_update.py` |
+| `tests/integration/test_epic_00343_distribution.py` | `uv run pytest --run-full-regression --full-regression-shard tests/integration/test_provider_lifecycle_artifacts.py tests/integration/test_provider_lifecycle_tripwire.py` |
+| platform-specific parity formerly embedded in old files | macOS-only conditional `uv run pytest --run-full-regression --full-regression-shard tests/platform/macos/test_provider_lifecycle_macos.py` |
 
-S70 same branch adds`provider_gate.py`、environment files、new workflow、Makefile/static analysis、root AGENTS andtests beforedeletingold policy hook、ledger、timing、quality sharder、main-push workflow、marker declarations。S70 non-main。S80 qualification/context/attestation isonly PR-C merge gate。Main never seesbroken workflow/missing consumer。
+`tests/unit/test_provider_test_lanes.py` removes constants/assertions pointing to deleted files、removes deleted `test_init_update.py` IDs from its mirrored required-fast set、and adds exact tests `test_s60_full_regression_ledger_has_zero_active_rows`、`test_s60_terminal_rows_are_resolved_by_collected_current_or_successor_nodes`、`test_s60_provider_ci_references_only_existing_successor_tests`。Accepted retirement rows use unique absence-proof successor nodes in `tests/unit/infra/test_provider_test_ownership.py` with pytest IDs `retire-<sha256(old_nodeid)[:12]>`; the temporary ledger encodes them as resolved/superseded because current observations carry no retirement evidence。
+
+S60 retains current `tests/conftest.py`、`tests/unit/test_full_regression_baseline.py`、ledger、timing、quality scripts、`provider-full-regression.yml`。Deleted node references are updated mechanically。Active approved failure 0。Both PR workflow-equivalent commands and current main-push verifier must pass。No `scripts/provider_gate.py` dependency。PR-B main remains releasable。
+
+### E384-D-018 — PR-C consumer-first atomic replacement
+
+S70 same branch first adds `provider_gate.py`、environment files、final workflow、Makefile/static analysis、root `AGENTS.md`、and final gate tests。Before deleting any policy provider, it then retires or replaces every remaining current-policy consumer, including the exact files `tests/unit/test_provider_test_lanes.py` and `tests/unit/test_full_regression_baseline.py`。The transitional `.github/workflows/provider-ci.yml` is rewritten to the final topology; it is not deleted。
+
+The required order is:
+
+1. Add final gate tooling、environment、workflow、and replacement tests; establish RED for forbidden old consumers/providers。
+2. Delete `tests/unit/test_provider_test_lanes.py` after its final-policy absence/collection responsibilities are represented in `tests/unit/infra/test_provider_gate.py` and `tests/unit/infra/test_provider_test_ownership.py`。
+3. Delete `tests/unit/test_full_regression_baseline.py` after the old baseline evaluator has no final Product authority and replacement gate tests cover final fail-closed artifact/node/result evaluation。
+4. Rewrite all remaining callsites in `.github/workflows/provider-ci.yml`、`AGENTS.md`、`pyproject.toml`、Makefile/static-analysis/test helpers。
+5. Run a pre-provider-deletion consumer inventory for `tests.conftest`、`scripts.quality.full_regression_baseline`、`scripts.quality.verify_full_regression`、legacy pytest options、ledger/timing paths; only the provider files scheduled for deletion may remain。
+6. Delete `tests/conftest.py`、both quality modules、ledger、timing、old main-push workflow、and marker policy。
+7. Prove post-deletion imports/references 0、ordinary collection GREEN、final workflow references only existing tools/tests、and final provider gate GREEN。
+
+S70 is non-main。S80 is the only PR-C merge gate。PR-B current gates and PR-C final gate are independent GREEN invariants; main never observes a provider without all consumers or a workflow with missing commands。
 
 ## 9. Final provider gate and environment
 

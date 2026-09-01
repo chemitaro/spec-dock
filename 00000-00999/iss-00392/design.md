@@ -10,7 +10,7 @@ ID: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
@@ -123,23 +123,68 @@ Required policy tests: fresh seed faults resume create; update/reinstall/migrati
 
 Required container tests: absent success、existing real + unknown child、symlink/non-dir、absence race、failure aftermkdir/beforeowner/beforerecord、empty cleanup、cleanup failure/foreign child partial、uninstall keepscontainer、no recursive cleanup。
 
-## 11. PR-B continuity
+## 11. PR-B transitional workflow and lane consumers
 
-S60 removesold product engine/tests only。Current conftest/ledger/timing/quality/workflow stayoperational。Ledger active approved failures0 andstale node refs updated。Ownership checked bystandalone pytest。Current verifier GREEN。No provider_gate dependency。
+### I392-D-011 — S60 exact current-gate repair
 
-## 12. PR-C gate replacement
+S60 exact owned paths include:
 
-### I392-D-011 — Atomic replacement set
+```text
+.github/workflows/provider-ci.yml
+tests/unit/test_provider_test_lanes.py
+tests/conftest.py                                # stale required-fast/node refs only
+full-regression-ledger.json                      # zero active, all terminal
+full-regression-timing-weights.json              # deleted node refs only
+```
 
-S70 addsprovider gate、environment Dockerfile/descriptor、gate tests、Makefile/static analysis、new provider workflow、root AGENTS beforedeletingold workflow/policy/ledger/timing/quality scripts/markers。S70 non-main;S80 onlymerge。
+The workflow remains `Provider CI` on `pull_request` with job IDs `provider-tests` and `provider-distribution-parity`、same matrix/setup/checkouts。Only test commands are mapped to already-existing successor paths specified in I392-RQ-020。No artifact build-once、aggregate gate、environment descriptor、required-context redesign is introduced in S60。
 
-### I392-D-012 — Provider gate subcommands
+`tests/unit/test_provider_test_lanes.py` keeps current policy imports until S70 but removes all old distribution/test_init_update constants。It owns three exact S60 assertions:
 
-`freeze-linux-environment`、`build`、`verify-artifact`、`verify-environment`、`verify-node-ownership`、`canonical`、`macos-delta`、`qualify`、`summarize`、`emit-attestation`。Build callsoneuv build。Canonical onepytest child/no xdist。
+1. `test_s60_full_regression_ledger_has_zero_active_rows`: no `lifecycle=active` row。
+2. `test_s60_terminal_rows_are_resolved_by_collected_current_or_successor_nodes`: every row resolved/fixed-in-place or resolved/superseded; successor collected/passing; old superseded node absent。
+3. `test_s60_provider_ci_references_only_existing_successor_tests`: all workflow test paths exist/collect; the three deleted paths and other missing paths are absent。
 
-### I392-D-013 — Environment descriptor
+For accepted contract retirement, `tests/unit/infra/test_provider_test_ownership.py` creates unique passing absence-proof nodes using `pytest.param(id=f"retire-{sha256(old_nodeid.encode()).hexdigest()[:12]}")`; ledger maps the old row to that exact collected successor。This satisfies the current evaluator without adding retirement-evidence transport。
 
-ID `specdock-linux-qualification-v1`; runner label、x86_64、base ref/digest、2CPU、8GiB、Python series、exactuv、lock hash。Freeze resolvesonce/refuses overwrite drift。Evidence exact fingerprint allruns。
+`tests/unit/test_full_regression_baseline.py` remains unchanged except mechanical import formatting if needed and continues validating the temporary provider module。Current ordinary、workflow-equivalent、and main-push verifier commands all pass before PR-B merge。
+
+## 12. PR-C consumer-first gate replacement
+
+### I392-D-012 — Exact S70 consumer retirement set
+
+S70 creates final provider gate/environment/workflow/AGENTS and replacement tests first。Then it retires/replaces these exact current-policy consumers before provider deletion:
+
+```text
+tests/unit/test_provider_test_lanes.py            # delete; final policy absence -> provider gate tests
+tests/unit/test_full_regression_baseline.py       # delete; baseline provider retired
+.github/workflows/provider-ci.yml                 # rewrite transitional commands to final topology
+.github/workflows/provider-full-regression.yml    # delete after final PR workflow is GREEN
+AGENTS.md                                         # rewrite old operator policy
+pyproject.toml                                    # remove fast/full marker declarations
+Makefile                                          # replace old commands if present
+scripts/static_analysis/run.sh                    # include final tooling, remove old refs
+```
+
+Provider/data deletions occur only after those consumers/callsites are closed:
+
+```text
+tests/conftest.py
+scripts/quality/full_regression_baseline.py
+scripts/quality/verify_full_regression.py
+scripts/quality/__init__.py if empty
+full-regression-ledger.json
+full-regression-timing-weights.json
+fast/full decorators/options/helpers
+```
+
+Before deleting providers, run exact consumer inventory over `.github scripts tests AGENTS.md Makefile pyproject.toml full-regression-*.json` for `tests.conftest`、`scripts.quality.full_regression_baseline`、`scripts.quality.verify_full_regression`、`--run-full-regression`、`--full-regression-shard`、`--full-regression-observation`、`POLICY_SKIP_REASON`、ledger/timing paths。After the two unit consumers and other callsites are deleted/replaced, only the provider files scheduled for deletion may match。Then delete providers and prove `importlib.util.find_spec(...) is None`、ordinary collection succeeds with no legacy options、final workflow references only existing final tools/tests。
+
+### I392-D-013 — Provider gate subcommands and environment
+
+`freeze-linux-environment`、`build`、`verify-artifact`、`verify-environment`、`verify-node-ownership`、`canonical`、`macos-delta`、`qualify`、`summarize`、`emit-attestation`。Build calls one `uv build`。Canonical launches one pytest child/no xdist。Environment ID `specdock-linux-qualification-v1`; runner label、x86_64、base ref/digest、2 CPU、8 GiB、Python series、exact uv、lock hash; all run fingerprints exact。
+
+S70 is non-main。S80 is the only PR-C merge gate and must prove final provider workflow GREEN independently from the PR-B transitional workflow evidence。
 
 ## 13. Required context
 
@@ -170,6 +215,6 @@ S70 updatesroot AGENTS。Final positive commands andprovider-first/human gate re
 | RQ-004〜005 | D-001、D-004、D-007〜010 |
 | RQ-006〜007 | D-002〜003 |
 | RQ-013〜019 | D-007〜010、public result |
-| RQ-020〜023 | tests、D-011〜013 |
+| RQ-020〜023 | D-011〜013（S60 workflow/lane closure、S70 consumer-first replacement、final gate） |
 | RQ-024 | required context |
 | RQ-025〜026 | D-015、root AGENTS |

@@ -11,7 +11,7 @@ Planning Level: "critical"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
@@ -24,8 +24,8 @@ repository_evidence:
 4.各stepはimplementationとfocused verificationを含むvertical milestone。
 5. S40/S50はPR-B internal checkpoint、S60だけPR-B main gate。
 6. S70はPR-C internal checkpoint、S80だけPR-C main gate。
-7. S60ではcurrent workflow/policy consumersを壊さずS70-only toolへ依存しない。
-8. S70はreplacement gate/environment/workflow/AGENTSを追加してからold machineryを同じbranchで削除する。
+7. S60は`.github/workflows/provider-ci.yml`と`tests/unit/test_provider_test_lanes.py`をowned pathとし、deleted test pathsをexisting successorsへretargetし、S70-only toolingなしでcurrent PR/main-push gatesを別々にGREENにする。
+8. S70はreplacement gate/environment/workflow/AGENTS/final testsを追加し、`tests/unit/test_provider_test_lanes.py`、`tests/unit/test_full_regression_baseline.py`を含むall remaining policy consumersをretire/replaceしてからproviders/old machineryを同じbranchで削除する。
 9. Tracked reportはpre-merge factsのみ。Final source-bound/post-merge factsはexternal attestation。
 10. Agentはmerge/required settings/Issue closeを実行しない。
 11. Stop条件は同じ#392でforward-fix。New Issue、bridge、toggle、skip、ledger approval、old fallbackは禁止。
@@ -471,11 +471,11 @@ S50 isnot a main merge point。Same branch continuesS60。No S50-only handoff。
 
 I392-RQ-016〜017。
 
-## I392-S60 — Old engine/test terminalization and PR-B main merge gate
+## I392-S60 — Old engine/test terminalization, transitional workflow repair, and PR-B main merge gate
 
 **Objective and contract-visible outcome**
 
-Old per-file/journal/purge engineとduplicate testsを削除しall active failuresをterminalizeする。同時にcurrent main-push verifierの全consumerを保持・更新してGREENにする。S70-only provider gateへ依存しない。
+Old per-file/journal/purge engine and duplicate tests are removed、all active failures are terminalized、and both current provider workflows remain independently executable。The PR workflow is mechanically retargeted from deleted tests to S10〜S50 successors; current lane-policy tests prove zero active rows/all terminal entries。No final provider-gate redesign or S70-only tool is introduced。
 
 **Exact owned repository paths and symbols**
 
@@ -490,7 +490,7 @@ tests/cli_runtime/test_distribution_cutover.py
 tests/integration/test_epic_00343_distribution.py
 ```
 
-Add/update:
+Create/update:
 
 ```text
 src/spec_dock/context_pack.py
@@ -498,109 +498,193 @@ src/spec_dock/cli.py
 tests/unit/infra/test_provider_assets.py
 tests/unit/infra/test_provider_test_ownership.py
 tests/provider_test_ownership.json
-tests/** exact active failure owners
-full-regression-ledger.json                     # zero active; node updates
-full-regression-timing-weights.json              # deleted node refs only
-tests/conftest.py                                # deleted node refs only; policy retained
+tests/unit/test_provider_test_lanes.py
+.github/workflows/provider-ci.yml
+tests/conftest.py                                # remove deleted required-fast/node refs only
+full-regression-ledger.json                      # zero active, all resolved terminal rows
+full-regression-timing-weights.json              # deleted/renamed node refs only
+tests/**                                         # exact active failure owners only
+pyproject.toml                                   # obsolete deleted-file mypy entries only
 ```
 
-Must retain functional untilPR-C:
+Must remain present and functionally current through PR-B:
 
 ```text
+tests/unit/test_full_regression_baseline.py
+tests/conftest.py
 scripts/quality/full_regression_baseline.py
 scripts/quality/verify_full_regression.py
+scripts/quality/__init__.py
+full-regression-ledger.json
+full-regression-timing-weights.json
 .github/workflows/provider-full-regression.yml
-pytest fast/full policy and markers
+pytest fast/full policy/options/markers
 ```
+
+`.github/workflows/provider-ci.yml` exact transitional edits:
+
+- Preserve workflow name `Provider CI`、`pull_request` trigger、job IDs、Ubuntu/macOS matrix、checkout/head verification、Python/uv/static-analysis steps。
+- Replace `tests/unit/infra/test_managed_distribution.py` with `tests/unit/infra/test_provider_lifecycle_model.py`、`test_provider_lifecycle_candidate.py`、`test_provider_lifecycle_filesystem.py`、`test_provider_lifecycle_service.py`、`test_provider_lifecycle_public_result.py`、`test_provider_lifecycle_faults.py`、`test_provider_assets.py`、`test_provider_test_ownership.py`。
+- Replace `tests/cli_runtime/test_distribution_cutover.py` with `tests/cli_runtime/test_provider_lifecycle.py`、`test_uninstall.py`、`test_update.py` under current permission flags。
+- Replace `tests/integration/test_epic_00343_distribution.py` with `tests/integration/test_provider_lifecycle_artifacts.py`、`test_provider_lifecycle_tripwire.py` under current permission flags。
+- Add a macOS-only conditional step for `tests/platform/macos/test_provider_lifecycle_macos.py` under current permission flags。
+- Do not build artifacts、add an aggregate job、change context names、or remove the matrix; those belong to S70。
 
 **Explicit non-owned and no-touch paths**
 
-Provider workflow redesign/removal、root AGENTS final policy、provider gate/environment、consumer data。
+Final provider gate/environment/root AGENTS redesign、old policy provider deletion、human settings、consumer data/seeds、release。
 
 **Prerequisites and dependency**
 
-S50 allproof GREEN、same PR-B branch、no old public callsite。
+S50 all migration/tripwire proof GREEN。S60 runs in the same PR-B branch; S40/S50 are not merged separately。All successor files named by the workflow exist and collect before the workflow edit。
 
-**RED evidence**
+**RED evidence or justified no-new-test rule**
 
-Old imports/files grep、ownership duplicate/missing tests、each active row focused RED/retirement authority、context/assets successor tests、current verifier fails ifstale node remains。
+Before GREEN:
+
+1. Temporarily apply the old workflow commands after the old test paths are removed; each fails because the referenced path is missing。
+2. `tests/unit/test_provider_test_lanes.py` current assertions fail because the ledger has active rows、deleted `test_init_update.py`/distribution constants、and old workflow refs。
+3. Current full verifier fails if any deleted node remains in ledger/timing/conftest or a successor is not collected。
+4. A new absence-proof successor fails while the retired behavior/file/reference still exists。
+
+Add/replace exact lane tests:
+
+```text
+tests/unit/test_provider_test_lanes.py::test_s60_full_regression_ledger_has_zero_active_rows
+tests/unit/test_provider_test_lanes.py::test_s60_terminal_rows_are_resolved_by_collected_current_or_successor_nodes
+tests/unit/test_provider_test_lanes.py::test_s60_provider_ci_references_only_existing_successor_tests
+```
 
 **Smallest implementation action**
 
-Extract context behavior、move asset assertions、terminalizeeach row fix/successor/retirement、addstandalone ownership pytest、deleteold engine/tests、updatecurrent ledger/timing/conftest exact refs、runordinary/current verifier。Do notdeletecurrent policy consumers orcallprovider_gate。
+1. Extract surviving context behavior and move retained asset assertions。
+2. Create/update successor lifecycle and absence-proof nodes before old deletion。
+3. For each active ledger row choose only fixed-in-place or superseded successor。Accepted retirement uses deterministic unique absence-proof successor ID `tests/unit/infra/test_provider_test_ownership.py::test_terminalized_retirement_absence[retire-<sha256(old_nodeid)[:12]>]`; the report records retirement authority。
+4. Update `tests/unit/test_provider_test_lanes.py` to zero-active/all-resolved current-policy contract and remove old constants。
+5. Remove old required-fast IDs from both `tests/conftest.py` and lane test; new provider asset tests remain ordinary-fast by default。
+6. Update `.github/workflows/provider-ci.yml` using the exact transitional mapping above without topology redesign。
+7. Delete old engine/manifest/tests。
+8. Update ledger/timing/conftest exact node refs; ledger has no active or retired rows under the current verifier, only resolved/fixed-in-place or resolved/superseded。
+9. Run lane/baseline tests、ordinary suite、each workflow-equivalent command、and current 4-shard verifier。
+10. Confirm no S60 command/import references `scripts/provider_gate.py`。
 
 **Focused verification commands**
 
 ```bash
 test -z "$(git grep -nE 'execute_explicit_spec_history_purge_distribution|from spec_dock\.managed_distribution|import spec_dock\.managed_distribution' -- src tests || true)"
-uv run pytest -q tests/unit/infra/test_provider_assets.py \
+! grep -F 'tests/unit/infra/test_managed_distribution.py' .github/workflows/provider-ci.yml
+! grep -F 'tests/cli_runtime/test_distribution_cutover.py' .github/workflows/provider-ci.yml
+! grep -F 'tests/integration/test_epic_00343_distribution.py' .github/workflows/provider-ci.yml
+grep -F 'tests/unit/infra/test_provider_lifecycle_service.py' .github/workflows/provider-ci.yml
+grep -F 'tests/cli_runtime/test_provider_lifecycle.py' .github/workflows/provider-ci.yml
+grep -F 'tests/integration/test_provider_lifecycle_artifacts.py' .github/workflows/provider-ci.yml
+uv run pytest -q \
+  tests/unit/test_provider_test_lanes.py \
+  tests/unit/test_full_regression_baseline.py \
+  tests/unit/infra/test_provider_assets.py \
   tests/unit/infra/test_provider_test_ownership.py
+uv run pytest -q \
+  tests/unit/infra/test_provider_lifecycle_model.py \
+  tests/unit/infra/test_provider_lifecycle_candidate.py \
+  tests/unit/infra/test_provider_lifecycle_filesystem.py \
+  tests/unit/infra/test_provider_lifecycle_service.py \
+  tests/unit/infra/test_provider_lifecycle_public_result.py \
+  tests/unit/infra/test_provider_lifecycle_faults.py \
+  tests/unit/infra/test_provider_assets.py \
+  tests/unit/infra/test_provider_test_ownership.py
+uv run pytest --run-full-regression --full-regression-shard -q \
+  tests/cli_runtime/test_provider_lifecycle.py \
+  tests/cli_runtime/test_uninstall.py \
+  tests/cli_runtime/test_update.py
+uv run pytest --run-full-regression --full-regression-shard -q \
+  tests/integration/test_provider_lifecycle_artifacts.py \
+  tests/integration/test_provider_lifecycle_tripwire.py
+# macOS runner
+uv run pytest --run-full-regression --full-regression-shard -q \
+  tests/platform/macos/test_provider_lifecycle_macos.py
+uv run python -c 'import json,pathlib; rows=json.loads(pathlib.Path("full-regression-ledger.json").read_text())["failure_paths"]; assert not [r for r in rows if r.get("lifecycle")=="active"]; assert all(r.get("lifecycle")=="resolved" and r.get("resolution_mode") in {"fixed-in-place","superseded"} for r in rows)'
 uv run pytest -q
 uv run python -m scripts.quality.verify_full_regression --shards 4
 make lint
 test -f .github/workflows/provider-full-regression.yml
 test -f scripts/quality/verify_full_regression.py
 test -f tests/conftest.py
+! git grep -n 'scripts/provider_gate.py' -- .github/workflows/provider-ci.yml tests/unit/test_provider_test_lanes.py tests/unit/test_full_regression_baseline.py
 ```
 
 **Expected observable result**
 
-Old product engine absent、active approved failure0、current verifier/main-push workflow GREEN、no missing consumer、no provider_gate dependency。
+Old product engine absent、the three old workflow paths absent、all workflow successor paths exist/collect、active approved failure 0、all ledger entries terminal、transitional Provider CI commands GREEN on Ubuntu/macOS、current main-push verifier GREEN、no missing consumer、no provider_gate dependency。
 
 **Evidence to record in Issue report.md**
 
-Deletion table、failure terminalization table、ownership output、ledger active0、current verifier logs、retained consumer inventory。
+Deletion table、workflow before/after command map、lane-test before/after assertions、failure terminalization table、ownership output、ledger active count 0、ordinary/workflow-equivalent/current verifier logs、retained consumer inventory。
 
 **Stop conditions and escalation owner**
 
-Unterminalized row/security gap/current verifier broken/S70-only command/workflow consumer deletion。Owner: Product/test/CI owner。No merge。
+Unterminalized row、security gap、successor path absent/not collected、transitional Provider CI failure、current verifier failure、S70-only command、or current workflow consumer deletion。Owner: Product/test/CI owner。No merge。
 
 **Cleanup**
 
-Obsolete fixtures/imports/mypy entries only。Keepcurrent policy infrastructure intentionally。
+Remove obsolete fixtures/imports/mypy entries only。Keep current policy infrastructure intentionally。
 
 **PR-B main merge gate invariant**
 
-S60 is the only PR-B main merge gate。S40+S50+S60 allproof GREEN。Human merge後のmain hascomplete final `0.2.4` lifecycle、no old fallback、active approved failure0、andstill-current main-push workflow withallconsumers intact/GREEN。No bridge/toggle。
+S60 is the only PR-B main merge gate。S40+S50+S60 all proof GREEN。Human merge後のmain has complete final `0.2.4` lifecycle、no old fallback、active approved failure 0、transitional `Provider CI` referencing only existing successor tests、and the still-current main-push workflow with all consumers intact/GREEN。No bridge/toggle。
 
 **Requirement and design trace IDs**
 
 I392-RQ-018〜021、I392-D-011〜013、PR continuity。
 
-## I392-S70 — Replacement provider gate/environment/AGENTS and atomic old policy removal
+## I392-S70 — Consumer-first replacement provider gate/environment/AGENTS and atomic old policy removal
 
 **Objective and contract-visible outcome**
 
-PR-C branchでreplacement gate、stable Linux environment、final workflow、root AGENTSを作成し、same branch/change setでold policy/workflow machineryを削除する。S70 internal only。
+PR-C branchでreplacement gate、stable Linux environment、final workflow、root AGENTS、replacement policy-absence testsを作成する。Then every remaining consumer of current policy modules is explicitly retired/replaced before the providers/data/old workflow are deleted。S70 is internal only; no main merge。
 
 **Exact owned repository paths and symbols**
 
-Create/update:
+Create/update before consumer retirement:
 
 ```text
 scripts/provider_gate.py
 ci/linux-qualification.Dockerfile
 ci/linux-qualification-environment.json
 tests/unit/infra/test_provider_gate.py
+tests/unit/infra/test_provider_test_ownership.py
+tests/provider_test_ownership.json
 scripts/static_analysis/run.sh
 Makefile
 .github/workflows/provider-ci.yml
 AGENTS.md
-tests/provider_test_ownership.json
 pyproject.toml
 ```
 
-Delete:
+Explicit current-policy consumers to retire/replace before provider deletion:
 
 ```text
-.github/workflows/provider-full-regression.yml
+tests/unit/test_provider_test_lanes.py            # delete after final gate/absence successors are GREEN
+tests/unit/test_full_regression_baseline.py       # delete after final evaluator/absence successors are GREEN
+.github/workflows/provider-ci.yml                 # rewrite from S60 transitional commands to final topology
+.github/workflows/provider-full-regression.yml    # delete after final PR workflow-equivalent GREEN
+AGENTS.md                                         # replace old operator commands
+pyproject.toml                                    # remove marker declarations
+Makefile
+scripts/static_analysis/run.sh
+all tests/helpers discovered by mandatory consumer grep
+```
+
+Provider/data deletion set, only after consumer 0:
+
+```text
 tests/conftest.py
-full-regression-ledger.json
-full-regression-timing-weights.json
 scripts/quality/full_regression_baseline.py
 scripts/quality/verify_full_regression.py
 scripts/quality/__init__.py if empty
-fast/full marker declarations/decorators/options
+full-regression-ledger.json
+full-regression-timing-weights.json
+fast/full marker decorators/options/helpers
+.github/workflows/provider-full-regression.yml
 ```
 
 **Explicit non-owned and no-touch paths**
@@ -609,20 +693,33 @@ Consumer seed workflows、commit identity workflow、unrelated settings、human 
 
 **Prerequisites and dependency**
 
-S60 exact tree/PR-B merge result withcurrent gate GREEN。PR-C continues throughS80 beforemerge。
+S60 exact PR-B merge tree with transitional Provider CI GREEN and current main-push verifier GREEN。PR-C continues through S80 before merge。
 
 **RED evidence**
 
-Provider gate command/hash/build-count/one-pytest、environment freeze/fingerprint mismatch、workflow same-wheel/macOS no build、atomic replacement ordering、AGENTS forbidden/required text、qualification evaluator failures、node intersection。
+1. `tests/unit/infra/test_provider_gate.py` initially fails because legacy policy modules/options/workflows still exist。
+2. New final ownership/absence tests fail while `tests/unit/test_provider_test_lanes.py` or `tests/unit/test_full_regression_baseline.py` still imports old providers。
+3. Mandatory consumer grep returns every remaining policy import/reference; deleting a provider before removing a consumer causes import/collection RED。
+4. Final workflow validation fails if any command references a missing path/tool or builds again on macOS。
+5. Environment freeze/fingerprint、build-count、one-pytest、node-intersection、AGENTS positive/negative tests provide their existing RED cases。
 
 **Smallest implementation action**
 
-Implement gate/tests、freeze descriptor/base digest/uv/lock、addDocker/resource limits、rewriteworkflow/Makefile/static analysis、updateAGENTS、verifyreplacement、deleteold machinery in same branch、run no-stale checks。Do notmerge。
+1. Implement `scripts/provider_gate.py` and final gate tests without deleting current providers。
+2. Freeze environment descriptor/base digest/uv/lock and add Docker resource limits。
+3. Rewrite `.github/workflows/provider-ci.yml` from the S60 transitional topology to final build-once/same-wheel topology; run its local workflow-equivalent commands GREEN。
+4. Update Makefile/static analysis/root AGENTS/pyproject callsites to final policy。
+5. Add final replacement assertions in `tests/unit/infra/test_provider_gate.py` and `tests/unit/infra/test_provider_test_ownership.py` for no legacy options/modules/workflow/data and valid final command paths。
+6. Delete `tests/unit/test_provider_test_lanes.py` and `tests/unit/test_full_regression_baseline.py` as retired tests of the removed policy; record their successor assertions in the ownership map/report。
+7. Run the pre-provider-deletion inventory below. Any match outside the exact provider/data deletion set is a blocker。
+8. Delete `tests/conftest.py`、quality modules、ledger/timing、old main-push workflow、legacy markers/options/decorators。
+9. Run post-deletion import/grep/collection/ordinary/final workflow verification。
+10. Do not merge; continue to S80。
 
 **Focused verification commands**
 
 ```bash
-uv run pytest -q tests/unit/infra/test_provider_gate.py
+uv run pytest -q tests/unit/infra/test_provider_gate.py tests/unit/infra/test_provider_test_ownership.py
 uv run python scripts/provider_gate.py freeze-linux-environment \
   --descriptor ci/linux-qualification-environment.json \
   --dockerfile ci/linux-qualification.Dockerfile
@@ -636,32 +733,46 @@ uv run python scripts/provider_gate.py verify-environment \
   --descriptor ci/linux-qualification-environment.json
 uv run python scripts/provider_gate.py verify-node-ownership \
   --map tests/provider_test_ownership.json
+# After consumer retirement but before provider deletion: only scheduled providers/data may match.
+git grep -nE 'from tests\.conftest|import tests\.conftest|from scripts\.quality\.full_regression_baseline|import scripts\.quality\.full_regression_baseline|from scripts\.quality import verify_full_regression|scripts\.quality\.verify_full_regression|--run-full-regression|--full-regression-shard|--full-regression-observation|POLICY_SKIP_REASON|full-regression-ledger\.json|full-regression-timing-weights\.json' -- \
+  .github scripts tests AGENTS.md Makefile pyproject.toml full-regression-ledger.json full-regression-timing-weights.json
+# The two exact current-policy consumer tests must already be absent.
+test ! -e tests/unit/test_provider_test_lanes.py
+test ! -e tests/unit/test_full_regression_baseline.py
+# After provider/data deletion: no non-Historical match remains.
+test -z "$(git grep -nE 'tests\.conftest|scripts\.quality\.full_regression_baseline|scripts\.quality\.verify_full_regression|--run-full-regression|--full-regression-shard|--full-regression-observation|POLICY_SKIP_REASON|full-regression-ledger\.json|full-regression-timing-weights\.json' -- . ':!spec-dock/initiatives/**' || true)"
+uv run python -c 'import importlib.util; assert importlib.util.find_spec("scripts.quality.full_regression_baseline") is None; assert importlib.util.find_spec("scripts.quality.verify_full_regression") is None'
+uv run pytest --collect-only -q
+uv run pytest -q
 make lint
-git grep -nE -- '--run-full-regression|--full-regression-shard|POLICY_SKIP_REASON|full-regression-ledger|verify_full_regression|full_regression' \
-  -- . ':!spec-dock/initiatives/**' || true
+uv run python scripts/provider_gate.py canonical \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json
+# macOS runner downloads the same wheel and runs no build command.
+uv run python scripts/provider_gate.py macos-delta \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json
 grep -F 'make provider-test' AGENTS.md
 grep -F 'make provider-qualify' AGENTS.md
 ```
 
 **Expected observable result**
 
-Replacement gate runnable、environment fixed、old machinery absent onPR-C branch、AGENTS final、no workflow missing files、new PR workflow GREEN。
+Replacement gate runnable、environment fixed、both exact policy test consumers absent before provider deletion、all policy providers/data/old workflow absent after consumer 0、ordinary collection/tests GREEN with no legacy options、final `provider-ci.yml` references only existing final tools/tests、Linux canonical and macOS same-wheel delta GREEN、AGENTS final。No workflow missing file or import failure。
 
 **Evidence to record in Issue report.md**
 
-Descriptor/hash/fingerprint schema、build manifest schema、workflow/deletion inventory、AGENTS policy diff。Final head-bound values external onlyafterfreeze。
+S60 transitional workflow run identity、S70 final workflow run identity、consumer inventory before/after、exact retirement/successor map for both policy test files、provider deletion order、import/collection/grep output、descriptor/build manifest schema、AGENTS diff。Final head-bound values remain external after freeze。
 
 **Stop conditions and escalation owner**
 
-Replacement unavailable/resource limits unenforceable/old consumer broken/AGENTS stale/macOS rebuild/S70 merge handoff。Owner: CI/Product owner。
+Replacement unavailable、resource limits unenforceable、any unclassified consumer、provider deleted before consumer 0、final workflow missing path/import、AGENTS stale、macOS rebuild、or S70 merge handoff。Owner: CI/Product/test owner。No merge。
 
 **Cleanup**
 
-Build temp/caches、keeptracked descriptor/Dockerfile。
+Build temp/caches、keep tracked descriptor/Dockerfile and final tests only。
 
 **Internal checkpoint invariant**
 
-S70 isnot a main merge point。Main stillhasworking current gate untilPR-C merge。PR-C branch hasworking replacement/no dangling consumers andmustcontinueS80。
+S70 is not a main merge point。Main still has the working PR-B current gates until PR-C merge。PR-C branch has a working replacement gate and no dangling consumers/providers; it must continue through S80。
 
 **Requirement and design trace IDs**
 
@@ -717,7 +828,7 @@ Phase B source-bound evidence:
 6. Run20 sequential canonical;first5 budget/all20 stability。
 7. Runfault pack andmacOS delta same wheel。
 8. Runfresh consumer/dogfood validate。
-9. New gate GREEN onimplementation PR。
+9. Run the final `.github/workflows/provider-ci.yml` jobs on the implementation PR and prove Linux canonical、macOS delta、aggregate provider-gate GREEN with no missing consumer。
 10. Human capturesrequired before-state。
 11. Human addsnew required whileold remains;read-back both。
 12. Dedicated non-merge canary makesnew gateRED;proveblocked;closecanary。
@@ -766,7 +877,7 @@ Canary closed withoutmerge、temporary environments/workspaces removed、externa
 
 **PR-C main merge invariant**
 
-Only PR-C merge gate。S70+S80 allproof、new context required/GREEN、external pre-merge attestation、human review complete。Main afterhuman merge hasfinal provider gate、no old machinery、final AGENTS、complete lifecycle。Agent doesnotmerge。
+Only PR-C merge gate。S70 consumer-first deletion and S80 all proof、final workflow GREEN、new context required/GREEN、external pre-merge attestation、human review complete。Main afterhuman merge hasfinal provider gate、no old machinery、final AGENTS、complete lifecycle。Agent doesnotmerge。
 
 **Requirement and design trace IDs**
 

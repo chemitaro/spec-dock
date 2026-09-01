@@ -9,7 +9,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
@@ -34,7 +34,7 @@ Outcomeはコード量削減そのものではない。管理権限、失敗時�
 
 ## 2. Current evidence and problem statement
 
-本書は`chemitaro/spec-dock`のbranch `codex/epic-00384-provider-test-strategy-planning`、full SHA `e47c1356892857e61388c7aefb2539d2061d1b9c`を調査基準とする。このrevisionでは次を直接確認した。
+本書は`chemitaro/spec-dock`のbranch `codex/epic-00384-provider-test-strategy-planning`、full SHA `b094771e089c1f31618116e84be32fcf78704409`を調査基準とする。このrevisionでは次を直接確認した。
 
 - `src/spec_dock/managed_distribution.py`がfresh、update、deprovision、purge、historical identity、journal、recovery、native rename、result modelを一つの巨大なmoduleで所有している。
 - `src/spec_dock/assets/managed_distribution.json`がrecognized version、historical current identity、obsolete exact fileを列挙している。
@@ -42,6 +42,7 @@ Outcomeはコード量削減そのものではない。管理権限、失敗時�
 - `pyproject.toml`のcurrent package versionは`0.2.3`で、pytestの`fast` / `full_regression` policy markerが存在する。
 - `tests/conftest.py`がpath-based lane classification、policy skip、failure ledger evaluation、shard observationを所有する。
 - `.github/workflows/provider-ci.yml`はordinary suiteに加えてUbuntu/macOSでdistribution contractを重複実行し、`.github/workflows/provider-full-regression.yml`はmain pushで4-shard verifierを実行する。
+- Current `provider-ci.yml`は`tests/unit/infra/test_managed_distribution.py`、`tests/cli_runtime/test_distribution_cutover.py`、`tests/integration/test_epic_00343_distribution.py`を直接参照する。`tests/unit/test_provider_test_lanes.py`は`tests.conftest`と両quality modulesをimportし、`tests/unit/test_full_regression_baseline.py`はbaseline providerを直接検証する。
 - `full-regression-ledger.json`、`full-regression-timing-weights.json`、`scripts/quality/full_regression_baseline.py`、`scripts/quality/verify_full_regression.py`がapproved failureとshardingを支える。
 - Issue #387はopenであり、このrevisionには#387 implementationがまだ含まれない。#387のcanonical R/D/Pはmanaged distribution、provider workflow、sharder、public installer CLIを明示的に非所有としている。
 - Epic `.meta.json`の`depends_on`は`iss-00387`を含む。
@@ -128,9 +129,11 @@ Final workspaceに対するold exact `0.2.3` packageの`init --force`、`update`
 
 各durable invariantは一つのowner layer、一つのauthoritative lane、少なくとも一つのrepresentative failureを持つ。Pure/domain、filesystem/service、CLI、built artifact、macOS deltaを分離し、same candidate/OS/contractのduplicate ownershipを0にする。
 
-### E384-RQ-013 — Failure terminalization with gate continuity
+### E384-RQ-013 — Failure terminalization with transitional workflow continuity
 
-Post-#387 baselineのactive failure ledger entryをfix、current successor、accepted contract retirementのいずれかへ全件terminal化する。PR-B merge時点でactive approved failureを0にする。ただしcurrent main-push verifierのconsumerであるledger、timing、policy hook、quality scripts、workflowはPR-Cまで壊さず保持する。PR-Cでreplacement gateと同一branch/PR内にて一括削除する。
+Post-#387 baselineのactive failure ledger entryをfix、current successor、accepted contract retirementのいずれかへ全件terminal化し、PR-B merge時点でactive approved failureを0にする。S60は`.github/workflows/provider-ci.yml`をexact owned pathとし、workflow名、event、job IDs、Ubuntu/macOS matrix、checkout、Python/uv install、static-analysis topologyを維持したまま、削除する3 test pathだけをS10〜S50で成立したsuccessor test groupsへ置換する。これはtemporary current-gate repairであり、S70のbuild-once provider-gate redesignではない。
+
+S60は`tests/unit/test_provider_test_lanes.py`もowned pathとし、`tests/conftest.py`のcurrent policyと整合するよう、active row 0、all ledger rows terminal、deleted test path参照0、workflow successor path実在、pytest adapter/standalone evaluator parityを検証する。Current verifierはretirement evidenceを生成しないため、accepted contract retirementはS60 ledgerでは`lifecycle=resolved` / `resolution_mode=superseded`として、deterministic passing absence-proof successor nodeへ結合する。`tests/unit/test_full_regression_baseline.py`、`tests/conftest.py`、ledger、timing、quality modules、`.github/workflows/provider-full-regression.yml`はS70まで保持する。
 
 ### E384-RQ-014 — Build-once artifact binding
 
@@ -140,9 +143,9 @@ Authoritative source SHAごとに一つのpackaging invocationでwheelとsdist�
 
 Linux canonicalはworker 1、one pytest process。Qualificationはenvironment ID `specdock-linux-qualification-v1`、tracked descriptor SHA-256、pinned container base digest、built image ID、x86_64、2.0 CPU quota、8 GiB memory、Python/uv/lock hashesへ束縛する。20-run series中のfingerprint mismatchは全seriesを無効にする。First 5各600秒以内、CPU/wall <=1.1、fault detection 100%、all 20 flake 0/retry 0。
 
-### E384-RQ-016 — Atomic provider-gate cutover
+### E384-RQ-016 — Atomic provider-gate cutover and complete consumer closure
 
-PR-B/S60 merge後もcurrent main-push Full Regression workflowと全consumerをGREENのまま保持する。PR-CではS70をnon-main checkpointとし、replacement `scripts/provider_gate.py`、Linux environment descriptor、new provider workflow、root `AGENTS.md`を追加した同一branch/PRでold workflow、ledger、timing、sharder、path policy hook、marker policyを削除する。S80後だけmergeし、mainはbroken workflowまたはmissing consumerを観測しない。
+PR-B/S60 merge後は、successor pathsへretarget済みのcurrent `.github/workflows/provider-ci.yml`と、current main-push Full Regression workflowの双方がGREENでなければならない。PR-C/S70ではreplacement `scripts/provider_gate.py`、Linux environment descriptor、final provider workflow、root `AGENTS.md`を同一branchへ先に追加する。その後、policy providersを削除する前に`tests/unit/test_provider_test_lanes.py`、`tests/unit/test_full_regression_baseline.py`を含む全remaining policy-module consumersをexplicitにretireまたはfinal gate testsへ置換し、import/grep/collection/workflowでconsumer 0を証明する。続いてold workflow、ledger、timing、sharder、`tests/conftest.py`、marker policyを同じPR-C branchで削除する。S70はnon-main checkpoint、S80後だけmergeし、mainはbroken workflowまたはmissing consumerを観測しない。
 
 ### E384-RQ-017 — Required-context transition without a gap
 
@@ -188,7 +191,7 @@ Root `AGENTS.md`をPR-Cでfinal pytest/provider-gate commands、no-policy-skip/n
 
 #392は#387がhuman mergeされる前に開始してはならない。S00は次を別々に検証する。
 
-1. Repository evidence SHA `e47c1356892857e61388c7aefb2539d2061d1b9c`は調査起点として記録する。
+1. Repository evidence SHA `b094771e089c1f31618116e84be32fcf78704409`は調査起点として記録する。
 2. Replacement manifestのcanonical/support payload hashesを、owner-recorded `SPEC_FREEZE_COMMIT`のexact repository blobsへ一致させる。
 3. #387 merge deltaを#387 own PR/merge graphからexact allowlist/content restrictionへ照合する。
 4. Implementation baseが`SPEC_FREEZE_COMMIT`と#387 mergeをancestorに持つことを要求する。
@@ -219,8 +222,8 @@ Epicは次のすべてが同一final PR treeと同一artifact identityに対し�
 - same operation/candidate/seed policy rerunで収束し、mismatchがblock。
 - old `0.2.3` command matrixがtripwire event 0、native positive control capture、tree digest不変。
 - public CLI text/JSON/exit、aliases、purge trapがcontractどおり。
-- PR-B main merge時点でactive approved failure 0、current main-push verifier GREEN。
-- PR-Cでreplacement gateとold machinery removalがatomic、mainにbroken workflow stateなし。
+- PR-B main merge時点でactive approved failure 0、transitional `provider-ci.yml`のsuccessor commands GREEN、current main-push verifier GREEN。
+- PR-Cでall policy consumersをprovidersより先にretire/replaceし、replacement gateとold machinery removalがatomic、final provider gate GREEN、mainにbroken workflow stateなし。
 - one build invocation、same wheel、Linux canonical、macOS delta、sdist smoke。
 - Linux environment ID/fingerprint、five-run budget、CPU ratio、fault pack、rolling 20を満たす。
 - new contextをoldと併存requiredにしてからRED blockを証明し、GREEN復帰後oldを除去。
@@ -235,8 +238,8 @@ Epicは次のすべてが同一final PR treeと同一artifact identityに対し�
 |---|---|
 | E384-RQ-001〜010 | fixed lifecycle、seed policy、container bootstrap、record、candidate、CLI |
 | E384-RQ-011 | old-package tripwire / downgrade proof |
-| E384-RQ-012〜013 | test ownership、active failure terminalization、PR-B gate continuity |
-| E384-RQ-014〜016 | build-once gate、stable Linux environment、atomic PR-C removal |
+| E384-RQ-012〜013 | test ownership、active failure terminalization、S60 workflow/lane-consumer repair、PR-B gate continuity |
+| E384-RQ-014〜016 | build-once gate、stable Linux environment、policy-consumer-first atomic PR-C removal |
 | E384-RQ-017 | no-gap required-context transition |
 | E384-RQ-018〜019 | specification lineage、external attestations、tree equality |
 | E384-RQ-020 | root AGENTS、single-Issue closure |
