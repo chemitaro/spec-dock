@@ -30,6 +30,8 @@ ID: "iss-00387"
 |---|---|---|
 | active-none report | 旧role、phase、reviewer、Profile、EAL、Promotion schemaを含む | active未設定・編集禁止・canonical pathだけを示す |
 | root README | `active set --checkout`とEAL必須を案内 | selection-only、`issue start`、canonical rewriteを案内 |
+| scripts README | `active set --checkout`をCurrent exampleとして案内 | selection-onlyと`issue start`のownershipを案内 |
+| rules artifacts/discussions | EALまたはreport ledgerをCurrent adoption authorityとして案内 | R/D/Pまたはaccepted ADRへの明示的再記述だけをadoption authorityとする |
 | Authoring overview | Issue #359完了前の未来形 | 現在の二skillを現在形で案内 |
 | active command args | parserにない旧flagのdefault値を内部へ運ぶ | targetと表示文字列だけを運ぶ |
 | SetActiveRequest | targetのほかcheckout/GitHub/force系fieldを持つ | targetだけを持つ |
@@ -45,6 +47,7 @@ ID: "iss-00387"
 
 - shipped docs/system/runtimeの正本は`src/spec_dock/assets/spec_dock/**`である。
 - `spec-dock/**`はdogfood projectionである。
+- `scripts/README.md`と`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`は7組のprovider/dogfood pairとして同じ更新順序とbyte parityを適用する。
 - root `README.md`と`pyproject.toml`はprovider repository固有の正本であり、projection pairを持たない。
 - 本IssueのR/D/Pは履歴領域内であるが、本Issue自身のcanonical authorityとして通常どおり更新する。
 
@@ -170,7 +173,7 @@ Class BをClass Aへ昇格させることは原則禁止する。すなわち、
 
 ### 5.4 Historical boundary
 
-`spec-dock/initiatives/**`、accepted ADR、provider/dogfood `docs/authoring/historical.md`はauthoritative Historical evidenceとして変更しない。一方、`tests/fixtures/**`のcopyやsynthetic mutationはtest infrastructureであり、自動的な保存対象ではない。canonical source、runtime input、surviving positive testのconsumerがなければ撤去できる。
+`spec-dock/initiatives/**`、accepted ADR、provider/dogfood `docs/authoring/historical.md`、historical discussion originalsはauthoritative Historical evidenceとして変更しない。provider/dogfoodの`docs/rules/**/discussions.md`自体はCurrent shipped rulesであり、そのCurrent adoption authorityは変更対象だが、grandfatheringとHistorical catalogは保持する。一方、`tests/fixtures/**`のcopyやsynthetic mutationはtest infrastructureであり、自動的な保存対象ではない。canonical source、runtime input、surviving positive testのconsumerがなければ撤去できる。
 
 ### 5.5 新規testの例外gate
 
@@ -315,7 +318,7 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 
 | 設計観測点 | Test surface |
 |---|---|
-| placeholder/README/overview | one-time content review、`cmp`、fresh init。新しいphrase testは作らない |
+| placeholder/root README/scripts README/rules/overview | one-time content review、provider/dogfood `cmp`、fresh init。新しいphrase testは作らない |
 | request shape | `rg`/AST/call-site audit、compile。field absence専用testは作らない |
 | selection-only | 既存`tests/unit/application/test_set_active.py`のpositive behavior |
 | issue start ordering | `tests/cli_runtime/test_issue_lifecycle.py` |
@@ -345,7 +348,7 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 
 | 要件 | 設計 |
 |---|---|
-| R01〜R04, R08, R09 | §3、§5、§7 |
+| R01〜R04, R08, R09 | §2、§3、§5、§7 |
 | R05 | §4 |
 | R06 | §6 |
 | R07 | §5、§6 |

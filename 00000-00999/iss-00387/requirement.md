@@ -41,6 +41,8 @@ Issue 357〜360で成立した「小さいStorage Core + Authoring Kit + agent-f
 6. Current-facing testには、削除済みroute/module/fieldの不在、旧語彙scanner、Historical exclusion、旧evidence mutationを恒久監視するretirement-only test supportが残っている。
 7. Current-facing drift guardをroot READMEとactive-noneへ拡張すると、廃止項目が増えるたびにnegative test、phrase inventory、mutation testが増える。
 8. `tests/unit/infra/test_init_update.py`にdefinition-only constant候補がある。
+9. provider/dogfoodの`spec-dock/scripts/README.md`が、削除済みの`active set --checkout`をCurrent exampleとして案内する。
+10. provider/dogfoodの`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`が、EALまたはreport ledgerをCurrent adoption authorityとして案内する。
 
 Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cleanup`、SHA `93be5dbb5390f03d22e1ba882c7e2a38357f39c1`である。このSHAは仕様起草時の固定点であり、実装candidateではない。現時点でproduction implementation、test追加、test実行、PR作成は未実施である。
 
@@ -64,7 +66,8 @@ Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cl
 ### 4.1 必須対象
 
 - Current placeholder: provider/dogfoodの`system/active-none/{initiative,epic,issue}/report.md`
-- Current documentation: `README.md`、provider/dogfoodの`docs/authoring/overview.md`
+- Current documentation: `README.md`、provider/dogfoodの`docs/authoring/overview.md`と`scripts/README.md`
+- Current Artifact rules: provider/dogfoodの`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`
 - active selection internal contract: provider/dogfoodの`commands/active.py`、`application/contracts.py`、`application/set_active.py`、call siteとしての`application/issue_lifecycle.py`
 - package/test hygiene: `pyproject.toml`と既存のauthoring asset、set-active、issue lifecycle、doctor、storage-core、init/update test
 - retirement-only test support: `tests/unit/infra/test_authoring_kit_assets.py`、`tests/unit/application/test_set_active.py`、`tests/cli_runtime/{test_storage_core_cli.py,test_issue_lifecycle.py,test_doctor.py,s09_invariance.py}`、関連fixture/helper/constant
@@ -92,13 +95,13 @@ Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cl
 
 三scopeのplaceholderは、active対象がないこと、編集対象でないこと、実際のReportのcanonical pathだけを示す。旧role、phase、reviewer、Profile、EAL、Promotion、failure-mode schemaを除去する。placeholder file自体は残す。
 
-### I387-R02 — root READMEをCurrent lifecycleへ合わせる
+### I387-R02 — Current lifecycle guidanceを現行契約へ合わせる
 
-`active set`をselection-onlyとして説明し、checkoutを伴う実装開始は`issue start`へ案内する。`active set --checkout`のexample、recovery案内、branch normalization説明を除去する。
+root `README.md`とprovider/dogfoodの`scripts/README.md`で`active set`をselection-onlyとして説明し、checkoutを伴う実装開始は`issue start`へ案内する。`active set --checkout`のexample、recovery案内、branch normalization説明を除去する。
 
 ### I387-R03 — Artifact authority flowをCurrent化する
 
-Artifactはevidence-onlyであり、review/synthesis後に採用内容をR/D/Pまたはaccepted ADRへ明示的に再記述する、とroot READMEへ記載する。EALを必須手順またはauthority gateとして要求しない。
+Artifactはevidence-onlyであり、review/synthesis後に採用内容をR/D/Pまたはaccepted ADRへ明示的に再記述する、とroot `README.md`とprovider/dogfoodの`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`へ記載する。EALまたはreport ledgerをCurrentの必須手順、採用経路、authority gateとして要求しない。Historical discussion originalsとgrandfathering説明は保持する。
 
 ### I387-R04 — Authoring overviewを現在形にする
 
@@ -127,7 +130,7 @@ Artifactはevidence-onlyであり、review/synthesis後に採用内容をR/D/P�
 
 ### I387-R08 — provider-first projectionを維持する
 
-shipped asset/runtimeはprovider sourceを先に変更し、dogfood projectionへ同期する。対象pairはbyte parityを保ち、projectionだけを独立編集しない。
+shipped asset/runtimeはprovider sourceを先に変更し、dogfood projectionへ同期する。§4.1の対象pairはbyte parityを保ち、projectionだけを独立編集しない。
 
 ### I387-R09 — 実装計画を一回限りの撤退checklistとして実行する
 
@@ -186,8 +189,8 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 |---|---|
 | I387-AC01 | 三scopeのactive-none provider/dogfood pairがminimal placeholderでbyte一致する |
 | I387-AC02 | Current placeholderに旧delegated/reviewer/Profile/EAL/Promotion schemaがない |
-| I387-AC03 | root READMEに`active set --checkout`のCurrent案内がなく、`issue start`へ案内する |
-| I387-AC04 | root READMEがArtifactのevidence-only/canonical rewrite contractを説明し、EALを必須にしない |
+| I387-AC03 | root READMEとprovider/dogfoodのscripts READMEに`active set --checkout`のCurrent案内がなく、selection-onlyと`issue start` ownershipを一意に案内する |
+| I387-AC04 | root READMEとprovider/dogfoodの三scopeのartifacts/discussions rulesがArtifactのevidence-only/canonical rewrite contractを説明し、EALまたはreport ledgerをCurrent adoption authorityにしない |
 | I387-AC05 | Authoring overviewが二skillを現在形で案内し、provider/dogfoodで一致する |
 | I387-AC06 | `ActiveSetArgs`が`target_ref`/`target_display`、`SetActiveRequest`が`target`だけを持つ |
 | I387-AC07 | `active set`がGit/GitHub/dependency portを呼ばずselection-only behaviorを維持する |
@@ -207,7 +210,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 
 | 観測対象 | 要件 | 主要な検証 |
 |---|---|---|
-| active-none / README / overview | R01〜R04, R08, R09 | one-time content review、provider/dogfood parity、fresh consumer |
+| active-none / root README / scripts README / rules / overview | R01〜R04, R08, R09 | one-time content review、provider/dogfood parity、fresh consumer |
 | active selection | R05, N01, N04 | existing positive application/CLI/lifecycle tests、call-site audit |
 | package/test hygiene | R06, R09, N03, N04, N05 | AST/reference proof、S06 testと専用mypy overrideの条件付きexact-entry audit、clean wheel/sdist inventory、同一wheel-bound fresh consumer |
 | retirement-only test support | R07, R09, N04, N06 | consumer map、before/after metrics、deleted/retained decision ledger |
