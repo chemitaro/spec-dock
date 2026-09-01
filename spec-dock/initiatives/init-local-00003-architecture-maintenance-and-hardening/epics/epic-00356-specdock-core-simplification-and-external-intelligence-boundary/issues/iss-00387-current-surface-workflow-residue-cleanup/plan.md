@@ -700,42 +700,42 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 
 | ID | 状態 | Evidence reference |
 |---|---|---|
-| C00-01 | NOT_RUN | |
-| C00-02 | NOT_RUN | |
-| C00-03 | NOT_RUN | |
-| C00-04 | NOT_RUN | |
-| C00-05 | NOT_RUN | |
-| C00-06 | NOT_RUN | |
-| C00-07 | NOT_RUN | |
-| C00-08 | NOT_RUN | |
-| C10-01 | NOT_RUN | |
-| C10-02 | NOT_RUN | |
-| C10-03 | NOT_RUN | |
-| C10-04 | NOT_RUN | |
-| C20-01 | NOT_RUN | |
-| C20-02 | NOT_RUN | |
-| C20-03 | NOT_RUN | |
-| C20-04 | NOT_RUN | |
-| C20-05 | NOT_RUN | |
-| C30-01 | NOT_RUN | |
-| C30-02 | NOT_RUN | |
-| C30-03 | NOT_RUN | |
-| C40-01 | NOT_RUN | |
-| C40-02 | NOT_RUN | |
-| C40-03 | NOT_RUN | |
-| C40-04 | NOT_RUN | |
-| C40-05 | NOT_RUN | |
-| C40-06 | NOT_RUN | |
-| C40-07 | NOT_RUN | |
-| C40-08 | NOT_RUN | |
-| C40-09 | NOT_RUN | |
-| C50-01 | NOT_RUN | |
-| C50-02 | NOT_RUN | |
-| C60-01 | NOT_RUN | |
+| C00-01 | PASS | branch v5; baseline `7e1c1fe8b25b8062405a62f467be55689a589ca7`; clean HEAD=upstream=remote |
+| C00-02 | PASS | active `iss-00387`; GitHub OPEN; deps ready=true |
+| C00-03 | PASS | approved Current inventory and no-touch boundary resolved |
+| C00-04 | PASS | before: 2710 collected; 97524 Python LOC; 113 tracked test files; 27 fixtures |
+| C00-05 | PASS | 10/10 candidate families decided; coverage=1.0 |
+| C00-06 | PASS | canonical history retained; synthetic fixture classified test-only |
+| C00-07 | PASS | wheel/sdist inventory: `.agents` and `.github` present; `.codex` absent |
+| C00-08 | PASS | GO; no unresolved consumer or scope overlap |
+| C10-01 | PASS | three active-none provider/dogfood pairs byte-identical |
+| C10-02 | PASS | seven Current docs pairs byte-identical; canonical rewrite wording confirmed |
+| C10-03 | PASS | authoring overview pair byte-identical and current-tense |
+| C10-04 | PASS | Historical, migration, sibling rules, Epic 384 no-touch diff=0 |
+| C20-01 | PASS | baseline: set_active 47; lifecycle 38; storage 4 passed |
+| C20-02 | PASS | target-only request implemented; issue-start checkout ordering retained |
+| C20-03 | PASS | four runtime provider/dogfood pairs identical; checkout helper unchanged |
+| C20-04 | PASS | retirement-only checkout seam removed; S06 positive observers retained |
+| C20-05 | PASS | post-change: set_active 46; lifecycle 26; storage 2 passed |
+| C30-01 | PASS | only delegated mypy member and stale `.codex` package glob removed |
+| C30-02 | PASS | definition-only constants removed; collection and Ruff green |
+| C30-03 | PASS | build and install-root inventory green; current 5 assets retained |
+| C40-01 | PASS | retired route/module inventories removed; current registry retained |
+| C40-02 | PASS | legacy flag rejection/absence-only assertions removed |
+| C40-03 | PASS | authoring lane 196 passed; legacy scanner residue=0 |
+| C40-04 | PASS | S09 mutation support and helper file removed; refs=0 |
+| C40-05 | PASS | finish ignore-only tests removed; current lifecycle retained |
+| C40-06 | PASS | exact 21-file test-copy fixture removed; canonical originals untouched |
+| C40-07 | PASS | lint green; 2513 collected; orphan support=0 |
+| C40-08 | PASS | legacy S05 authority assertions removed; structural observer retained |
+| C40-09 | PASS | 15 ledger rows; 243 timing nodes; deleted-node refs=0; parser/help green |
+| C50-01 | PASS | focused lanes: 242, 29, and 201 passed |
+| C50-02 | PASS | Ruff/format/mypy green; ordinary 1436 passed, 1077 policy-skipped |
+| C60-01 | PASS | one wheel/sdist; fixed digest; fresh init/parity/help green; expected empty-tree validate |
 | C60-02 | N/A(pre-commit execution; deferred to C90-05 final SHA) | DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence |
-| C90-01 | NOT_RUN | |
-| C90-02 | NOT_RUN | |
-| C90-03 | NOT_RUN | |
+| C90-01 | PASS | 70 approved paths only; all no-touch audits diff=0 |
+| C90-02 | PASS | after: 2513 collected; 93795 Python LOC; 91 tracked test files; 6 fixtures; coverage/closure=1.0 |
+| C90-03 | PASS | validate 230 nodes; sync no-github; validate 230; generated diff=0 |
 
 ## 16. Exit / handoff
 

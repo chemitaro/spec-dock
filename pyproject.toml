@@ -105,7 +105,6 @@ disable_error_code = ["attr-defined"]
 
 [[tool.mypy.overrides]]
 module = [
-    "tests.cli_runtime.test_delegated_authoring",
     "tests.cli_runtime.test_issue_lifecycle",
     "tests.cli_runtime.test_runtime_close_s12",
 ]
@@ -173,7 +172,6 @@ spec_dock = [
   "assets/**/.gitignore",
   # Hidden subtrees under install_root must be included explicitly.
   "assets/install_root/.agents/**",
-  "assets/install_root/.codex/**",
   "assets/install_root/.github/**",
   "assets/spec_dock/templates/root/.workbench/README.md",
   "assets/spec_dock/templates/initiative/.workbench/README.md",

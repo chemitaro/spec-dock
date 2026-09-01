@@ -290,10 +290,6 @@ def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
         active_set_result = set_active(
             SetActiveRequest(
                 target=canonical_target,
-                force=False,
-                checkout=False,
-                use_github=False,
-                issue_limit=req.issue_limit,
             ),
             ports,
         )
