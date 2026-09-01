@@ -1,6 +1,6 @@
 ---
 種別: Normative Artifact
-ID: "provider-lifecycle-wire-contract-v3"
+ID: "provider-lifecycle-wire-contract-v4"
 タイトル: "Provider Lifecycle Wire Contract"
 状態: "accepted"
 最終更新: "2026-09-01"
@@ -8,7 +8,7 @@ ID: "provider-lifecycle-wire-contract-v3"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d145f0f0d6f35535eebc0da89b7b708824279f1f"
+  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
 ---
 
 # Provider Lifecycle Wire Contract
@@ -29,6 +29,23 @@ repository_evidence:
 | Null | JSON `null`; missing field代用禁止。 |
 | Public path | repository-relative POSIX path or exact sentinel `@provider-stage`. Absolute、`..`、backslash禁止。 |
 | JSON bytes | UTF-8、key orderは本書どおり、`ensure_ascii=False,separators=(",",":")`、末尾LF一つ。 |
+
+
+### WIR-INV-001 — Mechanically checked inventory
+
+The normative finite inventory is exact:
+
+| Item | Count |
+|---|---:|
+| public status values | 6 |
+| public code values | 36 |
+| `phase` values | 23 |
+| `last_completed_phase` values | 24 |
+| durable record goldens | 4 |
+| complete code/context relation rows | 123 |
+| public JSON review goldens | 16 |
+
+The implementation test extracts the §10 table and all fenced JSON review goldens from this file, verifies these counts, parses every JSON block, and asserts one terminal LF. A count drift is a specification/test defect and is not auto-accepted.
 
 Table expressions are exact value functions:
 
@@ -98,38 +115,46 @@ Parser: UTF-8、regular file、link count1、max4096 bytes、duplicate/unknown/m
 
 Terminal ready policy records the immediately completed operation only and never authorizes later seed writes. A new update/uninstall first publishes a preserve-only incomplete record.
 
+
 ### WIR-REC-002 — Command relations
 
-| Invocation / observed state | Durable operation | Seed policy | Public code family |
-|---|---|---|---|
-| init or init-force / absent | install | create-if-absent | install-* |
-| update / absent | install | preserve-only | install-* |
-| init/init-force/update / tooling-absent | install | preserve-only | install-* |
-| init-force or update / exact legacy | install | preserve-only | legacy-migration-* |
-| init-force or update / ready | update | preserve-only | update-* |
-| uninstall / exact legacy, ready, incomplete uninstall, tooling-absent | uninstall | preserve-only | uninstall-* |
-| uninstall --remove-specs | null | null | spec-history-purge-removed |
+| Invocation / observed state | Mode | Durable operation | Seed policy | Required terminal/result family |
+|---|---|---|---|---|
+| `init` or `init --force` / `absent` | apply | `install` | `create-if-absent` | `install-*` |
+| `update` / `absent` | apply | `install` | `preserve-only` | `install-*` |
+| `init`, `init --force` or `update` / `tooling-absent-preserved-data` | apply | `install` | `preserve-only` | `install-*` |
+| `init --force` or `update` / exact `legacy-0.2.3` | apply | `install` | `preserve-only` | `legacy-migration-*` |
+| `init --force` or `update` / `ready` | apply | `update` | `preserve-only` | `update-*` |
+| `uninstall` / exact legacy | dry-run | `uninstall` | `preserve-only` | `uninstall-planned` |
+| `uninstall` / `ready` | dry-run | `uninstall` | `preserve-only` | `uninstall-planned` |
+| `uninstall` / `incomplete` with `operation=uninstall` | dry-run | `uninstall` | exact record `preserve-only` | `uninstall-planned` |
+| `uninstall` / `tooling-absent-preserved-data` | dry-run | `uninstall` | `preserve-only` | `uninstall-already-absent` with status `planned` |
+| `uninstall --apply` / exact legacy | apply | `uninstall` | `preserve-only` | `uninstall-completed*` |
+| `uninstall --apply` / `ready` | apply | `uninstall` | `preserve-only` | `uninstall-completed*` |
+| `uninstall --apply` / matching `incomplete(uninstall)` | apply | `uninstall` | exact record `preserve-only` | resume to `uninstall-completed*` or `uninstall-partial-failure` |
+| `uninstall --apply` / `tooling-absent-preserved-data` | apply | `uninstall` | `preserve-only` | `uninstall-already-absent` with status `completed` |
+| `uninstall --remove-specs` / any target state | request-selected dry-run or apply | `null` | `null` | `spec-history-purge-removed` before target observation |
 
-Migration is not a fourth durable operation. It is preserve-only `install` plus a `legacy-migration-*` public code.
+Exact migration is not a fourth durable operation. It is preserve-only `install` plus a `legacy-migration-*` public code. A dry-run against `incomplete(uninstall)` does not change or resume the record; it reports the remaining deterministic uninstall plan. No other incomplete operation is accepted by uninstall.
 
 ### WIR-REC-003 — Record goldens
 
-The digest fixture is exactly 64 lowercase `d` characters. Each block is one compact line plus LF.
+The digest fixture is exactly 64 lowercase `d` characters. Each block below is valid compact JSON followed by one LF; both the nested `skill_slots` object and the outer record object are closed.
 
 ```json
-{"schema_version":1,"state":"ready","operation":null,"version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}
+{"schema_version":1,"state":"ready","operation":null,"version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}}
 ```
 
 ```json
-{"schema_version":1,"state":"incomplete","operation":"install","version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}
+{"schema_version":1,"state":"incomplete","operation":"install","version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}}
 ```
 
 ```json
-{"schema_version":1,"state":"incomplete","operation":"update","version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}
+{"schema_version":1,"state":"incomplete","operation":"update","version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}}
 ```
 
 ```json
-{"schema_version":1,"state":"tooling-absent-preserved-data","operation":null,"version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}
+{"schema_version":1,"state":"tooling-absent-preserved-data","operation":null,"version":"0.2.4","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}}
 ```
 
 ## 5. Observed-only state enum
@@ -331,10 +356,17 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 | `update-completed-with-cleanup-warning` | `ready update` | `completed_with_warnings` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `update terminal + one stage warning` | 0 |
 | `legacy-migration-completed` | `legacy migration` | `completed` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `install-preserve terminal action set` | 0 |
 | `legacy-migration-completed-with-cleanup-warning` | `legacy migration` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `install-preserve terminal + one stage warning` | 0 |
-| `uninstall-planned` | `ready or exact legacy dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `owned_target_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `full uninstall planned action set` | 0 |
-| `uninstall-completed` | `ready or exact legacy apply` | `completed` | `apply` | `true` | `uninstall` | `owned_target_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `uninstall terminal action set` | 0 |
-| `uninstall-already-absent` | `tooling-absent apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `tooling-absent preserved action set` | 0 |
-| `uninstall-completed-with-cleanup-warning` | `ready or exact legacy apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `owned_target_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `uninstall terminal + one stage warning` | 0 |
+| `uninstall-planned` | `ready dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-READY-PLAN` | 0 |
+| `uninstall-planned` | `exact legacy dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-LEGACY-PLAN` | 0 |
+| `uninstall-planned` | `matching incomplete-uninstall dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-INCOMPLETE-PLAN` | 0 |
+| `uninstall-already-absent` | `tooling-absent dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-ABSENT` | 0 |
+| `uninstall-completed` | `ready apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `AP-U-READY-TERM` | 0 |
+| `uninstall-completed` | `exact legacy apply` | `completed` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `AP-U-LEGACY-TERM` | 0 |
+| `uninstall-completed` | `successful matching incomplete-uninstall resume apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `AP-U-INCOMPLETE-TERM` | 0 |
+| `uninstall-already-absent` | `tooling-absent apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-ABSENT` | 0 |
+| `uninstall-completed-with-cleanup-warning` | `ready apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `AP-U-READY-WARN` | 0 |
+| `uninstall-completed-with-cleanup-warning` | `exact legacy apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `AP-U-LEGACY-WARN` | 0 |
+| `uninstall-completed-with-cleanup-warning` | `matching incomplete-uninstall resume apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `AP-U-INCOMPLETE-WARN` | 0 |
 | `already-initialized` | `plain init on ready` | `blocked` | `apply` | `true` | `install` | `record.candidate_digest` | `record.seed_policy` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 |
 | `already-initialized` | `plain init on exact legacy` | `blocked` | `apply` | `true` | `install` | `legacy_fixture.aggregate_digest` | `preserve-only` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 |
 | `tooling-not-installed` | `uninstall dry-run on absent` | `blocked` | `dry-run` | `false` | `uninstall` | `null` | `preserve-only` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 |
@@ -528,6 +560,21 @@ Exact keys/order `path,category,status,reason`; all non-null strings.
 | stage | candidate-stage-cleanup-warning | warning | install,update,uninstall |
 | preservation | consumer-data-preserve | preserved | install,update,uninstall |
 
+
+### WIR-ACT-005 — Closed uninstall action profiles
+
+The `Actions` values `AP-U-*` in §10 are exact finite functions, not extension tokens.
+
+- `AP-U-READY-PLAN`: shared container and two seeds are preserved; record, four present roots and two present slots are planned for terminal publish/removal.
+- `AP-U-LEGACY-PLAN`: same rows/order as ready plan, with legacy ownership evidence and legacy aggregate digest.
+- `AP-U-INCOMPLETE-PLAN`: container and seeds are preserved; record is planned with `terminal-record-publish`; each already-absent owned root/slot is preserved with `owned-root-absent`/`owned-slot-absent`; each still-present owned root/slot is planned for removal. At least one target is already absent or the state is not incomplete.
+- `AP-U-ABSENT`: exactly four preserved actions: shared container, current terminal record, `spec-dock/.gitignore`, `.github/workflows/ci.yml`.
+- `AP-U-READY-TERM` and `AP-U-LEGACY-TERM`: shared container and seeds preserved; record and all present roots/slots completed; stage cleanup completed.
+- `AP-U-INCOMPLETE-TERM`: same finite target rows as the incomplete plan; previously absent roots/slots are preserved, still-present roots/slots and terminal record are completed, and stage cleanup is completed.
+- `AP-U-READY-WARN`, `AP-U-LEGACY-WARN`, `AP-U-INCOMPLETE-WARN`: corresponding terminal profile with exactly one additional `@provider-stage` warning action and no completed stage-cleanup action.
+
+All root/slot decisions are computed from the descriptor-bound observation captured for the accepted state. No unknown target, duplicate action or alternative reason is permitted.
+
 Finite action profiles:
 
 1. Planned uninstall emits container/record/existing owned roots/slots/seeds/preservation in target order.
@@ -539,36 +586,66 @@ Finite action profiles:
 
 ## 13. JSON goldens
 
-Digest fixture is 64 lowercase `d` characters. Each block is compact JSON plus LF.
+Digest fixture is 64 lowercase `d` characters. Every block is independently parsed by the normative test and is serialized as the displayed compact line plus one LF.
 
-### WIR-GOLDEN-U1 — Uninstall dry-run
+### WIR-GOLDEN-U1 — Ready uninstall dry-run
 
 ```json
 {"schema_version":1,"target":"/tmp/consumer","mode":"dry-run","apply":false,"specs_mode":null,"status":"planned","code":"uninstall-planned","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"preflight","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":7,"completed":0,"preserved":3,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"planned","reason":"terminal-record-publish"},{"path":"spec-dock/docs","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/templates","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/system","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/scripts","category":"root","status":"planned","reason":"owned-root-remove"},{"path":".agents/skills/spec-dock","category":"slot","status":"planned","reason":"owned-slot-remove"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"planned","reason":"owned-slot-remove"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
 ```
 
-### WIR-GOLDEN-U2 — Successful uninstall apply
+### WIR-GOLDEN-U2 — Exact legacy uninstall dry-run
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"dry-run","apply":false,"specs_mode":"keep","status":"planned","code":"uninstall-planned","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"preflight","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":7,"completed":0,"preserved":3,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"planned","reason":"terminal-record-publish"},{"path":"spec-dock/docs","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/templates","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/system","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/scripts","category":"root","status":"planned","reason":"owned-root-remove"},{"path":".agents/skills/spec-dock","category":"slot","status":"planned","reason":"owned-slot-remove"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"planned","reason":"owned-slot-remove"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
+```
+
+### WIR-GOLDEN-U3 — Matching incomplete-uninstall dry-run
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"dry-run","apply":false,"specs_mode":null,"status":"planned","code":"uninstall-planned","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"preflight","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":6,"completed":0,"preserved":4,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"planned","reason":"terminal-record-publish"},{"path":"spec-dock/docs","category":"root","status":"preserved","reason":"owned-root-absent"},{"path":"spec-dock/templates","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/system","category":"root","status":"planned","reason":"owned-root-remove"},{"path":"spec-dock/scripts","category":"root","status":"planned","reason":"owned-root-remove"},{"path":".agents/skills/spec-dock","category":"slot","status":"planned","reason":"owned-slot-remove"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"planned","reason":"owned-slot-remove"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
+```
+
+### WIR-GOLDEN-U4 — Tooling-absent dry-run
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"dry-run","apply":false,"specs_mode":null,"status":"planned","code":"uninstall-already-absent","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"preflight","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":4,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"preserved","reason":"terminal-record-current"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
+```
+
+### WIR-GOLDEN-U5 — Ready uninstall apply
 
 ```json
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":"keep","status":"completed","code":"uninstall-completed","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":true,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"cleanup-stage","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":7,"preserved":3,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"completed","reason":"terminal-record-publish"},{"path":"spec-dock/docs","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/templates","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/system","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/scripts","category":"root","status":"completed","reason":"owned-root-remove"},{"path":".agents/skills/spec-dock","category":"slot","status":"completed","reason":"owned-slot-remove"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"completed","reason":"owned-slot-remove"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
 ```
 
-### WIR-GOLDEN-U3 — Partial uninstall at templates
+### WIR-GOLDEN-U6 — Exact legacy uninstall apply
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"completed","code":"uninstall-completed","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":true,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"cleanup-stage","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":7,"preserved":3,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"completed","reason":"terminal-record-publish"},{"path":"spec-dock/docs","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/templates","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/system","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/scripts","category":"root","status":"completed","reason":"owned-root-remove"},{"path":".agents/skills/spec-dock","category":"slot","status":"completed","reason":"owned-slot-remove"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"completed","reason":"owned-slot-remove"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
+```
+
+### WIR-GOLDEN-U7 — Successful matching incomplete-uninstall resume
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":"keep","status":"completed","code":"uninstall-completed","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":true,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"cleanup-stage","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":6,"preserved":4,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"completed","reason":"terminal-record-publish"},{"path":"spec-dock/docs","category":"root","status":"preserved","reason":"owned-root-absent"},{"path":"spec-dock/templates","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/system","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/scripts","category":"root","status":"completed","reason":"owned-root-remove"},{"path":".agents/skills/spec-dock","category":"slot","status":"completed","reason":"owned-slot-remove"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"completed","reason":"owned-slot-remove"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
+```
+
+### WIR-GOLDEN-U8 — Tooling-absent apply
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"completed","code":"uninstall-already-absent","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"preflight","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":4,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"preserved","reason":"terminal-record-current"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
+```
+
+### WIR-GOLDEN-U9 — Partial uninstall at templates
 
 ```json
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":"keep","status":"partial_failure","code":"uninstall-partial-failure","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":true,"bootstrap_rolled_back":false,"phase":"detach-templates","last_completed_phase":"detach-docs","retry_command":"spec-dock uninstall --apply --keep-specs -- /tmp/consumer","failed_paths":["spec-dock/templates"],"pending_paths":["spec-dock/system","spec-dock/scripts",".agents/skills/spec-dock",".agents/skills/spec-dock-grill-with-docs","@provider-stage"],"summary":{"planned":0,"completed":2,"preserved":3,"pending":5,"failed":1,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"completed","reason":"incomplete-record-publish"},{"path":"spec-dock/docs","category":"root","status":"completed","reason":"owned-root-remove"},{"path":"spec-dock/templates","category":"root","status":"failed","reason":"owned-root-remove"},{"path":"spec-dock/system","category":"root","status":"pending","reason":"owned-root-remove"},{"path":"spec-dock/scripts","category":"root","status":"pending","reason":"owned-root-remove"},{"path":".agents/skills/spec-dock","category":"slot","status":"pending","reason":"owned-slot-remove"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"pending","reason":"owned-slot-remove"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":"@provider-stage","category":"stage","status":"pending","reason":"candidate-stage-cleanup"}],"guidance":["Rerun only the retry_command shown in this result.","Do not switch operation, candidate package, or seed policy."],"warnings":[],"errors":["SpecDock uninstall stopped after durable mutation; rerun the exact retry command."]}
 ```
 
-### WIR-GOLDEN-U4 — Removed purge trap
+### WIR-GOLDEN-U10 — Removed purge trap
 
 ```json
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":"remove","status":"error","code":"spec-history-purge-removed","operation":null,"candidate_digest":null,"seed_policy":null,"mutation_started":false,"bootstrap_rolled_back":false,"phase":"request-validation","last_completed_phase":"not-started","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":["Use tooling-only uninstall without --remove-specs.","Spec history and Workbench data remain consumer-owned."],"warnings":[],"errors":["Spec history purge has been removed; uninstall is tooling-only."]}
-```
-
-### WIR-GOLDEN-U5 — Idempotent tooling-absent apply
-
-```json
-{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"completed","code":"uninstall-already-absent","operation":"uninstall","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"preflight","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":4,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"preserved","reason":"terminal-record-current"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"}],"guidance":[],"warnings":[],"errors":[]}
 ```
 
 ### WIR-GOLDEN-I1 — Partial preserve-only install at system
@@ -607,7 +684,7 @@ Digest fixture is 64 lowercase `d` characters. Each block is compact JSON plus L
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"blocked","code":"bootstrap-container-conflict","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":false,"bootstrap_rolled_back":true,"phase":"bootstrap-container","last_completed_phase":"candidate-staging","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["The shared spec-dock container cannot be safely created or bound."]}
 ```
 
-Every matrix row is generated as a table-driven golden using the same exact constructor rules; the stable blocks above are review fixtures, not an incomplete relation list.
+Every one of the 123 relation rows is also generated as a table-driven golden from the same constructor and rejected if it does not match exactly one row. The 16 displayed objects are stable review fixtures, not a subset of accepted relations.
 
 ## 14. Public text
 
@@ -639,6 +716,6 @@ Null renders `null`; empty renders `none`; arrays use target order.
 
 ## 15. Required tests and trace
 
-Table-driven tests enumerate all 116 §10 rows and reject every unlisted relation; all sequences/partial pairs; action relations; target ordering and exact failed/pending equality; compact record/JSON/text goldens; duplicate/unknown values; CLI/service parity; exact dogfood record/markers at S60/S70.
+Table-driven tests enumerate all 123 §10 rows and reject every unlisted relation; all sequences/partial pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 16 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact dogfood record/markers at S60/S70.
 
 Normative trace: Epic E384-RQ-003,006–010,022; Issue I392-RQ-004–020,028; Design I392-D-001–012; Plan S10–S70. Owner decisions required: none.

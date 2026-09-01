@@ -4,148 +4,135 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-01"
+最終更新: "2026-09-02"
 親: ["init-local-00003"]
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d145f0f0d6f35535eebc0da89b7b708824279f1f"
+  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
 
-Normative artifacts are `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md`. Their closed wire and disposition rules are not delegated to implementation.
+Normative artifacts are `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md`. Their finite wire values and Issue #387 disposition rules are not delegated to implementation.
 
 ## 1. Outcome
 
-SpecDock provider distribution lifecycle and provider test execution are replaced by one fixed-ownership lifecycle and one build-once gate. The outcome is accepted only when all of the following hold together.
+SpecDock replaces the historical per-file provider lifecycle and sharded failure-approval gate with one fixed-ownership lifecycle and one build-once provider gate. Acceptance requires all of the following together.
 
-- Persistent provider mutation authority is exactly four tooling roots, two fixed skill slots and `spec-dock/spec-dock.version`.
-- The seven-key record carries immutable `seed_policy`; resume is exact `(operation,candidate_digest,seed_policy)`.
-- A fresh absent shared `spec-dock` container is created only through descriptor-bound bootstrap and exact empty rollback.
-- Exact clean `0.2.3` alone is migrated one-shot to `0.2.4`; active legacy recovery and modified or unsupported legacy states are not guessed.
-- Uninstall is tooling-only, dry-run by default, and retains a durable `tooling-absent-preserved-data` record. `--remove-specs` is a mutation-zero exit-2 trap.
-- The public result wire is closed: all codes, phase pairs, nullability, action reasons, path ordering, messages, retry commands, JSON and text goldens are fixed by the wire artifact.
-- Issue #387 remains a blocking dependency. Its permitted remove, retain(reason) and split results are consumed deterministically without changing #387 canonical documents.
-- Every temporary admission, build, witness, download, API snapshot and attestation workspace is outside the repository. All repository `spec-dock/.workbench/**` content is protected read-only consumer data.
-- S40 and S50 preserve exact legacy dogfood. S60 performs the sole complete legacy-to-0.2.4 dogfood migration; S70 performs the second complete candidate-wide update; S80 is tracked-read-only.
-- PR-B keeps current PR and main-push gates coherent. PR-C retires all old consumers before providers and replaces them atomically with the final provider gate.
-- Only Linux `provider-build-artifacts` packages the frozen head. Downstream Linux canonical, sdist, macOS and attestation jobs consume the same downloaded bytes with build count zero.
-- `provider-evidence-<sha>` is self-contained and contains exactly provider evidence, four receipts and four role evidence files with verified byte hashes.
-- Root `AGENTS.md` lifecycle/uninstall guidance is corrected at S60; final test-policy/provider-gate guidance is corrected at S70.
-- PR merge is human-only. New required context is added while old contexts remain, then intentional RED proves blocking, then GREEN is restored and old provider-only context is removed.
-- Epic #384 has one implementation-and-verification Issue only: GitHub #392.
+- Durable provider authority is exactly four roots, two fixed skill slots and `spec-dock/spec-dock.version`; fresh-only seed creation and shared-container bootstrap are separately bounded.
+- The strict seven-key record carries immutable `seed_policy`; resume is exact `(operation,candidate_digest,seed_policy)`.
+- Runtime lifecycle staging survives process exit in a deterministic owner-bound namespace on the repository filesystem. Discovery uses one repository `ACTIVE.json` index and a tuple-key path; no repository temp path or temp-root scan is allowed.
+- Exact clean `0.2.3` alone migrates to `0.2.4`. S40/S50 preserve checked-in legacy dogfood; S60 performs the sole complete migration; S70 performs the second complete candidate update; S80 is tracked-read-only.
+- Uninstall is tooling-only, default dry-run, retains `tooling-absent-preserved-data`, and treats `--remove-specs` as mutation-zero exit 2.
+- The public wire is closed at 36 codes and 123 context rows, with valid record/JSON goldens and every uninstall state/mode/resume relation fixed.
+- Issue #387 remains a blocking dependency. Its report names a production/test/config candidate, not a future PR. The candidate is an ancestor of the final PR head and the only permitted tail is evidence-only. S00 discovers the unique merged PR from GitHub evidence and applies `ISS387-THREE-WAY-V2`.
+- Every local admission/build/witness/download/API/attestation workspace is outside the repository. Every repository `spec-dock/.workbench/**` entry is protected and never used as a temporary target.
+- The protected manifest excludes only Issue #392 `report.md` and Issue #392 `.meta.json`; both have a separate exact blob/history contract. All other initiatives and artifacts remain protected.
+- S00/S30/S60 local Full Regression commands and the retained main-push workflow pass an owner-bound external `--artifact-dir`; no retained command writes repository workbench.
+- `provider-evidence-<sha>` contains exactly nine actual byte files. Candidate, four receipts, four role evidence documents and all aggregate linkages are independently rehashed.
+- Producer, role evidence, aggregate evidence and pre/post/Epic attestations have exact ordered schemas, compact UTF-8 plus LF serialization, hash relationships, typed failure contracts and canonical `EVIDENCE-FIXTURE-V1` byte/size/SHA-256 test vectors.
+- PR-C uses two explicit heads. `PRC_COMPAT_HEAD` emits both `Provider CI / provider-tests` and `Provider CI / provider-gate`; after the new context is required and RED-tested, `PRC_FINAL_HEAD` removes only the compatibility job and reruns all authoritative evidence.
+- Main remains releasable after S30, S60 and S80. S40, S50 and S70 are never main merge points.
+- GitHub #392 is the sole implementation-and-verification Issue; human alone changes required contexts and merges.
 
-## 2. Current verified baseline
+## 2. Verified baseline
 
-Repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `d145f0f0d6f35535eebc0da89b7b708824279f1f`. At that commit, the current canonical set still describes the old per-file managed distribution, old failure ledger/sharder and old operator guidance, while the checked-in dogfood record is exact plain `0.2.3` and both fixed slots have no new marker. The current root `AGENTS.md` still describes `--remove-specs` as destructive and the current full-regression policy. Issue #387 is separately approved and may remove, retain or split retirement candidates, but must not redesign Epic #384 distribution or provider-test policy.
+The repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `3c24bae76e86651f958bde7c716c5453fff73e56`. At that revision, root `AGENTS.md` and the current workflows still describe the old lane/full-regression policy; `scripts.quality.verify_full_regression` defaults to repository `spec-dock/.workbench/full-regression` unless `--artifact-dir` is passed; and checked-in dogfood is exact plain `0.2.3` with markerless fixed slots. Issue #387 is separately approved and may remove, retain(reason) or split retirement candidates without owning provider lifecycle or provider-test architecture.
 
-The repository evidence SHA is research provenance, not the future implementation-base diff authority. The imported replacement bytes are bound through `SPEC_FREEZE_COMMIT`; #387 is then verified from its own PR and merge graph.
+The repository evidence SHA is authoring provenance. The adopted bytes are bound by `SPEC_FREEZE_COMMIT`, and the later implementation base must contain both that commit and the independently verified Issue #387 merge.
 
 ## 3. Terms
 
 - **fixed roots**: `spec-dock/docs`, `spec-dock/templates`, `spec-dock/system`, `spec-dock/scripts`.
 - **fixed slots**: `.agents/skills/spec-dock`, `.agents/skills/spec-dock-grill-with-docs`.
-- **shared container**: repository-root `spec-dock`; create-only bootstrap authority, never whole-directory replacement or deletion authority.
-- **seeds**: `spec-dock/.gitignore` and `.github/workflows/ci.yml`; fresh-init-only absent creation, then consumer-owned.
-- **record**: `spec-dock/spec-dock.version`; plain `0.2.3\n` only for exact legacy, strict seven-key JSON for final lifecycle.
-- **external workspace**: an owner-bound `mkdtemp` directory below an OS temp root whose canonical real path is outside the repository real path.
-- **protected workbench**: every path under repository `spec-dock/.workbench/**`, including pre-existing symlinks and special entries; never used for Epic #384 temporary data.
-- **#387 pre-merge disposition block**: tracked report data containing only facts available before human merge, including candidate head/tree and mappings, not future merge identity.
-- **external closure evidence**: immutable content-addressed GitHub/Actions evidence created after the tracked head is frozen.
-- **main merge gates**: S30 for PR-A, S60 for PR-B and S80 for PR-C. S40, S50 and S70 are internal non-main checkpoints.
+- **record**: `spec-dock/spec-dock.version`; exact `0.2.3\n` legacy bytes or strict seven-key final JSON.
+- **shared container**: repository-root `spec-dock`; create-only bootstrap authority, never whole-directory replacement/deletion authority.
+- **ephemeral external workspace**: a `mkdtemp` directory below an OS temp root, realpath-proven outside the repository, used for evidence/build/download operations that need not survive an intentional cleanup.
+- **persistent lifecycle stage namespace**: `<repository-real-parent>/.spec-dock-provider-stages-v1`, same-filesystem, owner-bound and process-independent.
+- **resume tuple**: exact operation, candidate digest and seed policy.
+- **Issue #387 implementation candidate**: last #387 commit changing production, tests, workflow/config, package metadata, provider/dogfood assets or operator policy.
+- **Issue #387 evidence-only tail**: required #387 `report.md` and optional #387 `.meta.json` `updated_at` change only.
+- **PRC_COMPAT_HEAD**: PR-C head that contains the final gate plus the still-emitted old required context.
+- **PRC_FINAL_HEAD**: descendant that removes only the compatibility job and is the sole final source/evidence identity.
+- **append-only attestation comment**: a newly created GitHub Issue comment whose canonical body hash, comment ID, author and `created_at == updated_at` are verified; editing or deletion invalidates closure.
 
 ## 4. Requirements
 
-### E384-RQ-001 — Fixed ownership and protection
+### E384-RQ-001 — Fixed ownership and consumer preservation
 
-Durable target authority is exactly the four roots, two slots and record. Fresh `init` may additionally create the absent shared container, absent seeds and the exact absent `.github/workflows` parent chain. Initiatives, artifacts, generated state outside fixed roots, all repository workbench content, seeds after creation, unknown paths and unrelated skills are byte/type/mode/link-target preserved.
+Persistent target mutation authority is exactly the four roots, two slots and record. Fresh `init` may additionally create the absent shared container, absent seeds and exact absent `.github/workflows` parent chain. Consumer initiatives, artifacts, workbench, seeds after creation, unknown paths, unrelated skills and shared-container unknown children are preserved by type, mode, ownership, link target and bytes.
 
-### E384-RQ-002 — External temporary workspace
+### E384-RQ-002 — Ephemeral external workspaces
 
-All admission files, package builds, legacy fixtures, protected witnesses, downloads, receipts, API snapshots, run selectors and attestations are written only to an external owner-bound workspace. Creation uses `tempfile.mkdtemp(prefix="spec-dock-iss-00392-", dir=<OS temp root>)`, captures real path/device/inode/uid/mode, proves the real path is outside the repository, creates an exclusive `OWNER.json` sentinel with repository realpath hash, Issue ID, process UID and nonce, and accepts cleanup only after exact identity/sentinel verification. Collision, symlink, replaced directory, wrong owner, group/other write or repository containment fails closed. No command writes or deletes repository `.workbench`.
+Admission files, baseline packages, Full Regression output, witnesses, API snapshots, downloads, run selectors and attestation drafts use an owner-bound external workspace created with `tempfile.mkdtemp(prefix="spec-dock-iss-00392-", dir=<validated OS temp root>)`. The helper verifies realpath outside repository, current UID, mode 0700, no symlink components and an exclusive canonical `OWNER.json`. Cleanup accepts only the captured handle, exact device/inode/sentinel and registered entries. Unknown content or identity drift preserves the workspace and stops.
 
-### E384-RQ-003 — Lifecycle and resume identity
+### E384-RQ-003 — Cross-process lifecycle stage discovery
 
-The lifecycle classifies `absent`, `legacy-0.2.3`, `incomplete`, `ready`, `tooling-absent-preserved-data` and `blocked`. Final records serialize only the three durable states. `seed_policy` is `create-if-absent` only for never-installed fresh `init`; update-on-absent, migration, reinstall, update and uninstall are `preserve-only`. One operation preserves its policy through incomplete and terminal records. Resume requires exact operation, candidate digest and seed policy across request, record and stage.
+Lifecycle payload/tombstone staging uses the persistent namespace on the repository filesystem, not the ephemeral evidence workspace. The namespace has exact `NAMESPACE.json`, per-repository `REPOSITORY.json`, one deterministic `ACTIVE.json` and a deterministic tuple-key stage directory. `ACTIVE.json` is created before stage allocation, records `allocating|ready|terminal-cleanup`, and binds repository realpath hash/device/inode plus the resume tuple. The same tuple can recover after process exit, including bootstrap-before-record; a different tuple blocks. Directory scanning is forbidden.
 
-### E384-RQ-004 — Safe shared-container bootstrap and atomic publication
+### E384-RQ-004 — Lifecycle, record and closed wire
 
-Candidate validation and parent binding precede target mutation. An absent shared container is exclusively created with `mkdirat`, immediately opened no-follow, identity-checked and recorded in the external stage owner before record publication. A pre-record failure removes it only when exact identity and emptiness are proven; otherwise it remains a partial failure recoverable only by the same resume tuple. Roots/slots use native no-replace/exchange publication on Linux/macOS and fail closed without the required primitive.
+Final durable states are `incomplete`, `ready`, `tooling-absent-preserved-data`; observed-only states are `absent`, `legacy-0.2.3`, `blocked`. The strict record, result, action, text and exit relations are exactly the wire artifact. Unknown values, catch-all tokens or alternative path ordering are invalid.
 
-### E384-RQ-005 — Combined hard cutover and exact legacy boundary
+### E384-RQ-005 — Filesystem safety and fresh bootstrap
 
-No uninstall-first bridge, intermediate public generation, runtime toggle, dual writer or old-engine fallback is introduced. S40 and S50 run on one PR-B branch and may not be merged. S60 merges complete `0.2.4` lifecycle, exact migration proof, old-engine removal, final lifecycle docs, current-gate continuity and complete dogfood migration together. Only exact clean `0.2.3` is migrated; active recovery, modified payload, invalid record and unsupported version block pre-mutation.
+Candidate validation and descriptor binding precede target mutation. Absent `spec-dock` is exclusively `mkdirat`-created, opened no-follow, identity-checked, fsynced and written into persistent stage ownership before record publication. Pre-record rollback removes only that exact empty identity. Roots/slots publish with Linux `renameat2` or macOS `renameatx_np` no-replace/exchange primitives; absence or mismatch fails closed.
 
-### E384-RQ-006 — Tooling-only uninstall and closed public wire
+### E384-RQ-006 — Combined hard cutover and dogfood boundaries
 
-Uninstall is default dry-run and `--apply` confirmation. It removes only owned fixed roots and slots, preserves container, seeds and consumer data, and retains a tooling-absent record. `--keep-specs` is a compatibility alias. `--remove-specs` returns exact code `spec-history-purge-removed`, mutation false and exit 2 before target observation. All public record/result/action/text relations are exactly those in `provider-lifecycle-wire-contract.md`; no implementation-defined code, token, catch-all, path order or message exists.
+No uninstall-first bridge, intermediate public generation, runtime toggle, dual writer or old-engine fallback is introduced. S40/S50 remain non-main and preserve all checked-in dogfood bytes. S60 merges complete lifecycle, exact legacy proof, old-engine removal, current-gate continuity, lifecycle docs/operator guidance and one complete dogfood migration. S70 completes final gate/policy candidate changes and a second complete dogfood update. S80 edits no tracked path.
 
-### E384-RQ-007 — Old-package mutation-zero
+### E384-RQ-007 — Tooling-only uninstall, exact legacy and downgrade safety
 
-Old exact `0.2.3` package commands against final ready and tooling-absent workspaces are executed under a startup composite tripwire. Python filesystem mutation and Linux `renameat2` or macOS `renameatx_np` calls are intercepted before the underlying call. Positive controls must be caught and every old command must produce zero target mutation events and an identical target digest.
+Uninstall removes only owned fixed roots/slots, preserves container/seeds/data and keeps a durable absent record. `--keep-specs` is an alias; `--remove-specs` is the fixed removed-operation trap. Only exact clean `0.2.3` migrates. Old package commands against final states are mutation-zero under Python/native pre-call tripwires with positive controls.
 
-### E384-RQ-008 — Deterministic #387 admission
+### E384-RQ-008 — `ISS387-THREE-WAY-V2` admission
 
-The source ledger's 27 original node/signature identities remain the register authority. #387 tracked report contains one pre-merge disposition block for conditional rows with candidate repository, PR number, head SHA/tree, report schema and remove/retain/split mapping only. S00 independently obtains the merged PR from GitHub after merge, requires exact repository/PR/head/tree match, obtains merge SHA/tree, verifies head-tree equals merge-tree, verifies ancestry, reads the merged report blob and post-merge ledger/collection, then applies the closed register branch. Missing mapping, unexpected node, signature drift, multiple failure-lineage nodes or out-of-contract tree result stops before S10 for spec-owner amendment and Strict rereview. Post-#387 row count is formula-derived, never fixed to 15.
+The #387 tracked report contains the candidate SHA/tree and exact 12 conditional mappings but no PR number or merge facts. Candidate-to-final-head diff is restricted to required `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/report.md` and optional `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/.meta.json` `updated_at` only. S00 intersects candidate-associated PRs with Issue #387 GitHub timeline links and requires exactly one merged PR; verifies candidate ancestry, tail semantics, final-head/merge tree equality, main reachability, merged report, ledger and collection; then applies the register. Any zero/multiple PR, tail drift, signature drift or unmapped node stops before S10.
 
-### E384-RQ-009 — Failure terminalization and transitional gate continuity
+### E384-RQ-009 — Protected witness and authorized exclusions
 
-S60 mechanically fixes every admitted active row or applies the register's supersession rule, resulting in active count zero and approved failure count zero. It retargets only deleted distribution tests in the current `.github/workflows/provider-ci.yml`, updates current lane consumers and keeps the current main-push Full Regression graph operational. S60 does not depend on S70-only tooling. PR-B current PR workflow and current main-push verifier are independently GREEN.
+The protected witness covers every repository `spec-dock/.workbench/**` path and every initiative/artifact path except exact `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/report.md` and `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/.meta.json`. The report may change only in S00–S70 under the pre-merge report contract. `.meta.json` may change only its existing `updated_at` scalar. A separate external exclusion ledger records before/after blob OIDs, mode, path history and allowed-field diff. No glob, parent-directory or future metadata exclusion is allowed.
 
-### E384-RQ-010 — Dogfood and documentation boundaries
+### E384-RQ-010 — Transitional Full Regression external output
 
-S40 may modify provider source, root README lifecycle sections and provider-side lifecycle docs but must not directly edit or synchronize any dogfood root, either fixed slot, record or marker. S50 also leaves exact legacy dogfood unchanged. S60 applies the new service once to the repository root and commits all four roots, both slots, seven-key ready record and both markers as one complete `0.2.4` candidate while preserving protected data. S60 also updates root `AGENTS.md` lifecycle/uninstall sections only. S70 owns final candidate/test-policy docs, final AGENTS test-policy sections and a second complete candidate-wide dogfood update. S80 owns no tracked path and runs no update/sync/build.
+Every S00/S30/S60 invocation calls `verify_full_regression --shards 4 --artifact-dir <owner-bound external directory>`. S60 minimally changes `.github/workflows/provider-full-regression.yml` to create the directory below `${{ runner.temp }}` through the external-workspace helper, pass it explicitly and upload that exact output. Workflow name, trigger, job identity, test policy and evaluation stay otherwise unchanged until S70.
 
-### E384-RQ-011 — Consumer-first PR-C replacement
+### E384-RQ-011 — Failure terminalization and current-gate continuity
 
-On one non-main PR-C branch, S70 first creates the replacement gate, stable environment, workflow and tests; then retires or replaces all remaining old-policy consumers, including lane/baseline tests and imports; proves consumer zero; deletes old providers, ledger, timing, sharder, root policy hook and main-push workflow; and performs the second complete dogfood update. S70 is not mergeable. S80 proves the final gate before PR-C merge.
+S00 admits every #387-permitted branch by the register. S60 mechanically fixes/supersedes admitted rows to active/approved count zero, retargets deleted distribution tests in current Provider CI, updates current lane consumers and keeps both current PR workflow and main-push Full Regression independently GREEN. S60 does not use final S70 tooling.
 
-### E384-RQ-012 — Sole producer and self-contained evidence
+### E384-RQ-012 — Final CI byte graph and stable qualification
 
-After tracked head freeze, only Linux job `provider-build-artifacts` may invoke packaging. It uploads one candidate and producer receipt. Linux canonical, sdist smoke and macOS delta download the same candidate and invoke no build. `provider-attestation` needs exactly producer plus three consumers, downloads candidate, all receipts and all role evidence bytes, verifies them and uploads exactly one `provider-evidence-<sha>`. That artifact contains exactly nine files: `provider-evidence.json`, four role receipt JSON files and four role evidence JSON files. The verifier validates actual bytes, schemas, SHA-256 linkages, source/tree, run/job/artifact metadata, build counts and role metrics.
+Only Linux `provider-build-artifacts` packages `PRC_FINAL_HEAD`, exactly once. Linux canonical, sdist and macOS jobs download identical candidate bytes and build zero times. `provider-attestation` needs exactly all four roles, verifies actual bytes and uploads one nine-file `provider-evidence-<sha>`. Linux qualification is bound to `specdock-linux-qualification-v1`, pinned image/resource/toolchain fingerprint, first-five 600-second/1.1 CPU ratio, 20 clean runs and 100% seeded-fault detection.
 
-### E384-RQ-013 — Stable qualification and no-gap context transition
+### E384-RQ-013 — Exact evidence and attestation schemas
 
-Linux qualification environment ID is `specdock-linux-qualification-v1` and is bound to the tracked descriptor, pinned container base digest, x86_64, 2 CPU, 8 GiB, Python, uv and lock fingerprints. Mismatch invalidates the whole 20-run series. First five runs are each <=600 seconds with process-tree CPU/wall <=1.1; all 20 have zero flake/retry and seeded-fault detection is 100%. Human admin adds the new required context while old contexts remain, reads back both, proves intentional RED blocking on a non-merge canary, restores GREEN, then removes only the old provider context.
+Issue Design defines ordered keys/types/enums/nullability/units for candidate manifest, all four receipts, all four role evidence files, provider aggregate and three attestations. Serialization is compact UTF-8 plus one LF. Every child byte file is size/SHA-linked by its parent. `emit-attestation` has exact CLI, stdout, error and exit contracts. Attestations are posted as append-only GitHub Issue comments on #392 (pre/post) or #384 (Epic); identity, permissions and readback are verified.
 
-### E384-RQ-014 — Non-cyclic evidence and closure
+### E384-RQ-014 — Two-head required-context transition
 
-Tracked #392 report contains pre-freeze methodology and implementation facts only, with no own hash, final head, final source-bound artifact hash or post-merge facts. Frozen-head build/qualification/context data is stored in immutable external pre-merge attestation. Human merge is verified by PR-head tree OID equality with merge-commit tree OID. SpecDock finish and Issue/Epic closure are external post-merge attestations; tracked report is not rewritten.
+At `PRC_COMPAT_HEAD`, final evidence jobs and new `Provider CI / provider-gate` run together with compatibility `Provider CI / provider-tests`. The compatibility job independently validates provider-attestation and stays GREEN. Human adds the new context while old remains and reads both back. A dedicated non-merge canary makes only the new aggregate RED and proves block. After closing the canary and restoring GREEN, human removes old required context. `PRC_FINAL_HEAD` then removes only the compatibility job; all final CI/evidence/qualification is rerun on that final frozen head, followed by final required-context readback.
 
-### E384-RQ-015 — One Issue and human-only merge
+### E384-RQ-015 — Documentation and operator policy
 
-GitHub #392 is the sole implementation-and-verification Issue. Baseline and rebaseline are admissions, not new Product decisions. Internal PRs and canary PR are execution mechanisms, not Issues. Failure is forward-fixed in #392; no research-only, decision-only, tests-only or verification-only Issue is added. Human performs all main merges and required-context writes.
+S60 converges root README lifecycle, provider/dogfood migration docs and root AGENTS lifecycle/uninstall text with final `0.2.4`, while retaining current test-policy instructions. S70 converges final test-policy docs and AGENTS provider-gate instructions. S80 is read-only. Repository-wide forbidden-phrase and provider/dogfood parity checks are mandatory.
 
-## 5. Non-scope
+### E384-RQ-016 — Non-cyclic evidence and closure
 
-- User-owned spec-history purge.
-- Migration catalog beyond exact `0.2.3`.
-- Release publication, tags or PyPI.
-- Sharding, xdist or larger hardware as a budget escape.
-- Reimplementation or modification of Issue #387 canonical documents.
-- Changes to Issue #372 canonical evidence.
-- Automatic rollback, automatic Issue creation or agent merge.
+Tracked #392 report contains pre-freeze methodology and implementation facts only. Final source/evidence/context facts are external. Human merge is verified by `PRC_FINAL_HEAD^{tree} == merge_commit^{tree}`. SpecDock finish, GitHub #392 close and #384 close are external post-merge attestations; report is not rewritten.
 
-## 6. Accepted merge-point policy
+### E384-RQ-017 — Single Issue and human gates
 
-| Main gate | Required state after human merge |
+GitHub #392 is the only implementation-and-verification Issue. #387 remains the dependency; #388–#390 remain superseded. Baselines/rebaselines are admission steps, not new Issues. All failure is forward-fixed in #392. Human alone changes required contexts and merges.
+
+## 5. Accepted merge points
+
+| Gate | Required main state |
 |---|---|
-| PR-A / S30 | Old public product; dormant successor only; current gates and exact legacy dogfood unchanged. |
-| PR-B / S60 | Complete final lifecycle and wire; exact legacy proof; old engine removed; active failures zero; current PR/main-push gates GREEN; lifecycle docs/AGENTS aligned; complete S60 dogfood candidate committed. |
-| PR-C / S80 | Final consumer-first provider gate; self-contained evidence; old policy machinery absent; final AGENTS/test-policy docs; complete S70 dogfood candidate; S80 tracked-read-only evidence GREEN. |
+| PR-A / S30 | Old public product, dormant successor, exact legacy dogfood, current gates GREEN. |
+| PR-B / S60 | Complete final lifecycle/wire/docs/AGENTS lifecycle guidance, exact migration proof, old engine removed, failures zero, retained current workflows using external output, complete S60 dogfood. |
+| PR-C / S80 | `PRC_FINAL_HEAD` final gate/evidence, compatibility job absent, final required-context readback, old policy absent, final docs/AGENTS, complete S70 dogfood, S80 read-only proof. |
 
-S40, S50 and S70 are never main merge handoff points.
-
-## 7. Trace to Issue #392
-
-| Epic requirement | Issue authority |
-|---|---|
-| E384-RQ-001–004 | I392-RQ-004–016; I392-D-001–018; S10–S30 |
-| E384-RQ-005–007 | I392-RQ-017–021; wire artifact; S40–S50 |
-| E384-RQ-008–009 | register artifact; I392-RQ-002–003/023; I392-D-013–015/022; S00/S60 |
-| E384-RQ-010–011 | I392-RQ-021–024/031–032; I392-D-019–024; S40/S60/S70 |
-| E384-RQ-012–013 | I392-RQ-025–029; I392-D-025–033; S70/S80 |
-| E384-RQ-014–015 | I392-RQ-030/033; S80 and external closure protocol |
-
-Owner decisions required: none.
+S40, S50 and S70 are not main merge handoff points. Owner decisions required: none.
