@@ -6918,7 +6918,7 @@ def test_i370_resume_displaced_backup_only_marker_rebind_stops_before_gc(
     backup_payload = backup.read_bytes() if kind == "regular" else backup.readlink()
     outside = target_root / "outside-sentinel.txt"
     outside.write_bytes(b"outside\n")
-    outside_before = (outside.lstat(), outside.read_bytes())
+    outside_before = (outside.read_bytes(), outside.lstat())
 
     replacement = specdock / ".marker-replacement"
     marker_rebound: os.stat_result | None = None
@@ -6984,8 +6984,8 @@ def test_i370_resume_displaced_backup_only_marker_rebind_stops_before_gc(
     assert not target.exists() and not target.is_symlink()
     assert backup.lstat() == backup_before
     assert (backup.read_bytes() if kind == "regular" else backup.readlink()) == backup_payload
-    assert outside.lstat() == outside_before[0]
-    assert outside.read_bytes() == outside_before[1]
+    assert outside.lstat() == outside_before[1]
+    assert outside.read_bytes() == outside_before[0]
     assert journal_path.read_bytes() == journal_before
     assert marker_path.lstat() == marker_rebound
     assert marker_path.read_bytes() == marker_before
@@ -7117,7 +7117,7 @@ def test_i370_resume_gc_cleanup_deprovision_boundary_is_parent_bound(
     marker_before = marker_path.read_bytes()
     outside = target_root / "outside-sentinel.txt"
     outside.write_bytes(b"outside\n")
-    outside_before = (outside.lstat(), outside.read_bytes())
+    outside_before = (outside.read_bytes(), outside.lstat())
 
     def stable_entry_state(path: Path) -> tuple[tuple[int, ...], bytes | Path]:
         info = path.lstat()
@@ -7174,8 +7174,8 @@ def test_i370_resume_gc_cleanup_deprovision_boundary_is_parent_bound(
         assert journal_path.read_bytes() == journal_before
         assert marker_path.read_bytes() == marker_before
         assert target.exists() is False and target.is_symlink() is False
-        assert outside.lstat() == outside_before[0]
-        assert outside.read_bytes() == outside_before[1]
+        assert outside.lstat() == outside_before[1]
+        assert outside.read_bytes() == outside_before[0]
         assert rename_calls == 0
         assert unlink_calls == 0
         assert {path.name: stable_entry_state(path) for path in displaced.iterdir()} == private_entries

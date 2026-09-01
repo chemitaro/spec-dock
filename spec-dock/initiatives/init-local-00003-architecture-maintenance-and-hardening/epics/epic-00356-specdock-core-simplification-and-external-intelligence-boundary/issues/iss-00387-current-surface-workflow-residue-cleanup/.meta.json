@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00387",
+  "title": "Current Surface Workflow Residue Cleanup",
+  "slug": "current-surface-workflow-residue-cleanup",
+  "created_at": "2026-08-31T16:34:21+09:00",
+  "updated_at": "2026-08-31T17:19:45+09:00",
+  "parent_id": "epic-00356",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00356",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 387,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00357",
+    "iss-00358",
+    "iss-00359",
+    "iss-00360"
+  ]
+}
