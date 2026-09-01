@@ -57,6 +57,7 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 | 2026-09-01 | fixed SHA `7f4ec536e34b35fe1dfe250ee786cef5ed59bc6d`のC00独立監査とChatGPT Use Strict Extra High分析により、scripts READMEと三scopeのartifacts/discussions rulesの7 provider/dogfood pairをapproved Current surfaceへ追加 | production/test/config未着手。旧C00 evidenceは破棄してNOT_RUNへ戻した。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
 | 2026-09-01 | ChatGPT Use Strict Extra High advisoryの受入れにより、C60-02 exact verifierをpre-commitからC90-05のcommit/push後clean `FINAL_SHA`へ延期し、C90-04のfreezeとC90-05のfinal-SHA検証順を明示 | C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが明示的に失効扱いとし、final evidenceへ再利用しない。Plan rowを理由付きN/A/deferredへ固定し、38 checks、36 ledger rows、各check 8 fields、二external gatesを維持 |
 | 2026-09-02 | Strict spec review P1により、C40-09をcommit前のreferential-integrity確認へ限定し、full verifierの実行時点をC60-02/C90-05のclean `FINAL_SHA`へ一意化 | C40-09のverifier成功要求をledger parser、timing loader、collection、verifier CLI parser/help contractの成功へ置換。38 checks、36 ledger rows、各check 8 fields、二external gatesは不変 |
+| 2026-09-02 | Strict spec review P1により、C00-01期待結果から固定branch名を除き、attached/non-detached implementation branch名のReport記録とconfigured upstream一致を明示 | C00-01の既存確認command、40桁baseline拘束、38 checks、36 ledger rows、各check 8 fields、二external gatesは不変 |
 
 ## 3. 実装原則
 
@@ -153,7 +154,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **前提:** 改訂R/D/PがStrict reviewを通過し、commit/push済み。
 - **操作:** 変更しない。
 - **確認:** `git status --short`、`git branch --show-current`、`git rev-parse HEAD`、`git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'`、`git rev-parse '@{upstream}'`を別々に実行する。最後に`IMPLEMENTATION_BASELINE_SHA="$(git rev-parse --verify 'HEAD^{commit}')"`、`printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'`、`test "$(git rev-parse '@{upstream}')" = "$IMPLEMENTATION_BASELINE_SHA"`を実行する。
-- **期待結果:** clean、branch=`iss-00387-current-surface-workflow-residue-cleanup`、HEAD=upstream。検証済み40桁値を`<implementation-baseline-sha>`として以後のdiffへ使用する。
+- **期待結果:** clean、attached/non-detached implementation branch名をReportへ記録し、HEAD=its configured upstream。検証済み40桁値を`<implementation-baseline-sha>`として以後のdiffへ使用する。
 - **証拠:** branch、検証済みfull SHA、clean status。full SHAはReportへ一度記録し、後続shellでは同じ40桁値を再代入してC00-01値と一致確認する。
 - **停止条件:** dirty、detached、upstream不一致、Git operation/lock。
 - **cleanup:** なし。
