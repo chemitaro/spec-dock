@@ -6,294 +6,146 @@ ID: "epic-00384"
 状態: "draft"
 最終更新: "2026-09-01"
 親: ["init-local-00003"]
-正本検証:
+repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "eaddf76806c338ee05463741f15fd3967bbceb57"
+  sha: "d145f0f0d6f35535eebc0da89b7b708824279f1f"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
 
-Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md` (Issue documents use `../../artifacts/...`). Their exact wire/disposition data is not delegated to implementation.
-
+Normative artifacts are `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md`. Their closed wire and disposition rules are not delegated to implementation.
 
 ## 1. Outcome
 
-SpecDock providerのdistribution lifecycleとprovider test execution graphを同一のProduct変更として簡素化し、次のfinal contractへcombined hard cutoverする。
+SpecDock provider distribution lifecycle and provider test execution are replaced by one fixed-ownership lifecycle and one build-once gate. The outcome is accepted only when all of the following hold together.
 
-- consumer repositoryで永続的に管理するtooling mutation authorityを、4 fixed roots、2 fixed skill slots、1 fixed installation recordへ限定する。
-- `spec-dock/.gitignore`と`.github/workflows/ci.yml`はfresh `init`時にpathがabsentの場合だけ作成し、作成後はconsumer-owned seedとして扱う。
-- incomplete operationのresumeに必要なseed mutation authorityを、strict recordのimmutable `seed_policy`として保存し、seedの現在状態から推測しない。
-- fresh targetでshared `spec-dock` containerがabsentの場合だけ、descriptor-bound bootstrapとして安全に作成・bindし、record publication前のfailureではexact identityかつemptyの場合だけcleanupする。
-- exact clean `0.2.3` workspaceだけをone-shot migrateし、active legacy recovery、unsupported legacy、foreign markerless slotを推測変換しない。
-- uninstallをtooling-onlyへ縮小し、user-owned spec historyを削除するpurge capabilityを廃止する。
-- PR-BはS40/S50をnon-main checkpoint、S60を唯一のmerge gateとし、mainをold public productからcomplete final lifecycleへ一度だけ遷移させる。
-- PR-Cはreplacement provider gate、stable Linux qualification environment、root `AGENTS.md`更新、old policy/workflow removalを一つのbranch/PRで完了し、S80だけをmerge gateとする。
-- specification lineage、#387 implementation drift、tracked pre-merge report、external closure evidenceを別々のidentityで検証し、tracked treeへ自己参照するevidenceを置かない。
-- provider merge gateをbuild-once、Linux canonical single pytest process、macOS platform deltaへ移行し、approved failure、policy skip、duplicate contract execution、4-shard Full Regressionをfinal stateから除去する。
-- 実装と検証はGitHub #392の一つのIssue unitだけで受け入れる。
+- Persistent provider mutation authority is exactly four tooling roots, two fixed skill slots and `spec-dock/spec-dock.version`.
+- The seven-key record carries immutable `seed_policy`; resume is exact `(operation,candidate_digest,seed_policy)`.
+- A fresh absent shared `spec-dock` container is created only through descriptor-bound bootstrap and exact empty rollback.
+- Exact clean `0.2.3` alone is migrated one-shot to `0.2.4`; active legacy recovery and modified or unsupported legacy states are not guessed.
+- Uninstall is tooling-only, dry-run by default, and retains a durable `tooling-absent-preserved-data` record. `--remove-specs` is a mutation-zero exit-2 trap.
+- The public result wire is closed: all codes, phase pairs, nullability, action reasons, path ordering, messages, retry commands, JSON and text goldens are fixed by the wire artifact.
+- Issue #387 remains a blocking dependency. Its permitted remove, retain(reason) and split results are consumed deterministically without changing #387 canonical documents.
+- Every temporary admission, build, witness, download, API snapshot and attestation workspace is outside the repository. All repository `spec-dock/.workbench/**` content is protected read-only consumer data.
+- S40 and S50 preserve exact legacy dogfood. S60 performs the sole complete legacy-to-0.2.4 dogfood migration; S70 performs the second complete candidate-wide update; S80 is tracked-read-only.
+- PR-B keeps current PR and main-push gates coherent. PR-C retires all old consumers before providers and replaces them atomically with the final provider gate.
+- Only Linux `provider-build-artifacts` packages the frozen head. Downstream Linux canonical, sdist, macOS and attestation jobs consume the same downloaded bytes with build count zero.
+- `provider-evidence-<sha>` is self-contained and contains exactly provider evidence, four receipts and four role evidence files with verified byte hashes.
+- Root `AGENTS.md` lifecycle/uninstall guidance is corrected at S60; final test-policy/provider-gate guidance is corrected at S70.
+- PR merge is human-only. New required context is added while old contexts remain, then intentional RED proves blocking, then GREEN is restored and old provider-only context is removed.
+- Epic #384 has one implementation-and-verification Issue only: GitHub #392.
 
-Outcomeはコード量削減そのものではない。管理権限、失敗時挙動、migration、public CLI、artifact binding、test ownership、human merge gate、evidence identityが一つの検証可能な契約へ収束した状態である。
+## 2. Current verified baseline
 
-## 2. Current evidence and problem statement
+Repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `d145f0f0d6f35535eebc0da89b7b708824279f1f`. At that commit, the current canonical set still describes the old per-file managed distribution, old failure ledger/sharder and old operator guidance, while the checked-in dogfood record is exact plain `0.2.3` and both fixed slots have no new marker. The current root `AGENTS.md` still describes `--remove-specs` as destructive and the current full-regression policy. Issue #387 is separately approved and may remove, retain or split retirement candidates, but must not redesign Epic #384 distribution or provider-test policy.
 
-本書は`chemitaro/spec-dock`のbranch `codex/epic-00384-provider-test-strategy-planning`、full SHA `eaddf76806c338ee05463741f15fd3967bbceb57`を調査基準とする。このrevisionでは次を直接確認した。
+The repository evidence SHA is research provenance, not the future implementation-base diff authority. The imported replacement bytes are bound through `SPEC_FREEZE_COMMIT`; #387 is then verified from its own PR and merge graph.
 
-- `src/spec_dock/managed_distribution.py`がfresh、update、deprovision、purge、historical identity、journal、recovery、native rename、result modelを一つの巨大なmoduleで所有している。
-- `src/spec_dock/assets/managed_distribution.json`がrecognized version、historical current identity、obsolete exact fileを列挙している。
-- `src/spec_dock/cli.py`がlegacy admission、fresh/recognized execution、safe removal、purge、text/JSON mappingを直接結合している。
-- `pyproject.toml`のcurrent package versionは`0.2.3`で、pytestの`fast` / `full_regression` policy markerが存在する。
-- `tests/conftest.py`がpath-based lane classification、policy skip、failure ledger evaluation、shard observationを所有する。
-- `.github/workflows/provider-ci.yml`はordinary suiteに加えてUbuntu/macOSでdistribution contractを重複実行し、`.github/workflows/provider-full-regression.yml`はmain pushで4-shard verifierを実行する。
-- Current `provider-ci.yml`は`tests/unit/infra/test_managed_distribution.py`、`tests/cli_runtime/test_distribution_cutover.py`、`tests/integration/test_epic_00343_distribution.py`を直接参照する。`tests/unit/test_provider_test_lanes.py`は`tests.conftest`と両quality modulesをimportし、`tests/unit/test_full_regression_baseline.py`はbaseline providerを直接検証する。
-- `full-regression-ledger.json`、`full-regression-timing-weights.json`、`scripts/quality/full_regression_baseline.py`、`scripts/quality/verify_full_regression.py`がapproved failureとshardingを支える。
-- Issue #387はopenであり、このrevisionには#387 implementationがまだ含まれない。#387のcanonical R/D/Pはmanaged distribution、provider workflow、sharder、public installer CLIを明示的に非所有としている。
-- Epic `.meta.json`の`depends_on`は`iss-00387`を含む。
+## 3. Terms
 
-したがって、#387のaccepted cleanupと本Epicのmanaged distribution semanticsを混同せず、#387 merge後のexact SHAを新しいimplementation baselineとして固定する必要がある。
+- **fixed roots**: `spec-dock/docs`, `spec-dock/templates`, `spec-dock/system`, `spec-dock/scripts`.
+- **fixed slots**: `.agents/skills/spec-dock`, `.agents/skills/spec-dock-grill-with-docs`.
+- **shared container**: repository-root `spec-dock`; create-only bootstrap authority, never whole-directory replacement or deletion authority.
+- **seeds**: `spec-dock/.gitignore` and `.github/workflows/ci.yml`; fresh-init-only absent creation, then consumer-owned.
+- **record**: `spec-dock/spec-dock.version`; plain `0.2.3\n` only for exact legacy, strict seven-key JSON for final lifecycle.
+- **external workspace**: an owner-bound `mkdtemp` directory below an OS temp root whose canonical real path is outside the repository real path.
+- **protected workbench**: every path under repository `spec-dock/.workbench/**`, including pre-existing symlinks and special entries; never used for Epic #384 temporary data.
+- **#387 pre-merge disposition block**: tracked report data containing only facts available before human merge, including candidate head/tree and mappings, not future merge identity.
+- **external closure evidence**: immutable content-addressed GitHub/Actions evidence created after the tracked head is frozen.
+- **main merge gates**: S30 for PR-A, S60 for PR-B and S80 for PR-C. S40, S50 and S70 are internal non-main checkpoints.
 
-## 3. Actors
+## 4. Requirements
 
-| Actor | Responsibility |
+### E384-RQ-001 — Fixed ownership and protection
+
+Durable target authority is exactly the four roots, two slots and record. Fresh `init` may additionally create the absent shared container, absent seeds and the exact absent `.github/workflows` parent chain. Initiatives, artifacts, generated state outside fixed roots, all repository workbench content, seeds after creation, unknown paths and unrelated skills are byte/type/mode/link-target preserved.
+
+### E384-RQ-002 — External temporary workspace
+
+All admission files, package builds, legacy fixtures, protected witnesses, downloads, receipts, API snapshots, run selectors and attestations are written only to an external owner-bound workspace. Creation uses `tempfile.mkdtemp(prefix="spec-dock-iss-00392-", dir=<OS temp root>)`, captures real path/device/inode/uid/mode, proves the real path is outside the repository, creates an exclusive `OWNER.json` sentinel with repository realpath hash, Issue ID, process UID and nonce, and accepts cleanup only after exact identity/sentinel verification. Collision, symlink, replaced directory, wrong owner, group/other write or repository containment fails closed. No command writes or deletes repository `.workbench`.
+
+### E384-RQ-003 — Lifecycle and resume identity
+
+The lifecycle classifies `absent`, `legacy-0.2.3`, `incomplete`, `ready`, `tooling-absent-preserved-data` and `blocked`. Final records serialize only the three durable states. `seed_policy` is `create-if-absent` only for never-installed fresh `init`; update-on-absent, migration, reinstall, update and uninstall are `preserve-only`. One operation preserves its policy through incomplete and terminal records. Resume requires exact operation, candidate digest and seed policy across request, record and stage.
+
+### E384-RQ-004 — Safe shared-container bootstrap and atomic publication
+
+Candidate validation and parent binding precede target mutation. An absent shared container is exclusively created with `mkdirat`, immediately opened no-follow, identity-checked and recorded in the external stage owner before record publication. A pre-record failure removes it only when exact identity and emptiness are proven; otherwise it remains a partial failure recoverable only by the same resume tuple. Roots/slots use native no-replace/exchange publication on Linux/macOS and fail closed without the required primitive.
+
+### E384-RQ-005 — Combined hard cutover and exact legacy boundary
+
+No uninstall-first bridge, intermediate public generation, runtime toggle, dual writer or old-engine fallback is introduced. S40 and S50 run on one PR-B branch and may not be merged. S60 merges complete `0.2.4` lifecycle, exact migration proof, old-engine removal, final lifecycle docs, current-gate continuity and complete dogfood migration together. Only exact clean `0.2.3` is migrated; active recovery, modified payload, invalid record and unsupported version block pre-mutation.
+
+### E384-RQ-006 — Tooling-only uninstall and closed public wire
+
+Uninstall is default dry-run and `--apply` confirmation. It removes only owned fixed roots and slots, preserves container, seeds and consumer data, and retains a tooling-absent record. `--keep-specs` is a compatibility alias. `--remove-specs` returns exact code `spec-history-purge-removed`, mutation false and exit 2 before target observation. All public record/result/action/text relations are exactly those in `provider-lifecycle-wire-contract.md`; no implementation-defined code, token, catch-all, path order or message exists.
+
+### E384-RQ-007 — Old-package mutation-zero
+
+Old exact `0.2.3` package commands against final ready and tooling-absent workspaces are executed under a startup composite tripwire. Python filesystem mutation and Linux `renameat2` or macOS `renameatx_np` calls are intercepted before the underlying call. Positive controls must be caught and every old command must produce zero target mutation events and an identical target digest.
+
+### E384-RQ-008 — Deterministic #387 admission
+
+The source ledger's 27 original node/signature identities remain the register authority. #387 tracked report contains one pre-merge disposition block for conditional rows with candidate repository, PR number, head SHA/tree, report schema and remove/retain/split mapping only. S00 independently obtains the merged PR from GitHub after merge, requires exact repository/PR/head/tree match, obtains merge SHA/tree, verifies head-tree equals merge-tree, verifies ancestry, reads the merged report blob and post-merge ledger/collection, then applies the closed register branch. Missing mapping, unexpected node, signature drift, multiple failure-lineage nodes or out-of-contract tree result stops before S10 for spec-owner amendment and Strict rereview. Post-#387 row count is formula-derived, never fixed to 15.
+
+### E384-RQ-009 — Failure terminalization and transitional gate continuity
+
+S60 mechanically fixes every admitted active row or applies the register's supersession rule, resulting in active count zero and approved failure count zero. It retargets only deleted distribution tests in the current `.github/workflows/provider-ci.yml`, updates current lane consumers and keeps the current main-push Full Regression graph operational. S60 does not depend on S70-only tooling. PR-B current PR workflow and current main-push verifier are independently GREEN.
+
+### E384-RQ-010 — Dogfood and documentation boundaries
+
+S40 may modify provider source, root README lifecycle sections and provider-side lifecycle docs but must not directly edit or synchronize any dogfood root, either fixed slot, record or marker. S50 also leaves exact legacy dogfood unchanged. S60 applies the new service once to the repository root and commits all four roots, both slots, seven-key ready record and both markers as one complete `0.2.4` candidate while preserving protected data. S60 also updates root `AGENTS.md` lifecycle/uninstall sections only. S70 owns final candidate/test-policy docs, final AGENTS test-policy sections and a second complete candidate-wide dogfood update. S80 owns no tracked path and runs no update/sync/build.
+
+### E384-RQ-011 — Consumer-first PR-C replacement
+
+On one non-main PR-C branch, S70 first creates the replacement gate, stable environment, workflow and tests; then retires or replaces all remaining old-policy consumers, including lane/baseline tests and imports; proves consumer zero; deletes old providers, ledger, timing, sharder, root policy hook and main-push workflow; and performs the second complete dogfood update. S70 is not mergeable. S80 proves the final gate before PR-C merge.
+
+### E384-RQ-012 — Sole producer and self-contained evidence
+
+After tracked head freeze, only Linux job `provider-build-artifacts` may invoke packaging. It uploads one candidate and producer receipt. Linux canonical, sdist smoke and macOS delta download the same candidate and invoke no build. `provider-attestation` needs exactly producer plus three consumers, downloads candidate, all receipts and all role evidence bytes, verifies them and uploads exactly one `provider-evidence-<sha>`. That artifact contains exactly nine files: `provider-evidence.json`, four role receipt JSON files and four role evidence JSON files. The verifier validates actual bytes, schemas, SHA-256 linkages, source/tree, run/job/artifact metadata, build counts and role metrics.
+
+### E384-RQ-013 — Stable qualification and no-gap context transition
+
+Linux qualification environment ID is `specdock-linux-qualification-v1` and is bound to the tracked descriptor, pinned container base digest, x86_64, 2 CPU, 8 GiB, Python, uv and lock fingerprints. Mismatch invalidates the whole 20-run series. First five runs are each <=600 seconds with process-tree CPU/wall <=1.1; all 20 have zero flake/retry and seeded-fault detection is 100%. Human admin adds the new required context while old contexts remain, reads back both, proves intentional RED blocking on a non-merge canary, restores GREEN, then removes only the old provider context.
+
+### E384-RQ-014 — Non-cyclic evidence and closure
+
+Tracked #392 report contains pre-freeze methodology and implementation facts only, with no own hash, final head, final source-bound artifact hash or post-merge facts. Frozen-head build/qualification/context data is stored in immutable external pre-merge attestation. Human merge is verified by PR-head tree OID equality with merge-commit tree OID. SpecDock finish and Issue/Epic closure are external post-merge attestations; tracked report is not rewritten.
+
+### E384-RQ-015 — One Issue and human-only merge
+
+GitHub #392 is the sole implementation-and-verification Issue. Baseline and rebaseline are admissions, not new Product decisions. Internal PRs and canary PR are execution mechanisms, not Issues. Failure is forward-fixed in #392; no research-only, decision-only, tests-only or verification-only Issue is added. Human performs all main merges and required-context writes.
+
+## 5. Non-scope
+
+- User-owned spec-history purge.
+- Migration catalog beyond exact `0.2.3`.
+- Release publication, tags or PyPI.
+- Sharding, xdist or larger hardware as a budget escape.
+- Reimplementation or modification of Issue #387 canonical documents.
+- Changes to Issue #372 canonical evidence.
+- Automatic rollback, automatic Issue creation or agent merge.
+
+## 6. Accepted merge-point policy
+
+| Main gate | Required state after human merge |
 |---|---|
-| Consumer repository owner | consumer-owned data、seed、unknown pathの最終所有者。tooling operationを明示的に実行する。 |
-| SpecDock installer CLI | state classification、fixed tooling lifecycle、typed result、public compatibilityを提供する。 |
-| Provider maintainer | provider source、package asset、test ownership、CI transitionをreviewする。 |
-| Luna Max implementation agent | #392 `plan.md`に従い、追加のProduct判断を行わず実装・検証候補を作成する。 |
-| Human reviewer / merger | PR review、required-context変更、mergeを行う唯一の主体。 |
-| GitHub Actions | 同一artifactに束縛されたLinux canonical、macOS delta、static analysisを実行する。 |
+| PR-A / S30 | Old public product; dormant successor only; current gates and exact legacy dogfood unchanged. |
+| PR-B / S60 | Complete final lifecycle and wire; exact legacy proof; old engine removed; active failures zero; current PR/main-push gates GREEN; lifecycle docs/AGENTS aligned; complete S60 dogfood candidate committed. |
+| PR-C / S80 | Final consumer-first provider gate; self-contained evidence; old policy machinery absent; final AGENTS/test-policy docs; complete S70 dogfood candidate; S80 tracked-read-only evidence GREEN. |
 
-## 4. Terms
+S40, S50 and S70 are never main merge handoff points.
 
-- **fixed roots**: `spec-dock/docs`、`spec-dock/templates`、`spec-dock/system`、`spec-dock/scripts`。recordがownershipを証明する場合に限りroot全体をdisposable toolingとして置換・削除できる。
-- **fixed skill slots**: `.agents/skills/spec-dock`、`.agents/skills/spec-dock-grill-with-docs`。new-format markerまたはexact legacy treeがownershipを証明する場合に限りslot全体を置換・削除できる。
-- **shared spec-dock container**: repository root直下の`spec-dock` directory。fixed roots、record、seed、user-owned dataを収容するshared containerであり、whole-directory replacement/delete authorityを持たない。
-- **fixed installation record**: `spec-dock/spec-dock.version`。final formatではstrict JSON state record。legacy `0.2.3` formatはexact bytes `0.2.3\n`。
-- **seed policy**: `create-if-absent`または`preserve-only`。一operationのincomplete recordからterminal recordまで不変で、resume時にrequest/stage/recordのexact matchを要求する。
-- **fresh-init-only seed**: `spec-dock/.gitignore`と`.github/workflows/ci.yml`。fresh `init`だけabsent pathを一度作成でき、その後はprovider authority外。
-- **candidate**: package内の4 rootsと2 slotsから構築し、versionとcanonical tree digestで一意に識別するimmutable payload。seed、record、generated slot markerはdigestに含めない。
-- **legacy-0.2.3**: post-#387 baseline artifactが生成したplain marker、exact 4 root digests、各slotのabsent/exact digest、legacy recovery marker不在を満たすworkspace。
-- **tooling-absent-preserved-data**: uninstall後もrecordを保持し、never-installed `absent`と区別するdurable state。
-- **SPEC_FREEZE_COMMIT**: replacement manifestのexact canonical/support bytesをrepositoryへimportしたowner-recorded Git commit。repository evidence SHAとは別identity。
-- **pre-merge tracked report**: final PR treeへ含める#392 `report.md`。own hash、final PR head、post-merge factsを自己参照しない。
-- **external attestation**: final head固定後に生成し、canonical JSON SHA-256付きで新規GitHub comment/check artifactとして保存するimmutable evidence。
-- **tree equality**: `verified_pr_head^{tree}`とhuman merge commitの`^{tree}` object IDが等しいこと。merge commit SHA equalityは要求しない。
-- **Linux qualification environment ID**: `specdock-linux-qualification-v1`。tracked descriptor hashとobserved fingerprintへ束縛される。
-- **policy skip**: failure許容またはpath分類だけを理由にcanonical gateからtestをskipする仕組み。platform delta lane分離は含まない。
-- **wire contract**: `artifacts/provider-lifecycle-wire-contract.md`。Record/result/action/text/exitのnormative wire authority。
-- **failure disposition register**: `artifacts/active-failure-disposition-register.md`。Current ledger 27行、#387 expected delta、final dispositionのnormative authority。
-- **authoritative packaging producer**: final frozen headからwheel/sdist/manifestを一度だけ生成するLinux `provider-build-artifacts` job。Local buildはauthoritative final artifactにならない。
-- **Issue unit**: implementationとverificationを一体で完了・受入する一つのGitHub Issue。
+## 7. Trace to Issue #392
 
-## 5. Scope and requirements
-
-### E384-RQ-001 — Fixed ownership and fresh bootstrap boundary
-
-Providerのdurable mutation authorityは4 roots、2 slots、`spec-dock/spec-dock.version`だけに限定する。Fresh `init`では2 seedsのabsent-path creation、`.github/workflows`の不足するexact parent chain、およびabsent shared `spec-dock` containerのexclusive bootstrap creationだけを追加で許可する。Arbitrary path、manifest-provided path、historical obsolete path、wildcard deletionをauthorityにしない。
-
-### E384-RQ-002 — Consumer data preservation
-
-`spec-dock/initiatives/**`、nested `artifacts/**`、`.workbench/**`、generated projections、unknown non-target path、unrelated skill、consumer-owned seed、shared containerのunknown childrenを探索・正規化・移動・削除しない。Shared `spec-dock` container自体はuninstallしない。
-
-### E384-RQ-003 — Lifecycle and immutable resume intent
-
-fresh、ready、incomplete、tooling-absent-preserved-data、exact legacy-0.2.3を明示的に分類し、install、update、tooling-only uninstall、reinstallを提供する。Incomplete recordはoperation、candidate digest、seed policyをimmutable resume tupleとして持つ。same-operation / same-candidate / same-seed-policy rerunだけを収束経路とし、automatic rollback、cross-intent recovery、old engine fallbackを公開しない。
-
-### E384-RQ-004 — Combined hard cutover and merge boundaries
-
-Uninstall-first bridge、intermediate package generation、runtime toggle、dual writer、old/new behavior switchを導入しない。PR-BのS40/S50はnon-main checkpointsであり、S60まで完了した一つのPRだけをmainへmergeする。PR-A merge後はold public product、PR-B merge後はcomplete final lifecycle、PR-C merge後はfinal provider gateである。
-
-### E384-RQ-005 — Exact legacy migration
-
-Exact clean `0.2.3`だけをone-shot migrateする。Active legacy recovery、invalid plain-text version、unsupported version、modified root、foreign/modified markerless slotはmutation前にblockする。Legacy identityはsingle-version root/slot digest fixture以外へ拡張しない。Migration seed policyは常に`preserve-only`。
-
-### E384-RQ-006 — Tooling-only uninstall and purge removal
-
-Uninstallはdefault dry-run、`--apply`でconfirmationする。User history purgeを行わない。`--keep-specs`はdefault同義のcompatibility alias。`--remove-specs`は全modeでmutation zero、code `spec-history-purge-removed`、exit 2。
-
-### E384-RQ-007 — Durable uninstall discriminator
-
-Successful uninstall後もrecordを削除せず、`state=tooling-absent-preserved-data`、`operation=null`、`seed_policy=preserve-only`としてatomic replaceする。Reinstallはこのstateを読み、fresh-init-only seedsがabsentでも再作成しない。
-
-### E384-RQ-008 — Safe shared-container creation and cleanup
-
-Record absent、4 roots/2 slots absent、`spec-dock`がabsentまたはreal directoryの場合だけfresh stateを認める。Container absentならcandidate stage/validationとroot/absence binding後に`mkdirat`でexclusive createし、直ちに`O_NOFOLLOW|O_DIRECTORY`でbindする。Record publication前のfailureはexact created identityかつemptyの場合だけremoveする。Cleanup不能ならstage ownerを保持したpartial failureとし、same operation/candidate/seed policy以外をblockする。
-
-### E384-RQ-009 — Filesystem safety
-
-Repository root binding、parent binding、no-follow、hard-link rejection、unexpected type rejection、marker validation、candidate validationを最初のdurable tooling publication前に完了する。Existing root/slot replacementはLinux `renameat2(RENAME_EXCHANGE)`またはmacOS `renameatx_np(RENAME_SWAP)`、absent publication/uninstall detachはno-replace。Primitive不在はfail closed。
-
-### E384-RQ-010 — Public compatibility
-
-`init [path] [--force]`、`update [path]`、`uninstall [path] [--apply] [--keep-specs|--remove-specs] [--json]`を維持する。Accepted changes以外のsuccess text、error channel、JSON主要fieldを維持し、typed resultからstatus/code/exitを一意にmappingする。
-
-### E384-RQ-011 — Old-package mutation-zero
-
-Final workspaceに対するold exact `0.2.3` packageの`init --force`、`update`、tooling uninstall、`--remove-specs`をstartup composite tripwire下で実行する。Python filesystem audit eventとLinux `renameat2` / macOS `renameatx_np` native symbol callをsyscall前に捕捉し、commandごとのevent count 0、target tree digest不変を必須とする。Native positive controlが捕捉できなければ証明失敗。
-
-### E384-RQ-012 — Test ownership
-
-各durable invariantは一つのowner layer、一つのauthoritative lane、少なくとも一つのrepresentative failureを持つ。Pure/domain、filesystem/service、CLI、built artifact、macOS deltaを分離し、same candidate/OS/contractのduplicate ownershipを0にする。
-
-
-### E384-RQ-013 — Conditional #387 admission and failure terminalization
-
-`artifacts/active-failure-disposition-register.md`はrepository evidence ledgerの全27 original row identitiesを固定する。Issue #387 canonical R/D/Pは変更せず、#387 completion report、merge tree、post-merge ledger、pytest collectionをauthority inputとして、rows 4〜15へ`removed | retained-unchanged | split-or-renamed`のclosed three-way ruleを適用する。Expected post-#387 row countは固定しない。
-
-S00は各conditional rowをreport mappingとtree/ledger/collectionへ照合し、unmapped node、signature drift、missing report entry、multiple failure-lineage node、#387 contract外resultをS10前に停止する。S60はadmitted ledger rowsをregisterのmechanical ruleだけでnormal passへ修正し、active count 0、approved failure 0へterminalizeする。Lunaはremove/retain/split、successor、failure lineage、dispositionを選択しない。
-
-S60は`.github/workflows/provider-ci.yml`、`tests/unit/test_provider_test_lanes.py`、transitional ledger/timing/conftestをowned pathとし、削除testのworkflow参照を既存successorへretargetする。Current PR workflowとmain-push Full Regression workflowはPR-B merge時に独立してGREENである。Final provider-gate redesignはS70まで前倒ししない。
-### E384-RQ-014 — Build-once artifact binding
-
-Authoritative source SHAごとに一つのpackaging invocationでwheelとsdistを生成し、source SHA、filename、size、SHA-256、build invocation countをmanifestへ固定する。Linux canonicalとmacOS deltaは同じwheel bytesを使用し、sdistはLinux minimal smokeだけが所有する。
-
-### E384-RQ-015 — Canonical provider gate and stable Linux environment
-
-Linux canonicalはworker 1、one pytest process。Qualificationはenvironment ID `specdock-linux-qualification-v1`、tracked descriptor SHA-256、pinned container base digest、built image ID、x86_64、2.0 CPU quota、8 GiB memory、Python/uv/lock hashesへ束縛する。20-run series中のfingerprint mismatchは全seriesを無効にする。First 5各600秒以内、CPU/wall <=1.1、fault detection 100%、all 20 flake 0/retry 0。
-
-
-### E384-RQ-016 — Atomic provider-gate cutover and complete consumer closure
-
-PR-B/S60 merge後は、successor pathsへretarget済みのcurrent `.github/workflows/provider-ci.yml`と、current main-push Full Regression workflowの双方が独立にGREENでなければならない。PR-C/S70ではreplacement `scripts/provider_gate.py`、Linux environment descriptor、final provider workflow、root `AGENTS.md`、final provider test-policy docsを同一branchへ先に追加する。
-
-Policy providersを削除する前に、`tests/unit/test_provider_test_lanes.py`、`tests/unit/test_full_regression_baseline.py`を含む全remaining policy-module consumersをexplicitにretireまたはfinal gate testsへ置換し、import/grep/collection/workflow structural testsでconsumer 0を証明する。続いてold workflow、ledger、timing、sharder、`tests/conftest.py`、marker policyを同じPR-C branchで削除する。S70はnon-main checkpoint、S80後だけmergeし、mainはbroken workflowまたはmissing consumerを観測しない。
-### E384-RQ-017 — Required-context transition without a gap
-
-Old required contextsを保持したままnew contextをrequiredへ追加し、old+new required stateをread-backする。次にdedicated non-merge canary PRのintentional REDでnew contextがmergeをblockすることを証明し、canary closeとimplementation PR GREEN復帰後だけold provider-only contextを除去する。Unrelated contextsとhuman review requirementを変更しない。
-
-### E384-RQ-018 — Deterministic specification and #387 admission
-
-Repository evidence SHAは調査起点として記録する。本replacement manifestのcanonical/support payload hashesとowner-recorded `SPEC_FREEZE_COMMIT`のexact blobsを一致させ、commit ancestryを要求する。#387 merge deltaは#387 own base/head/merge tree/changed pathsで検証し、stale repository evidence SHAからpost-#387 tipへの単純diffをadmissionに使わない。
-
-### E384-RQ-019 — Non-cyclic evidence and tree equality
-
-Tracked #392 reportはpre-merge methodologyとimplementation facts、external attestation schema/locationだけを含み、own hash、final PR head、post-merge factsを自己参照しない。Final head固定後のbuild/qualificationはcontent-addressed external pre-merge attestationへ記録する。Human merge後はverified PR head tree OIDとmerge commit tree OIDを比較する。SpecDock finish、GitHub close、Epic closureはexternal closure attestationへ記録し、tracked reportへwritebackしない。
-
-### E384-RQ-020 — Root operator guidance and Issue boundary
-
-Root `AGENTS.md`をPR-Cでfinal pytest/provider-gate commands、no-policy-skip/no-main-push-full policy、provider-first/dogfood rule、human-only mergeへ更新する。Epic #384のimplementation-and-verification Issueは#392だけ。New decision/research/test/verification Issueを作成せず、未達は同じ#392でforward-fixする。
-
-### E384-RQ-021 — PR-B documentation convergence
-
-PR-B/S60 main merge時点でfinal `0.2.4` code、root README lifecycle、provider-shipped docs、dogfood docsを一致させる。S40/S60 exact ownershipは`README.md`のlifecycle sections、`src/spec_dock/assets/spec_dock/docs/migration.md`、`src/spec_dock/assets/spec_dock/docs/README.md`と対応する`spec-dock/docs/**` projectionである。Legacy journal/retry、current purge authority、compatible-newer retry、empty-boundary guidanceをtooling-only uninstall、strict record、same tuple resume、preserve-only lifecycleへ置換する。Root README/AGENTS/docsのtest-policy textはS70でfinal gateへ更新し、S80はcontentを編集せずfreeze/verificationだけを行う。
-
-
-### E384-RQ-022 — Closed normative provider lifecycle wire
-
-`artifacts/provider-lifecycle-wire-contract.md`をrecord、operation、observed state、resume relation、slot marker、phase/last-completed transition、typed result、action category/status/reason、public code/status/operation/apply/mutation/retry/exit、JSON/text、array orderingの唯一のnormative authorityとする。
-
-Implementation/test/docsはexact seven-key record、closed enums、nullability、relation matrices、`TARGET_PATH_ORDER`、compact JSON/text goldensへ一致する。Implementation-defined token、reason、code、catch-all、unknown fallbackを0にする。
-
-### E384-RQ-023 — Pre-decided conditional active failure dispositions
-
-`artifacts/active-failure-disposition-register.md`はsource ledger全27 original identities、authority、rationale、verification ownerを固定する。Rows 4〜15について#387が許容する`removed`、`retained-unchanged`、`split-or-renamed`をすべて事前にclosed rule化し、#387 report mappingを機械検証する。Removedならpositive successor/absence evidenceへsuperseded、retained unchangedならsame node fixed-in-place、split/renamedならexact report mappingに従いpositive successorへsupersededし、唯一のfailure-lineage nodeがあればそのnodeをfixed-in-placeする。
-
-Post-#387 row countはformula-derivedであり15固定ではない。Report欠落、unmapped new node、signature drift、#387 contract外resultはS10前に停止し、canonical spec owner updateとindependent Strict re-reviewを要求する。S60 final active countは0。Owner decisions requiredは空である。
-
-### E384-RQ-024 — Sole frozen-head packaging producer and receipt graph
-
-Final frozen PR headのwheel、sdist、candidate manifestを生成できる主体はfinal `.github/workflows/provider-ci.yml`のLinux `provider-build-artifacts` job一つだけとする。同jobはone packaging invocationを実行し、`provider-candidate-<sha>`と`provider-receipt-producer-<sha>`をimmutable Actions artifactsとしてuploadする。
-
-`provider-linux-canonical`、`provider-sdist-smoke`、`provider-macos-delta`はcandidate artifactをdownloadしbuild count 0でconsumeし、各receiptをuploadする。`provider-attestation`はproducer + three consumer jobsをexact `needs`とし、candidate/receipts/API metadataを`verify-downloaded-artifact`で検証してexact one `provider-evidence-<sha>`をuploadする。Aggregate `provider-gate`はattestationだけに依存する。S70 local buildはpre-freeze tooling validationのみ。S80はlocal final buildを行わず、workflow dispatch/wait/download/verify/evidenceだけを実行する。
-
-### E384-RQ-025 — Dogfood convergence at each candidate-changing gate
-
-Current dogfood evidenceはplain `spec-dock/spec-dock.version=0.2.3\n`、two fixed slots markerlessであり、exact legacy migration sourceとして扱う。PR-B/S60はprovider-first変更後にnew lifecycle serviceをrepository rootへ適用し、dogfood four roots、two slots、seven-key ready record、two slot markersをcandidate digestへ一致させてcommitする。Initiatives、Artifacts、`.workbench`、seeds、unknown/user dataはbyte-preserveする。
-
-PR-C/S70でprovider docs/test-policy等のcandidate bytesが変わった後、same branchでcandidate-wide dogfood updateを再実行し、新candidate digest、record、markers、four roots、two slotsをcommitする。S60/S70のpartial projection、modified legacy evidence、digest mismatch、seed/user-data driftをmainへmergeしない。S80はtracked dogfood edit、`spec-dock update`、`spec-dock sync`を行わずread-only verificationだけを行う。
-## 6. Non-scope
-
-- user-owned spec historyを削除する機能。
-- arbitrary historical versionのmigration catalog。
-- release publication workflow、PyPI publication、release tag作成。
-- worker増加、xdist、machine大型化、shardingによるbudget回避。
-- #387のCurrent surface cleanupを本Epicで再実装すること。
-- Issue #372のcanonical specification、candidate、evidenceの変更。
-- decision-only、research-only、tests-only、verification-onlyの追加Issue。
-- agentによるPR merge、branch protectionの推測変更。
-
-## 7. Constraints and accepted decisions
-
-1. Product source of truthは`src/spec_dock/`。Provider-firstで変更後、dogfood `spec-dock/`を同期・検証する。
-2. Final distribution versionは`0.2.4`。Release publicationはscope外。
-3. Record pathは`spec-dock/spec-dock.version`。Final JSONはold `0.2.3` parserにcanonical versionとして受理されず、pre-mutation block pointとなる。
-4. New skill markerは各slot直下の`.spec-dock-provider-slot.json`。
-5. Persistent recordにper-file digest、arbitrary path、checkpoint、progress bit、rollback imageを保存しない。`seed_policy`はprogressではなくresume authority。
-6. Valid target-local state成立後にprovider-owned external staging cleanupだけが失敗した場合に限り`completed_with_warnings`を許可する。
-7. Destructive defectはapply routeをfail closedにし、old engineへfallbackしない。
-8. #388〜#390はsuperseded historical nodeでありreopenしない。
-9. S40/S50/S70はmain merge pointではない。S60だけがPR-B gate、S80だけがPR-C gate。
-10. PR-A merge後はold public product、PR-B merge後はcomplete final lifecycle + still-valid current gate、PR-C merge後はfinal provider gate。
-11. PR-B merge時点でroot README lifecycleとprovider/dogfood migration/docs READMEがfinal codeへ一致する。
-12. `provider-lifecycle-wire-contract.md`と`active-failure-disposition-register.md`はnormative accepted artifactsであり、implementation時に再決定しない。
-13. Final frozen-head packaging authorityはLinux Provider CI build jobだけで、local artifactをacceptanceへ昇格しない。
-14. Public arraysはwire Artifactの`TARGET_PATH_ORDER`だけを使う。
-15. S60とS70の各candidate-changing gateはcomplete dogfood record/markers/digestをcommitし、S80はtracked edit zero。
-
-## 8. Dependency on Issue #387
-
-#392は#387がhuman mergeされる前に開始してはならない。S00は次を別々に検証する。
-
-1. Repository evidence SHA `eaddf76806c338ee05463741f15fd3967bbceb57`は調査起点として記録する。
-2. Replacement manifestのcanonical/support payload hashesを、owner-recorded `SPEC_FREEZE_COMMIT`のexact repository blobsへ一致させる。
-3. #387 merge deltaを#387 own PR/merge graphからexact allowlist/content restrictionへ照合する。
-4. Implementation baseが`SPEC_FREEZE_COMMIT`と#387 mergeをancestorに持つことを要求する。
-5. Protected distribution pathsにvalidated #387 delta以外のdriftがないこと、package versionがbaseline `0.2.3`、current gatesがGREENであることを記録する。
-
-Repository evidence SHAからfuture main tipへの単純allowlist diffをadmission authorityにしてはならない。Mismatch時はimplementationを開始せず、exact evidenceをrepository ownerへ返す。
-
-## 9. Issue unit and merge-point policy
-
-Epic #384のimplementation-and-verification IssueはGitHub #392だけ。
-
-- PR-A: S10/S20 internal、S30全proof後だけmerge。Mainはold public product。
-- PR-B: S40/S50 internal、S60全proof後だけmerge。Mainはcomplete final lifecycle。Current provider gate/main-push workflowはconsumerを失わずGREEN。
-- PR-C: S70 internal、S80全proof・required transition・external pre-merge attestation後だけmerge。Mainはfinal provider gate。
--各main merge pointはreleasable。
-- bridge generation、runtime toggle、中間public generationなし。
-- implementation completion、tracked report completion、pre-merge attestation、human merge、post-merge closure、Issue finish、Epic closeを別状態として扱う。
-- Acceptance未達は同じ#392でforward-fixする。
-
-## 10. Externally observable acceptance
-
-Epicは次のすべてが同一final PR treeと同一artifact identityに対して確認されたときだけ受入可能。
-
-- fixed mutation set外のconsumer data、seed、unknown path、unrelated skillがbyte-identical。
-- fresh container absent/existing、fresh install、ready update、exact `0.2.3` migration、tooling uninstall、tooling-absent reinstallがbuilt wheelで成功。
-- incomplete operationのseed policyがrecord/stage/requestで一致し、fault resumeでseed creation semanticsが変わらない。
-- shared container bootstrap/cleanupがdescriptor-safeで、uninstallがcontainerを削除しない。
-- same operation/candidate/seed policy rerunで収束し、mismatchがblock。
-- old `0.2.3` command matrixがtripwire event 0、native positive control capture、tree digest不変。
-- public CLI text/JSON/exit、aliases、purge trapがcontractどおり。
-- PR-B main merge時点でactive approved failure 0、transitional `provider-ci.yml`のsuccessor commands GREEN、current main-push verifier GREEN。
-- PR-Cでall policy consumersをprovidersより先にretire/replaceし、replacement gateとold machinery removalがatomic、final provider gate GREEN、mainにbroken workflow stateなし。
-- one build invocation、same wheel、Linux canonical、macOS delta、sdist smoke。
-- Linux environment ID/fingerprint、five-run budget、CPU ratio、fault pack、rolling 20を満たす。
-- new contextをoldと併存requiredにしてからRED blockを証明し、GREEN復帰後oldを除去。
-- root `AGENTS.md`がfinal commands/policyへ一致。
-- tracked reportにself-reference/post-merge factなし、external attestationsがcontent-addressed。
-- human merge commit tree OIDがverified PR head tree OIDと一致。
-- root/provider/dogfood lifecycle docsがPR-B final contractへ一致し、retired lifecycle phrase grepが0。
-- wire contractのseven-key record、public result enum/nullability/goldenがtestsと一致。
-- failure register 27行、#387 expected delta、S60 all-resolved ledgerがexact。
-- final frozen headのpackaging producerがLinux CI job一つで、downstream build count 0。
-- remaining owner decisions 0。
-
-## 11. Trace to the sole implementation Issue
-
-| Epic requirement | Issue #392 responsibility |
+| Epic requirement | Issue authority |
 |---|---|
-| E384-RQ-001〜010 | fixed lifecycle、seed policy、container bootstrap、record、candidate、CLI |
-| E384-RQ-011 | old-package tripwire / downgrade proof |
-| E384-RQ-012〜013 | test ownership、active failure terminalization、S60 workflow/lane-consumer repair、PR-B gate continuity |
-| E384-RQ-014〜016 | build-once gate、stable Linux environment、policy-consumer-first atomic PR-C removal |
-| E384-RQ-017 | no-gap required-context transition |
-| E384-RQ-018〜019 | specification lineage、external attestations、tree equality |
-| E384-RQ-020 | root AGENTS、single-Issue closure |
-| E384-RQ-021 | PR-B docs convergence and S70 policy-doc split |
-| E384-RQ-022 | `provider-lifecycle-wire-contract.md` exact wire implementation/tests |
-| E384-RQ-023 | `active-failure-disposition-register.md`、S00 delta gate、S60 fixed dispositions |
-| E384-RQ-024 | Linux CI-only final producer、downloaded-byte fan-out、S80 dispatch evidence |
-| E384-RQ-025 | S60 exact legacy dogfood migration、S70 candidate-wide update、S80 read-only verification |
+| E384-RQ-001–004 | I392-RQ-004–016; I392-D-001–018; S10–S30 |
+| E384-RQ-005–007 | I392-RQ-017–021; wire artifact; S40–S50 |
+| E384-RQ-008–009 | register artifact; I392-RQ-002–003/023; I392-D-013–015/022; S00/S60 |
+| E384-RQ-010–011 | I392-RQ-021–024/031–032; I392-D-019–024; S40/S60/S70 |
+| E384-RQ-012–013 | I392-RQ-025–029; I392-D-025–033; S70/S80 |
+| E384-RQ-014–015 | I392-RQ-030/033; S80 and external closure protocol |
 
-No other implementation Issue is authorized。
+Owner decisions required: none.
