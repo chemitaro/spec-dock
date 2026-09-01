@@ -1,6 +1,6 @@
 ---
 種別: Normative Artifact
-ID: "provider-lifecycle-wire-contract-v4"
+ID: "provider-lifecycle-wire-contract-v5"
 タイトル: "Provider Lifecycle Wire Contract"
 状態: "accepted"
 最終更新: "2026-09-01"
@@ -8,7 +8,7 @@ ID: "provider-lifecycle-wire-contract-v4"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
+  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
 ---
 
 # Provider Lifecycle Wire Contract
@@ -38,7 +38,7 @@ The normative finite inventory is exact:
 | Item | Count |
 |---|---:|
 | public status values | 6 |
-| public code values | 36 |
+| public code values | 37 |
 | `phase` values | 23 |
 | `last_completed_phase` values | 24 |
 | durable record goldens | 4 |
@@ -54,6 +54,8 @@ Table expressions are exact value functions:
 - `legacy_fixture.aggregate_digest`: exact deterministic aggregate of the recognized `0.2.3` roots/slots.
 - `owned_target_digest`: `record.candidate_digest` for final-format state, otherwise `legacy_fixture.aggregate_digest` for exact legacy state.
 - `null`: public JSON null. These expressions are not implementation choices.
+- `active.operation` / `active.candidate_digest` / `active.seed_policy`: exact values from validated `ACTIVE.json`.
+- `active.result_family`: exact private enum `install|legacy-migration|update|uninstall`, written before target mutation and used only to select the cleanup retry command. It is not part of the resume tuple or public result.
 
 ## 3. Canonical target and public array order
 
@@ -287,14 +289,27 @@ complete
 
 `bootstrap-container` is a no-mutation bind verification when the shared container exists. Uninstall staging is the external tombstone stage, so `candidate-staging` is retained.
 
-### WIR-PHASE-003 — Pair rule
+### WIR-PHASE-003 — Pair rule and mandatory cleanup transition
 
-- Partial results use the exact expanded row in §10; no arbitrary adjacent pair is accepted.
+- Partial lifecycle results use the exact expanded row in §10; no arbitrary adjacent pair is accepted.
 - Planned/already-absent use `complete/preflight`.
 - Clean completion uses `complete/cleanup-stage`.
-- Cleanup warning uses `complete/publish-terminal-record`.
+- Cleanup warning uses `complete/publish-terminal-record` and leaves validated `ACTIVE.state=terminal-cleanup`.
+- Mandatory pre-dispatch cleanup failure uses `cleanup-stage/publish-terminal-record`.
 - Request errors use `request-validation/not-started`.
-- Every blocked row uses its exact §10 pair. No derived “rejected phase” exists.
+- Every blocked row uses its exact §10 pair. No derived rejected phase exists.
+
+Before dispatching any new lifecycle intent, after repository lock/binding and before request-state classification, the service resolves the exact repository `ACTIVE.json` path without scanning. When the target terminal record is durable:
+
+1. `ACTIVE.state=ready` is atomically replaced by the same object with `state=terminal-cleanup` and fsynced.
+2. `ACTIVE.state=terminal-cleanup` validates namespace, repository, tuple, `result_family`, stage owner and registered entries, then removes only registered stage entries and the exact stage directory.
+3. If the stage is already absent, cleanup skips stage removal and continues.
+4. It then no-replace/content-bound removes exact `ACTIVE.json` and fsyncs the repository-stage directory.
+5. If `ACTIVE.json` is already absent, it still fsyncs the repository-stage directory and proceeds.
+6. A crash after ACTIVE unlink but before parent fsync is recovered by the preceding rule on the next invocation.
+7. Successful cleanup proceeds to the originally requested operation even when that operation differs from the old tuple.
+8. Cleanup failure returns `terminal-cleanup-failed`; it does not classify the new requested operation and does not permanently reserve the old tuple.
+
 
 ## 7. Slot marker
 
@@ -350,12 +365,12 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 |---|---|---|---|---:|---|---|---|---:|---:|---|---|---|---|---:|
 | `install-completed` | `create-if-absent install` | `completed` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `complete` | `cleanup-stage` | `null` | `install-create terminal action set` | 0 |
 | `install-completed` | `preserve-only install/reinstall` | `completed` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `install-preserve terminal action set` | 0 |
-| `install-completed-with-cleanup-warning` | `create-if-absent install` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `complete` | `publish-terminal-record` | `null` | `install-create terminal + one stage warning` | 0 |
-| `install-completed-with-cleanup-warning` | `preserve-only install/reinstall` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `install-preserve terminal + one stage warning` | 0 |
+| `install-completed-with-cleanup-warning` | `create-if-absent install` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `complete` | `publish-terminal-record` | `install/create-if-absent retry` | `install-create terminal + one stage warning` | 0 |
+| `install-completed-with-cleanup-warning` | `preserve-only install/reinstall` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `install/preserve-only retry` | `install-preserve terminal + one stage warning` | 0 |
 | `update-completed` | `ready update` | `completed` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `update terminal action set` | 0 |
-| `update-completed-with-cleanup-warning` | `ready update` | `completed_with_warnings` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `update terminal + one stage warning` | 0 |
+| `update-completed-with-cleanup-warning` | `ready update` | `completed_with_warnings` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `update retry` | `update terminal + one stage warning` | 0 |
 | `legacy-migration-completed` | `legacy migration` | `completed` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `install-preserve terminal action set` | 0 |
-| `legacy-migration-completed-with-cleanup-warning` | `legacy migration` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `install-preserve terminal + one stage warning` | 0 |
+| `legacy-migration-completed-with-cleanup-warning` | `legacy migration` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `update retry` | `install-preserve terminal + one stage warning` | 0 |
 | `uninstall-planned` | `ready dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-READY-PLAN` | 0 |
 | `uninstall-planned` | `exact legacy dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-LEGACY-PLAN` | 0 |
 | `uninstall-planned` | `matching incomplete-uninstall dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-INCOMPLETE-PLAN` | 0 |
@@ -364,9 +379,9 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 | `uninstall-completed` | `exact legacy apply` | `completed` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `AP-U-LEGACY-TERM` | 0 |
 | `uninstall-completed` | `successful matching incomplete-uninstall resume apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `AP-U-INCOMPLETE-TERM` | 0 |
 | `uninstall-already-absent` | `tooling-absent apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-ABSENT` | 0 |
-| `uninstall-completed-with-cleanup-warning` | `ready apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `AP-U-READY-WARN` | 0 |
-| `uninstall-completed-with-cleanup-warning` | `exact legacy apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `AP-U-LEGACY-WARN` | 0 |
-| `uninstall-completed-with-cleanup-warning` | `matching incomplete-uninstall resume apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `publish-terminal-record` | `null` | `AP-U-INCOMPLETE-WARN` | 0 |
+| `uninstall-completed-with-cleanup-warning` | `ready apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `uninstall retry` | `AP-U-READY-WARN` | 0 |
+| `uninstall-completed-with-cleanup-warning` | `exact legacy apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `uninstall retry` | `AP-U-LEGACY-WARN` | 0 |
+| `uninstall-completed-with-cleanup-warning` | `matching incomplete-uninstall resume apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `publish-terminal-record` | `uninstall retry` | `AP-U-INCOMPLETE-WARN` | 0 |
 | `already-initialized` | `plain init on ready` | `blocked` | `apply` | `true` | `install` | `record.candidate_digest` | `record.seed_policy` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 |
 | `already-initialized` | `plain init on exact legacy` | `blocked` | `apply` | `true` | `install` | `legacy_fixture.aggregate_digest` | `preserve-only` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 |
 | `tooling-not-installed` | `uninstall dry-run on absent` | `blocked` | `dry-run` | `false` | `uninstall` | `null` | `preserve-only` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 |
@@ -432,6 +447,7 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 | `bootstrap-container-conflict` | `created container fully rolled back` | `blocked` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | false | true | `bootstrap-container` | `candidate-staging` | `null` | `empty` | 1 |
 | `bootstrap-cleanup-failed` | `install/create-if-absent` | `partial_failure` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `bootstrap-container` | `candidate-staging` | `install/create-if-absent retry` | `bootstrap cleanup-failed action set` | 1 |
 | `bootstrap-cleanup-failed` | `install/preserve-only` | `partial_failure` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `bootstrap-container` | `candidate-staging` | `install/preserve-only retry` | `bootstrap cleanup-failed action set` | 1 |
+| `terminal-cleanup-failed` | `mandatory pre-dispatch terminal cleanup` | `partial_failure` | `apply` | `true` | `active.operation` | `active.candidate_digest` | `active.seed_policy` | true | false | `cleanup-stage` | `publish-terminal-record` | `active.result_family retry` | `terminal cleanup retry-failed action set` | 1 |
 | `install-partial-failure` | `install/create-if-absent/publish-docs` | `partial_failure` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `publish-docs` | `publish-incomplete-record` | `install/create-if-absent retry` | `exact install partial action set at publish-docs` | 1 |
 | `install-partial-failure` | `install/create-if-absent/publish-templates` | `partial_failure` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `publish-templates` | `publish-docs` | `install/create-if-absent retry` | `exact install partial action set at publish-templates` | 1 |
 | `install-partial-failure` | `install/create-if-absent/publish-system` | `partial_failure` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `publish-system` | `publish-templates` | `install/create-if-absent retry` | `exact install partial action set at publish-system` | 1 |
@@ -466,14 +482,12 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 | `uninstall-partial-failure` | `uninstall/preserve-only/detach-slot-spec-dock-grill-with-docs` | `partial_failure` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `detach-slot-spec-dock-grill-with-docs` | `detach-slot-spec-dock` | `uninstall retry` | `exact uninstall partial action set at detach-slot-spec-dock-grill-with-docs` | 1 |
 | `uninstall-partial-failure` | `uninstall/preserve-only/verify-target` | `partial_failure` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `verify-target` | `detach-slot-spec-dock-grill-with-docs` | `uninstall retry` | `exact uninstall partial action set at verify-target` | 1 |
 | `uninstall-partial-failure` | `uninstall/preserve-only/publish-terminal-record` | `partial_failure` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `publish-terminal-record` | `verify-target` | `uninstall retry` | `exact uninstall partial action set at publish-terminal-record` | 1 |
-| `invalid-request` | `init/update request` | `error` | `apply` | `true` | `null` | `null` | `null` | false | false | `request-validation` | `not-started` | `null` | `empty` | 2 |
+| `invalid-request` | `any apply request` | `error` | `apply` | `true` | `null` | `null` | `null` | false | false | `request-validation` | `not-started` | `null` | `empty` | 2 |
 | `invalid-request` | `uninstall dry-run request` | `error` | `dry-run` | `false` | `null` | `null` | `null` | false | false | `request-validation` | `not-started` | `null` | `empty` | 2 |
-| `invalid-request` | `uninstall apply request` | `error` | `apply` | `true` | `null` | `null` | `null` | false | false | `request-validation` | `not-started` | `null` | `empty` | 2 |
 | `spec-history-purge-removed` | `uninstall remove dry-run` | `error` | `dry-run` | `false` | `null` | `null` | `null` | false | false | `request-validation` | `not-started` | `null` | `empty` | 2 |
 | `spec-history-purge-removed` | `uninstall remove apply` | `error` | `apply` | `true` | `null` | `null` | `null` | false | false | `request-validation` | `not-started` | `null` | `empty` | 2 |
 
 No other code/variant/relation is valid.
-
 ## 11. Retry, messages, guidance
 
 ### WIR-TEXT-001 — Retry commands
@@ -484,9 +498,10 @@ No other code/variant/relation is valid.
 | install/preserve-only retry | `spec-dock update -- ${QUOTED_TARGET}` |
 | update retry | `spec-dock update -- ${QUOTED_TARGET}` |
 | uninstall retry | `spec-dock uninstall --apply --keep-specs -- ${QUOTED_TARGET}` |
+| active.result_family retry | `install` selects the policy-specific install retry; `legacy-migration` and `update` select update retry; `uninstall` selects uninstall retry |
 | null | JSON null |
 
-`${QUOTED_TARGET}` is the single normalized target rendered by `shlex.join([target])`. Only partial rows have non-null retry.
+`${QUOTED_TARGET}` is the single normalized target rendered by `shlex.join([target])`. Non-null retry is required exactly for lifecycle partial failures, cleanup-warning completions and `terminal-cleanup-failed`; every other row has null retry.
 
 ### WIR-TEXT-002 — Exact diagnostics
 
@@ -515,6 +530,7 @@ Cleanup warning: `Provider tooling reached the requested terminal state, but the
 | `stage-owner-mismatch` | `The existing provider stage does not match this repository, operation, candidate, and seed policy.` |
 | `bootstrap-container-conflict` | `The shared spec-dock container cannot be safely created or bound.` |
 | `bootstrap-cleanup-failed` | `The fresh container bootstrap failed and could not be restored to the exact absent pre-state.` |
+| `terminal-cleanup-failed` | `The requested tooling state is durable, but cleanup of the owned provider stage failed; rerun the retry command before another lifecycle operation.` |
 | `install-partial-failure` | `SpecDock install stopped after durable mutation; rerun the exact retry command.` |
 | `update-partial-failure` | `SpecDock update stopped after durable mutation; rerun the exact retry command.` |
 | `uninstall-partial-failure` | `SpecDock uninstall stopped after durable mutation; rerun the exact retry command.` |
@@ -526,7 +542,8 @@ Success/planned codes have no error. Cleanup-warning codes have exactly one warn
 ### WIR-TEXT-003 — Guidance
 
 - `active-legacy-recovery`: `Run the last compatible SpecDock package with the same legacy operation until its recovery markers are cleared.` then `Do not delete, rename, or convert legacy recovery files manually.`
-- Partial codes: `Rerun only the retry_command shown in this result.` then `Do not switch operation, candidate package, or seed policy.`
+- Lifecycle mutation partial codes: `Rerun only the retry_command shown in this result.` then `Do not switch operation, candidate package, or seed policy.`
+- Cleanup-warning codes and `terminal-cleanup-failed`: `Rerun only the retry_command to finish owned stage cleanup before requesting a different lifecycle operation.` then `The requested terminal tooling state is already durable.`
 - `spec-history-purge-removed`: `Use tooling-only uninstall without --remove-specs.` then `Spec history and Workbench data remain consumer-owned.`
 - Every other code: empty array.
 
@@ -582,7 +599,8 @@ Finite action profiles:
 3. Cleanup warning differs only by one `@provider-stage` warning row.
 4. For root/slot/seed publication/detach partials, exactly the current path is failed; prior authorized paths completed/preserved; later authorized paths pending. For `publish-terminal-record`, the record row is failed with `terminal-record-publish` and the prior incomplete record is not a second row. For `verify-target`, every and only mismatching fixed root/slot is failed, matching rows completed/preserved, stage pending. Skipped preserve-only seed phases emit no action.
 5. Bootstrap cleanup-failed has failed `spec-dock/fresh-container-create`, pending stage cleanup and later install rows.
-6. `failed_paths`/`pending_paths` derive exactly from action statuses and target order. Blocked/error arrays are empty.
+6. `terminal-cleanup-failed` has exactly one action: `@provider-stage`, category `stage`, status `failed`, reason `candidate-stage-cleanup`; `failed_paths=["@provider-stage"]`, `pending_paths=[]`.
+7. `failed_paths`/`pending_paths` derive exactly from action statuses and target order. Blocked/error arrays are empty.
 
 ## 13. JSON goldens
 
@@ -678,13 +696,11 @@ Digest fixture is 64 lowercase `d` characters. Every block is independently pars
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"blocked","code":"stage-owner-mismatch","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":false,"bootstrap_rolled_back":false,"phase":"candidate-staging","last_completed_phase":"preflight","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["The existing provider stage does not match this repository, operation, candidate, and seed policy."]}
 ```
 
-### WIR-GOLDEN-B5 — Fully rolled-back bootstrap conflict
+### WIR-GOLDEN-B5 — Mandatory terminal cleanup failure
 
 ```json
-{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"blocked","code":"bootstrap-container-conflict","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":false,"bootstrap_rolled_back":true,"phase":"bootstrap-container","last_completed_phase":"candidate-staging","retry_command":null,"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["The shared spec-dock container cannot be safely created or bound."]}
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"partial_failure","code":"terminal-cleanup-failed","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":true,"bootstrap_rolled_back":false,"phase":"cleanup-stage","last_completed_phase":"publish-terminal-record","retry_command":"spec-dock init --force -- /tmp/consumer","failed_paths":["@provider-stage"],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":1,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"failed","reason":"candidate-stage-cleanup"}],"guidance":["Rerun only the retry_command to finish owned stage cleanup before requesting a different lifecycle operation.","The requested terminal tooling state is already durable."],"warnings":[],"errors":["The requested tooling state is durable, but cleanup of the owned provider stage failed; rerun the retry command before another lifecycle operation."]}
 ```
-
-Every one of the 123 relation rows is also generated as a table-driven golden from the same constructor and rejected if it does not match exactly one row. The 16 displayed objects are stable review fixtures, not a subset of accepted relations.
 
 ## 14. Public text
 
@@ -716,6 +732,6 @@ Null renders `null`; empty renders `none`; arrays use target order.
 
 ## 15. Required tests and trace
 
-Table-driven tests enumerate all 123 §10 rows and reject every unlisted relation; all sequences/partial pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 16 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact dogfood record/markers at S60/S70.
+Table-driven tests enumerate all 123 §10 rows and all 37 codes and reject every unlisted relation; all sequences/partial and mandatory-cleanup pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 16 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact terminal-cleanup crash/retry cases and dogfood record/markers at S60/S70.
 
 Normative trace: Epic E384-RQ-003,006–010,022; Issue I392-RQ-004–020,028; Design I392-D-001–012; Plan S10–S70. Owner decisions required: none.

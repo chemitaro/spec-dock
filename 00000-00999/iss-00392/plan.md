@@ -11,359 +11,309 @@ Planning Level: "critical"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
+  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
 
 ## 1. Execution rules
 
-1. This Plan is the implementation entry point. Requirement defines observable behavior; Design defines exact components/schemas; the wire and register are normative data.
-2. #392 starts only after #387 human merge and S00 admission. #392 is the sole implementation Issue.
-3. Product source is `src/spec_dock/`; dogfood is updated only at complete S60/S70 checkpoints.
-4. Behavior change is test-first. Every step records RED and GREEN evidence.
-5. S30, S60 and S80 are the only main merge gates. S40, S50 and S70 are internal.
-6. S80 owns no tracked path. The compatibility-to-final workflow edit occurs in S70 after the human context subgate.
-7. Agent never merges or changes required settings. Human operations are exact gates.
-8. All local temporary data is external. Persistent lifecycle stage is the separate same-filesystem namespace. Repository `.workbench` is never written or cleaned.
-9. Tracked #392 report contains only pre-freeze facts. Final/pre/post closure evidence is external.
-10. Stop conditions are fail-closed and forward-fixed in #392; no new Issue, toggle, old fallback, skip, approved failure or sharding escape.
+1. Entry point is this Plan; Requirement defines behavior, Design defines components/schemas, wire/register are normative finite data.
+2. Product source of truth is `src/spec_dock/`; provider-first, dogfood only at S60/S70.
+3. Behavior changes are test-first. Existing RED may substitute only when exact node/failure is recorded.
+4. Every step includes implementation and focused verification.
+5. S40/S50 are PR-B internal; S60 is its only gate. S70 is PR-C internal; S80 is its only gate.
+6. S60 keeps current workflows independently GREEN and does not require S70 tooling.
+7. S70 creates replacement consumers/providers before old removal.
+8. S80 owns no tracked path and runs no local build/update/sync.
+9. Agent never merges or changes required contexts. Human operations are exact handoffs.
+10. Tracked report has no actual compatibility/final head/run identity or post-merge fact.
+11. Any stop is forward-fixed in #392; no new Issue, toggle, skip, approved failure or fallback.
 
-## 2. Common path boundaries
+## 2. Common boundaries
 
 ### Protected/no-touch
 
-- all `spec-dock/.workbench/**`;
-- all initiatives/artifacts except exact #392 `report.md` and `.meta.json` under the exclusion ledger;
-- seeds, unknown/user paths, unrelated skills;
-- Issue #387 canonical Requirement/Design/Plan;
+- all repository `spec-dock/.workbench/**`;
+- all initiatives/artifacts except exact #392 report/meta under exclusion contract;
+- seeds, unknown data and unrelated skills;
+- Issue #387 canonical files;
 - Issue #372 canonical evidence;
 - release/tag/PyPI;
-- human merge/review/required settings unless the human-gate step explicitly calls for a write.
+- human settings/merge.
 
-### External roots
+### Independent purpose workspaces
 
-Ephemeral `ISS392_EXTERNAL_ROOT` is mode0700 OS-temp outside repository and contains purpose subdirectories. Persistent stage root is repository-parent `.spec-dock-provider-stages-v1` and is never used for evidence. Neither root is tracked.
+The orchestrator creates each used workspace independently and retains its non-serializable handle. Exact environment variables:
+
+```text
+ISS392_WS_ADMISSION
+ISS392_WS_BASELINE_BUILD
+ISS392_WS_PROTECTED_WITNESS
+ISS392_WS_FULL_REGRESSION_S00
+ISS392_WS_FULL_REGRESSION_S30
+ISS392_WS_FULL_REGRESSION_S60
+ISS392_WS_TRIPWIRE
+ISS392_WS_FRESH_CONSUMER
+ISS392_WS_WORKFLOW_API
+ISS392_WS_ARTIFACT_DOWNLOAD
+ISS392_WS_ATTESTATION_DRAFT
+```
+
+No an aggregate external-root variable, shared parent, implicit purpose subdirectory or path-only cleanup. A child path such as `$ISS392_WS_WORKFLOW_API/run.json` is registered to that workspace handle before creation.
 
 ### Full Regression command rule
 
-Every retained verifier command includes both flags:
-
 ```bash
-uv run python -m scripts.quality.verify_full_regression \
-  --shards 4 \
-  --artifact-dir "$ISS392_EXTERNAL_ROOT/full-regression-STEP"
+uv run python -m scripts.quality.verify_full_regression   --shards 4   --artifact-dir "$ISS392_WS_FULL_REGRESSION_<STEP>"
 ```
 
-No S00/S30/S60 command accepts the default repository workbench path.
+S00/S30/S60 substitute the exact variable. Default verifier output is forbidden.
 
 ## 3. Step graph
 
 ```text
-#387 human merge
-  -> S00 admission
-  -> PR-A: S10 -> S20 -> S30 main gate
-  -> PR-B: S40 internal -> S50 internal -> S60 main gate
-  -> PR-C/S70:
-       candidate implementation -> complete dogfood -> tracked report
-       -> PRC_COMPAT_HEAD -> human context transition
-       -> PRC_FINAL_HEAD (remove compatibility job only)
-  -> S80 read-only final evidence -> PR-C main gate
-  -> human merge -> external Issue/Epic closure
+S00 admission
+ -> PR-A S10 -> S20 -> S30 main gate
+ -> PR-B S40 internal -> S50 internal -> S60 main gate
+ -> PR-C S70 internal compatibility head/context/final-head commit
+ -> S80 read-only final evidence/main gate
+ -> human merge -> measured external closure
 ```
 
 ## I392-S00 — Specification, #387, protected witness and legacy admission
 
-**Objective and contract-visible outcome**
+**Objective and visible outcome**
 
-Prove specification lineage, discover and verify the unique merged #387 PR under `ISS387-THREE-WAY-V2`, derive admitted rows, capture protected/exclusion witnesses and establish exact legacy dogfood/current gates without production change.
+Verify specification lineage, independently discover/admit the unique merged #387 PR, capture protected/legacy/current-gate baseline, and produce no Product change.
 
-**Exact owned repository paths and symbols**
+**Exact owned repository paths/symbols**
 
-- read-only repository/GitHub;
-- exact `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/report.md` pre-merge admission section;
-- optional `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/.meta.json` `updated_at` only through SpecDock lifecycle;
-- no production/test/workflow change.
+Read-only repository. Authorized tracked write only #392 `report.md` pre-freeze admission summary and necessary `.meta.json updated_at`. Temporary outputs only in independently-created admission, baseline-build, protected-witness and full-regression-s00 workspaces.
 
-**Explicit non-owned and no-touch paths**
+**Explicit non-owned/no-touch**
 
-All other tracked paths; all repository workbench; #387 canonical R/D/P; settings.
+All production/tests/workflows, #387 files, dogfood, repository workbench and settings.
 
-**Prerequisites and dependency**
+**Prerequisites/dependency**
 
-Replacement imported and `SPEC_FREEZE_COMMIT` recorded; #387 human-merged; clean implementation base contains both; credentials permit read-only GitHub PR/timeline/run data.
+#387 human merged; replacement imported and `SPEC_FREEZE_COMMIT` recorded; clean tree; implementation base contains both.
 
-**RED evidence or justified no-new-test rule**
+**RED evidence**
 
-Temporary external admission checker must reject: wrong spec blob; zero/multiple candidate-associated/timeline PR intersection; candidate not ancestor; report PR number; extra tail path; meta field beyond updated_at; final-head/merge tree mismatch; register mapping/signature/lineage drift; repository temp containment; unapproved protected exclusion.
+Admission parser rejects: report identity field; missing/duplicate mapping; zero/multiple timeline+association PRs; wrong repo/base/state; head-tree/merge-tree mismatch; unreachable merge; signature/lineage/successor drift; broad exclusion; workspace containment/owner/mode/sentinel failure; legacy dogfood drift.
 
-**Smallest implementation action**
+**Smallest action**
 
-1. Create external purpose `admission`, `protected-witness`, `baseline-build`, `full-regression-s00` workspaces and exact sentinels.
-2. Verify manifest hashes and `SPEC_FREEZE_COMMIT` ancestry.
-3. Parse #387 report block, candidate SHA/tree and 12 entries.
-4. Fetch candidate-associated PRs and Issue #387 timeline; intersect/filter to exactly one merged PR.
-5. Verify candidate ancestry, exact report/meta evidence tail, final-head/merge tree equality and admitted-main reachability.
-6. Read merge-tree report/ledger/collection and materialize external `post-387-admission.json` schema3 by the register.
-7. Capture complete protected manifest and separate report/meta exclusion ledger.
-8. Prove dogfood record exact `0.2.3\n`, slot markers absent and fixed roots/slots legacy digests exact.
-9. Build baseline wheel/sdist once externally; run current gates with explicit external artifact directory.
+1. Create separate workspaces/handles for admission, baseline build, protected witness and S00 Full Regression.
+2. Verify manifest payload hashes against `SPEC_FREEZE_COMMIT` blobs.
+3. Fetch Issue #387 timeline; collect same-repository PR references.
+4. Fetch each PR and its exact head commit association; filter and require one.
+5. Fetch head/merge commits; verify tree equality and main/implementation-base lineage.
+6. Read report/ledger/collection from merge tree; parse mapping-only schema4; apply register.
+7. Capture protected/exclusion manifests outside repository.
+8. Verify exact dogfood `0.2.3
+`, marker absence and fixed-tree digests.
+9. Build baseline `0.2.3` once in baseline-build workspace and capture hashes.
+10. Run current ordinary/full gates with external output.
 
 **Focused verification commands**
 
 ```bash
-test -z "$(git status --short)"
-git merge-base --is-ancestor "$SPEC_FREEZE_COMMIT" "$IMPLEMENTATION_BASE_SHA"
-gh api -H 'Accept: application/vnd.github+json' \
-  "repos/chemitaro/spec-dock/commits/$ISS387_CANDIDATE_SHA/pulls" \
-  > "$ISS392_EXTERNAL_ROOT/api/candidate-pulls.json"
-gh api -H 'Accept: application/vnd.github+json' \
-  "repos/chemitaro/spec-dock/issues/387/timeline" \
-  > "$ISS392_EXTERNAL_ROOT/api/issue-387-timeline.json"
-git merge-base --is-ancestor "$ISS387_CANDIDATE_SHA" "$ISS387_FINAL_PR_HEAD"
-test "$(git rev-parse "$ISS387_FINAL_PR_HEAD^{tree}")" = \
-  "$(git rev-parse "$ISS387_MERGE_SHA^{tree}")"
-git diff --name-status "$ISS387_CANDIDATE_SHA" "$ISS387_FINAL_PR_HEAD"
+# Paths are created/exported by the long-lived handle-owning orchestrator.
+gh api --paginate -H 'Accept: application/vnd.github+json'   repos/chemitaro/spec-dock/issues/387/timeline   > "$ISS392_WS_ADMISSION/issue-387-timeline.json"
+# The admission parser fetches each referenced PR and /commits/<head>/pulls.
+uv build --sdist --wheel --out-dir "$ISS392_WS_BASELINE_BUILD/dist"
 make lint
 uv run pytest -q
-uv run python -m scripts.quality.verify_full_regression \
-  --shards 4 \
-  --artifact-dir "$ISS392_EXTERNAL_ROOT/full-regression-s00"
+uv run python -m scripts.quality.verify_full_regression   --shards 4 --artifact-dir "$ISS392_WS_FULL_REGRESSION_S00"
 python3 ./spec-dock/scripts/spec-dock validate
-git diff --check
-test -z "$(git status --short)"
 ```
 
-**Expected observable result**
+**Expected result**
 
-One qualifying PR; exact candidate/evidence tail/merge tree; register admission valid; all protected paths exact except authorized report/meta ledger; baseline `0.2.3`; current gates GREEN; repository workbench unchanged.
+Exactly one merged #387 PR; head-tree=merge-tree; mapping-only report valid; register admission deterministic; current gates GREEN; baseline and legacy/protected witnesses fixed; repository workbench unchanged.
 
-**Evidence to record in Issue report.md**
+**Evidence in tracked report**
 
-Specification blob identities; candidate/final PR/merge identities; tail diff; admission JSON hash; protected/exclusion manifest hashes; dogfood legacy hashes; baseline artifact hashes; exact external verifier result summary. No final #392 head or future merge facts.
+SPEC_FREEZE/implementation base, externally obtained #387 PR/head/tree/merge/tree equality, report/ledger/collection blobs/hashes, admitted formula, baseline package hashes, protected/exclusion summaries, commands. No future #392 head identity.
 
-**Stop conditions and escalation owner**
+**Stop/escalation owner**
 
-Any prerequisite/identity/tail/register/protection/gate mismatch stops before S10. Escalation: canonical spec/repository owner. Luna does not widen a path, tail or outcome.
+Any mismatch stops before S10. Owner: canonical spec/repository owner. Luna does not edit #387 or choose a branch.
 
 **Cleanup**
 
-Delete external baseline/API workspaces only through captured handles after report summary. Retain evidence hashes; never touch repository workbench or persistent lifecycle namespace.
+Handle-clean each workspace only after retained hashes are recorded; unknown content preserves workspace and stops.
 
-**Merge-point invariant**
+**Merge invariant**
 
-No product change; not a merge point.
+No code diff; not a merge point.
 
-**Requirement and design trace IDs**
+**Trace**
 
-I392-RQ-001–007; I392-D-007–010.
+I392-RQ-001–007; D-007–010; register.
 
-## I392-S10 — Fixed model, record, candidate and complete wire
+## I392-S10 — Fixed model, candidate, record and complete wire
 
-**Objective and contract-visible outcome**
+**Objective and visible outcome**
 
-Implement dormant strict model/candidate/legacy parser and the entire finite public wire, including all uninstall states/modes/resume relations and valid goldens.
+Add dormant strict model/candidate/legacy parser and all finite wire values including terminal-cleanup result.
 
-**Exact owned repository paths and symbols**
+**Owned paths/symbols**
 
 ```text
-src/spec_dock/provider_lifecycle/__init__.py
-src/spec_dock/provider_lifecycle/model.py
-src/spec_dock/provider_lifecycle/candidate.py
-src/spec_dock/provider_lifecycle/legacy_023.py
-src/spec_dock/provider_lifecycle/public_result.py
+src/spec_dock/provider_lifecycle/{__init__,model,candidate,legacy_023,public_result}.py
 src/spec_dock/assets/legacy_0_2_3.json
-tests/unit/infra/test_provider_lifecycle_model.py
-tests/unit/infra/test_provider_lifecycle_candidate.py
-tests/unit/infra/test_provider_lifecycle_wire_contract.py
+tests/unit/infra/test_provider_lifecycle_{model,candidate,wire_contract,public_result}.py
 tests/unit/infra/test_provider_assets.py
 ```
 
-**Explicit non-owned and no-touch paths**
+**Non-owned/no-touch**
 
-Public CLI, old engine, workflows, checked-in dogfood, persistent stage namespace.
+Public CLI route, filesystem mutations, old engine/workflows, checked-in dogfood.
 
-**Prerequisites and dependency**
+**Prerequisites**
 
-S00 GREEN and post-#387 admission fixed.
-
-**RED evidence**
-
-Tests fail for malformed outer record JSON, wrong count, missing tooling-absent dry-run, missing incomplete-uninstall dry-run/resume, every unlisted phase/digest/policy/code relation, action/path order, unknown field/reason and invalid legacy fixture.
-
-**Smallest implementation action**
-
-Add enums/dataclasses/strict parsers/candidate digest/single legacy fixture/public table constructor only. Generate test cases from wire artifact and assert 36/123/4/16 counts.
-
-**Focused verification commands**
-
-```bash
-uv run pytest -q   tests/unit/infra/test_provider_lifecycle_model.py   tests/unit/infra/test_provider_lifecycle_candidate.py   tests/unit/infra/test_provider_lifecycle_wire_contract.py   tests/unit/infra/test_provider_assets.py
-uv run ruff check src/spec_dock/provider_lifecycle tests/unit/infra/test_provider_lifecycle_wire_contract.py
-uv run mypy src/spec_dock/provider_lifecycle
-```
-
-**Expected observable result**
-
-All finite rows/goldens parse and pass; no public route/dogfood change.
-
-**Evidence to record**
-
-Extracted counts, code/variant coverage, golden SHA-256 values, RED/GREEN commands.
-
-**Stop conditions and escalation owner**
-
-Any need for unknown/catch-all token, extra durable state or per-file historical catalog stops. Owner: Product/spec owner.
-
-**Cleanup**
-
-Remove generated temporary tables/caches; only source/tests/fixture remain.
-
-**Merge-point invariant**
-
-Internal PR-A checkpoint; old public product/current gates remain.
-
-**Trace IDs**
-
-I392-RQ-008–016; I392-D-001–003.
-
-## I392-S20 — Descriptor-safe filesystem, persistent stage and fresh install
-
-**Objective and contract-visible outcome**
-
-Implement same-filesystem process-independent stage discovery, shared-container bootstrap and fresh install direct service without public cutover.
-
-**Exact owned repository paths and symbols**
-
-```text
-src/spec_dock/provider_lifecycle/filesystem.py
-src/spec_dock/provider_lifecycle/external_workspace.py
-src/spec_dock/provider_lifecycle/stage_namespace.py
-src/spec_dock/provider_lifecycle/service.py
-tests/unit/infra/test_provider_lifecycle_filesystem.py
-tests/unit/infra/test_provider_lifecycle_external_workspace.py
-tests/unit/infra/test_provider_lifecycle_stage_namespace.py
-tests/unit/infra/test_provider_lifecycle_service.py
-tests/unit/infra/test_provider_lifecycle_faults.py
-```
-
-Symbols include namespace/repository/ACTIVE/stage owner parsers; repository/tuple-key functions; no-follow allocation/discovery/cleanup; external workspace helper; native rename/bootstrap; install service/fault hook.
-
-**Explicit non-owned and no-touch paths**
-
-CLI, old engine/workflows, checked-in dogfood, repository workbench.
-
-**Prerequisites and dependency**
-
-S10 GREEN; repository parent permits owner-only sibling namespace in tests/synthetic consumers; Linux/macOS primitive probes available.
+S00 GREEN.
 
 **RED evidence**
 
-Namespace symlink/wrong UID/mode/device; ACTIVE collision/mismatch; no scan spy; process kill/restart after ACTIVE allocation/stage/owner/container mkdir; bootstrap without record; terminal-cleanup crash; unknown stage entry; external workspace containment/collision/cleanup; fresh seed-policy/order/fault; native fallback rejection.
+37-code/123-row inventory; four record and sixteen public JSON goldens; terminal-cleanup code/retry/action/guidance; warning retries; strict result-family private enum; unknown/duplicate/order rejection; candidate/legacy safety.
 
-**Smallest implementation action**
+**Smallest action**
 
-Implement exact namespace/sentinel/index state machine and external helper, then integrate descriptor filesystem and fresh install. Create ACTIVE before stage allocation. Discover by exact repository/tuple only.
+Implement enums/types/parsers/digests and table-driven adapter only. No public dispatch.
 
-**Focused verification commands**
+**Verification**
 
 ```bash
-uv run pytest -q   tests/unit/infra/test_provider_lifecycle_external_workspace.py   tests/unit/infra/test_provider_lifecycle_stage_namespace.py   tests/unit/infra/test_provider_lifecycle_filesystem.py   tests/unit/infra/test_provider_lifecycle_service.py   tests/unit/infra/test_provider_lifecycle_faults.py   -k 'fresh or stage or restart or bootstrap or workspace or binding'
+uv run pytest -q tests/unit/infra/test_provider_lifecycle_model.py   tests/unit/infra/test_provider_lifecycle_candidate.py   tests/unit/infra/test_provider_lifecycle_wire_contract.py   tests/unit/infra/test_provider_lifecycle_public_result.py   tests/unit/infra/test_provider_assets.py
 make lint
 ```
 
-**Expected observable result**
+**Expected/evidence**
 
-Same tuple resumes across subprocess exit; mismatched tuple blocks; bootstrap-before-record recovers; no scan/repository temp; fresh install reaches ready and preserves protected bytes.
+All finite wire tests GREEN, matrix count exact, no public behavior change. Record RED/GREEN nodes and parsed fixture hashes.
 
-**Evidence to record**
+**Stop/cleanup/merge invariant**
 
-Namespace/ACTIVE/owner canonical bytes, restart matrix, mutation timeline, native primitive results, external helper identity/cleanup matrix.
+Unknown wire choice or extra record/path stops to spec owner. Remove temp caches. Internal PR-A checkpoint; old public product remains.
 
-**Stop conditions and escalation owner**
+**Trace**
 
-Need for directory scan, random orphan adoption, repository temp, cross-device copy, generic rename or broad cleanup stops. Owner: filesystem safety/Product owner.
+I392-RQ-010–017; D-001–003; wire.
 
-**Cleanup**
+## I392-S20 — Descriptor filesystem, persistent stage and fresh install
 
-Synthetic namespace/workspaces removed only via exact handles; verify no repository workbench change.
+**Objective and visible outcome**
 
-**Merge-point invariant**
+Implement safe namespace/ACTIVE/stage, fresh container bootstrap and fresh install direct service, including process-restart points.
 
-Internal PR-A checkpoint; dormant direct service only.
+**Owned paths/symbols**
 
-**Trace IDs**
+```text
+src/spec_dock/provider_lifecycle/{filesystem,external_workspace,stage_namespace,service}.py
+tests/unit/infra/test_provider_lifecycle_{filesystem,workspace,stage_namespace,service,faults}.py
+```
 
-I392-RQ-004–012; I392-D-004–008.
+**Non-owned/no-touch**
 
-## I392-S30 — Update/resume convergence and PR-A gate
+Public CLI, old engine/workflows, dogfood.
 
-**Objective and contract-visible outcome**
+**Prerequisites**
 
-Complete update and same-tuple convergence across record/ACTIVE/stage/process restarts while public route/dogfood remain old.
-
-**Exact owned repository paths and symbols**
-
-S10/S20 lifecycle modules/tests; `update_tooling`, `resume_incomplete`, terminal-cleanup resume.
-
-**Explicit non-owned and no-touch paths**
-
-CLI, old engine/workflows, dogfood, current policy data.
-
-**Prerequisites and dependency**
-
-S20 GREEN.
+S10 GREEN; supported Linux/macOS native primitives available for platform tests.
 
 **RED evidence**
 
-Each root/slot/record/cleanup boundary; cross operation/candidate/policy; process restart; ACTIVE terminal-cleanup; missing repair; marker mismatch; current root race.
+Independent workspace handles/no aggregate root; repository containment and cleanup attacks; exact sentinels; allocation/restart/bootstrap; no scan; fresh seed policy; no-follow/hard-link/native primitive; fault after each durable boundary.
 
-**Smallest implementation action**
+**Smallest action**
 
-Reuse fixed publication and stage state machine; derive remaining targets from observation; no progress list/rollback.
+Implement workspace helper, namespace/index/owner, bound filesystem and fresh install service. Terminal cleanup transition can be introduced dormant and completed in S30.
 
-**Focused verification commands**
+**Verification**
+
+```bash
+uv run pytest -q tests/unit/infra/test_provider_lifecycle_workspace.py   tests/unit/infra/test_provider_lifecycle_stage_namespace.py   tests/unit/infra/test_provider_lifecycle_filesystem.py   tests/unit/infra/test_provider_lifecycle_service.py   tests/unit/infra/test_provider_lifecycle_faults.py   -k 'fresh or bootstrap or workspace or stage or binding'
+make lint
+```
+
+**Expected/evidence**
+
+Fresh direct service reaches ready; all injected crashes are classified; repository workbench/protected data unchanged. Record identities/fault table.
+
+**Stop/cleanup/merge invariant**
+
+Generic rename, scan, aggregate workspace, serializable cleanup or recursive container removal stops. Handle-clean test workspaces. Internal PR-A checkpoint.
+
+**Trace**
+
+I392-RQ-005–014; D-004–008.
+
+## I392-S30 — Update, resume, terminal cleanup and PR-A gate
+
+**Objective and visible outcome**
+
+Complete update/exact-tuple resume and mandatory terminal cleanup so old cleanup cannot permanently block any later intent.
+
+**Owned paths/symbols**
+
+S10/S20 lifecycle modules/tests, especially `recover_terminal_cleanup()` and wire constructor tests.
+
+**Non-owned/no-touch**
+
+CLI old route, dogfood, workflows/policy.
+
+**Prerequisites**
+
+S20 GREEN; independent `ISS392_WS_FULL_REGRESSION_S30` handle exists.
+
+**RED evidence**
+
+- ACTIVE ready+terminal record promotion;
+- stage present/already absent;
+- ACTIVE present/already absent;
+- crash after stage removal and after ACTIVE unlink before fsync;
+- cleanup retry with next request same/different operation;
+- repeated cleanup failure exact `terminal-cleanup-failed`;
+- warning result non-null retry and next-call cleanup;
+- result-family retry mapping;
+- cross-tuple lifecycle resume remains blocked before terminal state.
+
+**Smallest action**
+
+Implement cleanup prelude before classifier/dispatch, update/resume and no-op/repair publication. Do not add rollback/progress list.
+
+**Verification**
 
 ```bash
 uv run pytest -q tests/unit/infra/test_provider_lifecycle_*.py
 make lint
 uv run pytest -q
-uv run python -m scripts.quality.verify_full_regression \
-  --shards 4 \
-  --artifact-dir "$ISS392_EXTERNAL_ROOT/full-regression-s30"
+uv run python -m scripts.quality.verify_full_regression   --shards 4 --artifact-dir "$ISS392_WS_FULL_REGRESSION_S30"
 ```
 
-**Expected observable result**
+**Expected/evidence**
 
-All same-tuple retries converge; all mismatches block; current ordinary/full gates GREEN with external output; exact legacy dogfood unchanged.
+All cleanup crash matrices converge; different next intent proceeds after cleanup; exact failure wire emitted; public route still old; current gates GREEN. Record action/phase/retry bytes and subprocess restart table.
 
-**Evidence to record**
+**Stop/cleanup/merge invariant**
 
-Fault/restart/convergence table, active-index cleanup, external verifier path/hash/result.
+Old tuple permanent block, unsafe absent handling or unclosed wire blocks PR-A. Handle-clean external output. S30 is only PR-A main gate; main remains old public product.
 
-**Stop conditions and escalation owner**
+**Trace**
 
-Any fallback/progress schema/new public generation/workbench output. Owner: Product/filesystem owner.
+I392-RQ-008–017; D-002–006.
 
-**Cleanup**
+## I392-S40 — Public lifecycle/docs cutover with dogfood frozen
 
-Synthetic stages and external output via handles.
+**Objective and visible outcome**
 
-**Merge-point invariant**
+Wire final `0.2.4` CLI/uninstall/purge trap and provider-side lifecycle documentation on PR-B branch while checked-in dogfood stays exact legacy.
 
-Only PR-A main gate. Human merge leaves old public product, dormant successor, exact legacy dogfood and current gates releasable.
-
-**Trace IDs**
-
-I392-RQ-007–012; I392-D-004–006.
-
-## I392-S40 — Public lifecycle/docs cutover with legacy dogfood frozen
-
-**Objective and contract-visible outcome**
-
-Connect final `0.2.4` lifecycle/CLI/uninstall/purge trap and provider-side lifecycle documentation on PR-B branch while preserving every checked-in dogfood byte.
-
-**Exact owned repository paths and symbols**
+**Owned paths**
 
 ```text
 pyproject.toml
@@ -373,279 +323,212 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/uninstall.py
 README.md lifecycle sections
 src/spec_dock/assets/spec_dock/docs/migration.md
 src/spec_dock/assets/spec_dock/docs/README.md lifecycle sections
-public result and CLI tests
+CLI/public wire tests
 ```
 
-**Explicit non-owned and no-touch paths**
+**No-touch**
 
-All `spec-dock/{docs,templates,system,scripts}`, both fixed slots, dogfood record/markers, root AGENTS, current workflows/policy, user data.
+All checked-in dogfood roots/slots/record/markers, root AGENTS, workflows/policy.
 
-**Prerequisites and dependency**
+**Prerequisites**
 
-S30 GREEN. S40 starts PR-B and cannot be offered for merge before S60.
+S30 merged/GREEN; S40 starts one PR-B that continues through S60.
 
-**RED evidence**
+**RED/action/verification**
 
-CLI/wire aliases/trap, docs forbidden legacy journal/purge/retry text, external dogfood witness detects any checked-in change.
-
-**Smallest implementation action**
-
-Wire CLI exclusively to new service, bump version, remove purge callsites, update provider-side lifecycle docs/root README lifecycle only. Do not run update/sync/copy on repository root.
-
-**Focused verification commands**
+Add failing CLI matrix for aliases, purge trap, terminal cleanup result/warning retry, text/JSON/exit and wrapper. Implement public wiring/version/docs. Verify focused CLI with current flags, lint and external protected/dogfood witnesses.
 
 ```bash
-uv run pytest -q tests/unit/infra/test_provider_lifecycle_wire_contract.py   tests/cli_runtime/test_provider_lifecycle.py   tests/cli_runtime/test_uninstall.py   tests/cli_runtime/test_update.py
+uv run pytest --run-full-regression --full-regression-shard -q   tests/cli_runtime/test_provider_lifecycle.py   tests/cli_runtime/test_uninstall.py tests/cli_runtime/test_update.py
 make lint
-# external S40 witness comparison proves all dogfood fixed targets unchanged
 ```
 
-**Expected observable result**
+**Expected/evidence**
 
-Final public behavior on branch; provider docs final lifecycle; checked-in dogfood exact legacy.
+PR-B branch exposes final route, dogfood record remains exact `0.2.3
+` and fixed trees/marker absence byte-identical. Record CLI goldens and witness equality.
 
-**Evidence to record**
+**Stop/cleanup/invariant**
 
-CLI/text/JSON exits, provider docs grep, before/after dogfood witness.
+Any dogfood change, bridge/toggle/purge mutation or unknown wire stops. Internal checkpoint only; no merge handoff.
 
-**Stop conditions and escalation owner**
+**Trace**
 
-Any dogfood edit/sync, bridge/toggle, purge mutation or wire drift blocks. Owner: Product/spec owner.
+I392-RQ-015–020; wire.
 
-**Cleanup**
+## I392-S50 — Exact legacy and old-package tripwire on external consumers
 
-External snapshots only.
+**Objective and visible outcome**
 
-**Internal checkpoint invariant**
+Prove exact migration/uninstall and old-package mutation-zero without changing checked-in dogfood.
 
-S40 is not mergeable; same PR continues through S50/S60.
-
-**Trace IDs**
-
-I392-RQ-013–017.
-
-## I392-S50 — Exact legacy/tripwire proof on external consumers
-
-**Objective and contract-visible outcome**
-
-Prove exact migration/uninstall/fault resume and old-package mutation-zero without touching checked-in dogfood.
-
-**Exact owned repository paths and symbols**
+**Owned paths**
 
 ```text
-src/spec_dock/provider_lifecycle/legacy_023.py
-src/spec_dock/provider_lifecycle/service.py
-tests/integration/test_provider_lifecycle_artifacts.py
-tests/integration/test_provider_lifecycle_tripwire.py
+src/spec_dock/provider_lifecycle/{legacy_023,service}.py
+tests/integration/test_provider_lifecycle_{artifacts,tripwire}.py
 tests/platform/macos/test_provider_lifecycle_macos.py
 tests/support/provider_lifecycle_tripwire/**
 ```
 
-**Explicit non-owned and no-touch paths**
+**No-touch**
 
-Checked-in dogfood fixed targets/record/markers, current workflows/policy, protected data.
+Checked-in dogfood, old engine deletion, current workflows/settings.
 
-**Prerequisites and dependency**
+**Prerequisites**
 
-S40 branch GREEN; baseline old artifacts external.
+S40 GREEN; independent baseline-build/tripwire/fresh-consumer handles.
 
-**RED evidence**
+**RED/action/verification**
 
-Exact/modified roots/slots/recovery, preserve-only resume, process restart, Python/native tripwire positive controls and old-command event zero.
-
-**Smallest implementation action**
-
-Complete legacy adapter and startup tripwire; use external purpose baseline-build/tripwire/fresh-consumer only.
-
-**Focused verification commands**
+Exact/modified roots/slots/recovery, preserve-only policy, fault resume, old command matrix, Python/native positive controls, terminal-cleanup after migrated operation. Build only in baseline-build purpose; consumers under fresh-consumer/tripwire purpose.
 
 ```bash
+uv build --sdist --wheel --out-dir "$ISS392_WS_BASELINE_BUILD/final-dist"
 uv run pytest --run-full-regression --full-regression-shard -q   tests/integration/test_provider_lifecycle_artifacts.py   tests/integration/test_provider_lifecycle_tripwire.py
-# macOS executes tests/platform/macos/test_provider_lifecycle_macos.py
 ```
 
-**Expected observable result**
+**Expected/evidence**
 
-Exact migration and uninstall succeed; unsupported states block; old commands have event zero/tree unchanged; positive controls caught; dogfood unchanged.
+Exact migration GREEN, old events empty, controls caught, all temp outside repo, checked-in dogfood unchanged.
 
-**Evidence to record**
+**Stop/cleanup/invariant**
 
-Old/final artifact hashes, migration matrix, stage/restart evidence, native events, dogfood witness.
+Any old mutation/control failure/dogfood drift blocks PR-B. Handle-clean external dirs. S50 is internal; continue S60.
 
-**Stop conditions and escalation owner**
+**Trace**
 
-Any old mutation/control failure/legacy guess/dogfood drift. Owner: Product/filesystem safety owner.
+I392-RQ-018–019; D legacy/tripwire.
 
-**Cleanup**
+## I392-S60 — Terminalization, retained gates, complete dogfood and PR-B gate
 
-External venv/consumers/tripwire outputs via handles.
+**Objective and visible outcome**
 
-**Internal checkpoint invariant**
+Remove old engine/tests, terminalize admitted failures, keep current PR/main-push gates independently GREEN with external output, update lifecycle docs/AGENTS and perform one complete dogfood migration.
 
-S50 is not mergeable; same PR continues through S60.
-
-**Trace IDs**
-
-I392-RQ-016–017.
-
-## I392-S60 — Terminalization, retained gate externalization, complete migration and PR-B gate
-
-**Objective and contract-visible outcome**
-
-Remove old engine/tests, reach failure active0, keep current PR/main-push gates independently GREEN with all output external, align lifecycle docs/AGENTS and perform the one complete checked-in legacy migration.
-
-**Exact owned repository paths and symbols**
+**Owned paths**
 
 ```text
 src/spec_dock/managed_distribution.py                         delete
 src/spec_dock/assets/managed_distribution.json                delete
-old distribution tests                                        delete/replace
+old distribution tests                                       delete
 src/spec_dock/context_pack.py
-.github/workflows/provider-ci.yml                              transitional retarget
-.github/workflows/provider-full-regression.yml                 external artifact-dir only
+.github/workflows/provider-ci.yml                              retarget only
+.github/workflows/provider-full-regression.yml                 external output only
+tests/unit/test_provider_test_lanes.py
 full-regression-ledger.json
 full-regression-timing-weights.json
 tests/conftest.py
-tests/unit/test_provider_test_lanes.py
-admitted failure-owner source/tests
-README.md lifecycle sections
-src/spec_dock/assets/spec_dock/docs/{migration.md,README.md}
-spec-dock/docs/{migration.md,README.md}
-AGENTS.md lifecycle/uninstall sections only
-spec-dock/{docs,templates,system,scripts}
-.agents/skills/spec-dock
-.agents/skills/spec-dock-grill-with-docs
-spec-dock/spec-dock.version
-two .spec-dock-provider-slot.json files
-spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/report.md and optional meta updated_at under exclusion ledger
+scripts/quality/full_regression_{baseline,verify}.py            retained
+failure-owner source/tests from register
+README/provider lifecycle docs
+root AGENTS.md lifecycle/uninstall paragraphs only
+all four dogfood roots, both slots, record and markers
+#392 report implementation summary
 ```
 
-Retain unchanged in policy purpose through S60: quality baseline/verifier modules, current pytest lane behavior, current main-push trigger and AGENTS test-policy paragraphs.
+**No-touch**
 
-**Explicit non-owned and no-touch paths**
+Final gate redesign, AGENTS test-policy sections, old policy provider deletion, protected data/seeds.
 
-All other initiatives/artifacts/workbench/seeds/user paths; final provider-gate tooling; required settings.
+**Prerequisites**
 
-**Prerequisites and dependency**
-
-S50 GREEN, external protected/exclusion witness valid, exact legacy checked-in dogfood.
+S50 GREEN; register admission fixed; independent S60 Full Regression/protected/fresh-consumer handles.
 
 **RED evidence**
 
-Register active rows, stale deleted workflow paths, lane consumer allowing active/approved rows, retained workflow defaulting to repository workbench, AGENTS/docs stale lifecycle text, partial dogfood, seed/protected drift.
+Each admitted failure focused RED/closed resolution; current Provider CI deleted path structural RED; lane/ledger stale reference RED; retained workflow default/repository-workbench RED; dogfood exact legacy precondition; terminal cleanup/stage residue; lifecycle docs/AGENTS stale phrase checks.
 
-**Smallest implementation action**
+**Smallest action**
 
-1. Apply register's admitted fixed/superseded rules; every surviving node normally passes.
-2. Retarget only deleted distribution test references in current Provider CI to S10–S50 successor tests.
-3. Update ledger/timing/conftest/lane tests mechanically; active/approved zero.
-4. Modify retained Full Regression workflow only to call external helper with parent `${{ runner.temp }}`, purpose full-regression-s60, pass `--artifact-dir` and upload that exact path.
-5. Extract surviving context behavior, remove old engine/manifest/tests.
-6. Finish provider lifecycle docs and root AGENTS lifecycle/uninstall paragraphs; retain test-policy text.
-7. Run new lifecycle service once against repository root; commit complete four roots/two slots/seven-key ready record/two markers.
-8. Verify provider/dogfood digest, persistent-stage clean terminal state, protected witness/exclusion ledger, seeds, validate and fresh consumer.
+1. Fix/supersede register rows to normal pass; active/approved zero.
+2. Extract surviving context behavior and delete old engine/tests.
+3. Retarget current provider-ci only to S10–S50 successors.
+4. Update lane/ledger/timing/conftest exact references.
+5. Modify retained workflow to create one independent full-regression-s60 workspace below runner.temp, pass/upload exact path and cleanup by handle.
+6. Update lifecycle docs and AGENTS lifecycle paragraphs.
+7. With provider bytes settled, apply new service once to exact legacy repository dogfood; commit complete roots/slots/record/markers.
+8. Validate provider/dogfood/protected parity and both current gates.
 
 **Focused verification commands**
 
 ```bash
-uv run pytest -q \
-  tests/unit/test_provider_test_lanes.py \
-  tests/unit/infra/test_provider_assets.py \
-  tests/unit/infra/test_provider_lifecycle_wire_contract.py
+uv run pytest -q tests/unit/test_provider_test_lanes.py
 uv run pytest -q
-uv run python -m scripts.quality.verify_full_regression \
-  --shards 4 \
-  --artifact-dir "$ISS392_EXTERNAL_ROOT/full-regression-s60"
-# workflow structural test requires --artifact-dir and runner.temp output/upload
-uvx --no-cache --from . spec-dock update .
-python3 ./spec-dock/scripts/spec-dock validate
+uv run python -m scripts.quality.verify_full_regression   --shards 4 --artifact-dir "$ISS392_WS_FULL_REGRESSION_S60"
 make lint
-git diff --check
+python3 ./spec-dock/scripts/spec-dock validate
+# workflow structural tests require independent runner.temp workspace and no spec-dock/.workbench path
 ```
 
-**Expected observable result**
+**Expected result/evidence**
 
-Old engine absent; register active/approved zero; current Provider CI and current main-push workflow independently GREEN; no repository workbench output; lifecycle docs/AGENTS correct; dogfood complete ready `0.2.4` and candidate-aligned; protected/excluded path contracts valid.
+Old engine absent; active/approved zero; current PR gate GREEN; retained main-push verifier GREEN; no S70 dependency; dogfood complete ready 0.2.4 with matching digest/markers; protected/workbench/seeds exact; no ACTIVE/stage residue.
 
-**Evidence to record**
+**Stop/escalation**
 
-Terminalization table, workflow before/after scope, external output identity, PR/main-push run IDs, docs/AGENTS grep, complete dogfood record/marker/root/slot digest, stage cleanup, protected/exclusion/seed hashes, validate/fresh consumer.
-
-**Stop conditions and escalation owner**
-
-Unmapped failure, broken current workflow, default workbench output, final-gate redesign, partial dogfood, protected/exclusion drift or S70 tooling dependency blocks PR-B. Owner: Product/test/CI/filesystem owner.
+Unterminalized row, deleted workflow consumer, default artifact-dir, repository workbench output, partial dogfood, protected drift or current gate failure blocks PR-B. Owner: Product/test/CI.
 
 **Cleanup**
 
-External verifier/fresh-consumer data through handles; persistent stage only through exact terminal cleanup. Repository workbench untouched.
+Handle-clean all purpose workspaces after evidence retained. Do not clean repository workbench or stage namespace sentinels.
 
-**Merge-point invariant**
+**PR-B merge invariant**
 
-Only PR-B main gate. Human merge yields complete final lifecycle with coherent current gates and complete dogfood; no bridge/fallback.
+S60 is only PR-B gate. Main receives complete final lifecycle and coherent current gates; S40/S50 commits are not handoffs.
 
-**Trace IDs**
+**Trace**
 
-I392-RQ-018–019; I392-D-011–012.
+I392-RQ-020–021/030/032; D-011–012; register.
 
-## I392-S70 — Consumer-first final gate, two-head transition and second dogfood update
+## I392-S70 — Consumer-first final gate, compatibility sequence and second dogfood update
 
-**Objective and contract-visible outcome**
+**Objective and visible outcome**
 
-Implement final gate/evidence schemas/environment, retire old consumers/providers, complete second dogfood update, create compatibility head, execute the human context subgate and create final head by removing only compatibility job. S70 remains non-main.
+Build final gate/evidence implementation, remove old policy consumer-first, complete second dogfood update, finalize tracked report method, push compatibility head, complete no-gap context transition and create distinct final head. No main merge.
 
-**Exact owned repository paths and symbols**
+**Owned paths**
 
 ```text
 scripts/provider_gate.py
 ci/linux-qualification.Dockerfile
 ci/linux-qualification-environment.json
-tests/unit/infra/test_provider_gate.py
-tests/unit/infra/test_provider_workflow.py
+tests/unit/infra/test_provider_{gate,workflow}.py
 tests/provider_test_ownership.json
 Makefile
 scripts/static_analysis/run.sh
 .github/workflows/provider-ci.yml
-AGENTS.md test-policy/provider-gate sections
-README.md and provider/dogfood docs test-policy sections
-all old policy consumers, then providers/data/workflow deletion
-spec-dock/{docs,templates,system,scripts}
-both fixed slots, record and markers
-spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/report.md pre-freeze completion and optional meta updated_at
+root AGENTS.md test-policy/provider-gate sections
+README/provider docs test-policy sections
+all remaining old policy consumers, then providers/data/workflow deletion
+all four dogfood roots, both slots, record and markers
+#392 report pre-freeze method/implementation facts only
 ```
 
-`PRC_FINAL_HEAD` may change only `.github/workflows/provider-ci.yml` relative to `PRC_COMPAT_HEAD`.
+**No-touch**
 
-**Explicit non-owned and no-touch paths**
+Protected paths/seeds; actual compatibility/final identities are not written to report; human settings are external.
 
-All other protected paths/workbench/seeds/user data; candidate/dogfood/report after compatibility head; human settings except explicit subgate.
+**Prerequisites**
 
-**Prerequisites and dependency**
-
-PR-B merged/known S60 tree; current gates GREEN; external witnesses valid; human admin available; new final context name observed exactly.
+PR-B S60 main state; current gates GREEN; human admin available.
 
 **RED evidence**
 
-Structural tests reject extra packager, wrong needs/artifacts/receipt/evidence/schema/order/hash, any `EVIDENCE-FIXTURE-V1` byte/size/SHA drift, missing actual-byte check, old consumer before provider deletion, compatibility job no-op/dependent on provider-gate, canary affecting old context, final diff beyond job removal, evidence/attestation/emit CLI mismatch, partial S70 dogfood.
+Evidence schemas/fixtures/hash chain; exact job needs; one producer; compatibility job candidate/evidence/API downloads, exact verifier flags, permissions, no build, canary isolation; old consumer inventory; final diff only job removal; actual head identities forbidden in report; second dogfood completeness.
 
-**Smallest implementation action**
+**Smallest action**
 
-Phase A — final candidate and compatibility head:
-
-1. Add provider gate, exact schemas/verifiers/emitter, stable environment and structural tests.
-2. Retire/replace all old policy consumers, prove zero, then delete providers/ledger/timing/sharder/conftest/old workflow.
-3. Update final AGENTS/test-policy docs.
-4. Perform second complete candidate-wide dogfood update and verify protected/exclusion/seed state.
-5. Finalize tracked #392 report; commit/push `PRC_COMPAT_HEAD` with final workflow plus compatibility job `provider-tests`.
-6. Run both old/new contexts GREEN and actual-byte checks at compatibility head.
-
-Phase B — human context gate and final head:
-
+1. Add final tooling/environment/workflow/tests.
+2. Retire/replace every old consumer, prove zero, then delete old providers/ledger/timing/sharder/conftest/main-push workflow.
+3. Update final operator/test-policy docs.
+4. Perform complete candidate-wide dogfood update; finalize tracked report without actual head/run identities; commit.
+5. Push and record actual compatibility SHA/tree externally.
+6. Run compatibility workflow; require both contexts GREEN. Compatibility provider-tests independently verifies candidate/evidence/API bytes.
 7. Human adds new required while old remains; read back both.
-8. Dedicated canary PR adds only `.github/provider-gate-canary-red`; prove new RED/old GREEN/merge blocked; close canary.
-9. Restore compatibility-head implementation PR GREEN.
-10. Human removes only old required context; read back new-only.
-11. Create one descendant commit removing only exact compatibility job `provider-tests` from provider-ci.yml. Record as `PRC_FINAL_HEAD`; no report/candidate/dogfood/test edit.
-12. Run structural tests proving exact compatibility-to-final diff and final context emission.
+8. Canary adds only marker; prove new RED, old GREEN, blocked; close canary; restore compatibility GREEN.
+9. Human removes old required; read back new-only.
+10. Create one descendant commit removing only provider-tests; record distinct final SHA/tree externally. Do not add identity to report.
 
 **Focused verification commands**
 
@@ -655,132 +538,102 @@ uv run python scripts/provider_gate.py verify-node-ownership --map tests/provide
 make lint
 uv run pytest -q
 python3 ./spec-dock/scripts/spec-dock validate
-# after compatibility context transition
 git diff --name-only "$PRC_COMPAT_HEAD" "$PRC_FINAL_HEAD"
 test "$(git diff --name-only "$PRC_COMPAT_HEAD" "$PRC_FINAL_HEAD")" = '.github/workflows/provider-ci.yml'
+test "$PRC_COMPAT_HEAD" != "$PRC_FINAL_HEAD"
 ```
 
-**Expected observable result**
+Compatibility job command uses its own purpose workspaces:
 
-Final tooling/schemas/tests GREEN; old consumers/providers absent; second dogfood complete; compatibility head both contexts GREEN; canary new RED old GREEN blocked; old required removed only after proof; final head differs only by compatibility job removal and emits new context.
+```bash
+uv run python scripts/provider_gate.py verify-downloaded-artifact   --repository chemitaro/spec-dock   --candidate-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/candidate"   --evidence-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/evidence"   --run-json "$ISS392_WS_WORKFLOW_API/run.json"   --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json"   --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json"   --source-sha "$PRC_COMPAT_HEAD" --source-tree "$PRC_COMPAT_TREE"   --workflow-run-id "$COMPAT_RUN_ID" --json
+```
 
-**Evidence to record in tracked report**
+**Expected/evidence**
 
-Pre-final-head implementation facts, consumer inventory/removal, schema/golden results, compatibility-head identity, dogfood/protected summaries and the planned external evidence schema/location. Do not record final-head source-bound artifacts or post-merge facts.
+Old consumers/providers absent; second dogfood complete; report non-self-referential; compatibility candidate/evidence/API actual bytes verified; canary new RED/old GREEN; new required; distinct final head with only job removal.
 
-**Stop conditions and escalation owner**
+**Stop/cleanup/invariant**
 
-Any consumer/provider ordering failure, schema choice, extra packager, compatibility context weakness, canary cross-impact, setting gap, final diff beyond allowed path/job, dogfood/protection drift or tracked report cycle stops. Owner: CI/Product/spec owner; settings: human admin.
+Any schema choice, old consumer, partial dogfood, report identity, compatibility no-op/build/canary dependency, setting gap, equal heads or extra final diff stops. Cleanup local pre-freeze purpose workspaces by handles. S70 is non-main; continue S80.
 
-**Cleanup**
+**Trace**
 
-Remove local pre-freeze builds/workspaces through handles. Keep tracked final candidate/docs/tests. No S70 merge handoff.
+I392-RQ-022–029/032; D-013–025.
 
-**Internal checkpoint invariant**
+## I392-S80 — Read-only final-head evidence and PR-C gate
 
-S70 is non-main. It ends with clean `PRC_FINAL_HEAD`, new required context active, compatibility job removed, complete dogfood and no tracked correction pending. S80 alone performs authoritative final evidence.
+**Objective and visible outcome**
 
-**Trace IDs**
+On clean distinct final head, run authoritative CI/evidence/qualification and pre-merge attestation without tracked edit/build/update/sync.
 
-I392-RQ-020–025/027; I392-D-013–023.
+**Owned repository paths**
 
-## I392-S80 — Read-only final frozen-head evidence and PR-C gate
+None. External workflow-api, artifact-download, protected-witness and attestation-draft workspaces/handles only; GitHub read APIs and human append-only pre-merge comment.
 
-**Objective and contract-visible outcome**
+**No-touch**
 
-On clean `PRC_FINAL_HEAD`, rerun all authoritative CI/evidence/qualification, final context readback and append-only pre-merge attestation without any tracked edit/build/update/sync.
+All tracked files, dogfood, report/meta, repository workbench, stage namespace except read-only clean check, settings except readback.
 
-**Exact owned repository paths and symbols**
+**Prerequisites**
 
-Tracked paths: none. External purpose `workflow-api`, `artifact-download`, `attestation-draft` only; GitHub read APIs and human append-only Issue comment.
-
-**Explicit non-owned and no-touch paths**
-
-All tracked files, dogfood, report/meta, workbench, stage namespace except read-only clean check, settings except readback, release.
-
-**Prerequisites and dependency**
-
-S70 final head clean; candidate/dogfood/report complete; new required context configured; compatibility job absent; human review available.
+S70 final head clean; compatibility sequence complete; new required context active; compatibility job absent; human review available.
 
 **RED evidence**
 
-Run selector rejects zero/multiple/wrong-head run; downloaded verifier typed failures 2–12; schema/hash/actual-byte mismatch; qualification mismatch; final context missing; tracked diff/build/update/sync; attestation emission/comment identity mismatch.
+Run selector zero/multiple/wrong head; candidate/evidence/API missing or mismatched; final head equals compatibility; final diff extra; verifier typed failures; fixture/hash/environment/metric mismatch; tracked write/build/update/sync; comment/receipt mismatch.
 
-**Smallest implementation action**
+**Smallest action**
 
-1. Freeze/record final head/tree externally and verify compatibility-to-final diff.
-2. Snapshot existing workflow runs, dispatch Provider CI for final head/qualification, select exactly one new matching run and wait success.
-3. Fetch run/jobs/artifacts API JSON externally.
-4. Download exact candidate and provider-evidence artifacts externally.
-5. Run exact `verify-downloaded-artifact`; inspect actual role evidence metrics/build counts and require all serializer/golden tests to match `EVIDENCE-FIXTURE-V1`.
-6. Read back final required contexts/reviews and verify only new provider context replaced old.
-7. Render pre-merge attestation with exact emitter; human posts new #392 comment; read back/hash/no-edit verify.
-8. Recheck head/tree/status, dogfood record/markers/digest, protected witness and repository workbench read-only identity.
+1. Create independent workflow-api, artifact-download, protected-witness and attestation-draft workspaces/handles.
+2. Verify final SHA/tree externally and allowed compatibility diff.
+3. Snapshot runs to workflow-api workspace; dispatch Provider CI for final head and qualification; select exactly one new run; wait success.
+4. Save exact run/jobs/artifacts API bytes to workflow-api workspace.
+5. Download exact final candidate/evidence to artifact-download workspace.
+6. Invoke exact verifier on actual bytes; inspect role metrics/build counts.
+7. Read back final required contexts/reviews.
+8. Render pre-merge payload/comment in attestation-draft workspace; human posts new #392 comment; read back; create comment receipt.
+9. Recheck head/tree/status, dogfood identity, protected witness and repository workbench.
 
-**Focused verification commands**
+**Focused commands**
 
 ```bash
 test "$(git rev-parse HEAD)" = "$PRC_FINAL_HEAD"
+test "$PRC_COMPAT_HEAD" != "$PRC_FINAL_HEAD"
 test -z "$(git status --short)"
-gh workflow run provider-ci.yml --ref "$BRANCH" \
-  -f candidate_sha="$PRC_FINAL_HEAD" \
-  -f qualification=true
-uv run python scripts/provider_gate.py verify-downloaded-artifact \
-  --repository chemitaro/spec-dock \
-  --candidate-dir "$ISS392_EXTERNAL_ROOT/download/candidate" \
-  --evidence-dir "$ISS392_EXTERNAL_ROOT/download/evidence" \
-  --run-json "$ISS392_EXTERNAL_ROOT/api/run.json" \
-  --jobs-json "$ISS392_EXTERNAL_ROOT/api/jobs.json" \
-  --artifacts-json "$ISS392_EXTERNAL_ROOT/api/artifacts.json" \
-  --source-sha "$PRC_FINAL_HEAD" \
-  --source-tree "$PRC_FINAL_TREE" \
-  --workflow-run-id "$RUN_ID" \
-  --json
-uv run python scripts/provider_gate.py emit-attestation \
-  --kind pre-merge-attestation-v1 \
-  --input-json "$ISS392_EXTERNAL_ROOT/attestation/input.json" \
-  --output-json "$ISS392_EXTERNAL_ROOT/attestation/pre-merge-attestation.json" \
-  --output-comment "$ISS392_EXTERNAL_ROOT/attestation/pre-merge-comment.md" \
-  --json
+gh workflow run provider-ci.yml --ref "$BRANCH"   -f candidate_sha="$PRC_FINAL_HEAD" -f qualification=true
+uv run python scripts/provider_gate.py verify-downloaded-artifact   --repository chemitaro/spec-dock   --candidate-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/candidate"   --evidence-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/evidence"   --run-json "$ISS392_WS_WORKFLOW_API/run.json"   --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json"   --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json"   --source-sha "$PRC_FINAL_HEAD" --source-tree "$PRC_FINAL_TREE"   --workflow-run-id "$FINAL_RUN_ID" --json
+uv run python scripts/provider_gate.py emit-attestation   --kind pre-merge-attestation-v1   --input-json "$ISS392_WS_ATTESTATION_DRAFT/input.json"   --output-json "$ISS392_WS_ATTESTATION_DRAFT/payload.json"   --output-comment "$ISS392_WS_ATTESTATION_DRAFT/comment.md" --json
 test "$(git rev-parse HEAD)" = "$PRC_FINAL_HEAD"
 test -z "$(git status --short)"
 ```
 
-**Expected observable result**
+**Expected/evidence**
 
-Unique final-head run; one producer, consumers zero; exact candidate/nine-file evidence bytes; stable 20-run qualification; final new-only required context; valid append-only pre-merge comment; no tracked/workbench/dogfood change.
+One final-head build invocation; all consumers zero; exact candidate/nine-file evidence/API bytes; stable 20-run qualification; final new-only context; append-only pre-merge #392 comment and external receipt; no tracked/workbench/dogfood change.
 
-**Evidence to record**
+**Stop/cleanup/invariant**
 
-External only: final head/tree, run/jobs/artifacts JSON hashes, downloaded verifier output, role/evidence hashes, metrics, context snapshots, comment ID/body hash/readback, clean status/protection digest.
+Any tracked edit/local build/update/sync, wrong run/head/context, byte/schema/metric mismatch or comment failure invalidates S80. Return S70 and repeat final sequence. Handle-clean only after immutable evidence retained. S80 is only PR-C main gate.
 
-**Stop conditions and escalation owner**
+**Trace**
 
-Any tracked edit, local build/update/sync, wrong run/head/context, byte/schema/metric mismatch, comment edit or protection drift invalidates S80. Return to S70 for tracked correction and repeat context/final evidence as required. Owner: CI/Product/human admin.
+I392-RQ-023–032; D-013–025.
 
-**Cleanup**
+## 4. Human merge and measured external closure
 
-External directories only through captured handles after immutable evidence identities are recorded. No repository cleanup target.
+1. Human merges `PRC_FINAL_HEAD`.
+2. Fetch `MERGE_COMMIT`; require `git rev-parse "$PRC_FINAL_HEAD^{tree}" == git rev-parse "$MERGE_COMMIT^{tree}"`.
+3. Run `python3 ./spec-dock/scripts/spec-dock issue finish`; verify actual local/state output.
+4. Run `python3 ./spec-dock/scripts/spec-dock close --id iss-00392`; read actual GitHub #392 closed state/timeline event.
+5. Create a new attestation-draft purpose workspace; render `post-merge-closure-v1` from measured facts; human posts to #392; read back and create external `comment-receipt-v1`.
+6. Re-evaluate all Epic acceptance.
+7. Run `python3 ./spec-dock/scripts/spec-dock close --id epic-00384`; read actual #384 close event.
+8. Create another independently-created attestation-draft workspace; render `epic-closure-v1`; human posts to #384; read back and create receipt.
+9. Tracked report/tree are never rewritten.
 
-**Merge-point invariant**
-
-Only PR-C main gate. Human may merge exact `PRC_FINAL_HEAD` after review; main receives final provider gate and evidence, no compatibility job/old machinery, complete S70 dogfood.
-
-**Trace IDs**
-
-I392-RQ-021–027; I392-D-013–023.
-
-## 4. Human merge and external closure
-
-Human merges `PRC_FINAL_HEAD`. Verify:
-
-```bash
-test "$(git rev-parse "$PRC_FINAL_HEAD^{tree}")" = \
-  "$(git rev-parse "$MERGE_COMMIT^{tree}")"
-```
-
-Render/post/readback `post-merge-closure-v1` on #392, then execute/record SpecDock issue finish and GitHub #392 close. After Epic acceptance, render/post/readback `epic-closure-v1` on #384. Tracked report is not edited. A comment edit/delete/hash mismatch or tree mismatch prevents Issue/Epic finish.
+No step creates payload fields for facts not yet observed. Post payload has no own comment ID; Epic payload may use already observed post comment ID/hash but has no own comment ID.
 
 ## 5. Definition of done
 
-S30/S60/S80 alone are main gates; all finite wire/register/stage/workspace/protection/gate/evidence/context contracts are satisfied; dogfood is complete at S60/S70; final evidence belongs to `PRC_FINAL_HEAD`; human merge remains external; `owner_decisions_required=[]`.
+All I392-RQ-001–032 are verified. Only S30/S60/S80 are main gates. #387 report is mapping-only, terminal cleanup releases old tuples, each temporary purpose has a distinct handle, compatibility/final evidence uses distinct heads and actual bytes, closure follows measured order, and `owner_decisions_required=[]`.

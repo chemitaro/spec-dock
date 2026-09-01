@@ -9,7 +9,7 @@ ID: "20260831t152024z-adr"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "3c24bae76e86651f958bde7c716c5453fff73e56"
+  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
@@ -18,74 +18,79 @@ Normative artifacts are `artifacts/provider-lifecycle-wire-contract.md` and `art
 
 ## Context
 
-Epic #384 changes provider ownership, migration, uninstall, dogfood, public wire, failure disposition, operator guidance and CI evidence. Publishing any bridge generation or splitting decisions into research/test-only Issues would create multiple writers and unverifiable merge states. Strict review additionally established that Issue #387's semantic candidate precedes its report-only tail, lifecycle staging must survive process exit without scanning, retained Full Regression must not write repository workbench, protected-report exclusions must be exact, evidence schemas must be fixed now and required-context cutover needs an explicit compatibility and final head.
+Epic #384 changes provider ownership, migration, uninstall, dogfood, public wire, failure disposition, operator guidance and CI evidence. Multiple implementation Issues, an intermediate public generation or ambiguous recovery would create multiple writers and unsafe merge states. Strict review additionally established six corrections: #387 report identity must be removed, ephemeral workspaces must be independent per purpose, terminal stage cleanup must precede later dispatch, compatibility/final identities must stay external and distinct, compatibility verification must consume the same actual bytes/API inputs as S80, and closure must use only measured events in order.
 
 ## Decisions
 
-### ADR-D1 — Single Issue and dependency
+### ADR-D1 — One Issue and dependency
 
-GitHub #392 remains the sole implementation-and-verification Issue and starts only after #387 merge/admission. #387 canonical documents are not modified. Human alone merges and changes required contexts.
+GitHub #392 is the sole implementation-and-verification Issue and starts only after #387 merge/admission. #387 canonical documents are not changed. Human alone merges and changes required contexts.
 
 ### ADR-D2 — Three safe main gates
 
-S30, S60 and S80 are the only main gates. S40/S50/S70 are non-main. Main sees old public product after PR-A, complete `0.2.4` with coherent retained current gates after PR-B, and final build-once gate after PR-C. No bridge, runtime toggle, dual writer or automatic old fallback.
+S30, S60 and S80 are the only main gates. S40/S50/S70 are non-main. Main sees old product after PR-A, complete `0.2.4` plus coherent current gates after PR-B, and final build-once gate after PR-C. No bridge, toggle, dual writer or automatic old fallback.
 
 ### ADR-D3 — Fixed lifecycle, immutable policy and closed wire
 
-Four roots, two slots, one record, bounded fresh bootstrap/seeds. Record includes immutable seed policy and exact resume tuple. The wire artifact's 36 codes, 123 context rows, phase/action/path rules and valid goldens are the only public values.
+Four roots, two slots, one record, bounded fresh bootstrap/seeds. Record includes immutable seed policy and exact resume tuple. The wire artifact's 37 codes, 123 context rows, phases/actions/order/retries and goldens are the only public values.
 
-### ADR-D4 — Persistent process-independent staging
+### ADR-D4 — Process-independent stage with mandatory terminal cleanup
 
-Lifecycle staging lives in same-filesystem sibling namespace `.spec-dock-provider-stages-v1`, bound by namespace/repository sentinels and one `ACTIVE.json`. Tuple-key lookup is deterministic; no repository temp, temp-root scan or arbitrary-stage adoption. ACTIVE state covers allocation, ready stage, cleanup and bootstrap-before-record recovery.
+Same-filesystem `.spec-dock-provider-stages-v1`, exact sentinels, repository/tuple keys and one ACTIVE index survive process exit. ACTIVE includes private result family. Before any normal dispatch, durable terminal cleanup is completed or returns `terminal-cleanup-failed` with the old operation retry. Stage/ACTIVE already-absent crash states are explicitly recovered. Successful cleanup releases the repository for any next intent.
 
-### ADR-D5 — Ephemeral evidence outside repository
+### ADR-D5 — One owner-bound workspace per purpose
 
-Evidence/build/download work uses owner-bound OS-temp directories. Repository `spec-dock/.workbench/**` is fully protected and never output/cleanup authority. S00/S30/S60 and retained main-push workflow pass explicit external `--artifact-dir`.
+Each admission/build/witness/full-regression/tripwire/fresh-consumer/API/download/attestation purpose receives its own `mkdtemp` directory and non-serializable cleanup handle. No aggregate root or path-only cleanup authority exists. Repository `.workbench` is protected input, never output or cleanup target.
 
 ### ADR-D6 — Exact protected exclusions
 
-Only #392 `report.md` and `.meta.json` are excluded from main protected equality. A separate external ledger limits report to pre-merge evidence content and meta to `updated_at`. All other initiatives/artifacts remain byte/type/mode/link-target protected.
+Only #392 `report.md` and `.meta.json` are excluded from main equality and are constrained by a separate external exclusion ledger. All other initiatives/artifacts/workbench data remain protected.
 
-### ADR-D7 — `ISS387-THREE-WAY-V2`
+### ADR-D7 — Mapping-only #387 report
 
-#387 report contains semantic candidate identity and mappings but no PR number or future merge facts. Candidate must be an ancestor of the final PR head. The only tail is report plus optional meta updated-at. S00 discovers exactly one merged PR from GitHub candidate/timeline evidence, verifies tail and final-head/merge tree equality, then applies the register. No fixed post-row count or implementer choice.
+#387 report carries only schema/rule and twelve mappings; no repository, PR, candidate/head/tree or merge fact. S00 discovers one merged PR from Issue timeline/cross-reference plus PR-head commit-association evidence, verifies head-tree/merge-tree equality and reads report/ledger/collection from the merge tree. No extra #387 commit boundary or report-to-merge identity/tail rule is required.
 
 ### ADR-D8 — Exact legacy, uninstall and dogfood
 
-Only clean `0.2.3` migrates. Uninstall is tooling-only and durable. S40/S50 preserve checked-in legacy dogfood; S60 commits one complete migration; S70 commits one complete update; S80 is read-only. Partial projection is never mergeable.
+Only clean `0.2.3` migrates. Uninstall is tooling-only and durable. S40/S50 preserve legacy dogfood; S60 commits one complete migration; S70 one complete update; S80 is read-only. Partial projection is never mergeable.
 
 ### ADR-D9 — Current gate continuity
 
-S60 repairs current Provider CI references and failure consumers, leaves final gate redesign to S70, and minimally changes retained Full Regression output to external runner temp. Current PR and main-push gates are independently GREEN.
+S60 repairs current Provider CI references and failure consumers and minimally sends retained Full Regression output to an independent runner-temp workspace. Current PR and main-push gates remain independently GREEN. Final redesign remains S70.
 
-### ADR-D10 — One frozen-head producer and exact byte graph
+### ADR-D10 — One producer and same verifier
 
-Only Linux `provider-build-artifacts` packages final head once. Three consumers build zero. Attestation downloads candidate, four receipts and four role evidence byte files, verifies exact schemas/metadata/hashes and uploads one nine-file evidence artifact. Filename-only assertions do not count.
+Only Linux build job packages each workflow head once. Three consumers build zero. Provider attestation verifies actual candidate/receipt/role/API bytes and uploads one nine-file evidence artifact. Compatibility `provider-tests` needs producer plus attestation, downloads candidate/evidence/API bytes and invokes the exact S80 verifier interface; no package build and no canary dependency.
 
-### ADR-D11 — Stable environment and fixed attestation schemas
+### ADR-D11 — Distinct external two-head identities
 
-Qualification binds `specdock-linux-qualification-v1` and the full pinned fingerprint. Candidate, receipt, role, aggregate, pre-merge, post-merge and Epic closure schemas have exact ordered keys/types/units/canonical bytes and parent-child hashes. `EVIDENCE-FIXTURE-V1` fixes canonical fixture bytes, sizes and SHA-256 values. `emit-attestation` and append-only GitHub comment verification are fixed in Issue Design.
+Actual compatibility/final SHA/tree/run identities never appear in tracked #392 report. Compatibility and final heads are distinct. Final head removes only the compatibility job and reruns all authoritative evidence. Serializer fixtures use distinct identity constants and recomputed child/hash chains.
 
-### ADR-D12 — Two-head required-context cutover
+### ADR-D12 — Stable environment and no-gap context cutover
 
-`PRC_COMPAT_HEAD` emits both old/new contexts. New is added as required while old remains. A canary makes only new RED and proves blocking. Old is then removed from required settings. `PRC_FINAL_HEAD` removes only compatibility job and reruns all authoritative evidence. Only the final head can merge.
+Qualification binds `specdock-linux-qualification-v1`. Human requires new while old remains, proves new RED/old GREEN blocking, restores GREEN, removes old, then creates/finally validates the distinct final head.
 
-### ADR-D13 — Documentation/evidence closure
+### ADR-D13 — Measured append-only closure
 
-S60 updates lifecycle docs and AGENTS lifecycle text; S70 updates final test policy. Tracked #392 report stops before final head evidence. Append-only external attestations hold final/pre/post closure facts. Merge equality is tree equality.
+Pre-merge comment is posted to #392 before merge. After merge, tree equality is measured, then SpecDock finish and #392 close are performed/read back; only then is post-merge payload posted to #392. Epic acceptance is then measured, #384 is closed/read back, and Epic payload is posted to #384. Payloads omit their own future comment identity; external `comment-receipt-v1` objects bind each observed comment.
+
+### ADR-D14 — Documentation and human gates
+
+S60 updates lifecycle docs and AGENTS lifecycle text; S70 updates final test policy. Tracked report ends before head freeze. Human-only merge/settings remain.
 
 ## Rejected alternatives
 
 - Additional research, decision, test-only or verification-only Issues.
-- Report PR-number input or candidate-equals-final-head requirement.
-- Arbitrary external temp scan, random orphan adoption or repository `.workbench` staging.
-- Retained Full Regression default artifact path.
-- Broad initiative/artifact exclusion.
-- Evidence schemas deferred to implementation or evidence without actual role bytes.
-- Removing old required context before new required RED proof.
-- Merging compatibility head without final-head evidence rerun.
+- Candidate/head/tree or PR identity in #387 report.
+- Extra #387 commit boundary or report-to-merge identity/tail rule.
+- Aggregate external temp root or cleanup from a serializable path.
+- Old terminal tuple permanently blocking a later operation.
+- Null retry for a cleanup warning or terminal cleanup failure.
+- Compatibility job that verifies evidence names but not candidate/evidence/API bytes.
+- Same fixture identity for compatibility and final heads.
+- Post-merge payload created before finish/close facts exist.
 - S40/S50/S70 merge, partial dogfood, multiple packagers, local final build, skip/ledger approval or old-engine fallback.
 
 ## Consequences
 
-Implementation has more explicit filesystem/evidence code and a temporary PR-C compatibility head, but each main point is independently releasable and every recovery, wire, evidence and gate transition is reproducible. `owner_decisions_required=[]`.
+Implementation has explicit recovery/evidence code and a temporary compatibility head, but each main point is releasable and every wire, workspace, #387 admission, artifact byte, context transition and closure event is reproducible. `owner_decisions_required=[]`.
