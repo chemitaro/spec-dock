@@ -1,116 +1,138 @@
 ---
-種別: ADR（Architecture Decision Record）
+種別: ADR
 ID: "20260831t152024z-adr"
-タイトル: "Single Implementation Unit And Provider Hard Cutover Policy"
+タイトル: "Single Implementation Unit and Provider Hard Cutover Policy"
 状態: "accepted"
-作成者: "iwasawayuuta"
+決定日: "2026-08-31"
 最終更新: "2026-09-01"
-親: ["epic-00384"]
-authority: "accepted"
-accepted_authority: "accepted ADR"
-accepted_at: "2026-09-01"
-accepted_by: "iwasawayuuta"
-mirror_eligible: true
-derived_from: ["20260831t005139z-adr", "20260830t234548z-research", "20260830t235429z-disc"]
-reflected_to: ["epic-00384/requirement.md", "epic-00384/design.md", "epic-00384/plan.md", "iss-00392/requirement.md", "iss-00392/design.md", "iss-00392/plan.md"]
+対象: ["epic-00384", "iss-00392"]
+正本検証:
+  repository: "chemitaro/spec-dock"
+  branch: "codex/epic-00384-provider-test-strategy-planning"
+  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
 ---
 
-# 20260831t152024z-adr Single Implementation Unit And Provider Hard Cutover Policy
+# ADR: Single Implementation Unit and Provider Hard Cutover Policy
 
 ## Context
 
-Epic #384の旧計画は、調査、Product判断、lifecycle bridge、writer cutover、CI移行、最終検証を、decision-only Issue 3件とC4〜C11へ分割していた。しかし本Productでは、Issueを「実装とその検証を一体で完了・受入する一つの実装ユニット」と定義する。実装を伴わない調査・分析・意思決定、tests-only、verification-onlyの作業はIssueとして成立しない。
+Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。旧案ではdecision、test restructuring、implementation、verificationを複数Issueへ横分割し、uninstall-first bridgeやintermediate generationを挟む可能性があった。
 
-現行実装にはuninstall bridgeとinstall/update writerを独立してreleaseできる自然な境界がない。分割を成立させるためにP0〜P3、split/combined、cross-Issue fixture、rolling inventory receipt、required-check bindingなどを導入すると、Issue分割のためだけの中間Product contractが増える。
+しかし、この分割は次の問題を生む。
 
-2026-09-01時点のexact baselineは次である。
+- Product判断がimplementation Issueへ持ち越される。
+- old/new writerとrecord formatが並存し、cross-generation recoveryを増やす。
+- tests-only / verification-only Issueが、実装を受け入れられない独立unitになる。
+- bridge generationをmainへmergeするたび、consumer migration matrixとdowngrade riskが増える。
+- provider CIがold contractとnew contractを重複実行し、failure approvalを温存する。
 
-- base SHA: `d8f9d02f2400cbc084e5ee92a5fbba339f93f015`
-- package / recognized legacy workspace: `0.2.3`
-- full collection: 2,710 nodes
-- sorted node-set SHA-256: `f607b007d167231ed27f2a17391b0d8b3aa452d67ce6532565463e193486a04c`
-- ordinary gate: `1574 passed, 1136 skipped in 57.02s`
-- ordinary gate resource reference: wall 58.42s、user 24.41s、system 31.29s、CPU/wall約0.953
-- approved-failure ledger: 27 entries、26 active、1 resolved
-- active 26 nodes focused rerun: 26 failed in 14.69s
-- GitHub ruleset API: 0 rulesets。classic branch protectionはcurrent tokenで403のためeffective required contextsは実装PR上で観測する。
+Current exact revision `d18ca60b2a6ff11571ee366f71c4528dcd668d99`では、legacy per-file engine、purge、journal、failure ledger、timing sharderが実在する。Issue #387は別のCurrent-surface cleanupであり、これらを変更しない。
 
 ## Decision
 
-### 1. Issue境界
+### ADR-D1 — One implementation-and-verification Issue
 
-- Epic #384の実装Issueは`iss-00392 Provider Lifecycle And Regression Gate Hard Cutover`の1件だけとする。
-- 調査、Product判断、baseline inventoryはIssue作成前のEpic authoringで完了する。
-- 実装、successor tests、旧実装撤去、failure terminalization、CI切替、性能・安定性検証を`iss-00392`が一体で所有する。
-- `iss-00388`〜`iss-00390`は実装前にEpicへ統合された誤ったIssue境界としてcloseする。実装済み・完了済みとは扱わない。
-- C4〜C11、`DEC-*`、`FIX-*`は作らない。必要な作業は`iss-00392`内のmilestone / stepとする。
+Epic #384の唯一のimplementation-and-verification Issueを#392とする。investigation、Product decision、tests、CI transition、final verificationを別Issueへ分割しない。internal step、commit、複数PRは許可するが、全て#392の内部実行単位とする。
 
-### 2. Lifecycle hard cutover
+### ADR-D2 — Combined hard cutover
 
-- uninstall-first bridgeや中間package generationを公開せず、legacy lifecycleからfinal simplified lifecycleへcombined hard cutoverする。
-- provider-owned tooling payloadは`spec-dock/{docs,templates,system,scripts}`の4 fixed rootsと、`.agents/skills/spec-dock`、`.agents/skills/spec-dock-grill-with-docs`の2 fixed slotsに限定する。固定mutation setは4 roots、2 slots、fixed installation record、fresh init時だけの2 consumer seed作成で閉じる。
-- Initiatives、nested Artifacts、`.workbench`、generated projections、unknown non-target paths、unrelated skillsは探索・正規化・削除しない。
-- mutation targetのownershipが不明なら最初のtarget mutation前にpreserve-and-blockする。unknown non-targetはpreserve-and-ignoreする。
-- updateはcandidate全体をstage / validateし、`docs -> templates -> system -> scripts -> skill slots`の順で置換し、ready recordを最後に書く。
-- uninstallは4 rootsとvalid owned 2 slotsを除去した後もfixed installation recordを削除せず、`state=tooling-absent-preserved-data`へatomic replaceする。このdurable discriminatorにより、never-installed `absent`とuninstalled stateを区別する。
-- automatic rollback、arbitrary checkpoint、cross-intent recoveryをpublic contractにしない。同じoperation・同じcandidateのexternal rerunだけを許可する。
+Final public generationへ一度に切り替える。次を採用しない。
 
-### 3. Legacy compatibility
+- uninstall-first bridge
+- intermediate package generation
+- runtime toggle
+- old/new dual writer
+- automatic old engine fallback
 
-- 自動認識するlegacy cohortはexact clean `0.2.3` workspaceだけとする。
-- 実root binding、exact version / runtime digest、active legacy recovery不存在、2 skill slotsがabsentまたはexact markerless treeであることをmutation前に確認する。
-- migration成功後はnew installation recordとslot markersをauthorityとし、legacy recognizerを再度参照しない。入力集合を将来拡張しない。
-- active legacy journal / retry / purge recoveryは推測変換せずwrite 0でblockし、exact `0.2.3` packageまたはsource artifactでclean stateへ戻してから再実行する。
-- final formatに対する旧`0.2.3`の`init --force`、`update`、tooling uninstall、`--remove-specs`はmutation-zeroでなければmergeしない。baseline `0.2.3` subprocessをtarget-scoped startup-injected composite tripwire付きで実行し、Python filesystem audit eventsに加え、exact 0.2.3が`ctypes.CDLL`から直接呼ぶLinux `renameat2`とmacOS `renameatx_np`をnative call前に遮断する。platformごとのnative positive controlをcall前に捕捉しtarget tree不変を証明した上で、composite tripwire event 0を主証拠、tree digest不変を補助的な最終状態証拠とする。失敗時はbridgeを追加せず、final marker / formatを旧engineがblockできる形へ修正する。
+Dormant successor codeを先にmergeしてもよいが、public routeはoldまたはfinalのどちらかであり、中間Product contractを公開しない。
 
-### 4. Consumer-owned seeds
+### ADR-D3 — Fixed lifecycle contract
 
-- `spec-dock/.gitignore`とshipped `.github/workflows/ci.yml`はfresh init時だけ作るconsumer-owned seedとする。
-- existing regular file、custom file、symlink、unexpected typeをfollow / overwrite / deleteしない。fresh initではwarningを許可し、provider tooling installは継続する。
-- update、reinstall、tooling uninstallは両seedを変更しない。
-- 両seedをinstallation completeness、candidate digest、legacy ownership anchor、uninstall allowlistから除外する。
+Persistent mutation authorityは4 roots、2 slots、`spec-dock/spec-dock.version`に限定する。fresh `init`だけ2 consumer seedをabsent時に作成できる。uninstall後はrecordを`tooling-absent-preserved-data`として保持する。purgeを削除し、`--remove-specs`をmutation-zero compatibility trapとする。
 
-### 5. Public CLI / purge
+### ADR-D4 — Exact legacy boundary
 
-- `init --force`は独自の破壊authorityを持たず、stateに応じた`install_tooling` / `update_tooling` compatibility aliasとする。
-- uninstallはtooling-onlyとし、`--apply`を唯一のconfirmationにする。defaultはdry-runである。
-- spec-history purge capabilityを廃止し、独立purge commandも作らない。
-- `--keep-specs`はdefault tooling-only uninstallと同義のcompatibility aliasとして残す。
-- `--remove-specs`はpermanent non-mutating compatibility trapとして残し、全modeでmutation 0、error code `spec-history-purge-removed`、exit 2を返す。
-- tooling uninstall後もfixed recordの`state=tooling-absent-preserved-data`を保持し、never-installed `absent`と区別する。このrecordからuser dataとconsumer seedsを保持したままreinstallし、fresh-init-only seedを再作成しない。
+exact clean `0.2.3`だけをsingle-version digest fixtureで認識する。active recovery、unsupported legacy、modified/foreign markerless slotは推測変換しない。final versionは`0.2.4`とし、legacy plain-text recordをstrict JSON recordへ置換する。
 
-### 6. Artifact / platform / CI
+### ADR-D5 — Build-once provider gate
 
-- authoritative PR candidateごとに一つのpackaging command invocationでwheelとsdistを生成し、source SHAと各SHA-256を固定する。
-- Linux canonical laneとmacOS delta laneは同じwheel bytesを使う。
-- Linuxはsingle pytest process / worker 1でOS非依存contract、Linux boundary、wheel lifecycle、sdist minimal smokeを所有する。
-- macOSはexecutable mode、symlink/no-follow、rename/replacement、installed entry pointなどのplatform deltaだけを所有し、pure/domain/common CLIを再実行しない。
-- main pushの4-shard Full Regressionを廃止する。release publication workflowは本Epicで新設しない。
-- required contextは既存名の再利用を第一選択とする。変更が不可避な場合だけ、同じIssue / PR内でold+new required、intentional RED canary、new-only requiredへ遷移し、unrelated contextsとhuman review gateを保持する。
+Wheelとsdistをone packaging invocationでbuildし、Linux canonicalとmacOS deltaへ同じwheelを配布する。Linux canonicalはsingle pytest process、worker 1。main-push 4-shard Full Regression、failure ledger、timing weights、sharder、policy skipをfinal stateから除去する。human PR merge gateは維持する。
 
-## Rejected alternatives
+## Alternatives considered
 
-- decision-only Issues、inventory Issue、verification-only Issueを作る。
-- P0 / P1 / P2 / P3やsplit/combined pathをProduct contractにする。
-- `InventoryHeadV1`、`RemovalReceiptDeltaV1`、`Provider Receipt Binding`、append-only receipt chainを構築する。
-- independent purgeと`PurgeOperationRecordV1`を維持する。
-- OS非依存testをLinuxとmacOSで重複実行する。
-- shard / xdist / worker追加やmachine大型化だけで実行量を隠す。
+### A. Decision/implementation/test/verificationを別Issueへ分割する
+
+**Rejected.** 各Issueが単独でend-to-end acceptanceを持たず、未決Product判断とcross-Issue dependencyを増やす。#388〜#390はこの構造を持つためsuperseded historical nodeとして維持し、reopenしない。
+
+### B. Uninstall-first bridge generationを先にreleaseする
+
+**Rejected.** consumerへ一時的なmigration順序を強制し、bridgeからfinalへの追加migrationとsupport期間を作る。tooling uninstallはfinal package自身がexact legacy stateに対して直接提供する。
+
+### C. Old/new runtime toggleを置く
+
+**Rejected.** two writers、two records、two recovery semanticsを同一binaryに残し、hard cutoverの複雑性削減を失う。rollbackはhuman-reviewed Git revertであり、runtime toggleではない。
+
+### D. Historical per-file engineを縮小して再利用する
+
+**Rejected.** arbitrary historical catalog、per-action journal、purge authority、per-file identityがfixed-root Product contractと不整合である。single exact legacy adapterだけを新設する。
+
+### E. Full Regressionをshardのまま高速化する
+
+**Rejected.** duplicate execution、timing weights、approved failure、policy skipを構造的に残す。single-process budgetを満たすようtest portfolio自体を所有契約へ再編する。
+
+### F. Uninstall時にrecordを削除する
+
+**Rejected.** never-installed absentとtooling-uninstalled workspaceを区別できず、reinstallがfresh-only seedを再作成し得る。
 
 ## Consequences
 
-- `iss-00392`は大きいが、一つの観測可能なcutover outcomeと一つの受入境界を持つ。内部作業はmilestone、step、必要に応じた複数PRで管理する。
-- 各PRはmerge直後にreleasableでなければならない。successor proofより先に旧contractやtestsを削除しない。
-- exact `0.2.3` migrationとold-package mutation-zero、5-run budget、seeded fault pack、rolling 20は実装後にしか得られないため、`iss-00392`のclose条件とする。
-- classic branch protection、effective required context、merge queueはcurrent tokenで観測できない動的外部事実であり、Product判断ではない。CI transition直前にread-onlyで取得し、未確認なら外部設定を変更しない。
-- implementation failureのblast radiusは大きいため、Planning Levelは`critical`とする。
+### Positive
 
-## References
+- mutation authorityがcode-fixed pathsへ限定される。
+- recoveryはsame-operation / same-candidate rerunだけになる。
+- old package downgradeはrecord parser boundaryでpre-mutation blockできる。
+- user history purgeのdestructive surfaceが消える。
+- test failureをledgerで成功扱いする仕組みが消える。
+- one artifact / one owner laneのtraceが明確になる。
+- Issue #392だけでacceptanceとclosureを判断できる。
 
-- `20260831t005139z-adr-disposable-provider-roots-and-fixed-skill-slots.md`
-- `20260830t234548z-research-provider-test-suite-root-cause-analysis-and-redesign.md`
-- `20260830t235429z-disc-provider-test-strategy-simplification-decision-analysis.md`
-- `requirement.md`
-- `design.md`
-- `plan.md`
-- `issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/`
+### Negative / cost
+
+- #392は大きなcross-cutting changeであり、critical planning、fault injection、built-artifact proofを要する。
+- Linux/macOS native rename primitiveへ明示的に依存する。
+- exact `0.2.3`以外のlegacy workspaceはmanual recoveryが必要になる。
+- combined cutover後はold engineへautomatic rollbackできない。
+- required-context transitionにはhuman repository admin操作が必要である。
+
+### Risk controls
+
+- #387 post-merge deterministic admission
+- successor-first direct proof
+- stage-before-mutate
+- ready-last record
+- root/slot boundary fault injection
+- old-package startup composite tripwire
+- same-wheel Linux/macOS binding
+- intentional RED required-context canary
+- human-only merge
+- forward-fix / fail-closed policy
+
+## Supersession
+
+- GitHub #388〜#390は実装前にIssue boundaryとしてsupersededされたhistorical nodeである。
+- それらのdecision contentは本ADR、Epic R/D/P、Issue #392 R/D/Pへ統合する。
+- close状態はimplementation completedを意味しない。
+- reopen、reassignment、new work acceptanceに使用しない。
+
+## Consistency contract
+
+本ADRのdecisionは次と一致しなければならない。
+
+- Epic `requirement.md`: E384-RQ-001〜016
+- Epic `design.md`: E384-D-001〜019
+- Epic `plan.md`: E384-P-001〜007
+- Issue #392 `requirement.md`: I392-RQ-001〜020
+- Issue #392 `design.md`: I392-D-001〜018
+- Issue #392 `plan.md`: I392-S00〜I392-S80
+
+矛盾が生じた場合はimplementationを停止し、canonical R/D/Pを先に整合させる。implementation agentが別案を選択してはならない。
