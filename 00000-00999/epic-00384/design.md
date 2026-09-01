@@ -10,7 +10,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
+  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
@@ -45,7 +45,7 @@ Four roots, two slots, record, fresh-only seeds and shared-container create auth
 
 Record keys are exactly `schema_version,state,operation,version,candidate_digest,seed_policy,skill_slots`. Resume identity is exact operation/candidate/policy. Persistent `ACTIVE.json` additionally stores private `result_family=install|legacy-migration|update|uninstall`, allowing a later process to render the correct cleanup retry without changing the resume tuple.
 
-Normal dispatch is preceded by `recover_terminal_cleanup()`. It validates exact stage ownership and final record, promotes `ACTIVE.ready` to `terminal-cleanup`, removes registered stage entries, tolerates an already-absent stage, content-bound removes ACTIVE and fsyncs its parent. ACTIVE already absent causes a parent fsync then dispatch. Cleanup failure returns closed code `terminal-cleanup-failed`; cleanup success permits the caller's new intent even when it differs from the old tuple.
+Normal dispatch is preceded by `recover_terminal_cleanup()`. It validates exact stage ownership and final record, promotes `ACTIVE.ready` to `terminal-cleanup`, removes registered stage entries, tolerates an already-absent stage, content-bound removes ACTIVE and fsyncs its parent. ACTIVE already absent causes a parent fsync then dispatch. Cleanup failure returns closed code `terminal-cleanup-failed` with actual invocation echo; cleanup success from present ACTIVE returns cleanup-only `terminal-cleanup-completed`. Neither result executes the new intent. ACTIVE-absent fsync recovery alone continues normal dispatch.
 
 ### E384-D-003 — Publication
 
@@ -102,7 +102,7 @@ ISS392_WS_ARTIFACT_DOWNLOAD
 ISS392_WS_ATTESTATION_DRAFT
 ```
 
-There is no an aggregate external-root variable. An orchestrator may hold several handles simultaneously, but no workspace is a child of another by contract. Every workspace has its own mode-0700 root, exact exclusive mode-0600 `OWNER.json`, registered children and cleanup authority.
+There is no aggregate external-root variable. An orchestrator may hold several handles simultaneously, but no workspace is a child of another. Each live owner reserves top-level child trees before launch, children write only beneath reserved descriptors, and the owner seals the complete descendant inventory. In Actions the background owner retains FDs through upload confirmation; unknown entries or premature cleanup fail closed.
 
 ### E384-D-007 — Protected witness and exclusions
 
@@ -124,7 +124,7 @@ S00 obtains Issue #387 timeline/cross-reference PR numbers, fetches each PR, and
 
 S40 changes provider lifecycle code/docs and root README lifecycle sections but preserves checked-in dogfood. S50 proves migration on independent external consumers. S60 applies the final service once to exact legacy dogfood, commits four roots/two slots/seven-key record/two markers, and proves candidate parity/protection. It updates AGENTS lifecycle/uninstall sections, current Provider CI test references and retained Full Regression workflow.
 
-The retained workflow creates an independent `full-regression-s60` workspace below `${{ runner.temp }}`, retains the cleanup handle for the job, passes its path through `--artifact-dir`, uploads from that path and performs handle-bound cleanup after upload. Name, triggers, concurrency, job ID and policy stay otherwise current.
+The retained workflow creates an independent `full-regression-s60` workspace below `${{ runner.temp }}` with a background owner, reserves/seals the output tree, passes it through `--artifact-dir`, keeps owner FDs alive through upload, and cleans only after actual upload confirmation. Name, triggers, concurrency, job ID and policy stay otherwise current.
 
 ## 7. Final CI/evidence architecture
 
@@ -166,9 +166,9 @@ Tracked #392 report records method and implementation summaries but no actual co
 pre-merge #392 comment verified
 -> human merge
 -> final-head-tree == merge-tree
--> spec-dock issue finish measured
--> spec-dock close iss-00392
--> #392 close event read
+-> spec-dock issue finish starts
+-> issue finish closes #392, clears active and post-syncs
+-> returned close snapshot + #392 close event read
 -> post-merge payload/comment/receipt on #392
 -> Epic acceptance re-evaluated
 -> spec-dock close epic-00384

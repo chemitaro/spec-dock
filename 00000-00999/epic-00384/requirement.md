@@ -9,7 +9,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
+  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
@@ -22,11 +22,11 @@ SpecDock replaces the historical per-file provider lifecycle and sharded failure
 
 - Durable target authority is exactly four roots, two fixed skill slots and `spec-dock/spec-dock.version`; fresh seed/container creation is separately bounded.
 - The seven-key record carries immutable `seed_policy`; lifecycle resume is exact `(operation,candidate_digest,seed_policy)`.
-- Process-independent lifecycle staging uses one deterministic same-filesystem namespace and one exact `ACTIVE.json`; terminal cleanup is completed before dispatching any later operation.
-- Every evidence/build/download workspace is an independently created owner-bound OS temporary directory for one exact purpose. No aggregate external root and no repository `.workbench` output exist.
+- Process-independent lifecycle staging uses one deterministic same-filesystem namespace and one exact `ACTIVE.json`; a present terminal cleanup returns one cleanup-only success or exact failure before later dispatch, with actual invocation echo fixed for init, update and every uninstall dry/apply form.
+- Every evidence/build/download workspace is an independently created owner-bound OS temporary directory for one exact purpose. A live FD-backed owner reserves child trees, seals child output and survives through artifact upload before cleanup; paths and nonces are not cleanup authority.
 - Exact clean `0.2.3` alone migrates to `0.2.4`. S40/S50 preserve checked-in legacy dogfood, S60 performs one complete migration, S70 one complete update, and S80 is tracked-read-only.
 - Uninstall is tooling-only, dry-run by default, retains `tooling-absent-preserved-data`, and treats `--remove-specs` as mutation-zero exit 2.
-- The public wire is closed at 37 codes and 123 relation rows, including terminal-cleanup recovery, with four valid record goldens and sixteen public JSON review goldens.
+- The public wire is closed at 38 codes and 136 relation rows, including terminal-cleanup recovery, with four valid record goldens and twenty-nine public JSON review goldens.
 - Issue #387 remains a blocking dependency. Its tracked report contains only the twelve remove/retain/split mappings. S00 independently discovers exactly one merged PR and applies `ISS387-THREE-WAY-V2` to merge-tree evidence.
 - The final provider evidence graph is byte-verifiable, self-contained and produced from one Linux packaging job. The compatibility context performs the same downloaded-byte verification as S80.
 - Required-context cutover uses distinct compatibility/final heads and reruns authoritative evidence after removal of the compatibility job.
@@ -35,7 +35,7 @@ SpecDock replaces the historical per-file provider lifecycle and sharded failure
 
 ## 2. Verified baseline
 
-Repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `f96d031ea86d3757374f3de14d588f1ba09a0864`. At that revision the current root `AGENTS.md`, provider workflows, Full Regression verifier and exact legacy dogfood still represent the transitional `0.2.3` system. Issue #387 is being implemented separately and its canonical R/D/P must not be changed by this Epic.
+Repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `95d7562ca1762e0b2a717912484eba5a5c2377f1`. At that revision the current root `AGENTS.md`, provider workflows, Full Regression verifier and exact legacy dogfood still represent the transitional `0.2.3` system. Issue #387 is being implemented separately and its canonical R/D/P must not be changed by this Epic.
 
 The repository evidence SHA is authoring provenance. Adopted bytes are later bound by `SPEC_FREEZE_COMMIT`; the implementation base must contain that commit and the independently verified #387 merge.
 
@@ -66,11 +66,11 @@ The exact purposes are `admission`, `baseline-build`, `protected-witness`, `full
 
 ### E384-RQ-003 — Persistent stage and terminal cleanup
 
-Lifecycle candidate/tombstone staging is process-independent and uses the deterministic same-filesystem namespace. `ACTIVE.json` binds repository identity, operation, candidate digest, seed policy, tuple key and private result family. On every invocation, after repository lock/binding and before normal dispatch, any durable terminal stage is cleaned. Stage present, stage already absent, ACTIVE present/absent and crash after ACTIVE unlink are all deterministic. Successful cleanup permits any new intent; cleanup failure returns exact `terminal-cleanup-failed` with the old result-family retry and cannot permanently block the repository.
+Lifecycle candidate/tombstone staging is process-independent and uses the deterministic same-filesystem namespace. `ACTIVE.json` binds repository identity, operation, candidate digest, seed policy, tuple key and private result family. On every invocation, after repository lock/binding and before normal dispatch, any durable terminal stage is cleaned. Stage present, stage already absent, ACTIVE present/absent and crash after ACTIVE unlink are all deterministic. When ACTIVE is present, successful cleanup returns exact `terminal-cleanup-completed` and does not execute the actual requested intent; the caller re-runs it. Failure returns exact `terminal-cleanup-failed` with actual invocation echo and old-family retry. ACTIVE-absent recovery fsyncs and dispatches normally, so no old tuple permanently blocks the repository.
 
 ### E384-RQ-004 — Closed lifecycle wire
 
-Durable states are `incomplete`, `ready`, `tooling-absent-preserved-data`; observed-only states are `absent`, `legacy-0.2.3`, `blocked`. Record, result, action, text, phase, retry and exit relations are exactly `provider-lifecycle-wire-contract.md`: 37 codes, 123 rows, 23 phase values, 24 last-completed values, four record goldens and sixteen public JSON review goldens. Unknown values, catch-all tokens or alternative path ordering are invalid.
+Durable states are `incomplete`, `ready`, `tooling-absent-preserved-data`; observed-only states are `absent`, `legacy-0.2.3`, `blocked`. Record, result, action, text, phase, retry and exit relations are exactly `provider-lifecycle-wire-contract.md`: 38 codes, 136 rows, 23 phase values, 24 last-completed values, four record goldens and twenty-nine public JSON review goldens. Unknown values, catch-all tokens or alternative path ordering are invalid.
 
 ### E384-RQ-005 — Filesystem safety and fresh bootstrap
 
@@ -118,11 +118,11 @@ Tracked #392 report contains pre-freeze methodology and implementation facts onl
 
 ### E384-RQ-016 — Measured closure order
 
-After human merge: verify final-head-tree equals merge-tree; run `python3 ./spec-dock/scripts/spec-dock issue finish`; verify its result; run `python3 ./spec-dock/scripts/spec-dock close --id iss-00392`; read actual #392 close event; create/post/read back post-merge closure on #392; re-evaluate Epic acceptance; close `epic-00384`; read actual #384 close event; create/post/read back Epic closure on #384. Payloads do not include their own future comment identities. Separate external comment receipts bind posted comments.
+After human merge: verify final-head-tree equals merge-tree; run `python3 ./spec-dock/scripts/spec-dock issue finish`, whose current implementation closes #392 before active clear/post-sync; bind its returned close snapshot to the immediate #392 timeline readback; create/post/read back post-merge closure on #392; re-evaluate Epic acceptance; close `epic-00384`; read actual #384 close event; create/post/read back Epic closure on #384. Payloads do not include their own future comment identities. Separate external comment receipts bind posted comments.
 
 ### E384-RQ-017 — Documentation, single Issue and human gates
 
-S60 converges lifecycle README/provider/dogfood docs and AGENTS lifecycle/uninstall text while retaining current test-policy guidance. S70 converges final test-policy/provider-gate guidance. GitHub #392 is the only implementation Issue; #387 remains the dependency and #388–#390 remain superseded. Human alone changes settings and merges.
+S60 converges lifecycle README/provider/dogfood docs and AGENTS lifecycle/uninstall text while retaining current test-policy guidance. S70 converges final test-policy/provider-gate guidance and creates both compatibility and final tracked heads; S80 is read-only rerun/readback/comment. GitHub #392 is the only implementation Issue; #387 remains the dependency and #388–#390 remain superseded. Human alone changes settings and merges.
 
 ## 5. Accepted merge points
 

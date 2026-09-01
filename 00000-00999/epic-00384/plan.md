@@ -10,7 +10,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
+  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
@@ -63,7 +63,7 @@ uv run python -m scripts.quality.verify_full_regression   --shards 4   --artifac
 
 ## 5. PR-A and PR-B
 
-- S10 implements strict model, 37 codes, 123 wire rows, valid four/sixteen goldens and table-driven rejection.
+- S10 implements strict model, 38 codes, 136 wire rows, valid four/twenty-nine goldens and table-driven rejection.
 - S20 implements descriptor-safe operations, process-independent ACTIVE/stage and fresh bootstrap.
 - S30 implements exact-tuple resume plus mandatory terminal-cleanup recovery and runs current gates using `ISS392_WS_FULL_REGRESSION_S30`.
 - S40 connects final public lifecycle/provider docs but does not touch checked-in dogfood.
@@ -76,7 +76,7 @@ PR-B cannot merge unless terminal cleanup crash/retry tests, current PR workflow
 
 ### E384-P-001 — Compatibility head
 
-S70 adds final provider-gate code, exact evidence schemas/fixtures, stable environment, structural tests and final operator/test-policy docs; removes old consumers before providers; performs the second complete dogfood update; and finalizes the tracked #392 report without actual head/run identities.
+S70 adds final provider-gate code, the complete D-015–D-026 schema/CLI/fixture contract, stable environment, structural tests and final operator/test-policy docs; removes old consumers before providers; performs the second complete dogfood update; finalizes the tracked #392 report; creates `PRC_COMPAT_HEAD`; completes the human context sequence; and commits distinct `PRC_FINAL_HEAD` by removing only compatibility job `provider-tests`. Actual head/run identities remain external.
 
 Push `PRC_COMPAT_HEAD` externally. Its workflow emits both contexts. Compatibility `provider-tests` needs producer and attestation, creates separate workflow-api and artifact-download workspaces, downloads candidate/evidence, fetches run/jobs/artifacts JSON, invokes the same verifier interface as S80, builds nothing and ignores the canary marker.
 
@@ -90,9 +90,9 @@ Push `PRC_COMPAT_HEAD` externally. Its workflow emits both contexts. Compatibili
 6. Close canary without merge; restore compatibility PR GREEN.
 7. Human removes only old required context and reads back new-only required.
 
-### E384-P-003 — Final head and authoritative rerun
+### E384-P-003 — Read-only authoritative rerun
 
-Create a distinct descendant `PRC_FINAL_HEAD` by removing only compatibility job `provider-tests` from `.github/workflows/provider-ci.yml`. Freeze final SHA/tree externally. No tracked report edit is allowed. Dispatch a new final run, rerun producer/all roles/attestation/gate, download candidate/evidence/API snapshots to purpose-specific workspaces, verify actual bytes and final required contexts, then emit/post/read back pre-merge attestation. Only final head may merge.
+S70 has already created the distinct descendant `PRC_FINAL_HEAD` by removing only compatibility job `provider-tests`. S80 freezes/reads that SHA/tree externally and owns no commit. No tracked report edit is allowed. Dispatch a new final run, rerun producer/all roles/attestation/gate, download candidate/evidence/API snapshots to purpose-specific workspaces, verify actual bytes and final required contexts, then emit/post/read back pre-merge attestation. Only final head may merge.
 
 ## 7. Evidence and closure
 
@@ -101,8 +101,8 @@ Tracked report contains pre-freeze methodology, implementation, terminalization 
 After human merge, execute exactly:
 
 1. fetch merge commit and compare final-head tree with merge tree;
-2. `python3 ./spec-dock/scripts/spec-dock issue finish` and verify actual result;
-3. `python3 ./spec-dock/scripts/spec-dock close --id iss-00392` and read actual #392 close event;
+2. start `python3 ./spec-dock/scripts/spec-dock issue finish`; capture its start/end and returned issue number, already-closed flag, active-clear and post-sync result;
+3. immediately read #392 state/timeline and bind the selected close event to the issue-finish interval/reported already-closed relation; do not invoke `close --id iss-00392`;
 4. render/post/read back post-merge closure on #392, then create external comment receipt;
 5. re-evaluate Epic acceptance;
 6. `python3 ./spec-dock/scripts/spec-dock close --id epic-00384` and read actual #384 close event;

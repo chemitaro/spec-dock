@@ -3,12 +3,12 @@
 ID: "active-failure-disposition-register-v5"
 タイトル: "Active Failure Disposition Register"
 状態: "accepted"
-最終更新: "2026-09-01"
+最終更新: "2026-09-02"
 対象: ["epic-00384", "iss-00392"]
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
+  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
 source_ledger:
   path: "full-regression-ledger.json"
   git_blob_sha1: "efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4"
@@ -26,7 +26,7 @@ The Issue #387 tracked report contains only a schema/rule declaration and the 12
 ## 2. Source ledger and row-count rule
 
 - Repository: `chemitaro/spec-dock`
-- Source commit: `f96d031ea86d3757374f3de14d588f1ba09a0864`
+- Source commit: `95d7562ca1762e0b2a717912484eba5a5c2377f1`
 - Source ledger blob: `efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4`
 - Original identities: exactly 27
 - Conditional identities: source rows 4–15, exactly 12
@@ -119,7 +119,7 @@ Missing report block/entry, report identity field, unmapped new row, signature d
   "source": {
     "repository": "chemitaro/spec-dock",
     "branch": "codex/epic-00384-provider-test-strategy-planning",
-    "commit": "f96d031ea86d3757374f3de14d588f1ba09a0864",
+    "commit": "95d7562ca1762e0b2a717912484eba5a5c2377f1",
     "path": "full-regression-ledger.json",
     "git_blob_sha1": "efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4",
     "original_row_count": 27,
@@ -1405,7 +1405,7 @@ Missing report block/entry, report identity field, unmapped new row, signature d
 
 ## 8. Verification
 
-The normative parser must assert schema 4, 27 source rows, 12 conditional entries, rule ID `ISS387-THREE-WAY-V2`, no conditional branch-fixed fields, no report PR-number field, formula-derived post row count, S60 active/approved counts zero and `owner_decisions_required=[]`. It must verify the exact tail and unique GitHub PR discovery before S10.
+The normative parser must assert schema 4, 27 source rows, 12 conditional entries, rule ID `ISS387-THREE-WAY-V2`, no conditional branch-fixed fields, no report repository/PR/candidate/head/tree/merge field, formula-derived post row count, S60 active/approved counts zero and `owner_decisions_required=[]`. It must discover the unique merged PR from GitHub Issue timeline/cross-reference and head-commit association evidence, verify PR-head-tree/merge-tree equality and read the mapping block, ledger and collection from the merge tree before S10.
 
 ## 9. Owner decisions
 
