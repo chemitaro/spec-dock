@@ -532,7 +532,18 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   tar -tf "$SDIST"
   shasum -a 256 "$WHEEL" "$SDIST"
   uvx --isolated --no-cache --from "$WHEEL" spec-dock init "$CONSUMER"
-  (cd "$CONSUMER" && ./spec-dock/scripts/spec-dock validate && ./spec-dock/scripts/spec-dock --help)
+  typeset VALIDATE_OUTPUT=''
+  typeset VALIDATE_STATUS=0
+  if VALIDATE_OUTPUT="$(cd "$CONSUMER" && ./spec-dock/scripts/spec-dock validate 2>&1)"; then
+    VALIDATE_STATUS=0
+  else
+    VALIDATE_STATUS=$?
+  fi
+  printf 'C60-01_VALIDATE_STATUS=%s\n' "$VALIDATE_STATUS"
+  printf 'C60-01_VALIDATE_OUTPUT=%s\n' "$VALIDATE_OUTPUT"
+  test "$VALIDATE_STATUS" -eq 1
+  test "$VALIDATE_OUTPUT" = 'error: No nodes found.'
+  (cd "$CONSUMER" && ./spec-dock/scripts/spec-dock --help)
   test -f "$CONSUMER/.agents/skills/spec-dock/SKILL.md"
   test -f "$CONSUMER/.agents/skills/spec-dock-grill-with-docs/SKILL.md"
   test -f "$CONSUMER/.github/workflows/ci.yml"
@@ -551,10 +562,10 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   )
   ```
 
-- **期待結果:** 一時pathが各作成直後に出力される。one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init/validate/help/cmp成功。current二skillと`ci.yml`あり、retired `.codex`なし。overview、active-none、scripts README、三scopeのartifacts/discussions rulesがprovider sourceと一致する。success時はtrapが解除され、二directoryがC90-04まで残る。
-- **証拠:** immediate path lines、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、exit、cmp summary。nonzero時はfailure cleanup pathと残存有無。
-- **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
-- **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
+- **期待結果:** 一時pathが各作成直後に出力される。one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init成功後、validateはstatus=`1`かつcombined outputがexact `error: No nodes found.`となり、そのassert後のhelp/cmpが成功する。current二skillと`ci.yml`あり、retired `.codex`なし。overview、active-none、scripts README、三scopeのartifacts/discussions rulesがprovider sourceと一致する。success時はtrapが解除され、二directoryがC90-04まで残る。
+- **証拠:** immediate path lines、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、validate status/output、help exit、cmp summary。予期しないnonzero時はfailure cleanup pathと残存有無。
+- **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、validateの期待status/output以外の予期しないnonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
+- **cleanup:** validateの期待status=`1`かつexact output以外を含む予期しないnonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
 
 **Evidence recording, classification, and repair-checkpoint rule:** C50-01で作ったGit index checkpoint以後、各tracked editまたはnon-ignored untracked追加の直後に、`CURRENT_ISSUE_DIR='spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup'`を設定し、`git diff --name-status`、`git diff -- "$CURRENT_ISSUE_DIR/requirement.md" "$CURRENT_ISSUE_DIR/design.md" "$CURRENT_ISSUE_DIR/plan.md" "$CURRENT_ISSUE_DIR/report.md"`、`git ls-files --others --exclude-standard`を確認してhunk単位で次の順に分類する。複数classが同一hunkに混在する場合は上位の停止側へ倒す。同一snapshot内の別hunkに一件でも`SPECIFICATION_CONTRACT`があればsnapshot全体を同classとし、他classのhunkもstageしない。
 
