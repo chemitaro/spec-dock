@@ -56,6 +56,7 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 | 2026-09-01 | fixed SHA `f3b6c2b6f1db2c3b7e54966496f76a74db34d689`のStrict review P1指摘により、`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`のfinite repair checkpointと、exact ledger二列以外のR/D/P全hunkを覆う`SPECIFICATION_CONTRACT`境界を追加 | implementation未着手のため失効させる実測なし。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
 | 2026-09-01 | fixed SHA `7f4ec536e34b35fe1dfe250ee786cef5ed59bc6d`のC00独立監査とChatGPT Use Strict Extra High分析により、scripts READMEと三scopeのartifacts/discussions rulesの7 provider/dogfood pairをapproved Current surfaceへ追加 | production/test/config未着手。旧C00 evidenceは破棄してNOT_RUNへ戻した。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
 | 2026-09-01 | ChatGPT Use Strict Extra High advisoryの受入れにより、C60-02 exact verifierをpre-commitからC90-05のcommit/push後clean `FINAL_SHA`へ延期し、C90-04のfreezeとC90-05のfinal-SHA検証順を明示 | C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが明示的に失効扱いとし、final evidenceへ再利用しない。Plan rowを理由付きN/A/deferredへ固定し、38 checks、36 ledger rows、各check 8 fields、二external gatesを維持 |
+| 2026-09-02 | Strict spec review P1により、C40-09をcommit前のreferential-integrity確認へ限定し、full verifierの実行時点をC60-02/C90-05のclean `FINAL_SHA`へ一意化 | C40-09のverifier成功要求をledger parser、timing loader、collection、verifier CLI parser/help contractの成功へ置換。38 checks、36 ledger rows、各check 8 fields、二external gatesは不変 |
 
 ## 3. 実装原則
 
@@ -467,9 +468,9 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **対象 / 目的:** test撤去と現行verifier inventoryを矛盾させない。
 - **前提:** C20-04、C40-01〜08で実際に削除するnode IDが確定。
 - **操作:** 削除node IDに一致する`full-regression-ledger.json` failure row/command input、`full-regression-timing-weights.json` weight、`tests/conftest.py`の`REQUIRED_FAST_NODE_IDS`だけを削除または現存successorへ最小更新する。
-- **確認:** 削除node IDごとに3ファイルを`rg`し、ledger parser/current verifier、collectionを実行する。
-- **期待結果:** deleted node参照0、現存nodeのledger/timing/required classificationは整合、verifier成功。
-- **証拠:** node ID別before/after entry、parser/verifier result。
+- **確認:** 削除node IDごとに3ファイルを`rg`し、ledger parser、timing loader、test collection、verifier CLIのparser/help contractを実行・確認する。current full-regression verifier本体、full verifierのshard実行、full ledger policy検証はここでは実行せず、C60-02/C90-05だけで実施する。
+- **期待結果:** deleted node参照0、現存nodeのledger/timing/required classificationは整合し、ledger parser、timing loader、collection、verifier CLI parser/help contractが成功する。full verifierの成功はC60-02/C90-05のclean `FINAL_SHA`上でのみ期待する。
+- **証拠:** node ID別before/after entry、ledger parser/timing loader/collection/verifier CLI parser/help contractの結果。full verifier、shard、ledger policyの実測証拠はC60-02/C90-05へ束縛する。
 - **停止条件:** schema、failure disposition、marker、shard、workflow、weight算出方法の変更、無関係nodeへの波及。
 - **cleanup:** orphan exact entriesだけ。ledger/timing全体の再生成はしない。
 
