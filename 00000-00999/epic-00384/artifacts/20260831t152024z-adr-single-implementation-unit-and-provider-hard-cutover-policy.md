@@ -9,7 +9,7 @@ ID: "20260831t152024z-adr"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
@@ -26,7 +26,7 @@ Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfo
 - bridge generationをmainへmergeするたび、consumer migration matrixとdowngrade riskが増える。
 - provider CIがold contractとnew contractを重複実行し、failure approvalを温存する。
 
-Current exact revision `d18ca60b2a6ff11571ee366f71c4528dcd668d99`では、legacy per-file engine、purge、journal、failure ledger、timing sharderが実在する。Issue #387は別のCurrent-surface cleanupであり、これらを変更しない。
+Current exact revision `91667235c6892f025a1d9ee69cf37525537a3c9e`では、legacy per-file engine、purge、journal、failure ledger、timing sharderが実在する。Issue #387は別のCurrent-surface cleanupであり、これらを変更しない。
 
 ## Decision
 
@@ -44,7 +44,7 @@ Final public generationへ一度に切り替える。次を採用しない。
 - old/new dual writer
 - automatic old engine fallback
 
-Dormant successor codeを先にmergeしてもよいが、public routeはoldまたはfinalのどちらかであり、中間Product contractを公開しない。
+Dormant successor codeを先にmergeしてもよいが、public routeはoldまたはfinalのどちらかであり、中間Product contractを公開しない。Public route cutoverを開始するPR-Bでは、I392-S40とI392-S50を同一branch/PR内のnon-main checkpointとし、いずれのcommitもmainへmergeしない。I392-S40、I392-S50、I392-S60の全proofが完了した後だけPR-Bをhuman mergeでき、mainはold public productからcomplete final lifecycleへ一度だけ遷移する。
 
 ### ADR-D3 — Fixed lifecycle contract
 

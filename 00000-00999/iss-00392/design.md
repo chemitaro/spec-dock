@@ -10,7 +10,7 @@ ID: "iss-00392"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計

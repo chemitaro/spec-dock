@@ -6,7 +6,7 @@ Issue: "iss-00392"
 正本:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # Luna Max Implementation Handoff
@@ -110,14 +110,17 @@ S00
  +-- PR-A: S10 -> S20 -> S30
  |          dormant successor, old public behavior
  |
- +-- PR-B: S40 -> S50 -> S60
- |          combined public cutover + old engine terminalization
+ +-- PR-B: one branch / one PR
+ |          S40 [internal checkpoint; no main merge]
+ |           -> S50 [internal checkpoint; no main merge]
+ |           -> S60 [only PR-B main merge gate]
+ |          combined public cutover + legacy proof + old engine/test terminalization
  |
  +-- PR-C: S70 -> S80
             provider gate cutover + qualification/handoff
 ```
 
-PR count is not mandatory。Do not split S40 public contract into bridge generations。
+PR count is not mandatory。Once S40 starts, the same branch/PR must continue through S50 and S60 before any main merge。Do not offer an S40-only or S50-only merge handoff, and do not split the public cutover into bridge generations。
 
 ## 4. Fixed contract cheat sheet
 
@@ -314,6 +317,7 @@ Current authoring observation: repository rulesets collection was empty。Classi
 | atomic native primitive missing | fail closed | filesystem safety reviewer |
 | candidate needs symlink/special/hard link | reject candidate | Product owner |
 | record needs progress/checkpoint/path list | stop; no schema expansion | Product owner |
+| S40またはS50のcommitがmain merge対象になっている | merge handoffをblockし、同じPR-BでS60まで継続 | implementation owner + human merger |
 | old package mutation event >0 | merge forbidden; adjust record/marker | Product + safety reviewer |
 | positive control not intercepted | test infrastructure failure | safety reviewer |
 | active failure not terminalizable | no ledger/skip | Product owner |

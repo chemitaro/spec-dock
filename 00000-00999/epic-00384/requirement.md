@@ -9,7 +9,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
@@ -29,7 +29,7 @@ Outcomeはコード量削減そのものではない。管理権限、失敗時�
 
 ## 2. Current evidence and problem statement
 
-本書は`chemitaro/spec-dock`のbranch `codex/epic-00384-provider-test-strategy-planning`、full SHA `d18ca60b2a6ff11571ee366f71c4528dcd668d99`を調査基準とする。このrevisionでは次を直接確認した。
+本書は`chemitaro/spec-dock`のbranch `codex/epic-00384-provider-test-strategy-planning`、full SHA `91667235c6892f025a1d9ee69cf37525537a3c9e`を調査基準とする。このrevisionでは次を直接確認した。
 
 - `src/spec_dock/managed_distribution.py`がfresh、update、deprovision、purge、historical identity、journal、recovery、native rename、result modelを一つの巨大なmoduleで所有している。
 - `src/spec_dock/assets/managed_distribution.json`がrecognized version、historical current identity、obsolete exact fileを列挙している。
@@ -159,7 +159,7 @@ PR mergeはhuman-onlyとする。required context transitionはbefore stateをre
 #392は#387がhuman mergeされる前に開始してはならない。開始時に次を満たすdeterministic admissionを行う。
 
 - #387がclosedで、merge commitがmainのancestorであり、`POST_387_SHA`としてfull SHAを固定できる。
-- authoring SHA `d18ca60b2a6ff11571ee366f71c4528dcd668d99`から`POST_387_SHA`までの差分が、#387 canonical scopeのexact allowlistとcontent restrictionだけに一致する。
+- authoring SHA `91667235c6892f025a1d9ee69cf37525537a3c9e`から`POST_387_SHA`までの差分が、#387 canonical scopeのexact allowlistとcontent restrictionだけに一致する。
 - `src/spec_dock/cli.py`、`src/spec_dock/managed_distribution.py`、`src/spec_dock/assets/managed_distribution.json`、`src/spec_dock/assets/install_root/**`、provider workflows、quality sharder、distribution lifecycle testsに#387由来のsemantics driftがない。
 - `pyproject.toml`のversionが`0.2.3`のままであり、#387が許可したstale mypy override / phantom package-data removal以外のbuild contract変更がない。
 - current lint、ordinary pytest、current Full Regression verifier、package build、dogfood validateがbaselineとして記録できる。

@@ -10,7 +10,7 @@ ID: "iss-00392"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
+  sha: "91667235c6892f025a1d9ee69cf37525537a3c9e"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
@@ -25,7 +25,7 @@ ID: "iss-00392"
 
 ### I392-RQ-001 — #387 post-merge admission
 
-Implementationは#387がhuman mergeされた後だけ開始する。`AUTHORING_SHA=d18ca60b2a6ff11571ee366f71c4528dcd668d99`と`POST_387_SHA`のfull SHAを固定し、#387 exact allowlist/content restriction、current gates、package version `0.2.3`、baseline artifact hashesを検査する。unclassified drift、protected path drift、baseline failureがある場合はcode changeを開始しない。
+Implementationは#387がhuman mergeされた後だけ開始する。`AUTHORING_SHA=91667235c6892f025a1d9ee69cf37525537a3c9e`と`POST_387_SHA`のfull SHAを固定し、#387 exact allowlist/content restriction、current gates、package version `0.2.3`、baseline artifact hashesを検査する。unclassified drift、protected path drift、baseline failureがある場合はcode changeを開始しない。
 
 ### I392-RQ-002 — Exact persistent paths
 
