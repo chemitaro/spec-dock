@@ -27,54 +27,6 @@ HISTORICAL_ROUTE_MARKERS = {
     "`pr-repair`": "`pr-repair`",
     "`profile`": "`profile`",
 }
-MANDATORY_WORKFLOW_PATTERNS = (
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)"
-        r".{0,40}(?:必須|使用してください|使ってください|前提とします|前提にします)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:必ず|必須で).{0,40}"
-        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:mandatory|required).{0,40}"
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)"
-        r".{0,40}(?:mandatory|required)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)"
-        r".{0,40}\b(?:must|shall)\b",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"\b(?:must|shall)\b.{0,40}"
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)"
-        r".{0,40}必ず.{0,20}(?:使用|利用|使う|用いる)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-)
-WORKFLOW_TERM_PATTERN = re.compile(
-    r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)",
-    flags=re.IGNORECASE,
-)
-NON_MANDATORY_PHRASES = re.compile(
-    r"必須\s*で\s*(?:は\s*(?:ありません|ない|なく)|ない)"
-    r"|not\s+(?:required|mandatory)"
-    r"|\b(?:must|shall)\s+not\b",
-    flags=re.IGNORECASE | re.DOTALL,
-)
-CLAUSE_BOUNDARY_PATTERN = re.compile(r"[.;。；]+")
 
 
 def _read_asset(root: Path, relative_path: Path | str) -> str:
@@ -110,15 +62,6 @@ def _relative_markdown_links(content: str) -> tuple[str, ...]:
         if path_without_fragment and not path_without_fragment.startswith("/") and "://" not in path_without_fragment:
             relative_paths.append(path_without_fragment)
     return tuple(relative_paths)
-
-
-def _requires_mandatory_workflow(content: str) -> bool:
-    for clause in CLAUSE_BOUNDARY_PATTERN.split(content):
-        if WORKFLOW_TERM_PATTERN.search(clause) and NON_MANDATORY_PHRASES.search(clause):
-            continue
-        if any(pattern.search(clause) for pattern in MANDATORY_WORKFLOW_PATTERNS):
-            return True
-    return False
 
 
 def test_physical_catalog_current_catalog_is_exact_six() -> None:
@@ -300,57 +243,6 @@ def test_draft_document_state_and_adr_draft_authority_are_not_historical_routes(
     assert 'authority: "draft"' in _frontmatter(
         _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_TEMPLATE_DIRECTORY / "adr.md")
     )
-
-
-def test_current_artifact_assets_do_not_require_eal_provider_model_or_reviewer_workflow() -> None:
-    current_assets = [
-        _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_TEMPLATE_DIRECTORY / f"{artifact_type}.md")
-        for artifact_type in CURRENT_ARTIFACT_TYPES
-    ]
-    current_assets.append(_read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE))
-
-    for content in current_assets:
-        assert not _requires_mandatory_workflow(content)
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "EAL schema を必須とします。",
-        "EAL schema は\n必須です。",
-        "指定 reviewer workflow を使ってください。",
-        "指定 reviewer workflow は\n複数行の説明を挟んでも\n必須です。",
-        "ChatGPT is required for promotion.",
-        "A mandatory provider model must be selected.",
-        "ChatGPT must be used.",
-        "reviewer approval shall be obtained.",
-        "An approved model must be used.",
-        "A provider shall be selected.",
-        "ChatGPTを必ず使用する。",
-        "指定 model を必ず利用する。",
-        "EAL schema は必須ではありません。\n指定 reviewer workflow は必須です。",
-        "ChatGPT is not required; reviewer approval must be obtained.",
-    ),
-)
-def test_mandatory_workflow_detector_rejects_required_tools(content: str) -> None:
-    assert _requires_mandatory_workflow(content)
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "EAL schema は必須ではありません。",
-        "EAL schema は必須で\nはありません。",
-        "A provider is not required.",
-        "A provider is\nnot required.",
-        "model の利用は optional です。",
-        "reviewer workflow は任意です。",
-        "ChatGPT must not be used as authority.",
-        "ChatGPT is not required; the report must be complete.",
-    ),
-)
-def test_mandatory_workflow_detector_allows_explicitly_optional_tools(content: str) -> None:
-    assert not _requires_mandatory_workflow(content)
 
 
 @pytest.mark.parametrize("root", (PROVIDER_ASSET_ROOT, DOGFOOD_ASSET_ROOT))

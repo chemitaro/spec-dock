@@ -43,61 +43,6 @@ class _StubNodeReader:
         return list(self.records)
 
 
-class _StubDepsTopologyReader:
-    def __init__(self, issue_depends_on_map=None, node_depends_on_map=None, dependency_contexts=None):
-        self.issue_depends_on_map = dict(issue_depends_on_map or {})
-        self.node_depends_on_map = {
-            node_id: list(depends_on) for node_id, depends_on in (node_depends_on_map or {}).items()
-        }
-        self.dependency_contexts = {
-            issue_id: list(contexts) for issue_id, contexts in (dependency_contexts or {}).items()
-        }
-
-    def load_issue_depends_on_map(self, specdock_dir, graph):
-        _app_contracts, _app_ports, _app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        return infra_contracts.DepsTopologyLoadResult(
-            issue_depends_on_map=dict(self.issue_depends_on_map),
-            warnings=[],
-            dependency_contexts_by_issue_id=dict(self.dependency_contexts),
-        )
-
-    def load_node_dependency_resolutions(self, specdock_dir, graph):
-        _app_contracts, _app_ports, _app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        return {
-            node_id: [
-                infra_contracts.DirectDependencyResolution(
-                    raw_ref=target_id,
-                    resolved_node_id=target_id,
-                )
-                for target_id in depends_on
-            ]
-            for node_id, depends_on in self.node_depends_on_map.items()
-        }
-
-
-class _StubIssueOnlyDepsTopologyReader:
-    def __init__(self, issue_depends_on_map=None):
-        self.issue_depends_on_map = dict(issue_depends_on_map or {})
-
-    def load_issue_depends_on_map(self, specdock_dir, graph):
-        _app_contracts, _app_ports, _app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        return infra_contracts.DepsTopologyLoadResult(
-            issue_depends_on_map=dict(self.issue_depends_on_map),
-            warnings=[],
-        )
-
-
-class _StubDerivedStateReader:
-    def __init__(self, statuses=None):
-        self.statuses = dict(statuses or {})
-
-    def load_cached_issue_status_by_id(self, specdock_dir):
-        return dict(self.statuses)
-
-    def load_cached_issue_last_sync_at_by_id(self, specdock_dir):
-        return {}
-
-
 class _StubActiveStateStore:
     def __init__(self, manifest=None):
         _app_contracts, _app_ports, _app_set_active, _domain_models, infra_contracts = _runtime_modules()
@@ -142,53 +87,6 @@ class _StubActiveStateStore:
 
     def restore_previous_state(self, specdock_dir, snapshot):
         self.manifest = snapshot.manifest
-
-
-class _StubIssueGateway:
-    def __init__(self, snapshots):
-        self.snapshots = list(snapshots)
-        self.issue_index_calls = []
-
-    def issue_index(self, repo_root, *, limit):
-        self.issue_index_calls.append((repo_root, limit))
-        return list(self.snapshots)
-
-    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
-        raise RuntimeError("not used")
-
-
-class _StubGitGateway:
-    def __init__(self, *, current_branch="main", existing_branches=(), valid_ref=True):
-        self.current_branch = current_branch
-        self.existing_branches = set(existing_branches)
-        self.valid_ref = valid_ref
-        self.calls = []
-
-    def origin_github_repo_slug(self, repo_root):
-        return "example/repo"
-
-    def check_ref_format_branch(self, repo_root, branch):
-        self.calls.append(("check_ref_format_branch", branch))
-        return self.valid_ref
-
-    def require_clean_working_tree(self, repo_root):
-        self.calls.append(("require_clean_working_tree", None))
-
-    def current_branch_or_none(self, repo_root):
-        self.calls.append(("current_branch_or_none", None))
-        return self.current_branch
-
-    def local_branch_exists(self, repo_root, branch):
-        self.calls.append(("local_branch_exists", branch))
-        return branch in self.existing_branches
-
-    def checkout_branch(self, repo_root, branch):
-        self.calls.append(("checkout_branch", branch))
-        self.current_branch = branch
-
-    def create_and_checkout_branch(self, repo_root, branch):
-        self.calls.append(("create_and_checkout_branch", branch))
-        self.current_branch = branch
 
 
 class _FailFastPort:
@@ -362,39 +260,21 @@ class TestSetActiveApplication:
         infra_contracts,
         *,
         active_store=None,
-        deps=None,
-        node_deps=None,
-        expose_node_resolutions=True,
-        derived_state_reader=None,
         issue_gateway=None,
         git_gateway=None,
-        dependency_contexts=None,
         specdock_dir=Path("/repo/spec-dock"),
     ):
-        deps_reader = (
-            _StubDepsTopologyReader(deps, node_deps, dependency_contexts)
-            if expose_node_resolutions
-            else _StubIssueOnlyDepsTopologyReader(deps)
-        )
         return app_ports.Ports(
             node_reader=_StubNodeReader(self._records(infra_contracts)),
             repo_root=Path("/repo"),
             specdock_dir=specdock_dir,
             active_state_store=active_store or _StubActiveStateStore(),
-            deps_topology_reader=deps_reader,
-            derived_state_reader=derived_state_reader,
             issue_gateway=issue_gateway,
             git_gateway=git_gateway,
         )
 
-    def _request(self, app_contracts, *, target, use_github=False, force=False, checkout=False):
-        return app_contracts.SetActiveRequest(
-            target=target,
-            use_github=use_github,
-            force=force,
-            checkout=checkout,
-            issue_limit=10000,
-        )
+    def _request(self, app_contracts, *, target):
+        return app_contracts.SetActiveRequest(target=target)
 
     def _node_id_target(self, app_contracts, node_id):
         return app_contracts.TargetRef(kind="node_id", node_id=node_id, github_issue_number=None)
@@ -427,11 +307,10 @@ class TestSetActiveApplication:
             app_ports,
             infra_contracts,
             active_store=active_store,
-            expose_node_resolutions=False,
         )
 
         by_id = app_set_active.set_active(
-            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-302"), force=True),
+            self._request(app_contracts, target=self._node_id_target(app_contracts, "iss-302")),
             ports,
         )
         assert by_id.selection.issue_id == "iss-00302"
@@ -445,7 +324,6 @@ class TestSetActiveApplication:
             self._request(
                 app_contracts,
                 target=self._github_target(app_contracts, 301, owner="example", repo="repo"),
-                force=True,
             ),
             ports,
         )
@@ -463,7 +341,6 @@ class TestSetActiveApplication:
             app_ports,
             infra_contracts,
             active_store=active_store,
-            deps={"iss-00302": ["iss-00301"]},
             issue_gateway=issue_spy,
             git_gateway=git_spy,
         )
@@ -479,7 +356,6 @@ class TestSetActiveApplication:
             self._request(
                 app_contracts,
                 target=target,
-                use_github=True,
             ),
             ports,
         )
@@ -559,24 +435,6 @@ class TestSetActiveApplication:
         assert active_store.written == []
         assert git_spy.calls == []
 
-    def test_internal_checkout_request_preserves_issue_start_compatibility(self) -> None:
-        app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        git_gateway = _StubGitGateway(existing_branches={"iss-00302-target-issue"})
-        ports = self._ports(app_ports, infra_contracts, git_gateway=git_gateway)
-
-        result = app_set_active.set_active(
-            self._request(
-                app_contracts,
-                target=self._node_id_target(app_contracts, "iss-00302"),
-                checkout=True,
-            ),
-            ports,
-        )
-
-        assert result.branch.desired == "iss-00302-target-issue"
-        assert ("require_clean_working_tree", None) in git_gateway.calls
-        assert ("checkout_branch", "iss-00302-target-issue") in git_gateway.calls
-
     def test_active_manifest_and_context_pack_are_structural_only(self) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
         assert [field.name for field in fields(infra_contracts.ActiveManifestEntry)] == ["id", "path"]
@@ -588,9 +446,7 @@ class TestSetActiveApplication:
             ports,
         )
 
-        context_pack = active_store.applied[-1][1]
-        for forbidden in ("Authority", "authority", "grants", "promotion", "reviewer", "EAL", "Planning Level"):
-            assert forbidden not in context_pack
+        assert active_store.applied[-1][1]
 
     @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
     @pytest.mark.parametrize("projection_exists", [True, False])

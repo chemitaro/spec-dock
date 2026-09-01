@@ -10,6 +10,7 @@ v2 では、日常運用（initiative/epic/issue/artifact の作成、active 切
 - `--no-github` は node creation option ではありません。
 - working artifacts は `new artifact <type>` を使います（current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr`）。
 - `pr-repair-batch` / `draft-*` / `scratch` / `note` は Historical-only です。既存 artifact は grandfathered として壊さず、新規 untyped capture は `blank` を使います。
+- `active set` は local node を選択して active state を更新するだけです。branch checkout、unfinished active Issue guard、dependency readiness は `issue start` が所有します。
 - `new/import {initiative,epic,issue}` と `new artifact <type>` の `--slug` は kebab-case が必要です（詳細は `spec-dock/docs/reference_naming.md`）。
 
 ## 使い方（例）
@@ -31,9 +32,11 @@ v2 では、日常運用（initiative/epic/issue/artifact の作成、active 切
 ./spec-dock/scripts/spec-dock new artifact decision-candidate --issue iss-00123 --title "Token options" # 20260329t123500z-decision-candidate-...
 ./spec-dock/scripts/spec-dock new artifact adr --issue iss-00123 --title "Token rotation"       # 20260329t123501z-adr-...
 
-# active（現在作業中）を設定
+# active node selection（selection-only）
 ./spec-dock/scripts/spec-dock active set 123
-./spec-dock/scripts/spec-dock active set iss-00123 --checkout
+
+# Issue lifecycle（branch checkout/create, guard, dependency readiness）
+./spec-dock/scripts/spec-dock issue start iss-00123
 
 # 状態集計を生成
 ./spec-dock/scripts/spec-dock sync

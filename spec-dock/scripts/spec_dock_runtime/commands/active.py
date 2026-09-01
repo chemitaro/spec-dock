@@ -26,11 +26,6 @@ if TYPE_CHECKING:
 class ActiveSetArgs(CommandArgs):
     target_ref: TargetRef
     target_display: str
-    checkout: bool
-    force: bool
-    github: bool
-    no_github: bool
-    gh_limit: int
 
 
 @dataclass(frozen=True)
@@ -91,11 +86,6 @@ def _active_set_args(ns: argparse.Namespace) -> CommandArgs:
     return ActiveSetArgs(
         target_ref=target_ref,
         target_display=target_display,
-        checkout=bool(getattr(ns, "checkout", False)),
-        force=bool(getattr(ns, "force", False)),
-        github=not bool(getattr(ns, "no_github", False)),
-        no_github=bool(getattr(ns, "no_github", False)),
-        gh_limit=int(getattr(ns, "gh_limit", 10000)),
     )
 
 
@@ -114,10 +104,6 @@ def _run_active_set(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     result = use_cases.set_active(
         SetActiveRequest(
             target=typed.target_ref,
-            force=typed.force,
-            checkout=typed.checkout,
-            use_github=typed.github,
-            issue_limit=typed.gh_limit,
         )
     )
     return CommandOutcome(

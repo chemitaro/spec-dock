@@ -20,7 +20,6 @@ HEAVY_NODE_PREFIXES = (
 )
 
 REQUIRED_FAST_NODE_IDS = frozenset({
-    "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_legacy_flag_reports_parser_error",
     "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_by_id_succeeds_through_runtime_subprocess",
     (
         "tests/unit/infra/test_init_update.py::TestInitUpdate::"

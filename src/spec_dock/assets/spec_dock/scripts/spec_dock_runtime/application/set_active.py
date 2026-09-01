@@ -339,16 +339,6 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     target_id = resolve_target_node_id(graph, req.target)
 
     selection = select_active_chain(graph, NodeId(target_id))
-    branch = (
-        checkout_active_target(
-            graph=graph,
-            target_id=target_id,
-            ports=ports,
-            warnings=warnings,
-        )
-        if req.checkout
-        else None
-    )
 
     manifest = build_active_manifest(selection, graph, repo_root=_resolve_repo_root(ports))
     context_pack_text = _build_context_pack_text(manifest, repo_root=_resolve_repo_root(ports))
@@ -360,7 +350,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     )
     return ActiveSetResult(
         selection=selection,
-        branch=branch,
+        branch=None,
         manifest_written=True,
         pointer_updated=True,
         warnings=warnings,

@@ -30,17 +30,6 @@ from tests.cli_runtime.harness import (
 _EXPECTED_MANAGED_SKILL_NAMES = _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
 
 
-_ISSUE_359_EXPECTED_CODEX_CONFIG = {
-    "project_doc_fallback_filenames": [".codex/AGENTS.md"],
-}
-
-_REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS = tuple(
-    f"issue-profiles/{profile}/{artifact}.md"
-    for profile in ("lite", "standard", "strict", "critical")
-    for artifact in ("design", "plan")
-)
-
-
 def _workflow_job_lines(workflow_text: str, job_key: str) -> list[str]:
     lines = workflow_text.splitlines()
     start = lines.index(f"  {job_key}:")
