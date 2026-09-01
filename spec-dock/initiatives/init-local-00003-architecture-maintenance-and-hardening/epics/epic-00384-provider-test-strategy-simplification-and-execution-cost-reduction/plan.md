@@ -5,201 +5,168 @@ ID: "epic-00384"
 関連GitHub: ["#384"]
 状態: "draft"
 最終更新: "2026-09-01"
-依存: ["requirement.md", "design.md"]
+依存: ["requirement.md", "design.md", "artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md"]
 親: ["init-local-00003"]
+正本検証:
+  repository: "chemitaro/spec-dock"
+  branch: "codex/epic-00384-provider-test-strategy-planning"
+  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
 ---
 
-# epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 計画
+# epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
 
-詳細: [Epic Plan Guide](../../../../docs/authoring/epic-plan.md)
+## 1. Governance
 
-## 目標
+Epic #384はProduct判断、scope、acceptance、implementation unit boundaryを管理する。実装作業は唯一のchild Issue #392で行う。#388〜#390をreopenせず、research、decision、tests、CI、final verificationを別Issueへ分割しない。
 
-Epic #384を一つのimplementation-and-verification Issueで完了する。調査、Product decision、production cutover、test replacement、CI transition、最終検証を別Issueへ流出させない。
+### E384-P-001 — Single-Issue boundary
 
-## Issue granularity assessment
+- Authorized implementation-and-verification unit: `iss-00392` / GitHub #392。
+- Internal step、commit、PRは#392の実行単位であり、新しいIssueではない。
+- #392が未達の間はEpicをopenのままにする。
+- failureをledgerで承認してEpicをcloseしない。
 
-`Result: ONE_ISSUE`
+### E384-P-002 — Dependency gate
 
-Decision basis:
+#392 implementation startより前に#387のhuman mergeとdeterministic post-merge admissionを完了する。admissionがfailした場合は実装を開始せず、exact evidenceをrepository ownerへ返す。unclassified driftをimplementation agentの裁量で吸収しない。
 
-- 本ProductでIssueは実装と検証を一体で受入する実装ユニットである。
-- 調査・分析・意思決定だけのscopeはIssueとして成立しない。
-- install / update / uninstallは現行同一engineへ接続され、自然なindependent release seamがない。
-- C4〜C11の分割はtechnical phase、layer、coordination、verificationによる横スライスである。
-- splitを成立させるP0〜P3、receipt chain、cross-Issue fixtureはProduct価値を持たない中間contractである。
-- lifecycle simplification、old contract removal、portfolio / CI cutoverは一つのobservable outcomeと一つのacceptance boundaryを持つ。
+## 2. Ordered execution
 
-## Child graph
+Epic-level orderは次のとおりである。詳細なpath/symbol/commandは#392 `plan.md`を正本とする。
 
-```text
-epic-00384
-  └─ iss-00392 Provider Lifecycle And Regression Gate Hard Cutover
-```
+1. **Admission and baseline**
+   #387 merge SHA、allowed drift、current gates、baseline old artifactを固定する。
+2. **Dormant successor proof**
+   fixed model、candidate、filesystem、serviceをold public routeに接続せず追加し、direct testsで証明する。
+3. **Combined public hard cutover**
+   `0.2.4`へversion bumpし、CLI、record、legacy migration、uninstall compatibilityを同一generationで切り替える。
+4. **Old contract terminalization**
+   successor proof後にper-file engine、purge、journal、legacy catalog、duplicate old testsを削除する。
+5. **Portfolio and gate cutover**
+   active failuresをterminal化し、build-once Linux/macOS gateへ切り替え、old Full Regression machineryを削除する。
+6. **Qualification and handoff**
+   five-run、CPU ratio、fault pack、rolling 20、dogfood、fresh consumer、required context、exact PR treeを同一candidateへ束縛する。
+7. **Human merge and closure**
+   human merge後にmerged SHAとverified PR SHAを照合し、Issue finish、その後Epic closeを行う。
 
-`iss-00392`だけがproduction、public CLI、tests、workflow、migration、old machinery removal、performance / stability verificationを所有する。
+## 3. Multi-PR policy
 
-## Former Issue disposition
+複数PRを使用する場合の推奨境界は次のとおりである。
 
-- `iss-00388`: legacy / `.gitignore` / `init --force`判断をaccepted ADRとEpicへ統合。future unitとしてsuperseded-before-implementation。
-- `iss-00389`: uninstall / purge / CLI判断をaccepted ADRとEpicへ統合。future unitとしてsuperseded-before-implementation。
-- `iss-00390`: workflow / artifact / platform判断をaccepted ADRとEpicへ統合。future unitとしてsuperseded-before-implementation。
-- C4〜C11、`DEC-*`、`FIX-*`:作成しない。
+| PR | Permitted content | Merge-point invariant |
+|---|---|---|
+| PR-A | dormant successor modules、single-version legacy fixture、direct tests | public CLIはold behaviorのまま。new runtime toggleなし。ordinary/current full gatesがGREEN。 |
+| PR-B | `0.2.4` hard cutover、CLI/service wiring、migration、purge trap、old engine removal、successor tests | public productはfinal lifecycle。old engineへfallbackしない。provider workflowは既存でも全testがfinal behaviorを検証する。 |
+| PR-C | failure terminalization、test ownership、build-once CI、old Full Regression removal、docs/dogfood/final evidence | final gateだけがrequired provider authority。main-push rebuild/shardなし。 |
 
-3件は実装済み / 完了済みではなく、誤ったIssue境界としてcloseする。ローカルnodeのhistorical removalは、SpecDock destructive deleteの明示authorizationなしには行わない。
+PR-A〜Cは例であり、必須数ではない。ただしpublic cutoverをbridge generationへ分割してはならない。
 
-## Authoring-time investigation completed
+## 4. Human gates
 
-調査を後続Issueへ送らず、`iss-00392`作成前に次を完了した。
+### E384-P-003 — Review gate
 
-| evidence | result |
-|---|---|
-| exact branch / SHA | `codex/epic-00384-provider-test-strategy-planning` / `d8f9d02f...` |
-| current package / recognized workspace | exact `0.2.3` |
-| full collection | 2,710 nodes |
-| sorted node-set digest | `f607b007d167231ed27f2a17391b0d8b3aa452d67ce6532565463e193486a04c` |
-| ordinary gate | 1,574 passed / 1,136 skipped / 57.02s |
-| resource reference | wall 58.42 / user 24.41 / sys 31.29 / CPU ratio≈0.953 |
-| ledger | 27 total / 26 active / 1 resolved |
-| active cohort focused rerun | 26 failed / 14.69s |
-| current CI | ordinary + Ubuntu parity + macOS parity + main 4-shard full |
-| rulesets API | 0 rulesets |
-| repository owner capability | `chemitaro` admin |
-| classic protection / required set | current tokenで403、未観測 |
+各PRはhuman reviewを必要とする。agentはmerge、required context変更、branch protection変更を行わない。
 
-static / historical root-cause analysis、accepted ADR、same ChatGPT 5.6 Pro strict conversationのadvisoryをlocal evidenceへ照合した。Product policyとして未決事項は残さない。
+### E384-P-004 — CI transition gate
 
-## Product decisions completed now
+Required-context transitionはhuman repository adminが次の順で行う。
 
-1. combined hard cutover。uninstall-first bridge、中間generation、runtime toggleなし。
-2. exact clean `0.2.3`だけをper-workspace one-shot migrate。
-3. active legacy recoveryはlast-compatible `0.2.3`へ戻し、new formatへ推測変換しない。
-4. old `0.2.3` packageのfinal workspace mutation-zeroをmerge acceptanceにする。
-5. `.gitignore`とconsumer `ci.yml`はfresh-init-only consumer-owned seeds。
-6. `init --force`はinstall / update aliasで追加authorityなし。
-7. uninstallはtooling-only、`--apply`がconfirmation、`--keep-specs`はalias。
-8. purge capabilityを廃止し、`--remove-specs`はnon-mutating exit 2 trap。
-9. candidateごとにone invocationでwheel / sdistをbuild。
-10. Linux canonical / macOS deltaへ排他的に割り当て、main Full Regressionを廃止。
-11. required contextは既存名再利用を優先し、human review gateを維持。
+1. existing classic protection、ruleset、required context、review requirement、merge queueをread-only captureする。
+2. new `Provider CI / provider-gate`を追加し、old required contextを保持したままGREENを確認する。
+3. controlled canaryでnew gateをintentional REDにし、merge blockingを確認する。
+4. new gateをGREENへ戻す。
+5. new gateをrequiredへ追加する。
+6. required setが有効であることを再取得する。
+7. old provider-only contextだけをremoveする。unrelated contextとreview requirementは変更しない。
+8. before/after JSONとoperatorを#392 reportへ記録する。
 
-## Internal milestones
+settingsを読めない、new contextが出現しない、REDがblockしない、unrelated setting差分がある場合は停止する。
 
-milestoneはIssueではなく、`iss-00392`内のexecution orderである。
+## 5. Evidence contract
 
-### M1. Successor contract freeze
+### E384-P-005 — Evidence identity
 
-- ownership classes、record / marker schema、typed result
-- exact `0.2.3` recognizer
-- consumer seed matrix
-- CLI state-result table
-- Linux / macOS lane ownership
+全evidenceは少なくとも次へ束縛する。
 
-### M2. Minimal lifecycle core
+- repository
+- full source SHA
+- wheel filename / SHA-256
+- sdist filename / SHA-256
+- candidate digest
+- OS / architecture / Python version
+- exact command
+- exit code
+- wall time
+- process-tree CPU time where applicable
+- test node inventory digest
+- generated timestamp
 
-- no-follow binding、fixed action set
-- candidate stage / validate
-- incomplete / ready record
-- uninstall後も残る`tooling-absent-preserved-data` recordとnever-installed `absent`の識別
-- root / slot replacement、fixed tombstone
-- same-candidate rerun、fault seams
+Evidence artifactはcanonical R/D/Pを上書きせず、#392 `report.md`に結果とdigestを記録する。一時logやbinary artifactをcanonical directoryへcommitしない。
 
-### M3. Combined public cutover
+### E384-P-006 — Acceptance evidence groups
 
-- init / init-force / update / uninstall / reinstall
-- keep alias / remove trap
-- public docs / migration / recovery guidance
+- #387 post-merge admission
+- fixed path / state / result contract
+- candidate stage-before-mutate and atomic publication
+- install/update/uninstall/reinstall matrix
+- same-candidate convergence / cross-intent block
+- exact `0.2.3` migration / active recovery block
+- old-package composite tripwire / native controls
+- public CLI and compatibility trap
+- active failure terminalization
+- duplicate ownership zero
+- one build invocation / same wheel
+- Linux canonical / macOS delta
+- required-context transition
+- five-run / CPU / fault / rolling-20
+- dogfood / fresh consumer / exact PR tree
 
-### M4. Legacy / downgrade proof
+## 6. Stop and forward-fix policy
 
-- exact `0.2.3` migration
-- active / unsupported / modified legacy block
-- old-package mutation-zero
-- Python filesystem eventsと`renameat2` / `renameatx_np`を覆うstartup composite tripwire event 0、native positive controls、補助tree digest不変
+### E384-P-007 — Fail closed
 
-### M5. Old product / test removal
+次の場合、当該step以降を実行しない。
 
-- per-file engine、historical catalog、journal / checkpoint
-- cross-intent recovery、purge、obsolete exact files
-- corresponding historical tests / docs
+- #387 admission mismatch
+- fixed path外のmutation authorityが必要
+- old packageがtarget mutationをattempt
+- atomic rename primitiveまたはno-follow bindingが利用不能
+- candidate/source/stage digest mismatch
+- active failureをfix/successor/retirementへterminal化できない
+- duplicate contract ownerが残る
+- build invocation countが1でない
+- Linux/macOS wheel digestが異なる
+- budget/fault/rolling acceptance未達
+- required-context stateが読めない、またはhuman gateが弱まる
 
-successor proof成立後だけ削除する。
+未達は同じ#392でforward-fixする。shard追加、approved failure、policy skip、old engine fallbackで回避しない。
 
-### M6. Failure cohort / portfolio consolidation
+## 7. Closure states
 
-- 26 active nodesをfix / successor / retirementへterminal化
-- pure/domain、filesystem/service、CLI、artifact、macOS deltaへ再配置
-- approved failure / policy skip / duplicateを0へ
+### Implementation completion
 
-### M7. Build-once provider gate
+Final PR headでRequirementの全technical acceptanceとevidenceが揃った状態。まだmerge済みとは扱わない。
 
-- wheel / sdist build invocation 1
-- Linux single-process canonical
-- macOS delta same-wheel consumer
-- digest / candidate mismatch failure、metrics、duplicate detector
-- required context observation / transition
+### PR merge readiness
 
-### M8. Old CI removal
+New required gate、human review requirement、exact PR SHA、rollback informationが揃い、humanがmerge判断できる状態。
 
-- duplicate parity
-- `provider-full-regression.yml`
-- 4-shard verifier、timing weights、ledger evaluator、policy hooks
+### Human PR merge
 
-new gateのGREEN / intentional RED block確認後だけ撤去する。
+Humanだけが実行する外部状態変更。agentは完了を主張しない。
 
-### M9. Final acceptance / human merge
+### Issue finish
 
-- same final treeの5 reference runs
-- seeded fault pack
-- rolling 20
-- Linux / macOS artifact smoke
-- old package mutation-zero
-- durable uninstall discriminatorとfresh-init-only seed非再作成
-- required set final state
-- human merge、merged tree equality
+Human merge後、merged SHAがverified PR SHAと一致し、#392 reportがcompleteで、SpecDock lifecycle上finish可能な状態。
 
-## Merge-point safety
+### Epic close
 
-一つのIssueを使うことは、最後までmainへ統合できない巨大PRを意味しない。必要に応じて複数PRを使うが、次を守る。
+#392がfinished/closedで、Epic acceptanceが全て満たされ、追加implementation Issueが存在しない状態。#388〜#390はhistorical supersededのまま保持する。
 
-1. successor tests / internal modelをadditiveに導入するPRはexisting public behaviorを維持する。
-2. public hard cutover PRはsuccessor implementation / tests / docsとold contract removalを同時に成立させる。
-3. CI PRはold required contextを失わずnew gateを証明し、必要なexternal transition後にold machineryを撤去する。
-4. 各PR merge直後にaccepted public commandsとrequired gateをGREENに保つ。
-5. Issueは全milestone / acceptanceが完了するまでcloseしない。
+## 8. Epic completion criteria
 
-## Dynamic facts, not deferred decisions
-
-次はProduct判断ではなく、実装対象または外部状態が存在してからしか取得できないevidenceである。同じ`iss-00392`内で取得し、未達なら同Issueを修正する。
-
-- final node set / wheel / sdist digests
-- old `0.2.3` package mutation-zero
-- seeded fault後rerun convergence
-- final 5-run wall / CPU
-- duplicate 0 / policy skip 0
-- macOS delta result
-- rolling 20
-- effective required contexts / classic protection / merge queue
-- final required-context canary
-- merged tree / verified PR tree equality
-
-これらのために調査Issueや検証Issueを作らない。
-
-## Epic verification
-
-- Epic / Issue Requirement / Design / Planのcross-referenceとaccepted ADR反映
-- `./spec-dock/scripts/spec-dock sync --no-github --no-update-active`
-- `./spec-dock/scripts/spec-dock validate`
-- `./spec-dock/scripts/spec-dock deps check --id iss-00392 --github --json`
-- Markdown / trailing whitespace / link inspection
-- GitHub #384 / #392 body sync
-- #388〜#390 close reasonとsuperseded-before-implementationの記録
-- human explanatory HTML / Tailscale preview更新
-- clean pushed branchに対するindependent Strict review
-
-## Exit / handoff
-
-- Product decisionsはaccepted ADRとEpic docsで完了している。
-- `iss-00392`がimplementation-readyで、他のchild implementation Issueを必要としない。
-- dynamic external factsは具体的な取得step / fail-closed conditionを持つ。
-- merge / closeは実装後の別lifecycle gateであり、本planning完了を実装完了と扱わない。
+- Epic Requirement / Design / Plan / ADRと#392 R/D/Pが同じdecisionを表す。
+- #387 dependency admissionがreportに記録される。
+- #392だけでimplementationとverificationが受入可能である。
+- human merge後のexact treeがverified PR treeと一致する。
+- remaining owner decisionがない。execution時にstop conditionが発火した場合だけrepository ownerへescalateする。

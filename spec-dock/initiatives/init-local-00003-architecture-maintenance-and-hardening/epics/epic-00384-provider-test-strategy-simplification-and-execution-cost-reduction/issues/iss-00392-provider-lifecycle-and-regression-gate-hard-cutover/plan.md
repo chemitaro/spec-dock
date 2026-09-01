@@ -5,141 +5,990 @@ ID: "iss-00392"
 関連GitHub: ["#392"]
 状態: "draft"
 最終更新: "2026-09-01"
-依存: ["requirement.md", "design.md"]
+依存: ["requirement.md", "design.md", "../../plan.md", "../../artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md"]
 親: ["epic-00384", "init-local-00003"]
+Planning Level: "critical"
+正本検証:
+  repository: "chemitaro/spec-dock"
+  branch: "codex/epic-00384-provider-test-strategy-planning"
+  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
 
-詳細: [Issue Plan Guide](../../../../../../docs/authoring/issue-plan.md)
+## 1. Execution rules
 
-## Planning Level
+1. 本書だけをentry pointとし、Issue Requirement / Designのtrace IDを参照する。
+2. Product source of truthは`src/spec_dock/`。provider-firstで変更し、dogfood `spec-dock/`を後から同期する。
+3. behavior changeはtest-first。REDが既存testで十分に観測される場合だけ、理由とexact nodeをreportへ記録してnew testを省略できる。
+4. 各stepはimplementationとfocused verificationを同時に完了するvertical milestoneである。最後にまとめて検証しない。
+5. successor proofより先にold production contractを削除しない。
+6. public bridge generation、runtime toggle、old-engine fallbackを作らない。
+7. agentはmerge、required-context変更、Issue closeを実行しない。human operationはexact handoffとして提示する。
+8. evidenceはIssue directoryの`report.md`へ記録する。canonical R/D/Pをimplementation中に書き換えない。
+9. stop condition発火時は同じ#392をopenのまま停止し、指定ownerへevidenceを渡す。
+10. 各merge pointでmainはreleasableでなければならない。
 
-`critical`。
+## 2. Common no-touch boundary
 
-spec-history purgeを廃止してProduct surfaceは縮小するが、root allowlist、binding、marker、uninstall順序の欠陥はuser dataやshared contentを不可逆に削除し得る。public CLI、legacy migration、package artifact、required CIを同時にcutoverするため、successor proof、fault injection、artifact-level verification、人間reviewを必須とする。
+全stepに共通して、次を変更しない。
 
-## 目標
+- `spec-dock/initiatives/**`のuser/Historical content。ただし#392 `report.md`、#392自身のgenerated metadata、human-approved lifecycle updateを除く。
+- Issue #372のcanonical docs/evidence。
+- `spec-dock/.gitignore`とroot `.github/workflows/ci.yml`のdogfood consumer-owned bytes。
+- `.agents/skills/`内の2 fixed slots以外。
+- `.workbench/**`のconsumer content。test/CI evidenceはignored temporary pathへ生成しcommitしない。
+- human review requirement、unrelated required contexts、merge policy。
+- #387 implementation paths after I392-S00 baseline fixation。ただし#392がwhole provider rootをdogfood syncする際、provider asset由来のfinal contentへ更新することは本Issue ownershipとしてtraceする。
+- release publication、tag、PyPI。
 
-4 roots / 2 slotsのminimal lifecycle、tooling-only uninstall、exact `0.2.3` migration、purge removal、contract-owned test portfolio、build-once single-process provider gateを一つのimplementation-and-verification unitとして完成させる。最終candidateから旧per-file engine、active failure approval、duplicate lanes、4-shard machineryを除き、Requirementの全受入を同じIssueで証明する。
+## 3. Step graph
 
-## 順序・依存
+```text
+I392-S00 admission
+  -> I392-S10 model/classifier/candidate
+  -> I392-S20 fresh install/atomic publication
+  -> I392-S30 update/convergence
+  -> I392-S40 uninstall/reinstall/public CLI
+  -> I392-S50 legacy migration/downgrade tripwire
+  -> I392-S60 old engine removal/failure terminalization
+  -> I392-S70 build-once CI transition/old CI removal
+  -> I392-S80 qualification/dogfood/final handoff
+```
 
-Start preconditions:
+## I392-S00 — #387 post-merge deterministic admission and baseline
 
-- Epic Requirement / Design / Planとaccepted ADR `20260831t152024z-adr`がProduct判断を完了している。
-- #388〜#390がfuture implementation unitではない。
-- base SHA `d8f9d02f...`、2,710 node set、node digest、ordinary gate、26 active failuresが記録済みである。
-- effective required contexts / branch protectionがcurrent tokenでは未観測であることを明記し、外部設定を推測変更しない。
+**Objective and contract-visible outcome**
 
-Sequence rules:
+#387がhuman mergeされたexact main SHAを固定し、#392が依存するmanaged distribution semanticsがauthoring時から変わっていないことを機械的に証明する。baseline old `0.2.3` wheel/sdist、node inventory、active failure inventoryを同じSHAへ束縛する。Product codeは変更しない。
 
-- successor tests / service proofをold production contract / testsの削除より先に成立させる。
-- candidate全体と全target collisionを最初のtarget mutation前に検証する。
-- 中間package generationやruntime toggleをmainへ公開しない。
-- 内部milestoneはIssueではない。必要なら複数PRを使うが、各main merge pointをreleasableに保つ。
-- final acceptanceが揃うまでIssueをopenに保ち、検証Issueを作らない。
+**Exact owned paths and symbols**
 
-## 実装step
+- Read-only: repository全体。
+- Evidence write only: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/report.md`
+- Ignored temporary: `spec-dock/.workbench/iss-00392/admission/**`
+- No production symbol change。
 
-### M1. Successor contract freeze
+**Explicit non-owned / no-touch paths**
 
-1. 4 roots / 2 slots / consumer seeds / durable data / unknown targetのclassifierをtest-firstで固定する。
-2. installation record、skill marker、typed resultのschemaを固定する。
-3. exact `0.2.3` recognizer inputsとactive-recovery blockをfixture化する。
-4. init / update / uninstall / compatibility aliasesのstate-result tableを固定する。
-5. Linux canonical / macOS deltaの排他的node ownershipを定める。
+- 全tracked production/test/workflow path。
+- branch protection、required contexts。
+- #387 code/doc diffの修正。
 
-### M2. Minimal lifecycle core
+**Prerequisites and dependency**
 
-1. no-follow repository / parent bindingとfixed action setを実装する。
-2. candidate staging / validationとtree digestを実装する。
-3. incomplete / ready recordとuninstall後も残る`tooling-absent-preserved-data` recordのatomic replaceを実装する。
-4. fixed roots replacement、fixed slot marker、exact tombstone cleanupを実装する。
-5. same-operation / same-candidate rerunとcross-intent blockを実装する。
-6.各mutation境界へfault injection seamを置く。
+- GitHub #387 closed。
+- #387 merge commitがmainへhuman merge済み。
+- clean working tree。
+- exact authoring SHA `d18ca60b2a6ff11571ee366f71c4528dcd668d99`を取得可能。
+- implementation branchは`POST_387_SHA`から作成する。
 
-### M3. Combined public cutover
+**Deterministic allowed drift**
 
-1. install / update / uninstall servicesをfinal interfaceへ接続する。
-2. `init`、`init --force`、`update`、`uninstall`をnew servicesへ接続する。
-3. default dry-run、`--apply`、`--keep-specs`、rejected `--remove-specs`を実装する。
-4. text / JSON / exit mappingとmigration / recovery guidanceを更新する。
-5. durable `tooling-absent-preserved-data` recordからのreinstallを実装し、never-installed `absent`と区別してfresh-init-only seedsを再作成しない。
+Path allowlist:
 
-### M4. Legacy / downgrade proof
+```text
+README.md
+pyproject.toml
+src/spec_dock/assets/spec_dock/docs/authoring/overview.md
+spec-dock/docs/authoring/overview.md
+src/spec_dock/assets/spec_dock/system/active-none/initiative/report.md
+src/spec_dock/assets/spec_dock/system/active-none/epic/report.md
+src/spec_dock/assets/spec_dock/system/active-none/issue/report.md
+spec-dock/system/active-none/initiative/report.md
+spec-dock/system/active-none/epic/report.md
+spec-dock/system/active-none/issue/report.md
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/active.py
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py
+spec-dock/scripts/spec_dock_runtime/commands/active.py
+spec-dock/scripts/spec_dock_runtime/application/contracts.py
+spec-dock/scripts/spec_dock_runtime/application/set_active.py
+spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py
+tests/unit/infra/test_authoring_kit_assets.py
+tests/unit/application/test_set_active.py
+tests/cli_runtime/test_storage_core_cli.py
+tests/cli_runtime/test_issue_lifecycle.py
+tests/cli_runtime/test_doctor.py
+tests/cli_runtime/s09_invariance.py
+tests/cli_runtime/test_runtime_active_s05.py
+tests/cli_runtime/test_runtime_active_s06.py
+tests/conftest.py
+full-regression-ledger.json
+full-regression-timing-weights.json
+spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup/**
+```
 
-1. exact clean `0.2.3` workspaceとmarkerless 2 slotsをbuilt baseline artifactから作る。
-2. clean migration、absent slots、exact slots、modified / foreign slotsを検証する。
-3. active legacy recoveryとunsupported legacyがwrite 0になることを検証する。
-4. Python filesystem eventsとexact 0.2.3の`ctypes.CDLL`経由Linux `renameat2` / macOS `renameatx_np`を覆うtarget-scoped startup composite tripwire付きで旧commandsを実行する。platformごとのnative positive controlをcall前に捕捉し、tripwire event 0を主証拠、tree digest不変を補助証拠としてmutation 0を証明する。
-5. mutationがあればfinal marker / formatを変更して再検証する。
+Content restrictions:
 
-### M5. Old product contract removal
+- `pyproject.toml`: project version/build-system/dependencies/pytest marker/package-data authorityを変更してはならない。#387 planが許可したstale mypy overrideと`assets/install_root/.codex/**` phantom package-data removalだけを許可する。
+- `tests/conftest.py`: #387が削除したexact node IDのset membership removalだけを許可する。`pytest_addoption`、`pytest_collection_modifyitems`、`pytest_sessionfinish`、`HEAVY_NODE_PREFIXES`、`POLICY_SKIP_REASON`、ledger evaluationを変更してはならない。
+- ledger/timing: #387でdeleted/retiredとなったexact node entryのremove/terminal updateだけを許可し、schema、command、failure approval rule、other weightsを変更してはならない。
+- provider/dogfood pairはcontent-equivalentでなければならない。
 
-successor proof後に限り、per-file reconciler、historical identity catalog、operation journal、per-action checkpoint、cross-intent recovery、purge service、obsolete exact-file catalog、対応tests / docsを削除する。削除対象、reason、successor / retirement authority、focused verificationをIssue reportの一枚の表へ記録する。
+Protected path driftは一件でも停止:
 
-### M6. Failure cohort / portfolio consolidation
+```text
+src/spec_dock/cli.py
+src/spec_dock/managed_distribution.py
+src/spec_dock/assets/managed_distribution.json
+src/spec_dock/assets/install_root/**
+.github/workflows/**
+scripts/quality/**
+tests/unit/infra/test_managed_distribution.py
+tests/unit/infra/test_init_update.py
+tests/cli_runtime/test_distribution_cutover.py
+tests/cli_runtime/test_uninstall.py
+tests/cli_runtime/test_update.py
+tests/integration/test_epic_00343_distribution.py
+```
 
-1. 26 active nodeをexact nodeごとにfix / current successor / accepted retirementへ分類する。
-2. S05 context-pack、S06 active、import S10、delete scrub、credentialed URL、shell structural、sync、workbench familyをcurrent contractへ修正する。
-3. approved-no-opを0にしてfailure ledgerを削除する。
-4. testをpure/domain、filesystem/service、CLI、built artifact、macOS deltaへ再配置する。
-5. path-based fast/full permissionを撤去し、canonical collectionでpolicy skip 0にする。
+**RED evidence or justified no-new-test rule**
 
-### M7. Build-once provider gate
+Admissionのためnew product testは作らない。REDはallowlist checkerが意図的にprotected dummy pathを入力したdry-run fixtureでnonzeroになること、content checkerがforbidden `pyproject.toml` changeをrejectすることで示す。checkerをrepositoryへcommitせず、reportへcommand/exitを残す。
 
-1. authoritative candidateからone invocationでwheel / sdistをbuildしdigest manifestを作る。
-2. Linux canonical single-process laneを実装する。
-3. same wheelをconsumeするmacOS delta laneを実装する。
-4. candidate SHA / digest mismatch failure、duplicate node detector、wall / CPU metricsを実装する。
-5. effective required contexts、classic protection、merge queueをPR上でread-only取得する。
-6. existing context名を再利用する。不可避な場合だけold+new required / intentional RED / new-only requiredを人間ownerと実行する。
+**Smallest implementation action**
 
-### M8. Old CI removal
+1. GitHub/APIとGitで#387 state、merge commit、main ancestryを取得する。
+2. `POST_387_SHA`をfull SHAで固定する。
+3. `git diff --name-status d18ca60b2a6ff11571ee366f71c4528dcd668d99..$POST_387_SHA`をallowlistへ通す。
+4. restricted filesのzero-context diffをcontent ruleへ通す。
+5. current commandsを実行する。
+6. clean detached worktreeからbaseline wheel/sdistをone invocationでbuildしhashする。
+7. baseline wheelでfresh consumerを作り、legacy root/slot digest fixture source dataを生成する。
+8. node inventory、active ledger rows、ruleset/readable protection stateをcaptureする。
 
-new gateのGREEN / intentional RED block確認後に、duplicate parity selection、`provider-full-regression.yml`、4-shard verifier、timing weights、failure ledger evaluator、policy skip hooks、関連meta-testsを削除する。main pushでfull regressionやcandidate rebuildを行わない。
+**Focused verification commands**
 
-### M9. Final acceptance
+```bash
+test -z "$(git status --short)"
+git merge-base --is-ancestor "$ISSUE_387_MERGE_SHA" "$POST_387_SHA"
+git diff --name-status d18ca60b2a6ff11571ee366f71c4528dcd668d99.."$POST_387_SHA"
+uv run python -c 'import tomllib; p=tomllib.load(open("pyproject.toml","rb")); assert p["project"]["version"]=="0.2.3"'
+make lint
+uv run pytest -q
+uv run python -m scripts.quality.verify_full_regression --shards 4
+rm -rf spec-dock/.workbench/iss-00392/admission/dist
+uv build --sdist --wheel --out-dir spec-dock/.workbench/iss-00392/admission/dist
+python3 ./spec-dock/scripts/spec-dock validate
+git diff --check
+test -z "$(git status --short)"
+```
 
-同じfinal candidateでlocal / fixed Linux 5 runs、seeded fault pack、rolling 20、Linux / macOS artifact smoke、old-package mutation-zero、duplicate 0、required setを確認する。人間merge後、merged treeがverified PR treeと同一であることを確認する。
+**Expected observable result**
 
-## 検証
+- allowlist/content check pass。
+- all current gates pass under current policy。
+- baseline package version exactly `0.2.3`。
+- exactly one wheel and one sdist、hash recorded。
+- legacy fresh workspace digest data generated。
+- tracked tree clean。
 
-Planning baseline:
+**Evidence to record in Issue `report.md`**
 
-- `uv run pytest --run-full-regression --collect-only -qq`: 2,710 nodes
-- sorted node-set SHA-256: `f607b007d167231ed27f2a17391b0d8b3aa452d67ce6532565463e193486a04c`
-- `uv run pytest -q`: 1,574 passed、1,136 skipped、57.02s
-- active ledger focused rerun: 26 failed、14.69s
+`AUTHORING_SHA`、`ISSUE_387_MERGE_SHA`、`POST_387_SHA`、diff path table、content restriction result、commands/exit/duration、baseline filenames/hashes、legacy tree digests、node inventory digest、active ledger exact node list、rulesets/protection read result。
 
-Final commands / evidenceは実装中にrepository scriptsへ固定する。最低限、次を同じcandidate SHAへ束縛する。
+**Stop conditions and escalation owner**
 
-- lint / static analysis
-- canonical single-process pytest collection and execution
-- focused lifecycle / CLI / fault tests
-- built wheel / sdist source / digest verification
-- baseline `0.2.3` migration and old-package mutation-zero
-- macOS delta node set and Linux intersection 0
-- five-run wall / process-tree CPU report
-- seeded fault detection report
-- rolling-20 flake / retry report
-- required contexts before / after、review requirement、merge queue、canary
-- SpecDock sync / validateとdogfooding projection inspection
+Any mismatch、#387 not merged、version != 0.2.3、protected drift、baseline failure、dirty treeで停止。Owner: repository owner / Product owner `chemitaro`。Implementation agentはallowlistを拡張しない。
 
-## rollback
+**Cleanup**
 
-- pre-merge: failing candidateをmergeせず、required setを変更した場合はcaptured before stateへ戻す。
-- runtime preflight failure: target mutation 0でread-only diagnosticを返す。
-- runtime partial failure: same operation / same candidateのexternal rerunだけを許可する。
-- destructive defect: apply routeをfail closedにし、old engineへfallbackしない。
-- post-merge: human-reviewed Git revertを用いる。user dataをrollback素材として変更しない。
+Detached worktreeとtemporary virtual environmentを削除する。baseline artifact/hash evidenceはignored workbenchに保持し、binaryをcommitしない。
 
-## exit / handoff
+**Merge-point invariant**
 
-- Requirementの全checkboxが同じfinal tree / artifactsで証明されている。
-- unexpected failures、approved failures、policy skips、duplicate nodesがすべて0である。
-- performance / fault / rolling-20 / artifact / required-context evidenceがIssue reportに記録されている。
-- human mergeが完了し、merged treeとverified PR treeが一致する。
-- `iss-00392`のReportを完成し、SpecDock `issue finish`可能な状態へ進める。
-- follow-up decision / investigation / verification Issueを予約しない。未達なら同じIssueをopenのまま修正する。
+Admissionはcode diffを作らない。mainは#387 merge後のreleasable stateのまま。
+
+**Trace IDs**
+
+I392-RQ-001、I392-RQ-014、I392-RQ-019、I392-D-014、I392-D-018。
+
+## I392-S10 — Fixed model, record, classifier, candidate, legacy fixture
+
+**Objective and contract-visible outcome**
+
+Public routeを変更せず、final fixed paths、strict record/marker、candidate digest、target classifier、single-version legacy fixtureをdirect APIで利用可能にする。old product behaviorはmain上で維持する。
+
+**Exact owned paths and symbols**
+
+```text
+src/spec_dock/provider_lifecycle/__init__.py
+src/spec_dock/provider_lifecycle/model.py
+src/spec_dock/provider_lifecycle/candidate.py
+src/spec_dock/provider_lifecycle/legacy_023.py
+src/spec_dock/assets/legacy_0_2_3.json
+tests/unit/infra/test_provider_lifecycle_model.py
+tests/unit/infra/test_provider_lifecycle_candidate.py
+tests/unit/infra/test_provider_assets.py
+```
+
+Symbols: I392-D-002のmodel/candidate/legacy symbols。`FINAL_DISTRIBUTION_VERSION`のproduction valueは`0.2.4`。
+
+**Explicit non-owned / no-touch paths**
+
+`src/spec_dock/cli.py`、`managed_distribution.py/json`、provider workflows、current old tests、dogfood roots/slots/record。
+
+**Prerequisites and dependency**
+
+I392-S00 pass。baseline legacy fixture input/hash固定済み。
+
+**RED evidence**
+
+最初に次のfailing testsを追加する。
+
+- exact constants/path order
+- strict record exact keys/state-operation invariants/duplicate key/size/type
+- slot marker exact keys/digest match
+- candidate rejects symlink/special/hard link/path traversal
+- candidate digest deterministic、mode/content/version sensitive、seed/marker excluded
+- record JSON blocks old canonical version parsing fixture
+- legacy fixture exact 4 roots、2 slots、recovery paths
+- legacy recognizer: exact/absent slots pass、modified/foreign/recovery block
+
+**Smallest implementation action**
+
+Dataclasses/enums/strict parser、candidate capture/digest、legacy fixture loader/whole-tree observationを実装する。No mutation functionを作らない。
+
+**Focused verification commands**
+
+```bash
+uv run pytest -q \
+  tests/unit/infra/test_provider_lifecycle_model.py \
+  tests/unit/infra/test_provider_lifecycle_candidate.py \
+  tests/unit/infra/test_provider_assets.py
+uv run ruff check src/spec_dock/provider_lifecycle \
+  tests/unit/infra/test_provider_lifecycle_model.py \
+  tests/unit/infra/test_provider_lifecycle_candidate.py \
+  tests/unit/infra/test_provider_assets.py
+uv run mypy src/spec_dock/provider_lifecycle
+```
+
+**Expected observable result**
+
+All new unit tests pass。No CLI behavior/tree mutation。Legacy fixture hashがS00 generated dataと一致する。
+
+**Evidence to record**
+
+RED node/expected failure、GREEN command/exit、candidate digest examples、legacy fixture source baseline hash、coverage-to-trace table。
+
+**Stop conditions and escalation owner**
+
+Baseline fixtureをper-file historical catalogへ拡張しないと認識できない、fixed path以外が必要、record schemaへprogress/checkpointが必要になった場合停止。Owner: Product owner。
+
+**Cleanup**
+
+Test temp dirs/cacheを削除。generated fixture script/outputのうちcommitted JSON以外を削除。
+
+**Merge-point invariant**
+
+Dormant successorのみ。public CLIはold engineのまま、existing gatesもGREEN。Runtime toggleなし。
+
+**Trace IDs**
+
+I392-RQ-002〜007、I392-RQ-014、I392-D-001〜006、I392-D-010、I392-D-014。
+
+## I392-S20 — Descriptor-bound filesystem and fresh install vertical slice
+
+**Objective and contract-visible outcome**
+
+Fresh targetに対しcandidate全体をstage/validateしてから、4 roots、2 slots、seeds、ready recordをfinal orderでatomic publishするdirect service sliceを完成する。foreign collisionとunsafe bindingはmutation zeroでblockする。
+
+**Exact owned paths and symbols**
+
+```text
+src/spec_dock/provider_lifecycle/filesystem.py
+src/spec_dock/provider_lifecycle/service.py
+tests/unit/infra/test_provider_lifecycle_filesystem.py
+tests/unit/infra/test_provider_lifecycle_service.py
+tests/unit/infra/test_provider_lifecycle_faults.py
+```
+
+Symbols: `PosixProviderFilesystem`、binding/native rename/record publication、`ProviderLifecycleService.install_tooling`、`LifecycleFaultHook`。
+
+**Explicit non-owned / no-touch paths**
+
+Public `cli.py` route、update/uninstall routing、legacy old engine、workflow、dogfood tracked tree。
+
+**Prerequisites and dependency**
+
+I392-S10 GREEN。Linux/macOS native symbol behaviorはunit wrapperとplatform probeで確認可能。
+
+**RED evidence**
+
+- stage/source digest mismatch leaves target digest unchanged
+- root/parent symlink、hard-link record、foreign fixed root/slot block
+- fresh order and ready-last
+- existing seed bytes/type preserved
+- absent seeds created exactly once
+- `.github` parent symlink block when seed absent
+- executable mode preserved
+- native no-replace/exchange wrapper fail closed
+- fault after each durable boundary yields incomplete record and protected data unchanged
+
+**Smallest implementation action**
+
+Root lock/binding、external deterministic stage、native rename wrappers、atomic record、directory publish、seed creation、fresh install serviceだけを実装する。Update/uninstall behaviorはまだpublicに接続しない。
+
+**Focused verification commands**
+
+```bash
+uv run pytest -q \
+  tests/unit/infra/test_provider_lifecycle_filesystem.py \
+  tests/unit/infra/test_provider_lifecycle_service.py \
+  tests/unit/infra/test_provider_lifecycle_faults.py \
+  -k 'fresh or binding or candidate or seed or publish'
+make lint
+```
+
+**Expected observable result**
+
+Synthetic fresh workspaceがfinal 4 roots/2 slots/recordを持ち、seed ruleとprotected digestを満たす。Injected failureはsuccessにならず、record state/operationがexactである。
+
+**Evidence to record**
+
+Mutation order log、pre/post protected digest、record/marker sample、fault-point table、native primitive availability、RED/GREEN commands。
+
+**Stop conditions and escalation owner**
+
+Generic `os.rename` fallbackが必要、target内部arbitrary stagingが必要、seed overwriteが必要、root単位でなくper-file recoveryが必要になった場合停止。Owner: Product owner / filesystem safety reviewer。
+
+**Cleanup**
+
+Owned external stagesを削除。cleanup failure testではwarning evidenceを残した後test temp parentごと削除。
+
+**Merge-point invariant**
+
+Public productはold engine。Dormant fresh serviceはdirect testsでGREEN。Existing ordinary/full gatesがGREEN。
+
+**Trace IDs**
+
+I392-RQ-002〜010、I392-RQ-013、I392-D-007〜009、I392-D-012。
+
+## I392-S30 — Update, incomplete convergence, cross-intent/cross-candidate blocking
+
+**Objective and contract-visible outcome**
+
+Ready/incomplete workspaceに対するwhole-root/slot update、missing repair、same-operation same-candidate convergenceをdirect serviceで完成する。No automatic rollback。
+
+**Exact owned paths and symbols**
+
+Existing S10/S20 files:
+
+```text
+src/spec_dock/provider_lifecycle/model.py
+src/spec_dock/provider_lifecycle/candidate.py
+src/spec_dock/provider_lifecycle/filesystem.py
+src/spec_dock/provider_lifecycle/service.py
+tests/unit/infra/test_provider_lifecycle_service.py
+tests/unit/infra/test_provider_lifecycle_faults.py
+```
+
+Symbols: `update_tooling`、`resume_incomplete`、state transition validation、exchange publication。
+
+**Explicit non-owned / no-touch paths**
+
+Public CLI、uninstall/purge code、legacy production route、workflow、old test deletion。
+
+**Prerequisites and dependency**
+
+I392-S20 GREEN。Fresh serviceがready recordを生成できる。
+
+**RED evidence**
+
+- modified record-owned root whole-replaced
+- missing root/slot repaired
+- marker mismatch blocks before write
+- fault after each root/slot/ready boundary
+- matching rerun skips already-matching targets and completes
+- different candidate digest blocks
+- uninstall intent against incomplete install/update blocks
+- root/parent identity race fails closed
+- cleanup-only failure after ready returns warning exit semantic
+
+**Smallest implementation action**
+
+Update planとresume classifierを追加し、fresh publish primitiveを再利用する。Persistent progress listは追加しない。Current target observationとcandidate comparisonだけでremaining workを決める。
+
+**Focused verification commands**
+
+```bash
+uv run pytest -q \
+  tests/unit/infra/test_provider_lifecycle_service.py \
+  tests/unit/infra/test_provider_lifecycle_faults.py \
+  -k 'update or incomplete or resume or cross_intent or cross_candidate or warning'
+make lint
+```
+
+**Expected observable result**
+
+全fault pointでfirst runがexpected partial failure、same candidate rerunがreadyへ収束。Cross-intent/candidateはmutation_started false。
+
+**Evidence to record**
+
+Fault matrix（point、first status、record、rerun status）、target action order、cross-block codes、protected digest。
+
+**Stop conditions and escalation owner**
+
+Operation checkpoint/progress bit、automatic rollback、old engine fallbackが必要になった場合停止。Owner: Product owner。
+
+**Cleanup**
+
+Owned stage/tombstone cleanupを検証し、test tempを削除。
+
+**Merge-point invariant**
+
+Public productはold engine。Dormant successor install/updateがGREEN。No new public generation。
+
+**Trace IDs**
+
+I392-RQ-009〜010、I392-RQ-013、I392-RQ-018、I392-D-009〜013。
+
+## I392-S40 — Tooling-only uninstall, durable reinstall, public CLI hard cutover, purge trap
+
+**Objective and contract-visible outcome**
+
+Uninstall/reinstallを完成し、package versionを`0.2.4`へ上げ、`init`/`update`/`uninstall`をnew servicesへ一度に接続する。`--remove-specs`をpermanent mutation-zero trapへ変更する。これはcombined public hard cutover pointである。
+
+**Exact owned paths and symbols**
+
+```text
+pyproject.toml
+src/spec_dock/cli.py
+src/spec_dock/provider_lifecycle/service.py
+src/spec_dock/provider_lifecycle/public_result.py
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/uninstall.py
+spec-dock/scripts/spec_dock_runtime/commands/uninstall.py
+README.md
+tests/unit/infra/test_provider_lifecycle_public_result.py
+tests/cli_runtime/test_provider_lifecycle.py
+tests/cli_runtime/test_uninstall.py
+tests/cli_runtime/test_update.py
+```
+
+Symbols: `uninstall_tooling`、dispatch functions、public result mappers、CLI parser/dispatch。`_run_uninstall_explicit_spec_history_purge`とpurge request/result helpersは削除対象。
+
+**Explicit non-owned / no-touch paths**
+
+User history、seed bytes、provider workflows、managed engine file（まだsuccessor proofのため削除しない）、old CI machinery、release publication。
+
+**Prerequisites and dependency**
+
+I392-S30 GREEN。Public cutover PRはI392-S40〜S50のrequired proofを含め、old engine fallbackなしでmerge可能にする。
+
+**RED evidence**
+
+- uninstall dry-run complete action set/mutation zero
+- apply without specs flag succeeds tooling-only
+- keep alias exact-equivalent
+- remove trap precedence on missing/invalid target、text/JSON、exit 2、mutation zero
+- uninstall ready/legacy/tooling-absent states
+- durable record remains
+- reinstall does not recreate deleted seeds
+- `init --force` state dispatch
+- `update` absent installs without seeds
+- public text/JSON existing fields + additive code/mutation_started
+- wrapper forwarding remains `uvx --no-cache`
+- public success/error channels and exit map
+
+Before implementation these tests must fail against old semantics、特に`uninstall --apply` without specs modeとremove trap。
+
+**Smallest implementation action**
+
+1. Implement uninstall direct service and result adapter。
+2. Wire parser/dispatch to successor only。
+3. Set project version `0.2.4`。
+4. Remove public callsites to old fresh/recognized/deprovision/purge executors。
+5. Update shipped runtime uninstall help/forwarding semantics and dogfood mirror。
+6. Update README public guidance。
+7. Keep old engine file temporarily unreachable until S50/S60 proof。
+
+**Focused verification commands**
+
+Current root policy still marks CLI runtime asfull-regression; use explicit current flags until I392-S60:
+
+```bash
+uv run pytest -q tests/unit/infra/test_provider_lifecycle_public_result.py
+uv run pytest --run-full-regression --full-regression-shard -q \
+  tests/cli_runtime/test_provider_lifecycle.py \
+  tests/cli_runtime/test_uninstall.py \
+  tests/cli_runtime/test_update.py
+uv run python -c 'import tomllib; p=tomllib.load(open("pyproject.toml","rb")); assert p["project"]["version"]=="0.2.4"'
+make lint
+```
+
+**Expected observable result**
+
+Public commands use only new services。Uninstall default/apply/aliases/trap satisfy matrix。Purge mutation path is unreachable。User data/seeds remain identical。
+
+**Evidence to record**
+
+Parser help snapshots、command/state matrix、text/JSON payloads、exit codes、mutation_started、protected digests、version bump、old service callsite grep result。
+
+**Stop conditions and escalation owner**
+
+Public route needs runtime toggle/bridge、purge compatibility requires mutation、seed update is needed、existing JSON field removal is unavoidable。Stop and escalate to Product owner。Do not silently change schema。
+
+**Cleanup**
+
+Remove temporary snapshots not used as test fixtures。Ensure provider/dogfood runtime wrapper pair identical。
+
+**Merge-point invariant**
+
+If merged, public product is fully final `0.2.4` lifecycle for implemented states; old engine is unreachable and cannot be fallback。All existing/current gates plus new focused tests GREEN。
+
+**Trace IDs**
+
+I392-RQ-008〜013、I392-RQ-016〜018、I392-D-011〜015。
+
+## I392-S50 — Exact legacy migration and old-package composite tripwire
+
+**Objective and contract-visible outcome**
+
+Post-#387 exact `0.2.3` baselineから`0.2.4`へのmigrationとlegacy tooling uninstallをbuilt artifactsで証明し、old packageがfinal workspaceへmutationをattemptしないことをLinux/macOSで証明する。
+
+**Exact owned paths and symbols**
+
+```text
+src/spec_dock/provider_lifecycle/legacy_023.py
+src/spec_dock/provider_lifecycle/service.py
+tests/integration/test_provider_lifecycle_artifacts.py
+tests/integration/test_provider_lifecycle_tripwire.py
+tests/platform/macos/test_provider_lifecycle_macos.py
+tests/support/provider_lifecycle_tripwire/sitecustomize.py
+tests/support/provider_lifecycle_tripwire/native_positive_control.py
+```
+
+**Explicit non-owned / no-touch paths**
+
+Legacy consumer history/seeds、baseline old artifact bytes、provider CI settings、old engine deletion（S60）。
+
+**Prerequisites and dependency**
+
+I392-S40 public cutover GREEN。S00 baseline wheel/hash available。Final wheel can be built locally。
+
+**RED evidence**
+
+- exact baseline workspace migrates
+- modified each root blocks
+- each slot absent/exact passes; modified/foreign markerless blocks
+- each active recovery marker blocks
+- migration failure after record/root/slot resumes only with same final candidate
+- legacy uninstall preserves data/seeds
+- old command matrix initially must refuse final JSON record
+- startup sentinel proves tripwire loaded
+- Python write positive control trapped before write
+- Linux native `renameat2` positive control trapped before call
+- macOS native `renameatx_np` positive control trapped before call
+- old commands event count 0/tree digest unchanged
+
+**Smallest implementation action**
+
+Complete legacy adapter wiring、build isolated old/final artifacts、add startup `sitecustomize` proxy/audit hook、add command matrix and native controls。If an old command reaches mutation event, change final record/marker admission boundary within current design; do not add bridge。
+
+**Focused verification commands**
+
+Until S60 policy removal:
+
+```bash
+uv build --sdist --wheel --out-dir spec-dock/.workbench/iss-00392/final-artifacts
+uv run pytest --run-full-regression --full-regression-shard -q \
+  tests/integration/test_provider_lifecycle_artifacts.py \
+  tests/integration/test_provider_lifecycle_tripwire.py
+# On macOS:
+uv run pytest --run-full-regression --full-regression-shard -q \
+  tests/platform/macos/test_provider_lifecycle_macos.py
+```
+
+**Expected observable result**
+
+Exact migration/uninstall matrix GREEN。Every old command reports refusal、tripwire events `[]`、target digest identical。Positive controls each produce exactly one pre-call event and no target mutation。
+
+**Evidence to record**
+
+Baseline/final wheel hashes、workspace fixture digest、migration matrix、old command argv/exit/stdout/stderr sanitized、tripwire event logs、native symbol/platform、positive control result、pre/post tree digest。
+
+**Stop conditions and escalation owner**
+
+Old command event > 0、positive control not intercepted、baseline fixture mismatch、active recovery converted、unsupported platform fallback。Immediate stop; owner: Product owner + filesystem safety reviewer。Public PR is not mergeable。
+
+**Cleanup**
+
+Delete isolated venv、temporary workspaces、native probes。Retain only hash/evidence references in report。
+
+**Merge-point invariant**
+
+Public `0.2.4` is releasable and exact `0.2.3` migration/downgrade-safe。Old engine remains unreachable only until S60 deletion。
+
+**Trace IDs**
+
+I392-RQ-014〜015、I392-RQ-020、I392-D-006、I392-D-014、I392-D-017。
+
+## I392-S60 — Old engine removal, test portfolio ownership, active failure terminalization
+
+**Objective and contract-visible outcome**
+
+Successor proofをauthorityに、old per-file/journal/purge engineとduplicate testsを削除する。Post-#387 active failuresを全件terminal化し、canonical pytestにapproved failure/policy skipを残さない。
+
+**Exact owned paths and symbols**
+
+Delete:
+
+```text
+src/spec_dock/managed_distribution.py
+src/spec_dock/assets/managed_distribution.json
+tests/unit/infra/test_managed_distribution.py
+tests/unit/infra/test_init_update.py
+tests/cli_runtime/test_distribution_cutover.py
+tests/integration/test_epic_00343_distribution.py
+full-regression-ledger.json
+tests/conftest.py
+```
+
+Add/update:
+
+```text
+src/spec_dock/context_pack.py
+src/spec_dock/cli.py
+tests/unit/infra/test_provider_assets.py
+tests/provider_test_ownership.json
+pyproject.toml
+tests/**  # exact active failure owner files only
+```
+
+Move `render_context_pack()` behavior if still required。Remove `fast`/`full_regression` markers from tests and marker declarations from pyproject。
+
+**Explicit non-owned / no-touch paths**
+
+Current product behavior unrelated to accepted retirement、Issue #372、consumer history、provider workflow（S70）、timing/sharder files（S70）、human settings。
+
+**Prerequisites and dependency**
+
+I392-S50 all successor/artifact/tripwire proof GREEN。No old public callsite。
+
+**RED evidence**
+
+- `git grep` detects forbidden old imports/symbols/files
+- ownership map rejects duplicate/missing node
+- canonical collection rejects policy skip reason
+- each active ledger entry has failing current test or retirement proof before fix
+- context pack extraction preserves current surviving behavior
+- non-lifecycle asset assertions survive move from `test_init_update.py`
+
+**Smallest implementation action**
+
+1. Extract surviving non-lifecycle context behavior。
+2. Move retained asset assertions。
+3. For each post-#387 active ledger row, apply mechanical disposition:
+   - current accepted behavior exists -> fix source/test until pass
+   - exact successor node covers same requirement -> map and delete old node
+   - #387/accepted hard-cutover retires behavior -> delete node and record requirement retirement
+   - anything else -> stop; never approve failure
+4. Add ownership JSON and verifier unit tests。
+5. Delete old engine/manifest/tests/ledger/root policy hook。
+6. Remove marker decorators/options/retry assumptions。
+7. Run full unskipped canonical suite in one process。
+
+**Focused verification commands**
+
+```bash
+test -z "$(git grep -nE 'managed_distribution|execute_explicit_spec_history_purge_distribution|--run-full-regression|--full-regression-shard|POLICY_SKIP_REASON|approved-no-op' -- \
+  src tests pyproject.toml README.md ':!spec-dock/initiatives/**' ':!*.md' || true)"
+uv run pytest -q tests/unit/infra/test_provider_assets.py tests/unit/infra/test_provider_gate.py
+uv run python scripts/provider_gate.py verify-node-ownership --map tests/provider_test_ownership.json
+uv run pytest -q tests --ignore=tests/platform/macos
+make lint
+```
+
+**Expected observable result**
+
+Old engine/files/imports absent。Canonical one-process run unexpected failure 0、approved failure 0、policy skip reason 0。All active ledger entries have terminal disposition in report。Ownership duplicate 0。
+
+**Evidence to record**
+
+Old file deletion list、symbol grep、active failure disposition table（old node、status、successor/retirement trace、command）、collection count/digest、skip reason inventory、ownership verifier output、context extraction proof。
+
+**Stop conditions and escalation owner**
+
+Active entry cannot be terminalized、surviving behavior depends on old journal/catalog、security invariant lacks successor、canonical suite fails。Stop; owner: Product owner。Do not restore ledger/skip。
+
+**Cleanup**
+
+Remove obsolete fixtures/helpers/imports/mypy overrides。Delete empty `scripts/quality` only in S70 after sharder removal。Run `git diff --check`。
+
+**Merge-point invariant**
+
+Final public lifecycle has no old engine fallback。All tests pass unskipped under current provider workflow even before workflow rewrite。Main remains releasable。
+
+**Trace IDs**
+
+I392-RQ-017、I392-RQ-019、I392-D-001、I392-D-016。
+
+## I392-S70 — Build-once artifact gate, Linux canonical/macOS delta, required-context transition, old CI removal
+
+**Objective and contract-visible outcome**
+
+Provider CIをone build / same wheel / Linux canonical / macOS delta / aggregate gateへ切り替え、main-push 4-shard Full Regression、timing/sharder、duplicate parityを削除する。Human review gateを弱めない。
+
+**Exact owned paths and symbols**
+
+```text
+scripts/provider_gate.py
+tests/unit/infra/test_provider_gate.py
+tests/provider_test_ownership.json
+scripts/static_analysis/run.sh
+Makefile
+.github/workflows/provider-ci.yml
+.github/workflows/provider-full-regression.yml      # delete
+full-regression-timing-weights.json                 # delete
+scripts/quality/full_regression_baseline.py         # delete
+scripts/quality/verify_full_regression.py           # delete
+scripts/quality/__init__.py                         # delete if directory empty
+```
+
+Symbols/subcommandsはI392-D-018。
+
+**Explicit non-owned / no-touch paths**
+
+Root consumer `.github/workflows/ci.yml`、shipped seed `src/spec_dock/assets/install_root/.github/workflows/ci.yml`、commit-identity workflow、unrelated required contexts、review requirement、merge queue unless exact restoration required。
+
+**Prerequisites and dependency**
+
+I392-S60 final unskipped suite GREEN。GitHub settings read permission available for human/admin transition。Current repo rulesets observation at authoring was empty; classic protection must be re-read at transition time。
+
+**RED evidence**
+
+- manifest rejects wrong source SHA/hash/size/build count/output count
+- build wrapper test proves one subprocess invocation
+- canonical rejects `-n`, more than one pytest child, policy skip/approved failure
+- macOS rejects wheel hash mismatch and Linux-owned node intersection
+- ownership verifier rejects duplicate
+- qualification evaluator rejects wall/CPU/flake/retry
+- workflow inspection proves macOS downloads artifact and does not build
+- intentional RED canary blocks merge before old context removal
+
+**Smallest implementation action**
+
+1. Implement `scripts/provider_gate.py` and unit tests。
+2. Add Makefile targets、static-analysis coverage。
+3. Rewrite provider CI。
+4. Run new jobs while old required contexts remain。
+5. Human captures protection state。
+6. Human executes new gate intentional RED/GREEN and required transition。
+7. Delete old full-regression workflow、timing、sharder scripts。
+8. Verify no main-push provider regression/rebuild remains。
+
+**Focused verification commands**
+
+```bash
+uv run pytest -q tests/unit/infra/test_provider_gate.py
+uv run python scripts/provider_gate.py build \
+  --source-sha "$(git rev-parse HEAD)" \
+  --out spec-dock/.workbench/provider-gate/candidate
+uv run python scripts/provider_gate.py verify-artifact \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json \
+  --source-sha "$(git rev-parse HEAD)"
+uv run python scripts/provider_gate.py verify-node-ownership \
+  --map tests/provider_test_ownership.json
+uv run python scripts/provider_gate.py canonical \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json
+# macOS runner:
+uv run python scripts/provider_gate.py macos-delta \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json
+make lint
+git grep -nE 'verify_full_regression|full-regression-ledger|full-regression-timing|--shards 4|--run-full-regression|full_regression' \
+  -- . ':!spec-dock/initiatives/**' || true
+```
+
+**Expected observable result**
+
+Build invocation count 1、one wheel/one sdist。Linux/macOS wheel hash identical。Canonical one process/worker 1。Lane intersection 0。New aggregate gate GREEN and intentional RED blocking verified。Old files/triggers absent。
+
+**Evidence to record**
+
+Candidate manifest、workflow run IDs/jobs、Linux/macOS environment、node inventories/digests/intersection、build invocation log、same wheel hash、sdist smoke、required contexts before/after、intentional RED proof、human operator、removed files。
+
+**Stop conditions and escalation owner**
+
+Settings unreadable、new context not emitted、RED does not block、unrelated gate changes、macOS rebuild、hash mismatch、canonical uses multiple pytest processes、old main-push trigger remains。Stop。Owner: human repository admin + Product owner。
+
+**Cleanup**
+
+Remove canary fault、restore green branch、delete temporary CI artifact after retention need、remove old required contexts only after new required state confirmed。
+
+**Merge-point invariant**
+
+New provider gate is required and GREEN。Human review requirement unchanged。Main push does not run old Full Regression。Main remains releasable。
+
+**Trace IDs**
+
+I392-RQ-019〜020、I392-D-016、I392-D-018。
+
+## I392-S80 — Qualification tooling, final dogfood, package/fresh consumer, exact PR handoff
+
+**Objective and contract-visible outcome**
+
+Same final candidateでfive-run/CPU、seeded faults、rolling 20を実行し、provider/dogfood/public docsをfinal contractへ収束させる。Final PR headのexact artifact/tree/context handoffを作る。Pure verification-only stepにせず、qualification command、final drift guard、dogfood record/slot markers、docsを完成させる。
+
+**Exact owned paths and symbols**
+
+```text
+scripts/provider_gate.py                         # qualify/summarize finalization
+tests/unit/infra/test_provider_gate.py
+README.md
+src/spec_dock/assets/spec_dock/docs/authoring/overview.md
+spec-dock/docs/authoring/overview.md
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/uninstall.py
+spec-dock/scripts/spec_dock_runtime/commands/uninstall.py
+spec-dock/{docs,templates,system,scripts}         # dogfood sync output
+.agents/skills/spec-dock
+.agents/skills/spec-dock-grill-with-docs
+spec-dock/spec-dock.version                      # final JSON record
+.agents/skills/*/.spec-dock-provider-slot.json   # exact two slots
+tests/provider_test_ownership.json
+#392 report.md
+```
+
+Dogfood seed files remain no-touch。
+
+**Explicit non-owned / no-touch paths**
+
+All consumer history/artifacts/workbench、dogfood seed bytes、unrelated skills、required settings except human-read verification、canonical R/D/P、release publication。
+
+**Prerequisites and dependency**
+
+I392-S70 new gate GREEN/required。Final PR head candidate can be fixed。
+
+**RED evidence**
+
+- qualification evaluator fails injected over-budget/CPU/flake/retry sample
+- seeded fault inventory fails if any point not detected
+- provider/dogfood root diff guard fails before sync
+- dogfood seed digest guard fails on mutation
+- fresh consumer validation fails before artifact install
+- exact tree handoff fails if working tree/PR head changes after evidence
+
+**Smallest implementation action**
+
+1. Finalize `qualify`/`summarize` output schemas。
+2. Run fault pack and ensure all fault IDs owned。
+3. Update public docs/help。
+4. Use final built wheel/service to update dogfood roots/slots/record。
+5. Verify seed pre/post digests。
+6. Run SpecDock sync/validate。
+7. Create fresh consumer from same wheel and validate。
+8. Run 20 sequential canonical qualification、evaluate first 5 budget/all 20 flake。
+9. Freeze final PR head SHA、artifact hashes、tree status、required contexts and report handoff。
+10. Remove all temporary generated files from tracked tree。
+
+**Focused verification commands**
+
+```bash
+uv run pytest -q tests/unit/infra/test_provider_lifecycle_faults.py
+uv run python scripts/provider_gate.py qualify \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json \
+  --runs 20 \
+  --budget-runs 5 \
+  --wall-limit-seconds 600 \
+  --cpu-wall-ratio-limit 1.1
+uv run python scripts/provider_gate.py summarize \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json \
+  --output spec-dock/.workbench/provider-gate/final-summary.json
+make lint
+uv run python scripts/provider_gate.py canonical \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json
+# macOS:
+uv run python scripts/provider_gate.py macos-delta \
+  --manifest spec-dock/.workbench/provider-gate/candidate/manifest.json
+python3 ./spec-dock/scripts/spec-dock sync
+python3 ./spec-dock/scripts/spec-dock validate
+git diff --check
+test -z "$(git status --short)"
+```
+
+Fresh consumer smoke uses manifest-selected wheel:
+
+```bash
+tmp="$(mktemp -d)"
+python3 -m venv "$tmp/venv"
+"$tmp/venv/bin/python" -m pip install --no-deps "<verified-wheel>"
+"$tmp/venv/bin/spec-dock" init "$tmp/consumer"
+python3 "$tmp/consumer/spec-dock/scripts/spec-dock" validate
+rm -rf "$tmp"
+```
+
+**Expected observable result**
+
+- seeded fault detection 100%
+- first 5 canonical runs each <=600s、CPU/wall <=1.1
+- all 20 runs unexpected failure 0、flake 0、retry 0
+- provider/dogfood roots and exact two slots match candidate
+- dogfood record ready/version 0.2.4/digest matching
+- seed digests unchanged
+- fresh consumer valid
+- final tree clean
+- exact PR head SHA equals all evidence source SHA
+
+**Evidence to record**
+
+Qualification JSON、run-by-run wall/CPU/outcome、fault inventory/detection、provider/dogfood tree digests、seed before/after hashes、SpecDock commands、fresh consumer result、final manifest、required context state、PR URL/head SHA、reviewer/human merge instructions。
+
+**Stop conditions and escalation owner**
+
+Any budget/fault/flake failure、seed mutation、dogfood drift、validate failure、artifact/tree SHA mismatch、required gate weakening。Stop and forward-fix same Issue。Owner: Product owner; required setting issueはhuman repository admin。
+
+**Cleanup**
+
+Delete virtualenv、fresh consumer、old stages、canary、local artifacts not needed for review。Tracked treeにはproduction/tests/docs/reportだけを残す。
+
+**Merge-point invariant**
+
+Final PR head is releasable、all acceptance evidence is bound to same head/artifacts、new gate GREEN/required、human review required。Agentはmergeしない。
+
+**Trace IDs**
+
+I392-RQ-002〜003、I392-RQ-015、I392-RQ-019〜020、I392-D-016〜018。
+
+## 4. Completion and human handoff
+
+### Implementation completion
+
+I392-S00〜S80のexpected result、evidence、cleanup、merge invariantが全て成立し、final PR headが固定された時点。
+
+### Human merge handoff
+
+Reportに次を一つのtableで提示する。
+
+- final PR URL
+- exact head SHA
+- wheel/sdist/candidate digests
+- required contexts before/after
+- all job run URLs/IDs
+- human review status
+- merge method restriction
+- post-merge exact SHA comparison command
+- forward-fix/revert note
+
+### Post-merge
+
+Human merge後:
+
+```bash
+git fetch origin main
+git rev-parse origin/main
+git diff --exit-code "<verified-pr-head>^{tree}" "origin/main^{tree}"
+python3 ./spec-dock/scripts/spec-dock validate
+```
+
+Tree mismatch、merge commitにunexpected content、gate state変化があればIssue finishしない。
+
+### Issue finish and Epic close
+
+- merged tree equality確認
+- #392 report complete
+- #392をSpecDock lifecycleでfinish
+- GitHub #392 close state確認
+- Epic #384 acceptance再確認
+- Epic close
+- #388〜#390はsuperseded historicalのまま

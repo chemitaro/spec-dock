@@ -5,254 +5,378 @@ ID: "epic-00384"
 関連GitHub: ["#384"]
 状態: "draft"
 最終更新: "2026-09-01"
-依存: ["requirement.md"]
+依存: ["requirement.md", "artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md"]
 親: ["init-local-00003"]
+正本検証:
+  repository: "chemitaro/spec-dock"
+  branch: "codex/epic-00384-provider-test-strategy-planning"
+  sha: "d18ca60b2a6ff11571ee366f71c4528dcd668d99"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
 
-詳細: [Design Guide](../../../../docs/authoring/design.md)
+## 1. Design intent
 
-## 設計目標
+現行のhistorical per-file reconciliation、journal/checkpoint recovery、purge、failure approval、sharded regressionを、fixed ownershipとexternal rerun convergenceを中心とする一つのdeep contractへ置換する。設計の主眼は「少ないcode」ではなく、「誰がどのpathを変更できるか」「partial failure後に何を許可するか」「どのartifactをどのlaneが証明するか」を静的に限定することである。
 
-provider distributionの安全性を、per-file historical identityとarbitrary recoveryの広さではなく、狭いownership boundary、fixed action set、stage-before-mutate、fail-closed classification、same-candidate rerunで実現する。Product contract縮小とtest portfolio縮小を同じ実装ユニットへ結び、不要になったstateとtestを同じcutoverで除去する。
-
-## Architecture
+## 2. Architecture
 
 ```text
-Current
-legacy per-file engine
-  ├─ install / update
-  ├─ deprovision / purge
-  ├─ historical identity
-  ├─ journal / checkpoint / cross-intent recovery
-  └─ duplicate / sharded regression
+public CLI: src/spec_dock/cli.py
+          |
+          v
+public result adapter
+          |
+          v
+provider lifecycle service
+   |          |             |
+   v          v             v
+classifier  candidate     legacy-0.2.3 recognizer
+   |          |             |
+   +----------+-------------+
+              |
+              v
+   descriptor-bound POSIX filesystem
+              |
+              v
+  4 roots + 2 slots + fixed record
+  (+ fresh-init-only seed creation)
 
-Target
-fixed-root lifecycle service
-  ├─ domain/model: fixed targets, state, result
-  ├─ filesystem: no-follow binding, stage, replace
-  ├─ application: install/update/uninstall
-  ├─ legacy_023: exact predecessor recognizer
-  ├─ CLI: arguments and result mapping
-  └─ build-once single-process gate
+provider source assets
+  src/spec_dock/assets/spec_dock/{docs,templates,system,scripts}
+  src/spec_dock/assets/install_root/.agents/skills/{spec-dock,spec-dock-grill-with-docs}
+
+provider gate
+  one build -> wheel/sdist manifest
+      |             |
+      v             v
+  Linux canonical  macOS delta
+      |
+      v
+  required provider context -> human merge
 ```
 
-legacy lifecycleからtargetへcombined hard cutoverする。uninstall-first bridge、P0〜P3、split path、cross-Issue fixture API、runtime toggleを持たない。
+### E384-D-001 — Boundary decomposition
 
-## Ownership model
+- `src/spec_dock/cli.py`はparser、command-to-service dispatch、human-readable error boundaryだけを所有する。
+- `src/spec_dock/provider_lifecycle/`はfixed path model、candidate、filesystem safety、legacy recognizer、service、public result mappingを所有する。
+- `src/spec_dock/assets/legacy_0_2_3.json`はsingle supported legacy generationのroot/slot tree digestだけを所有する。
+- `scripts/provider_gate.py`はartifact build/verify、node ownership、run-series evidenceを所有し、product mutation authorityを持たない。
+- `tests/provider_test_ownership.json`はcontract-to-owner-lane mappingだけを所有し、failure approval、timing weight、shard partitionを持たない。
 
-### Provider-owned fixed targets
+### E384-D-002 — Provider/dogfood direction
+
+`src/spec_dock/`を先に変更し、dogfoodはprovider lifecycleを通じて次を同期する。
+
+- `spec-dock/{docs,templates,system,scripts}`
+- `.agents/skills/spec-dock`
+- `.agents/skills/spec-dock-grill-with-docs`
+- `spec-dock/spec-dock.version`
+
+Dogfoodの`spec-dock/.gitignore`と`.github/workflows/ci.yml`はconsumer-owned seedであり、provider sourceとbytesが異なってもupdate対象にしない。
+
+## 3. Ownership model
+
+### E384-D-003 — Persistent mutation set
+
+| Category | Exact path | Authority |
+|---|---|---|
+| Disposable root | `spec-dock/docs` | valid new recordまたはexact legacy recognition |
+| Disposable root | `spec-dock/templates` | 同上 |
+| Disposable root | `spec-dock/system` | 同上 |
+| Disposable root | `spec-dock/scripts` | 同上 |
+| Disposable slot | `.agents/skills/spec-dock` | matching new markerまたはexact legacy tree |
+| Disposable slot | `.agents/skills/spec-dock-grill-with-docs` | 同上 |
+| State record | `spec-dock/spec-dock.version` | lifecycle serviceのみ |
+| Seed creation | `spec-dock/.gitignore` | fresh `init`かつabsent時だけ |
+| Seed creation | `.github/workflows/ci.yml` | fresh `init`かつabsent時だけ |
+
+Providerはfixed rootの内部pathを個別所有しない。recordがroot ownershipを証明した後はroot全体をreplace/deleteする。recordがないfresh targetではfixed rootの存在自体をforeign collisionとしてblockする。
+
+### E384-D-004 — Transient staging
+
+Candidate stagingはtarget repositoryの外、同じfilesystem上のtarget parentに作る。pathは次のdeterministic formである。
 
 ```text
-spec-dock/docs
-spec-dock/templates
-spec-dock/system
-spec-dock/scripts
-.agents/skills/spec-dock
-.agents/skills/spec-dock-grill-with-docs
+<target-parent>/.spec-dock-provider-txn-<root-identity-hash>-<operation>-<candidate-digest>
 ```
 
-4 rootsと2 slotsはcode-fixedである。manifestやrecordからarbitrary pathを取得しない。
+staging rootにはstrict owner markerを置き、repository rootのdevice/inode、operation、candidate digestが一致する場合だけ再利用・cleanupする。transient pathはpersistent mutation authorityではなく、same-operation/same-candidate rerunの実装手段である。foreign collision、owner marker mismatch、symlinkはblockする。
 
-### Consumer-owned seeds
+## 4. State machine
 
-```text
-spec-dock/.gitignore
-.github/workflows/ci.yml
-```
-
-fresh initでabsentの場合だけ作成する。その後はconsumer-ownedで、provider update / reinstall / uninstallはfollow / overwrite / deleteしない。installation completeness、legacy recognition、uninstall targetにも含めない。
-
-### Durable / opaque / generated
-
-- durable user data: `spec-dock/initiatives/**`とnested Artifacts
-- opaque preserve: `.workbench/**`、unknown paths、unrelated skills
-- generated projection: `active/**`、`.agent/**`、dashboard、tree / deps図、ADR mirror
-
-これらはprovider payload inventoryに含めず、lifecycle mutation対象にしない。unknown non-targetの存在だけではoperationをblockしない。
-
-## State model
-
-computed stateを次へ縮小する。
+### E384-D-005 — Observed states
 
 ```text
 absent
-legacy-0.2.3
-ready
-incomplete(install|update|uninstall, candidate)
-tooling-absent-preserved-data
-blocked
+  | install
+  v
+incomplete(install) -> ready
+                          |
+                          | update
+                          v
+                    incomplete(update) -> ready
+                          |
+                          | uninstall --apply
+                          v
+                 incomplete(uninstall)
+                          |
+                          v
+              tooling-absent-preserved-data
+                          |
+                          | reinstall
+                          v
+                 incomplete(install) -> ready
+
+exact legacy-0.2.3
+  | migrate or tooling uninstall
+  +-------------------------------> new-format states
+
+unsafe / unknown evidence -> blocked (not serialized)
 ```
 
-`blocked`はserialized stateではなく、binding / type / marker / digest / active recoveryの観測結果である。
+`blocked`はrecord stateではない。record/path/binding/marker/candidate evidenceから算出する。
 
-fixed installation recordはrepository rootへ置き、known schema、state、operation、version、candidate digest、2 slot versionsだけを持つ。`ready`、`incomplete`に加え、uninstall後も`tooling-absent-preserved-data`をserialized stateとして保持する。record不在のnever-installed `absent`とdurableに区別し、reinstall時にconsumer seed absenceを意図として保存する。exact pathはimplementationでold-engine mutation-zeroとforeign collisionを検証して固定する。
+### E384-D-006 — Record identity
 
-recordへ持たせないもの:
+`spec-dock/spec-dock.version`を再利用する理由は二つである。
 
-- arbitrary path / action list
-- per-file digest
-- per-action checkpoint / progress bit
-- rollback image
-- cross-intent authority
-- historical version catalog
+1. current `0.2.3` packageがこのpathをASCII canonical versionとしてpre-mutation admissionで解析する。
+2. final JSON recordはcanonical versionではないため、old packageがnative rename routeへ到達する前にfail closedする。
 
-## Deep interfaces
+Final recordはstrict keysだけを許可する。
 
-```text
-install_tooling(target, candidate) -> LifecycleResult
-update_tooling(target, candidate) -> LifecycleResult
-uninstall_tooling(target) -> LifecycleResult
+```json
+{
+  "schema_version": 1,
+  "state": "ready",
+  "operation": null,
+  "version": "0.2.4",
+  "candidate_digest": "<64 lowercase hex>",
+  "skill_slots": {
+    "spec-dock": "0.2.4",
+    "spec-dock-grill-with-docs": "0.2.4"
+  }
+}
 ```
 
-CLIはservice内部のfilesystem planを知らず、typed resultをtext / JSON / exitへmappingする。
+- `state`: `incomplete | ready | tooling-absent-preserved-data`
+- `operation`: `incomplete`時だけ`install | update | uninstall`、その他は`null`
+- `version`: operationが対象とするinstalled/final distribution version
+- `candidate_digest`: fixed rootsとslot payloadのimmutable digest。seed、record、generated slot markerを含めない。
+- `skill_slots`: exact two keys。additional slotを許可しない。
 
-### Install
+Canonical serializationはUTF-8、sorted keys、2-space indent、末尾LFである。unknown key、duplicate JSON key、non-regular file、hard link、oversized record、invalid UTF-8をblockする。
 
-1. bind / classify / preflight
-2. candidate stage / validate
-3. incomplete install record
-4. fixed roots / slots配置
-5. ready record
-6. best-effort owned temporary cleanup
+### E384-D-007 — Slot marker
 
-### Update
+各new-format slot直下に`.spec-dock-provider-slot.json`を生成する。
 
-1. bind / classify / preflight
-2. candidate stage / validate
-3. incomplete update record
-4. `docs -> templates -> system -> scripts -> slots`
-5. ready record
-6. best-effort cleanup
+```json
+{
+  "schema_version": 1,
+  "slot": "spec-dock",
+  "version": "0.2.4",
+  "candidate_digest": "<same candidate digest>"
+}
+```
 
-### Uninstall
+markerはcandidate digest計算後に生成し、digest対象から除外して循環参照を避ける。new recordが存在するslotはmatching markerがある場合だけprovider-ownedである。markerless slotはlegacy recognizer以外ではforeignである。
 
-1. bind / classify / dry-run plan
-2. apply時だけincomplete uninstall record
-3. 4 roots
-4. valid owned 2 slots
-5. recordを`state=tooling-absent-preserved-data`へatomic replace
-6. durable tooling-absent-preserved-data成立
+## 5. Candidate and filesystem interfaces
 
-skill slot処理でmarker authorityを失わないため、exact fixed tombstoneへのno-replace renameを許可する。arbitrary tombstone名、catalog、progress bitは持たず、rerunはexact tombstoneとvalid markerだけを認識する。
+### E384-D-008 — Candidate construction
 
-## Failure / recovery
+Candidate sourceはcode-fixedである。
 
-- preflight / stage failure: target mutation 0
-- mutation target unknown: preserve-and-block
-- unknown non-target: preserve-and-ignore
-- root / slot間failure: incomplete recordを残す
-- same operation / same candidate: rerunで収束
-- different operation / candidate: block
-- ready後valid owned temporary cleanupだけ失敗: completed_with_warnings
-- root / slot / recordがfinal stateでない: partial_failure
-- automatic rollback / old-engine fallback:行わない
-
-public result:
-
-| result | exit | meaning |
-|---|---:|---|
-| planned | 0 | dry-run plan成立 |
-| completed | 0 | desired state成立 |
-| completed_with_warnings | 0 | desired state成立、owned cleanupのみ残存 |
-| blocked | 1 | mutation前にauthority不成立 |
-| partial_failure | 1 | mutation後にdesired state未成立 |
-| error | 2 | invalid request / removed operation |
-
-## Legacy 0.2.3 adapter
-
-`Legacy023Recognizer`のinputはexact predecessor一件だけである。
-
-- real repository / `spec-dock` binding
-- exact `0.2.3` version evidence
-- expected runtime script digest
-- 4 rootsがexpected parent直下のreal directories
-- active legacy journal / retry / purge recovery不存在
-- 2 current slotsがabsentまたはexact markerless `0.2.3` tree
-
-modified / foreign / symlink / unexpected typeではoperation全体をwrite 0でblockする。migration後はnew recordを優先し、legacy recognizerを二度と呼ばない。historical version catalog、range comparison、partial identity、consumer manifest authorityを移植しない。
-
-old `0.2.3` packageのmutating commandsはfinal workspaceにmutation 0でなければならない。baseline `0.2.3` CLI subprocessのprocess startup時にtarget-scoped composite tripwire（例: isolated test environmentの`sitecustomize`）を注入する。Python audit hookは保護対象repository配下の`open` write/create/truncate/appendと、`os.remove`、`os.rename`、`os.rmdir`、`os.mkdir`、`os.chmod`、`os.link`、`os.symlink`等をsyscall完了前に捕捉する。さらにstartup injectionで`ctypes.CDLL`のsymbol解決をwrapし、exact 0.2.3の`_rename_distribution_no_replace` / `_rename_distribution_swap`が直接呼ぶLinux `renameat2`とmacOS `renameatx_np`をnative関数呼出し前に捕捉してfailさせる。platformごとに利用可能なnative symbolを直接呼ぶpositive controlを実行し、tripwireがcall前に捕捉してtarget treeが不変であることを先に証明する。許可するtarget外writeはvenv/cache/evidence output等へ明示限定する。composite tripwire event 0を時間的な主証拠、pre/post tree digest不変を補助的な最終状態証拠とする。final marker / record / root evidenceをold engineがunknownとしてblockできるよう設計し、成立しない場合もbridge generationを追加しない。
-
-## Public CLI
-
-| surface | final semantics |
+| Target | Package source |
 |---|---|
-| `init` | absent / tooling-absentへinstall、exact 0.2.3へmigration |
-| `init --force` | state別install / update alias、追加authorityなし |
-| `update` | readyまたはsame incomplete candidateをupdate / resume |
-| `uninstall` | tooling-only dry-run |
-| `uninstall --apply` | tooling-only mutation |
-| `--keep-specs` | default uninstallと同義 |
-| `--remove-specs` | mutation 0、removed-operation error、exit 2 |
+| `spec-dock/docs` | `src/spec_dock/assets/spec_dock/docs` |
+| `spec-dock/templates` | `src/spec_dock/assets/spec_dock/templates` |
+| `spec-dock/system` | `src/spec_dock/assets/spec_dock/system` |
+| `spec-dock/scripts` | `src/spec_dock/assets/spec_dock/scripts` |
+| `.agents/skills/spec-dock` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock` |
+| `.agents/skills/spec-dock-grill-with-docs` | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs` |
 
-spec-history purge service、purge journal、purge retry、independent purge commandは存在しない。
+Candidate builderはsource treeをno-followでcaptureし、regular fileとreal directoryだけを許可する。path traversal、absolute path、device entry、FIFO、socket、symlink、hard-linked regular fileをrejectする。executable modeを含むcanonical entry streamをsorted UTF-8 path orderでSHA-256する。headerにdigest schemaとdistribution versionを含める。
 
-## Test architecture
+Seedsは別sourceとして読み、fresh creation bytesをvalidationするがcandidate digestへ含めない。
 
-### Pure / domain
+### E384-D-009 — Atomic publication
 
-ownership classification、state transition、operation admission、typed result。filesystem、Git、package build、CLI subprocessを起動しない。
+1. repository rootをreal directoryとしてopenし、`flock`でoperationを排他する。
+2. root identityと全target parent chainを`O_NOFOLLOW | O_DIRECTORY`でbindする。
+3. candidateをrepository外のsame-filesystem staging rootへmaterializeし、source digestとstaged digestを一致させる。
+4. all-target preflight後、external staged recordを`spec-dock/spec-dock.version`へatomic replaceし`incomplete`を公開する。
+5. `docs -> templates -> system -> scripts -> spec-dock slot -> grill slot`の順でpublishする。
+   - target absent: native no-replace rename。
+   - target valid existing directory: native exchange rename。old treeはstaging側へ移る。
+6. fresh `init`だけ、absent seedを`O_EXCL | O_NOFOLLOW`で作成する。
+7. 全target postcondition成立後、`ready` recordをatomic replaceする。
+8. old treeとstagingをcleanupする。ready成立後のowned cleanup failureだけwarningへ降格できる。
 
-### Filesystem / application
+Uninstallはvalid targetをstaging tombstoneへnative no-replace renameしてrepository pathをatomicにabsent化し、最後にtooling-absent recordをpublishする。
 
-minimal synthetic workspace、fixed action set、no-follow、stage-before-mutate、ready-last、same-candidate rerun、fault injection、byte preservationを証明する。
+## 6. Operation flows
 
-### CLI adapter
+### E384-D-010 — Install and update
 
-argument、text / JSON、exit、mutation_startedと代表happy / fail-closed pathsを証明する。
+- `install_tooling`は`absent`、`tooling-absent-preserved-data`、exact legacy migrationを扱う。
+- `update_tooling`は`ready`、exact legacy migrationを扱い、missing fixed targetをrepairできる。
+- `update` commandがnever-installed `absent`へ実行された場合はcompatibilityのため`install_tooling`へdispatchするが、fresh-init-only seedを作成しない。
+- `init --force`はobserved stateに応じてinstall/updateへdispatchし、独自mutation authorityを持たない。
+- incomplete stateはrecord operationとcandidate digestが一致する場合だけresumeする。
 
-### Built artifact
+### E384-D-011 — Uninstall and reinstall
 
-exact `0.2.3 -> final -> tooling uninstall -> reinstall`とdurable uninstall discriminatorを証明する。old-package mutation-zeroはPython filesystem eventsと`renameat2` / `renameatx_np` native callsを覆うtarget-scoped composite tripwire event 0、native positive controlsの捕捉、tree digest不変で証明する。wheel lifecycle、sdist minimal smokeも同じcandidateで証明する。
+- dry-runはrecord/path/bindingを完全にpreflightし、mutationなしでplanned actionsを返す。
+- applyは`incomplete(uninstall)`を先にpublishし、4 roots、valid owned slotsをdetachする。
+- user data、unknown non-target、seed、unrelated skillをtouchしない。
+- final recordは`tooling-absent-preserved-data`。last installed version/digest/slot versionsを保持する。
+- reinstallはnew candidateで`incomplete(install)`へ移行し、seed absenceをconsumer intentとして保持する。
 
-### Platform delta
+## 7. Legacy migration and downgrade safety
 
-macOSはexecutable mode、symlink/no-follow、rename/replacement、installed entry pointだけを所有する。Linux canonicalのplatform-independent nodeとintersection 0にする。
+### E384-D-012 — Exact legacy recognizer
 
-## Artifact / CI graph
+`src/spec_dock/assets/legacy_0_2_3.json`はpost-#387 baseline artifactから生成し、次だけを持つ。
+
+- schema version
+- exact legacy version `0.2.3`
+- plain marker SHA-256
+- 4 root tree digests
+- 2 slot tree digests
+- active recovery marker exact paths
+
+Recognizerはread-onlyで、4 rootsは全てexactを要求する。2 slotsは各々absentまたはexactを許可する。seedとconsumer dataは認識対象外である。active legacy recovery markerが一つでも存在すればblockする。
+
+Migrationの最初のdurable writeはplain version markerをnew `incomplete` JSONへ置換することであり、この時点からold packageはfinal parser boundaryでblockされる。
+
+### E384-D-013 — Composite tripwire
+
+Built old wheelは`PYTHONPATH`でstartup-injected `sitecustomize`を読み込む。tripwireは次をsyscall前に捕捉する。
+
+- target-scoped write/create/truncate/append `open`
+- `os.remove/unlink/rename/replace/rmdir/mkdir/chmod/link/symlink/truncate`
+- `ctypes.CDLL`から解決されたLinux `renameat2`、macOS `renameatx_np`
+
+Native function proxyは`argtypes`/`restype` assignmentを受け付け、`__call__`でsource/destinationをdirfdから解決し、target scopeならunderlying symbolを呼ばずfailする。各platformのpositive controlは同じsymbolを直接解決・callし、event 1で阻止されることを証明する。old command matrixはevent 0でなければ失敗する。
+
+## 8. Result and failure architecture
+
+### E384-D-014 — Typed result
+
+Service resultは次のstatusを持つ。
+
+| Status | Meaning | Exit |
+|---|---|---:|
+| `planned` | dry-run plan成立 | 0 |
+| `completed` | desired durable state成立 | 0 |
+| `completed_with_warnings` | desired state成立、owned external cleanupのみ残存 | 0 |
+| `blocked` | pre-mutation ownership/binding/state/candidate拒否 | 1 |
+| `partial_failure` | durable mutation開始後、desired state未成立 | 1 |
+| `error` | invalid requestまたはremoved operation | 2 |
+
+`mutation_started`はincomplete recordがpublishされたかで決まる。partial failureはsame operation / same candidate retry commandを持つ。arbitrary rollback guidanceを返さない。
+
+### E384-D-015 — Forward-fix policy
+
+- preflight failure: mutation zero、同じIssue内でinputまたはimplementationを修正する。
+- partial failure: same operation / same candidate external rerunだけを許可する。
+- old-package mutation attempt: merge禁止。record/marker boundaryを同じIssueで修正して全matrixを再実行する。
+- destructive defect: apply routeをfail closedにする。old engine fallback禁止。
+- post-merge defect: human-reviewed revertまたはforward fix。consumer dataをrollback素材にしない。
+
+## 9. Test and CI target
+
+### E384-D-016 — Portfolio layers
+
+| Layer | Owns | Must not own |
+|---|---|---|
+| Pure/model | state table、record schema、result mapping、path constants | real FS、subprocess、package build |
+| Filesystem/service | no-follow、atomic publish、fault convergence、preservation | GitHub settings、built old wheel |
+| CLI runtime | parser、wrapper forwarding、text/JSON/exit | exhaustive root/slot matrix |
+| Built artifact | baseline migration、final lifecycle、old-package tripwire、artifact identity | unit-only branches |
+| macOS delta | native rename/no-follow/mode/entry point | Linux-independent lifecycle duplicates |
+
+`tests/provider_test_ownership.json`はrequirement/design trace ID、owner node、lane、representative faultを一意にmappingする。duplicate `(candidate, os, contract_id)`をrejectする。
+
+### E384-D-017 — Provider gate topology
 
 ```text
-source SHA
-  -> build invocation 1
-       ├─ wheel + SHA-256
-       └─ sdist + SHA-256
-            |
-            ├─ Linux canonical: pytest process 1, worker 1
-            └─ macOS delta: same wheel, delta nodes only
+Provider CI / provider-static-analysis
+                   |
+                   v
+Provider CI / provider-tests (Linux)
+  - verify PR head
+  - one uv build invocation -> wheel + sdist + manifest
+  - install wheel
+  - one canonical pytest process, worker 1
+  - sdist minimal smoke
+  - upload exact artifacts/evidence
+                   |
+                   v
+Provider CI / provider-macos-delta
+  - download Linux-built artifact
+  - verify wheel SHA-256
+  - install same wheel
+  - run only macOS-owned nodes
+                   |
+                   v
+Provider CI / provider-gate
+  - aggregate both jobs
+  - no tests, no rebuild
+  - required context
+                   |
+                   v
+               human review/merge
 ```
 
-- PRをauthoritative merge gateにする。
-- main pushでFull Regressionやcandidate rebuildを行わない。
-- `workflow_dispatch`をfinal 5-run / rolling-20 / fault evidenceに使えるnon-required routeにする。
-- release publication workflowは作らない。
-- required contextは既存名の再利用を優先する。
-- 名前変更時だけ、old + new、intentional new-only RED、new-only requiredへ同じIssue / PRで遷移する。
-- `Provider Receipt Binding`やappend-only coordination chainを作らない。
+Qualification mode reuses one built candidate and executes canonical run 20 times sequentially。first 5 satisfy budget、all 20 satisfy flake/retry contract。required PR gateは通常1回とし、qualification evidenceはfinal PR headへ束縛する。
 
-## Removal model
+### E384-D-018 — Old machinery terminal state
 
-cross-Issue receipt chainを持たず、`iss-00392` reportに一枚のtraceability tableを置く。
+Final treeに次を残さない。
 
-| removed symbol / node / workflow | reason | successor / retirement authority | focused verification |
-|---|---|---|---|
+- `src/spec_dock/managed_distribution.py`
+- `src/spec_dock/assets/managed_distribution.json`
+- `full-regression-ledger.json`
+- `full-regression-timing-weights.json`
+- `scripts/quality/full_regression_baseline.py`
+- `scripts/quality/verify_full_regression.py`
+- `.github/workflows/provider-full-regression.yml`
+- root `tests/conftest.py`のlane/policy hooks
+- `fast` / `full_regression` marker declarations
+- old distribution-specific duplicate test files
 
-successor proof成立後だけold production route / tests / workflowを削除する。
+Non-distribution behaviorが`managed_distribution.py`に残っている場合は、cutover前に`src/spec_dock/context_pack.py`へbehavior-preserving extractionし、old engine fileを完全に削除する。
 
-## Rollback
+## 10. #387 post-merge rebaseline design
 
-- pre-merge: PRをmergeせず、external required setをbefore stateへ戻す。
-- runtime: preflightでwrite 0、partial failureはsame-candidate rerun。
-- destructive defect: apply routeをfail closedにし、read-only diagnosticを維持する。
-- post-merge: human-reviewed revert。old engineへのruntime fallbackはしない。
+### E384-D-019 — Deterministic admission
 
-## Risks
+Admissionは次をrecordする。
 
-- fixed target classifierの欠陥によるuser data / shared content破壊
-- exact `0.2.3` evidenceの過不足
-- old packageがfinal workspaceを変更するdowngrade risk
-- partial failureをsuccess扱いするresult mapping
-- test consolidationでsecurity invariantを退役させる誤り
-- required context切替時のgate空白 / pending
-- large Issueによるreviewability低下。successor-firstのmilestone / PRで緩和し、Issue境界は増やさない。
+- `AUTHORING_SHA=d18ca60b2a6ff11571ee366f71c4528dcd668d99`
+- `POST_387_SHA`
+- #387 issue state/merge evidence
+- exact diff path list
+- content-restriction checks
+- current command results
+- baseline `0.2.3` wheel/sdist hashes
+- current node inventory and active ledger inventory
+
+Allowed driftは#387 R/D/Pに列挙されたCurrent text、active request、package/test hygiene、#387 own report/evidenceだけである。`pyproject.toml`、`tests/conftest.py`、ledger/timingへの変更はexact restrictionを満たす場合だけ許可する。protected pathまたはunclassified diffが一つでもあればadmissionはfailする。
+
+## 11. Traceability
+
+| Requirement | Design |
+|---|---|
+| E384-RQ-001〜002 | E384-D-003〜004、008〜009 |
+| E384-RQ-003〜007 | E384-D-005〜012 |
+| E384-RQ-008 | E384-D-008〜009 |
+| E384-RQ-009 | E384-D-010、014 |
+| E384-RQ-010 | E384-D-006、012〜013 |
+| E384-RQ-011〜012 | E384-D-016、018 |
+| E384-RQ-013〜015 | E384-D-017〜018 |
+| E384-RQ-016 | E384-D-015、017、019 |
