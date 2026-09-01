@@ -9,14 +9,14 @@ ID: "20260831t152024z-adr"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
 
 ## Context
 
-Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。Current repository evidence `e47c1356892857e61388c7aefb2539d2061d1b9c`ではlegacy per-file engine、purge、journal、failure ledger、timing sharder、main-push Full Regression、stale operator guidanceが実在する。Issue #387は別のCurrent-surface cleanupであり、これらのProduct semanticsを変更しない。
+Epic #384はdistribution lifecycle、legacy migration、public CLI、test portfolio、artifact build、provider CIを同時に変更する。Current repository evidence `b094771e089c1f31618116e84be32fcf78704409`ではlegacy per-file engine、purge、journal、failure ledger、timing sharder、main-push Full Regression、stale operator guidanceが実在する。Issue #387は別のCurrent-surface cleanupであり、これらのProduct semanticsを変更しない。
 
 Strict reviewにより、main merge boundary、temporary policy consumers、resume seed intent、fresh container bootstrap、specification admission、evidence self-reference、required-context order、qualification environment、root operator guidanceをcross-documentで一意にする必要が確認された。
 
@@ -42,9 +42,13 @@ Persistent tooling authorityは4 roots、2 slots、`spec-dock/spec-dock.version`
 
 Exact clean `0.2.3`だけをsingle-version root/slot digest fixtureで認識する。Active recovery、unsupported legacy、modified/foreign markerless slotは推測変換しない。Final versionは`0.2.4`、migration seed policyはpreserve-only。
 
-### ADR-D6 — No broken gate merge state
+### ADR-D6 — No broken gate merge state and consumer-complete deletion
 
-PR-B/S60はold engine/testsを削除しactive failuresをterminalizeするが、current `tests/conftest.py`、ledger、timing、quality scripts、main-push workflowをintact/workingに保つ。S60はS70-only provider gate toolへ依存しない。PR-C/S70でreplacement gate/environment/workflow/AGENTSを先に同一branchへ追加し、そのchange setでold policy/workflowを削除する。S80後だけmerge。
+PR-B/S60はold engine/testsを削除しactive failuresをterminalizeする。同じS60で`.github/workflows/provider-ci.yml`をowned pathとして、削除する`test_managed_distribution.py`、`test_distribution_cutover.py`、`test_epic_00343_distribution.py`への参照だけを、S10〜S50で成立したsuccessor unit/CLI/artifact/macOS testsへbehavior-preservingにretargetする。Workflow name、event、job IDs、matrix、setupを維持し、S70のfinal provider-gate redesignを前倒ししない。
+
+S60は`tests/unit/test_provider_test_lanes.py`も更新し、current policy下でzero active ledger、all terminal entries、successor collection、workflow path existenceを検証する。`tests/unit/test_full_regression_baseline.py`、`tests/conftest.py`、ledger、timing、quality scripts、main-push workflowはworking consumer graphとしてS70まで保持する。S60はS70-only provider gate toolへ依存しない。PR-B merge evidenceはcurrent PR workflow GREENとcurrent main-push verifier GREENを別々に含む。
+
+PR-C/S70はreplacement gate/environment/workflow/AGENTS/final testsを同一branchへ先に追加する。次に`tests/unit/test_provider_test_lanes.py`と`tests/unit/test_full_regression_baseline.py`を含む全remaining policy-module consumersをretireまたはfinal testsへ置換し、consumer 0を証明してからpolicy providers、ledger、timing、old workflowを削除する。S70単独mergeは禁止し、S80後のPR-C final gate GREENを独立に証明する。
 
 ### ADR-D7 — Build-once and stable Linux environment
 
@@ -71,6 +75,9 @@ Root `AGENTS.md`はPR-Cでfinal provider-gate commands、single-process policy�
 - Additional decision/test/verification Issues。
 - S40/S50/S70 single merge handoff。
 - PR-Bでpolicy consumersを削除しS70-only toolへ依存するtemporary broken state。
+- S60で`.github/workflows/provider-ci.yml`をretargetせず、deleted test pathsを残すこと。
+- S60で`tests/unit/test_provider_test_lanes.py`を更新せず、active/stale ledger assumptionsを残すこと。
+- S70で`tests/unit/test_provider_test_lanes.py` / `tests/unit/test_full_regression_baseline.py`を残したままtheir provider modulesを削除すること。
 - Seed policyをCLI alias、seed existence、stateから再推測。
 - Generic recursive `spec-dock` bootstrap/cleanup。
 - Repository evidence SHAからpost-#387 mainまでのsingle allowlist diff。
@@ -83,7 +90,7 @@ Root `AGENTS.md`はPR-Cでfinal provider-gate commands、single-process policy�
 
 ## Consequences
 
-Mainの各merge pointはworking product/gateを持つ。Resume seed authorityはdurable。Fresh empty repositoryをsafeにbootstrapできる。Specificationと#387 implementation driftを混同しない。Evidence graphはself-referenceせずmerge strategyを正しく扱う。Required transitionにgapがない。Qualification driftを検出でき、operator guidanceがactual final systemへ一致する。
+Mainの各merge pointはworking product/gateを持つ。PR-B current workflowsとPR-C final provider gateは独立に実行可能でGREENである。Resume seed authorityはdurable。Fresh empty repositoryをsafeにbootstrapできる。Specificationと#387 implementation driftを混同しない。Evidence graphはself-referenceせずmerge strategyを正しく扱う。Required transitionにgapがない。Qualification driftを検出でき、operator guidanceがactual final systemへ一致する。
 
 CostはPR-B/PR-C internal checkpointsをmainへmergeできないこと、external attestations/human settings operation、Linux descriptor maintenance、native primitive依存、exact `0.2.3`以外のmanual recoveryである。
 

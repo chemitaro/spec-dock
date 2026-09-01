@@ -10,7 +10,7 @@ ID: "iss-00392"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
@@ -97,13 +97,24 @@ Grammar preserved。Init-force state alias。Uninstall apply withoutspec mode。
 
 Statuses/exits fixed: planned/completed/completed_with_warnings=0、blocked/partial=1、error=2。Additive JSON fields `code,seed_policy,mutation_started,bootstrap_rolled_back`。Actions fixed-set only。
 
-### I392-RQ-020 — Test portfolio and PR-B continuity
+### I392-RQ-020 — Test portfolio and PR-B transitional gate continuity
 
-Pure/filesystem/CLI/artifact/macOS ownership unique。All active failure rows terminalized; active approved failures0 atPR-B. S60 retainscurrent conftest/ledger/timing/quality/main-push workflow、updates deleted node refs、usescurrent verifier andself-contained ownership pytest。No provider_gate dependency。
+Pure/filesystem/CLI/artifact/macOS ownershipをuniqueにし、all active failure rowsをterminalizeしてPR-B merge時点でactive approved failures 0とする。S60 exact owned pathsには`.github/workflows/provider-ci.yml`と`tests/unit/test_provider_test_lanes.py`を含める。
 
-### I392-RQ-021 — Atomic PR-C gate transition
+S60 `provider-ci.yml`はcurrent workflow name/event/job IDs/matrix/setupを維持し、次だけをbehavior-preservingに変更する。
 
-S70 same branch addsreplacement tooling/workflow/environment/AGENTS beforedeletingold policy hook/ledger/timing/sharder/workflow/markers。S70 notmergeable。S80 afterqualification/context/attestation onlymerge。Main neverbroken。
+- `tests/unit/infra/test_managed_distribution.py` -> existing provider lifecycle model/candidate/filesystem/service/public-result/fault/assets/ownership unit tests。
+- `tests/cli_runtime/test_distribution_cutover.py` -> `test_provider_lifecycle.py`、`test_uninstall.py`、`test_update.py` with current full-regression permission flags。
+- `tests/integration/test_epic_00343_distribution.py` -> `test_provider_lifecycle_artifacts.py`、`test_provider_lifecycle_tripwire.py` with current permission flags。
+- macOS matrix additionally runs `tests/platform/macos/test_provider_lifecycle_macos.py` only on macOS。
+
+`tests/unit/test_provider_test_lanes.py` must assert ledger active rows `[]`、all rows `resolved` under current evaluator、fixed-in-place node or superseding successor is collected、deleted test path references absent、workflow successor paths exist、pytest/standalone adapters agree。Accepted retirements use unique deterministic absence-proof successor nodes and temporary `resolved/superseded` ledger encoding。S60 retains `tests/unit/test_full_regression_baseline.py` and all current policy providers。Ordinary suite、workflow-equivalent successor commands、current 4-shard verifier must all GREEN。No `scripts/provider_gate.py` dependency。
+
+### I392-RQ-021 — Consumer-first atomic PR-C gate transition
+
+S70 same branch adds replacement tooling/workflow/environment/AGENTS and final replacement tests before old removal。Before deleting `tests/conftest.py`、`scripts/quality/full_regression_baseline.py`、`scripts/quality/verify_full_regression.py`, it must retire or replace every remaining consumer, explicitly including `tests/unit/test_provider_test_lanes.py` and `tests/unit/test_full_regression_baseline.py`。The transitional `.github/workflows/provider-ci.yml` is rewritten to final provider-gate topology rather than deleted。
+
+An exact pre/post inventory must prove zero imports/references to old policy modules、pytest options、ledger/timing paths in runtime/CI/tests/operator guidance, excluding Historical `spec-dock/initiatives/**`。After consumer 0, delete providers、old main-push workflow、ledger/timing/sharder/conftest/markers。Run final import absence、collection、workflow command and provider-gate tests。S70 not mergeable; S80 after qualification/context/attestation only merge。Main never broken and PR-C final gate GREEN is independent of PR-B current-gate GREEN。
 
 ### I392-RQ-022 — Build-once and platform ownership
 

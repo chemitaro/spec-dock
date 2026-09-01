@@ -6,7 +6,7 @@ Issue: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # Luna Max Implementation Handoff
@@ -85,25 +85,55 @@ tests/support/provider_lifecycle_tripwire/**
 tests/provider_test_ownership.json
 ```
 
-S60 delete old engine/tests only。S60 retain current policy consumers:
+S60 exact additional owned paths:
 
 ```text
+.github/workflows/provider-ci.yml                 # transitional command retarget only
+tests/unit/test_provider_test_lanes.py            # zero active/all terminal/workflow path checks
+tests/conftest.py                                 # stale node refs only
+full-regression-ledger.json                       # zero active, all resolved
+full-regression-timing-weights.json               # stale node refs only
+```
+
+S60 workflow mapping:
+
+```text
+tests/unit/infra/test_managed_distribution.py
+  -> provider_lifecycle model/candidate/filesystem/service/public_result/faults
+     + provider_assets + provider_test_ownership
+
+tests/cli_runtime/test_distribution_cutover.py
+  -> test_provider_lifecycle.py + test_uninstall.py + test_update.py
+
+tests/integration/test_epic_00343_distribution.py
+  -> test_provider_lifecycle_artifacts.py + test_provider_lifecycle_tripwire.py
+
+macOS matrix
+  -> additionally test_provider_lifecycle_macos.py
+```
+
+S60 retains and proves GREEN:
+
+```text
+tests/unit/test_full_regression_baseline.py
 tests/conftest.py
-full-regression-ledger.json        # update to zero active
+full-regression-ledger.json
 full-regression-timing-weights.json
 scripts/quality/**
 .github/workflows/provider-full-regression.yml
+current pytest policy/options/markers
 ```
 
 ### S70-S80 PR-C ownership
 
-Create/update:
+Create/update first:
 
 ```text
 scripts/provider_gate.py
 ci/linux-qualification.Dockerfile
 ci/linux-qualification-environment.json
 tests/unit/infra/test_provider_gate.py
+tests/unit/infra/test_provider_test_ownership.py
 scripts/static_analysis/run.sh
 Makefile
 .github/workflows/provider-ci.yml
@@ -113,10 +143,20 @@ provider/dogfood final pairs
 #392 report.md pre-merge content
 ```
 
-Delete in S70 same branch:
+Explicit consumer retirement before provider deletion:
 
 ```text
-.github/workflows/provider-full-regression.yml
+tests/unit/test_provider_test_lanes.py            # delete after final successor assertions GREEN
+tests/unit/test_full_regression_baseline.py       # delete after final successor assertions GREEN
+.github/workflows/provider-ci.yml                 # rewrite transitional -> final topology
+.github/workflows/provider-full-regression.yml    # delete after final workflow-equivalent GREEN
+AGENTS.md / Makefile / pyproject.toml / static-analysis callsites
+all additional consumers found by mandatory grep
+```
+
+Delete providers/data only after consumer 0:
+
+```text
 tests/conftest.py
 full-regression-ledger.json
 full-regression-timing-weights.json
@@ -124,6 +164,7 @@ scripts/quality/full_regression_baseline.py
 scripts/quality/verify_full_regression.py
 scripts/quality/__init__.py if empty
 fast/full marker policy
+.github/workflows/provider-full-regression.yml
 ```
 
 ### No-touch
@@ -253,27 +294,27 @@ Every evidence row includes operation/candidate/seed policy。Fresh create polic
 
 ### S60 must be true
 
-- old engine/tests removed
-- active approved failure 0
-- ownership map self-contained verifier GREEN
-- `scripts/provider_gate.py` not required
-- `tests/conftest.py` present
-- ledger/timing/quality scripts present
-- `provider-full-regression.yml` present and GREEN
-- no workflow missing consumer
-- PR-B merge-ready only after S60
+- old engine/tests removed。
+- active approved failure 0 and every ledger row resolved/fixed-in-place or resolved/superseded。
+- `.github/workflows/provider-ci.yml` is S60-owned、preserves topology、references no deleted path、and all successor commands GREEN。
+- `tests/unit/test_provider_test_lanes.py` is S60-owned and verifies zero active/all terminal/workflow paths。
+- `tests/unit/test_full_regression_baseline.py` remains present/GREEN。
+- `scripts/provider_gate.py` is not required。
+- conftest/ledger/timing/quality scripts/main-push workflow present and current verifier GREEN。
+- PR-B merge-ready only after these independent PR and main-push workflow proofs。
 
 ### S70/S80 must be true
 
-- provider gate + environment + workflow + AGENTS added before old removal
-- old policy/workflow deleted in same PR-C branch
-- S70 not mergeable
-- S80 qualification/context/attestation complete
-- PR-C merge-ready only after S80
+- provider gate + environment + workflow + AGENTS + replacement assertions added before old removal。
+- `tests/unit/test_provider_test_lanes.py` and `tests/unit/test_full_regression_baseline.py` retired before their providers。
+- mandatory consumer grep has no match outside scheduled provider/data deletions。
+- providers/data/old workflow deleted only after consumer 0。
+- post-deletion import/grep/collection/ordinary/final workflow GREEN。
+- S70 not mergeable; S80 final provider gate GREEN/qualification/context/attestation required。
 
 ## 9. Specification admission
 
-Do not use `e47c1356892857e61388c7aefb2539d2061d1b9c..POST_387_SHA` as one allowlist diff。
+Do not use `b094771e089c1f31618116e84be32fcf78704409..POST_387_SHA` as one allowlist diff。
 
 Use:
 
@@ -354,7 +395,9 @@ S70 owns root `AGENTS.md`。Final must contain:
 |---|---|
 | S00-S60 ordinary | `uv run pytest -q` |
 | S00-S60 current full | `uv run python -m scripts.quality.verify_full_regression --shards 4` |
-| S60 ownership | `uv run pytest -q tests/unit/infra/test_provider_test_ownership.py` |
+| S60 current-policy closure | `uv run pytest -q tests/unit/test_provider_test_lanes.py tests/unit/test_full_regression_baseline.py tests/unit/infra/test_provider_test_ownership.py` |
+| S60 workflow parity | exact successor unit/CLI/integration/macOS commands from S60 plan + current 4-shard verifier |
+| S70 consumer closure | delete/replace `test_provider_test_lanes.py` and `test_full_regression_baseline.py`, then mandatory grep/import/collection 0 |
 | S70 build | `uv run python scripts/provider_gate.py build ...` |
 | S70 environment | `uv run python scripts/provider_gate.py verify-environment ...` |
 | S70 ownership | `uv run python scripts/provider_gate.py verify-node-ownership ...` |
@@ -375,9 +418,13 @@ S70 owns root `AGENTS.md`。Final must contain:
 | native primitive missing | fail closed | safety reviewer |
 | S40/S50 offered for merge | block handoff; continue S60 | implementation owner + human merger |
 | S60 references provider_gate | block PR-B | implementation owner |
+| S60 provider-ci still references deleted tests | retarget exact commands; block PR-B until GREEN | test/CI owner |
+| S60 lane test allows active/stale rows | update zero-active/all-terminal contract; block PR-B | test owner |
 | S60 removes current workflow consumer | restore consumer; block PR-B | test/CI owner |
 | active failure not terminalized | no ledger approval | Product owner |
 | S70 old removal before replacement | block PR-C | CI owner |
+| S70 deletes policy provider while `test_provider_test_lanes.py` or `test_full_regression_baseline.py` remains | retire/replace consumer first; block PR-C | test/CI owner |
+| S70 post-deletion grep/import/collection or final workflow fails | restore coherent branch state; block PR-C | test/CI owner |
 | S70 offered for merge | block; continue S80 | implementation owner + human merger |
 | environment mismatch | invalidate series | CI owner |
 | build count/hash mismatch | no merge | CI owner |

@@ -10,7 +10,7 @@ ID: "epic-00384"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "e47c1356892857e61388c7aefb2539d2061d1b9c"
+  sha: "b094771e089c1f31618116e84be32fcf78704409"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
@@ -33,8 +33,8 @@ Implementation開始前に、replacement manifest hashes、owner-recorded `SPEC_
 
 1. **S00 Admission and baseline**: specification lineageと#387 deltaを分離検証。
 2. **PR-A S10-S30 dormant successor**: seed policy、candidate、container bootstrap、install/update/resume。S30だけmerge gate、mainはold public product。
-3. **PR-B S40-S60 combined public cutover**: S40/S50 internal、S60だけmerge gate。Complete lifecycle、legacy proof、old engine removal、active failure terminalization。Current gateはintact。
-4. **PR-C S70-S80 gate cutover**: S70 internalでreplacement tooling/environment/workflow/AGENTSを追加しold machineryを同じbranchで削除。S80でqualification/context/attestation後だけmerge。
+3. **PR-B S40-S60 combined public cutover**: S40/S50 internal、S60だけmerge gate。Complete lifecycle、legacy proof、old engine removal、active failure terminalizationに加え、S60でcurrent `provider-ci.yml`をsuccessor testsへretargetし、`test_provider_test_lanes.py`をzero-active/all-terminal contractへ更新する。Current PR workflowとmain-push verifierの双方を独立にGREENとする。
+4. **PR-C S70-S80 gate cutover**: S70 internalでreplacement tooling/environment/workflow/AGENTS/final testsを追加し、`test_provider_test_lanes.py`、`test_full_regression_baseline.py`を含む全policy consumersをretire/replaceした後にproviders/old machineryを同じbranchで削除する。S80でfinal workflow GREEN、qualification/context/attestation後だけmerge。
 5. **Human merge and external closure**: tree OID equality、SpecDock finish、Issue/Epic closeをexternal attestationsへ記録。
 
 ## 3. Multi-PR policy and exact merge points
@@ -42,10 +42,10 @@ Implementation開始前に、replacement manifest hashes、owner-recorded `SPEC_
 | PR | Internal steps | Only permitted main merge gate | Main state after merge |
 |---|---|---|---|
 | PR-A | S10 -> S20 -> S30 | S30 all proof GREEN | Old public product + dormant successor。Current test/workflow intact。 |
-| PR-B | S40 -> S50 -> S60 | S60 all proof GREEN | Complete final `0.2.4` lifecycle、legacy proof、old engine removed、active approved failure 0。Current legacy provider gate/main-push workflow remain intact and GREEN。 |
-| PR-C | S70 -> S80 | S80 all proof + required transition + external attestation | Final build-once provider gate、old workflow/policy/ledger/timing/sharder removed、root AGENTS final。 |
+| PR-B | S40 -> S50 -> S60 | S60 all proof GREEN | Complete final `0.2.4` lifecycle、legacy proof、old engine removed、active approved failure 0。Transitional `provider-ci.yml` references only existing successor tests; current PR workflow and main-push verifier are independently GREEN。 |
+| PR-C | S70 -> S80 | S80 all proof + required transition + external attestation | All old policy consumers retired before provider deletion、final build-once provider gate GREEN、old workflow/policy/ledger/timing/sharder removed、root AGENTS final。 |
 
-S40、S50、S70をmain merge candidateとしてhandoffしない。PR-B merge時にS70-only toolへ依存せず、current main-push workflow consumerを削除しない。PR-Cではreplacement workflow/toolingを追加した同一change setでold consumers/workflowを除去する。
+S40、S50、S70をmain merge candidateとしてhandoffしない。PR-B merge時にS70-only toolへ依存せず、`.github/workflows/provider-ci.yml`と`tests/unit/test_provider_test_lanes.py`をS60 ownershipへ含め、current PR/main-push workflowsの全consumerを実在する状態に保つ。PR-Cではreplacement workflow/tooling/testsを追加し、`tests/unit/test_provider_test_lanes.py`と`tests/unit/test_full_regression_baseline.py`を含むall policy consumersをprovidersより先にretire/replaceした同一change setでold providers/workflowを除去する。
 
 ## 4. Human gates
 
@@ -97,8 +97,8 @@ Environment IDは`specdock-linux-qualification-v1`。Tracked descriptor、pinned
 - old package mutation attempt
 - native primitive/no-follow binding unavailable
 - active failure not terminalized
-- S60がS70-only toolへ依存、またはcurrent workflow consumerを削除
-- S70 old removal前にreplacement gate unavailable
+- S60がS70-only toolへ依存、`.github/workflows/provider-ci.yml`にdeleted test pathが残る、`tests/unit/test_provider_test_lanes.py`がactive/stale referenceを許容する、またはcurrent workflow consumerを削除
+- S70で`tests/unit/test_provider_test_lanes.py` / `tests/unit/test_full_regression_baseline.py`等のconsumerが残ったままproviderを削除、またはold removal前にreplacement gate unavailable
 - environment fingerprint mismatch、build/hash/budget/fault/flake failure
 - new context required前にoldを外す、RED not blocking、settings unreadable
 - tracked report self-reference/post-merge writeback
