@@ -6,10 +6,13 @@ Issue: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "b094771e089c1f31618116e84be32fcf78704409"
+  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
 ---
 
 # Luna Max Implementation Handoff
+
+Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md` (Issue documents use `../../artifacts/...`). Their exact wire/disposition data is not delegated to implementation.
+
 
 ## 1. Instruction priority
 
@@ -73,6 +76,11 @@ src/spec_dock/context_pack.py
 src/spec_dock/provider_lifecycle/**
 provider/dogfood runtime uninstall wrapper pair
 README.md
+src/spec_dock/assets/spec_dock/docs/migration.md
+spec-dock/docs/migration.md
+src/spec_dock/assets/spec_dock/docs/README.md
+spec-dock/docs/README.md
+tests/unit/infra/test_provider_lifecycle_wire_contract.py
 tests/unit/infra/test_provider_lifecycle_public_result.py
 tests/unit/infra/test_provider_test_ownership.py
 tests/cli_runtime/test_provider_lifecycle.py
@@ -314,7 +322,7 @@ Every evidence row includes operation/candidate/seed policy。Fresh create polic
 
 ## 9. Specification admission
 
-Do not use `b094771e089c1f31618116e84be32fcf78704409..POST_387_SHA` as one allowlist diff。
+Do not use `ef183ae46febe52f0152431cb3a8b4846c9972fc..POST_387_SHA` as one allowlist diff。
 
 Use:
 
@@ -402,7 +410,7 @@ S70 owns root `AGENTS.md`。Final must contain:
 | S70 environment | `uv run python scripts/provider_gate.py verify-environment ...` |
 | S70 ownership | `uv run python scripts/provider_gate.py verify-node-ownership ...` |
 | S80 canonical | `make provider-test` |
-| S80 qualification | `make provider-qualify` / `provider_gate.py qualify` |
+| S80 qualification | final Provider CI workflow dispatch/wait/download; no local build or local authoritative qualify |
 | macOS | `provider_gate.py macos-delta` |
 | dogfood | `spec-dock sync` then `validate` |
 
@@ -452,6 +460,46 @@ Tracked `report.md` contains:
 10. remaining owner decisions: zero
 
 It does not contain its own hash、final head/tree、final source-bound artifact hashes、merge result、Issue/Epic close result。
+
+## 17. Normative artifacts
+
+Do not reinterpret:
+
+```text
+provider-lifecycle-wire-contract.md
+active-failure-disposition-register.md
+```
+
+Wire artifact fixesrecord/result/enum/nullability/goldens。Failure register fixesall27 rows、#387 delta、final successor/owner。Any mismatch stops;noequivalent substitution。
+
+## 18. PR-B documentation ownership
+
+S40/S60 ownroot README lifecycle andprovider/dogfood migration/docs README pairs。Provider-first then`cmp`。S60 lifecycle grep mustremovejournal/retry/purge/compatible-newer/empty-boundary guidance。Do notremoveFull Regression test-policy wording untilS70。S80 makesno doc edits。
+
+## 19. S60 failure/workflow register
+
+- Runregister source/post-#387 checker beforeS10。
+- S60 remaining ledger: 15 rows、active0、resolved15、retired0。
+- Row2 successor: `tests/unit/infra/test_provider_assets.py::test_fixed_skill_slots_match_provider_and_dogfood`。
+- Rows1、3、16〜27 normalpass sameID。
+- Rows4〜15 absent after#387 andnotreinserted。
+- Transitional`provider-ci.yml` retargetsonlydeleted3 paths;keepname/events/jobs/matrix anddo notintroducefinal gate。
+
+## 20. Frozen-head artifact producer
+
+Final authority beginsafterS70 content/reportfreeze。Onlyworkflow job`provider-build-artifacts` maypackage。Its artifact name is`provider-candidate-<candidate_sha>`。Linux canonical、sdist smoke、macOS delta、attestation downloadsameartifact andrecordbuild0。S70 localbuild uses`--authority pre-freeze-tooling-smoke` andisdeleted。S80 hasno local build command;use`gh workflow run/watch/view/download` andAPI artifact receipt。
+
+## 21. S70 consumer deletion order
+
+Exact current consumers retired/replaced beforeproviders:
+
+```text
+tests/unit/test_provider_test_lanes.py
+tests/unit/test_full_regression_baseline.py
+.github/workflows/provider-full-regression.yml
+```
+
+Then proveonlyscheduledproviders/data remain beforedeleting`tests/conftest.py`、quality modules、ledger、timing。Unknown consumer path iscanonical-spec stop, notLuna classification。
 
 ## 17. Owner decisions
 

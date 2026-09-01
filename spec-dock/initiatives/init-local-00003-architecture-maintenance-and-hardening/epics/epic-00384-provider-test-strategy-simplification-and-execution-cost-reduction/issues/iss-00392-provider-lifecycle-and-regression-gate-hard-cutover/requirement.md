@@ -10,10 +10,13 @@ ID: "iss-00392"
 正本検証:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "b094771e089c1f31618116e84be32fcf78704409"
+  sha: "ef183ae46febe52f0152431cb3a8b4846c9972fc"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
+
+Normative artifacts: `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md` (Issue documents use `../../artifacts/...`). Their exact wire/disposition data is not delegated to implementation.
+
 
 ## 1. Objective and acceptance unit
 
@@ -108,7 +111,7 @@ S60 `provider-ci.yml`はcurrent workflow name/event/job IDs/matrix/setupを維�
 - `tests/integration/test_epic_00343_distribution.py` -> `test_provider_lifecycle_artifacts.py`、`test_provider_lifecycle_tripwire.py` with current permission flags。
 - macOS matrix additionally runs `tests/platform/macos/test_provider_lifecycle_macos.py` only on macOS。
 
-`tests/unit/test_provider_test_lanes.py` must assert ledger active rows `[]`、all rows `resolved` under current evaluator、fixed-in-place node or superseding successor is collected、deleted test path references absent、workflow successor paths exist、pytest/standalone adapters agree。Accepted retirements use unique deterministic absence-proof successor nodes and temporary `resolved/superseded` ledger encoding。S60 retains `tests/unit/test_full_regression_baseline.py` and all current policy providers。Ordinary suite、workflow-equivalent successor commands、current 4-shard verifier must all GREEN。No `scripts/provider_gate.py` dependency。
+`tests/unit/test_provider_test_lanes.py` must assert ledger active rows `[]`、all 15 remaining rows `resolved` under current evaluator、fixed-in-place node or exact superseding successor is collected、rows 4〜15 remain absent after #387、deleted test path references are absent、workflow successor paths exist、and pytest/standalone adapters agree。The exact relation comes from `active-failure-disposition-register.md`; no generated synthetic or implementation-selected successor is permitted。S60 retains `tests/unit/test_full_regression_baseline.py` and all current policy providers。Ordinary suite、workflow-equivalent successor commands、current 4-shard verifier must all GREEN。No `scripts/provider_gate.py` dependency。
 
 ### I392-RQ-021 — Consumer-first atomic PR-C gate transition
 
@@ -135,6 +138,22 @@ Tracked report committed beforehead freeze andcontainsnoown hash/final head/fina
 ### I392-RQ-026 — Root AGENTS and closure
 
 PR-C updatesroot AGENTS tofinal commands/policy、removesretired guidance、preserveshuman-only merge/human-admin settings。Tree equality iscommit tree objects。Issue finish/Epic close external closure evidence afterhuman merge。No newIssue。
+
+### I392-RQ-027 — PR-B lifecycle documentation ownership
+
+S40/S60 exact owned paths are `README.md` lifecycle sections、`src/spec_dock/assets/spec_dock/docs/migration.md`、`src/spec_dock/assets/spec_dock/docs/README.md`、`spec-dock/docs/migration.md`、`spec-dock/docs/README.md`。Provider source first、projection byte parity。PR-B merge時点でlegacy journal/retry、purge authority、same-compatible-newer、empty-boundary guidanceを除き、strict record、same operation/candidate/seed policy resume、tooling-only uninstall、preserve-only update/reinstall/migrationへ同期する。Root README/AGENTS/docs README test-policy textはS70。S80 content edits禁止。
+
+### I392-RQ-028 — Exact wire contract
+
+`../../artifacts/provider-lifecycle-wire-contract.md`のseven-key record、observed-only state、operation wire、resume/terminal relation、slot marker、service/public result field、status/code/action enum、nullability、text/JSON/exit goldenをexactに実装する。`tests/unit/infra/test_provider_lifecycle_wire_contract.py`がnormative valuesを検証し、unknown enum/default mappingをrejectする。
+
+### I392-RQ-029 — Exact failure disposition register
+
+`../../artifacts/active-failure-disposition-register.md`の27 row registerをS00とS60のauthorityにする。S00でsource ledgerとpost-#387 expected deltaを照合し、expected 12-row removal以外のnew/missing/signature/successor changeはS10前に停止する。S60でremaining 15 rowsをregisterどおりall resolved、active 0へ変更する。Lunaはfix/successor/retirementを再選択しない。
+
+### I392-RQ-030 — CI-only frozen-head artifact production
+
+Final frozen PR headのpackaging producerはLinux `provider-build-artifacts` job exactly one。One invocationでwheel/sdist/manifestを生成し`provider-candidate-<sha>`としてimmutable upload。`provider-linux-canonical`、`provider-sdist-smoke`、`provider-macos-delta`、`provider-attestation`はsame run artifactをdownload/hash-verifyし、build invocation count 0。S70 local buildはpre-freeze non-authoritative smoke。S80はworkflow dispatch/wait/download/verifyだけでlocal final buildなし。
 
 ## 3. Command/state/seed-policy matrix
 
