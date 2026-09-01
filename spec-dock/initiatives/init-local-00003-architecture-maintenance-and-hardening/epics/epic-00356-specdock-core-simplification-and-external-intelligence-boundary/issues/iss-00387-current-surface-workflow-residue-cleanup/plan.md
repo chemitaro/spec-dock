@@ -729,13 +729,13 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 | C40-07 | PASS | lint green; 2513 collected; orphan support=0 |
 | C40-08 | PASS | legacy S05 authority assertions removed; structural observer retained |
 | C40-09 | PASS | 15 ledger rows; 243 timing nodes; deleted-node refs=0; parser/help green |
-| C50-01 | PASS | focused lanes: 242, 29, and 201 passed |
-| C50-02 | PASS | Ruff/format/mypy green; ordinary 1436 passed, 1077 policy-skipped |
-| C60-01 | PASS | one wheel/sdist; fixed digest; fresh init/parity/help green; expected empty-tree validate |
+| C50-01 | PASS | repair replay: focused lanes 242, 29, and 201 passed |
+| C50-02 | PASS | repair replay: Ruff/format/mypy green; ordinary 1436 passed, 1076 policy-skipped |
+| C60-01 | PASS | repair replay: one wheel/sdist; fixed digest; fresh init/parity/help green; expected empty-tree validate |
 | C60-02 | N/A(pre-commit execution; deferred to C90-05 final SHA) | DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence |
-| C90-01 | PASS | 70 approved paths only; all no-touch audits diff=0 |
-| C90-02 | PASS | after: 2513 collected; 93795 Python LOC; 91 tracked test files; 6 fixtures; coverage/closure=1.0 |
-| C90-03 | PASS | validate 230 nodes; sync no-github; validate 230; generated diff=0 |
+| C90-01 | PASS | repair replay: 72 approved paths only; all no-touch audits diff=0 |
+| C90-02 | PASS | repair replay after: 2512 collected; 93736 Python LOC; 91 tracked test files; 6 fixtures; coverage/closure=1.0 |
+| C90-03 | PASS | repair replay: validate 230; sync no-github; validate 230; generated diff=0 |
 
 ## 16. Exit / handoff
 

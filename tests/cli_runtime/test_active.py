@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -199,64 +198,6 @@ class TestCliActive(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["active", "set", "--github-issue", "0"])
             assert p.returncode != 0, p.stdout + p.stderr
             assert "positive integer" in p.stderr
-
-    @pytest.mark.skip(
-        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
-    )
-    def test_active_set_github_issue_number_requires_linked_node(self) -> None:
-        if os.name == "nt":
-            pytest.skip("This test uses a bash stub for gh; skip on Windows.")
-        if shutil.which("git") is None:
-            pytest.skip("git not available")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-
-            self._init_origin_repo(target)
-            self._run_git(
-                target,
-                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
-            )
-
-            self._create_same_repo_linked_hierarchy(target)
-
-            # Make the working tree clean so checkout is allowed.
-            self._run_git(target, ["add", "-A"])
-            self._run_git(
-                target,
-                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
-            )
-
-            with tempfile.TemporaryDirectory() as bin_tmp:
-                bin_dir = Path(bin_tmp)
-                counter = bin_dir / "counter.txt"
-                gh_path = bin_dir / "gh"
-                gh_path.write_text(
-                    "#!/usr/bin/env bash\n"
-                    "set -euo pipefail\n"
-                    f"counter_file='{counter.as_posix()}'\n"
-                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
-                    '  n="$3"\n'
-                    '  branch="gh-issue-${n}"\n'
-                    '  git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch" >/dev/null 2>&1\n'
-                    "  c=0\n"
-                    '  if [[ -f "$counter_file" ]]; then\n'
-                    '    c=$(cat "$counter_file")\n'
-                    "  fi\n"
-                    '  echo $((c+1)) > "$counter_file"\n'
-                    "  exit 0\n"
-                    "fi\n"
-                    'echo "unexpected gh args: $@" >&2\n'
-                    "exit 1\n",
-                    encoding="utf-8",
-                )
-                gh_path.chmod(0o755)
-                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-
-                # GitHub issue number requires a linked node; command fails without checkout side effects.
-                self._run_runtime_expect_fail(target, ["active", "set", "999"], env=test_env)
-                assert not counter.exists()
 
     def test_active_set_ignores_unreachable_dependency_cycle_and_only_patches_active_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
