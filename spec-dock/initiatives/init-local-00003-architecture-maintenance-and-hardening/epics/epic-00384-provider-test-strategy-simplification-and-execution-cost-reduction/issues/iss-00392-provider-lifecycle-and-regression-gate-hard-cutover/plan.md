@@ -11,7 +11,7 @@ Planning Level: "critical"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
+  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
@@ -60,7 +60,7 @@ ISS392_WS_ARTIFACT_DOWNLOAD
 ISS392_WS_ATTESTATION_DRAFT
 ```
 
-No an aggregate external-root variable, shared parent, implicit purpose subdirectory or path-only cleanup. A child path such as `$ISS392_WS_WORKFLOW_API/run.json` is registered to that workspace handle before creation.
+No aggregate external-root variable, shared parent, implicit purpose subdirectory or path-only cleanup exists. The live owner calls `reserve_tree` before launching a child, passes only the reserved tree, calls `seal_tree` after exit, rejects every unreserved top-level entry, and retains its FDs through any Actions upload before `upload-confirmed` cleanup.
 
 ### Full Regression command rule
 
@@ -158,7 +158,7 @@ I392-RQ-001–007; D-007–010; register.
 
 **Objective and visible outcome**
 
-Add dormant strict model/candidate/legacy parser and all finite wire values including terminal-cleanup result.
+Add dormant strict model/candidate/legacy parser and all finite wire values including the seven-echo `terminal-cleanup-completed` and `terminal-cleanup-failed` result families.
 
 **Owned paths/symbols**
 
@@ -179,7 +179,7 @@ S00 GREEN.
 
 **RED evidence**
 
-37-code/123-row inventory; four record and sixteen public JSON goldens; terminal-cleanup code/retry/action/guidance; warning retries; strict result-family private enum; unknown/duplicate/order rejection; candidate/legacy safety.
+38-code/136-row inventory; four record and twenty-nine public JSON goldens; terminal-cleanup code/retry/action/guidance; warning retries; strict result-family private enum; unknown/duplicate/order rejection; candidate/legacy safety.
 
 **Smallest action**
 
@@ -277,6 +277,9 @@ S20 GREEN; independent `ISS392_WS_FULL_REGRESSION_S30` handle exists.
 - ACTIVE present/already absent;
 - crash after stage removal and after ACTIVE unlink before fsync;
 - cleanup retry with next request same/different operation;
+- each of init, init-force, update, uninstall default/keep dry-run and uninstall default/keep apply echoes exactly on cleanup success/failure;
+- present-ACTIVE cleanup success returns cleanup-only and does not classify/execute the requested operation;
+- old-family retry success returns cleanup-only; caller must invoke the desired command again;
 - repeated cleanup failure exact `terminal-cleanup-failed`;
 - warning result non-null retry and next-call cleanup;
 - result-family retry mapping;
@@ -445,7 +448,7 @@ Each admitted failure focused RED/closed resolution; current Provider CI deleted
 2. Extract surviving context behavior and delete old engine/tests.
 3. Retarget current provider-ci only to S10–S50 successors.
 4. Update lane/ledger/timing/conftest exact references.
-5. Modify retained workflow to create one independent full-regression-s60 workspace below runner.temp, pass/upload exact path and cleanup by handle.
+5. Modify retained workflow to start one background handle owner, reserve/seal one full-regression-s60 output tree, pass/upload that exact tree while owner FDs remain alive, mark the actual upload identity confirmed, and only then handle-clean. Upload failure preserves and fails.
 6. Update lifecycle docs and AGENTS lifecycle paragraphs.
 7. With provider bytes settled, apply new service once to exact legacy repository dogfood; commit complete roots/slots/record/markers.
 8. Validate provider/dogfood/protected parity and both current gates.
@@ -481,7 +484,7 @@ S60 is only PR-B gate. Main receives complete final lifecycle and coherent curre
 
 I392-RQ-020–021/030/032; D-011–012; register.
 
-## I392-S70 — Consumer-first final gate, compatibility sequence and second dogfood update
+## I392-S70 — Consumer-first final gate, both tracked heads and second dogfood update
 
 **Objective and visible outcome**
 
@@ -555,7 +558,7 @@ Old consumers/providers absent; second dogfood complete; report non-self-referen
 
 **Stop/cleanup/invariant**
 
-Any schema choice, old consumer, partial dogfood, report identity, compatibility no-op/build/canary dependency, setting gap, equal heads or extra final diff stops. Cleanup local pre-freeze purpose workspaces by handles. S70 is non-main; continue S80.
+Any schema/CLI choice, old consumer, partial dogfood, report identity, compatibility no-op/build/canary dependency, setting gap, equal heads or extra final diff stops. Before leaving S70, commit `PRC_COMPAT_HEAD`, complete the human context transition, then commit distinct `PRC_FINAL_HEAD` by removing only `provider-tests`; record both identities externally. Cleanup local pre-freeze purpose workspaces by handles. S70 is non-main; continue to read-only S80.
 
 **Trace**
 
@@ -577,7 +580,7 @@ All tracked files, dogfood, report/meta, repository workbench, stage namespace e
 
 **Prerequisites**
 
-S70 final head clean; compatibility sequence complete; new required context active; compatibility job absent; human review available.
+S70-created final head clean; compatibility sequence complete; new required context active; compatibility job absent; human review available. S80 may not create a commit or modify workflow bytes.
 
 **RED evidence**
 
@@ -585,7 +588,7 @@ Run selector zero/multiple/wrong head; candidate/evidence/API missing or mismatc
 
 **Smallest action**
 
-1. Create independent workflow-api, artifact-download, protected-witness and attestation-draft workspaces/handles.
+1. Read and pin the already-existing S70 `PRC_FINAL_HEAD`/tree; create independent workflow-api, artifact-download, protected-witness and attestation-draft workspaces/handles.
 2. Verify final SHA/tree externally and allowed compatibility diff.
 3. Snapshot runs to workflow-api workspace; dispatch Provider CI for final head and qualification; select exactly one new run; wait success.
 4. Save exact run/jobs/artifacts API bytes to workflow-api workspace.
@@ -624,9 +627,9 @@ I392-RQ-023–032; D-013–025.
 
 1. Human merges `PRC_FINAL_HEAD`.
 2. Fetch `MERGE_COMMIT`; require `git rev-parse "$PRC_FINAL_HEAD^{tree}" == git rev-parse "$MERGE_COMMIT^{tree}"`.
-3. Run `python3 ./spec-dock/scripts/spec-dock issue finish`; verify actual local/state output.
-4. Run `python3 ./spec-dock/scripts/spec-dock close --id iss-00392`; read actual GitHub #392 closed state/timeline event.
-5. Create a new attestation-draft purpose workspace; render `post-merge-closure-v1` from measured facts; human posts to #392; read back and create external `comment-receipt-v1`.
+3. Record command start, run `python3 ./spec-dock/scripts/spec-dock issue finish`, and record completion plus returned issue number, already-closed, active-clear and post-sync values. The command itself calls `close_node()` before clear/post-sync.
+4. Immediately read GitHub #392 state/timeline and select the unique close event satisfying Design D-022; do not invoke `close --id iss-00392`.
+5. Create a new attestation-draft purpose workspace; render `post-merge-closure-v1` from the measured command interval/result and close event; human posts to #392; read back and create external `comment-receipt-v1`.
 6. Re-evaluate all Epic acceptance.
 7. Run `python3 ./spec-dock/scripts/spec-dock close --id epic-00384`; read actual #384 close event.
 8. Create another independently-created attestation-draft workspace; render `epic-closure-v1`; human posts to #384; read back and create receipt.
@@ -636,4 +639,4 @@ No step creates payload fields for facts not yet observed. Post payload has no o
 
 ## 5. Definition of done
 
-All I392-RQ-001–032 are verified. Only S30/S60/S80 are main gates. #387 report is mapping-only, terminal cleanup releases old tuples, each temporary purpose has a distinct handle, compatibility/final evidence uses distinct heads and actual bytes, closure follows measured order, and `owner_decisions_required=[]`.
+All I392-RQ-001–032 are verified. Only S30/S60/S80 are main gates. #387 report is mapping-only, terminal cleanup has exact cleanup-only success/failure echoes, each temporary purpose has a live registering/upload-surviving handle, provider-gate schemas/CLI mappings are closed, both tracked heads are created in S70, S80 is read-only, `issue finish` supplies #392 close evidence, and `owner_decisions_required=[]`.

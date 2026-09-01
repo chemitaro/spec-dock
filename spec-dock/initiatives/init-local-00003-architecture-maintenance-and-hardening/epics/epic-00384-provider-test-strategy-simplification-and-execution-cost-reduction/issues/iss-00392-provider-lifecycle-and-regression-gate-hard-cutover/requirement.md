@@ -10,7 +10,7 @@ ID: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
+  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
@@ -23,7 +23,7 @@ This is Epic #384's sole implementation-and-verification Issue. It remains block
 
 ### I392-RQ-001 — Specification freeze
 
-The replacement manifest, all canonical/support payload SHA-256 values and owner-recorded `SPEC_FREEZE_COMMIT` must match exact repository blobs. The implementation base must contain that commit and the independently admitted #387 merge. Repository evidence SHA `f96d031ea86d3757374f3de14d588f1ba09a0864` is provenance, not a future blanket diff base.
+The replacement manifest, all canonical/support payload SHA-256 values and owner-recorded `SPEC_FREEZE_COMMIT` must match exact repository blobs. The implementation base must contain that commit and the independently admitted #387 merge. Repository evidence SHA `95d7562ca1762e0b2a717912484eba5a5c2377f1` is provenance, not a future blanket diff base.
 
 ### I392-RQ-002 — Mapping-only #387 report
 
@@ -47,7 +47,7 @@ Every repository `spec-dock/.workbench/**` path is read-only protected. Initiati
 
 ### I392-RQ-007 — Independent purpose workspaces
 
-Each used purpose creates its own external owner-bound `mkdtemp` and its own non-serializable cleanup handle. Exact purpose/env mapping is fixed by Design. No aggregate root, nested shared workspace, serializable cleanup token or cleanup-from-path is allowed. Workspace and sentinel identities, mode, owner, outside-repository realpath and registered children are revalidated on cleanup.
+Each used purpose creates its own external owner-bound `mkdtemp` and its own live non-serializable cleanup handle. The owner reserves top-level child trees before process launch, seals their descendants after exit and remains alive through artifact upload confirmation. Exact purpose/env mapping is fixed by Design. No aggregate root, nested shared workspace, serializable cleanup token or cleanup-from-path is allowed. Workspace and sentinel identities, mode, owner, outside-repository realpath and registered children are revalidated on cleanup.
 
 ### I392-RQ-008 — Persistent stage namespace
 
@@ -55,7 +55,7 @@ Candidate/tombstone stage uses the same-filesystem `.spec-dock-provider-stages-v
 
 ### I392-RQ-009 — Mandatory terminal cleanup before dispatch
 
-Every lifecycle invocation locks/binds repository, then runs terminal-cleanup recovery before interpreting the new requested operation. It handles ACTIVE ready, terminal-cleanup, already absent; stage present or already absent; ACTIVE unlink/fsync crash; and repeated cleanup failure. Successful cleanup proceeds with any new operation. Failure returns exact `terminal-cleanup-failed` and old-family retry; the old tuple does not permanently block later work.
+Every lifecycle invocation locks/binds repository, then runs terminal-cleanup recovery before interpreting the new requested operation. It handles ACTIVE ready, terminal-cleanup, already absent; stage present or already absent; ACTIVE unlink/fsync crash; and repeated cleanup failure. When ACTIVE is present, successful cleanup returns exact cleanup-only `terminal-cleanup-completed`; failure returns exact `terminal-cleanup-failed`. Both echo the actual init/update/uninstall invocation and expose the old ACTIVE tuple. Neither executes the new intent; caller re-runs after success. ACTIVE-absent fsync recovery dispatches normally.
 
 ### I392-RQ-010 — Final version and strict record
 
@@ -87,7 +87,7 @@ Uninstall is dry-run by default and applies with `--apply`. It preserves contain
 
 ### I392-RQ-017 — Closed wire implementation
 
-Production enums/constructors/serializers/tests match 37 codes, 123 relation rows, four valid record goldens, sixteen public JSON review goldens, 23 phases, action relations and target order. Cleanup-warning rows have exact retry; terminal-cleanup failure has exact phase/digest/policy/action/retry/message. No unknown/catch-all branch exists.
+Production enums/constructors/serializers/tests match 38 codes, 136 relation rows, four valid record goldens, twenty-nine public JSON review goldens, 23 phases, action relations and target order. Cleanup-warning rows have exact retry; terminal-cleanup failure has exact phase/digest/policy/action/retry/message. No unknown/catch-all branch exists.
 
 ### I392-RQ-018 — Exact legacy and old-package mutation-zero
 
@@ -107,7 +107,7 @@ S60 applies admitted register rows to normal pass/supersession, active/approved 
 
 ### I392-RQ-022 — Consumer-first PR-C and second dogfood update
 
-S70 first creates replacement gate/environment/workflow/tests, then retires/replaces all old consumers, proves zero, deletes old providers/ledger/timing/sharder/conftest/workflow, updates final test-policy docs/AGENTS and performs one complete candidate-wide dogfood update. S70 is non-main. S80 has no tracked ownership.
+S70 first creates replacement gate/environment/workflow/tests, then retires/replaces all old consumers, proves zero, deletes old providers/ledger/timing/sharder/conftest/workflow, updates final test-policy docs/AGENTS, performs one complete candidate-wide dogfood update, creates compatibility head, completes context transition and commits the final descendant by removing only `provider-tests`. S70 is non-main. S80 has no tracked ownership or commit instruction.
 
 ### I392-RQ-023 — Sole producer and role graph
 
@@ -123,7 +123,7 @@ Environment ID is `specdock-linux-qualification-v1`, bound to tracked descriptor
 
 ### I392-RQ-026 — Exact evidence/attestation schemas
 
-Issue Design fixes ordered keys/types/enums/nullability/units for candidate, role evidence, receipts, provider aggregate, pre/post/Epic payloads and comment receipt. Canonical compact UTF-8+LF and exact child hashes apply. Fixture compatibility/final identities are distinct and all hash chains are recomputed.
+Issue Design D-015–D-026 fixes every ordered key/type/enum/nullability/unit, digest input, range, role relation, CLI success/failure number-code-message mapping, stdout bytes, fixture semantics and parent-child hash for candidate, role evidence, receipts, provider aggregate, pre/post/Epic payloads and comment receipts. Canonical compact UTF-8+LF and exact child hashes apply. Fixture compatibility/final identities are distinct and all hash chains are recomputed.
 
 ### I392-RQ-027 — Distinct external two-head identities
 
@@ -139,7 +139,7 @@ Tracked report has pre-freeze method/implementation facts only. S80 owns no trac
 
 ### I392-RQ-030 — Ordered post-merge closure
 
-Human merge and tree equality precede SpecDock finish. Actual command is `python3 ./spec-dock/scripts/spec-dock issue finish`; then `python3 ./spec-dock/scripts/spec-dock close --id iss-00392`; then actual close event is read; then post-merge payload is created/posted/read back on #392. Only afterward is Epic acceptance re-evaluated, `epic-00384` closed/read, and Epic payload posted/read on #384. No future fact is invented.
+Human merge and tree equality precede SpecDock finish. Actual command is `python3 ./spec-dock/scripts/spec-dock issue finish`; current implementation closes #392 first, then clears active and post-syncs. Its returned close snapshot is bound to immediate close-event readback; no second `close --id iss-00392` command is allowed; then post-merge payload is created/posted/read back on #392. Only afterward is Epic acceptance re-evaluated, `epic-00384` closed/read, and Epic payload posted/read on #384. No future fact is invented.
 
 ### I392-RQ-031 — Comment receipts
 

@@ -9,7 +9,7 @@ ID: "20260831t152024z-adr"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "f96d031ea86d3757374f3de14d588f1ba09a0864"
+  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
@@ -32,7 +32,7 @@ S30, S60 and S80 are the only main gates. S40/S50/S70 are non-main. Main sees ol
 
 ### ADR-D3 — Fixed lifecycle, immutable policy and closed wire
 
-Four roots, two slots, one record, bounded fresh bootstrap/seeds. Record includes immutable seed policy and exact resume tuple. The wire artifact's 37 codes, 123 context rows, phases/actions/order/retries and goldens are the only public values.
+Four roots, two slots, one record, bounded fresh bootstrap/seeds. Record includes immutable seed policy and exact resume tuple. The wire artifact's 38 codes, 136 context rows, phases/actions/order/retries and goldens are the only public values. Present ACTIVE cleanup returns cleanup-only success/failure with actual invocation echo; it never dispatches the new intent in the same invocation.
 
 ### ADR-D4 — Process-independent stage with mandatory terminal cleanup
 
@@ -40,7 +40,7 @@ Same-filesystem `.spec-dock-provider-stages-v1`, exact sentinels, repository/tup
 
 ### ADR-D5 — One owner-bound workspace per purpose
 
-Each admission/build/witness/full-regression/tripwire/fresh-consumer/API/download/attestation purpose receives its own `mkdtemp` directory and non-serializable cleanup handle. No aggregate root or path-only cleanup authority exists. Repository `.workbench` is protected input, never output or cleanup target.
+Each admission/build/witness/full-regression/tripwire/fresh-consumer/API/download/attestation purpose receives its own `mkdtemp` directory and live non-serializable cleanup handle. The owner reserves/seals child trees and stays alive through upload confirmation. No aggregate root, child self-registration, nonce-only or path-only cleanup authority exists. Repository `.workbench` is protected input, never output or cleanup target.
 
 ### ADR-D6 — Exact protected exclusions
 
@@ -64,7 +64,7 @@ Only Linux build job packages each workflow head once. Three consumers build zer
 
 ### ADR-D11 — Distinct external two-head identities
 
-Actual compatibility/final SHA/tree/run identities never appear in tracked #392 report. Compatibility and final heads are distinct. Final head removes only the compatibility job and reruns all authoritative evidence. Serializer fixtures use distinct identity constants and recomputed child/hash chains.
+Actual compatibility/final SHA/tree/run identities never appear in tracked #392 report. Compatibility and final heads are distinct. S70 creates both tracked heads, with final head removing only the compatibility job. S80 is strictly read-only and reruns all authoritative evidence. Serializer fixtures use distinct identity constants and recomputed child/hash chains.
 
 ### ADR-D12 — Stable environment and no-gap context cutover
 
@@ -72,7 +72,7 @@ Qualification binds `specdock-linux-qualification-v1`. Human requires new while 
 
 ### ADR-D13 — Measured append-only closure
 
-Pre-merge comment is posted to #392 before merge. After merge, tree equality is measured, then SpecDock finish and #392 close are performed/read back; only then is post-merge payload posted to #392. Epic acceptance is then measured, #384 is closed/read back, and Epic payload is posted to #384. Payloads omit their own future comment identity; external `comment-receipt-v1` objects bind each observed comment.
+Pre-merge comment is posted to #392 before merge. After merge, tree equality is measured, then current `issue finish` performs the #392 close before active clear/post-sync. Its returned close snapshot is bound to immediate timeline readback; no redundant `close --id iss-00392` is run. Only then is post-merge payload posted to #392. Epic acceptance is then measured, #384 is closed/read back, and Epic payload is posted to #384. Payloads omit their own future comment identity; external `comment-receipt-v1` objects bind each observed comment.
 
 ### ADR-D14 — Documentation and human gates
 
