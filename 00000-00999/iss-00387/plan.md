@@ -617,7 +617,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'
   test "$(git rev-parse --verify "${IMPLEMENTATION_BASELINE_SHA}^{commit}")" = "$IMPLEMENTATION_BASELINE_SHA"
   C90_METRIC_DIR="$(mktemp -d)"
-  trap 'status=$?; rm -rf -- "$C90_METRIC_DIR"; exit "$status"' EXIT
+  trap 'c90_02_exit_status=$?; rm -rf -- "$C90_METRIC_DIR"; exit "$c90_02_exit_status"' EXIT
   TRACKED_LIST="$C90_METRIC_DIR/tracked-tests.zlist"
   UNTRACKED_LIST="$C90_METRIC_DIR/untracked-tests.zlist"
   COLLECT_OUTPUT="$C90_METRIC_DIR/collect-only.txt"
@@ -625,18 +625,18 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   typeset -a EXISTING_TRACKED_TESTS=()
   typeset -a EXISTING_TRACKED_TEST_PY=()
   typeset -a EXISTING_TRACKED_FIXTURES=()
-  while IFS= read -r -d '' path; do
-    if [[ ! -e "$path" ]]; then
-      printf 'C90-02_EXCLUDED_MISSING_TRACKED=%s\n' "$path"
+  while IFS= read -r -d '' tracked_test_path; do
+    if [[ ! -e "$tracked_test_path" ]]; then
+      printf 'C90-02_EXCLUDED_MISSING_TRACKED=%s\n' "$tracked_test_path"
       continue
     fi
-    EXISTING_TRACKED_TESTS+=("$path")
-    [[ "$path" != *.py ]] || EXISTING_TRACKED_TEST_PY+=("$path")
-    [[ "$path" != tests/fixtures/* ]] || EXISTING_TRACKED_FIXTURES+=("$path")
+    EXISTING_TRACKED_TESTS+=("$tracked_test_path")
+    [[ "$tracked_test_path" != *.py ]] || EXISTING_TRACKED_TEST_PY+=("$tracked_test_path")
+    [[ "$tracked_test_path" != tests/fixtures/* ]] || EXISTING_TRACKED_FIXTURES+=("$tracked_test_path")
   done < "$TRACKED_LIST"
   git ls-files -z --others --exclude-standard -- tests > "$UNTRACKED_LIST"
   if [[ -s "$UNTRACKED_LIST" ]]; then
-    while IFS= read -r -d '' path; do printf 'C90-02_NON_IGNORED_UNTRACKED=%s\n' "$path" >&2; done < "$UNTRACKED_LIST"
+    while IFS= read -r -d '' untracked_test_path; do printf 'C90-02_NON_IGNORED_UNTRACKED=%s\n' "$untracked_test_path" >&2; done < "$UNTRACKED_LIST"
     exit 1
   fi
   (( ${#EXISTING_TRACKED_TESTS[@]} > 0 ))
