@@ -5,137 +5,140 @@ ID: "epic-00384"
 関連GitHub: ["#384"]
 状態: "draft"
 最終更新: "2026-09-02"
-依存: ["requirement.md", "artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md", "artifacts/provider-lifecycle-wire-contract.md", "artifacts/active-failure-disposition-register.md"]
+依存:
+  - "requirement.md"
+  - "artifacts/20260902t070000z-adr-multi-issue-epic-integration-branch-and-rolling-wave-elaboration-policy.md"
+  - "artifacts/epic-integration-branch-contract.md"
+  - "artifacts/rolling-wave-issue-elaboration-contract.md"
+  - "artifacts/provider-lifecycle-wire-contract.md"
+  - "artifacts/active-failure-disposition-register.md"
 親: ["init-local-00003"]
+実装開始許可: false
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
+  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
+  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
 
-## 1. Architecture
+## 1. Delivery architecture
 
 ```text
-public CLI -> closed wire adapter -> lifecycle service
-                                   |-> classifier/candidate/legacy recognizer
-                                   |-> descriptor-bound target filesystem
-                                   `-> process-independent stage namespace
-
-purpose workspace factory -> private owner root + exported reserved tree per purpose
-protected witness         -> complete repository workbench/data observation
-
-PR-A/S30 -> dormant successor, old public product
-PR-B/S60 -> complete lifecycle + retained current gates + complete dogfood migration
-PR-C compatibility head -> old/new contexts + compatibility byte verifier
-PR-C final head         -> compatibility job removed + raw/archive/API evidence rerun
-S80                     -> read-only PR-C merge gate
+post-#387 planning baseline
+  -> parent contract freeze
+  -> iss-00392 lifecycle PR -> human merge -> GREEN integration state B1
+  -> iss-00395 defect PR    -> human merge -> GREEN integration state B2
+  -> iss-00396 gate PR      -> human merge -> GREEN integration state B3
+  -> final Epic PR          -> one human merge to main -> state B4
 ```
 
-Production source of truth is `src/spec_dock/`; checked-in `spec-dock/` is a consumer projection. The wire artifact owns every public lifecycle value. The register owns every #387 conditional outcome.
+Issue branches are short-lived writers. The Epic branch is the only integration target. Main is not an Issue-level integration target.
 
-## 2. Lifecycle ownership and state
+## 2. Stable cross-Issue contracts
 
-### E384-D-001 — Code-fixed targets
+### E384-C-001 — Branch topology
 
-Four roots, two slots, record, fresh-only seeds and shared-container create authority are constants. No manifest-supplied mutation path, wildcard or historical obsolete path is accepted. Slot markers bind slot/version/candidate digest; candidate digest excludes record, seeds and generated markers.
+The exact integration branch name is `codex/epic-00384-provider-test-strategy-planning`. Each Issue branch starts from its current tip, targets it by PR, and is merged sequentially by a human. The branch contract is detailed in [Epic Integration Branch Contract](artifacts/epic-integration-branch-contract.md).
 
-### E384-D-002 — Durable state, deferred intent and public continuation
+### E384-C-002 — Dependency direction
 
-The seven-key record keeps exact resume identity. Persistent `ACTIVE.json` stores old result family, an exact identity-bound `cleanup_token`, and a nullable deferred-invocation object. Invocation role is syntactic and machine-visible: every public command without the hidden token is desired, while the exact generated command carrying `--provider-cleanup-token <active token>` is cleanup-only. The first desired request is stored immutably even when its base form equals the old retry; tokenized retry, repeat, or third command cannot overwrite it. Cleanup failure returns tokenized retry now and optionally the first desired command after cleanup. Cleanup success is cleanup-only and returns that desired command or no action. The wire continuation object is the sole caller authority.
-
-### E384-D-003 — Publication
-
-Repository/parent descriptors are no-follow and identity-bound under exclusive lock. Candidate is captured/validated before target mutation. Absent shared container is exclusively created and recorded in stage ownership. Fixed roots/slots publish through native no-replace/exchange. Terminal record is last. A post-terminal cleanup warning leaves deterministic terminal-cleanup state and the exact tokenized `active.cleanup_retry_command`; an un-tokenized desired command is never a cleanup retry.
-
-## 3. Persistent lifecycle stage namespace
-
-### E384-D-004 — Layout and private schema
-
-The same-filesystem layout remains namespace sentinel, per-repository sentinel, one `ACTIVE.json`, and deterministic tuple-key stage. Repository/tuple keys are SHA-256 over exact identities. ACTIVE exact keys include immutable `cleanup_token` and nullable `deferred_invocation`; its desired invocation enum is the seven wire forms. The cleanup token is a 64-hex SHA-256 of the wire-defined repository/tuple/result-family input and is identity binding, not authorization. Namespace/repository/stage directories are real, current-UID, 0700; JSON is canonical, regular/link-one, 0600. ACTIVE is the only locator; scans and orphan adoption are forbidden.
-
-### E384-D-005 — Recovery state machine
-
-Absent ACTIVE fsyncs parent then dispatches. Allocating/ready incomplete resumes exact tuple. Ready terminal atomically becomes cleanup. Before cleanup, a no-token invocation is persisted as the first desired request; an exact tokenized retry never changes it. Stage present/already absent and ACTIVE unlink crash are deterministic. Failure emits the exact tokenized cleanup retry plus the deferred desired request; success emits the desired request only, or none; both are cleanup-only. Wrong/missing token on a retry form and any identity/sentinel/entry mismatch fail closed.
-
-## 4. Independent ephemeral workspaces and protection
-
-### E384-D-006 — Private owner root and reserved-tree API
-
-Each purpose creates a private mode-0700 owner root and live descriptor-backed handle. The root path is not exported. The owner reserves one exact top-level child, pre-registers every fixed output or closed subtree policy, and exports only the reserved child. A downloaded-verification step uses exactly one provider-attestation or provider-verification tree for API snapshots, raw ZIPs, empty extraction destinations and stdout; extraction occurs inside the verifier. Exact mappings are Issue Design D-007. Children receive the reserved tree only and cannot create registration or cleanup authority. Owner seals output, remains alive through upload confirmation and cleans only via handle. Unknown or policy-invalid entries, root exposure, identity drift or premature owner death preserve and stop.
-
-### E384-D-007 — Protected witness and exclusions
-
-The witness is in `ISS392_WS_PROTECTED_WITNESS` and captures all repository `spec-dock/.workbench/**`, initiatives/artifacts, seeds, unknown paths and unrelated skills by UTF-8 path order, kind, mode, UID/GID, link target, size/content hash and device identity. Only exact #392 `report.md` and `.meta.json` are excluded from equality; `authorized-exclusions.json` separately fixes their before/after blobs, mode, parents, step and allowed semantic diff. No other exclusion is valid.
-
-## 5. Issue #387 admission
-
-### E384-D-008 — Mapping-only report
-
-The report block is schema 4 with exact top-level keys `schema_version,kind,issue_id,rule_id,entries`. It contains exactly twelve entries and no repository/PR/commit/tree/merge/timestamp/ledger/collection identity. Thus the current #387 plan remains satisfiable without an extra commit boundary or report self-reference.
-
-### E384-D-009 — Unique PR and merge-tree evidence
-
-S00 obtains Issue #387 timeline/cross-reference PR numbers, fetches each PR, and verifies each exact head SHA through the commit-association endpoint. It filters same repository, base `main`, merged state, report presence and main reachability, then requires exactly one. It compares PR-head tree to merge-commit tree and reads report, ledger and collection from that merge tree. `ISS387-THREE-WAY-V2` determines the admitted rows; no semantic-candidate/evidence-tail construct exists.
-
-## 6. PR-B and dogfood
-
-### E384-D-010 — S40/S50/S60
-
-S40 changes provider lifecycle code/docs and root README lifecycle sections but preserves checked-in dogfood. S50 proves migration on independent external consumers. S60 applies the final service once to exact legacy dogfood, commits four roots/two slots/seven-key record/two markers, and proves candidate parity/protection. It updates AGENTS lifecycle/uninstall sections, current Provider CI test references and retained Full Regression workflow.
-
-The retained workflow creates an independent `full-regression-s60` workspace below `${{ runner.temp }}` with a background owner, reserves/seals the output tree, passes it through `--artifact-dir`, keeps owner FDs alive through upload, and cleans only after actual upload confirmation. Name, triggers, concurrency, job ID and policy stay otherwise current.
-
-## 7. Final CI/evidence architecture
-
-### E384-D-011 — Compatibility/final graph, raw bytes and permissions
-
-Compatibility graph is producer -> three roles; producer+roles -> attestation -> gate, with compatibility provider-tests depending producer+attestation. Final removes only provider-tests. Workflow-level permissions are `{}`; exact job overrides are fixed in Issue Design. Every role/attestation/compatibility download preserves authenticated raw ZIP bytes and passes raw/API inputs plus empty extraction destinations to the same verifier under one handle. Exact verification phases distinguish in-progress role-set, compatibility green/canary, terminal canary readback and S80 final success. Only gate reads the canary.
-
-### E384-D-012 — Byte graph, exact Provider Gate CLI and qualification
-
-Only producer packages once; consumers build zero. All nine provider-gate subcommands have exact argv, required flags, path types, repeated option order, stdout/stderr and number-code-message mapping in Issue Design. Provider evidence remains nine actual files and all raw archives/extracted files/API snapshots are independently verified. Linux evidence binds `specdock-linux-qualification-v1`, one fingerprint, twenty runs and fault metrics.
-
-## 8. Attestation and closure
-
-### E384-D-013 — Tracked/external identity split
-
-Tracked #392 report records method and implementation summaries but no actual compatibility/final head or run identity. Actual compatibility/final SHA/tree and run IDs are fields of the external pre-merge attestation. Fixture identities are distinct, and all parent/child hashes are computed over actual canonical bytes.
-
-### E384-D-014 — Append-only objects and comment receipts
-
-`emit-attestation` creates payload/comment bytes only. Human posts pre-merge and post-merge comments to #392 and Epic closure to #384. Each payload omits its own future comment ID/body hash. After posting, an external `comment-receipt-v1` records target, ID, URL, actor, created/updated timestamps, payload hash, body hash/size and verification time. It is not embedded in payload or tracked tree.
-
-### E384-D-015 — Closure state machine with post-sync recovery
+Dependency direction is one-way:
 
 ```text
-pre-merge #392 comment verified
--> human merge and tree equality
--> issue finish attempt 1
--> if post-sync failed after close/clear: bind unique original close event
--> active set iss-00392 and retry issue finish as already-closed (maximum attempts 3)
--> final successful interval selected
--> post-merge payload/comment/receipt on #392
--> Epic acceptance
--> close #384 and read event
--> Epic payload/comment/receipt on #384
+iss-00387 (completed predecessor)
+  -> iss-00392
+  -> iss-00395
+  -> iss-00396
+  -> Epic main merge
 ```
 
-No redundant #392 close command exists. Failed restore, ambiguous close event or three post-sync failures stops. Payload records all attempts/restores and the accepted final interval, while preserving the original close event.
+A later Issue may consume an earlier output but may not redefine it. An earlier Issue may not import a later Issue's implementation or verification tooling.
 
-## 9. r11 cross-contract invariants
+### E384-C-003 — Lifecycle wire ownership
 
-- Wire continuation separates cleanup retry from desired request.
-- Workspace variables are reserved trees, never owner roots.
-- Provider Gate validates raw ZIP, verifier-produced extracted bytes and phase-aware API/job/artifact states under exact permissions.
-- Closure accepts only a final successful issue-finish attempt after bounded recovery; active restoration is evidenced only by current active-set exit/output and active-show readback, never a nonexistent active-set post-sync status.
+[Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md) is frozen by the parent. Issue #392 is the sole production writer for lifecycle behavior and owns conformance. Issues #395 and #396 are read-only consumers and may neither extend nor reinterpret lifecycle fields, codes, ordering, retry, compatibility or filesystem semantics.
 
-## 10. Traceability
+### E384-C-004 — Protected data and dogfood
 
-| Requirement | Design |
+The fixed provider target set, consumer preservation, private owner-bound workspaces and complete-candidate dogfood rule apply to every Issue. Candidate-changing Issues must converge provider and dogfood completely before merge. #395 may change dogfood only when its Product repair changes shipped candidate bytes.
+
+### E384-C-005 — Regression baseline
+
+[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md) freezes the current 15 rows. Its `failure_paths` identities are current authority; stale 27-row top-level metadata remains historical context only. #392 preserves the 14 active identities, #395 terminalizes them, and #396 consumes only the clean result.
+
+### E384-C-006 — Transitional gate
+
+The current ledger/timing/sharder/policy system remains a live compatibility provider through #392 and #395. It must be GREEN after both merges. #396 is the sole final-policy writer and removes it only after replacement and consumer-zero proof.
+
+### E384-C-007 — Final provider gate
+
+The final gate uses one Linux packaging producer and zero downstream builds. All roles consume the same candidate identity. Linux canonical, sdist, macOS delta, qualification and evidence are separate observable responsibilities but one Issue acceptance unit.
+
+### E384-C-008 — Compatibility and evidence
+
+Required-context transition has no gap. External dynamic identities are measured after source freeze; tracked documents contain schemas and methods, not future run/head/merge facts. Human is the only writer of branch settings and merge state.
+
+### E384-C-009 — Rollback and recovery
+
+Issue merge is the smallest integration rollback unit. Runtime lifecycle recovery uses the wire contract. Branch rollback uses whole-merge revert or reverse-order suffix revert. CI/settings recovery restores a captured human-readable before-state. No automatic old behavior fallback exists.
+
+### E384-C-010 — Rolling-wave detail
+
+The current Issue designs specify responsibility, inputs, outputs and acceptance boundaries. Implementation structures are intentionally absent. [Rolling-Wave Issue Elaboration Contract](artifacts/rolling-wave-issue-elaboration-contract.md) controls when those details may be introduced.
+
+## 3. Integration states
+
+| State | Source | Required invariant |
+|---|---|---|
+| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed. |
+| B1 | #392 merge | Complete final lifecycle and dogfood; old lifecycle writer absent; 14 active identities unchanged; transitional gates GREEN. |
+| B2 | #395 merge | 15 resolved, active/approved 0; Product repairs accepted; transitional gates independently GREEN. |
+| B3 | #396 merge | Final build-once gate GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |
+| B4 | Epic main merge | Main tree equals accepted B3 tree; final context and closure evidence read back. |
+
+## 4. Issue responsibility boundaries
+
+| Issue | Sole write authority | Explicit read-only input | Forbidden ownership |
+|---|---|---|---|
+| #392 | Provider lifecycle semantics, wire conformance, migration/uninstall/recovery, lifecycle docs and candidate | Post-#387 active identities and transitional gate | Product defect terminalization; final gate/policy removal |
+| #395 | Product behavior represented by the 14 active rows and their terminal state | #392 lifecycle output, wire, current policy | Lifecycle redesign; final gate/policy removal |
+| #396 | Provider test ownership, build-once CI, evidence, qualification, policy cutover and final guidance | Clean #395 baseline and #392 lifecycle | New Product behavior or lifecycle semantic change |
+
+## 5. Compatibility design
+
+- B1 is compatible with the current regression system even though Product lifecycle has changed.
+- B2 is a clean baseline under the current regression system.
+- B3 replaces that system atomically and preserves Product behavior.
+- Compatibility is not a runtime feature toggle. It is an integration-state property.
+- No Issue merge is required to be independently deployable to main; it must only be internally coherent and GREEN on the Epic branch.
+
+## 6. Main drift design
+
+Main is inspected only between Issues. Non-overlapping drift may be human-integrated into the Epic branch followed by complete GREEN revalidation. Drift touching a stable contract, owned boundary or acceptance identity blocks the next Issue and returns to parent adjudication. Issue implementers do not silently absorb it.
+
+## 7. Evidence design
+
+Each Issue records four evidence classes without deferring all proof to the final Issue:
+
+1. contract conformance;
+2. observable Product or CI outcome;
+3. integration-branch GREEN state at exact tip;
+4. rollback/recovery readiness.
+
+Final Epic evidence additionally binds the B3 tree, human main merge tree equality and final required-context readback.
+
+## 8. Historical material
+
+Historical research, discussions, HTML guides and CLOSED #388–#390 remain in the repository. They may explain prior reasoning but cannot override current parent R/D/P, accepted multi-Issue ADR or normative contracts. The accepted disposable-root/fixed-slot ADR remains supporting technical authority where it does not conflict with the new ADR.
+
+## 9. Traceability
+
+| Requirement | Design contract |
 |---|---|
-| E384-RQ-001–005 | D-001–007 and wire artifact |
-| E384-RQ-006–011 | D-001–010 and failure register |
-| E384-RQ-012–014 | D-011–013 and Issue evidence schemas |
-| E384-RQ-015–017 | D-013–015 |
+| E384-RQ-001–003 | C-001, C-002, C-010 |
+| E384-RQ-004–006 | C-003, C-004, C-009 |
+| E384-RQ-007–011 | C-005, C-006 and B0–B2 |
+| E384-RQ-012–014 | C-007, C-008 and B3 |
+| E384-RQ-015–018 | C-004, C-008, C-009 and B4 |

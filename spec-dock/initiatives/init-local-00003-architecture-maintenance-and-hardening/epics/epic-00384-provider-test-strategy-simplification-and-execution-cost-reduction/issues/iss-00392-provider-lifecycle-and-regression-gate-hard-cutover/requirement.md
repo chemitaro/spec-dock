@@ -2,153 +2,136 @@
 種別: 要件定義書（Issue）
 ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
+契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
 状態: "draft"
 最終更新: "2026-09-02"
-依存: ["iss-00387", "../../requirement.md", "../../design.md", "../../artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md", "../../artifacts/provider-lifecycle-wire-contract.md", "../../artifacts/active-failure-disposition-register.md"]
+依存:
+  - "../../requirement.md"
+  - "../../design.md"
+  - "../../plan.md"
+  - "../../artifacts/provider-lifecycle-wire-contract.md"
+  - "../../artifacts/active-failure-disposition-register.md"
+  - "../../artifacts/epic-integration-branch-contract.md"
+  - "../../artifacts/rolling-wave-issue-elaboration-contract.md"
+完了済み前提: ["iss-00387"]
 親: ["epic-00384", "init-local-00003"]
+実装開始許可: false
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
+  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
+  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
 
-## 1. Acceptance unit
+本Issueは既存nodeを再利用するが、accepted scopeは**Fixed Ownership Provider Lifecycle Hard Cutover**に限定する。Regression baseline terminalizationとprovider-gate policy cutoverはそれぞれ#395、#396へ移管する。
 
-This is Epic #384's sole implementation-and-verification Issue. It remains blocked until Issue #387 is human-merged and S00 admits the actual result. No investigation-only, decision-only, test-only or verification-only Issue is created. Internal PR-A/PR-B/PR-C and one required-context canary remain inside #392.
+Parent: [Epic Requirement](../../requirement.md) / [Integration Contract](../../artifacts/epic-integration-branch-contract.md) / [Rolling-Wave Contract](../../artifacts/rolling-wave-issue-elaboration-contract.md)
 
-## 2. End-to-end requirements
+## 1. Observable outcome
 
-### I392-RQ-001 — Specification freeze
+Epic integration branch上で、SpecDockのpublic provider lifecycleがfixed ownership modelへhard cutoverされる。Fresh、exact legacy `0.2.3`、ready、incomplete、tooling-absent-preserved-dataの各stateに対し、install、update、tooling-only uninstall、reinstallがclosed wireとsafe recoveryへ一致する。Old lifecycle writerはなく、checked-in dogfoodは一つのcomplete `0.2.4` candidateになる。
 
-The replacement manifest, all canonical/support payload SHA-256 values and owner-recorded `SPEC_FREEZE_COMMIT` must match exact repository blobs. The implementation base must contain that commit and the independently admitted #387 merge. Repository evidence SHA `0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78` is provenance, not a future blanket diff base.
+## 2. Goal
 
-### I392-RQ-002 — Mapping-only #387 report
+- Four fixed roots、two fixed skill slots、strict record、fresh-only seeds、shared-container bootstrapを一つのlifecycle authorityへ収束する。
+- Immutable seed policy、same-tuple resume、terminal cleanup continuationを成立させる。
+- Exact clean `0.2.3` migrationとold-package mutation-zero boundaryを成立させる。
+- Public compatibility、tooling-only uninstall、purge removalをwireどおり提供する。
+- Provider-first implementationとcomplete dogfood convergenceを受け入れる。
 
-The #387 report disposition block has exact keys `schema_version,kind,issue_id,rule_id,entries`, schema 4, rule `ISS387-THREE-WAY-V2` and exactly twelve entries. It contains no repository, branch, PR number, candidate/head/tree, merge, timestamp, ledger or collection identity. #392 requires no new #387 commit boundary and no semantic-candidate/evidence-tail convention.
+## 3. Non-goals
 
-### I392-RQ-003 — Unique #387 merged PR
+- Registerの14 active Product failuresを修正またはterminalizeすること。
+- Approved-failure policy、ledger、timing、sharder、policy skip machineryを削除すること。
+- Build-once Provider Gate、stable qualification、required-context transitionを実装すること。
+- 調査、文書、test、verificationだけの別Issueを作ること。
+- Mainへ直接mergeすること。
 
-After human merge, S00 independently reads Issue #387 timeline/cross-reference PR references, fetches each PR and verifies each exact PR head through commit-association evidence. It filters to `chemitaro/spec-dock`, base `main`, merged state, report present and merge reachable from admitted main/implementation base. Exactly one PR is required. Its head tree must equal merge-commit tree. Report, ledger and pytest collection are read from the merge tree.
+## 4. Stable input
 
-### I392-RQ-004 — Conditional failure admission
+| Input | Required state |
+|---|---|
+| Predecessor | #387 CLOSED/completed and merged |
+| Integration branch | Current B0 tip, GREEN, parent freeze accepted |
+| Product baseline | Exact transitional `0.2.3` package/dogfood and old lifecycle writer |
+| Regression baseline | 15 rows, 14 active, 1 resolved; active identities/signatures fixed |
+| Test policy | Current ledger/timing/sharder/policy/current workflows operational |
+| Normative wire | Parent `provider-lifecycle-wire-contract.md`, immutable |
 
-All 27 source identities and every #387-permitted removed/retained/split branch are governed by `active-failure-disposition-register.md`. Post-#387 row count is formula-derived. Missing/identity-bearing report fields, zero/multiple PR, signature drift, ambiguous lineage, failed successor or unaccounted row stops before S10 and requires canonical amendment plus Strict rereview.
+## 5. Stable output
 
-### I392-RQ-005 — Fixed target authority
+| Output | Observable state |
+|---|---|
+| Lifecycle | Complete fixed-ownership `0.2.4` public lifecycle |
+| Compatibility | Accepted public grammar/result/text/JSON/exit preserved except approved lifecycle changes |
+| Recovery | Exact resume/cleanup contract; no old fallback |
+| Dogfood | Complete four-root/two-slot/record/marker candidate |
+| Old implementation | Old lifecycle writer and obsolete lifecycle-only tests absent |
+| Regression baseline | Same 14 active identities/signatures/lifecycle; no new active row |
+| Current gates | Transitional PR/full-regression system remains coherent and GREEN |
+| Merge target | Human merge to Epic integration branch only |
 
-Durable target authority is exactly four roots, two slots and `spec-dock/spec-dock.version`. Fresh init alone may additionally create absent `spec-dock`, `spec-dock/.gitignore`, `.github`, `.github/workflows`, `.github/workflows/ci.yml` under exact constraints. Shared container is never whole-replaced/deleted.
+## 6. Owned and shared Epic acceptance
 
-### I392-RQ-006 — Protected data and exact exclusions
+**Owned:** E384-RQ-004、005、006、008、009 and lifecycle portion of E384-RQ-015。
 
-Every repository `spec-dock/.workbench/**` path is read-only protected. Initiatives/artifacts, seeds, unknown paths, unrelated skills and user data are protected except exact #392 `report.md` and `.meta.json`; a separate external exclusion ledger limits report to pre-freeze evidence sections and meta to `updated_at` only.
+**Shared/read-only:** E384-RQ-001〜003、007、016〜018。#395/#396 contracts are non-owned。
 
-### I392-RQ-007 — Private owner roots and exact reserved trees
+## 7. Requirements
 
-Each purpose creates an independent private owner root and live non-serializable handle. The owner root is never exported. The Design table maps each purpose to one exported `ISS392_WS_*` variable whose value is one exact reserved child tree. Before spawn, the live owner pre-registers every exact file or closed subtree policy; children cannot register, widen or clean. Every child command receives the reserved tree, never owner root. Unknown owner-root entry, unregistered or policy-invalid descendant, owner death or premature cleanup fails closed and preserves data. Paths, sentinels, nonces and child PIDs do not confer registration or cleanup authority.
+### I392-RQ-001 — Vertical acceptance unit
 
-### I392-RQ-008 — Persistent stage namespace
+Implementation、migration、compatibility、dogfood and Issue-local verification form one acceptance unit. A dormant framework without public outcome or a documentation/test-only result is not accepted。
 
-Candidate/tombstone stage uses the same-filesystem `.spec-dock-provider-stages-v1` namespace. Exact sentinels, repository key, tuple key, ACTIVE and stage owner survive process exit. Discovery reads only exact index/path; no scan or orphan adoption. ACTIVE and stage owner include private result family in addition to resume tuple.
+### I392-RQ-002 — Fixed authority
 
-### I392-RQ-009 — Mandatory terminal cleanup and deterministic continuation
+Persistent mutation authority is exactly four roots、two slots and the record, with bounded fresh container/seed creation only. Unknown paths and consumer data are not authority。
 
-Every parser-valid lifecycle invocation locks/binds the repository and resolves terminal cleanup before normal dispatch. The private ACTIVE object stores immutable `cleanup_token` plus a nullable exact deferred-invocation object. A no-token public invocation is always desired, even when its base form is the same update/init-force form selected for old cleanup; only the generated hidden-token command is cleanup-retry. The first desired request is immutable. Tokenized retry, repeat, or any third desired request cannot replace it. Cleanup failure returns the tokenized retry as `continuation.next_command` and the first deferred desired command as `continuation.after_cleanup_command`. Cleanup success is cleanup-only and returns that desired command as the sole next command, or no action. No result says to rerun the same command, no caller infers intent from `result_family`, and no old install/update retry can replace a pending uninstall.
+### I392-RQ-003 — Record and seed policy
 
-### I392-RQ-010 — Final version and strict record
+Final record is the exact seven-key wire object. Seed policy is immutable across one operation and part of resume identity. Seed presence is not inference authority。
 
-Final version is `0.2.4`. Record path and all seven keys/types/state relations are exactly the wire artifact. `seed_policy` is immutable for one operation. Unknown/missing/duplicate keys, invalid JSON/type/link count/size or inconsistent state block.
+### I392-RQ-004 — Closed wire
 
-### I392-RQ-011 — Candidate and slot ownership
+The parent wire is implemented without added、missing or reinterpreted values. #392 is sole production writer; later Issues consume it read-only。
 
-Candidate is code-fixed to four roots/two slots and includes logical path/kind/mode/content/version. Seeds/record/generated markers are excluded. Source and stage digest match. New slots require strict markers; markerless slots are owned only by exact legacy recognition.
+### I392-RQ-005 — Safe filesystem and recovery
 
-### I392-RQ-012 — Classification and fresh bootstrap
+Preflight、descriptor binding、same-filesystem stage、native atomic publication、bootstrap rollback、terminal cleanup and fault convergence preserve unknown data and fail closed on identity drift。
 
-Classifier returns only `absent|legacy-0.2.3|incomplete|ready|tooling-absent-preserved-data|blocked`. Fresh absent container is created by descriptor-bound exclusive `mkdirat`, no-follow open, identity capture and stage-owner update before record. Pre-record rollback removes only exact empty created identity; otherwise exact-tuple recovery remains.
+### I392-RQ-006 — Exact migration and uninstall
 
-### I392-RQ-013 — Install/update publication
+Only exact clean `0.2.3` migrates. Uninstall is tooling-only and leaves durable tooling-absent state. Removed purge flag is mutation-zero error. Old package cannot mutate final state。
 
-Stage/validation/preflight precede target mutation. Publish order is incomplete record, docs, templates, system, scripts, two slots, authorized seeds, verification, terminal record, cleanup. Existing targets use native exchange; absent targets use native no-replace. Linux/macOS primitives are mandatory.
+### I392-RQ-007 — Provider-first complete dogfood
 
-### I392-RQ-014 — Immutable seed policy and resume
+Provider source is the implementation authority. Candidate-changing output is projected as one complete dogfood candidate; seeds、initiatives、artifacts、workbench and unknown data remain unchanged。
 
-`create-if-absent` is only fresh init/init-force on never-installed absent. Update-on-absent, migration, reinstall, update and uninstall are preserve-only. Resume requires request/record/ACTIVE/stage-owner tuple equality. Seed presence never determines policy.
+### I392-RQ-008 — Active baseline immutability
 
-### I392-RQ-015 — Tooling-only uninstall
+The 14 active row identities、signatures and lifecycle remain unchanged. No new approved row、skip、xfail、retirement or terminalization occurs in this Issue。
 
-Uninstall is dry-run by default and applies with `--apply`. It preserves container/seeds/data, removes only owned roots/slots and retains tooling-absent record. Exact legacy, ready, matching incomplete-uninstall and tooling-absent dry/apply behavior are fixed by wire matrix/goldens. `--keep-specs` is an alias.
+### I392-RQ-009 — GREEN integration output
 
-### I392-RQ-016 — Purge removal and compatibility
+After human merge, B1 satisfies lifecycle acceptance and current transitional gates are independently GREEN with known baseline only。
 
-`--remove-specs` is processed before target observation and returns `spec-history-purge-removed`, mutation false, exit 2 in text/JSON. Existing command grammar, success lines, target resolution and wrapper forwarding remain except accepted lifecycle changes. No purge service/journal/recovery remains.
+### I392-RQ-010 — Issue-start gate
 
-### I392-RQ-017 — Closed wire implementation
+Current draft is not implementation-ready. Exact implementation R/D/P and Luna Max handoff must be generated against the accepted B0 tip and independently Strict-reviewed before start。
 
-Production enums/constructors/serializers/tests match 38 codes, 142 relation rows, four valid record goldens, thirty-three public JSON review goldens, 23 phases, action relations and target order. The public result has exact 23-key order and a closed `continuation` object. Cleanup warning and cleanup failure use exact tokenized `active.cleanup_retry_command`; cleanup success and lifecycle partial rows have their separately fixed next/after-cleanup relations. Unknown/catch-all branch or prose-derived next action is invalid.
+## 8. Verification evidence categories
 
-### I392-RQ-018 — Exact legacy and old-package mutation-zero
+Lifecycle behavior、public wire、filesystem/fault recovery、migration/uninstall、old-package safety、built candidate、dogfood/protected data、active-baseline preservation、current-gate non-regression。
 
-Only exact clean `0.2.3` roots/slots/plain record migrate. Active recovery, modified/foreign/unsupported states block. Old exact package commands against final states run under composite Python/native pre-call tripwire; each has event zero/unchanged digest, while positive controls are caught.
+## 9. Rollback and recovery boundary
 
-### I392-RQ-019 — S40/S50 legacy dogfood preservation
+Rollback unit is the complete #392 integration merge. Before #395 starts, human may revert it and return to B0. Runtime partial operations recover only through the closed lifecycle contract. Partial old-writer restoration or ledger manipulation is invalid。
 
-S40 may update provider code/provider-side lifecycle docs/root README lifecycle sections. S40/S50 do not modify or sync checked-in dogfood roots, fixed slots, record or markers. External witness proves exact legacy identity unchanged.
+## 10. Stop and return
 
-### I392-RQ-020 — S60 complete dogfood/docs
+Stop before implementation or merge if the wire must change、active identity/signature drifts、current gate cannot remain coherent、candidate cannot converge completely、protected data changes、#395/#396 responsibility is required、or owner decision becomes non-empty。Return exact contract/evidence mismatch to the parent。
 
-After PR-B provider bytes settle, S60 applies new service once to repository root and commits all four roots, both slots, ready seven-key record and both markers for one digest. Protected data remains exact. Root README, provider/dogfood migration docs and AGENTS lifecycle/uninstall sections describe final tooling-only lifecycle; test-policy sections remain current until S70.
-
-### I392-RQ-021 — Failure terminalization and retained current gates
-
-S60 applies admitted register rows to normal pass/supersession, active/approved count zero, retargets current Provider CI and keeps current main-push Full Regression operational. Every local/current workflow verifier receives an independent full-regression purpose workspace path. S60 does not depend on S70 tooling.
-
-### I392-RQ-022 — Consumer-first PR-C and second dogfood update
-
-S70 first creates replacement gate/environment/workflow/tests, then retires/replaces all old consumers, proves zero, deletes old providers/ledger/timing/sharder/conftest/workflow, updates final test-policy docs/AGENTS, performs one complete candidate-wide dogfood update, creates compatibility head, completes context transition and commits the final descendant by removing only `provider-tests`. S70 is non-main. S80 has no tracked ownership or commit instruction.
-
-### I392-RQ-023 — Sole producer and role graph
-
-Only `provider-build-artifacts` packages each workflow head once. Linux canonical, sdist, macOS download same candidate and build zero. `provider-attestation` needs producer+three roles and uploads one nine-file evidence artifact. `provider-gate` needs attestation only.
-
-### I392-RQ-024 — Compatibility and aggregate actual-byte verification
-
-Compatibility `provider-tests`, provider-attestation, canary readback and S80 use the same closed verifier. Each invocation uses one owner/reserved tree containing API snapshots, exact raw ZIP bytes, empty extraction destinations and stdout. The verifier recomputes archive SHA-256, matches REST/upload digests and performs safe extraction itself. The exact verification phase closes run/job/artifact status/conclusion and evidence-artifact-name nullability. Exact repeated role order and artifact inventory are mandatory. Compatibility packages nothing, ignores the canary marker and remains independently GREEN.
-
-### I392-RQ-025 — Stable Linux qualification
-
-Environment ID is `specdock-linux-qualification-v1`, bound to tracked descriptor, pinned image/resources/toolchain and one fingerprint. Twenty runs share exact fingerprint; first five meet 600 seconds/CPU ratio 1.1; failures/flakes/retries zero; seeded-fault detection 100%.
-
-### I392-RQ-026 — Complete Provider Gate CLI, evidence schemas and permissions
-
-Issue Design D-013–D-026 fixes all nine subcommand argv arrays, required flags, absolute/reserved path types, repeated-option order, outputs, success/failure stdout/stderr, codes/exits, raw archive semantics, verifier-owned extraction, phase-aware API/job/artifact relations, evidence-name nullability, ordered schemas, units, fixture bytes and parent-child relations. Workflow-level permissions are empty; every job has an exact least-privilege override. Structural tests reject missing/extra/inherited/write permissions, wrong needs, raw download, archive path, verifier argument, packager or upload.
-
-### I392-RQ-027 — Distinct external two-head identities
-
-Tracked report records only method and expected one-job diff, never actual compatibility/final SHA/tree/run. Actual identities are external. Final head is a distinct descendant that removes only compatibility job. All authoritative evidence reruns on final head; equal identities or additional diff is invalid.
-
-### I392-RQ-028 — Required-context transition
-
-Compatibility head emits both contexts. Human adds new while old remains, reads both, uses a dedicated non-merge canary where new RED/old GREEN blocks, restores compatibility GREEN, removes old required, then creates/finalizes final head and reads new-only context after final rerun.
-
-### I392-RQ-029 — Tracked report and pre-merge attestation
-
-Tracked report has pre-freeze method/implementation facts only. S80 owns no tracked path. Pre-merge payload includes external compatibility/final SHA/tree/run identities and final byte evidence, but not its own future comment identity. Human posts it to #392 and external comment receipt verifies actual comment.
-
-### I392-RQ-030 — Ordered post-merge closure with post-sync recovery
-
-After human merge/tree equality, automation runs exact `issue finish`, whose current implementation closes #392 before active clear/post-sync. If exit 0, that interval is accepted. Exit 1 is recoverable only when measured facts prove #392 closed, active cleared and post-sync failed: read the unique original close event, restore active with exact `active set --id iss-00392`, require its observable exit/stdout/stderr and exact `active show` readback, and rerun issue finish against the already-closed Issue. Active-set has no post-sync field and none is accepted as evidence. At most three finish attempts are allowed; later attempts require `already_closed=true` and must not create a new close event. The accepted post payload includes all attempts/restores and identifies the final successful interval. Repeated sync failure, ambiguous close event or failed restore stops. No `close --id iss-00392` is run.
-
-### I392-RQ-031 — Comment receipts
-
-After each append-only comment is posted, external `comment-receipt-v1` records target issue, comment ID/URL/actor, created/updated, payload SHA, body SHA/size and verification time. Receipt is not embedded in payload or tracked tree. Pre/post target #392; Epic target #384. Editing/deletion/timestamp/body mismatch invalidates dependent closure.
-
-### I392-RQ-032 — Main gates and operator policy
-
-Only S30/S60/S80 are main gates. S60 owns lifecycle AGENTS text; S70 final test-policy/provider-gate text. PR-A main is old product+dormant successor; PR-B main complete lifecycle+coherent current gates; PR-C main final gate on final head. Human only merges/settings. `owner_decisions_required=[]`.
-
-## 3. Acceptance summary
-
-Acceptance requires every requirement on the applicable exact source/tree, no repository workbench mutation, one private owner root and exported reserved tree per purpose, deterministic cleanup continuation, mapping-only #387 report, complete S60/S70 dogfood, independently GREEN current gates, raw-archive actual-byte verification with exact permissions, post-sync recovery and measured closure, and human merge tree equality.
+`owner_decisions_required=[]`.

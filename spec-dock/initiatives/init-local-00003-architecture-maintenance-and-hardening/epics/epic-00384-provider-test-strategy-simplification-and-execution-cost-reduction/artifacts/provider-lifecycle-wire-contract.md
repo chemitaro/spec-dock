@@ -1,21 +1,33 @@
 ---
 種別: Normative Artifact
-ID: "provider-lifecycle-wire-contract-v8"
+ID: "provider-lifecycle-wire-contract-v9"
 タイトル: "Provider Lifecycle Wire Contract"
 状態: "accepted"
 最終更新: "2026-09-02"
-対象: ["epic-00384", "iss-00392"]
+対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
+  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
+  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
 ---
 
 # Provider Lifecycle Wire Contract
 
 ## 1. Authority and closed-world rule
 
-本ArtifactはIssue #392のprovider lifecycle public wireに対する唯一のnormative authorityである。Production enum、dataclass、constructor、serializer、CLI text/JSON、golden、fault/migration evidenceは本書のfinite tablesだけを使用する。未知のfield、enum、code、phase、reason、path、relationは生成・受理せずfail closedする。`other`、`unknown`、`generic`、`internal-error`、free-form reason、catch-all mapping、dictionary/filesystem orderはwire valueとして禁止する。予期しない未型付け例外は本wire codeへ丸めずprocess/test defectとして失敗させる。
+本ArtifactはEpic #384が固定するprovider lifecycle public wireの唯一のnormative authorityである。Issue #392はこのwireへ適合するproduction lifecycleのsole writerである。Issues #395と#396はread-only consumerであり、field、enum、code、phase、reason、path、relation、serialization、compatibility、retryまたはorderingを追加・変更・再解釈してはならない。Production enum、dataclass、constructor、serializer、CLI text/JSON、golden、fault/migration evidenceは本書のfinite tablesだけを使用する。未知のfield、enum、code、phase、reason、path、relationは生成・受理せずfail closedする。`other`、`unknown`、`generic`、`internal-error`、free-form reason、catch-all mapping、dictionary/filesystem orderはwire valueとして禁止する。予期しない未型付け例外は本wire codeへ丸めずprocess/test defectとして失敗させる。
+
+### WIR-OWN-001 — Cross-Issue ownership and immutability
+
+| Actor | Authority |
+|---|---|
+| Epic #384 parent | Freeze this artifact and adjudicate any proposed semantic change before an Issue starts. |
+| Issue #392 | Sole production writer and sole implementation owner for lifecycle behavior and wire conformance. |
+| Issue #395 | Read-only consumer. Product defect repairs must preserve lifecycle semantics and serialized values. |
+| Issue #396 | Read-only consumer. Provider-gate and policy cutover may verify but not redefine this wire. |
+
+Any semantic change requires a superseding parent ADR, regenerated Issue drafts, dependency-chain restart from the affected state and independent Strict review. Rolling-wave elaboration may add implementation details and tests but cannot change this artifact.
 
 ## 2. Canonical scalar and serialization conventions
 
@@ -933,6 +945,6 @@ Action, guidance, warning and error lines follow in array order. JSON mode emits
 
 Required tests include desired uninstall during old install cleanup; cleanup failure -> tokenized retry -> deferred uninstall; no-token desired update/init-force distinct from the tokenized base form; cleanup retry with no deferred request; a third explicit command preserving the first deferred request; crash after ACTIVE update/unlink; and table-driven continuation rendering for all seven invocation IDs.
 
-Table-driven tests enumerate all 142 §10 rows and all 38 codes and reject every unlisted relation; all seven actual invocation echoes for both terminal-cleanup success and failure; cleanup-only return/no-dispatch; all sequences/partial and mandatory-cleanup pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 33 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact terminal-cleanup crash/retry cases and dogfood record/markers at S60/S70.
+Table-driven tests enumerate all 142 §10 rows and all 38 codes and reject every unlisted relation; all seven actual invocation echoes for both terminal-cleanup success and failure; cleanup-only return/no-dispatch; all sequences/partial and mandatory-cleanup pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 33 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact terminal-cleanup crash/retry cases and the complete Issue #392 lifecycle/dogfood acceptance state.
 
-Normative trace: Epic E384-RQ-003,006–010,022; Issue I392-RQ-004–020,028; Design I392-D-001–012; Plan S10–S70. Owner decisions required: none.
+Normative trace: Epic E384-RQ-004–006,008–009; Issue I392-RQ-002–009; cross-Issue ownership WIR-OWN-001. Issues #395 and #396 consume this artifact read-only. Owner decisions required: none.
