@@ -6,6 +6,7 @@ ID: "epic-00384-integration-branch-contract-v1"
 最終更新: "2026-09-02"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -18,11 +19,16 @@ repository_evidence:
 
 - Repository: `chemitaro/spec-dock`
 - Integration branch: `codex/epic-00384-provider-test-strategy-planning`
-- Authoring base/current full SHA: `240e561e94b50250a4a6309452a7fd0fb511458a`
-- Authoring tree: `181f7eb28da0edff3ca1352edf4cb2ae1f21d433`
+- `PACK_AUTHORING_SOURCE_SHA`: `240e561e94b50250a4a6309452a7fd0fb511458a`
+- `PACK_AUTHORING_SOURCE_TREE`: `181f7eb28da0edff3ca1352edf4cb2ae1f21d433`
+- `FAILED_REVIEWED_CANDIDATE_SHA`: `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83`
+- `FAILED_REVIEWED_CANDIDATE_TREE`: `175408f56af05677fce2a42a169f735983a3a0af`
+- Source reviewer: `required-strict-github-connector-verificati-723`, result `fail`
+- `CURRENT_INTEGRATION_TIP`: dynamically resolved from the connector at every gate
+- `PARENT_FREEZE_SHA`: unset until the exact clean pushed remediation tip receives same-reviewer `P0/P1=0` and `review_status=pass`; then recorded in an external parent-freeze receipt
 - Human merge order: #392 -> #395 -> #396 -> Epic #384 to main
 
-This artifact fixes delivery topology. It does not start any Issue and does not authorize direct repository mutation。
+The authoring-source identity is provenance only. The failed reviewed candidate is remediation history only and is never a freeze identity. This artifact does not predict a future remediation SHA, start any Issue or authorize direct repository mutation。
 
 ## 2. Branch rules
 
@@ -52,7 +58,7 @@ GREEN is not only a checkmark. It requires:
 
 ### B0 — Parent freeze
 
-Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register and rolling-wave contract are coherent. #392 is not started。
+Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register、rolling-wave contract and `E384-QUAL-001` are coherent. The exact clean pushed tip has a same-reviewer pass、external parent-freeze receipt and successful readback of the post-pass GitHub #384/#392/#395/#396 body projections. #392 is not started。
 
 ### B1 — After #392 merge
 
@@ -72,9 +78,9 @@ Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline regist
 
 ### B3 — After #396 merge
 
-- One Linux packaging producer; downstream build count 0。
-- Same candidate consumed across roles。
-- Final qualification、evidence and required context GREEN。
+- Build-once packaging and same-candidate role graph are complete。
+- `E384-QUAL-001` raw evidence and mechanical result are GREEN。
+- Required context and actual-byte evidence are GREEN。
 - Old ledger、timing、sharder、policy skip、policy hook、quality providers and main-push workflow removed consumer-first。
 - Final docs and complete dogfood coherent。
 - B3 is final Epic PR source。
@@ -110,6 +116,6 @@ Partial lifecycle writer rollback、ledger-only rollback that violates gate cons
 
 ## 7. Issue acceptance and closure
 
-An Issue may be marked complete only after its PR is human-merged to the integration branch and the exact merged tip is GREEN. Issue closure does not assert deployment to main. Epic closure occurs only after B4。
+Parent B0 is not accepted until same-reviewer pass、external freeze receipt and Issue-body projection readback are complete. An Issue may be marked complete only after its PR is human-merged to the integration branch and the exact merged tip is GREEN. Issue closure does not assert deployment to main. Epic closure occurs only after B4。
 
 `owner_decisions_required=[]`.

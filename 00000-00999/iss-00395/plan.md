@@ -15,6 +15,7 @@ ID: "iss-00395"
 Planning Level: "critical-contract-only"
 実装開始許可: false
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -29,7 +30,7 @@ This Plan fixes acceptance and sequencing relative to #392/#396. It does not spe
 
 ## 2. Entry gate
 
-Entry requires #392 human-merged、B1 GREEN、exact 15/14/1 register、current policy operational、lifecycle conformance unchanged、protected/dogfood evidence accepted and no concurrent writer。
+Entry requires #392 human-merged、B1 GREEN、exact 15/14/1 register、current policy operational、lifecycle conformance unchanged、protected/dogfood evidence accepted、parent `E384-QUAL-001` preserved as non-owned and no concurrent writer。
 
 ## 3. Required Issue outcome
 
@@ -55,7 +56,7 @@ Before #396 starts, human whole-merge revert restores B1 and the 14-active known
 
 ## 7. Stop / return
 
-Return to parent for any unknown row、semantic ambiguity requiring new Product decision、wire change、premature policy removal、scope outside register、non-GREEN B1 or non-empty owner decision. Do not create a new Issue or select alternate successor。
+Return to parent for any unknown row、semantic ambiguity requiring new Product decision、wire change、premature policy removal、`E384-QUAL-001` implementation/redefinition、scope outside register、non-GREEN B1 or non-empty owner decision. Do not create a new Issue or select alternate successor。
 
 ## 8. Issue-start elaboration gate
 

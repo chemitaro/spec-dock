@@ -6,6 +6,7 @@ ID: "epic-00384-post-387-regression-baseline-register-v1"
 最終更新: "2026-09-02"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"

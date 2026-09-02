@@ -17,6 +17,7 @@ ID: "iss-00395"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: false
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -42,7 +43,7 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 
 - Lifecycle wire、ownership、migration、uninstall semanticsの変更。
 - Ledger、timing、sharder、policy skip machinery、current workflowsの最終削除。
-- Build-once gate、evidence、qualification、required-context transition。
+- Build-once gate、evidence、parent `E384-QUAL-001` implementation、required-context transition。
 - New Product feature、general dead-code cleanup、test-only terminalization。
 - Mainへの直接merge。
 
@@ -72,7 +73,7 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 
 **Owned:** E384-RQ-010、011 and Product-repair portion of E384-RQ-015。
 
-**Shared/read-only:** E384-RQ-001〜003、006、007、009、016〜018。E384-RQ-004〜005 and E384-RQ-012〜014 are non-owned。
+**Shared/read-only:** E384-RQ-001〜003、006、007、009、016〜018 and parent `E384-QUAL-001`。E384-RQ-004〜005 and E384-RQ-012〜014 implementation are non-owned。
 
 ## 7. Requirements
 
@@ -106,7 +107,7 @@ Candidate-changing Product repairs update dogfood completely when necessary and 
 
 ### I395-RQ-008 — Issue-start gate
 
-Concrete owner surfaces、repair hypotheses、RED/GREEN tests、commands and ordering are generated only against B1 current tip and independently Strict-reviewed before start。
+Concrete owner surfaces、repair hypotheses、RED/GREEN tests、commands and ordering are generated only against B1 current tip and independently Strict-reviewed before start. Elaboration does not implement or redefine `E384-QUAL-001`。
 
 ## 8. Verification evidence categories
 
@@ -118,6 +119,6 @@ Whole #395 merge is the rollback unit. Revert returns to accepted B1 with the kn
 
 ## 10. Stop and return
 
-Stop for unknown row/signature、already-changed active identity、required lifecycle redesign、need to remove current policy early、new Product scope、unresolvable behavior ambiguity、or non-GREEN B1。Return exact row and evidence to the parent; do not choose a new disposition。
+Stop for unknown row/signature、already-changed active identity、required lifecycle redesign、need to remove current policy early、`E384-QUAL-001` implementation or reinterpretation、new Product scope、unresolvable behavior ambiguity、or non-GREEN B1。Return exact row and evidence to the parent; do not choose a new disposition。
 
 `owner_decisions_required=[]`.
