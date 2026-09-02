@@ -728,10 +728,6 @@ class ActiveViewResult:
 @dataclass(frozen=True)
 class SetActiveRequest:
     target: TargetRef
-    force: bool
-    checkout: bool
-    use_github: bool
-    issue_limit: int
 
 
 @dataclass(frozen=True)

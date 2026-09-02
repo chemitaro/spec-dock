@@ -46,7 +46,6 @@ class TestCliTestTreeSplitS12:
 
     def test_command_grouping_contains_critical_inventory(self) -> None:
         from tests.cli_runtime import (
-            test_active,
             test_deps,
             test_import,
             test_new,
@@ -63,7 +62,6 @@ class TestCliTestTreeSplitS12:
         from tests.unit.presentation import test_runtime_sync_s07
 
         groups = {
-            test_active.TestCliActive: ["test_active_set_force_overrides_deps_guard"],
             test_deps.TestCliDeps: ["test_deps_check_json_stdout_only"],
             test_import.TestCliImport: ["test_import_initiative_creates_node_and_runs_sync_without_updating_active"],
             test_new.TestCliNew: ["test_new_artifact_blank_issue_omits_blank_token_and_uses_artifacts_dir"],
