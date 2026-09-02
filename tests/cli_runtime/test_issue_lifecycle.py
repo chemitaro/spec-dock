@@ -9,11 +9,6 @@ from types import SimpleNamespace
 import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
-from tests.cli_runtime.s09_invariance import (
-    S09_LEGACY_EVIDENCE_MUTATIONS,
-    apply_s09_legacy_evidence_mutation,
-    normalize_s09_process_result,
-)
 
 
 def _runtime_modules():
@@ -155,7 +150,6 @@ class TestIssueLifecycleApplication:
                 node_id="iss-00102",
                 github_issue_number=None,
             )
-            assert not req.checkout
             return app_contracts.ActiveSetResult(
                 selection=domain_models.ActiveSelection(
                     initiative_id="init-00001",
@@ -622,112 +616,6 @@ class TestIssueLifecycleApplication:
         assert result.post_sync.failed
         assert any("derived artifacts may be stale" in line for line in result.post_sync.guidance)
 
-    def test_issue_finish_does_not_read_quality_evidence(self, monkeypatch) -> None:
-        app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
-        original_read_text = Path.read_text
-        forbidden_reads: list[Path] = []
-        observations: list[tuple[list[str], tuple[object, ...]]] = []
-
-        def fail_on_quality_evidence(path: Path, *args, **kwargs):
-            if path.name in {"report.md", "design.md", "plan.md", ".assurance.json"}:
-                forbidden_reads.append(path)
-                raise AssertionError(f"quality evidence must not be read: {path.name}")
-            return original_read_text(path, *args, **kwargs)
-
-        variants = (
-            ("thin", ""),
-            ("heavy", "## Evidence Adoption Ledger\n| id | adoption_status |\n|---|---|\n| EAL-1 | blocked |\n"),
-        )
-        variant_roots: list[Path] = []
-        temp_dirs = [tempfile.TemporaryDirectory() for _ in variants]
-        try:
-            for temporary, (label, report_text) in zip(temp_dirs, variants, strict=True):
-                repo_root = Path(temporary.name)
-                variant_roots.append(repo_root)
-                issue_dir = (
-                    repo_root
-                    / "spec-dock"
-                    / "initiatives"
-                    / "init-00001"
-                    / "epics"
-                    / "epic-00002"
-                    / "issues"
-                    / "iss-00101"
-                )
-                issue_dir.mkdir(parents=True)
-                for name, content in (
-                    ("report.md", report_text),
-                    ("design.md", f"---\nauthority: proposed\n---\n# {label}\n"),
-                    ("plan.md", f"# {label}\n"),
-                    (".assurance.json", '{"profile":"critical"}\n'),
-                ):
-                    (issue_dir / name).write_text(content, encoding="utf-8")
-
-            monkeypatch.setattr(Path, "read_text", fail_on_quality_evidence)
-
-            for repo_root in variant_roots:
-                events: list[str] = []
-
-                def fake_close_node(req, ports, *, events=events):
-                    del req, ports
-                    events.append("close")
-                    return app_contracts.CloseNodeResult(
-                        node_id="iss-00101",
-                        node_kind="issue",
-                        github_issue_number=101,
-                        issue_snapshot=domain_models.IssueSnapshot(
-                            issue_number=101,
-                            state="CLOSED",
-                            title="First issue",
-                            labels=[],
-                            updated_at="2026-05-05T00:00:00Z",
-                            url="https://github.com/example/repo/issues/101",
-                        ),
-                        already_closed=False,
-                        warnings=[],
-                    )
-
-                def fake_clear_active(req, ports, *, events=events):
-                    del req, ports
-                    events.append("clear")
-                    return app_contracts.ActiveClearResult(cleared=True, previous=None, warnings=[])
-
-                def fake_post_mutation_sync(ports, *, events=events):
-                    del ports
-                    events.append("sync")
-                    return app_contracts.PostMutationSyncOutcome.skipped("test")
-
-                monkeypatch.setattr(app_issue_lifecycle, "close_node", fake_close_node)
-                monkeypatch.setattr(app_issue_lifecycle, "clear_active", fake_clear_active)
-                monkeypatch.setattr(app_issue_lifecycle, "post_mutation_sync", fake_post_mutation_sync)
-
-                store = _StubActiveStateStore(infra_contracts)
-                ports = app_ports.Ports(
-                    node_reader=_StubNodeReader(),
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                    active_state_store=store,
-                )
-                result = app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
-
-                observations.append((
-                    events,
-                    (
-                        result.issue_id,
-                        result.github_issue_number,
-                        result.already_closed,
-                        result.active_cleared,
-                        result.post_sync.skipped_reason if result.post_sync is not None else None,
-                    ),
-                ))
-                assert store.write_calls == []
-        finally:
-            for temporary in temp_dirs:
-                temporary.cleanup()
-
-        assert observations[0] == observations[1]
-        assert forbidden_reads == []
-
 
 class TestCliIssueLifecycle(CliRuntimeHarness):
     def _commit_all(self, target: Path, message: str) -> None:
@@ -833,78 +721,6 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             return path_file.read_text(encoding="utf-8").strip()
         return ""
 
-    def _s09_core_durable_state(self, target: Path, bin_dir: Path) -> dict[str, object]:
-        active_path = target / "spec-dock" / ".agent" / "active.json"
-        active = json.loads(active_path.read_text(encoding="utf-8")) if active_path.is_file() else None
-        if isinstance(active, dict) and isinstance(active.get("updated_at"), str):
-            active["updated_at"] = "<timestamp>"
-        state_path = bin_dir / "gh-state.json"
-        gh_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.is_file() else None
-        log_path = bin_dir / "gh-calls.log"
-        gh_calls = log_path.read_text(encoding="utf-8").splitlines() if log_path.is_file() else []
-        index_path = target / "spec-dock" / ".agent" / "index-all.json"
-        issue_status = None
-        if index_path.is_file():
-            index = json.loads(index_path.read_text(encoding="utf-8"))
-            issue_status = index.get("nodes", {}).get("iss-00101", {}).get("status")
-        return {
-            "active_manifest": active,
-            "active_pointer": self._active_issue_pointer_text(target),
-            "branch": self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip(),
-            "gh_state": gh_state,
-            "gh_calls": gh_calls,
-            "issue_status": issue_status,
-        }
-
-    def _capture_s09_core_sequence(
-        self,
-        target: Path,
-        bin_dir: Path,
-        *,
-        mutation: str | None,
-    ) -> dict[str, dict[str, object]]:
-        target.mkdir(parents=True)
-        self._prepare_clean_repo_with_two_issues(target)
-        self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
-        mutated_paths = (
-            apply_s09_legacy_evidence_mutation(target, mutation, issue_id="iss-00101") if mutation is not None else ()
-        )
-        mutation_bytes = {path: path.read_bytes() for path in mutated_paths}
-        self._commit_all(target, "S09 invariance input")
-
-        bin_dir.mkdir(parents=True)
-        self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
-        test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-        surfaces = (
-            ("active", ["active", "show"], None, True),
-            ("deps", ["deps", "check", "--id", "iss-00101", "--no-github"], None, True),
-            ("validate", ["validate"], None, True),
-            ("doctor", ["doctor"], None, True),
-            ("start", ["issue", "start", "--id", "iss-00101"], test_env, False),
-            ("finish", ["issue", "finish"], test_env, False),
-        )
-        observations: dict[str, dict[str, object]] = {}
-        for name, args, env, read_only in surfaces:
-            before_state = self._s09_core_durable_state(target, bin_dir)
-            result = self._run_runtime_capture(target, args, env=env)
-            after_state = self._s09_core_durable_state(target, bin_dir)
-            if read_only:
-                assert after_state == before_state, f"{mutation or 'baseline'}:{name} mutated Core durable state"
-                durable_effect: object = "unchanged"
-            else:
-                durable_effect = after_state
-            observations[name] = {
-                "process": normalize_s09_process_result(result, repo_root=target, bin_root=bin_dir),
-                "durable_effect": durable_effect,
-            }
-
-            if read_only or mutation != "legacy_active_extra_fields":
-                assert {path: path.read_bytes() for path in mutated_paths} == mutation_bytes, (
-                    f"{mutation or 'baseline'}:{name} rewrote Historical evidence"
-                )
-
-        return observations
-
     def test_issue_start_sets_active_and_checks_out_issue_branch(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
@@ -928,9 +744,6 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             issue = active["issue"]
             assert set(issue) == {"id", "path"}
             assert issue["id"] == "iss-00101"
-            context_pack = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
-            assert "authority" not in context_pack.lower()
-            assert "issue_finish" not in context_pack
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert current == "iss-00101-first-issue"
 
@@ -1015,45 +828,6 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8") == before
             after_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             assert after_branch == before_branch
-
-    def test_direct_active_set_checkout_is_parser_error_without_writes(self) -> None:
-        if os.name == "nt":
-            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
-        if shutil.which("git") is None:
-            pytest.skip("git not available")
-
-        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
-            target = Path(tmp)
-            self._prepare_clean_repo_with_two_issues(target)
-            bin_dir = Path(bin_tmp)
-            self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
-            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-            self._run_runtime(target, ["issue", "start", "101"], env=test_env)
-            self._commit_all(target, "active first issue")
-            active_path = target / "spec-dock" / ".agent" / "active.json"
-            before_active = active_path.read_bytes()
-            before_pointer = self._active_issue_pointer_text(target)
-            before_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            before_status = self._run_git(target, ["status", "--porcelain=v1"]).stdout
-            gh_log = bin_dir / "gh-calls.log"
-            before_gh_log = gh_log.read_bytes()
-            assert before_branch == "iss-00101-first-issue"
-            assert self._active_issue_id(target) == "iss-00101"
-
-            p = self._run_runtime_capture(
-                target,
-                ["active", "set", "iss-00102", "--checkout"],
-                env=test_env,
-            )
-
-            assert p.returncode != 0
-            assert "unrecognized arguments: --checkout" in p.stderr
-            assert active_path.read_bytes() == before_active
-            assert self._active_issue_id(target) == "iss-00101"
-            assert self._active_issue_pointer_text(target) == before_pointer
-            assert self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip() == before_branch
-            assert self._run_git(target, ["status", "--porcelain=v1"]).stdout == before_status
-            assert gh_log.read_bytes() == before_gh_log
 
     def test_issue_start_allows_different_issue_from_closed_active_issue_branch(self) -> None:
         if os.name == "nt":
@@ -1435,28 +1209,6 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             log = (bin_dir / "gh-calls.log").read_text(encoding="utf-8")
             assert log.count("issue list") == list_count_before_finish + 1
 
-    @pytest.mark.parametrize("mutation", S09_LEGACY_EVIDENCE_MUTATIONS)
-    def test_core_operations_legacy_evidence_mutation_invariance(self, mutation: str) -> None:
-        if os.name == "nt":
-            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
-        if shutil.which("git") is None:
-            pytest.skip("git not available")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            baseline = self._capture_s09_core_sequence(
-                root / "baseline",
-                root / "baseline-bin",
-                mutation=None,
-            )
-            mutated = self._capture_s09_core_sequence(
-                root / "mutated",
-                root / "mutated-bin",
-                mutation=mutation,
-            )
-
-        assert mutated == baseline, mutation
-
     def test_issue_finish_closes_open_issue_and_clears_active(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
@@ -1471,38 +1223,6 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(target, ["issue", "finish"], env=test_env)
-            assert p.returncode == 0, p.stdout + p.stderr
-            assert "spec-dock: ok (issue finish)" in p.stdout
-            assert "issue=iss-00101" in p.stdout
-            assert "github=#101" in p.stdout
-            assert "active_cleared=true" in p.stdout
-            assert "already_closed=false" in p.stdout
-            assert self._active_issue_id(target) is None
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-            assert state["101"]["state"] == "CLOSED"
-
-    def test_issue_finish_ignores_heavy_report_and_assurance(self) -> None:
-        if os.name == "nt":
-            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
-
-        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
-            self._run_runtime(target, ["active", "set", "--id", "iss-00101"])
-            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            issue_dir = target / active["issue"]["path"]
-            (issue_dir / "report.md").write_text(
-                "## Evidence Adoption Ledger\n\n| id | adoption_status |\n|---|---|\n| EAL-1 | blocked |\n",
-                encoding="utf-8",
-            )
-            (issue_dir / ".assurance.json").write_text('{"authorized_profile":"critical"}\n', encoding="utf-8")
-            bin_dir = Path(bin_tmp)
-            state_path = self._make_gh_stub(bin_dir, states={101: "OPEN"})
-            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-
-            p = self._run_runtime_capture(target, ["issue", "finish"], env=test_env)
-
             assert p.returncode == 0, p.stdout + p.stderr
             assert "spec-dock: ok (issue finish)" in p.stdout
             assert "issue=iss-00101" in p.stdout
@@ -1549,7 +1269,6 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             assert "Recovery:" in no_active.stderr
             assert "issue start <issue>" in no_active.stderr
             assert "active set <issue>" in no_active.stderr
-            assert "--checkout" not in no_active.stderr
             assert self._active_issue_id(target) is None
 
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")

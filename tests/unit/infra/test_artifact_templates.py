@@ -20,61 +20,6 @@ CURRENT_ARTIFACT_TYPES = (
 PHYSICAL_ARTIFACT_TEMPLATES = {
     *(f"{artifact_type}.md" for artifact_type in CURRENT_ARTIFACT_TYPES),
 }
-HISTORICAL_ROUTE_MARKERS = {
-    "`analysis`": "`analysis`",
-    "`draft-*`": "`draft-*`",
-    "`repair`": "`repair`",
-    "`pr-repair`": "`pr-repair`",
-    "`profile`": "`profile`",
-}
-MANDATORY_WORKFLOW_PATTERNS = (
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)"
-        r".{0,40}(?:必須|使用してください|使ってください|前提とします|前提にします)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:必ず|必須で).{0,40}"
-        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:mandatory|required).{0,40}"
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)"
-        r".{0,40}(?:mandatory|required)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)"
-        r".{0,40}\b(?:must|shall)\b",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"\b(?:must|shall)\b.{0,40}"
-        r"(?:EAL|provider|model|reviewer|review workflow|ChatGPT|Oracle|Codex)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-    re.compile(
-        r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)"
-        r".{0,40}必ず.{0,20}(?:使用|利用|使う|用いる)",
-        flags=re.IGNORECASE | re.DOTALL,
-    ),
-)
-WORKFLOW_TERM_PATTERN = re.compile(
-    r"(?:EAL|provider|model|reviewer|review workflow|review 手順|ChatGPT|Oracle|Codex)",
-    flags=re.IGNORECASE,
-)
-NON_MANDATORY_PHRASES = re.compile(
-    r"必須\s*で\s*(?:は\s*(?:ありません|ない|なく)|ない)"
-    r"|not\s+(?:required|mandatory)"
-    r"|\b(?:must|shall)\s+not\b",
-    flags=re.IGNORECASE | re.DOTALL,
-)
-CLAUSE_BOUNDARY_PATTERN = re.compile(r"[.;。；]+")
 
 
 def _read_asset(root: Path, relative_path: Path | str) -> str:
@@ -110,15 +55,6 @@ def _relative_markdown_links(content: str) -> tuple[str, ...]:
         if path_without_fragment and not path_without_fragment.startswith("/") and "://" not in path_without_fragment:
             relative_paths.append(path_without_fragment)
     return tuple(relative_paths)
-
-
-def _requires_mandatory_workflow(content: str) -> bool:
-    for clause in CLAUSE_BOUNDARY_PATTERN.split(content):
-        if WORKFLOW_TERM_PATTERN.search(clause) and NON_MANDATORY_PHRASES.search(clause):
-            continue
-        if any(pattern.search(clause) for pattern in MANDATORY_WORKFLOW_PATTERNS):
-            return True
-    return False
 
 
 def test_physical_catalog_current_catalog_is_exact_six() -> None:
@@ -272,21 +208,6 @@ def test_artifact_guide_rejects_automatic_promotion_of_evidence_and_report() -> 
     assert "正本へ明示的に再記述" in authority_flow
 
 
-def test_historical_routes_are_not_current_and_retired_template_is_absent() -> None:
-    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
-    current_catalog = _section(guide, "## Current creation catalog")
-    historical_retention = _section(guide, "## Historical retention")
-
-    for current_marker, historical_marker in HISTORICAL_ROUTE_MARKERS.items():
-        assert current_marker not in current_catalog
-        assert historical_marker in historical_retention
-    assert "draft-" not in current_catalog
-    assert "Current creation route ではありません" in historical_retention
-    assert "削除、rename、rewrite を指示しません" in historical_retention
-    assert not (PROVIDER_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").exists()
-    assert not (DOGFOOD_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").exists()
-
-
 def test_draft_document_state_and_adr_draft_authority_are_not_historical_routes() -> None:
     guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
 
@@ -302,57 +223,6 @@ def test_draft_document_state_and_adr_draft_authority_are_not_historical_routes(
     )
 
 
-def test_current_artifact_assets_do_not_require_eal_provider_model_or_reviewer_workflow() -> None:
-    current_assets = [
-        _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_TEMPLATE_DIRECTORY / f"{artifact_type}.md")
-        for artifact_type in CURRENT_ARTIFACT_TYPES
-    ]
-    current_assets.append(_read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE))
-
-    for content in current_assets:
-        assert not _requires_mandatory_workflow(content)
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "EAL schema を必須とします。",
-        "EAL schema は\n必須です。",
-        "指定 reviewer workflow を使ってください。",
-        "指定 reviewer workflow は\n複数行の説明を挟んでも\n必須です。",
-        "ChatGPT is required for promotion.",
-        "A mandatory provider model must be selected.",
-        "ChatGPT must be used.",
-        "reviewer approval shall be obtained.",
-        "An approved model must be used.",
-        "A provider shall be selected.",
-        "ChatGPTを必ず使用する。",
-        "指定 model を必ず利用する。",
-        "EAL schema は必須ではありません。\n指定 reviewer workflow は必須です。",
-        "ChatGPT is not required; reviewer approval must be obtained.",
-    ),
-)
-def test_mandatory_workflow_detector_rejects_required_tools(content: str) -> None:
-    assert _requires_mandatory_workflow(content)
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "EAL schema は必須ではありません。",
-        "EAL schema は必須で\nはありません。",
-        "A provider is not required.",
-        "A provider is\nnot required.",
-        "model の利用は optional です。",
-        "reviewer workflow は任意です。",
-        "ChatGPT must not be used as authority.",
-        "ChatGPT is not required; the report must be complete.",
-    ),
-)
-def test_mandatory_workflow_detector_allows_explicitly_optional_tools(content: str) -> None:
-    assert not _requires_mandatory_workflow(content)
-
-
 @pytest.mark.parametrize("root", (PROVIDER_ASSET_ROOT, DOGFOOD_ASSET_ROOT))
 def test_relative_links_in_artifact_guide_resolve_when_present(root: Path) -> None:
     guide_path = root / ARTIFACT_GUIDE
@@ -361,20 +231,10 @@ def test_relative_links_in_artifact_guide_resolve_when_present(root: Path) -> No
         assert (guide_path.parent / relative_path).is_file(), f"broken relative link: {relative_path}"
 
 
-def test_templates_readme_stays_thin_without_restoring_legacy_artifact_workflow() -> None:
+def test_templates_readme_explains_template_guide_usage() -> None:
     readme = _read_asset(PROVIDER_ASSET_ROOT, "templates/README.md")
 
     assert "各テンプレートは対応する Guide を参照して記入する" in readme
-    for legacy_marker in (
-        "future `new artifact` catalog",
-        "draft-requirement",
-        "draft-design",
-        "draft-plan",
-        "templates/issue-profiles/<profile>",
-        "no-write fail-closed",
-        "future artifact catalog",
-    ):
-        assert legacy_marker not in readme
 
 
 def test_current_initiative_and_epic_artifact_rules_keep_historical_types_non_creatable() -> None:
@@ -397,10 +257,6 @@ def test_current_initiative_and_epic_artifact_rules_keep_historical_types_non_cr
         ):
             assert expected in rules
 
-        assert "templates/issue-profiles/<profile>" not in rules
-        assert "new artifact draft-" not in rules
-        assert "new artifact pr-repair-batch" not in rules
-
 
 def test_current_issue_artifact_rules_keep_profile_routes_historical_only() -> None:
     rules = _read_asset(PROVIDER_ASSET_ROOT, "docs/rules/issue/artifacts.md")
@@ -415,7 +271,3 @@ def test_current_issue_artifact_rules_keep_profile_routes_historical_only() -> N
         "Currentの新規作成catalogやtemplate routingには含めません",
     ):
         assert expected in rules
-
-    assert "templates/issue-profiles/<profile>" not in rules
-    assert "new artifact draft-" not in rules
-    assert "new artifact pr-repair-batch" not in rules

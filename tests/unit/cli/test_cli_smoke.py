@@ -16,18 +16,6 @@ class TestCliSmoke(CliRuntimeHarness):
         if shutil.which("bash") is None:
             pytest.skip("bash not available")
 
-    def test_active_set_legacy_flag_reports_parser_error(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-
-            result = self._run_runtime_capture(target, ["active", "set", "--issue", "1"])
-
-        assert result.returncode == 2
-        assert result.stdout == ""
-        assert "unrecognized arguments: --issue" in result.stderr
-        assert "Hint:" in result.stderr
-
     def test_active_set_by_id_succeeds_through_runtime_subprocess(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

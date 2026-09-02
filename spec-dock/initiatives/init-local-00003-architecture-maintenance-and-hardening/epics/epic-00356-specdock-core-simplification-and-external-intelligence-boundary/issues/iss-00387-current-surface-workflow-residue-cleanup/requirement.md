@@ -41,6 +41,8 @@ Issue 357〜360で成立した「小さいStorage Core + Authoring Kit + agent-f
 6. Current-facing testには、削除済みroute/module/fieldの不在、旧語彙scanner、Historical exclusion、旧evidence mutationを恒久監視するretirement-only test supportが残っている。
 7. Current-facing drift guardをroot READMEとactive-noneへ拡張すると、廃止項目が増えるたびにnegative test、phrase inventory、mutation testが増える。
 8. `tests/unit/infra/test_init_update.py`にdefinition-only constant候補がある。
+9. provider/dogfoodの`spec-dock/scripts/README.md`が、削除済みの`active set --checkout`をCurrent exampleとして案内する。
+10. provider/dogfoodの`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`が、EALまたはreport ledgerをCurrent adoption authorityとして案内する。
 
 Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cleanup`、SHA `93be5dbb5390f03d22e1ba882c7e2a38357f39c1`である。このSHAは仕様起草時の固定点であり、実装candidateではない。現時点でproduction implementation、test追加、test実行、PR作成は未実施である。
 
@@ -64,7 +66,8 @@ Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cl
 ### 4.1 必須対象
 
 - Current placeholder: provider/dogfoodの`system/active-none/{initiative,epic,issue}/report.md`
-- Current documentation: `README.md`、provider/dogfoodの`docs/authoring/overview.md`
+- Current documentation: `README.md`、provider/dogfoodの`docs/authoring/overview.md`と`scripts/README.md`
+- Current Artifact rules: provider/dogfoodの`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`
 - active selection internal contract: provider/dogfoodの`commands/active.py`、`application/contracts.py`、`application/set_active.py`、call siteとしての`application/issue_lifecycle.py`
 - package/test hygiene: `pyproject.toml`と既存のauthoring asset、set-active、issue lifecycle、doctor、storage-core、init/update test
 - retirement-only test support: `tests/unit/infra/test_authoring_kit_assets.py`、`tests/unit/application/test_set_active.py`、`tests/cli_runtime/{test_storage_core_cli.py,test_issue_lifecycle.py,test_doctor.py,s09_invariance.py}`、関連fixture/helper/constant
@@ -92,13 +95,13 @@ Strict planning baselineはbranch `iss-00387-current-surface-workflow-residue-cl
 
 三scopeのplaceholderは、active対象がないこと、編集対象でないこと、実際のReportのcanonical pathだけを示す。旧role、phase、reviewer、Profile、EAL、Promotion、failure-mode schemaを除去する。placeholder file自体は残す。
 
-### I387-R02 — root READMEをCurrent lifecycleへ合わせる
+### I387-R02 — Current lifecycle guidanceを現行契約へ合わせる
 
-`active set`をselection-onlyとして説明し、checkoutを伴う実装開始は`issue start`へ案内する。`active set --checkout`のexample、recovery案内、branch normalization説明を除去する。
+root `README.md`とprovider/dogfoodの`scripts/README.md`で`active set`をselection-onlyとして説明し、checkoutを伴う実装開始は`issue start`へ案内する。`active set --checkout`のexample、recovery案内、branch normalization説明を除去する。
 
 ### I387-R03 — Artifact authority flowをCurrent化する
 
-Artifactはevidence-onlyであり、review/synthesis後に採用内容をR/D/Pまたはaccepted ADRへ明示的に再記述する、とroot READMEへ記載する。EALを必須手順またはauthority gateとして要求しない。
+Artifactはevidence-onlyであり、review/synthesis後に採用内容をR/D/Pまたはaccepted ADRへ明示的に再記述する、とroot `README.md`とprovider/dogfoodの`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`へ記載する。EALまたはreport ledgerをCurrentの必須手順、採用経路、authority gateとして要求しない。Historical discussion originalsとgrandfathering説明は保持する。
 
 ### I387-R04 — Authoring overviewを現在形にする
 
@@ -127,7 +130,7 @@ Artifactはevidence-onlyであり、review/synthesis後に採用内容をR/D/P�
 
 ### I387-R08 — provider-first projectionを維持する
 
-shipped asset/runtimeはprovider sourceを先に変更し、dogfood projectionへ同期する。対象pairはbyte parityを保ち、projectionだけを独立編集しない。
+shipped asset/runtimeはprovider sourceを先に変更し、dogfood projectionへ同期する。§4.1の対象pairはbyte parityを保ち、projectionだけを独立編集しない。
 
 ### I387-R09 — 実装計画を一回限りの撤退checklistとして実行する
 
@@ -153,7 +156,7 @@ TDDは、現在残るbehaviorに実質的変更があり、既存testで期待�
 
 current R/D/P/Reportのspecification境界はC00-01開始後の全期間に適用し、C50-01の初回stage前snapshotでも確認する。candidate checkpoint以後、`EVIDENCE_ONLY`となるPlan変更は、§15の既存36行にある`状態`列と`Evidence reference`列のcell valueだけである。column header、separator、`ID`列、rowの追加・削除・並べ替え、ledger前後の本文は含まない。Reportでは既存の`Outcome`、`Verification`、`Residual Risks / Follow-ups`本文への実測事実だけを`EVIDENCE_ONLY`とする。current RequirementとDesignの全hunk、および上記二列のcell value以外のcurrent Planの全hunkは、front matter、原則、test budget、実行規約、milestone、check本文、exit、ledger規約・構造を含めて`SPECIFICATION_CONTRACT`とする。Reportの見出し・構造変更も同じ扱いとし、許可領域と他領域が混在するhunkはfail-closedで`SPECIFICATION_CONTRACT`とする。同一classification snapshotの別hunkに一件でも`SPECIFICATION_CONTRACT`があればsnapshot全体を同classとして扱い、他classのhunkもstageしない。これを検出したproduction writerは、C60-01保持物があればexact ownershipを照合してcleanupした後、実装を`BLOCKED`としてmain agentへ返し、そのhunkまたはcurrent candidateを追加stage/commitしない。main agentはoriginal C00-01 implementation baselineから分離したclean worktree/branchを用意し、production/test/config差分0を確認して改訂R/D/Pだけをcommit/pushし、固定full SHAに対するindependent Strict再reviewを通過させる。その実装前treeからだけC00-01を新規実行し、旧candidateのstatus/evidenceを流用しない。
 
-`EVIDENCE_ONLY`でも`SPECIFICATION_CONTRACT`でもないtracked変更、non-ignored untracked追加、または分類不能な変更は`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`とする。検出時はcheck実行と通常のevidence editを止め、C60-01の保持物があればexact pathで先にcleanupする。修正は既に承認されたinventory内の既存pathだけに限定し、C50-01〜C90-03を`NOT_RUN`へ戻し、C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻して短いinvalidation evidenceを付ける。C00-01〜C40-09はoriginal implementation baselineまたは実装前観測へ束縛されたまま保持し、repair checkpoint上で再実行しない。classified repair hunk、失効status、Plan/Reportの短いinvalidation evidenceを一つのrepair bundleとして一度だけまとめて確認し、approved repair pathとcurrent Plan/Reportだけを一回のexplicit `git add -- <paths>`でstageする。`git diff`が空、non-ignored untrackedが0、cached pathがapproved inventoryだけである状態をrepair checkpointとする。新規pathまたは未承認pathが一件でも必要・出現した場合はrepair bundleをstageせず`BLOCKED` handoffとする。repair checkpoint成立後はC50-01からC90-04までID順に再実行し、そのPASS後にC90-05を先頭から実行する。この順序外で旧wheel、digest、fresh consumer、verifier、audit結果を再利用しない。
+`EVIDENCE_ONLY`でも`SPECIFICATION_CONTRACT`でもないtracked変更、non-ignored untracked追加、または分類不能な変更は`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`とする。検出時はcheck実行と通常のevidence editを止め、C60-01の保持物があればexact pathで先にcleanupする。修正は既に承認されたinventory内の既存pathだけに限定し、C50-01〜C90-03のうちC60-02を除くrowを`NOT_RUN`へ戻し、C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻して短いinvalidation evidenceを付ける。C60-02は直後のledger rowに示すexact N/A/deferred semanticsを維持する。C00-01〜C40-09はoriginal implementation baselineまたは実装前観測へ束縛されたまま保持し、repair checkpoint上で再実行しない。classified repair hunk、失効status、Plan/Reportの短いinvalidation evidenceを一つのrepair bundleとして一度だけまとめて確認し、approved repair pathとcurrent Plan/Reportだけを一回のexplicit `git add -- <paths>`でstageする。`git diff`が空、non-ignored untrackedが0、cached pathがapproved inventoryだけである状態をrepair checkpointとする。新規pathまたは未承認pathが一件でも必要・出現した場合はrepair bundleをstageせず`BLOCKED` handoffとする。repair checkpoint成立後は、pre-freezeでC50-01、C50-02、C60-01、C90-01〜C90-04をこの順に実行する。C60-02はpre-commitで実行せず、C90-05のcommit/push後にHEAD、upstream、remote branch tipが同一のcleanな`FINAL_SHA`を指すことを確認してからexact verifierを一度だけ実行し、その後にvalidate、independent Strict code review/Final Quality Gate、PR checksを順に行う。C60-02のverifier開始前後にHEAD/upstream/remoteの`FINAL_SHA` equality、working tree clean、non-ignored untracked path 0を確認し、verifier後にtrackedまたはuntrackedの1 byteでも変化があれば結果を失効させて停止する。C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが、明示的に失効扱いとし、final evidenceへ再利用しない。この順序外で旧wheel、digest、fresh consumer、verifier、audit結果を再利用しない。
 
 ### I387-N05 — distribution非変更
 
@@ -186,8 +189,8 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 |---|---|
 | I387-AC01 | 三scopeのactive-none provider/dogfood pairがminimal placeholderでbyte一致する |
 | I387-AC02 | Current placeholderに旧delegated/reviewer/Profile/EAL/Promotion schemaがない |
-| I387-AC03 | root READMEに`active set --checkout`のCurrent案内がなく、`issue start`へ案内する |
-| I387-AC04 | root READMEがArtifactのevidence-only/canonical rewrite contractを説明し、EALを必須にしない |
+| I387-AC03 | root READMEとprovider/dogfoodのscripts READMEに`active set --checkout`のCurrent案内がなく、selection-onlyと`issue start` ownershipを一意に案内する |
+| I387-AC04 | root READMEとprovider/dogfoodの三scopeのartifacts/discussions rulesがArtifactのevidence-only/canonical rewrite contractを説明し、EALまたはreport ledgerをCurrent adoption authorityにしない |
 | I387-AC05 | Authoring overviewが二skillを現在形で案内し、provider/dogfoodで一致する |
 | I387-AC06 | `ActiveSetArgs`が`target_ref`/`target_display`、`SetActiveRequest`が`target`だけを持つ |
 | I387-AC07 | `active set`がGit/GitHub/dependency portを呼ばずselection-only behaviorを維持する |
@@ -197,7 +200,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 | I387-AC11 | definition-only候補がproof成立時だけ削除され、判断結果がReportに残る |
 | I387-AC12 | retirement-only test/support候補が100%分類され、削除可能項目とそのorphan supportが撤去され、保持項目にはsurviving consumerと理由がある |
 | I387-AC13 | 新しいabsence test/scanner/fixture/helperを追加せず、collected test count、test LOC、test file数、fixture file数がbaselineから純増しない。C90-02はstagingなしで現存tracked pathだけを列挙し、non-ignored untrackedがあれば計測前に停止する |
-| I387-AC14 | 36行のversion管理ledger（C00-01〜C90-03）がPASSまたは理由付きN/AでReportに追跡でき、C90-04/C90-05は二つのexternal gateとしてPR/handoff evidenceで閉じる。Planの既存ledger rowにある`状態`・`Evidence reference`のcell valueとReportの3実測欄だけが`EVIDENCE_ONLY`であり、Requirement/Designの全hunkとそれ以外のPlan hunkは`SPECIFICATION_CONTRACT`としてC60保持物をexact cleanup後にBLOCKED handoffし、original baseline由来の実装前treeでclean fixed SHA Strict再reviewとC00-01新規実行へ戻る。`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`はapproved既存pathのrepair hunk、失効status、短いinvalidation evidenceを一度だけまとめてexplicit stageし、unstaged/untracked 0のrepair checkpoint後にC50-01〜C90-04をID順で再実行し、C90-05を先頭から実行する。C00-01〜C40-09の実装前evidenceは保持し、新規・未承認pathはstageせずBLOCKEDとする |
+| I387-AC14 | 36行のversion管理ledger（C00-01〜C90-03）がPASSまたは理由付きN/AでReportに追跡でき、C60-02はpre-commit未実行のstatus=`N/A(pre-commit execution; deferred to C90-05 final SHA)`とし、Evidence referenceをexact `DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence`としてfreezeする。pre-freezeではC50-01、C50-02、C60-01、C90-01〜C90-04を順に実行し、C90-05でcommit/push後にHEAD/upstream/remote branch tipのexact `FINAL_SHA` equality、working tree clean、non-ignored untracked path 0を確認してからC60-02のexact verifier、validate、independent Strict code review/Final Quality Gate、PR checksを順に実行する。C60-02 verifier前後のequality/clean確認後、verifier完了後にtrackedまたはuntrackedの1 byteでも変化があれば結果を失効させて停止する。C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが、明示的に失効扱いとしfinal evidenceへ再利用しない。C90-04/C90-05は二つのexternal gateとしてPR/handoff evidenceで閉じる。Planの既存ledger rowにある`状態`・`Evidence reference`のcell valueとReportの3実測欄だけが`EVIDENCE_ONLY`であり、Requirement/Designの全hunkとそれ以外のPlan hunkは`SPECIFICATION_CONTRACT`としてC60保持物をexact cleanup後にBLOCKED handoffし、original baseline由来の実装前treeでclean fixed SHA Strict再reviewとC00-01新規実行へ戻る。`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`はapproved既存pathのrepair hunk、失効status、短いinvalidation evidenceを一度だけまとめてexplicit stageし、unstaged/untracked 0のrepair checkpoint後にC50-01、C50-02、C60-01、C90-01〜C90-04を順に再実行し、C90-05を先頭から実行する。C00-01〜C40-09の実装前evidenceは保持し、新規・未承認pathはstageせずBLOCKEDとする |
 | I387-AC15 | focused tests、lint、ordinary tests、current full-regression verifier、clean packageの実結果が最終candidateへ束縛して記録され、fresh consumerはinventory/digest採取済みの同一exact wheelを`uvx --isolated --no-cache --from`で実行する。sdistはinventory evidenceとして検査され、project path `.`またはsdistをfresh consumerのexecution sourceにしない。C60-01はpathを作成直後に記録し、失敗時は同check内、成功時はC90-04でexact cleanupする |
 | I387-AC16 | current二skill、consumer CI、authoritative Historical evidence、Epic #384所有surfaceに意図しない差分がない |
 | I387-AC17 | final candidate内容を含むSHAで`spec-dock validate`が成功し、Issue #387のR/D/P/Reportが履歴を捏造しない |
@@ -207,7 +210,7 @@ Epic #384が所有するdistribution semanticsとprovider test architectureを�
 
 | 観測対象 | 要件 | 主要な検証 |
 |---|---|---|
-| active-none / README / overview | R01〜R04, R08, R09 | one-time content review、provider/dogfood parity、fresh consumer |
+| active-none / root README / scripts README / rules / overview | R01〜R04, R08, R09 | one-time content review、provider/dogfood parity、fresh consumer |
 | active selection | R05, N01, N04 | existing positive application/CLI/lifecycle tests、call-site audit |
 | package/test hygiene | R06, R09, N03, N04, N05 | AST/reference proof、S06 testと専用mypy overrideの条件付きexact-entry audit、clean wheel/sdist inventory、同一wheel-bound fresh consumer |
 | retirement-only test support | R07, R09, N04, N06 | consumer map、before/after metrics、deleted/retained decision ledger |

@@ -54,6 +54,10 @@ Current surfaceを親Epic #356の契約へ収束させる。同じ変更で、�
 | 2026-08-31 | user判断とChatGPT Use Strict分析により、test-addition drivenからevidence-driven retirementへ変更 | 旧S01/S03/S05/S06は未実施のまま廃止。完了扱いにしない |
 | 2026-09-01 | Strict reviewのP2指摘により、S06専用mypy overrideの条件付きexact-entry cleanupと、C60-01の同一wheel artifact bindingを追加 | implementation未着手のため実施済みcheckなし。checklist数、ledger行、closure gateは不変 |
 | 2026-09-01 | fixed SHA `f3b6c2b6f1db2c3b7e54966496f76a74db34d689`のStrict review P1指摘により、`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`のfinite repair checkpointと、exact ledger二列以外のR/D/P全hunkを覆う`SPECIFICATION_CONTRACT`境界を追加 | implementation未着手のため失効させる実測なし。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
+| 2026-09-01 | fixed SHA `7f4ec536e34b35fe1dfe250ee786cef5ed59bc6d`のC00独立監査とChatGPT Use Strict Extra High分析により、scripts READMEと三scopeのartifacts/discussions rulesの7 provider/dogfood pairをapproved Current surfaceへ追加 | production/test/config未着手。旧C00 evidenceは破棄してNOT_RUNへ戻した。38 checks、36 ledger rows、各check 8 fields、C90-04/C90-05の二external gatesは不変 |
+| 2026-09-01 | ChatGPT Use Strict Extra High advisoryの受入れにより、C60-02 exact verifierをpre-commitからC90-05のcommit/push後clean `FINAL_SHA`へ延期し、C90-04のfreezeとC90-05のfinal-SHA検証順を明示 | C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが明示的に失効扱いとし、final evidenceへ再利用しない。Plan rowを理由付きN/A/deferredへ固定し、38 checks、36 ledger rows、各check 8 fields、二external gatesを維持 |
+| 2026-09-02 | Strict spec review P1により、C40-09をcommit前のreferential-integrity確認へ限定し、full verifierの実行時点をC60-02/C90-05のclean `FINAL_SHA`へ一意化 | C40-09のverifier成功要求をledger parser、timing loader、collection、verifier CLI parser/help contractの成功へ置換。38 checks、36 ledger rows、各check 8 fields、二external gatesは不変 |
+| 2026-09-02 | Strict spec review P1により、C00-01期待結果から固定branch名を除き、attached/non-detached implementation branch名のReport記録とconfigured upstream一致を明示 | C00-01の既存確認command、40桁baseline拘束、38 checks、36 ledger rows、各check 8 fields、二external gatesは不変 |
 
 ## 3. 実装原則
 
@@ -139,7 +143,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 | M2 | active request contraction | target-only、legacy checkout seam/test撤去、positive behavior GREEN |
 | M3 | package/config hygiene | stale entry削除、definition proof、clean archive inventory |
 | M4 | retirement-only test/support withdrawal | 全candidateをremove/retain分類し、orphan supportを撤去 |
-| M5 | surviving behavior/integration | focused、lint、ordinary、build、fresh init、current verifier |
+| M5 | surviving behavior/integration | focused、lint、ordinary、build、fresh init。current verifierはC90-05のcommit/push後に固定したclean `FINAL_SHA`で実行し、結果をPR/handoff evidenceへ記録 |
 | M99 | audit/handoff | test budget、scope、Report、Strict gate、merge-ready PR |
 
 ## 8. M0 — Admission、baseline、consumer map
@@ -150,7 +154,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **前提:** 改訂R/D/PがStrict reviewを通過し、commit/push済み。
 - **操作:** 変更しない。
 - **確認:** `git status --short`、`git branch --show-current`、`git rev-parse HEAD`、`git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'`、`git rev-parse '@{upstream}'`を別々に実行する。最後に`IMPLEMENTATION_BASELINE_SHA="$(git rev-parse --verify 'HEAD^{commit}')"`、`printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'`、`test "$(git rev-parse '@{upstream}')" = "$IMPLEMENTATION_BASELINE_SHA"`を実行する。
-- **期待結果:** clean、branch=`iss-00387-current-surface-workflow-residue-cleanup`、HEAD=upstream。検証済み40桁値を`<implementation-baseline-sha>`として以後のdiffへ使用する。
+- **期待結果:** clean、attached/non-detached implementation branch名をReportへ記録し、HEAD=its configured upstream。検証済み40桁値を`<implementation-baseline-sha>`として以後のdiffへ使用する。
 - **証拠:** branch、検証済みfull SHA、clean status。full SHAはReportへ一度記録し、後続shellでは同じ40桁値を再代入してC00-01値と一致確認する。
 - **停止条件:** dirty、detached、upstream不一致、Git operation/lock。
 - **cleanup:** なし。
@@ -170,9 +174,9 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 
 - **対象 / 目的:** 変更可能pathと保護pathを固定する。
 - **前提:** C00-02 PASS。
-- **操作:** Requirement §4とDesign §5のknown candidateを実pathへ解決する。
+- **操作:** Requirement §4とDesign §2/§5のknown candidateを実pathへ解決し、provider/dogfoodの`scripts/README.md`と`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`の14 pathsをapproved inventoryへ明示する。
 - **確認:** `rg -n 'ActiveSetArgs|SetActiveRequest|checkout_active_target|active set .*--checkout|Evidence Adoption Ledger|Issue 359' README.md src/spec_dock/assets/spec_dock spec-dock tests`、`rg -n 'REMOVED_HELP_ROUTES|REMOVED_RUNTIME_MODULES|CURRENT_LEGACY_VOCABULARY_PATTERNS|S09_LEGACY_EVIDENCE_MUTATIONS|existing_issue|test_active_set_legacy_flag_reports_parser_error|test_runtime_active_s05|test_runtime_active_s06' tests pyproject.toml full-regression-ledger.json full-regression-timing-weights.json`、`rg -n 'tests\.cli_runtime\.test_delegated_authoring|tests\.cli_runtime\.test_runtime_active_s06|assets/install_root/\.codex/\*\*' pyproject.toml`。
-- **期待結果:** candidate path、surviving consumer、S06 testと専用mypy overrideのcoupling、no-touch pathが一覧化される。
+- **期待結果:** candidate path、追加した14 Current paths、surviving consumer、S06 testと専用mypy overrideのcoupling、no-touch pathが一覧化される。
 - **証拠:** inventory表をReportへ要約。
 - **停止条件:** candidateがEpic #384またはauthoritative historyだけに存在する。
 - **cleanup:** なし。
@@ -245,15 +249,15 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **停止条件:** placeholder構造変更、Historical/fixture変更が必要。
 - **cleanup:** 旧schemaを固定していたretirement-only test/supportはM4候補へ追加。
 
-### C10-02 — root README cleanup
+### C10-02 — Current lifecycle / Artifact authority docs cleanup
 
-- **対象 / 目的:** Current lifecycleとArtifact authorityを正しく案内する。
+- **対象 / 目的:** root README、scripts README、三scopeのartifacts/discussions rulesでCurrent lifecycleとArtifact authorityを正しく案内する。
 - **前提:** C00-08 GO。
-- **操作:** `active set --checkout`、recovery/normalization、EAL必須説明を削り、selection-only、`issue start`、evidence review + canonical rewriteへ置換する。
-- **確認:** 対象sectionを目視し、`rg -n 'active set .*--checkout|Evidence Adoption Ledger|EAL' README.md`をone-time確認する。
-- **期待結果:** Current手順が一意で、旧案内がCurrent instructionとして残らない。
-- **証拠:** section見出し、rg結果、diff summary。
-- **停止条件:** migration/history文脈まで消す必要がある、public CLI変更が必要。
+- **操作:** root `README.md`では`active set --checkout`、recovery/normalization、EAL必須説明を削り、selection-only、`issue start`、evidence review + canonical rewriteへ置換する。providerの`scripts/README.md`は旧checkout exampleをselection-onlyと`issue start`の二経路へ置換する。providerの三scopeのartifacts/discussions rulesはEAL/report ledgerをCurrent adoption authorityとする文だけをR/D/Pまたはaccepted ADRへの明示的再記述へ置換し、Historical grandfathering/catalogを保持する。7 provider filesをdogfoodへ同期する。
+- **確認:** 対象sectionを目視し、14 provider/dogfood pathsのpairを`cmp`する。`rg -n 'active set .*--checkout|Evidence Adoption Ledger|EAL|report ledger' README.md src/spec_dock/assets/spec_dock/scripts/README.md src/spec_dock/assets/spec_dock/docs/rules spec-dock/scripts/README.md spec-dock/docs/rules`をone-time確認し、Historical文脈とCurrent instructionを区別する。
+- **期待結果:** Current手順が一意で、旧checkout exampleとCurrent EAL/report-ledger adoption authorityが残らず、7 pairがbyte一致する。Historical grandfathering/catalogは保持される。
+- **証拠:** section見出し、14 changed paths、7 pairの`cmp` exit 0、rg結果、diff summary。
+- **停止条件:** migration/history originalsまで消す必要がある、列挙外のsibling Current docs変更、public CLI変更が必要。
 - **cleanup:** README phrase absence testは追加しない。
 
 ### C10-03 — Authoring overview cleanup
@@ -273,7 +277,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **前提:** C10-01〜03実装後。
 - **操作:** 変更しない。
 - **確認:** `<implementation-baseline-sha>`からHistorical guide、他Issue履歴、migration docs、Epic #384 docsをpath限定diffする。
-- **期待結果:** 本Issue R/D/P/Report以外のauthoritative history差分0。
+- **期待結果:** C10-01〜03のapproved Current docsと本Issue R/D/P/Report以外のauthoritative history差分0。scripts READMEと三scopeのartifacts/discussions rulesの7 pair以外のsibling rules差分0。
 - **証拠:** diff exit/result。
 - **停止条件:** 一件でも意図しない差分。
 - **cleanup:** unintended diffだけを原因pathで修正する。historyを書き換えて合わせない。
@@ -465,9 +469,9 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 - **対象 / 目的:** test撤去と現行verifier inventoryを矛盾させない。
 - **前提:** C20-04、C40-01〜08で実際に削除するnode IDが確定。
 - **操作:** 削除node IDに一致する`full-regression-ledger.json` failure row/command input、`full-regression-timing-weights.json` weight、`tests/conftest.py`の`REQUIRED_FAST_NODE_IDS`だけを削除または現存successorへ最小更新する。
-- **確認:** 削除node IDごとに3ファイルを`rg`し、ledger parser/current verifier、collectionを実行する。
-- **期待結果:** deleted node参照0、現存nodeのledger/timing/required classificationは整合、verifier成功。
-- **証拠:** node ID別before/after entry、parser/verifier result。
+- **確認:** 削除node IDごとに3ファイルを`rg`し、ledger parser、timing loader、test collection、verifier CLIのparser/help contractを実行・確認する。current full-regression verifier本体、full verifierのshard実行、full ledger policy検証はここでは実行せず、C60-02/C90-05だけで実施する。
+- **期待結果:** deleted node参照0、現存nodeのledger/timing/required classificationは整合し、ledger parser、timing loader、collection、verifier CLI parser/help contractが成功する。full verifierの成功はC60-02/C90-05のclean `FINAL_SHA`上でのみ期待する。
+- **証拠:** node ID別before/after entry、ledger parser/timing loader/collection/verifier CLI parser/help contractの結果。full verifier、shard、ledger policyの実測証拠はC60-02/C90-05へ束縛する。
 - **停止条件:** schema、failure disposition、marker、shard、workflow、weight算出方法の変更、無関係nodeへの波及。
 - **cleanup:** orphan exact entriesだけ。ledger/timing全体の再生成はしない。
 
@@ -531,14 +535,29 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   tar -tf "$SDIST"
   shasum -a 256 "$WHEEL" "$SDIST"
   uvx --isolated --no-cache --from "$WHEEL" spec-dock init "$CONSUMER"
-  (cd "$CONSUMER" && ./spec-dock/scripts/spec-dock validate && ./spec-dock/scripts/spec-dock --help)
+  typeset VALIDATE_OUTPUT=''
+  typeset VALIDATE_STATUS=0
+  if VALIDATE_OUTPUT="$(cd "$CONSUMER" && ./spec-dock/scripts/spec-dock validate 2>&1)"; then
+    VALIDATE_STATUS=0
+  else
+    VALIDATE_STATUS=$?
+  fi
+  printf 'C60-01_VALIDATE_STATUS=%s\n' "$VALIDATE_STATUS"
+  printf 'C60-01_VALIDATE_OUTPUT=%s\n' "$VALIDATE_OUTPUT"
+  test "$VALIDATE_STATUS" -eq 1
+  test "$VALIDATE_OUTPUT" = 'error: No nodes found.'
+  (cd "$CONSUMER" && ./spec-dock/scripts/spec-dock --help)
   test -f "$CONSUMER/.agents/skills/spec-dock/SKILL.md"
   test -f "$CONSUMER/.agents/skills/spec-dock-grill-with-docs/SKILL.md"
   test -f "$CONSUMER/.github/workflows/ci.yml"
   test ! -e "$CONSUMER/.codex"
   cmp src/spec_dock/assets/spec_dock/docs/authoring/overview.md "$CONSUMER/spec-dock/docs/authoring/overview.md"
+  cmp src/spec_dock/assets/spec_dock/scripts/README.md "$CONSUMER/spec-dock/scripts/README.md"
   for scope in initiative epic issue; do
     cmp "src/spec_dock/assets/spec_dock/system/active-none/$scope/report.md" "$CONSUMER/spec-dock/system/active-none/$scope/report.md"
+    for rule in artifacts discussions; do
+      cmp "src/spec_dock/assets/spec_dock/docs/rules/$scope/$rule.md" "$CONSUMER/spec-dock/docs/rules/$scope/$rule.md"
+    done
   done
   shasum -a 256 "$WHEEL" "$SDIST"
   printf 'ARTIFACT_DIR=%s\nWHEEL=%s\nSDIST=%s\nCONSUMER=%s\n' "$ARTIFACT_DIR" "$WHEEL" "$SDIST" "$CONSUMER"
@@ -546,43 +565,43 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   )
   ```
 
-- **期待結果:** 一時pathが各作成直後に出力される。one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init/validate/help/cmp成功。current二skillと`ci.yml`あり、retired `.codex`なし。success時はtrapが解除され、二directoryがC90-04まで残る。
-- **証拠:** immediate path lines、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、exit、cmp summary。nonzero時はfailure cleanup pathと残存有無。
-- **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、nonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
-- **cleanup:** nonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
+- **期待結果:** 一時pathが各作成直後に出力される。one wheel/one sdist、inventory/digest成功。exact `uvx` commandがinventory済み`$WHEEL`を使い、init成功後、validateはstatus=`1`かつcombined outputがexact `error: No nodes found.`となり、そのassert後のhelp/cmpが成功する。current二skillと`ci.yml`あり、retired `.codex`なし。overview、active-none、scripts README、三scopeのartifacts/discussions rulesがprovider sourceと一致する。success時はtrapが解除され、二directoryがC90-04まで残る。
+- **証拠:** immediate path lines、wheel/sdist absolute pathと前後SHA-256、archive inventory、exact `uvx` command、validate status/output、help exit、cmp summary。予期しないnonzero時はfailure cleanup pathと残存有無。
+- **停止条件:** artifact countが1でない、`--from .`/sdist/別buildを使う、既存installed toolを再利用する、live GitHub操作またはmanaged distribution変更が必要、validateの期待status/output以外の予期しないnonzero後に作成済みpathが残る、またはcleanupがその二path以外へ及ぶ。
+- **cleanup:** validateの期待status=`1`かつexact output以外を含む予期しないnonzero時はfailure trapが作成済みの`$CONSUMER`と`$ARTIFACT_DIR`だけを削除する。success時はC90-04がimmediate path evidenceと照合して削除する。
 
 **Evidence recording, classification, and repair-checkpoint rule:** C50-01で作ったGit index checkpoint以後、各tracked editまたはnon-ignored untracked追加の直後に、`CURRENT_ISSUE_DIR='spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00387-current-surface-workflow-residue-cleanup'`を設定し、`git diff --name-status`、`git diff -- "$CURRENT_ISSUE_DIR/requirement.md" "$CURRENT_ISSUE_DIR/design.md" "$CURRENT_ISSUE_DIR/plan.md" "$CURRENT_ISSUE_DIR/report.md"`、`git ls-files --others --exclude-standard`を確認してhunk単位で次の順に分類する。複数classが同一hunkに混在する場合は上位の停止側へ倒す。同一snapshot内の別hunkに一件でも`SPECIFICATION_CONTRACT`があればsnapshot全体を同classとし、他classのhunkもstageしない。
 
 1. Plan §15の既存C00-01〜C90-03 rowにある`状態`列・`Evidence reference`列のcell valueだけ、またはReportの既存`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文へ実測事実だけを記録するhunkは`EVIDENCE_ONLY`とする。Planのheader、separator、`ID`列、row set/order、§15説明本文、およびReport見出し・構造は含めない。該当Plan/Report pathだけをexplicit stageし、unstaged/untracked 0を確認して次checkへ進む。
 2. current RequirementとDesignの全hunk、および1のexact二列cell value以外のcurrent Planの全hunkは`SPECIFICATION_CONTRACT`とする。front matter、原則、test budget、実行規約、milestone、check本文、exit、ledger規約・構造を含む。Report見出し・構造も同じ扱いとする。C60-01 success時の一時directoryが残っていれば、immediate path evidenceとbyte-for-byte照合し、nonempty・distinct・directoryを確認して旧`$CONSUMER`と`$ARTIFACT_DIR`だけをexact cleanupする。その後production writerは直ちに`BLOCKED` handoffし、そのhunkまたはcurrent candidateを追加stage/commitしない。main agentはoriginal C00-01 implementation baselineから分離したclean worktree/branchを用意し、production/test/config差分0を確認して改訂R/D/Pだけをcommit/pushする。remote branch tipと一致するfixed full SHAにindependent Strict再reviewを通した後、その実装前treeからC00-01を新規実行する。旧status/evidenceは流用しない。
 3. 1、2以外のtracked hunk、non-ignored untracked追加、または分類不能な変更は`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`とする。最初の検出からrepair checkpoint成立までを一つのrepair windowとし、その間は通常のcheck実行と通常のledger/Report evidence editを停止する。次の有限順序を一repair windowにつき一度だけ実行する。
-   1. C60-01 success時の一時directoryが残っている場合は、immediate path evidenceとbyte-for-byte照合した旧`$CONSUMER`と`$ARTIFACT_DIR`だけを削除して不在確認し、旧wheel、digest、fresh consumer、verifier、audit evidenceを失効させる。
+   1. C60-01 success時の一時directoryが残っている場合は、immediate path evidenceとbyte-for-byte照合した旧`$CONSUMER`と`$ARTIFACT_DIR`だけを削除して不在確認し、旧wheel、digest、fresh consumer、C60-02の旧pre-commit/final-SHA verifier、audit evidenceはhistorical recordとして残り得るが明示的に失効扱いとし、final evidenceへ再利用しない。
    2. repairをC00-03で承認済みの既存pathだけで完了する。新規path、rename先を含むapproved inventory外path、またはnon-ignored untracked pathが一件でも必要・出現した場合は、repair bundleの一部もstageせず`BLOCKED` handoffする。
-   3. §15のC50-01〜C90-03を`NOT_RUN`へ戻し、該当`Evidence reference` cellへexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair; see Report Verification`を記録する。C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻し、各Evidence referenceをexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair`とする。C00-01〜C40-09のstatus/evidenceはoriginal implementation baselineまたは実装前観測へ束縛されたまま保持し、repair checkpoint上で再実行しない。Reportの`Verification`へ`class=OTHER_SUBSTANTIVE_OR_AMBIGUOUS; repair_paths=<approved paths>; invalidated=C50-01..C90-05; preimplementation=C00-01..C40-09 retained; temp_cleanup=<none|exact removed paths>`の一entryだけを記録する。
+   3. §15のC50-01〜C90-03のうちC60-02を除くrowを`NOT_RUN`へ戻し、該当`Evidence reference` cellへexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair; see Report Verification`を記録する。C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが明示的に失効扱いとし、pre-commitでは実行せず、statusをexact `N/A(pre-commit execution; deferred to C90-05 final SHA)`、Evidence referenceをexact `DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence`へ設定する。C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻し、各Evidence referenceをexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair`とする。C00-01〜C40-09のstatus/evidenceはoriginal implementation baselineまたは実装前観測へ束縛されたまま保持し、repair checkpoint上で再実行しない。Reportの`Verification`へ`class=OTHER_SUBSTANTIVE_OR_AMBIGUOUS; repair_paths=<approved paths>; invalidated=C50-01..C90-05; preimplementation=C00-01..C40-09 retained; temp_cleanup=<none|exact removed paths>`の一entryだけを記録する。
    4. classified repair hunk、失効status、Plan/Reportの短いinvalidation evidenceを一つのunstaged repair bundleとして一度だけまとめて確認する。全hunkがapproved repairまたは3の記録だけで、`SPECIFICATION_CONTRACT`、新規path、未承認pathを含まないことを確認する。
    5. approved repair pathのexplicit listに`"$CURRENT_ISSUE_DIR/plan.md"`と`"$CURRENT_ISSUE_DIR/report.md"`を加え、一回の`git add -- <approved-repair-path-1> ... "$CURRENT_ISSUE_DIR/plan.md" "$CURRENT_ISSUE_DIR/report.md"`でstageする。`git add .`、glob、動的path展開、部分stageは使わない。`git diff --name-status`が空、`git ls-files --others --exclude-standard`が空、`git diff --cached --name-status "$IMPLEMENTATION_BASELINE_SHA"`がapproved inventoryだけであることを確認し、これをrepair checkpointとする。成立しなければ再実行へ進まず`BLOCKED` handoffする。
-   6. repair checkpointからC50-01〜C90-04をID順に再実行し、そのPASS後にC90-05を先頭から実行する。再実行中の後続`EVIDENCE_ONLY` editは1の通常規約でstageする。新たな`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`を検出した場合だけ、新しいrepair windowとして同じ順序を最初から適用する。
+   6. repair checkpointからpre-freezeでC50-01、C50-02、C60-01、C90-01〜C90-04をこの順に再実行する。C60-02はpre-commitで実行せず、C90-05のcommit/push後にHEAD/upstream/remote branch tipが一致するclean `FINAL_SHA`でexact verifierを一度だけ実行し、その後にvalidate、independent Strict code review/Final Quality Gate、PR checksを順に行う。C60-02のverifier前後で`FINAL_SHA` equality、working tree clean、non-ignored untracked path 0を確認し、verifier後にtrackedまたはuntrackedの1 byteでも変化があれば結果を失効させて停止する。C60-02の実測結果はPR/handoff evidenceだけへ記録する。再実行中の後続`EVIDENCE_ONLY` editは1の通常規約でstageする。新たな`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`を検出した場合だけ、新しいrepair windowとして同じ順序を最初から適用する。
 
 ### C60-02 — Current Full Regression
 
-- **対象 / 目的:** 現行policy内の非回帰。
-- **前提:** C60-01 PASS。
-- **操作:** C40-09でreview済みのdeleted-node exact参照更新を固定し、それ以外のworkflow/ledger/timing/shardを変更せずverifierを実行する。
-- **確認:** `uv run python -m scripts.quality.verify_full_regression --shards 4`。
-- **期待結果:** verifier成功。
-- **証拠:** summary、duration、shard結果。
-- **停止条件:** C40-09以外のledger/timing、shard、provider workflow変更が必要、failureをfuture Epicで無視。
-- **cleanup:** verifier temp outputはownership確認後。
+- **対象 / 目的:** commit/push後に固定したclean `FINAL_SHA`上で現行policy内の非回帰を検証し、pre-commit treeや自己参照するPlan/Reportへ依存しない。
+- **前提:** C90-04のcandidate freezeがhandoff evidence上でPASSし、C60-02はpre-commitでは未実行（意味上`NOT_RUN`）でstatus=`N/A(pre-commit execution; deferred to C90-05 final SHA)`となっている。C90-05のcommit/push後、local `HEAD`、configured upstream、remote branch tipが同一の`FINAL_SHA`を指し、working treeとnon-ignored untracked pathがcleanである。
+- **操作:** C90-05でfreeze済みcandidateをcommit/pushした後、同じclean `FINAL_SHA`上でC40-09のdeleted-node exact参照更新以外のworkflow/ledger/timing/shardを変更せず、exact verifierを一度だけ実行する。Plan/Reportのledger rowをPASSへ変更せず、結果はPR/handoff evidenceへ記録する。
+- **確認:** verifier開始前に`git rev-parse HEAD`、`git rev-parse '@{upstream}'`、remote branch tipのSHA、`git status --short`、`git ls-files --others --exclude-standard`を照合する。`uv run python -m scripts.quality.verify_full_regression --shards 4`完了直後に同じHEAD/upstream/remote、working tree、non-ignored untracked pathを再照合し、前後で一致することを確認する。
+- **期待結果:** clean `FINAL_SHA`のHEAD/upstream/remoteがverifier前後で完全一致し、working treeとnon-ignored untracked path 0も維持され、exact verifierがexit 0で成功する。summary、duration、shard結果を取得し、pre-commit実行やverification contentの弱化はない。
+- **証拠:** `FINAL_SHA`、verifier前後のclean equality、exact command、exit status、summary、duration、shard結果をPR/handoff evidenceだけへ記録する。version管理ledgerのC60-02 rowは指定のN/A/deferredから変更しない。旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが失効扱いで再利用しない。
+- **停止条件:** final SHA未確定、HEAD/upstream/remote不一致、dirtyまたはuntracked、verifier前後のtracked/untracked 1 byteでも変化、pre-commit実行、exact verifier failure、C40-09以外のledger/timing、shard、provider workflow変更が必要、failureをfuture Epicで無視する場合。
+- **cleanup:** verifierが生成したtemporary outputはownership確認後にそのtemporary itemだけを削除する。Plan/Report、final tree、ledger、未知のpathは変更・削除しない。
 
 ## 14. M99 — Audit、Report、handoff
 
 ### C90-01 — Scope/no-touch diff audit
 
 - **対象 / 目的:** approved scopeだけが変わったことを確認する。
-- **前提:** M5完了。
+- **前提:** M5のpre-freeze checks（C50-01、C50-02、C60-01）が完了し、C60-02はpre-commit未実行の理由付きN/A/deferredである。
 - **操作:** 変更しない。
 - **確認:** `git diff --name-status <implementation-baseline-sha>`、Historical authority、current skills/CI、Epic #384 pathsをpath限定diffし、`git diff <implementation-baseline-sha> -- pyproject.toml`をC30-01のexact decisionと照合する。
-- **期待結果:** changed pathはapproved inventoryのみ。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-09で承認したdeleted-node exact entry以外の差分0。`pyproject.toml`はdelegated member、`.codex` glob、およびS06 file削除時だけ専用S06 overrideに差分があり、その他entryの差分0。
+- **期待結果:** changed pathはC00-03のapproved inventoryのみ。追加したscripts READMEと三scopeのartifacts/discussions rulesの14 pathsは7 pairでbyte一致し、列挙外のsibling rules差分0。R/D/P/Report以外のIssue history差分0。managed distribution、workflow、scripts/quality差分0。ledger/timing/conftestはC40-09で承認したdeleted-node exact entry以外の差分0。`pyproject.toml`はdelegated member、`.codex` glob、およびS06 file削除時だけ専用S06 overrideに差分があり、その他entryの差分0。
 - **証拠:** name-statusとno-touch results。
 - **停止条件:** unrelated/unowned diff、S06 file/override不一致。
 - **cleanup:** unintended diffを原因箇所で修正。user変更を消さない。
@@ -601,7 +620,7 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   printf '%s\n' "$IMPLEMENTATION_BASELINE_SHA" | rg -q '^[0-9a-f]{40}$'
   test "$(git rev-parse --verify "${IMPLEMENTATION_BASELINE_SHA}^{commit}")" = "$IMPLEMENTATION_BASELINE_SHA"
   C90_METRIC_DIR="$(mktemp -d)"
-  trap 'status=$?; rm -rf -- "$C90_METRIC_DIR"; exit "$status"' EXIT
+  trap 'c90_02_exit_status=$?; rm -rf -- "$C90_METRIC_DIR"; exit "$c90_02_exit_status"' EXIT
   TRACKED_LIST="$C90_METRIC_DIR/tracked-tests.zlist"
   UNTRACKED_LIST="$C90_METRIC_DIR/untracked-tests.zlist"
   COLLECT_OUTPUT="$C90_METRIC_DIR/collect-only.txt"
@@ -609,18 +628,18 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
   typeset -a EXISTING_TRACKED_TESTS=()
   typeset -a EXISTING_TRACKED_TEST_PY=()
   typeset -a EXISTING_TRACKED_FIXTURES=()
-  while IFS= read -r -d '' path; do
-    if [[ ! -e "$path" ]]; then
-      printf 'C90-02_EXCLUDED_MISSING_TRACKED=%s\n' "$path"
+  while IFS= read -r -d '' tracked_test_path; do
+    if [[ ! -e "$tracked_test_path" ]]; then
+      printf 'C90-02_EXCLUDED_MISSING_TRACKED=%s\n' "$tracked_test_path"
       continue
     fi
-    EXISTING_TRACKED_TESTS+=("$path")
-    [[ "$path" != *.py ]] || EXISTING_TRACKED_TEST_PY+=("$path")
-    [[ "$path" != tests/fixtures/* ]] || EXISTING_TRACKED_FIXTURES+=("$path")
+    EXISTING_TRACKED_TESTS+=("$tracked_test_path")
+    [[ "$tracked_test_path" != *.py ]] || EXISTING_TRACKED_TEST_PY+=("$tracked_test_path")
+    [[ "$tracked_test_path" != tests/fixtures/* ]] || EXISTING_TRACKED_FIXTURES+=("$tracked_test_path")
   done < "$TRACKED_LIST"
   git ls-files -z --others --exclude-standard -- tests > "$UNTRACKED_LIST"
   if [[ -s "$UNTRACKED_LIST" ]]; then
-    while IFS= read -r -d '' path; do printf 'C90-02_NON_IGNORED_UNTRACKED=%s\n' "$path" >&2; done < "$UNTRACKED_LIST"
+    while IFS= read -r -d '' untracked_test_path; do printf 'C90-02_NON_IGNORED_UNTRACKED=%s\n' "$untracked_test_path" >&2; done < "$UNTRACKED_LIST"
     exit 1
   fi
   (( ${#EXISTING_TRACKED_TESTS[@]} > 0 ))
@@ -656,80 +675,80 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 ### C90-04 — Final cleanup、Report completion、candidate freeze
 
 - **対象 / 目的:** 未実施捏造を防ぎ、証拠をhandoff可能にする。
-- **前提:** C00-01〜C90-03のversion管理ledgerが全てPASSまたは理由付きN/A。
-- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。Plan §15の既存rowにある`状態`・`Evidence reference`のcell valueとReportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文だけに実測事実を記録し、Evidence recording, classification, and repair-checkpoint ruleの`EVIDENCE_ONLY`であることをunstaged diff hunkごとに確認して該当Plan/Report pathだけをstageする。ledger header・ID・row set/orderや他のR/D/P本文は変更しない。その他の本Issue所有cacheもexact ownership確認後に削除・不在確認し、open repair windowがなく、unstaged/untracked差分0のfinal indexをcommit candidateとしてfreezeする。C90-04自身のPASSをPlan/Reportへ書かない。
+- **前提:** C00-01〜C90-03のversion管理ledgerが、C60-02を除き全てPASSまたは理由付きN/Aであり、C60-02はpre-commitでは未実行（意味上`NOT_RUN`）のstatus=`N/A(pre-commit execution; deferred to C90-05 final SHA)`、Evidence reference=`DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence`でfreezeされている。C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが、明示的に失効扱いでfinal evidenceへ再利用されておらず、C90-01〜C90-03が完了している。
+- **操作:** C60-01のimmediate path evidenceをbyte-for-byteで`ARTIFACT_DIR`と`CONSUMER`へ設定し、空でないこと、相互に異なること、各directoryが存在することを確認する。exact pathを出力後、`rm -rf -- "$CONSUMER" "$ARTIFACT_DIR"`を1回だけ実行し、両pathの不在を確認する。C60-02をpre-commitで実行せず、Plan §15の既存rowにある`状態`・`Evidence reference`のcell valueとReportの`Outcome`・`Verification`・`Residual Risks / Follow-ups`本文だけに実測事実を記録し、Evidence recording, classification, and repair-checkpoint ruleの`EVIDENCE_ONLY`であることをunstaged diff hunkごとに確認して該当Plan/Report pathだけをstageする。ledger header・ID・row set/orderや他のR/D/P本文は変更しない。その他の本Issue所有cacheもexact ownership確認後に削除・不在確認し、open repair windowがなく、unstaged/untracked差分0のfinal indexをcommit candidateとしてfreezeする。C90-04自身のPASSをPlan/Reportへ書かない。
 - **確認:** `test -n "$ARTIFACT_DIR"`、`test -n "$CONSUMER"`、`test "$ARTIFACT_DIR" != "$CONSUMER"`、各`test -d`、cleanup前後のexact path出力、各`test ! -e`を実行する。その後、version管理ledgerとraw command evidence、Report内容、空の`git diff --name-status`、空のnon-ignored untracked一覧、`git diff --cached --name-status "$IMPLEMENTATION_BASELINE_SHA"`、`git diff --cached --check "$IMPLEMENTATION_BASELINE_SHA"`を照合する。
-- **期待結果:** C60-01 success時に保持された二つのmktemp-owned directoryだけがexact pathで削除される。C00-01〜C90-03にNOT_RUN/BLOCKEDなし、N/Aは理由付き。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
-- **証拠:** candidate freezeのPASS/BLOCKEDをPR/handoff evidenceへ記録し、version管理Plan/Reportには追記しない。
-- **停止条件:** C60-01 evidenceとcleanup変数の不一致、empty/same/missing/unknown path、raw実行なしのPASS、final SHA自己参照、長いlog複製、unknown temporary/untracked path。
+- **期待結果:** C60-01 success時に保持された二つのmktemp-owned directoryだけがexact pathで削除される。C00-01〜C90-03はC60-02を除きNOT_RUN/BLOCKEDなし、C60-02は指定の理由付きN/A/deferredでpre-commit未実行のまま、final verifierの実測はC90-05へ延期される。Reportにactual changed/deleted/retained files、test metrics、verification、residual riskがあり、意図したtracked diffだけが残る。
+- **証拠:** candidate freezeのPASS/BLOCKEDとC60-02 deferred状態をPR/handoff evidenceへ記録し、version管理Plan/ReportにはC60-02のfinal verifier結果を追記しない。
+- **停止条件:** C60-01 evidenceとcleanup変数の不一致、empty/same/missing/unknown path、C60-02の旧pre-commit/final-SHA evidence再利用、C60-02をpre-commitで実行したPASS、final SHA自己参照、長いlog複製、unknown temporary/untracked path。
 - **cleanup:** C60-01がsuccess時に保持したexact `$CONSUMER`と`$ARTIFACT_DIR`、およびownershipを証明できる本Issue所有temporary/duplicate scratch/logだけ。glob、prefix、parent directory、user-owned/unknown pathは削除しない。
 
 ### C90-05 — Commit、push、Strict quality gate、PR
 
 - **対象 / 目的:** human merge判断へ固定candidateを渡す。
-- **前提:** version管理ledgerのC00-01〜C90-03が完了し、C90-04 candidate freezeがhandoff evidence上でPASS、identity確認済み。
-- **操作:** C90-04でfreezeしたfinal indexに追加stageがないことを確認してcommit/pushし、Issue #387参照PRを作る。cleanなfinal SHA上でもう一度`spec-dock validate`を実行してから、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、Evidence recording, classification, and repair-checkpoint ruleで分類して必要な再reviewまたは再実行を行い、Plan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
-- **確認:** staged name-status、clean status、remote SHA、final SHA上のvalidate、PR checks、Strict review status。
-- **期待結果:** pushed clean candidate、P0/P1=0、review pass、merge-ready PR。agentはmergeしない。
-- **証拠:** final SHA、PR URL、checks/review summaryをversion管理Plan/ReportではなくPR/handoff evidenceへ記録する。これらの記録のためにreviewed SHAを変更しない。
-- **停止条件:** identity不一致、unexpected staged path、`review_status=fail`、P0/P1 finding、CI failure。
+- **前提:** version管理ledgerのC00-01〜C90-03が、C60-02を除き完了し、C60-02は指定の理由付きN/A/deferredでfreezeされ、C90-04 candidate freezeがhandoff evidence上でPASS、identity確認済み。
+- **操作:** C90-04でfreezeしたfinal indexに追加stageがないことを確認してcommit/pushし、Issue #387参照PRを作る。commit後に`FINAL_SHA`を固定し、local `HEAD`、configured upstream、remote branch tipが`FINAL_SHA`と完全一致し、working treeとnon-ignored untracked pathがcleanであることを確認する。そのclean `FINAL_SHA`上でC60-02のexact verifierを一度だけ実行し、完了直後に同じHEAD/upstream/remote equalityとclean/non-ignored-untracked状態を再確認する。verifier後にtrackedまたはuntrackedの1 byteでも変化があれば結果を失効させて停止する。成功後に同じSHAで`spec-dock validate`を実行し、その後、固定SHAでindependent ChatGPT code review/Final Quality Gateを実施してPR checksを確認する。`review_status=fail`またはP0/P1 findingによるtracked修正が必要ならfreezeを解除し、Evidence recording, classification, and repair-checkpoint ruleで分類して必要な再reviewまたは再実行を行い、Plan/Report/evidenceを新candidateへ再束縛し、新SHAでC90-05を最初から行う。P2/P3は記録するが、それだけを理由に修正・再reviewを必須にしない。
+- **確認:** staged name-status、commit/push結果、`FINAL_SHA`とlocal `HEAD`/upstream/remoteのexact equality、clean status、C60-02 verifier前後のequality/clean/non-ignored-untracked、final SHA上のvalidate、Strict review status、PR checksをこの順に確認する。
+- **期待結果:** pushed clean candidate上でC60-02 exact verifierが成功し、verifier前後のSHA/clean確認を通過した同じSHAのvalidateも成功する。P0/P1=0、review pass、PR checks pass、merge-ready PRとなる。C60-02の結果はPR/handoff evidenceだけにあり、agentはmergeしない。
+- **証拠:** `FINAL_SHA`、PR URL、C60-02 verifierのcommand/exit/summary/duration/shards、verifier前後のHEAD/upstream/remote equalityとclean status、validate、checks/review summaryをversion管理Plan/ReportではなくPR/handoff evidenceへ記録する。これらの記録のためにreviewed SHAを変更せず、旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが失効扱いで再利用しない。
+- **停止条件:** identity不一致、unexpected staged path、HEAD/upstream/remote不一致、dirty/untracked、C60-02未実行・pre-commit実行・failure、verifier後のtracked/untracked変化、validate failure、`review_status=fail`、P0/P1 finding、CI failure。
 - **cleanup:** なし。
 
 ## 15. Execution status ledger
 
-初期状態はversion管理対象のC00-01〜C90-03の36 rowが全て`NOT_RUN`である。実装者は各milestone終了時に、既存rowの`状態`と短い`Evidence reference`のcell valueだけを更新する。このexact二列だけの実測更新は`EVIDENCE_ONLY`であり、既にPASSしたcheckを失効させない。column header、separator、`ID`列、row set/order、この説明本文を含むそれ以外のPlan hunkはすべて`SPECIFICATION_CONTRACT`である。C90-04とC90-05はfinal tracked contentの自己参照を避ける二つのexternal gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
+初期状態はversion管理対象のC00-01〜C90-03の36 rowが全て`NOT_RUN`である。実装者は各milestone終了時に、既存rowの`状態`と短い`Evidence reference`のcell valueだけを更新する。このexact二列だけの実測更新は`EVIDENCE_ONLY`であり、既にPASSしたcheckを失効させない。C60-02だけはpre-commit実行を行わない特殊な理由付きN/A semanticsを持ち、statusをexact `N/A(pre-commit execution; deferred to C90-05 final SHA)`、Evidence referenceをexact `DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence`としてfreezeする。C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが明示的に失効扱いとし、C90-05でclean `FINAL_SHA`へcommit/push後に取得する実測結果だけをPR/handoff evidenceへ記録し、Plan rowはN/Aから変更しない。column header、separator、`ID`列、row set/order、この説明本文を含むそれ以外のPlan hunkはすべて`SPECIFICATION_CONTRACT`である。C90-04とC90-05はfinal tracked contentの自己参照を避ける二つのexternal gateであるためversion管理ledgerへ含めず、PR/handoff evidenceだけで閉じる。実施済みでない項目を過去形にしない。
 
 | ID | 状態 | Evidence reference |
 |---|---|---|
-| C00-01 | NOT_RUN | |
-| C00-02 | NOT_RUN | |
-| C00-03 | NOT_RUN | |
-| C00-04 | NOT_RUN | |
-| C00-05 | NOT_RUN | |
-| C00-06 | NOT_RUN | |
-| C00-07 | NOT_RUN | |
-| C00-08 | NOT_RUN | |
-| C10-01 | NOT_RUN | |
-| C10-02 | NOT_RUN | |
-| C10-03 | NOT_RUN | |
-| C10-04 | NOT_RUN | |
-| C20-01 | NOT_RUN | |
-| C20-02 | NOT_RUN | |
-| C20-03 | NOT_RUN | |
-| C20-04 | NOT_RUN | |
-| C20-05 | NOT_RUN | |
-| C30-01 | NOT_RUN | |
-| C30-02 | NOT_RUN | |
-| C30-03 | NOT_RUN | |
-| C40-01 | NOT_RUN | |
-| C40-02 | NOT_RUN | |
-| C40-03 | NOT_RUN | |
-| C40-04 | NOT_RUN | |
-| C40-05 | NOT_RUN | |
-| C40-06 | NOT_RUN | |
-| C40-07 | NOT_RUN | |
-| C40-08 | NOT_RUN | |
-| C40-09 | NOT_RUN | |
-| C50-01 | NOT_RUN | |
-| C50-02 | NOT_RUN | |
-| C60-01 | NOT_RUN | |
-| C60-02 | NOT_RUN | |
-| C90-01 | NOT_RUN | |
-| C90-02 | NOT_RUN | |
-| C90-03 | NOT_RUN | |
+| C00-01 | PASS | branch v5; baseline `7e1c1fe8b25b8062405a62f467be55689a589ca7`; clean HEAD=upstream=remote |
+| C00-02 | PASS | active `iss-00387`; GitHub OPEN; deps ready=true |
+| C00-03 | PASS | approved Current inventory and no-touch boundary resolved |
+| C00-04 | PASS | before: 2710 collected; 97524 Python LOC; 113 tracked test files; 27 fixtures |
+| C00-05 | PASS | 10/10 candidate families decided; coverage=1.0 |
+| C00-06 | PASS | canonical history retained; synthetic fixture classified test-only |
+| C00-07 | PASS | wheel/sdist inventory: `.agents` and `.github` present; `.codex` absent |
+| C00-08 | PASS | GO; no unresolved consumer or scope overlap |
+| C10-01 | PASS | three active-none provider/dogfood pairs byte-identical |
+| C10-02 | PASS | seven Current docs pairs byte-identical; canonical rewrite wording confirmed |
+| C10-03 | PASS | authoring overview pair byte-identical and current-tense |
+| C10-04 | PASS | Historical, migration, sibling rules, Epic 384 no-touch diff=0 |
+| C20-01 | PASS | baseline: set_active 47; lifecycle 38; storage 4 passed |
+| C20-02 | PASS | target-only request implemented; issue-start checkout ordering retained |
+| C20-03 | PASS | four runtime provider/dogfood pairs identical; checkout helper unchanged |
+| C20-04 | PASS | retirement-only checkout seam removed; S06 positive observers retained |
+| C20-05 | PASS | post-change: set_active 46; lifecycle 26; storage 2 passed |
+| C30-01 | PASS | only delegated mypy member and stale `.codex` package glob removed |
+| C30-02 | PASS | definition-only constants removed; collection and Ruff green |
+| C30-03 | PASS | build and install-root inventory green; current 5 assets retained |
+| C40-01 | PASS | retired route/module inventories removed; current registry retained |
+| C40-02 | PASS | legacy flag rejection/absence-only assertions removed |
+| C40-03 | PASS | authoring lane 196 passed; legacy scanner residue=0 |
+| C40-04 | PASS | S09 mutation support and helper file removed; refs=0 |
+| C40-05 | PASS | finish ignore-only tests removed; current lifecycle retained |
+| C40-06 | PASS | exact 21-file test-copy fixture removed; canonical originals untouched |
+| C40-07 | PASS | lint green; 2513 collected; orphan support=0 |
+| C40-08 | PASS | legacy S05 authority assertions removed; structural observer retained |
+| C40-09 | PASS | 15 ledger rows; 243 timing nodes; deleted-node refs=0; parser/help green |
+| C50-01 | PASS | focused: set-active + authoring 242 passed in 4.27s; storage/lifecycle/doctor 29 passed in 51.81s; init/update 201 passed in 1580.61s (26:20) |
+| C50-02 | PASS | make lint: Ruff check/format/mypy pass (247 formatted; mypy 174 source files); diff --check exit 0; ordinary 1435 passed, 1075 policy-skipped in 59.67s |
+| C60-01 | PASS | one wheel/sdist; wheel SHA-256 `48dcb135b3724c005c9fbe2eed782858e5af70bac98119d0c93c124cec1f4f94`; sdist SHA-256 `39e1b17852e396724cd3813914f4297850a6679b233022421acecf3cd8e81bde`; fresh init/parity/help green; expected empty-tree validate; exact cleanup completed |
+| C60-02 | N/A(pre-commit execution; deferred to C90-05 final SHA) | DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence |
+| C90-01 | PASS | 72 approved paths only; protected Historical/current skills+CI/Epic 384/scripts-quality/managed-distribution no-touch diff=0; 15 provider/dogfood pairs identical; pyproject only approved two removals |
+| C90-02 | PASS | 2510 collected; 93661 Python LOC; 91 tracked test files; 6 fixtures; coverage/closure=1.0 |
+| C90-03 | PASS | validate 230; sync --no-github; validate 230; generated diff=0 |
 
 ## 16. Exit / handoff
 
 次をすべて満たしたときだけproduction writerからmain agentへ返す。
 
 - I387-AC01〜AC18のevidenceがある。
-- version管理ledgerのC00-01〜C90-03が全てPASSまたは理由付きN/Aで、C90-04とC90-05がPR/handoff evidence上でPASSしている。
+- version管理ledgerのC00-01〜C90-03がC60-02を除き全てPASSまたは理由付きN/Aで、C60-02はexact `N/A(pre-commit execution; deferred to C90-05 final SHA)`としてfreezeされ、C90-04とC90-05がPR/handoff evidence上でPASSしている。
 - production residueとremovable test/supportが一体で撤去されている。
 - new absence test/scanner/fixture/helperがない。
 - surviving positive behavior、provider/dogfood parity、package outputが確認済み。
 - test budget、candidate coverage、removable closureが合格している。
 - authoritative Historical evidence、current二skill、consumer CI、Epic #384 surfaceに意図しない差分がない。
-- focused、lint、ordinary、current verifier、package/fresh consumer、validateの実結果がある。
+- focused、lint、ordinary、package/fresh consumer、validateの実結果があり、current verifierはC90-05のcommit/push後clean `FINAL_SHA`上で実行したC60-02の結果としてPR/handoff evidenceにある。C60-02のpre-commit/final-SHA旧evidenceはhistorical recordとして残り得るが、失効扱いで再利用していない。
 - pushed clean branch、fixed final SHA、merge-ready PR、Strict quality gate pass、residual riskが明確である。
 - open repair windowがなく、latest candidate/repair checkpointのunstaged/untracked差分が0で、全R/D/P hunkがfixed SHA Strict review済みである。
 - human merge前に`issue finish`を実行していない。

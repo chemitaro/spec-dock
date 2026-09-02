@@ -30,6 +30,8 @@ ID: "iss-00387"
 |---|---|---|
 | active-none report | 旧role、phase、reviewer、Profile、EAL、Promotion schemaを含む | active未設定・編集禁止・canonical pathだけを示す |
 | root README | `active set --checkout`とEAL必須を案内 | selection-only、`issue start`、canonical rewriteを案内 |
+| scripts README | `active set --checkout`をCurrent exampleとして案内 | selection-onlyと`issue start`のownershipを案内 |
+| rules artifacts/discussions | EALまたはreport ledgerをCurrent adoption authorityとして案内 | R/D/Pまたはaccepted ADRへの明示的再記述だけをadoption authorityとする |
 | Authoring overview | Issue #359完了前の未来形 | 現在の二skillを現在形で案内 |
 | active command args | parserにない旧flagのdefault値を内部へ運ぶ | targetと表示文字列だけを運ぶ |
 | SetActiveRequest | targetのほかcheckout/GitHub/force系fieldを持つ | targetだけを持つ |
@@ -45,6 +47,7 @@ ID: "iss-00387"
 
 - shipped docs/system/runtimeの正本は`src/spec_dock/assets/spec_dock/**`である。
 - `spec-dock/**`はdogfood projectionである。
+- `scripts/README.md`と`docs/rules/{initiative,epic,issue}/{artifacts,discussions}.md`は7組のprovider/dogfood pairとして同じ更新順序とbyte parityを適用する。
 - root `README.md`と`pyproject.toml`はprovider repository固有の正本であり、projection pairを持たない。
 - 本IssueのR/D/Pは履歴領域内であるが、本Issue自身のcanonical authorityとして通常どおり更新する。
 
@@ -170,7 +173,7 @@ Class BをClass Aへ昇格させることは原則禁止する。すなわち、
 
 ### 5.4 Historical boundary
 
-`spec-dock/initiatives/**`、accepted ADR、provider/dogfood `docs/authoring/historical.md`はauthoritative Historical evidenceとして変更しない。一方、`tests/fixtures/**`のcopyやsynthetic mutationはtest infrastructureであり、自動的な保存対象ではない。canonical source、runtime input、surviving positive testのconsumerがなければ撤去できる。
+`spec-dock/initiatives/**`、accepted ADR、provider/dogfood `docs/authoring/historical.md`、historical discussion originalsはauthoritative Historical evidenceとして変更しない。provider/dogfoodの`docs/rules/**/discussions.md`自体はCurrent shipped rulesであり、そのCurrent adoption authorityは変更対象だが、grandfatheringとHistorical catalogは保持する。一方、`tests/fixtures/**`のcopyやsynthetic mutationはtest infrastructureであり、自動的な保存対象ではない。canonical source、runtime input、surviving positive testのconsumerがなければ撤去できる。
 
 ### 5.5 新規testの例外gate
 
@@ -240,12 +243,14 @@ current R/D/P/Reportの`SPECIFICATION_CONTRACT`判定はC00-01開始後の全期
 
 `OTHER_SUBSTANTIVE_OR_AMBIGUOUS`の収束順序は一回のrepair windowごとに次で固定する。
 
-1. C60-01 success時の一時directoryが残っていれば、immediate path evidenceとbyte-for-byte照合した旧`CONSUMER`と`ARTIFACT_DIR`だけをcleanupし、不在を確認する。旧wheel、digest、fresh consumer、verifier、audit結果をfinal evidenceから失効させる。
+1. C60-01 success時の一時directoryが残っていれば、immediate path evidenceとbyte-for-byte照合した旧`CONSUMER`と`ARTIFACT_DIR`だけをcleanupし、不在を確認する。旧wheel、digest、fresh consumer、C60-02の旧pre-commit/final-SHA verifier、audit結果はhistorical recordとして残り得るが、明示的に失効扱いとしfinal evidenceへ再利用しない。
 2. approved既存path上でrepairを完了する。新規path、rename先を含む未承認path、またはnon-ignored untracked pathが一件でも必要・出現した場合は、repair bundleの一部もstageせず`BLOCKED` handoffとする。
-3. Plan ledgerのC50-01〜C90-03を`NOT_RUN`へ戻し、該当`Evidence reference` cellへexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair; see Report Verification`を記録する。C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻し、各Evidence referenceをexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair`とする。C00-01〜C40-09のstatus/evidenceはoriginal implementation baselineまたは実装前観測へ束縛されたまま保持し、repair checkpoint上で再実行しない。Reportの`Verification`へ`class=OTHER_SUBSTANTIVE_OR_AMBIGUOUS; repair_paths=<approved paths>; invalidated=C50-01..C90-05; preimplementation=C00-01..C40-09 retained; temp_cleanup=<none|exact removed paths>`の一entryだけを記録する。
+3. Plan ledgerのC50-01〜C90-03のうちC60-02を除くrowを`NOT_RUN`へ戻し、該当`Evidence reference` cellへexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair; see Report Verification`を記録する。C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが明示的に失効扱いとし、pre-commitでは実行せず、statusをexact `N/A(pre-commit execution; deferred to C90-05 final SHA)`、Evidence referenceをexact `DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence`へ設定する。C90-04とC90-05もPR/handoff evidence上で`NOT_RUN`へ戻し、各Evidence referenceをexact string `INVALIDATED: OTHER_SUBSTANTIVE_OR_AMBIGUOUS repair`とする。C00-01〜C40-09のstatus/evidenceはoriginal implementation baselineまたは実装前観測へ束縛されたまま保持し、repair checkpoint上で再実行しない。Reportの`Verification`へ`class=OTHER_SUBSTANTIVE_OR_AMBIGUOUS; repair_paths=<approved paths>; invalidated=C50-01..C90-05; preimplementation=C00-01..C40-09 retained; temp_cleanup=<none|exact removed paths>`の一entryだけを記録する。
 4. classified repair hunk、3の失効status、Plan/Reportのinvalidation evidenceを一つのunstaged repair bundleとして一度だけまとめて確認する。各hunkがapproved repairまたは3の記録だけであり、R/D/Pの`SPECIFICATION_CONTRACT` hunk、新規path、未承認pathを含まないことを確認する。
 5. approved repair pathとexact current Plan/Report pathだけを、一回の`git add -- <explicit-path>...`でstageする。`git diff --name-status`が空、`git ls-files --others --exclude-standard`が空、`git diff --cached --name-status <implementation-baseline-sha>`がapproved inventoryだけであることを確認し、これをrepair checkpointとする。部分stage、`git add .`、glob、動的path展開は使わない。
-6. repair checkpoint成立後、C50-01からC90-04までID順に再実行し、そのPASS後にC90-05を先頭から実行する。再実行中の後続`EVIDENCE_ONLY` editは通常規約どおり個別にstageできる。新たな`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`を検出した場合だけ、新しいrepair windowとして同じ有限順序を最初から適用する。
+6. repair checkpoint成立後、pre-freezeでC50-01、C50-02、C60-01、C90-01〜C90-04をこの順に再実行する。C60-02はpre-commitで実行せず、C90-05のcommit/push後にHEAD/upstream/remote branch tipが一致するclean `FINAL_SHA`でexact verifierを一度だけ実行し、その後にvalidate、independent Strict code review/Final Quality Gate、PR checksを順に行う。C60-02のverifier前後で`FINAL_SHA` equality、working tree clean、non-ignored untracked path 0を確認し、verifier後にtrackedまたはuntrackedの1 byteでも変化があれば結果を失効させて停止する。C60-02の実測結果はPR/handoff evidenceだけへ記録する。再実行中の後続`EVIDENCE_ONLY` editは通常規約どおり個別にstageできる。新たな`OTHER_SUBSTANTIVE_OR_AMBIGUOUS`を検出した場合だけ、新しいrepair windowとして同じ有限順序を最初から適用する。
+
+C60-02のfinal verifier evidenceはC90-05のcommit/push後に確定したclean `FINAL_SHA`へ束縛する。過去のC60-02 pre-commit/final-SHA evidenceはhistorical recordとして残り得るが、明示的に失効扱いとしfinal evidenceへ再利用しない。C90-05ではcommit/push、HEAD/upstream/remote equalityとclean/non-ignored-untracked確認、C60-02 exact verifier、validate、Strict code review/Final Quality Gate、PR checksの順を変更しない。
 
 after test metricsはstagingへ依存させない。`git ls-files -z -- tests`のうちworking treeに現存するpathだけをLOC/file/fixture指標の母集団とし、non-ignored untracked test pathがあれば計測前に停止する。collected countはC00-04と同じrepository全体の`uv run pytest --collect-only -q`を使い、個別のfilename patternでdiscoveryを再定義しない。
 
@@ -264,7 +269,7 @@ Planは38個のcheckを持つ。IDは各checkの見出しとして固定し、�
 | 停止条件 | 続行せず仕様判断へ戻す条件 |
 | cleanup | temp/build/cache/orphan support |
 
-状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`とする。version管理status ledgerはC00-01〜C90-03の36 rowだけを持ち、C90-04とC90-05はfinal SHAを変更しない二つのexternal gateとしてPR/handoff evidenceへ記録する。command未実行、policy skip、対象test未collectionをPASSにしない。ledgerの既存rowにある`状態`と`Evidence reference`のcell value、およびReportの3実測欄だけの更新は6.4の`EVIDENCE_ONLY` editとして扱い、記録行為だけでcheckを自己失効させない。それ以外のR/D/P hunkはすべて`SPECIFICATION_CONTRACT`である。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
+状態語彙は`NOT_RUN`、`PASS`、`BLOCKED`、`N/A(reason)`とする。version管理status ledgerはC00-01〜C90-03の36 rowだけを持ち、C60-02はpre-commit実行を行わない特殊な理由付きN/A semanticsとしてstatusをexact `N/A(pre-commit execution; deferred to C90-05 final SHA)`、Evidence referenceをexact `DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence`へ固定する。C90-04とC90-05はfinal SHAを変更しない二つのexternal gateとしてPR/handoff evidenceへ記録する。C60-02の旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが、明示的に失効扱いとしfinal evidenceへ再利用しない。command未実行、policy skip、対象test未collectionをPASSにしない。ledgerの既存rowにある`状態`と`Evidence reference`のcell value、およびReportの3実測欄だけの更新は6.4の`EVIDENCE_ONLY` editとして扱い、記録行為だけでcheckを自己失効させない。それ以外のR/D/P hunkはすべて`SPECIFICATION_CONTRACT`である。詳細な長いlogはReportへ複製せず要約と参照だけを残す。
 
 ## 8. Epic #384との境界
 
@@ -306,6 +311,7 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 | Epic #384 file変更が必要 | 本Issueから除外しEpic #384へhandoffする |
 | 削除nodeへのledger/timing/required-node参照 | exact entryだけを同時に除去し、他entryまたはpolicyへ波及するなら停止する |
 | Full Regression failure | C40-09のdeleted-node exact参照更新をfailure前に確定し、それ以外のledger/timing/shardを変更せず原因diffを修正する |
+| C60-02 verifier前後の`FINAL_SHA`/clean不一致またはtracked/untracked変化 | C90-05のcommit/push後にHEAD/upstream/remote branch tip、working tree、non-ignored untracked pathを再確認する。verifier後に1 byteでも変化があれば結果を失効させ、停止してC90-05を新しいclean SHAからやり直す |
 
 ### 9.3 Rollback
 
@@ -315,13 +321,13 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 
 | 設計観測点 | Test surface |
 |---|---|
-| placeholder/README/overview | one-time content review、`cmp`、fresh init。新しいphrase testは作らない |
+| placeholder/root README/scripts README/rules/overview | one-time content review、provider/dogfood `cmp`、fresh init。新しいphrase testは作らない |
 | request shape | `rg`/AST/call-site audit、compile。field absence専用testは作らない |
 | selection-only | 既存`tests/unit/application/test_set_active.py`のpositive behavior |
 | issue start ordering | `tests/cli_runtime/test_issue_lifecycle.py` |
 | package config/archive | delegated member、条件付きS06専用override、package-dataのexact diff audit。clean buildのwheel/sdist inventoryを採取し、同一wheelだけを`uvx --isolated --no-cache --from`へ渡す。stale path不在testは作らない |
 | source/projection parity | existing `cmp`/parity assertions |
-| overall non-regression | ordinary `uv run pytest`、current verifier、fresh init、`spec-dock validate` |
+| overall non-regression | pre-freezeのordinary `uv run pytest`、fresh init、C90-05のcommit/push後clean `FINAL_SHA`におけるC60-02 exact verifier、同じSHAの`spec-dock validate`、independent Strict code review/Final Quality Gate、PR checks。C60-02の実測はPR/handoff evidenceへ記録し、旧pre-commit/final-SHA evidenceはhistorical recordとして残り得るが失効扱いで再利用しない |
 | retirement test support | consumer map、deletion diff、before/after metrics、remaining positive suite |
 | no-touch boundary | implementation baselineからのpath diff audit。恒久exclusion testは作らない |
 
@@ -345,7 +351,7 @@ package buildとcurrent full-regression verifierは非回帰確認として実�
 
 | 要件 | 設計 |
 |---|---|
-| R01〜R04, R08, R09 | §3、§5、§7 |
+| R01〜R04, R08, R09 | §2、§3、§5、§7 |
 | R05 | §4 |
 | R06 | §6 |
 | R07 | §5、§6 |

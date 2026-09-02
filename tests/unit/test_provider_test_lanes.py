@@ -21,7 +21,6 @@ from scripts.quality.full_regression_baseline import (
 from tests.conftest import build_candidate_observation
 
 REQUIRED_FAST_NODE_IDS = frozenset({
-    "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_legacy_flag_reports_parser_error",
     "tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_by_id_succeeds_through_runtime_subprocess",
     (
         "tests/unit/infra/test_init_update.py::TestInitUpdate::"
@@ -56,7 +55,7 @@ FULL_REGRESSION_LEDGER = FULL_REGRESSION_ROOT_LEDGER
 ISSUE368_HISTORICAL_LEDGER_SHA256 = "3fb3192110ad9981a6826dae8a5eea30f12bc9f5b65106173dc5777749a8ea3b"
 ISSUE368_HISTORICAL_TIMING_WEIGHTS_SHA256 = "b647b3a0ee3f24202c954e0dd367809dc8981ba686bf6a67f349868ab01da5fc"
 PRE_MIGRATION_LEDGER_CURRENT_HEAD = "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2"
-PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256 = "f997de22e6507e6a27ce76284df079c9dd1e65bb015e309801b4aa041ea3dfcf"
+PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256 = "f55f1c8a30d59fbeca0952d4e0d0c159d2edb20b1d5e0efe0608c288ddfc7f22"
 RETAINED_SKILL_HISTORICAL_NODE = (
     "tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source"
 )

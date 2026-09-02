@@ -1,8 +1,6 @@
 from collections.abc import Mapping
-import hashlib
 from pathlib import Path
 import re
-import shutil
 from typing import TypedDict, cast
 
 import pytest
@@ -47,24 +45,6 @@ S06_CURRENT_ASSET_PATHS = (
 S06_HISTORICAL_ASSET_PATH = "docs/authoring/historical.md"
 S06_MANAGED_ASSET_PATHS = (*S06_CURRENT_ASSET_PATHS, S06_HISTORICAL_ASSET_PATH)
 
-
-def _ascii_identifier_pattern(token_pattern: str) -> re.Pattern[str]:
-    return re.compile(
-        rf"(?<![A-Za-z0-9])(?:{token_pattern})(?![A-Za-z0-9])",
-        flags=re.IGNORECASE,
-    )
-
-
-CURRENT_LEGACY_VOCABULARY_PATTERNS = {
-    "workflow": _ascii_identifier_pattern("workflow"),
-    "phase": _ascii_identifier_pattern("phase"),
-    "profile": _ascii_identifier_pattern("profile"),
-    "assurance": _ascii_identifier_pattern("assurance"),
-    "grade": _ascii_identifier_pattern("grade"),
-    "promotion": _ascii_identifier_pattern("promotion"),
-    "eal": _ascii_identifier_pattern("eal"),
-    "delegated-authoring": _ascii_identifier_pattern(r"delegated[ _-]+authoring"),
-}
 
 RESERVED_SKILL_PATHS = (
     ".agents/skills/spec-dock/SKILL.md",
@@ -131,54 +111,7 @@ S07_OWNED_ASSET_CATEGORIES = {
 S07_OWNED_ASSET_MANIFEST = tuple(
     path for category_paths in S07_OWNED_ASSET_CATEGORIES.values() for path in category_paths
 )
-S07_PARITY_EXCLUDED_SURFACES = (
-    "tests/unit/infra/test_authoring_kit_assets.py",
-    "tests/fixtures/authoring_kit/existing_issue/",
-)
-
-PRESERVATION_FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "authoring_kit" / "existing_issue"
-PRESERVATION_BASELINE_SHA256 = {
-    ".assurance.json": "f0f6ef47171ab67360ed7c26b8dc144e4ba588c7abe1234115c4373bebcca4c8",
-    "artifacts/adr-candidate.md": "6a73ece30ebdcec2b74294afa8f9bba698253077ff8f1368a8ac0dbf1c9e6d18",
-    "artifacts/adr.md": "45a216303a4d40ae520809de567a22fa855b12c90fddf3e3eacc64c587ceb183",
-    "artifacts/blank.md": "ca97502f2f3dfb44da9cc2b6f17d53ec178425787e5ca8f6081184e5b71e3687",
-    "artifacts/decision-candidate.md": "6727b5f8753c745c155264c5614e716ddf16039812cdbdb04db8b6d4dac08e8e",
-    "artifacts/disc.md": "69e01e33d6a4fda374e54b21153d8bb07f3f2a7f2d571bf8742a0fc701cbbd3d",
-    "artifacts/interview.md": "9292241a07bda6c3282c77ea6c3c28362bafe33408bc1501a67b97db0c05080c",
-    "artifacts/legacy/draft-requirement.md": "238a3fc61c205ba96e832214c07c21271ebb37ff3d03a8e60d31dfc5b244e1b6",
-    "artifacts/legacy/generic-import.zip": "5a0252dc24db5e718a9e328b79c6f4042312d7ded54aaddafd4c7c57f48b252a",
-    "artifacts/legacy/pr-repair.md": "63111299f7da51fe129fb288359aa86f8a4103cd737aead4473efaf1cd2bd649",
-    "artifacts/legacy/profile-derived-design.md": "a7aa51d84a2af70c969b6e791403fd3beb042f7c23cf74b804c24032c4b28ba7",
-    "artifacts/legacy/profile-derived-plan.md": "3e69c2a7776fc13cb196c18a193e80094dc682cf0aab6c5076439193e860ea5b",
-    "artifacts/research.md": "0b0c310e184ec9453fe9dfc88ffef1aa24abc9b077ca73610897858f8da020c4",
-    "design.md": "c8ce7eee921677d7b71ffff9917cc7e494d20d64ee3ae0454b3743721766388d",
-    "discussions/legacy-discussion.md": "191d3c6fe1f149cfa969981dd859a5c4b7efd7bfa69db9e4cb2fdb6f8b75f2ad",
-    "discussions/note.md": "bf453106a27b938c95774bbcbf69268eb65ea38a52d577ae2df6c0df82af698f",
-    "discussions/scratch.md": "13d58db407ccdb170c67f0f88a915ae7c76b97e0732a3e24165ce856d0f48200",
-    "plan.md": "8d2db2a601c0d6a4459f903204f2bf1e1694fb3c1e1c31a4eb6ceb0a699c8a7a",
-    "report-heavy.md": "1602d6e382993ab9ce24c0af790c5257b32295caa350a20f0cd83f2e59675b67",
-    "report-thin.md": "4aeaaa94f889257ec5dc1e5af97b8266b523513e5f2f51c63aa687518074955c",
-    "requirement.md": "d7a943b0b568186b93957b77d07d01e2c58046f9bd8ad7e573f9c4f2e2ed0c8e",
-}
-PRESERVATION_COPIED_SOURCE_PATHS = {
-    "requirement.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/requirement.md",
-    "design.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/design.md",
-    "plan.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/plan.md",
-    "report-heavy.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/report.md",
-    "artifacts/blank.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/artifacts/20260701t145916z-dogfood-blank-artifact.md",
-    "artifacts/research.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260808t082616z-research-authoring-kit-clarification.md",
-    "artifacts/interview.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260808t083300z-interview-issue-profile-and-draft-routing.md",
-    "artifacts/disc.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260809t042432z-disc-strict-clarification-authoring-handoff-358.md",
-    "artifacts/decision-candidate.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/artifacts/20260702t071230z-decision-candidate-epic-planning-issue-draft-composition-workflow.md",
-    "artifacts/adr.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/artifacts/20260701t055644z-adr-artifacts-future-only-command-unification.md",
-    "artifacts/legacy/draft-requirement.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/issues/iss-00358-simplify-authoring-kit-and-document-contracts/artifacts/20260809t125148z-draft-requirement-strict-vertical-slice-requirement.md",
-    "artifacts/legacy/pr-repair.md": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00344-workbench-shell-scaffolding/artifacts/20260729t141053z-disc-pr-350-repair-u001-uninstall-managed-inventory.md",
-    "artifacts/legacy/generic-import.zip": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00346-integration-distribution-and-final-quality/artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip",
-    "discussions/scratch.md": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/discussions/20260530t000000z-scratch-external-worktree-management.md",
-    "discussions/note.md": "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00050-host-adapter-scaffold-and-final-parity/discussions/20260403t161053z-note-s03-triage-resolution.md",
-    "discussions/legacy-discussion.md": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/discussions/20260630t083605z-pr-repair-batch-pr-repair-batch.md",
-    ".assurance.json": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/.assurance.json",
-}
+S07_PARITY_EXCLUDED_SURFACES = ("tests/unit/infra/test_authoring_kit_assets.py",)
 
 DOCUMENT_RESPONSIBILITIES = {
     "requirement.md": {
@@ -235,26 +168,6 @@ S01_OWNED_DOC_PATHS = (
     "authoring/issue-plan.md",
     "authoring/report.md",
     "authoring/scope-layering.md",
-)
-
-KNOWN_LEGACY_ROUTE_MARKERS = (
-    "spec-dock-issue-planning",
-    "chatgpt-first",
-    "assurance compose",
-    "spec-dock-chatgpt",
-)
-
-MANDATORY_WORKFLOW_PATTERNS = (
-    re.compile(
-        r"(?:agent|provider|model|workflow|reviewer|review 手順|ChatGPT|Oracle|Codex|Claude|Gemini|GPT-[0-9]+(?:\.[0-9]+)*).{0,40}"
-        r"(?:を必須とします|が必須です|を使用してください|を使ってください|を前提とします|を前提にします)",
-        flags=re.IGNORECASE,
-    ),
-    re.compile(
-        r"(?:必ず|必須で).{0,40}"
-        r"(?:agent|provider|model|workflow|reviewer|review 手順|ChatGPT|Oracle|Codex|Claude|Gemini|GPT-[0-9]+(?:\.[0-9]+)*)",
-        flags=re.IGNORECASE,
-    ),
 )
 
 SCOPES = ("initiative", "epic", "issue")
@@ -360,44 +273,10 @@ DOCUMENT_TEMPLATE_CONTRACTS: dict[str, DocumentTemplateContract] = {
     },
 }
 
-FORBIDDEN_TEMPLATE_PATTERNS = (
-    re.compile(r"\bartifact_state\b", flags=re.IGNORECASE),
-    re.compile(r"\bworkflow\b", flags=re.IGNORECASE),
-    re.compile(r"\breviewer\b", flags=re.IGNORECASE),
-    re.compile(r"\bgrade\b", flags=re.IGNORECASE),
-    re.compile(r"\beal\b", flags=re.IGNORECASE),
-    re.compile(r"\bassurance\b", flags=re.IGNORECASE),
-    re.compile(r"\bauthority\b", flags=re.IGNORECASE),
-    re.compile(r"\bpromotion\b", flags=re.IGNORECASE),
-    re.compile(r"\bdelegated[ _-]+authoring\b", flags=re.IGNORECASE),
-    re.compile(r"\bphase[ _-]+gate\b", flags=re.IGNORECASE),
-    re.compile(r"\bpr[ _-]+status\b", flags=re.IGNORECASE),
-)
-
 REPORT_REQUIRED_HEADINGS = (
     "Outcome",
     "Verification",
     "Residual Risks / Follow-ups",
-)
-REPORT_FORBIDDEN_PATTERNS = (
-    re.compile(r"\bdecision[ _-]+ledger\b|仕様解釈・判断台帳", flags=re.IGNORECASE),
-    re.compile(r"\beal\b", flags=re.IGNORECASE),
-    re.compile(r"\bevidence[ _-]+adoption(?:[ _-]+ledger)?\b|証跡採用台帳", flags=re.IGNORECASE),
-    re.compile(r"\bauthoring[ _-]+gate\b|authoring ゲート", flags=re.IGNORECASE),
-    re.compile(r"\breviewer[ _-]+gate\b|レビューゲート", flags=re.IGNORECASE),
-    re.compile(r"\bcompletion[ _-]+gate\b|完了ゲート", flags=re.IGNORECASE),
-    re.compile(r"\bsession[ _-]+log\b|セッションログ", flags=re.IGNORECASE),
-    re.compile(r"\bprogress[ _-]+summary\b|進捗サマリー", flags=re.IGNORECASE),
-    re.compile(r"\bworkflow\b", flags=re.IGNORECASE),
-    re.compile(r"\bauthority\b", flags=re.IGNORECASE),
-    re.compile(r"\bpromotion\b", flags=re.IGNORECASE),
-)
-REPORT_TEMPLATE_FORBIDDEN_PATTERNS = (*FORBIDDEN_TEMPLATE_PATTERNS, *REPORT_FORBIDDEN_PATTERNS)
-REPORT_GUIDE_GENERIC_FORBIDDEN_PATTERNS = (
-    re.compile(r"\bgrade\b", flags=re.IGNORECASE),
-    re.compile(r"\bassurance\b", flags=re.IGNORECASE),
-    re.compile(r"\bdelegated[ _-]+authoring\b", flags=re.IGNORECASE),
-    re.compile(r"\bpr[ _-]+status\b", flags=re.IGNORECASE),
 )
 
 PLANNING_LEVELS = ("light", "standard", "strict", "critical")
@@ -535,31 +414,6 @@ def _has_exact_current_first_read_destinations(content: str) -> bool:
     return set(_markdown_link_destinations(content)) == CURRENT_FIRST_READ_DESTINATIONS
 
 
-def _requires_specific_workflow(content: str) -> bool:
-    return any(pattern.search(content) is not None for pattern in MANDATORY_WORKFLOW_PATTERNS)
-
-
-def _current_vocabulary_violations(relative_path: str, content: str) -> tuple[str, ...]:
-    if relative_path not in S06_CURRENT_ASSET_PATHS:
-        return ()
-
-    violations = tuple(name for name, pattern in CURRENT_LEGACY_VOCABULARY_PATTERNS.items() if pattern.search(content))
-    if _requires_specific_workflow(content):
-        violations = (*violations, "provider-specific-mandatory")
-    return violations
-
-
-def _report_template_has_forbidden_contract(content: str) -> bool:
-    return any(pattern.search(content) is not None for pattern in REPORT_TEMPLATE_FORBIDDEN_PATTERNS)
-
-
-def _report_guide_has_forbidden_contract(content: str) -> bool:
-    return _requires_specific_workflow(content) or any(
-        pattern.search(content) is not None
-        for pattern in (*REPORT_FORBIDDEN_PATTERNS, *REPORT_GUIDE_GENERIC_FORBIDDEN_PATTERNS)
-    )
-
-
 def _read_template(scope: str, document: str) -> str:
     return (TEMPLATES_ROOT / scope / f"{document}.md").read_text(encoding="utf-8")
 
@@ -673,42 +527,6 @@ def _relative_link_violations(manifest: tuple[str, ...], scaffold_root: Path) ->
     return tuple(violations)
 
 
-def _recursive_sha256_matrix(root: Path) -> dict[str, str]:
-    return {
-        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-    }
-
-
-def _sha256_matrix_delta(
-    expected: dict[str, str],
-    actual: dict[str, str],
-) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-    changed = tuple(path for path in expected if path in actual and expected[path] != actual[path])
-    missing = tuple(path for path in expected if path not in actual)
-    unexpected = tuple(path for path in actual if path not in expected)
-    return changed, missing, unexpected
-
-
-def _copy_s07_owned_assets(
-    provider_root: Path,
-    consumer_root: Path,
-    manifest: tuple[str, ...] = S07_OWNED_ASSET_MANIFEST,
-) -> tuple[str, ...]:
-    if manifest != S07_OWNED_ASSET_MANIFEST:
-        raise ValueError("asset apply must use the exact S07 owned manifest")
-
-    applied: list[str] = []
-    for relative_path in manifest:
-        source = provider_root / relative_path
-        destination = consumer_root / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
-        applied.append(relative_path)
-    return tuple(applied)
-
-
 def test_s07_parity_owned_asset_manifest_is_exact_and_explicit() -> None:
     assert {category: len(paths) for category, paths in S07_OWNED_ASSET_CATEGORIES.items()} == {
         "scope-templates": 12,
@@ -720,10 +538,7 @@ def test_s07_parity_owned_asset_manifest_is_exact_and_explicit() -> None:
     }
     assert len(S07_OWNED_ASSET_MANIFEST) == 34
     assert _owned_manifest_delta(S07_OWNED_ASSET_MANIFEST) == ((), (), ())
-    assert S07_PARITY_EXCLUDED_SURFACES == (
-        "tests/unit/infra/test_authoring_kit_assets.py",
-        "tests/fixtures/authoring_kit/existing_issue/",
-    )
+    assert S07_PARITY_EXCLUDED_SURFACES == ("tests/unit/infra/test_authoring_kit_assets.py",)
 
 
 def test_s07_parity_manifest_rejects_missing_extra_and_duplicate_rows() -> None:
@@ -772,104 +587,6 @@ def test_s07_relative_link_detector_rejects_broken_link(tmp_path: Path) -> None:
     assert _relative_link_violations((relative_path,), tmp_path) == (
         f"broken relative link: {relative_path} -> missing.md",
     )
-
-
-def test_s08_preservation_fixture_has_exact_explicit_baseline_matrix() -> None:
-    actual = _recursive_sha256_matrix(PRESERVATION_FIXTURE_ROOT)
-
-    assert len(PRESERVATION_BASELINE_SHA256) == 21
-    assert tuple(actual) == tuple(PRESERVATION_BASELINE_SHA256)
-    assert _sha256_matrix_delta(PRESERVATION_BASELINE_SHA256, actual) == ((), (), ())
-
-
-def test_s08_preservation_copied_rows_remain_byte_exact_to_sources() -> None:
-    assert len(PRESERVATION_COPIED_SOURCE_PATHS) == 17
-    for relative_path, source_path in PRESERVATION_COPIED_SOURCE_PATHS.items():
-        fixture_bytes = (PRESERVATION_FIXTURE_ROOT / relative_path).read_bytes()
-        source_bytes = (REPO_ROOT / source_path).read_bytes()
-
-        assert fixture_bytes == source_bytes, relative_path
-        assert hashlib.sha256(source_bytes).hexdigest() == PRESERVATION_BASELINE_SHA256[relative_path]
-
-
-def test_s08_preservation_survives_s07_owned_asset_apply(tmp_path: Path) -> None:
-    consumer_root = tmp_path / "consumer" / "spec-dock"
-    node_root = consumer_root / "initiatives" / "init-existing" / "epics" / "epic-existing" / "issues" / "iss-existing"
-    shutil.copytree(PRESERVATION_FIXTURE_ROOT, node_root, copy_function=shutil.copy2)
-    before = _recursive_sha256_matrix(node_root)
-
-    applied = _copy_s07_owned_assets(DOCS_ROOT.parent, consumer_root)
-
-    assert applied == S07_OWNED_ASSET_MANIFEST
-    assert all(node_root not in (consumer_root / relative_path).parents for relative_path in applied)
-    assert _sha256_matrix_delta(before, _recursive_sha256_matrix(node_root)) == ((), (), ())
-    assert before == PRESERVATION_BASELINE_SHA256
-
-
-def test_s08_preservation_asset_apply_rejects_non_s07_manifest(tmp_path: Path) -> None:
-    reordered = (S07_OWNED_ASSET_MANIFEST[1], S07_OWNED_ASSET_MANIFEST[0], *S07_OWNED_ASSET_MANIFEST[2:])
-
-    with pytest.raises(ValueError, match="exact S07 owned manifest"):
-        _copy_s07_owned_assets(DOCS_ROOT.parent, tmp_path / "consumer", reordered)
-
-
-def test_s08_preservation_delta_detects_exact_intentional_mutation(tmp_path: Path) -> None:
-    node_root = tmp_path / "existing_issue"
-    shutil.copytree(PRESERVATION_FIXTURE_ROOT, node_root, copy_function=shutil.copy2)
-    before = _recursive_sha256_matrix(node_root)
-
-    (node_root / "artifacts" / "legacy" / "generic-import.zip").write_bytes(b"intentional mutation")
-
-    assert _sha256_matrix_delta(before, _recursive_sha256_matrix(node_root)) == (
-        ("artifacts/legacy/generic-import.zip",),
-        (),
-        (),
-    )
-
-
-def test_s08_preservation_delta_detects_missing_and_unexpected_files(tmp_path: Path) -> None:
-    node_root = tmp_path / "existing_issue"
-    shutil.copytree(PRESERVATION_FIXTURE_ROOT, node_root, copy_function=shutil.copy2)
-    before = _recursive_sha256_matrix(node_root)
-
-    (node_root / "report-thin.md").unlink()
-    (node_root / "unexpected.md").write_bytes(b"unexpected\n")
-
-    assert _sha256_matrix_delta(before, _recursive_sha256_matrix(node_root)) == (
-        (),
-        ("report-thin.md",),
-        ("unexpected.md",),
-    )
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "特定の agent を使用してください。",
-        "指定 provider が必須です。",
-        "特定の model を前提とします。",
-        "この workflow を必須とします。",
-        "指定の review 手順を使ってください。",
-        "必ず approved model を利用します。",
-        "ChatGPT を必須とします。",
-        "GPT-5.6 を使用してください。",
-        "Codex を前提とします。",
-    ),
-)
-def test_mandatory_workflow_patterns_reject_required_tools(content: str) -> None:
-    assert _requires_specific_workflow(content)
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "特定の agent、model、provider、review 手順を前提にしません。",
-        "必要に応じて任意の model や provider を選べます。",
-        ".agents/ と .codex/ の利用は必須ではありません。",
-    ),
-)
-def test_mandatory_workflow_patterns_allow_optional_tools(content: str) -> None:
-    assert not _requires_specific_workflow(content)
 
 
 def test_authoring_overview_links_to_each_foundation_guide() -> None:
@@ -989,13 +706,6 @@ def test_relative_link_resolver_includes_reference_style_destination() -> None:
     assert _relative_markdown_links(content) == ("../overview.md",)
 
 
-@pytest.mark.parametrize("relative_path", S06_CURRENT_ASSET_PATHS)
-def test_current_navigation_vocabulary_excludes_legacy_authoring_contracts(relative_path: str) -> None:
-    content = (DOCS_ROOT.parent / relative_path).read_text(encoding="utf-8")
-
-    assert not _current_vocabulary_violations(relative_path, content)
-
-
 def test_s90_retained_repository_guidelines_match_current_distribution_surface() -> None:
     content = REPOSITORY_GUIDELINES_PATH.read_text(encoding="utf-8")
 
@@ -1003,83 +713,6 @@ def test_s90_retained_repository_guidelines_match_current_distribution_surface()
     assert ".agents/skills/spec-dock/SKILL.md" in content
     assert ".agents/skills/spec-dock-grill-with-docs/SKILL.md" in content
     assert ".github/workflows/ci.yml" in content
-    assert ".codex/" not in content
-    assert ".github/agents/" not in content
-    assert "host adapter" not in content.lower()
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "workflow を参照します。",
-        "phase の順序に従います。",
-        "Profile と Assurance を使います。",
-        "Grade を EAL で promotion します。",
-        "delegated authoring を使います。",
-        "Codex を必須とします。",
-        "workflowを使います。",
-        "workflow_route を使います。",
-        "phaseを進めます。",
-        "phase_gate を通します。",
-        "Profileを選びます。",
-        "profile_name を記録します。",
-        "Assuranceを確認します。",
-        "assurance_level を記録します。",
-        "Gradeを付けます。",
-        "grade_value を記録します。",
-        "promotionを行います。",
-        "promotion_route を使います。",
-        "EALを記録します。",
-        "eal_schema を使います。",
-        "delegated authoringを使います。",
-        "delegated_authoring_route を使います。",
-    ),
-)
-def test_current_navigation_vocabulary_detector_rejects_legacy_mutations(content: str) -> None:
-    assert _current_vocabulary_violations("docs/guide.md", content)
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "workflowing",
-        "phased",
-        "profiles",
-        "assurances",
-        "grader",
-        "promotional",
-        "ealing",
-        "delegated authoringx",
-        "reworkflow",
-        "metaphase",
-        "subprofile",
-        "reassurance",
-        "retrograde",
-        "prepromotion",
-        "predelegated authoring",
-    ),
-)
-def test_current_navigation_vocabulary_detector_allows_ascii_word_infixes(content: str) -> None:
-    assert not _current_vocabulary_violations("docs/guide.md", content)
-
-
-def test_historical_navigation_is_a_positive_control_outside_current_vocabulary_scan() -> None:
-    historical_path = DOCS_ROOT.parent / S06_HISTORICAL_ASSET_PATH
-    historical = historical_path.read_text(encoding="utf-8")
-
-    assert historical.strip()
-    for token in ("Profile", "Assurance", "workflow", "draft", "repair", "provider"):
-        assert token in historical
-    for token in ("保持", "新規作成には使いません", "削除", "rename", "rewrite"):
-        assert token in historical
-    for token in ("`requirement.md`", "`design.md`", "`plan.md`", "accepted ADR"):
-        assert token in historical
-    assert "Current の推奨手順を示しません" in historical
-    assert not _markdown_link_destinations(historical)
-
-    assert CURRENT_LEGACY_VOCABULARY_PATTERNS["workflow"].search(historical)
-    assert not _current_vocabulary_violations(S06_HISTORICAL_ASSET_PATH, historical)
-    assert _current_vocabulary_violations("docs/guide.md", historical)
 
 
 @pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
@@ -1201,25 +834,6 @@ def test_scope_layering_distinguishes_plan_responsibilities_by_scope() -> None:
     assert "親の目的、Issue 分割、依存方向を変更しません" in plan_lines["Issue"]
 
 
-@pytest.mark.parametrize("relative_path", S01_OWNED_DOC_PATHS)
-def test_current_authoring_foundation_does_not_require_a_specific_workflow(
-    relative_path: str,
-) -> None:
-    content = (DOCS_ROOT / relative_path).read_text(encoding="utf-8")
-
-    assert not _requires_specific_workflow(content)
-
-    if relative_path.startswith("authoring/"):
-        normalized_content = content.casefold()
-        for marker in KNOWN_LEGACY_ROUTE_MARKERS:
-            assert marker not in normalized_content
-
-    if relative_path == "authoring/overview.md":
-        assert "特定の agent、model、provider、review 手順を前提にしません" in content
-    if relative_path == "authoring/issue-plan.md":
-        assert "特定の agent、provider、review 手順を前提にしません" in content
-
-
 @pytest.mark.parametrize("template_root", (TEMPLATES_ROOT, DOGFOOD_TEMPLATES_ROOT))
 @pytest.mark.parametrize("scope", SCOPES)
 def test_template_scope_markdown_catalog_is_exact(
@@ -1251,8 +865,6 @@ def test_template_readme_navigation_catalogs_exact_scope_docs_and_current_artifa
 
     artifact_catalog = f"`artifacts/{{{','.join(CURRENT_ARTIFACT_TEMPLATES)}}}.md`"
     assert content.count(artifact_catalog) == 1
-    for retired_route in ("analysis", "repair", "draft-"):
-        assert retired_route not in content.casefold()
 
     assert links == {
         "../docs/authoring/overview.md",
@@ -1386,36 +998,6 @@ def test_template_plan_routes_scope_guides_and_limits_planning_level_to_issue() 
 
 
 @pytest.mark.parametrize(
-    ("scope", "document"),
-    ((scope, document) for scope in SCOPES for document in RDP_DOCUMENTS),
-)
-def test_template_rdp_excludes_legacy_workflow_and_quality_gate_contracts(
-    scope: str,
-    document: str,
-) -> None:
-    content = _read_template(scope, document)
-
-    for pattern in FORBIDDEN_TEMPLATE_PATTERNS:
-        assert pattern.search(content) is None, f"forbidden template contract: {pattern.pattern}"
-
-
-@pytest.mark.parametrize(
-    "content",
-    ("delegated_authoring", "phase_gate", "pr_status"),
-)
-def test_template_forbidden_patterns_reject_snake_case_variants(content: str) -> None:
-    assert any(pattern.search(content) is not None for pattern in FORBIDDEN_TEMPLATE_PATTERNS)
-
-
-@pytest.mark.parametrize(
-    "content",
-    ("delegated task", "authoring guidance", "deployment phase", "quality gate", "PR reference", "status note"),
-)
-def test_template_forbidden_patterns_allow_unrelated_terms(content: str) -> None:
-    assert all(pattern.search(content) is None for pattern in FORBIDDEN_TEMPLATE_PATTERNS)
-
-
-@pytest.mark.parametrize(
     "relative_path",
     (
         "README.md",
@@ -1524,69 +1106,6 @@ def test_report_templates_match_dogfood_projection(scope: str) -> None:
 
 def test_report_guide_matches_dogfood_projection() -> None:
     assert (AUTHORING_ROOT / "report.md").read_bytes() == (DOGFOOD_DOCS_ROOT / "authoring" / "report.md").read_bytes()
-
-
-@pytest.mark.parametrize(
-    "path",
-    (
-        *(TEMPLATES_ROOT / scope / "report.md" for scope in SCOPES),
-        *(DOGFOOD_TEMPLATES_ROOT / scope / "report.md" for scope in SCOPES),
-    ),
-)
-def test_report_templates_exclude_heavy_and_generic_workflow_contracts(path: Path) -> None:
-    content = path.read_text(encoding="utf-8")
-
-    assert not _report_template_has_forbidden_contract(content), f"forbidden Report template contract in {path}"
-
-
-@pytest.mark.parametrize(
-    "path",
-    (AUTHORING_ROOT / "report.md", DOGFOOD_DOCS_ROOT / "authoring" / "report.md"),
-)
-def test_report_guides_exclude_heavy_and_generic_workflow_contracts(path: Path) -> None:
-    content = path.read_text(encoding="utf-8")
-
-    assert not _report_guide_has_forbidden_contract(content), f"forbidden Report Guide contract in {path}"
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "reviewer",
-        "Grade",
-        "Assurance",
-        "delegated authoring",
-        "delegated-authoring",
-        "delegated_authoring",
-        "PR status",
-        "PR-status",
-        "PR_status",
-    ),
-)
-def test_report_template_forbidden_contract_detector_rejects_generic_variants(content: str) -> None:
-    assert _report_template_has_forbidden_contract(content)
-
-
-@pytest.mark.parametrize(
-    "content",
-    (
-        "Grade",
-        "Assurance",
-        "delegated authoring",
-        "delegated-authoring",
-        "delegated_authoring",
-        "PR status",
-        "PR-status",
-        "PR_status",
-    ),
-)
-def test_report_guide_forbidden_contract_detector_rejects_generic_variants(content: str) -> None:
-    assert _report_guide_has_forbidden_contract(content)
-
-
-def test_report_guide_allows_nonmandatory_reviewer_boundary_but_rejects_mandatory_reviewer() -> None:
-    assert not _report_guide_has_forbidden_contract("特定の reviewer による利用記録を必須にする項目を置きません。")
-    assert _report_guide_has_forbidden_contract("特定の reviewer を必須とします。")
 
 
 def test_report_guide_is_non_gating_and_routes_durable_decisions_elsewhere() -> None:

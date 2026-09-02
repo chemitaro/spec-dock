@@ -133,15 +133,14 @@ so.
 # Note: canonical GitHub issue URLs are checked against the current repo; owner/repo mismatch is rejected.
 # Note: numeric initiative/epic/issue imports read from the resolved current repo (or explicit owner/repo when provided); if neither explicit repo scope nor a resolvable current repo scope from `origin` is available, import fails before local writes.
 
-# Normal issue execution lifecycle (primary path)
+# Normal issue execution lifecycle (primary path: branch checkout/create, guard, dependency readiness)
 ./spec-dock/scripts/spec-dock issue start 123             # active + branch checkout/create
 ./spec-dock/scripts/spec-dock issue start iss-local-00001 # local node id
 ./spec-dock/scripts/spec-dock issue finish                # lifecycle closure: GitHub close + active clear
 
-# Manual / recovery active-set path (low-level)
+# Active node selection (selection-only)
 ./spec-dock/scripts/spec-dock active set 123             # default: active only (no checkout)
 ./spec-dock/scripts/spec-dock active set iss-local-00001 # local node id (no checkout)
-./spec-dock/scripts/spec-dock active set 123 --checkout  # active + branch checkout/create
 
 # Generate index.json/tree.json (local scan; optionally enrich from GitHub via gh)
 ./spec-dock/scripts/spec-dock sync
@@ -217,8 +216,8 @@ Notes:
 - Workbench copy applies to the complete directory without language, extension, MIME, or content
   classification. Keep material that must survive outside Workbench in an Artifact or canonical doc.
 - `artifact import file` accepts one explicit regular file, preserves the source and its bytes, and
-  stores it as an opaque generic Artifact. Imported content remains evidence-only until its adoption is
-  recorded in the Evidence Adoption Ledger and accepted claims are rewritten into canonical docs. See
+  stores it as an opaque generic Artifact. Imported content remains evidence-only until it is reviewed and
+  accepted claims are explicitly rewritten into Requirement, Design, Plan, or an accepted ADR. See
   [移行ガイド](spec-dock/docs/migration.md) for the replacement route and recovery notes.
 - `update` preserves existing Workbench directories as unmanaged local content. It does not migrate,
   normalize, delete, or promote them.
@@ -226,8 +225,7 @@ Notes:
 - Legacy sequential discussion docs are grandfathered only. New docs do not reuse legacy sequence names, and spec-dock does not auto-rename or auto-repair them to preserve forced backward compatibility.
 - Normal issue execution should use `issue start <target>` / `issue finish` as the primary path. Use `issue start <target> -f` / `--force` only to bypass the unfinished active issue guard; dependency readiness still applies.
 - `issue finish` is lifecycle closure only: it closes or confirms the linked GitHub issue and clears active state, but it does not guarantee commit, push, PR, merge, validate, test, or review completion. Record delivery completion evidence before running it.
-- Treat direct `active set` / `active set --checkout` as manual / recovery / low-level commands. `active set` updates active pointers from local nodes first. Branch operations are opt-in via `--checkout`.
-- With `active set --checkout`, the branch name is normalized to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
+- Treat `active set` as selection-only: it resolves a local node and updates active pointers without branch checkout, GitHub access, dependency readiness, or the unfinished active Issue guard. `issue start <target>` owns branch checkout, that guard, and dependency readiness.
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
 - Generated initiative/epic/issue nodes include `artifacts/rules.md` as the default working-artifact surface.
 - New working artifacts are created under the target scope `artifacts/` direct child with `./spec-dock/scripts/spec-dock new artifact <type> --{initiative|epic|issue} <id> --title "..."`.
@@ -319,5 +317,5 @@ v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様�
 `spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
 状態の集計は `spec-dock/.agent/index.json` と `spec-dock/.agent/tree.json` を `./spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
 
-補足: 通常の issue 実行開始/終了は `issue start <target>` / `issue finish` を primary path とし、unfinished active issue guard だけを bypass する場合は `issue start <target> -f` / `--force` を使います。`active set` / `active set --checkout` は manual / recovery 向けの low-level path として扱います。`new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があり、`active set --checkout` を使う場合はブランチ名が `<id>-<slug>`（不適合なら `<id>`）へ正規化されます。
+補足: 通常の issue 実行開始/終了は `issue start <target>` / `issue finish` を primary path とし、unfinished active issue guard だけを bypass する場合は `issue start <target> -f` / `--force` を使います。`active set` は local node の selection-only であり、branch checkout、unfinished active Issue guard、dependency readiness は `issue start` が所有します。Artifact の採用内容は Requirement、Design、Plan または accepted ADR へ明示的に再記述します。`new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があります。
 また、`github.issue_number` は initiative/epic/issue をまたいで一意です（重複は検知されます）。詳細は導入先の `spec-dock/docs/reference_github.md`（このリポジトリでは `src/spec_dock/assets/spec_dock/docs/reference_github.md`）を参照してください。

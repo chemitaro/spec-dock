@@ -24,7 +24,10 @@ Issue の canonical `plan.md` は一つです。完成基準は選んだ一つ�
 
 ## Agent assistance
 
-Agent assistance の導線は Issue 359 の handoff 後に追加できます。`.agents/skills/spec-dock/SKILL.md` と `.agents/skills/spec-dock-grill-with-docs/SKILL.md` が実在し、link 解決を確認するまでは、この節に live Markdown link を置きません。
+Agent assistance は、現在存在する次の二つの repo-local skill が担います。
+
+- `.agents/skills/spec-dock/SKILL.md`: SpecDock の scope、文書、Artifact、依存、lifecycle、worktree、managed installation を current CLI で操作・執筆します。
+- `.agents/skills/spec-dock-grill-with-docs/SKILL.md`: read-only grilling と domain clarification の後に scope-local evidence Artifact を作成します。
 
 ## 基本原則
 
