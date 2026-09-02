@@ -25,7 +25,7 @@ repository_evidence:
 
 ## 1. Planning status
 
-本計画は三Issue deliveryを固定する親計画である。前回multi-Issue replacement packはfailed reviewed candidate `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83`へimport、structural validation、commit、push済みである。Reviewer session `required-strict-github-connector-verificati-723`はP1 x1、P2 x1でfailしたため、現在は本remediationのadoptionと同一reviewer re-reviewがpendingである。Issue #392を含めimplementation startは許可せず、Product implementationも未startである。
+本計画は三Issue deliveryを固定する親計画である。Qualification remediation packはfull SHA `177937163526c369108c97ef7c024adb3dd05f77`、tree `ec47247721e71d410a2553c8c94e24d7fa20726c`へcanonical adoption、structural validation、commit、push済みである。同じreviewer conversation `required-strict-github-connector-verificati-723`のexecution `required-strict-github-connector-verificati-740`は同SHAをreviewし、rolling-twenty all-member final-gate success/accepted predicateの欠落をP1、import/review state driftをP2としてschema-valid failを返した。Review 740はcompleted historyであり、現在pendingなのは本three-file correctionのparent adoption、同一reviewerによるexact pushed remediation tipのpass、external `PARENT_FREEZE_SHA` receipt、pass後のGitHub #384/#392/#395/#396 body projection/readbackだけである。Issue #392を含めimplementation startは許可せず、Product implementationも未startである。
 
 ## 2. Issue order and acceptance gates
 
