@@ -28,6 +28,8 @@ Issue #372 は distribution hard cutover と parity を対象とし、Full Regre
 
 本 Epic は親 Initiative の architecture hardening 方針を維持しつつ、「安全であること」と「すべての歴史的・異常状態を自動回復すること」を分離する。Issue #372 の candidate を直接変更せず、独立した product / test architecture outcome として扱う。
 
+Issue #372 は完了し、その成果は main `5f7b7fc11a3e27b0e65cd33630ff939433b25c0d` に含まれる。完了後の Strict audit で見つかった current surface の古い workflow 表現、廃止済み public CLI seam、設定残骸は、本 Epic の distribution / test architecture とは別責務である。この cleanup は Epic #356 配下の `iss-00387 / #387 Current Surface Workflow Residue Cleanup` が所有する。#387のRequirement / Design / Planはbranch `iss-00387-current-surface-workflow-residue-cleanup`、approved spec SHA `7acaf40fff273c292c12111b81e11d997dbe18cd` でStrict review pass（findings 0）となっている。Epic #384 は #387 完了後の current surface と drift guard を実装baselineとして受け取るが、そのcleanupを重複実装しない。
+
 ## 観測可能な要件
 
 ### R1. 一つの実行時間予算
@@ -122,6 +124,8 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 対象外:
 
 - Issue #372 candidateへの横入り修正
+- `iss-00387 / #387` が所有する current-surface cleanup: active-none reportの旧 delegated / reviewer / EAL / Promotion schema、root READMEの旧 `active set --checkout` / EAL-required説明、authoring overviewのIssue #359 future-tense、public CLIから削除済みの `SetActiveRequest.checkout / force / use_github / issue_limit` seam、stale mypy override、phantom `.codex/**` package-data glob、definition-only legacy constants、current-surface drift guard
+- #387 cleanupを理由に、historical `spec-dock/initiatives/**`、historical docs / fixtures、現行2 skills、consumer `ci.yml`、`checkout_active_target()`、または本Epicが置換対象として所有するdistribution / Full Regression machineryを先行削除すること
 - test時間短縮だけを目的としたworker数の増加、CI machineの大型化、恒久的なtiming-weight tuning
 - Product判断なしでfail-closed path protectionを弱めること
 - user-owned spec historyの自動削除範囲を黙って拡大すること
@@ -135,10 +139,14 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - cold dependency install、GitHub runnerのnoisy-neighbor、network downloadをtest bodyと混同しない。artifact buildとtest実行を別計測する。
 - wall timeだけを満たしてprocess-hoursが増える変更は失敗とする。
 - R5Bの未決事項はProduct判断であり、影響する下位Issueが推測で決めない。
+- #387所有surfaceを本Epicでも変更する、またはreplacement proofとsuccessor receiptが揃う前にdistribution / Full Regression machineryを削除する変更は失敗とする。
 
 ## 受け入れ条件
 
 - [x] 4 disposable roots、fixed skill slots、user history保護、external rerun convergenceをaccepted ADR `20260831t005139z-adr` に記録している。
+- [x] `iss-00387 / #387` のapproved R/D/PをSHA `7acaf40fff273c292c12111b81e11d997dbe18cd` で固定し、本Epicとのowner / no-touch境界を確認している。
+- [ ] `iss-00387 / #387` がmainへ完了・mergeされ、current-surface drift guardがGREENであることを、本Epicの実装baseline receiptとして固定している。
+- [ ] 本Epicの実装diffが#387所有surfaceを重複変更せず、historical data / docs / fixtures、現行2 skills、consumer `ci.yml`、`checkout_active_target()`をcleanup名目で削除していない。
 - [ ] R5Bの残るProduct判断を、影響する実装Issueの開始前にaccepted decisionとして記録している。
 - [ ] 全test familyのcontract / layer / lane / cost / keep-move-consolidate-delete判定が追跡できる。
 - [ ] canonical local regressionを単一pytest processで連続5回実行し、各回600秒以内、zero failures、zero policy skipsである。
@@ -161,3 +169,4 @@ accepted ADR `20260831t005139z-adr` により、次を確定した。
 - destructive operationは既定でfail closedとし、path ownershipを証明できない対象を削除しない。
 - 既存のhuman PR merge gateを維持する。
 - accepted ADR `20260831t005139z-adr` の範囲は確定済みとし、R5Bの未決事項だけを実装上の既成事実にしない。
+- `iss-00387` nodeはapproved spec branchへpush済みだが、本Epic文書更新時点ではmain未収載である。現時点ではapproved spec SHAとGitHub `#387` をtextual handoffとし、nodeがmainへmergeされた後、SpecDockの正式dependencyとして登録する。

@@ -19,6 +19,8 @@ ID: "epic-00384"
 
 本Planはaccepted ADR `20260831t005139z-adr` を実装境界のauthorityとする。子Issueはまだ作成・開始しない。各候補の開始前に残るProduct判断とcurrent evidenceを固定し、Issue作成時に改めてacceptanceを受理する。
 
+Epic #356配下の `iss-00387 / #387 Current Surface Workflow Residue Cleanup` は本Planの外部前提である。#387はcurrent-surface residueとdrift guardを所有し、approved spec SHA `7acaf40fff273c292c12111b81e11d997dbe18cd` で実装準備済みである。本Planは#387完了後のmainをinventory baselineとして受け取る。Epic #384の候補Issueへ#387 cleanupを再分配しない。
+
 ## Issue granularity assessment
 
 - **Result**: `PROPOSED_ISSUE_CANDIDATES`
@@ -26,12 +28,14 @@ ID: "epic-00384"
   - 4 provider rootsのlifecycle、shared skill slots、tooling-only uninstall / public compatibility、test / CI cutoverは、それぞれ異なるobservable outcomeとfailure boundaryを持つ。
   - pure / filesystem / CLI / testsのようなtechnical layerでは分けない。各candidateは関係するproduction behavior、docs、tests、migrationをend-to-endで所有する。
   - candidate 4はproduction contract cutoverなしでは受け入れられないため、1〜3に依存する。
+  - #387は現行surfaceのcleanup、Epic #384はdistribution / test architectureのreplacementを所有する。両者を同一Issueへ再統合しない。
   - workflow ownership、legacy window、purge CLI migrationなどの未決事項は各candidateの詳細を変えるが、4つのobservable boundary自体は維持できる。
 - **Assumptions / unresolved evidence**:
   - `.github/workflows/ci.yml` がconsumer-ownedかreusable workflow projectionかは未決。
   - legacy no-marker workspaceのsupport windowは未決。
   - `--remove-specs` のdeprecation / replacement shapeは未決。
   - candidateは提案であり、Issueとしてaccepted / created / startedではない。
+  - `iss-00387` nodeはapproved spec branchへpush済みだが本Plan更新時点でmain未収載のため、正式dependency登録はnode merge後に行う。
 
 ## Parent acceptance coverage
 
@@ -44,18 +48,25 @@ ID: "epic-00384"
 | 26 active failures、ledger / sharder / timing weights撤去 | candidate 4 |
 | package build once、Linux / macOS delta evidence | candidate 4（trigger decisionはcandidate 3で確定） |
 | workflow ownership / legacy / purge / `.gitignore` policy | affected candidate開始前のProduct gate |
+| current-surface workflow residue cleanupとdrift guard | `iss-00387 / #387`（外部前提。本Epicは所有しない） |
 
 ## Dependency direction
 
 ```text
-accepted ADR 20260831t005139z
-  └─> Candidate 1: Disposable provider root lifecycle
-        └─> Candidate 2: Fixed skill slot lifecycle
-              └─> Candidate 3: Tooling-only uninstall and compatibility cutover
-                    └─> Candidate 4: Test portfolio and CI budget cutover
+iss-00387 / #387 completed on main
+  └─> current-surface baseline + drift guard receipt
+        └─> accepted ADR 20260831t005139z
+              └─> Candidate 1: Disposable provider root lifecycle
+                    └─> Candidate 2: Fixed skill slot lifecycle
+                          └─> Candidate 3: Tooling-only uninstall and compatibility cutover
+                                └─> Candidate 4: Test portfolio and CI budget cutover
 ```
 
 Candidate 2はshared slot contractだけなら1と並行設計できるが、installation recordとupdate orchestrationのwriter競合を避けるため実装は1のstable service interface後に行う。Candidate 4は1〜3の旧test削除receiptを集約する最終cutoverであり、production contract未変更のまま先行しない。
+
+Candidate 1〜4は#387が変更・削除したcurrent-surface document / symbol / testを重複変更しない。各candidateのinventoryとcost baselineは#387 merge後のmainから採取し、#387のcleanup結果をEpic #384のtest削減実績として二重計上しない。
+
+#387実装と並行して実施できるのは、Epic #384のread-only inventory、Product decision、Issue設計、prototypeまでとする。provider production / testへのmutation、旧route削除、cutoverは#387のmerged stateを再確認してから開始する。
 
 ## Candidate 1 proposal — Disposable provider root lifecycle
 
@@ -73,6 +84,8 @@ fresh / recognized workspaceのinit・updateが、`spec-dock/{docs,templates,sys
 - provider root内のlocal editとobsolete fileは保存しないことをdocs / CLI diagnosticへ明記する。
 - markerなしcurrent workspaceのfinite one-shot migrationとsunset evidenceを持つ。
 - old per-file update route、journal / checkpoint / historical identity codeと対応testsを同じcandidateで削除する。
+- #387所有のdocumentation / request seam / configuration cleanupをcandidate scopeへ含めない。
+- replacement proof成立前にdistribution machineryを削除しない。
 
 ### Relevant boundaries
 
@@ -185,6 +198,7 @@ merge-required regressionが単一pytest process・worker 1で連続5回各600�
 ### Acceptance trace
 
 - all collected nodesをcurrent contract、owner layer、lane、cost、keep / move / consolidate / deleteへ100%分類する。
+- node inventoryは#387 merge後のmainで再採取し、#387がretireしたcurrent-surface nodesを候補数へ含めない。
 - Candidate 1〜3でretiredしたcontractの旧testsをreplacement receiptとともに削除する。
 - 26 active failure nodesをfix / accepted retirement / exactly-once successorへ処理し、active countを0にする。
 - same candidate / OSでduplicate nodeを0にする。
@@ -192,6 +206,7 @@ merge-required regressionが単一pytest process・worker 1で連続5回各600�
 - macOSはOS差のあるboundaryだけを実行する。
 - `full-regression-ledger.json`、timing weights、baseline evaluator、policy skip flags、4-shard verifier、関連meta-testsを削除する。
 - CI summaryへcandidate SHA、wall / CPU、node、subprocess、workspace / copy、duplicate、build countを出す。
+- Full Regression machineryはsuccessor proof、zero-failure cutover、rollback-to-safe-command手順が揃うまで削除しない。
 
 ### Relevant boundaries
 
@@ -220,6 +235,15 @@ merge-required regressionが単一pytest process・worker 1で連続5回各600�
 
 ## Sequence and decision gates
 
+### Gate 0 — iss-00387 handoff
+
+- branch `iss-00387-current-surface-workflow-residue-cleanup` のapproved R/D/P SHAが `7acaf40fff273c292c12111b81e11d997dbe18cd` で、Strict review pass / findings 0である。
+- `iss-00387 / #387` がmainへmergeされている。
+- current-surface drift guardがGREENである。
+- merge receiptが変更・削除したsymbol、test、documentを列挙している。
+- #387がhistorical specs / docs / fixtures、現行2 skills、consumer `ci.yml`、`checkout_active_target()`、Epic #384所有のdistribution / Full Regression machineryを変更していない。
+- `iss-00387` nodeがmainへ収載された時点で、本Epicまたは最初のcandidate Issueへ正式dependencyを登録する。
+
 ### Gate A — Candidate 1 start
 
 - legacy direct-update support window
@@ -236,7 +260,7 @@ merge-required regressionが単一pytest process・worker 1で連続5回各600�
 
 - Candidates 1〜3のaccepted implementation evidence
 - wheel / sdist / macOS trigger
-- current 2,708-node inventoryと26 active failuresのexact candidate snapshot
+- #387 merge後のexact candidateで再採取したnode inventoryとactive failure snapshot
 
 未回答を下位Issueへ委譲しない。Gate回答によりcandidate boundaryがmaterialに変わる場合は、Issue作成前にgranularityを再評価する。
 
@@ -251,6 +275,7 @@ merge-required regressionが単一pytest process・worker 1で連続5回各600�
 7. user dataとunrelated skillsがbyte-identicalであることを確認する。
 8. plain zero-failure / zero policy skipを確認する。
 9. SpecDock validation、lint、typecheck、provider / dogfood parityを確認する。
+10. #387 merge receiptとEpic #384 final diffを比較し、owner overlap 0とprotected surface deletion 0を確認する。
 
 performanceは最良値ではなく5回すべてを記録する。wall 600秒超、平均論理core1.1超、worker追加依存、duplicate node、active approved failureのいずれかがあればEpic acceptance未達とする。
 
@@ -263,4 +288,5 @@ Epic完了条件:
 - canonical regressionがsingle process / 10分以内 / zero failure / zero policy skipである。
 - duplicate nodes、approved failure ledger、4-shard runner、timing weightsが残っていない。
 - distribution contractとtest ownershipをcode / test name / CI commandから理解できる。
+- #387 handoff receipt、post-#387 inventory、owner-overlap 0のdiff evidenceが残っている。
 - human merge gateへmerge-ready PRを渡し、agentはmergeを実行しない。

@@ -241,15 +241,34 @@ testがslowという理由だけでは削除しない。retired contractまた�
 - budget violationはfailureであり、worker追加やtiming-weight調整で回避しない。
 - reporterは標準time / pytest reportの薄い集約とし、新しいschedulerやbaseline frameworkにしない。
 
+## Responsibility boundary with iss-00387
+
+Epic #384は `iss-00387 / #387 Current Surface Workflow Residue Cleanup` を外部前提として扱う。#387のR/D/P authorityはbranch `iss-00387-current-surface-workflow-residue-cleanup`、approved spec SHA `7acaf40fff273c292c12111b81e11d997dbe18cd` である。Strict reviewはpass、findings 0であり、両scopeの所有権は次のとおり固定する。
+
+| owner | owned outcome |
+|---|---|
+| `iss-00387 / #387` | active-none reportの旧 delegated / reviewer / EAL / Promotion schema、root READMEの旧 `active set --checkout` / EAL-required説明、authoring overviewのIssue #359 future-tense、削除済みpublic CLIに残る `SetActiveRequest.checkout / force / use_github / issue_limit` seam、stale mypy override、phantom `.codex/**` package-data glob、definition-only legacy constants、current-surface drift guard |
+| `epic-00384 / #384` | `managed_distribution` を4 disposable roots + 2 fixed skill slotsへ置換するproduct contract、minimal ready marker、external rerun failure model、legacy skill identityのfinite migration、tooling-only uninstall / purge分離、Full Regression 4-shard / ledger / timing weightsのsuccessor付き退役、provider test portfolio簡素化 |
+
+どちらのcleanupも、historical `spec-dock/initiatives/**`、historical docs / fixtures、現行2 skills、consumer `ci.yml`、`checkout_active_target()`を不要物として削除するauthorityを持たない。現行2 skillsはEpic #384のaccepted fixed-slot replacement proofが成立した場合にだけcomplete rootとして置換でき、#387のcurrent-surface cleanupでは変更しない。`checkout_active_target()`は`issue start`が所有するCurrent coreとして#387で保持する。distribution / Full Regression machineryはEpic #384のsuccessor proofとcutover receiptなしに先行削除しない。
+
+handoff contractは次の4点とする。
+
+1. #387のmerge SHAとcurrent-surface drift guard GREENをbaseline receiptとして受け取る。
+2. Epic #384のproduction / test inventoryを、そのmerge後のmainから再取得する。
+3. #387が変更・削除したsymbol、test、documentをEpic #384のcandidateへ再掲しない。
+4. `iss-00387` nodeがmainへmergeされた後にSpecDockの正式dependencyを追加する。それまではapproved spec SHAとGitHub #387をtextual handoff authorityとする。
+
 ## Migration / compatibility
 
-1. accepted ADRとcurrent inventoryを実装Issueの固定入力にする。
-2. root replacement serviceを導入し、current recognized workspaceのone-shot migrationを同じvertical sliceで実装する。
-3. new service proofが成立したrouteから旧per-file engineとtestsを同じchangeで削除する。
-4. fixed skill markerをprovider sourceへ追加し、current 2 slotsをone-shot migrationする。
-5. tooling-only uninstallとpurge / public compatibilityを確定する。
-6. 26 active failure nodesをfix / retired / successorへ処理し、plain zero-failure suiteにする。
-7. duplicate selection、Full Regression ledger、timing weights、4-shard runnerをcutoverで削除する。
+1. `iss-00387 / #387` をmainへmergeし、current-surface drift guardと変更receiptを固定する。
+2. accepted ADRと#387後のcurrent inventoryを実装Issueの固定入力にする。
+3. root replacement serviceを導入し、current recognized workspaceのone-shot migrationを同じvertical sliceで実装する。
+4. new service proofが成立したrouteから旧per-file engineとtestsを同じchangeで削除する。
+5. fixed skill markerをprovider sourceへ追加し、current 2 slotsをone-shot migrationする。
+6. tooling-only uninstallとpurge / public compatibilityを確定する。
+7. 26 active failure nodesをfix / retired / successorへ処理し、plain zero-failure suiteにする。
+8. duplicate selection、Full Regression ledger、timing weights、4-shard runnerをcutoverで削除する。
 
 old / new engineを長期dual modeにしない。destructive safety issueが見つかった場合はapply routeを停止し、read-only diagnosticへ戻す。旧engineへのautomatic fallbackは行わない。
 
@@ -271,6 +290,8 @@ old / new engineを長期dual modeにしない。destructive safety issueが見�
 - candidate SHA / artifact digestに束縛したevidence
 - human PR merge gate
 - Issue #372 candidateは別branch / Issueとして変更しない
+- `iss-00387 / #387` 所有のcurrent-surface cleanupを重複実装しない
+- historical specs / docs / fixtures、現行2 skills、consumer `ci.yml`、`checkout_active_target()`をcleanup対象へ拡張しない
 
 ## Risk
 
@@ -289,4 +310,5 @@ old / new engineを長期dual modeにしない。destructive safety issueが見�
 - accepted authority: `artifacts/20260831t005139z-adr-disposable-provider-roots-and-fixed-skill-slots.md`
 - detailed synthesis: `artifacts/20260831t005132z-disc-disposable-root-replacement-and-skill-lifecycle-design.md`
 - superseded in part: Epic #365 ADRのper-file operation / journal / shared deprovision-purge engine
+- external prerequisite / handoff: `iss-00387 / #387` approved spec SHA `7acaf40fff273c292c12111b81e11d997dbe18cd`。nodeがmainへmergeされるまではtextual handoffとし、merge後に正式dependencyを登録する
 - open before affected Issue start: workflow ownership、legacy window、purge CLI migration、`.gitignore` seed policy、artifact/platform triggers
