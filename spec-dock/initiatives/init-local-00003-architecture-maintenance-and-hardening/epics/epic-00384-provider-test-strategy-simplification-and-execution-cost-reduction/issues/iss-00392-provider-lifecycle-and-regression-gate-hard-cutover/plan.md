@@ -15,6 +15,7 @@ ID: "iss-00392"
 Planning Level: "critical-contract-only"
 実装開始許可: false
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -29,11 +30,11 @@ This Plan is a rolling-wave contract, not an implementation procedure. It contai
 
 ## 2. Entry gate
 
-Entry requires parent G0 accepted、integration state B0 GREEN、#387 completion verified、Issue #392 open/not-started、15/14/1 register exact、legacy candidate exact、current policy operational and no conflicting writer。
+Entry requires parent G0 accepted、external `PARENT_FREEZE_SHA` and post-pass GitHub Issue projection receipts、integration state B0 GREEN、#387 completion verified、Issue #392 open/not-started、15/14/1 register exact、legacy candidate exact、current policy operational and no conflicting writer。
 
 ## 3. Required Issue outcome
 
-One PR must deliver the complete lifecycle output in Requirement without terminalizing Product failures or replacing regression policy. Internal checkpoints are permitted during implementation but none is independently acceptable or mergeable。
+One PR must deliver the complete lifecycle output in Requirement without terminalizing Product failures、replacing regression policy or implementing parent `E384-QUAL-001`. Final qualification remains a preserved read-only parent/#396 contract. Internal checkpoints are permitted during implementation but none is independently acceptable or mergeable。
 
 ## 4. Evidence owned by this Issue
 
@@ -55,7 +56,7 @@ Before #395 start, rollback is a human whole-merge revert to B0. During Issue wo
 
 ## 7. Stop / return
 
-Return to parent if current tree requires a stable wire change、baseline identity change、scope crossing into #395/#396、unsafe compatibility state、non-complete dogfood、or unresolved Product decision. Return evidence must identify exact contract ID and current tip。
+Return to parent if current tree requires a stable wire change、baseline identity change、scope crossing into #395/#396、`E384-QUAL-001` implementation or reinterpretation、unsafe compatibility state、non-complete dogfood、or unresolved Product decision. Return evidence must identify exact contract ID and current tip。
 
 ## 8. Issue-start elaboration gate
 

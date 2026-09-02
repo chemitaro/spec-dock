@@ -8,6 +8,7 @@ ID: "20260902t070000z-adr"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 supersedes: "20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md"
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -40,7 +41,7 @@ No research、decision、documentation、test-only、verification-only Issue is 
 
 ### ADR-MI-003 — Single writer by domain
 
-#392 is sole lifecycle writer. #395 is sole active-regression Product repair writer. #396 is sole provider-gate/test-policy writer. Later Issues consume earlier stable outputs read-only and cannot redefine them。
+#392 is sole lifecycle writer. #395 is sole active-regression Product repair writer. #396 is sole provider-gate/test-policy implementation and evidence writer. Parent `E384-QUAL-001` remains the sole quantitative qualification policy authority; the three-Issue pivot relocates implementation ownership from old #392 scope to #396 without weakening the accepted guarantee. Later Issues consume earlier stable outputs read-only and cannot redefine them。
 
 ### ADR-MI-004 — Rolling-wave elaboration
 
@@ -56,7 +57,7 @@ Current authority is the 15-row `failure_paths` payload. The 27-count top-level 
 
 ### ADR-MI-007 — Transitional and final gates
 
-Current ledger/timing/sharder/policy machinery remains intact and GREEN through #392 and #395. #396 adds replacement before consumer-first removal, then deletes old machinery in the same Issue acceptance unit。
+Current ledger/timing/sharder/policy machinery remains intact and GREEN through #392 and #395. #396 adds the replacement gate and implements/evidences parent `E384-QUAL-001` before consumer-first removal, then deletes old machinery in the same Issue acceptance unit. This ADR does not duplicate the contract values or aggregation semantics。
 
 ### ADR-MI-008 — Compatibility and evidence
 
@@ -65,6 +66,10 @@ Required-context changes and all merges are human-only. Dynamic head/run/artifac
 ### ADR-MI-009 — Rollback and recovery
 
 Issue merge is the integration rollback unit. Before the next Issue starts, a whole merge may be reverted. After dependency work starts, unmerged work is discarded and accepted suffixes are reverted in reverse order or repaired within the current owned boundary. Partial writer rollback and automatic old fallback are forbidden。
+
+### ADR-MI-011 — Parent-owned qualification policy
+
+Final qualification is a stable Product acceptance contract, not an Issue-start implementation choice. Epic Requirement `E384-QUAL-001` is the sole current source of its quantitative values, population, aggregation, platform scope, rejection and forbidden escapes. #396 may choose measurement and workflow implementation during rolling-wave elaboration but may not change or restate those semantics as independent authority。
 
 ### ADR-MI-010 — Historical material
 
@@ -77,6 +82,7 @@ Old single-Issue ADR/HTML/guides and CLOSED #388〜#390 remain historical eviden
 - Each Issue has a smaller acceptance and rollback boundary。
 - Planning is rolling-wave; start latency includes a mandatory rebaseline and Strict review。
 - Parent contract maintenance is stricter because stable cross-Issue changes require ADR-level reassessment。
+- Qualification policy has one current numeric source; #396 carries implementation/evidence ownership without becoming a second policy source。
 
 ## Rejected alternatives
 

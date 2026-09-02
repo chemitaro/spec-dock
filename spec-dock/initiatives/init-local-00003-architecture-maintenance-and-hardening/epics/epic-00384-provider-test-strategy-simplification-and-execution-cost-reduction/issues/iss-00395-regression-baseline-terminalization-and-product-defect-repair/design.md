@@ -14,6 +14,7 @@ ID: "iss-00395"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: false
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -42,7 +43,7 @@ The register provides identity、signature、behavior and terminalization mode. 
 
 ## 4. Stable input/output interface
 
-Input is accepted B1 tree plus exact register. Output is a clean current-policy baseline consumed by #396. A row is resolved only when the canonical observation is normal pass and current evaluator agrees. Ledger text alone cannot create resolution truth。
+Input is accepted B1 tree plus exact register. Output is a clean current-policy baseline consumed by #396. Parent `E384-QUAL-001` remains a read-only future-gate contract and is not implemented or reinterpreted here. A row is resolved only when the canonical observation is normal pass and current evaluator agrees. Ledger text alone cannot create resolution truth。
 
 ## 5. Repair isolation
 
@@ -53,7 +54,7 @@ Rolling-wave elaboration groups rows only when one Product cause and one observa
 - Current CLI and lifecycle behavior remain compatible with B1。
 - Current PR and full verifier remain the acceptance mechanism。
 - Timing/sharding may be referentially updated for repaired nodes but not redesigned。
-- #396 receives zero-approved-failure input and no unresolved Product choice。
+- #396 receives zero-approved-failure input and no unresolved Product choice; #396 alone later implements/evidences parent `E384-QUAL-001`。
 
 ## 7. Failure and recovery
 
@@ -65,7 +66,7 @@ Rolling-wave elaboration groups rows only when one Product cause and one observa
 
 ## 8. Testability
 
-Implementation-ready elaboration defines exact production observers、representative REDs、focused Product tests、register evaluator checks、ordinary/full integrated gates and protection evidence. This draft intentionally does not name concrete files、symbols or commands。
+Implementation-ready elaboration defines exact production observers、representative REDs、focused Product tests、register evaluator checks、ordinary/full integrated gates and protection evidence. This draft intentionally does not name concrete files、symbols or commands and does not select qualification values or mechanisms。
 
 ## 9. Risk controls
 

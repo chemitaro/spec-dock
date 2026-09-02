@@ -15,6 +15,7 @@ ID: "epic-00384"
 親: ["init-local-00003"]
 実装開始許可: false
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -74,7 +75,7 @@ The current ledger/timing/sharder/policy system remains a live compatibility pro
 
 ### E384-C-007 — Final provider gate
 
-The final gate uses one Linux packaging producer and zero downstream builds. All roles consume the same candidate identity. Linux canonical, sdist, macOS delta, qualification and evidence are separate observable responsibilities but one Issue acceptance unit.
+The final gate is a build-once, same-candidate role graph implemented by Issue #396. Linux canonical, sdist, macOS delta, qualification and evidence are separate observable responsibilities but one Issue acceptance unit. Every quantitative qualification predicate is consumed from `E384-QUAL-001`; this Design does not define a second value, population or aggregation rule.
 
 ### E384-C-008 — Compatibility and evidence
 
@@ -88,14 +89,18 @@ Issue merge is the smallest integration rollback unit. Runtime lifecycle recover
 
 The current Issue designs specify responsibility, inputs, outputs and acceptance boundaries. Implementation structures are intentionally absent. [Rolling-Wave Issue Elaboration Contract](artifacts/rolling-wave-issue-elaboration-contract.md) controls when those details may be introduced.
 
+### E384-C-011 — Parent-owned qualification policy
+
+`E384-QUAL-001` in Epic Requirement is the sole current quantitative qualification authority. Issue #396 owns measurement, evaluation, evidence schemas and workflow realization, but does not own the policy values or aggregation semantics. #392 and #395 may verify non-interference only. A required semantic change returns to parent adjudication before Issue start.
+
 ## 3. Integration states
 
 | State | Source | Required invariant |
 |---|---|---|
-| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed. |
+| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; same-reviewer pass, external freeze receipt and post-pass Issue-body projection readback complete. |
 | B1 | #392 merge | Complete final lifecycle and dogfood; old lifecycle writer absent; 14 active identities unchanged; transitional gates GREEN. |
 | B2 | #395 merge | 15 resolved, active/approved 0; Product repairs accepted; transitional gates independently GREEN. |
-| B3 | #396 merge | Final build-once gate GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |
+| B3 | #396 merge | Final build-once gate and mechanical `E384-QUAL-001` evidence GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |
 | B4 | Epic main merge | Main tree equals accepted B3 tree; final context and closure evidence read back. |
 
 ## 4. Issue responsibility boundaries
@@ -104,7 +109,7 @@ The current Issue designs specify responsibility, inputs, outputs and acceptance
 |---|---|---|---|
 | #392 | Provider lifecycle semantics, wire conformance, migration/uninstall/recovery, lifecycle docs and candidate | Post-#387 active identities and transitional gate | Product defect terminalization; final gate/policy removal |
 | #395 | Product behavior represented by the 14 active rows and their terminal state | #392 lifecycle output, wire, current policy | Lifecycle redesign; final gate/policy removal |
-| #396 | Provider test ownership, build-once CI, evidence, qualification, policy cutover and final guidance | Clean #395 baseline and #392 lifecycle | New Product behavior or lifecycle semantic change |
+| #396 | Provider test ownership, build-once CI, `E384-QUAL-001` implementation/evidence, policy cutover and final guidance | Clean #395 baseline, #392 lifecycle and parent qualification policy | New Product behavior, lifecycle semantic change or qualification policy change |
 
 ## 5. Compatibility design
 
@@ -127,7 +132,7 @@ Each Issue records four evidence classes without deferring all proof to the fina
 3. integration-branch GREEN state at exact tip;
 4. rollback/recovery readiness.
 
-Final Epic evidence additionally binds the B3 tree, human main merge tree equality and final required-context readback.
+Final Epic evidence additionally binds the B3 tree, human main merge tree equality, final required-context readback and the mechanical `E384-QUAL-001` result with its complete raw inputs.
 
 ## 8. Historical material
 
@@ -140,5 +145,5 @@ Historical research, discussions, HTML guides and CLOSED #388–#390 remain in t
 | E384-RQ-001–003 | C-001, C-002, C-010 |
 | E384-RQ-004–006 | C-003, C-004, C-009 |
 | E384-RQ-007–011 | C-005, C-006 and B0–B2 |
-| E384-RQ-012–014 | C-007, C-008 and B3 |
+| E384-RQ-012–014 and E384-QUAL-001 | C-007, C-008, C-011 and B3 |
 | E384-RQ-015–018 | C-004, C-008, C-009 and B4 |

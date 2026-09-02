@@ -18,6 +18,7 @@ ID: "iss-00392"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: false
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -26,7 +27,7 @@ repository_evidence:
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
 
-本Issueは既存nodeを再利用するが、accepted scopeは**Fixed Ownership Provider Lifecycle Hard Cutover**に限定する。Regression baseline terminalizationとprovider-gate policy cutoverはそれぞれ#395、#396へ移管する。
+本Issueは既存nodeを再利用するが、accepted scopeは**Fixed Ownership Provider Lifecycle Hard Cutover**に限定する。Regression baseline terminalizationとprovider-gate policy cutoverはそれぞれ#395、#396へ移管する。旧#392 bodyに存在したfinal qualification guaranteeは削除せず、parent `E384-QUAL-001`へ移管し#396が実装・証拠化する。#392は同contractのread-only consumerである。
 
 Parent: [Epic Requirement](../../requirement.md) / [Integration Contract](../../artifacts/epic-integration-branch-contract.md) / [Rolling-Wave Contract](../../artifacts/rolling-wave-issue-elaboration-contract.md)
 
@@ -46,7 +47,7 @@ Epic integration branch上で、SpecDockのpublic provider lifecycleがfixed own
 
 - Registerの14 active Product failuresを修正またはterminalizeすること。
 - Approved-failure policy、ledger、timing、sharder、policy skip machineryを削除すること。
-- Build-once Provider Gate、stable qualification、required-context transitionを実装すること。
+- Build-once Provider Gate、parent `E384-QUAL-001`のimplementation/evidence、required-context transitionを実装すること。
 - 調査、文書、test、verificationだけの別Issueを作ること。
 - Mainへ直接mergeすること。
 
@@ -78,7 +79,7 @@ Epic integration branch上で、SpecDockのpublic provider lifecycleがfixed own
 
 **Owned:** E384-RQ-004、005、006、008、009 and lifecycle portion of E384-RQ-015。
 
-**Shared/read-only:** E384-RQ-001〜003、007、016〜018。#395/#396 contracts are non-owned。
+**Shared/read-only:** E384-RQ-001〜003、007、016〜018 and parent `E384-QUAL-001`。#395/#396 implementation contracts are non-owned。
 
 ## 7. Requirements
 
@@ -96,7 +97,7 @@ Final record is the exact seven-key wire object. Seed policy is immutable across
 
 ### I392-RQ-004 — Closed wire
 
-The parent wire is implemented without added、missing or reinterpreted values. #392 is sole production writer; later Issues consume it read-only。
+The parent wire is implemented without added、missing or reinterpreted values. #392 is sole production writer for lifecycle only; `E384-QUAL-001` is a separate non-owned parent contract and later Issues consume lifecycle read-only。
 
 ### I392-RQ-005 — Safe filesystem and recovery
 
@@ -120,7 +121,7 @@ After human merge, B1 satisfies lifecycle acceptance and current transitional ga
 
 ### I392-RQ-010 — Issue-start gate
 
-Current draft is not implementation-ready. Exact implementation R/D/P and Luna Max handoff must be generated against the accepted B0 tip and independently Strict-reviewed before start。
+Current draft is not implementation-ready. Exact implementation R/D/P and Luna Max handoff must be generated against the accepted external `PARENT_FREEZE_SHA`/B0 tip after post-pass GitHub Issue body projection readback, and independently Strict-reviewed before start。
 
 ## 8. Verification evidence categories
 
@@ -132,6 +133,6 @@ Rollback unit is the complete #392 integration merge. Before #395 starts, human 
 
 ## 10. Stop and return
 
-Stop before implementation or merge if the wire must change、active identity/signature drifts、current gate cannot remain coherent、candidate cannot converge completely、protected data changes、#395/#396 responsibility is required、or owner decision becomes non-empty。Return exact contract/evidence mismatch to the parent。
+Stop before implementation or merge if the wire must change、active identity/signature drifts、current gate cannot remain coherent、candidate cannot converge completely、protected data changes、`E384-QUAL-001` implementation or any #395/#396 responsibility is required、or owner decision becomes non-empty。Return exact contract/evidence mismatch to the parent。
 
 `owner_decisions_required=[]`.

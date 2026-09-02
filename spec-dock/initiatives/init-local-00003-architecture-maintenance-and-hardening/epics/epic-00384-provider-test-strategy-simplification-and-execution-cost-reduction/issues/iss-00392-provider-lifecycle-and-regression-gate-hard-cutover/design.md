@@ -14,6 +14,7 @@ ID: "iss-00392"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: false
 repository_evidence:
+  role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
   sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
@@ -42,7 +43,7 @@ Lifecycle state、mutation authority、public wire、filesystem recovery、migra
 
 #392 owns state classification、candidate ownership、record/marker behavior、safe publication、migration、uninstall、public lifecycle output、lifecycle documentation and complete dogfood convergence。
 
-#392 does not own the semantics represented by the 14 active baseline failures, their Product repair, test-policy architecture, final workflow/evidence/qualification or required-context transition。
+#392 does not own the semantics represented by the 14 active baseline failures, their Product repair, test-policy architecture, final workflow/evidence, parent `E384-QUAL-001` implementation or required-context transition。
 
 ## 4. Stable interfaces
 
@@ -50,6 +51,7 @@ Lifecycle state、mutation authority、public wire、filesystem recovery、migra
 - The output lifecycle is consumed read-only by #395 and #396。
 - The regression baseline is read-only input except the resolved row's behavior-preserving referential rebind if old lifecycle test identity disappears。
 - Current gate remains the compatibility verifier at B1。
+- Parent `E384-QUAL-001` is a preserved, read-only future-gate interface; #392 neither implements nor redefines it。
 - Protected-data contract applies before、during and after candidate publication。
 
 ## 5. Dependency direction
@@ -81,7 +83,7 @@ The implementation-ready elaboration must create observable tests for model/wire
 
 ## 9. Elaboration boundary
 
-At Issue start, current repository topology determines concrete modules、symbols、fixtures、commands and step ordering. Elaboration may decompose internals but may not add a bridge generation、change wire、terminalize active rows or introduce final-gate tooling as an acceptance dependency。
+At Issue start, current repository topology determines concrete modules、symbols、fixtures、commands and step ordering. Elaboration may decompose internals but may not add a bridge generation、change wire、terminalize active rows、implement/redefine `E384-QUAL-001` or introduce final-gate tooling as an acceptance dependency。
 
 ## 10. Risk controls
 
