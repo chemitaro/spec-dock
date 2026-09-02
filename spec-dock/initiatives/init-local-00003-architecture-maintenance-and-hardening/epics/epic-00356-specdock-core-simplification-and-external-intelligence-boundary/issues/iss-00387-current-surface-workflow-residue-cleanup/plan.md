@@ -729,13 +729,13 @@ current Issueのexact directoryは`spec-dock/initiatives/init-local-00003-archit
 | C40-07 | PASS | lint green; 2513 collected; orphan support=0 |
 | C40-08 | PASS | legacy S05 authority assertions removed; structural observer retained |
 | C40-09 | PASS | 15 ledger rows; 243 timing nodes; deleted-node refs=0; parser/help green |
-| C50-01 | PASS | repair replay: focused lanes 242, 29, and 201 passed |
-| C50-02 | PASS | repair replay: Ruff/format/mypy green; ordinary 1436 passed, 1076 policy-skipped |
-| C60-01 | PASS | repair replay: one wheel/sdist; fixed digest; fresh init/parity/help green; expected empty-tree validate |
+| C50-01 | PASS | focused: set-active + authoring 242 passed in 4.27s; storage/lifecycle/doctor 29 passed in 51.81s; init/update 201 passed in 1580.61s (26:20) |
+| C50-02 | PASS | make lint: Ruff check/format/mypy pass (247 formatted; mypy 174 source files); diff --check exit 0; ordinary 1435 passed, 1075 policy-skipped in 59.67s |
+| C60-01 | PASS | one wheel/sdist; wheel SHA-256 `48dcb135b3724c005c9fbe2eed782858e5af70bac98119d0c93c124cec1f4f94`; sdist SHA-256 `39e1b17852e396724cd3813914f4297850a6679b233022421acecf3cd8e81bde`; fresh init/parity/help green; expected empty-tree validate; exact cleanup completed |
 | C60-02 | N/A(pre-commit execution; deferred to C90-05 final SHA) | DEFERRED: exact C60-02 runs after commit/push on clean FINAL_SHA inside C90-05; result in PR/handoff evidence |
-| C90-01 | PASS | repair replay: 72 approved paths only; all no-touch audits diff=0 |
-| C90-02 | PASS | repair replay after: 2512 collected; 93736 Python LOC; 91 tracked test files; 6 fixtures; coverage/closure=1.0 |
-| C90-03 | PASS | repair replay: validate 230; sync no-github; validate 230; generated diff=0 |
+| C90-01 | PASS | 72 approved paths only; protected Historical/current skills+CI/Epic 384/scripts-quality/managed-distribution no-touch diff=0; 15 provider/dogfood pairs identical; pyproject only approved two removals |
+| C90-02 | PASS | 2510 collected; 93661 Python LOC; 91 tracked test files; 6 fixtures; coverage/closure=1.0 |
+| C90-03 | PASS | validate 230; sync --no-github; validate 230; generated diff=0 |
 
 ## 16. Exit / handoff
 
