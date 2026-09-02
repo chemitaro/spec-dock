@@ -9,7 +9,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
@@ -22,20 +22,20 @@ SpecDock replaces the historical per-file provider lifecycle and sharded failure
 
 - Durable target authority is exactly four roots, two fixed skill slots and `spec-dock/spec-dock.version`; fresh seed/container creation is separately bounded.
 - The seven-key record carries immutable `seed_policy`; lifecycle resume is exact `(operation,candidate_digest,seed_policy)`.
-- Process-independent staging uses one deterministic namespace and `ACTIVE.json`; private cleanup token plus deferred invocation and public continuation separate tokenized cleanup retry from the desired next lifecycle command, and cleanup-only return never dispatches.
-- Every evidence/build/download purpose has a private non-exported owner root and one exported exact reserved tree. A live FD-backed owner reserves, spawns, seals, upload-confirms and cleans; paths/nonces are never cleanup authority.
+- Process-independent staging uses one deterministic namespace and `ACTIVE.json`; every cleanup warning/failure exposes the exact token-bearing `active.cleanup_retry_command`, while deferred invocation and public continuation preserve a distinct desired command. Cleanup-only return never dispatches.
+- Every evidence/build/download purpose has a private non-exported owner root and one exported exact reserved tree. Each downloaded-verification step keeps API snapshots, raw ZIPs, empty extraction destinations and stdout under one live-handle tree; a live FD-backed owner reserves, spawns, seals, upload-confirms and cleans.
 - Exact clean `0.2.3` alone migrates to `0.2.4`. S40/S50 preserve checked-in legacy dogfood, S60 performs one complete migration, S70 one complete update, and S80 is tracked-read-only.
 - Uninstall is tooling-only, dry-run by default, retains `tooling-absent-preserved-data`, and treats `--remove-specs` as mutation-zero exit 2.
 - The public wire is closed at 38 codes and 142 relation rows, including terminal-cleanup recovery, with four valid record goldens and thirty-three public JSON review goldens.
 - Issue #387 remains a blocking dependency. Its tracked report contains only the twelve remove/retain/split mappings. S00 independently discovers exactly one merged PR and applies `ISS387-THREE-WAY-V2` to merge-tree evidence.
-- The final evidence graph is produced by one Linux packager. All roles, attestation, compatibility and S80 preserve authenticated raw Actions ZIP bytes, recompute API/upload digests, safe-extract and verify actual bytes under exact least-privilege permissions.
+- The final evidence graph is produced by one Linux packager. Role-set, compatibility-green, compatibility-canary, canary-post-run and final-post-run verification use exact finite run/job/artifact-state profiles; evidence artifact name is null only before assembly. All actual bytes are verified under exact least privilege.
 - Required-context cutover uses distinct compatibility/final heads and reruns authoritative evidence after removal of the compatibility job.
 - Post-merge closure records only measured facts. If issue finish closes #392 but post-sync fails, exact active restoration and at most three already-closed finish attempts produce one accepted final interval while preserving the original close event.
 - GitHub #392 is the sole implementation-and-verification Issue; human alone merges and changes required contexts.
 
 ## 2. Verified baseline
 
-Repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `ea168b745d3f443f11a24b975f32e3bb6fb17b1a`. At that revision the current root `AGENTS.md`, provider workflows, Full Regression verifier and exact legacy dogfood still represent the transitional `0.2.3` system. Issue #387 is being implemented separately and its canonical R/D/P must not be changed by this Epic.
+Repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78`. At that revision the current root `AGENTS.md`, provider workflows, Full Regression verifier and exact legacy dogfood still represent the transitional `0.2.3` system. Issue #387 is being implemented separately and its canonical R/D/P must not be changed by this Epic.
 
 The repository evidence SHA is authoring provenance. Adopted bytes are later bound by `SPEC_FREEZE_COMMIT`; the implementation base must contain that commit and the independently verified #387 merge.
 
@@ -61,7 +61,7 @@ Persistent target mutation authority is exactly the four roots, two slots and re
 
 ### E384-RQ-002 — Private owner roots and exact reserved trees
 
-Each purpose independently creates a private owner root and live non-serializable handle. The root is never exported. Design maps every `ISS392_WS_*` variable to exactly one reserved child tree; all commands receive that tree only. Before spawn the owner pre-registers each fixed output or closed subtree policy, then seals the exact descendant inventory, remains alive through upload confirmation and cleans only by handle. Children cannot register or clean. Unknown, unregistered or policy-invalid entries, owner death or path-only authority fail closed.
+Each purpose independently creates a private owner root and live non-serializable handle. The root is never exported. Design maps every `ISS392_WS_*` variable to exactly one reserved child tree; all commands receive that tree only. A downloaded-verification invocation uses one tree for API/raw/extracted/output and never combines workflow-api, artifact-download and provider-verification roots. Before spawn the owner pre-registers each fixed output or closed subtree policy, seals inventory, remains alive through upload confirmation and cleans only by handle.
 
 ### E384-RQ-003 — Persistent stage, deferred invocation and terminal cleanup
 
@@ -69,7 +69,7 @@ Each purpose independently creates a private owner root and live non-serializabl
 
 ### E384-RQ-004 — Closed lifecycle wire
 
-Durable/observed states and all public relations are exactly the wire artifact: 38 codes, 142 rows, 23 phases, four record goldens and thirty-three JSON review goldens. The 23-key result includes exact continuation `next_action,next_command,after_cleanup_action,after_cleanup_command`; no prose-derived action, catch-all token or alternative ordering exists.
+Durable/observed states and all public relations are exactly the wire artifact: 38 codes, 142 rows, 23 phases, four record goldens and thirty-three JSON review goldens. The 23-key result includes exact continuation `next_action,next_command,after_cleanup_action,after_cleanup_command`; cleanup-warning `retry_command` and `next_command` are always the matching tokenized `active.cleanup_retry_command`. No prose-derived action, catch-all token or alternative ordering exists.
 
 ### E384-RQ-005 — Filesystem safety and fresh bootstrap
 
@@ -101,7 +101,7 @@ S00 admits every #387-permitted branch by the register. S60 mechanically fixes/s
 
 ### E384-RQ-012 — Sole producer, raw-byte verifier and permissions
 
-Only Linux `provider-build-artifacts` packages a workflow head once. Every consuming job preserves authenticated raw artifact ZIP bytes, matches SHA-256 against API `sha256:<hex>` and upload output `<hex>`, safe-extracts, and verifies raw/extracted/API bytes. Provider-attestation and compatibility/S80 use the same verifier with exact repeated role order. Workflow-level permissions are empty and every job has the exact least-privilege override fixed in Issue Design; structural tests reject drift.
+Only Linux `provider-build-artifacts` packages a workflow head once. Every consuming job preserves authenticated raw artifact ZIP bytes, matches SHA-256 against API `sha256:<hex>` and upload output `<hex>`, and lets the verifier safe-extract within its one live-handle tree. Provider-attestation, compatibility normal/canary and S80 use exact verification phases with finite run/job/artifact relations and evidence-name nullability. Workflow-level permissions are empty and every job has the exact least-privilege override.
 
 ### E384-RQ-013 — Stable qualification and complete Provider Gate CLI
 
@@ -117,7 +117,7 @@ Tracked #392 report contains pre-freeze methodology and implementation facts onl
 
 ### E384-RQ-016 — Measured closure and bounded post-sync recovery
 
-After tree equality, exact issue finish closes #392 before active clear/post-sync. Exit 0 is accepted. Exit 1 is recoverable only for measured closed+active-cleared+post-sync-failed: read the unique original close event, restore active with exact `active set --id iss-00392`, and rerun issue finish with `already_closed=true`, at most three attempts. The post payload records all attempts/restores and the final successful interval. Ambiguous close events, restore failure or repeated third failure stops. No redundant close command is used.
+After tree equality, exact issue finish closes #392 before active clear/post-sync. Exit 0 is accepted. Exit 1 is recoverable only for measured closed+active-cleared+post-sync-failed: read the unique original close event, restore active with `active set --id iss-00392`, prove exit/stdout/stderr and an `active show` readback selecting `iss-00392`, then rerun issue finish with `already_closed=true`, at most three attempts. Active-set has no post-sync field and none is recorded. Ambiguous close events, restore/readback failure or repeated third finish failure stops.
 
 ### E384-RQ-017 — Documentation, single Issue and human gates
 

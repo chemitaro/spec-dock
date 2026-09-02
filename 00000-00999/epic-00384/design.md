@@ -10,7 +10,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
@@ -47,7 +47,7 @@ The seven-key record keeps exact resume identity. Persistent `ACTIVE.json` store
 
 ### E384-D-003 — Publication
 
-Repository/parent descriptors are no-follow and identity-bound under exclusive lock. Candidate is captured/validated before target mutation. Absent shared container is exclusively created and recorded in stage ownership. Fixed roots/slots publish through native no-replace/exchange. Terminal record is last. A post-terminal cleanup warning leaves deterministic terminal-cleanup state and an exact retry command.
+Repository/parent descriptors are no-follow and identity-bound under exclusive lock. Candidate is captured/validated before target mutation. Absent shared container is exclusively created and recorded in stage ownership. Fixed roots/slots publish through native no-replace/exchange. Terminal record is last. A post-terminal cleanup warning leaves deterministic terminal-cleanup state and the exact tokenized `active.cleanup_retry_command`; an un-tokenized desired command is never a cleanup retry.
 
 ## 3. Persistent lifecycle stage namespace
 
@@ -63,7 +63,7 @@ Absent ACTIVE fsyncs parent then dispatches. Allocating/ready incomplete resumes
 
 ### E384-D-006 — Private owner root and reserved-tree API
 
-Each purpose creates a private mode-0700 owner root and live descriptor-backed handle. The root path is not exported. The owner reserves one exact top-level child, pre-registers every fixed output or closed subtree policy, and exports only the reserved child through the purpose-specific `ISS392_WS_*` variable. Exact mappings, policy IDs and layouts are Issue Design D-007. Children receive the reserved tree only and cannot create registration or cleanup authority. Owner seals output, remains alive through upload confirmation and cleans only via handle. Unknown or policy-invalid entries, root exposure, identity drift or premature owner death preserve and stop.
+Each purpose creates a private mode-0700 owner root and live descriptor-backed handle. The root path is not exported. The owner reserves one exact top-level child, pre-registers every fixed output or closed subtree policy, and exports only the reserved child. A downloaded-verification step uses exactly one provider-attestation or provider-verification tree for API snapshots, raw ZIPs, empty extraction destinations and stdout; extraction occurs inside the verifier. Exact mappings are Issue Design D-007. Children receive the reserved tree only and cannot create registration or cleanup authority. Owner seals output, remains alive through upload confirmation and cleans only via handle. Unknown or policy-invalid entries, root exposure, identity drift or premature owner death preserve and stop.
 
 ### E384-D-007 — Protected witness and exclusions
 
@@ -91,7 +91,7 @@ The retained workflow creates an independent `full-regression-s60` workspace bel
 
 ### E384-D-011 — Compatibility/final graph, raw bytes and permissions
 
-Compatibility graph is producer -> three roles; producer+roles -> attestation -> gate, with compatibility provider-tests depending producer+attestation. Final removes only provider-tests. Workflow-level permissions are `{}`; exact job overrides are fixed in Issue Design. Every role/attestation/compatibility download preserves authenticated raw ZIP bytes, matches API/upload SHA-256, safe-extracts and passes raw+extracted+API data to the same verifier. Only gate reads the canary.
+Compatibility graph is producer -> three roles; producer+roles -> attestation -> gate, with compatibility provider-tests depending producer+attestation. Final removes only provider-tests. Workflow-level permissions are `{}`; exact job overrides are fixed in Issue Design. Every role/attestation/compatibility download preserves authenticated raw ZIP bytes and passes raw/API inputs plus empty extraction destinations to the same verifier under one handle. Exact verification phases distinguish in-progress role-set, compatibility green/canary, terminal canary readback and S80 final success. Only gate reads the canary.
 
 ### E384-D-012 — Byte graph, exact Provider Gate CLI and qualification
 
@@ -124,14 +124,14 @@ pre-merge #392 comment verified
 
 No redundant #392 close command exists. Failed restore, ambiguous close event or three post-sync failures stops. Payload records all attempts/restores and the accepted final interval, while preserving the original close event.
 
-## 9. r10 cross-contract invariants
+## 9. r11 cross-contract invariants
 
 - Wire continuation separates cleanup retry from desired request.
 - Workspace variables are reserved trees, never owner roots.
-- Provider Gate validates raw ZIP and extracted bytes under exact permissions.
-- Closure accepts only a final successful issue-finish attempt after bounded recovery.
+- Provider Gate validates raw ZIP, verifier-produced extracted bytes and phase-aware API/job/artifact states under exact permissions.
+- Closure accepts only a final successful issue-finish attempt after bounded recovery; active restoration is evidenced only by current active-set exit/output and active-show readback, never a nonexistent active-set post-sync status.
 
-## 9. Traceability
+## 10. Traceability
 
 | Requirement | Design |
 |---|---|

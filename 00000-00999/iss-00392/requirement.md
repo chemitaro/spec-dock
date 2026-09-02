@@ -10,7 +10,7 @@ ID: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
@@ -23,7 +23,7 @@ This is Epic #384's sole implementation-and-verification Issue. It remains block
 
 ### I392-RQ-001 — Specification freeze
 
-The replacement manifest, all canonical/support payload SHA-256 values and owner-recorded `SPEC_FREEZE_COMMIT` must match exact repository blobs. The implementation base must contain that commit and the independently admitted #387 merge. Repository evidence SHA `ea168b745d3f443f11a24b975f32e3bb6fb17b1a` is provenance, not a future blanket diff base.
+The replacement manifest, all canonical/support payload SHA-256 values and owner-recorded `SPEC_FREEZE_COMMIT` must match exact repository blobs. The implementation base must contain that commit and the independently admitted #387 merge. Repository evidence SHA `0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78` is provenance, not a future blanket diff base.
 
 ### I392-RQ-002 — Mapping-only #387 report
 
@@ -87,7 +87,7 @@ Uninstall is dry-run by default and applies with `--apply`. It preserves contain
 
 ### I392-RQ-017 — Closed wire implementation
 
-Production enums/constructors/serializers/tests match 38 codes, 142 relation rows, four valid record goldens, thirty-three public JSON review goldens, 23 phases, action relations and target order. The public result has exact 23-key order and a closed `continuation` object. Cleanup warning, cleanup failure, cleanup success and lifecycle partial rows have exact next/after-cleanup action-command relations. Unknown/catch-all branch or prose-derived next action is invalid.
+Production enums/constructors/serializers/tests match 38 codes, 142 relation rows, four valid record goldens, thirty-three public JSON review goldens, 23 phases, action relations and target order. The public result has exact 23-key order and a closed `continuation` object. Cleanup warning and cleanup failure use exact tokenized `active.cleanup_retry_command`; cleanup success and lifecycle partial rows have their separately fixed next/after-cleanup relations. Unknown/catch-all branch or prose-derived next action is invalid.
 
 ### I392-RQ-018 — Exact legacy and old-package mutation-zero
 
@@ -115,7 +115,7 @@ Only `provider-build-artifacts` packages each workflow head once. Linux canonica
 
 ### I392-RQ-024 — Compatibility and aggregate actual-byte verification
 
-Compatibility `provider-tests`, provider-attestation and S80 use the same closed verifier. Each authenticated Actions artifact download preserves the exact raw ZIP bytes, recomputes SHA-256 over the complete archive, and matches the REST `sha256:`-prefixed digest. Within the producing workflow, role-set verification also matches each bare `artifact-digest` job output. The verifier safely extracts into an empty registered reserved tree and receives both raw and extracted paths plus run/jobs/artifacts snapshots. Exact repeated role order and artifact inventory are mandatory. Compatibility packages nothing, ignores the canary marker and remains independently GREEN.
+Compatibility `provider-tests`, provider-attestation, canary readback and S80 use the same closed verifier. Each invocation uses one owner/reserved tree containing API snapshots, exact raw ZIP bytes, empty extraction destinations and stdout. The verifier recomputes archive SHA-256, matches REST/upload digests and performs safe extraction itself. The exact verification phase closes run/job/artifact status/conclusion and evidence-artifact-name nullability. Exact repeated role order and artifact inventory are mandatory. Compatibility packages nothing, ignores the canary marker and remains independently GREEN.
 
 ### I392-RQ-025 — Stable Linux qualification
 
@@ -123,7 +123,7 @@ Environment ID is `specdock-linux-qualification-v1`, bound to tracked descriptor
 
 ### I392-RQ-026 — Complete Provider Gate CLI, evidence schemas and permissions
 
-Issue Design D-013–D-026 fixes all nine subcommand argv arrays, required flags, absolute/reserved path types, repeated-option order, outputs, success/failure stdout/stderr, codes/exits, raw archive semantics, safe extraction, ordered schemas, units, nullability, digest inputs, fixture bytes and parent-child relations. Workflow-level permissions are empty; every job has an exact least-privilege override. Structural tests reject missing/extra/inherited/write permissions, wrong needs, raw download, archive path, verifier argument, packager or upload.
+Issue Design D-013–D-026 fixes all nine subcommand argv arrays, required flags, absolute/reserved path types, repeated-option order, outputs, success/failure stdout/stderr, codes/exits, raw archive semantics, verifier-owned extraction, phase-aware API/job/artifact relations, evidence-name nullability, ordered schemas, units, fixture bytes and parent-child relations. Workflow-level permissions are empty; every job has an exact least-privilege override. Structural tests reject missing/extra/inherited/write permissions, wrong needs, raw download, archive path, verifier argument, packager or upload.
 
 ### I392-RQ-027 — Distinct external two-head identities
 
@@ -139,7 +139,7 @@ Tracked report has pre-freeze method/implementation facts only. S80 owns no trac
 
 ### I392-RQ-030 — Ordered post-merge closure with post-sync recovery
 
-After human merge/tree equality, automation runs exact `issue finish`, whose current implementation closes #392 before active clear/post-sync. If exit 0, that interval is accepted. Exit 1 is recoverable only when measured facts prove #392 closed, active cleared and post-sync failed: read the unique original close event, restore active with exact `active set --id iss-00392`, require successful readback, and rerun issue finish against the already-closed Issue. At most three finish attempts are allowed; later attempts require `already_closed=true` and must not create a new close event. The accepted post payload includes all attempts/restores and identifies the final successful interval. Repeated sync failure, ambiguous close event or failed restore stops. No `close --id iss-00392` is run.
+After human merge/tree equality, automation runs exact `issue finish`, whose current implementation closes #392 before active clear/post-sync. If exit 0, that interval is accepted. Exit 1 is recoverable only when measured facts prove #392 closed, active cleared and post-sync failed: read the unique original close event, restore active with exact `active set --id iss-00392`, require its observable exit/stdout/stderr and exact `active show` readback, and rerun issue finish against the already-closed Issue. Active-set has no post-sync field and none is accepted as evidence. At most three finish attempts are allowed; later attempts require `already_closed=true` and must not create a new close event. The accepted post payload includes all attempts/restores and identifies the final successful interval. Repeated sync failure, ambiguous close event or failed restore stops. No `close --id iss-00392` is run.
 
 ### I392-RQ-031 — Comment receipts
 

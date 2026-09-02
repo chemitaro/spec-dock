@@ -11,7 +11,7 @@ Planning Level: "critical"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
@@ -574,32 +574,33 @@ test "$(git diff --name-only "$PRC_COMPAT_HEAD" "$PRC_FINAL_HEAD")" = '.github/w
 test "$PRC_COMPAT_HEAD" != "$PRC_FINAL_HEAD"
 ```
 
-Compatibility job creates private owners for `provider-verification`, `workflow-api` and `artifact-download`, exports their exact reserved trees, downloads raw archives by D-014, saves API JSON, and runs:
+Compatibility job creates one private owner for `provider-verification`, exports its exact reserved tree, stores API JSON and raw archives there, creates registered empty extraction destinations, waits for provider-gate terminal state, selects the exact compatibility verification phase, and runs:
 
 ```bash
 REPOSITORY_ROOT="$(pwd -P)"
 uv run python scripts/provider_gate.py verify-downloaded-artifact \
   --scope aggregate \
+  --verification-phase "$COMPATIBILITY_VERIFICATION_PHASE" \
   --repository chemitaro/spec-dock \
   --repository-root "$REPOSITORY_ROOT" \
   --source-sha "$PRC_COMPAT_HEAD" \
   --source-tree "$PRC_COMPAT_TREE" \
   --workflow-run-id "$COMPAT_RUN_ID" \
   --workflow-run-attempt "$COMPAT_RUN_ATTEMPT" \
-  --run-json "$ISS392_WS_WORKFLOW_API/run.json" \
-  --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json" \
-  --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json" \
-  --artifact-archive "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-candidate-$PRC_COMPAT_HEAD.zip" \
-  --artifact-archive "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-evidence-$PRC_COMPAT_HEAD.zip" \
-  --artifact-dir "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-candidate-$PRC_COMPAT_HEAD" \
-  --artifact-dir "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-evidence-$PRC_COMPAT_HEAD" \
+  --run-json "$ISS392_WS_PROVIDER_VERIFICATION/api/run.json" \
+  --jobs-json "$ISS392_WS_PROVIDER_VERIFICATION/api/jobs.json" \
+  --artifacts-json "$ISS392_WS_PROVIDER_VERIFICATION/api/artifacts.json" \
+  --artifact-archive "candidate=$ISS392_WS_PROVIDER_VERIFICATION/raw/provider-candidate-$PRC_COMPAT_HEAD.zip" \
+  --artifact-archive "provider-evidence=$ISS392_WS_PROVIDER_VERIFICATION/raw/provider-evidence-$PRC_COMPAT_HEAD.zip" \
+  --artifact-dir "candidate=$ISS392_WS_PROVIDER_VERIFICATION/extracted/provider-candidate-$PRC_COMPAT_HEAD" \
+  --artifact-dir "provider-evidence=$ISS392_WS_PROVIDER_VERIFICATION/extracted/provider-evidence-$PRC_COMPAT_HEAD" \
   --workspace "$ISS392_WS_PROVIDER_VERIFICATION" \
   --json
 ```
 
 **Expected/evidence**
 
-All nine CLI contracts and raw vectors GREEN; permissions/needs exact; old consumers/providers absent; second dogfood complete; compatibility candidate/evidence/API raw and extracted bytes verified; canary new RED/old GREEN; distinct final head with only compatibility job removal.
+All nine CLI contracts and raw vectors GREEN; permissions/needs exact; old consumers/providers absent; second dogfood complete; compatibility normal run uses `compatibility-aggregate-green`; canary provider-tests uses `compatibility-aggregate-canary` and stays GREEN while provider-gate is RED. After the canary run becomes terminal, create a new independent `provider-verification` owner/tree and rerun the same aggregate argv with `COMPATIBILITY_VERIFICATION_PHASE=compatibility-canary-post-run`; it must prove run failure, provider-gate failure, provider-tests success and exact evidence bytes. Distinct final head differs only by compatibility job removal.
 
 **Stop/cleanup/invariant**
 
@@ -625,15 +626,15 @@ Final head clean/distinct; compatibility sequence complete; new required active;
 
 **RED evidence**
 
-Zero/multiple/wrong run; wrong raw archive digest; missing preserved raw ZIP; unsafe extraction; API/upload digest mismatch; actual extracted bytes mismatch; wrong permissions/needs; candidate/evidence schema/metrics mismatch; tracked write/build/update/sync; comment/receipt mismatch.
+Zero/multiple/wrong run; wrong raw archive digest; missing preserved raw ZIP; pre-extraction or cross-workspace input; nonempty destination; wrong verification phase; invalid run/job/conclusion or evidence-name nullability; API/upload digest mismatch; actual extracted bytes mismatch; wrong permissions/needs; candidate/evidence schema/metrics mismatch; tracked write/build/update/sync; comment/receipt mismatch.
 
 **Smallest action**
 
-1. Pin existing `PRC_FINAL_HEAD`/tree and create workflow-api, artifact-download, provider-verification, protected-witness and attestation-draft private owners/reserved trees.
-2. Dispatch exactly one final workflow run and wait success.
-3. Save exact run/jobs/artifacts API JSON in workflow-api reserved tree.
-4. Select exact candidate/evidence artifact IDs by name/run, authenticate-download their raw ZIP bytes into artifact-download `raw/`, preserve them and safe-extract to exact `extracted/` paths.
-5. Run the aggregate verifier with both raw and extracted options in exact order.
+1. Pin existing `PRC_FINAL_HEAD`/tree and create provider-verification, protected-witness and attestation-draft private owners/reserved trees.
+2. Dispatch exactly one final workflow run and wait for terminal `completed/success`.
+3. Under the single provider-verification tree, save exact run/jobs/artifacts API JSON, authenticate-download exact candidate/evidence raw ZIPs, and create registered empty extraction destinations.
+4. Run the aggregate verifier with phase `post-run-final`; it performs safe extraction and verifies raw/extracted/API bytes in exact order. No preceding extraction step is allowed.
+5. Verify the registered verifier stdout and sealed single-tree inventory.
 6. Verify environment/20-run/fault/macOS/sdist evidence and final permissions/needs from actual bytes/API.
 7. Read back final required contexts/reviews.
 8. Emit pre-merge payload/comment in attestation reserved tree; human posts new #392 comment; read back and create receipt.
@@ -649,19 +650,20 @@ gh workflow run provider-ci.yml --ref "$BRANCH" -f candidate_sha="$PRC_FINAL_HEA
 REPOSITORY_ROOT="$(pwd -P)"
 uv run python scripts/provider_gate.py verify-downloaded-artifact \
   --scope aggregate \
+  --verification-phase post-run-final \
   --repository chemitaro/spec-dock \
   --repository-root "$REPOSITORY_ROOT" \
   --source-sha "$PRC_FINAL_HEAD" \
   --source-tree "$PRC_FINAL_TREE" \
   --workflow-run-id "$FINAL_RUN_ID" \
   --workflow-run-attempt "$FINAL_RUN_ATTEMPT" \
-  --run-json "$ISS392_WS_WORKFLOW_API/run.json" \
-  --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json" \
-  --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json" \
-  --artifact-archive "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-candidate-$PRC_FINAL_HEAD.zip" \
-  --artifact-archive "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-evidence-$PRC_FINAL_HEAD.zip" \
-  --artifact-dir "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-candidate-$PRC_FINAL_HEAD" \
-  --artifact-dir "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-evidence-$PRC_FINAL_HEAD" \
+  --run-json "$ISS392_WS_PROVIDER_VERIFICATION/api/run.json" \
+  --jobs-json "$ISS392_WS_PROVIDER_VERIFICATION/api/jobs.json" \
+  --artifacts-json "$ISS392_WS_PROVIDER_VERIFICATION/api/artifacts.json" \
+  --artifact-archive "candidate=$ISS392_WS_PROVIDER_VERIFICATION/raw/provider-candidate-$PRC_FINAL_HEAD.zip" \
+  --artifact-archive "provider-evidence=$ISS392_WS_PROVIDER_VERIFICATION/raw/provider-evidence-$PRC_FINAL_HEAD.zip" \
+  --artifact-dir "candidate=$ISS392_WS_PROVIDER_VERIFICATION/extracted/provider-candidate-$PRC_FINAL_HEAD" \
+  --artifact-dir "provider-evidence=$ISS392_WS_PROVIDER_VERIFICATION/extracted/provider-evidence-$PRC_FINAL_HEAD" \
   --workspace "$ISS392_WS_PROVIDER_VERIFICATION" \
   --json
 uv run python scripts/provider_gate.py emit-attestation \
@@ -694,7 +696,7 @@ I392-RQ-023–032; D-013–026.
 2. Create one fresh attestation-draft reserved tree and record finish attempt 1 start/end. Run `python3 ./spec-dock/scripts/spec-dock issue finish`.
 3. If exit 0, require returned issue 392, active cleared true, post-sync completed; attempt 1 is accepted.
 4. If exit 1, recovery is allowed only when result/readback proves #392 closed, active cleared true and post-sync failed. Immediately read #392 timeline and bind the unique original close event. No payload yet.
-5. For attempt 2, run `python3 ./spec-dock/scripts/spec-dock active set --id iss-00392`; require exit 0, post-sync completed and `active show` exactly selects `iss-00392`. Then rerun issue finish, requiring `already_closed=true` and no additional close event.
+5. For attempt 2, run `python3 ./spec-dock/scripts/spec-dock active set --id iss-00392`; require exit 0 and exact active-set stdout/stderr hashes from Design D-022. Then run `python3 ./spec-dock/scripts/spec-dock active show`; require exit 0, exact stdout/stderr hashes and active issue `iss-00392`. Active-set performs no post-sync and no such field is recorded. Then rerun issue finish, requiring `already_closed=true` and no additional close event.
 6. If attempt 2 again has only post-sync failure, repeat the exact active-set/readback/finish sequence once for attempt 3. Three failed finish attempts, active restore failure, ambiguous/multiple close event, reopen, or any other failure is a hard stop.
 7. Build `post-merge-closure-v1` from all measured attempts/restores, the original close event and the final successful attempt number. Human posts to #392; read back and create comment receipt. Never invoke `close --id iss-00392`.
 8. Re-evaluate Epic acceptance. Run `python3 ./spec-dock/scripts/spec-dock close --id epic-00384`; read the actual #384 close event. Build/post/read Epic closure on #384 and create receipt.

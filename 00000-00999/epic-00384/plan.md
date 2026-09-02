@@ -10,7 +10,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
@@ -70,7 +70,7 @@ PR-B cannot merge unless terminal cleanup crash/retry tests, current PR workflow
 
 S70 implements all nine exact Provider Gate commands, raw ZIP transport/safe extraction, job permissions, evidence schemas, stable environment, structural tests and final operator docs. It removes old policy consumer-first, completes the second dogfood update and finalizes tracked report. It creates `PRC_COMPAT_HEAD`, runs both contexts and completes the human transition, then creates `PRC_FINAL_HEAD` by removing only compatibility `provider-tests`. Actual identities stay external. S70 owns both commits; S80 owns none.
 
-Compatibility provider-tests independently creates private owners/reserved API/download/verification trees, preserves raw candidate/evidence ZIPs, safe-extracts, and invokes the aggregate verifier with raw/extracted/API inputs. It packages nothing and ignores the canary.
+Compatibility provider-tests creates one private provider-verification owner/reserved tree containing API snapshots, raw candidate/evidence ZIPs, empty extraction destinations and verifier stdout. It waits until provider-gate is terminal, selects the exact green/canary verification phase, and invokes the verifier, which performs safe extraction. It packages nothing and ignores the canary file.
 
 ### E384-P-002 — Required-context transition
 
@@ -84,7 +84,7 @@ Compatibility provider-tests independently creates private owners/reserved API/d
 
 ### E384-P-003 — Read-only authoritative rerun
 
-S80 reads the S70-created final head. It dispatches a fresh final run, authenticates and preserves raw Actions archives, verifies API/upload digest equality, safe-extracts, passes exact raw/extracted/API options to the same verifier, reads final permissions/contexts and posts the pre-merge attestation. No tracked write, local build, update, sync or commit occurs.
+S80 reads the S70-created final head. It creates one provider-verification owner/tree, dispatches a fresh final run, stores API snapshots and raw Actions archives there, creates registered empty extraction destinations, and invokes `post-run-final`; the verifier performs safe extraction and actual-byte checks. It reads final permissions/contexts and posts the pre-merge attestation. No tracked write, local build, update, sync or commit occurs.
 
 ## 7. Evidence and closure
 
@@ -95,7 +95,7 @@ After human merge:
 1. compare final-head and merge tree;
 2. run issue-finish attempt 1 and capture exact interval/result;
 3. if success, select attempt 1;
-4. if only post-sync failed after #392 close/active clear, bind the unique original close event, run exact `active set --id iss-00392`, verify active readback, and retry issue finish with `already_closed=true`;
+4. if only issue-finish post-sync failed after #392 close/active clear, bind the unique original close event, run exact `active set --id iss-00392`, verify its exit/stdout/stderr, run `active show` and require exact active issue readback, then retry issue finish with `already_closed=true`; active-set supplies no post-sync status;
 5. repeat recovery once only if the second post-sync also fails; after three failed attempts stop;
 6. create post payload from all attempts/restores and the final successful interval; post/read receipt on #392;
 7. re-evaluate Epic, close/read #384, post/read Epic receipt.

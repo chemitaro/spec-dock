@@ -6,7 +6,7 @@ Issue: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # Luna Max Implementation Handoff
@@ -112,7 +112,7 @@ Tracked none. Read final head, download and preserve authenticated raw candidate
 
 ## 8. Compatibility workflow and permissions
 
-Compatibility job needs producer+attestation, creates private owner handles and exact reserved workflow-api/artifact-download/verification trees, downloads raw candidate/evidence ZIPs through authenticated Actions API, verifies API `sha256:<hex>` and upload `<hex>`, safe-extracts, and calls the exact aggregate verifier with repeated roles candidate then provider-evidence. It builds zero and ignores canary.
+Compatibility job needs producer+attestation, creates one private provider-verification owner/tree, stores API snapshots and raw candidate/evidence ZIPs there, registers empty extraction destinations and calls the verifier, which performs extraction. It polls provider-gate terminal state and selects exact `compatibility-aggregate-green` or `compatibility-aggregate-canary`; external canary readback uses `compatibility-canary-post-run`. It builds zero and ignores canary.
 
 Workflow-level `permissions: {}`. Exact overrides: build `contents:read`; Linux/sdist/macOS/attestation `actions:read,contents:read`; gate `contents:read`; compatibility `actions:read,contents:read,pull-requests:read`. No workflow write permission. Human comment POST/readback is outside workflow.
 
@@ -120,7 +120,7 @@ Final head removes only compatibility job and reruns all authoritative evidence.
 
 ## 9. Provider Gate and fixture authority
 
-Issue Design D-013–D-026 is complete. Implement exactly nine subcommands and their ordered argv arrays, required flags, path containment, repeated role order, stdout/stderr, exits 2–14 and schemas. Raw archive bytes are first-class inputs; extracted-only verification is invalid. `RAW-ARCHIVE-DIGEST-V1` and `EVIDENCE-FIXTURE-V4` are serializer/transport oracles; regenerate size/SHA from displayed bytes, never copy an old hash after schema change.
+Issue Design D-013–D-026 is complete. Implement exactly nine subcommands and their ordered argv arrays, required flags, path containment, repeated role order, stdout/stderr, exits 2–14 and schemas. Raw archive bytes are first-class inputs; extracted-only verification is invalid. `RAW-ARCHIVE-DIGEST-V1` and `EVIDENCE-FIXTURE-V5` are serializer/transport oracles; regenerate size/SHA from displayed bytes, never copy an old hash after schema change.
 
 The 38-code/142-row wire remains finite but public result is now 23 keys with continuation. Implementer must not alter counts without canonical review.
 
@@ -129,7 +129,7 @@ The 38-code/142-row wire remains finite but public result is now 23 keys with co
 1. Human merge; verify tree equality.
 2. Run issue finish attempt 1 with start/end capture.
 3. If exit 0, accept attempt 1.
-4. If and only if #392 closed + active cleared + post-sync failed, bind the unique original close event, run exact `active set --id iss-00392`, require exit 0 and active readback, then run issue finish attempt 2 with `already_closed=true` and no new close event.
+4. If and only if #392 closed + active cleared + issue-finish post-sync failed, bind the unique original close event, run exact `active set --id iss-00392`, verify exit/stdout/stderr, run exact `active show` and require `iss-00392`, then run issue finish attempt 2 with `already_closed=true` and no new close event. Do not expect or record active-set post-sync.
 5. Repeat restore+finish once for attempt 3 if the second post-sync fails. Three failures stop; no post payload.
 6. Post payload records all finish/restore rows and selects final successful attempt. No `close --id iss-00392`.
 7. Post/read receipt on #392, then measure Epic acceptance, close/read #384, and post/read Epic receipt.
@@ -146,17 +146,17 @@ Repeated sync failure, ambiguous/multiple close event, reopen or active restorat
 | exported path is owner root or does not equal the exact reserved-tree mapping | preserve workspace; block step |
 | ACTIVE/stage/result-family/registered-entry mismatch | fail closed |
 | cleanup retry overwrites deferred desired request or continuation is ambiguous | block dispatch; fix wire implementation |
-| terminal cleanup success/failure lacks actual echo or cleanup-only return | block dispatch |
+| cleanup warning/failure uses an un-tokenized retry or terminal cleanup lacks actual echo/cleanup-only return | block dispatch |
 | wire count/golden/relation mismatch | test defect; do not invent |
 | S40/S50 dogfood drift | restore exact legacy; no merge |
 | S60 current PR/main-push gate not independently GREEN | block PR-B |
-| compatibility verifier misses candidate/evidence/API input, packages, or sees canary | block context transition |
+| verifier combines workspace trees, pre-extracts, has wrong phase/job-state/evidence-name relation, misses bytes, packages, or reads canary | block context transition |
 | raw archive not preserved/rehashed/safe-extracted or workflow permission differs | block PR-C |
 | compatibility/final identities equal or final diff beyond job removal | repeat S70/two-head sequence |
 | final evidence not rerun on final head | block PR-C |
 | S80 creates a commit or tracked change | invalidate final evidence; return to S70 |
 | closure payload precedes measured finish/close facts | invalidate closure |
-| post-sync retry exceeds three attempts, active restore fails, or close event is ambiguous | no closure payload |
+| post-sync retry exceeds three attempts, active-set output or active-show readback fails, or close event is ambiguous | no closure payload |
 | comment receipt/body/actor/timestamp mismatch | invalidate dependent closure |
 | merge tree mismatch | do not finish Issue |
 
