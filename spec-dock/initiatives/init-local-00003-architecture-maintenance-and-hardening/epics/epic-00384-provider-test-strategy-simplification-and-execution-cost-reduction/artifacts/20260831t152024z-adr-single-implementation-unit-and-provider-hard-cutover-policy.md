@@ -9,7 +9,7 @@ ID: "20260831t152024z-adr"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # ADR: Single Implementation Unit and Provider Hard Cutover Policy
@@ -32,7 +32,7 @@ S30, S60 and S80 are the only main gates. S40/S50/S70 are non-main. Main sees ol
 
 ### ADR-D3 — Fixed lifecycle, immutable policy and deterministic continuation
 
-Four roots, two slots, one record and bounded bootstrap/seeds remain fixed. ACTIVE stores old result family, exact cleanup token and nullable desired invocation. Every no-token public command is desired; only the generated hidden-token form is cleanup-only, so a desired update/init-force cannot be mistaken for an old retry. Public continuation separately represents tokenized cleanup retry and desired-after-cleanup command. Cleanup success is cleanup-only and returns desired command or none; retry never overwrites desired intent. Wire remains 38 codes, 142 rows, four records and thirty-three JSON goldens.
+Four roots, two slots, one record and bounded bootstrap/seeds remain fixed. ACTIVE stores old result family, exact cleanup token and nullable desired invocation. Every no-token public command is desired; only the generated hidden-token form is cleanup-only, so a desired update/init-force cannot be mistaken for an old retry. Public continuation separately represents tokenized cleanup retry and desired-after-cleanup command. Cleanup warnings and failures always use exact `active.cleanup_retry_command` with the matching hidden token; un-tokenized lifecycle retry tokens remain limited to lifecycle partial failures. Cleanup success is cleanup-only and returns desired command or none. Wire remains 38 codes, 142 rows, four records and thirty-three JSON goldens.
 
 ### ADR-D4 — Process-independent stage with cleanup-only recovery
 
@@ -40,7 +40,7 @@ Same-filesystem namespace and exact ACTIVE index survive process exit. Every no-
 
 ### ADR-D5 — Private owner root and exported reserved tree per purpose
 
-Each purpose receives a private `mkdtemp` owner root and live FD-backed handle. The root is not exported. Exactly one named reserved child is exported through the corresponding environment variable and passed to commands. Owner reserves, pre-registers fixed outputs or closed subtree policies, spawns, seals, upload-confirms and cleans. Children cannot register or clean. Path/sentinel/nonce/PID is not authority; unknown or policy-invalid entries and owner death preserve and stop.
+Each purpose receives a private `mkdtemp` owner root and live FD-backed handle. The root is not exported. Exactly one named reserved child is exported. Each downloaded-verification step places API snapshots, raw archives, empty extraction destinations and stdout under one provider-attestation or provider-verification tree; the verifier performs extraction. Owner reserves, spawns, seals, upload-confirms and cleans. Children cannot register or clean. Path/sentinel/nonce/PID is not authority; unknown or policy-invalid entries and owner death preserve and stop.
 
 ### ADR-D6 — Exact protected exclusions
 
@@ -60,7 +60,7 @@ S60 repairs current Provider CI references and failure consumers and minimally s
 
 ### ADR-D10 — One producer, raw-byte verifier and least privilege
 
-Only Linux build packages once. Every consumer preserves authenticated raw Actions ZIP bytes, matches API prefixed/upload bare SHA-256, safe-extracts and verifies raw/extracted/API bytes. All nine Provider Gate commands have exact argv and outputs. Workflow default permissions are empty and every job has an exact read-only override; structural tests reject any needs/permission/download/verifier drift.
+Only Linux build packages once. Every consumer preserves authenticated raw Actions ZIP bytes and verifies them in one live-handle tree. Exact phases close in-progress role-set, compatibility green/canary, terminal canary readback and post-run final API/job/artifact states, including evidence-name nullability. All nine Provider Gate commands have exact argv and outputs. Workflow default permissions are empty and every job has an exact read-only override; structural tests reject any needs/permission/download/verifier drift.
 
 ### ADR-D11 — Distinct external two-head identities
 
@@ -72,7 +72,7 @@ Qualification binds `specdock-linux-qualification-v1`. Human requires new while 
 
 ### ADR-D13 — Measured append-only closure with bounded post-sync recovery
 
-After tree equality, current issue finish closes #392 before clear/post-sync. A post-sync-only failure triggers exact active restoration and already-closed retry, maximum three finish attempts. The original close event remains unique; the accepted payload records every attempt/restore and the final successful interval. No redundant #392 close command. Post/Epic comments and receipts remain append-only and fact-after-observation.
+After tree equality, current issue finish closes #392 before clear/post-sync. A post-sync-only failure triggers exact active restoration and already-closed retry, maximum three finish attempts. Active restoration is proven by the current active-set exit/output and active-show readback; active-set has no post-sync value. The original close event remains unique; the accepted payload records every attempt/restore and the final successful interval. No redundant #392 close command. Post/Epic comments and receipts remain append-only and fact-after-observation.
 
 ### ADR-D14 — Documentation and human gates
 

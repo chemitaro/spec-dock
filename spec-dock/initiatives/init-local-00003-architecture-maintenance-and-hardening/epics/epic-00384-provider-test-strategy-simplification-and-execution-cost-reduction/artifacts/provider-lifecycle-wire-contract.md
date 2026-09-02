@@ -1,6 +1,6 @@
 ---
 種別: Normative Artifact
-ID: "provider-lifecycle-wire-contract-v7"
+ID: "provider-lifecycle-wire-contract-v8"
 タイトル: "Provider Lifecycle Wire Contract"
 状態: "accepted"
 最終更新: "2026-09-02"
@@ -8,7 +8,7 @@ ID: "provider-lifecycle-wire-contract-v7"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # Provider Lifecycle Wire Contract
@@ -45,7 +45,7 @@ The normative finite inventory is exact:
 | complete code/context relation rows | 142 |
 | public JSON review goldens | 33 |
 
-The implementation test extracts the §10 table and all fenced JSON review goldens from this file, verifies these counts, parses every JSON block, and asserts one terminal LF. A count drift is a specification/test defect and is not auto-accepted.
+The implementation test extracts the §10 table and all fenced JSON review goldens from this file, verifies these counts, parses every JSON block, and asserts one terminal LF. It additionally parameterizes all seven cleanup-warning rows and requires `retry_command == continuation.next_command == active.cleanup_retry_command` with a matching hidden token. The thirty-three JSON review goldens remain unchanged in count; warning tokenization is proven by the seven finite matrix rows rather than a new review golden. A count drift is a specification/test defect and is not auto-accepted.
 
 Table expressions are exact value functions:
 
@@ -393,7 +393,7 @@ Exact action enums are `none|retry-cleanup|run-request` for `next_action` and `n
 |---|---|
 | `NONE` | `none,null,none,null` |
 | `LIFECYCLE-RETRY` | `run-request,retry_command,none,null` |
-| `CLEANUP-WARNING` | `retry-cleanup,retry_command,none,null` |
+| `CLEANUP-WARNING` | `retry-cleanup,active.cleanup_retry_command,none,null` |
 | `CLEANUP-FAILED-NONE` | `retry-cleanup,retry_command,none,null` |
 | `CLEANUP-FAILED-DEFERRED` | `retry-cleanup,retry_command,run-request,render(active.deferred_invocation)` |
 | `CLEANUP-COMPLETED-NONE` | `none,null,none,null` |
@@ -401,7 +401,7 @@ Exact action enums are `none|retry-cleanup|run-request` for `next_action` and `n
 
 `CLEANUP-FAILED-BY-ROLE-AND-DEFERRED` selects `CLEANUP-FAILED-DEFERRED` for every no-token desired invocation and for a tokenized retry when deferred is present; otherwise it selects `CLEANUP-FAILED-NONE`. `CLEANUP-COMPLETED-BY-ROLE-AND-DEFERRED` applies the parallel success rule.
 
-`render()` uses WIR-CLEANUP-001 exact invocation strings. Action `none` iff paired command is null. `retry_command` equals `continuation.next_command` only for lifecycle retry, cleanup warning and cleanup failure. Cleanup success always has `retry_command=null`.
+`render()` uses WIR-CLEANUP-001 exact invocation strings. Action `none` iff paired command is null. Lifecycle partial-failure rows use the un-tokenized lifecycle retry tokens. Every cleanup-warning and terminal-cleanup-failure row instead sets both `retry_command` and `continuation.next_command` to the exact token-bearing `active.cleanup_retry_command`; substituting an un-tokenized desired command is invalid. Cleanup success always has `retry_command=null`.
 
 ## 9. Status enum
 
@@ -422,12 +422,12 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 |---|---|---|---|---:|---|---|---|---:|---:|---|---|---|---|---:|---|
 | `install-completed` | `create-if-absent install` | `completed` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `complete` | `cleanup-stage` | `null` | `install-create terminal action set` | 0 | `NONE` |
 | `install-completed` | `preserve-only install/reinstall` | `completed` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `install-preserve terminal action set` | 0 | `NONE` |
-| `install-completed-with-cleanup-warning` | `create-if-absent install` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `complete` | `publish-terminal-record` | `install/create-if-absent retry` | `install-create terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
-| `install-completed-with-cleanup-warning` | `preserve-only install/reinstall` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `install/preserve-only retry` | `install-preserve terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
+| `install-completed-with-cleanup-warning` | `create-if-absent install` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `complete` | `publish-terminal-record` | `active.cleanup_retry_command` | `install-create terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
+| `install-completed-with-cleanup-warning` | `preserve-only install/reinstall` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `active.cleanup_retry_command` | `install-preserve terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
 | `update-completed` | `ready update` | `completed` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `update terminal action set` | 0 | `NONE` |
-| `update-completed-with-cleanup-warning` | `ready update` | `completed_with_warnings` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `update retry` | `update terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
+| `update-completed-with-cleanup-warning` | `ready update` | `completed_with_warnings` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `active.cleanup_retry_command` | `update terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
 | `legacy-migration-completed` | `legacy migration` | `completed` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `install-preserve terminal action set` | 0 | `NONE` |
-| `legacy-migration-completed-with-cleanup-warning` | `legacy migration` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `update retry` | `install-preserve terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
+| `legacy-migration-completed-with-cleanup-warning` | `legacy migration` | `completed_with_warnings` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `active.cleanup_retry_command` | `install-preserve terminal + one stage warning` | 0 | `CLEANUP-WARNING` |
 | `uninstall-planned` | `ready dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-READY-PLAN` | 0 | `NONE` |
 | `uninstall-planned` | `exact legacy dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-LEGACY-PLAN` | 0 | `NONE` |
 | `uninstall-planned` | `matching incomplete-uninstall dry-run` | `planned` | `dry-run` | `false` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-INCOMPLETE-PLAN` | 0 | `NONE` |
@@ -436,9 +436,9 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 | `uninstall-completed` | `exact legacy apply` | `completed` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `AP-U-LEGACY-TERM` | 0 | `NONE` |
 | `uninstall-completed` | `successful matching incomplete-uninstall resume apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `cleanup-stage` | `null` | `AP-U-INCOMPLETE-TERM` | 0 | `NONE` |
 | `uninstall-already-absent` | `tooling-absent apply` | `completed` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | false | false | `complete` | `preflight` | `null` | `AP-U-ABSENT` | 0 | `NONE` |
-| `uninstall-completed-with-cleanup-warning` | `ready apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `uninstall retry` | `AP-U-READY-WARN` | 0 | `CLEANUP-WARNING` |
-| `uninstall-completed-with-cleanup-warning` | `exact legacy apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `uninstall retry` | `AP-U-LEGACY-WARN` | 0 | `CLEANUP-WARNING` |
-| `uninstall-completed-with-cleanup-warning` | `matching incomplete-uninstall resume apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `publish-terminal-record` | `uninstall retry` | `AP-U-INCOMPLETE-WARN` | 0 | `CLEANUP-WARNING` |
+| `uninstall-completed-with-cleanup-warning` | `ready apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `active.cleanup_retry_command` | `AP-U-READY-WARN` | 0 | `CLEANUP-WARNING` |
+| `uninstall-completed-with-cleanup-warning` | `exact legacy apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `legacy_fixture.aggregate_digest` | `preserve-only` | true | false | `complete` | `publish-terminal-record` | `active.cleanup_retry_command` | `AP-U-LEGACY-WARN` | 0 | `CLEANUP-WARNING` |
+| `uninstall-completed-with-cleanup-warning` | `matching incomplete-uninstall resume apply` | `completed_with_warnings` | `apply` | `true` | `uninstall` | `record.candidate_digest` | `record.seed_policy=preserve-only` | true | false | `complete` | `publish-terminal-record` | `active.cleanup_retry_command` | `AP-U-INCOMPLETE-WARN` | 0 | `CLEANUP-WARNING` |
 | `already-initialized` | `plain init on ready` | `blocked` | `apply` | `true` | `install` | `record.candidate_digest` | `record.seed_policy` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
 | `already-initialized` | `plain init on exact legacy` | `blocked` | `apply` | `true` | `install` | `legacy_fixture.aggregate_digest` | `preserve-only` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
 | `tooling-not-installed` | `uninstall dry-run on absent` | `blocked` | `dry-run` | `false` | `uninstall` | `null` | `preserve-only` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
@@ -574,7 +574,7 @@ No other code/variant/relation is valid.
 | install/preserve-only retry | `spec-dock update -- ${QUOTED_TARGET}` |
 | update retry | `spec-dock update -- ${QUOTED_TARGET}` |
 | uninstall retry | `spec-dock uninstall --apply --keep-specs -- ${QUOTED_TARGET}` |
-| active.cleanup_retry_command | Select the result-family base command, insert exact `--provider-cleanup-token ${ACTIVE_CLEANUP_TOKEN}` before `--`, and preserve public flags/order exactly as WIR-CLEANUP-001 |
+| active.cleanup_retry_command | Exact tokenized command selected by ACTIVE: `install/create-if-absent -> init-force token form`; `install/preserve-only|legacy-migration|update -> update token form`; `uninstall -> uninstall-apply-keep token form`. Insert exact `--provider-cleanup-token ${ACTIVE_CLEANUP_TOKEN}` before `--` and preserve WIR-CLEANUP-001 flag order. |
 | render(`init`) | `spec-dock init -- ${QUOTED_TARGET}` |
 | render(`init-force`) | `spec-dock init --force -- ${QUOTED_TARGET}` |
 | render(`update`) | `spec-dock update -- ${QUOTED_TARGET}` |
@@ -584,7 +584,7 @@ No other code/variant/relation is valid.
 | render(`uninstall-apply-keep`) | `spec-dock uninstall --apply --keep-specs -- ${QUOTED_TARGET}` |
 | null | JSON null |
 
-`${QUOTED_TARGET}` is `shlex.join([normalized_target])`; `${ACTIVE_CLEANUP_TOKEN}` is exact `active.cleanup_token`. Callers act only on `continuation`; `retry_command` is a compatibility echo. Cleanup failure independently conveys cleanup retry and optional desired-after-cleanup command.
+`${QUOTED_TARGET}` is `shlex.join([normalized_target])`; `${ACTIVE_CLEANUP_TOKEN}` is exact `active.cleanup_token`. Callers act only on `continuation`; `retry_command` is a compatibility echo. Cleanup warning and cleanup failure both expose the exact tokenized cleanup retry, never an un-tokenized lifecycle command. Cleanup failure independently conveys optional desired-after-cleanup command.
 
 ### WIR-TEXT-002 — Exact diagnostics
 
@@ -790,7 +790,7 @@ Digest fixture is 64 lowercase `d` characters. Every block is independently pars
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"partial_failure","code":"terminal-cleanup-failed","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":true,"bootstrap_rolled_back":false,"phase":"cleanup-stage","last_completed_phase":"publish-terminal-record","retry_command":"spec-dock init --force --provider-cleanup-token eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee -- /tmp/consumer","continuation":{"next_action":"retry-cleanup","next_command":"spec-dock init --force --provider-cleanup-token eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee -- /tmp/consumer","after_cleanup_action":"run-request","after_cleanup_command":"spec-dock init -- /tmp/consumer"},"failed_paths":["@provider-stage"],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":1,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"failed","reason":"candidate-stage-cleanup"}],"guidance":["Run continuation.next_command to retry owned stage cleanup.","After cleanup succeeds, run continuation.after_cleanup_command.","The requested terminal tooling state is already durable."],"warnings":[],"errors":["The requested tooling state is durable, but owned stage cleanup failed; follow the continuation object exactly."]}
 ```
 
-### WIR-GOLDEN-CS1 — Tokenized retry completes cleanup and continues desired init
+### WIR-GOLDEN-CS1 — Tokenized retry completes cleanup and returns desired init command
 
 ```json
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"completed","code":"terminal-cleanup-completed","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":true,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"cleanup-stage","retry_command":null,"continuation":{"next_action":"run-request","next_command":"spec-dock init -- /tmp/consumer","after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":1,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"completed","reason":"candidate-stage-cleanup"}],"guidance":["Owned provider stage cleanup completed; no lifecycle operation was executed.","Run continuation.next_command to execute the preserved requested operation."],"warnings":[],"errors":[]}
@@ -802,7 +802,7 @@ Digest fixture is 64 lowercase `d` characters. Every block is independently pars
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"partial_failure","code":"terminal-cleanup-failed","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":true,"bootstrap_rolled_back":false,"phase":"cleanup-stage","last_completed_phase":"publish-terminal-record","retry_command":"spec-dock init --force --provider-cleanup-token eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee -- /tmp/consumer","continuation":{"next_action":"retry-cleanup","next_command":"spec-dock init --force --provider-cleanup-token eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee -- /tmp/consumer","after_cleanup_action":"run-request","after_cleanup_command":"spec-dock init --force -- /tmp/consumer"},"failed_paths":["@provider-stage"],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":1,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"failed","reason":"candidate-stage-cleanup"}],"guidance":["Run continuation.next_command to retry owned stage cleanup.","After cleanup succeeds, run continuation.after_cleanup_command.","The requested terminal tooling state is already durable."],"warnings":[],"errors":["The requested tooling state is durable, but owned stage cleanup failed; follow the continuation object exactly."]}
 ```
 
-### WIR-GOLDEN-CS2 — Tokenized retry completes cleanup and continues desired init --force
+### WIR-GOLDEN-CS2 — Tokenized retry completes cleanup and returns desired init --force command
 
 ```json
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"completed","code":"terminal-cleanup-completed","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":true,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"cleanup-stage","retry_command":null,"continuation":{"next_action":"run-request","next_command":"spec-dock init --force -- /tmp/consumer","after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":1,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"completed","reason":"candidate-stage-cleanup"}],"guidance":["Owned provider stage cleanup completed; no lifecycle operation was executed.","Run continuation.next_command to execute the preserved requested operation."],"warnings":[],"errors":[]}
@@ -814,7 +814,7 @@ Digest fixture is 64 lowercase `d` characters. Every block is independently pars
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"partial_failure","code":"terminal-cleanup-failed","operation":"update","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":true,"bootstrap_rolled_back":false,"phase":"cleanup-stage","last_completed_phase":"publish-terminal-record","retry_command":"spec-dock update --provider-cleanup-token eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee -- /tmp/consumer","continuation":{"next_action":"retry-cleanup","next_command":"spec-dock update --provider-cleanup-token eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee -- /tmp/consumer","after_cleanup_action":"run-request","after_cleanup_command":"spec-dock update -- /tmp/consumer"},"failed_paths":["@provider-stage"],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":1,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"failed","reason":"candidate-stage-cleanup"}],"guidance":["Run continuation.next_command to retry owned stage cleanup.","After cleanup succeeds, run continuation.after_cleanup_command.","The requested terminal tooling state is already durable."],"warnings":[],"errors":["The requested tooling state is durable, but owned stage cleanup failed; follow the continuation object exactly."]}
 ```
 
-### WIR-GOLDEN-CS3 — Tokenized retry completes cleanup and continues desired update
+### WIR-GOLDEN-CS3 — Tokenized retry completes cleanup and returns desired update command
 
 ```json
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"completed","code":"terminal-cleanup-completed","operation":"update","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":true,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"cleanup-stage","retry_command":null,"continuation":{"next_action":"run-request","next_command":"spec-dock update -- /tmp/consumer","after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":1,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"completed","reason":"candidate-stage-cleanup"}],"guidance":["Owned provider stage cleanup completed; no lifecycle operation was executed.","Run continuation.next_command to execute the preserved requested operation."],"warnings":[],"errors":[]}

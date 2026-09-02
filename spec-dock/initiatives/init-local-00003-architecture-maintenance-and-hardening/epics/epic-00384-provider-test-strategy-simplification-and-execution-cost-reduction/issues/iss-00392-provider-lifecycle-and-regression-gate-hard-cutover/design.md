@@ -10,7 +10,7 @@ ID: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
+  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
@@ -120,25 +120,27 @@ Exact one-to-one mapping:
 | full-regression-s60 | `ISS392_WS_FULL_REGRESSION_S60` | `full-regression` | verifier-created timestamp run directories |
 | tripwire | `ISS392_WS_TRIPWIRE` | `tripwire` | `venvs/`, `workspaces/`, `events/` |
 | fresh-consumer | `ISS392_WS_FRESH_CONSUMER` | `consumer` | `venv/`, `repository/`, `evidence/` |
-| workflow-api | `ISS392_WS_WORKFLOW_API` | `api` | `run.json`, `jobs.json`, `artifacts.json` |
-| artifact-download | `ISS392_WS_ARTIFACT_DOWNLOAD` | `artifacts` | `raw/<artifact-name>.zip`, `extracted/<artifact-name>/` |
+| workflow-api | `ISS392_WS_WORKFLOW_API` | `api` | standalone `run.json`, `jobs.json`, `artifacts.json` observation only; never an aggregate-verifier input tree |
+| artifact-download | `ISS392_WS_ARTIFACT_DOWNLOAD` | `artifacts` | standalone archive transport inspection only; never an aggregate-verifier input tree |
 | attestation-draft | `ISS392_WS_ATTESTATION_DRAFT` | `attestation` | `input.json`, `payload.json`, `comment.md`, `receipt.json` |
 | provider-build | `ISS392_WS_PROVIDER_BUILD` | `output` | `candidate/`, `receipt/` |
 | provider-linux | `ISS392_WS_PROVIDER_LINUX` | `role` | `raw/`, `extracted/`, `api/`, `output/` |
 | provider-sdist | `ISS392_WS_PROVIDER_SDIST` | `role` | `raw/`, `extracted/`, `api/`, `output/` |
 | provider-macos | `ISS392_WS_PROVIDER_MACOS` | `role` | `raw/`, `extracted/`, `api/`, `output/` |
-| provider-attestation | `ISS392_WS_PROVIDER_ATTESTATION` | `aggregate` | `raw/`, `extracted/`, `api/`, `output/` |
-| provider-verification | `ISS392_WS_PROVIDER_VERIFICATION` | `verification` | `raw/`, `extracted/`, `api/`, `output/` |
+| provider-attestation | `ISS392_WS_PROVIDER_ATTESTATION` | `aggregate` | `api/{run,jobs,artifacts}.json`, `raw/<artifact>.zip`, initially empty `extracted/<artifact>/`, `output/{role-set-verification,provider-evidence}.json` |
+| provider-verification | `ISS392_WS_PROVIDER_VERIFICATION` | `verification` | `api/{run,jobs,artifacts}.json`, `raw/<artifact>.zip`, initially empty `extracted/<artifact>/`, `output/verify-downloaded-artifact.json` |
 | provider-node-ownership | `ISS392_WS_PROVIDER_NODE_OWNERSHIP` | `verification` | `collection.json`, `result.json` |
 | provider-workflow-structure | `ISS392_WS_PROVIDER_WORKFLOW_STRUCTURE` | `verification` | `result.json` |
 
+A `verify-downloaded-artifact` step uses exactly one live handle and one exported reserved tree: `provider-attestation` for role-set verification or `provider-verification` for compatibility/canary/S80 aggregate verification. Its API snapshots, authenticated raw ZIPs, empty extraction destinations and stdout file all reside under that one tree. Combining `ISS392_WS_WORKFLOW_API`, `ISS392_WS_ARTIFACT_DOWNLOAD` and `ISS392_WS_PROVIDER_VERIFICATION` in one verifier invocation is forbidden. No extraction occurs before the verifier starts; the owner creates and registers each destination as an exact empty directory, and the verifier alone performs safe extraction.
+
 Every command receives an exported reserved tree, never owner root. Before spawn, the live owner calls `register_output()` for every fixed file or subtree capability listed by the purpose row. A child cannot register, widen or clean its own outputs. The registration object is non-serializable and contains the reserved-tree descriptor identity, relative path, expected kind and one closed policy ID.
 
-Exact registration policy IDs are `fixed-file-v1`, `fixed-directory-v1`, `baseline-dist-v1`, `full-regression-output-v1`, `tripwire-output-v1`, `fresh-consumer-output-v1`, `actions-api-snapshot-v1`, `actions-artifact-archive-v1`, `actions-artifact-extraction-v1`, `provider-role-output-v1`, `attestation-output-v1`. `full-regression-output-v1` permits only UTC run directories matching `[0-9]{8}T[0-9]{6}\.[0-9]{6}Z` and the verifier's closed file inventory; the other policies validate the exact child layouts in the table. No generic recursive-write registration exists.
+Exact registration policy IDs are `fixed-file-v1`, `fixed-directory-v1`, `baseline-dist-v1`, `full-regression-output-v1`, `tripwire-output-v1`, `fresh-consumer-output-v1`, `actions-api-snapshot-v1`, `actions-artifact-archive-v1`, `actions-artifact-extraction-v1`, `provider-role-output-v1`, `provider-verification-output-v1`, `attestation-output-v1`. `full-regression-output-v1` permits only UTC run directories matching `[0-9]{8}T[0-9]{6}\.[0-9]{6}Z` and the verifier's closed file inventory; the other policies validate the exact child layouts in the table. No generic recursive-write registration exists.
 
 The live owner creates the reserved directory before spawn, records device/inode in memory, pre-registers capabilities, starts the child with the reserved path plus inherited descriptor, and seals a no-follow inventory after exit. Any write outside a registered capability, any policy-invalid descendant, or any unknown top-level owner-root entry changes the state to `preserved-on-failure` and fails the step. Environment path, sentinel, nonce or PID cannot recreate registration or cleanup authority.
 
-Exact APIs are `reserve_tree(handle,name)`, `register_output(handle,reserved_tree,relative_path,expected_kind,policy_id)`, `spawn_registered_child(handle,reserved_tree,registrations,argv,env,stdout_registration=None)`, `seal_tree(handle,reserved_tree,result)`, `begin_upload(handle,sealed_tree)`, `confirm_upload(handle,sealed_tree,artifact_id,name,digest)`, `cleanup_external_workspace(handle)`. Cleanup accepts the live handle only. In Actions, one background owner process with inherited FDs remains alive until every required upload is confirmed; upload failure or cancellation preserves the workspace and fails the job. Tests cover root exposure, env-to-root mismatch, child attempted registration, unregistered entry, policy-invalid descendant, child escape, owner death, premature cleanup and after-upload success.
+Exact APIs are `reserve_tree(handle,name)`, `register_output(handle,reserved_tree,relative_path,expected_kind,policy_id)`, `spawn_registered_child(handle,reserved_tree,registrations,argv,env,stdout_registration=None)`, `seal_tree(handle,reserved_tree,result)`, `begin_upload(handle,sealed_tree)`, `confirm_upload(handle,sealed_tree,artifact_id,name,digest)`, `cleanup_external_workspace(handle)`. Cleanup accepts the live handle only. In Actions, one background owner process with inherited FDs remains alive until every required upload is confirmed; upload failure or cancellation preserves the workspace and fails the job. Tests cover root exposure, env-to-root mismatch, cross-tree aggregate invocation, pre-extraction, nonempty destination, child attempted registration, unregistered entry, policy-invalid descendant, child escape, owner death, premature cleanup and after-upload success.
 
 ### I392-D-008 — Protected/exclusion manifests
 
@@ -206,6 +208,8 @@ Final head removes only `provider-tests`. Exact job permissions:
 
 No job has `issues:write`, `pull-requests:write`, `contents:write`, `actions:write`, `id-token:write`, `checks:write` or `security-events:write`. The canary uses the same workflow/job permissions; only `provider-gate` reads `.github/provider-gate-canary-red`. Append-only Issue comment POST is a separate human operation using `issues:write`; readback uses `issues:read`.
 
+Compatibility `provider-tests` creates one `provider-verification` owner/step, stores API snapshots, raw candidate/evidence ZIPs, empty extraction destinations and verifier stdout under that single reserved tree, then calls the exact downloaded verifier. It invokes no package build and does not read the canary marker. It polls authenticated jobs API until `provider-gate` is terminal, selects `compatibility-aggregate-green` for success or `compatibility-aggregate-canary` for failure, and remains GREEN when actual-byte verification succeeds.
+
 Exact job outputs are:
 
 | Job | Exact outputs in declaration order |
@@ -220,7 +224,7 @@ Exact job outputs are:
 
 Each digest output is the bare lowercase 64-hex output of its one `actions/upload-artifact@v4` step. Each downstream job compares the output ID/name/digest with the authenticated REST artifact object and the complete raw ZIP bytes. An empty output, a duplicate artifact name, or a job output that names another run is a relation mismatch.
 
-`verify-workflow-structure` parses the workflow as YAML and asserts top-level empty permissions, exact job set/order for `head_kind`, exact override maps, exact needs order, exact job output names/order, only one packaging command in producer package phase, zero packaging commands in producer finalize and every other job, exact artifact names, the descriptor-bound raw-download invocation, and complete provider-gate argv arrays. Missing, extra, inherited or write permission is `provider-gate-workflow-structure-mismatch`.
+`verify-workflow-structure` parses the workflow as YAML and asserts top-level empty permissions, exact job set/order for `head_kind`, exact override maps, exact needs order, exact job output names/order, only one packaging command in producer package phase, zero packaging commands in producer finalize and every other job, exact artifact names, one-tree descriptor-bound raw-download/extraction/verifier invocation, provider-tests terminal-gate polling and phase selection, and complete provider-gate argv arrays. Missing, extra, inherited or write permission is `provider-gate-workflow-structure-mismatch`.
 
 ### I392-D-014 — Authenticated raw artifact download and safe extraction
 
@@ -250,21 +254,32 @@ Safe extraction is performed only by provider-gate into the exact empty `extract
 
 This section is the sole normative authority for `scripts/provider_gate.py`, raw Actions archive verification, role evidence, receipts, aggregate evidence and external attestations. JSON is UTF-8 compact with displayed key order, `ensure_ascii=False`, separators `(",",":")`, one final LF, no BOM/NUL/duplicate/extra keys. `GitOid` is 40 lowercase hex; `Sha256` 64 lowercase hex; `ActionsDigest` `sha256:` plus Sha256; IDs are integers 1..9007199254740991; run attempt 1..100; byte size 1..9223372036854775807; count 0..1000000; UTC timestamps `YYYY-MM-DDTHH:MM:SSZ`; duration milliseconds 0..3600000. Repository is exact `chemitaro/spec-dock`; role order is producer, linux-canonical, sdist-smoke, macos-delta.
 
-### I392-D-016 — Digest and archive relations
+### I392-D-016 — Digest, archive and phase-aware API relations
 
 Every file SHA-256 covers complete actual bytes, including JSON LF. Actions artifact digest covers complete authenticated raw ZIP bytes and must match API prefixed and upload-output bare forms. Extracted file descriptors hash actual extracted bytes. Environment fingerprint hashes exact compact+LF ordered input. Provider aggregate hashes all eight subordinate actual files. Attestation payload and comment body hashes cover complete bytes. Declared hashes without bytes are invalid.
 
-`RAW-ARCHIVE-DIGEST-V1` is the independent transport oracle: exact 128 bytes, SHA-256 `f045719a6085e235f04e34bb12054b841ee0457dd4c424f7ecbd781c0f307368`, hex `504b030414000000000000002100ac2c607508000000080000000b0000007061796c6f61642e747874666978747572650a504b0102140314000000000000002100ac2c607508000000080000000b0000000000000000000000a481000000007061796c6f61642e747874504b0506000000000100010039000000310000000000`. Tests reconstruct exact bytes and require API digest `sha256:f045719a6085e235f04e34bb12054b841ee0457dd4c424f7ecbd781c0f307368` and upload output `f045719a6085e235f04e34bb12054b841ee0457dd4c424f7ecbd781c0f307368`.
+`RAW-ARCHIVE-DIGEST-V1` remains the independent transport oracle: exact 128 bytes, SHA-256 `f045719a6085e235f04e34bb12054b841ee0457dd4c424f7ecbd781c0f307368`, and the displayed hex bytes in D-026. Tests reconstruct exact bytes and require API digest `sha256:f045719a6085e235f04e34bb12054b841ee0457dd4c424f7ecbd781c0f307368` and upload output `f045719a6085e235f04e34bb12054b841ee0457dd4c424f7ecbd781c0f307368`.
 
-The three API input files are authenticated raw UTF-8 JSON responses and are hashed over their complete received bytes before parsing. Duplicate JSON keys or invalid UTF-8 are rejected. GitHub may add unrelated fields; they are retained in the raw byte hash but have no semantic authority. The verifier requires these exact field paths and types:
+`verify-downloaded-artifact --verification-phase` is the exact enum below. Scope and phase combinations outside this table are argument-invalid.
 
-| File | Required field paths and relations |
-|---|---|
-| `run.json` | `id` PositiveId equals `--workflow-run-id`; `run_attempt` RunAttempt equals flag; `head_sha` equals source SHA; `event` is `pull_request|workflow_dispatch`; `status=completed`; `conclusion=success`; `repository.full_name=chemitaro/spec-dock`; `workflow_id` PositiveId; `html_url` nonempty HTTPS URL |
-| `jobs.json` | `total_count` Count; `jobs` array with unique PositiveId `id`; exact required `name`; `status=completed`; `conclusion=success`; UTC `started_at,completed_at`; `run_id` equals run; exact `steps` array with unique positive `number`, nonempty `name`, `status=completed`, `conclusion=success`; exact job set/needs are validated against the workflow |
-| `artifacts.json` | `total_count` Count; `artifacts` array with unique PositiveId `id`; unique exact `name`; positive `size_in_bytes`; exact `digest` ActionsDigest; `expired=false`; `workflow_run.id` equals run; UTC `created_at,expires_at`; nonempty HTTPS `archive_download_url` |
+| Verification phase | Scope | Invocation location | Run `status/conclusion` | `provider-gate` | `provider-tests` | `evidence_artifact_name` |
+|---|---|---|---|---|---|---|
+| `role-set-compatibility` | `role-set` | in `provider-attestation` on compatibility head | `in_progress/null` | `queued/null` | `queued/null` | null |
+| `role-set-final` | `role-set` | in `provider-attestation` on final head | `in_progress/null` | `queued/null` | absent | null |
+| `compatibility-aggregate-green` | `aggregate` | in compatibility `provider-tests` after gate terminal polling | `in_progress/null` | `completed/success` | `in_progress/null` | exact `provider-evidence-${SOURCE_SHA}` |
+| `compatibility-aggregate-canary` | `aggregate` | in canary `provider-tests` after gate terminal polling | `in_progress/null` | `completed/failure` | `in_progress/null` | exact `provider-evidence-${SOURCE_SHA}` |
+| `compatibility-canary-post-run` | `aggregate` | external canary readback after run terminal | `completed/failure` | `completed/failure` | `completed/success` | exact `provider-evidence-${SOURCE_SHA}` |
+| `post-run-final` | `aggregate` | S80 after final run terminal | `completed/success` | `completed/success` | absent | exact `provider-evidence-${SOURCE_SHA}` |
 
-The verifier success object contains `api_snapshots` in exact order `run,jobs,artifacts`. Each row has ordered keys `kind,filename,size_bytes,sha256` and hashes the complete raw snapshot bytes.
+For both role-set phases, `provider-build-artifacts`, `provider-linux-canonical`, `provider-sdist-smoke` and `provider-macos-delta` are `completed/success`; `provider-attestation` is `in_progress/null`. For compatibility aggregate phases, those four roles and `provider-attestation` are `completed/success`. For `post-run-final`, every final-head job is `completed/success`. No `cancelled`, `skipped`, `neutral`, `timed_out` or missing required job is accepted.
+
+Job-step relations are exact. A completed/success job has every step `completed/success`; a queued job has an empty steps array. For an in-workflow snapshot, the current job has prior steps `completed/success`, exact step `capture-provider-api-snapshots` as `in_progress/null`, and every later step—including `verify-downloaded-artifact`, assembly and upload where present—as `queued/null`. The snapshot is fsynced after the API response completes, then the capture step completes and the verifier starts. A completed/failure canary gate has prior steps `completed/success` and exactly the canary enforcement step `completed/failure`. IDs are unique and `run_id` equals the selected run.
+
+The three API files are authenticated raw UTF-8 JSON responses and are hashed before parsing. Duplicate keys or invalid UTF-8 are rejected. Unrelated GitHub fields remain in the raw hash but have no authority. Common required fields are: run ID/attempt/head/repository/workflow/event; unique job IDs/names/timestamps/steps; and unique artifact IDs/names/sizes/digests/expiry/run/URLs. Status, conclusion, exact job set and evidence-artifact presence are selected only by the phase table above.
+
+Artifact inventory is phase-closed. Role-set phases require candidate plus four receipt artifacts and forbid `provider-evidence-*`. Aggregate phases require candidate plus exact provider evidence; other artifacts may be present in the API response but are not accepted as repeated verifier options. `candidate_artifact_name` is always exact and non-null. `evidence_artifact_name` is JSON null only for role-set phases and exact non-null for aggregate phases.
+
+The verifier success object contains `verification_phase` and `api_snapshots` in exact order `run,jobs,artifacts`. Each snapshot row has ordered keys `kind,filename,size_bytes,sha256` and hashes complete raw bytes.
 
 ### I392-D-017 — Candidate manifest, role evidence and receipt schemas
 
@@ -432,6 +447,7 @@ Exact role-set verifier argv used in `provider-attestation` before assembly:
 ```bash
 uv run python scripts/provider_gate.py verify-downloaded-artifact \
   --scope role-set \
+  --verification-phase "$ROLE_SET_VERIFICATION_PHASE" \
   --repository chemitaro/spec-dock \
   --repository-root "$REPOSITORY_ROOT" \
   --source-sha "$SOURCE_SHA" \
@@ -460,7 +476,7 @@ uv run python scripts/provider_gate.py verify-downloaded-artifact \
   --json
 ```
 
-The live owner binds stdout to the pre-reserved `output/role-set-verification.json` file. Repeated `--expected-upload-digest`, `--artifact-archive`, and `--artifact-dir` options are each exact, unique, and ordered `candidate,producer,linux-canonical,sdist-smoke,macos-delta`.
+The live owner binds stdout to the pre-reserved `output/role-set-verification.json` file. `ROLE_SET_VERIFICATION_PHASE` is exactly `role-set-compatibility` when `provider-tests` exists in the checked workflow and `role-set-final` otherwise; `verify-workflow-structure` proves that relation. Repeated `--expected-upload-digest`, `--artifact-archive`, and `--artifact-dir` options are each exact, unique, and ordered `candidate,producer,linux-canonical,sdist-smoke,macos-delta`. The five extraction destinations are owner-created, registered and empty before the verifier; no earlier extraction is permitted.
 
 Exact role-set assembly argv:
 
@@ -490,27 +506,30 @@ uv run python scripts/provider_gate.py assemble-provider-evidence \
   --json
 ```
 
-Exact aggregate verifier argv used by compatibility and S80:
+Exact aggregate verifier argv used by compatibility, canary readback and S80:
 
 ```bash
 uv run python scripts/provider_gate.py verify-downloaded-artifact \
   --scope aggregate \
+  --verification-phase "$AGGREGATE_VERIFICATION_PHASE" \
   --repository chemitaro/spec-dock \
   --repository-root "$REPOSITORY_ROOT" \
   --source-sha "$SOURCE_SHA" \
   --source-tree "$SOURCE_TREE" \
   --workflow-run-id "$RUN_ID" \
   --workflow-run-attempt "$RUN_ATTEMPT" \
-  --run-json "$ISS392_WS_WORKFLOW_API/run.json" \
-  --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json" \
-  --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json" \
-  --artifact-archive "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-candidate-$SOURCE_SHA.zip" \
-  --artifact-archive "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-evidence-$SOURCE_SHA.zip" \
-  --artifact-dir "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-candidate-$SOURCE_SHA" \
-  --artifact-dir "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-evidence-$SOURCE_SHA" \
+  --run-json "$ISS392_WS_PROVIDER_VERIFICATION/api/run.json" \
+  --jobs-json "$ISS392_WS_PROVIDER_VERIFICATION/api/jobs.json" \
+  --artifacts-json "$ISS392_WS_PROVIDER_VERIFICATION/api/artifacts.json" \
+  --artifact-archive "candidate=$ISS392_WS_PROVIDER_VERIFICATION/raw/provider-candidate-$SOURCE_SHA.zip" \
+  --artifact-archive "provider-evidence=$ISS392_WS_PROVIDER_VERIFICATION/raw/provider-evidence-$SOURCE_SHA.zip" \
+  --artifact-dir "candidate=$ISS392_WS_PROVIDER_VERIFICATION/extracted/provider-candidate-$SOURCE_SHA" \
+  --artifact-dir "provider-evidence=$ISS392_WS_PROVIDER_VERIFICATION/extracted/provider-evidence-$SOURCE_SHA" \
   --workspace "$ISS392_WS_PROVIDER_VERIFICATION" \
   --json
 ```
+
+`AGGREGATE_VERIFICATION_PHASE` is exactly one of `compatibility-aggregate-green`, `compatibility-aggregate-canary`, `compatibility-canary-post-run`, or `post-run-final` at the locations fixed by D-016. One live `provider-verification` owner pre-registers API files, raw ZIPs, exact empty extraction directories and `output/verify-downloaded-artifact.json`, performs authenticated downloads, then spawns the verifier. The verifier performs extraction and writes its stdout to the registered output file. `ISS392_WS_WORKFLOW_API` and `ISS392_WS_ARTIFACT_DOWNLOAD` are never arguments to this invocation.
 
 Exact ownership argv:
 
@@ -553,7 +572,7 @@ uv run python scripts/provider_gate.py emit-attestation \
 
 ### I392-D-020 — Exact stdout, stderr and failure mapping
 
-All flags displayed in D-019 are required for the displayed form, and no unlisted flag or positional argument is accepted. `build-candidate` accepts exactly the two `--phase` forms shown. `verify-downloaded-artifact` accepts exactly `--scope role-set` with five ordered digest/archive/directory triples or `--scope aggregate` with two ordered archive/directory pairs and no `--expected-upload-digest`. `verify-workflow-structure --head-kind` accepts exactly `compatibility|final`. `emit-attestation --kind` accepts exactly the three displayed kinds.
+All flags displayed in D-019 are required for the displayed form, and no unlisted flag or positional argument is accepted. `build-candidate` accepts exactly the two `--phase` forms shown. `verify-downloaded-artifact` accepts exactly `--scope role-set` with a matching `role-set-*` verification phase and five ordered digest/archive/directory triples, or `--scope aggregate` with one matching aggregate verification phase and two ordered archive/directory pairs with no `--expected-upload-digest`. Scope/phase mismatch is arguments-invalid. `verify-workflow-structure --head-kind` accepts exactly `compatibility|final`. `emit-attestation --kind` accepts exactly the three displayed kinds.
 
 Success writes one compact-plus-LF JSON object to stdout and nothing to stderr. Post-subcommand parse or typed execution failure writes one compact-plus-LF JSON object with exact ordered keys `schema_version,status,code,command,message,exit_code` to stdout and nothing to stderr. Before subcommand recognition, stdout is empty and stderr is exact `provider-gate: error (provider-gate-arguments-invalid): The provider-gate command arguments are invalid.` plus LF, exit 2.
 
@@ -585,48 +604,67 @@ Success codes and exact ordered keys:
 | `run-sdist-smoke` | `sdist-smoke-passed` | `schema_version,status,code,command,repository,source_sha,source_tree,workflow_run_id,receipt,evidence,build_invocation_count` |
 | `run-macos-delta` | `macos-delta-passed` | `schema_version,status,code,command,repository,source_sha,source_tree,workflow_run_id,receipt,evidence,build_invocation_count` |
 | `assemble-provider-evidence` | `provider-evidence-assembled` | `schema_version,status,code,command,repository,source_sha,source_tree,workflow_run_id,artifact_name,file_count,files` |
-| `verify-downloaded-artifact --scope role-set` | `downloaded-artifact-verified` | `schema_version,status,code,command,scope,repository,workflow_run_id,source_sha,source_tree,candidate_artifact_name,evidence_artifact_name,api_snapshots,artifact_archives,receipt_roles,evidence_files` |
-| `verify-downloaded-artifact --scope aggregate` | `downloaded-artifact-verified` | `schema_version,status,code,command,scope,repository,workflow_run_id,source_sha,source_tree,candidate_artifact_name,evidence_artifact_name,api_snapshots,artifact_archives,receipt_roles,evidence_files` |
+| `verify-downloaded-artifact --scope role-set` | `downloaded-artifact-verified` | `schema_version,status,code,command,scope,verification_phase,repository,workflow_run_id,source_sha,source_tree,candidate_artifact_name,evidence_artifact_name,api_snapshots,artifact_archives,receipt_roles,evidence_files` |
+| `verify-downloaded-artifact --scope aggregate` | `downloaded-artifact-verified` | `schema_version,status,code,command,scope,verification_phase,repository,workflow_run_id,source_sha,source_tree,candidate_artifact_name,evidence_artifact_name,api_snapshots,artifact_archives,receipt_roles,evidence_files` |
 | `verify-node-ownership` | `node-ownership-verified` | `schema_version,status,code,command,ownership_map_sha256,collected_node_count,owned_contract_count` |
 | `verify-workflow-structure` | `workflow-structure-verified` | `schema_version,status,code,command,workflow_sha256,head_kind,job_count,jobs` |
 | `emit-attestation` | `attestation-emitted` | `schema_version,status,code,command,kind,payload_path,payload_size_bytes,payload_sha256,comment_path,comment_size_bytes,comment_sha256` |
 
-Success status is exact `completed`. File descriptors are exact ordered keys `filename,size_bytes,sha256`. Role build counts are zero. Producer package phase count is one and finalize phase count is zero. Assembly file count is nine. Workflow jobs are in declaration order. Extra or missing keys are `provider-gate-schema-invalid`.
+Success status is exact `completed`. File descriptors are exact ordered keys `filename,size_bytes,sha256`. `verification_phase` is mandatory for downloaded verification. `evidence_artifact_name` is null exactly for role-set phases and exact non-null for aggregate phases. Role build counts are zero. Producer package phase count is one and finalize phase count is zero. Assembly file count is nine. Workflow jobs are in declaration order. Extra or missing keys are `provider-gate-schema-invalid`.
 
-### I392-D-021 — Actual-byte verifier and authenticated archive dataflow
+### I392-D-021 — Single-owner actual-byte verifier and authenticated archive dataflow
 
-The same verifier is used in provider-attestation (`scope=role-set`), compatibility provider-tests and S80 (`scope=aggregate`). Before invocation, the live owner creates each raw file no-follow/exclusive mode 0600 and passes its open descriptor as stdout for the exact authenticated `gh api` download. Raw ZIP remains sealed until verification and upload/read confirmation.
+The same verifier is used in provider-attestation (`scope=role-set`), compatibility provider-tests, external canary readback and S80 (`scope=aggregate`). Each invocation has exactly one live owner and one reserved tree. Before invocation, that owner creates API files and raw files no-follow/exclusive mode 0600, streams authenticated `gh api` responses to already-open descriptors, and creates each registered extraction destination as an exact empty directory. Raw ZIPs remain sealed until verification and any required upload/read confirmation.
 
-For every raw archive, verifier:
+For every raw archive the verifier, and no preceding step:
 
-1. hashes complete raw bytes and compares API `sha256:<hex>` and upload output `<hex>`;
-2. checks ZIP CRC and safe-extracts to the exact empty supplied directory;
+1. hashes complete raw bytes and compares API `sha256:<hex>` and any required upload output `<hex>`;
+2. checks ZIP CRC and safe-extracts into its exact empty supplied directory;
 3. rejects encrypted, duplicate, absolute, backslash, dot/dotdot, NUL/non-UTF-8, symlink, special, unsupported compression or size-limit entries;
 4. hashes every extracted actual byte and verifies exact inventory;
-5. validates run/jobs/artifacts snapshots, source/tree/run attempt/job IDs/names/needs/status/permissions;
+5. validates the D-016 verification-phase run/job/artifact state, source/tree/run attempt/job IDs/names/needs/status/permissions;
 6. validates candidate manifest, role evidence, receipts, provider aggregate, one producer/zero consumer builds and stable qualification;
-7. emits the exact archive descriptor list and success object.
+7. emits the exact phase-aware success object to the registered stdout file.
 
-Filename, stated hash, extracted directory or API response alone is never sufficient. Role-set order and aggregate order are exact and duplicate repeated options are arguments-invalid.
+Provider-attestation uses only `ISS392_WS_PROVIDER_ATTESTATION`. Compatibility/canary/S80 use only `ISS392_WS_PROVIDER_VERIFICATION`. Filename, stated hash, pre-extracted directory, separate API tree or API response alone is insufficient. Repeated option order is exact and duplicate options are arguments-invalid.
 
+Compatibility `provider-tests` polls authenticated jobs API until provider-gate is terminal before it snapshots inputs. Gate success selects `compatibility-aggregate-green`; gate failure selects `compatibility-aggregate-canary`. The job never reads the canary file and its success depends only on actual-byte verification. After the canary run terminates, external readback runs `compatibility-canary-post-run` and proves run failure, gate failure and provider-tests success. S80 uses only `post-run-final`.
 
-### I392-D-022 — Attestation payloads and post-sync recovery
+### I392-D-022 — Attestation payloads and observable post-sync recovery
 
 Pre-merge and Epic payload key sets remain current. Post-merge payload exact ordered keys are:
 
 `schema_version,kind,repository,issue_number,pre_merge_comment_id,pre_merge_payload_sha256,final_head_sha,final_head_tree,merge_commit_sha,merge_commit_tree,tree_equal,merge_actor,merged_at,issue_finish_command,max_finish_attempts,issue_finish_attempts,active_restore_attempts,accepted_issue_finish_attempt,github_issue_closed_event_id,github_issue_closed_at,generated_at`.
 
-`max_finish_attempts` is exact 3. Each `issue_finish_attempts` row keys are `attempt,started_at,completed_at,exit_code,status,already_closed,active_cleared,post_sync_status`; status `finished|post-sync-failed`, post-sync `completed|failed`. Each restore row keys are `before_attempt,command,started_at,completed_at,exit_code,active_issue_id_after,post_sync_status`; command exact `python3 ./spec-dock/scripts/spec-dock active set --id iss-00392`.
+`max_finish_attempts` is exact 3. Each `issue_finish_attempts` row keys are `attempt,started_at,completed_at,exit_code,status,already_closed,active_cleared,post_sync_status`; status `finished|post-sync-failed`, post-sync `completed|failed`.
+
+`active set` has no post-mutation sync contract and therefore restore rows contain no `post_sync_status`. Each restore row exact ordered keys are `before_attempt,command,started_at,completed_at,exit_code,stdout_sha256,stderr_sha256,readback_command,readback_started_at,readback_completed_at,readback_exit_code,readback_stdout_sha256,readback_stderr_sha256,active_issue_id_after`. The command is exact `python3 ./spec-dock/scripts/spec-dock active set --id iss-00392`; readback is exact `python3 ./spec-dock/scripts/spec-dock active show`.
+
+For a successful restore, active-set exit is 0, stderr is empty SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, and stdout bytes are exactly:
+
+```text
+spec-dock: ok (active set) target=iss-00392 initiative=init-local-00003 epic=epic-00384 issue=iss-00392
+```
+
+Their SHA-256 is `1967627d9f241b2dccef144b99af201ea0f196efe71941a59e1275d0f8bfc1cd`. Readback exit is 0, stderr is empty SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, and stdout bytes are exactly:
+
+```text
+initiative: init-local-00003 (spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening)
+epic: epic-00384 (spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction)
+issue: iss-00392 (spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover)
+```
+
+Their SHA-256 is `7b85ea56ea35d990a60006e46d08482aef029c0f3e5ace33955b0d5d1867004a` and parsed active issue is exact `iss-00392`. Raw stdout/stderr bytes are retained in the external attestation workspace and independently rehashed; hashes without bytes are invalid.
 
 Closure algorithm:
 
 1. Record attempt interval and run exact issue-finish command. The implementation closes #392 before clear/post-sync.
-2. Exit 0 requires status finished, active cleared true, post-sync completed; this becomes `accepted_issue_finish_attempt`.
+2. Exit 0 requires status finished, active cleared true and post-sync completed; this becomes `accepted_issue_finish_attempt`.
 3. Exit 1 is recoverable only when measured result proves #392 closed, active cleared true and post-sync failed. Immediately read back the unique original close event. No post payload yet.
-4. Before next attempt, run exact active-set command, require exit 0, post-sync completed and readback active issue exactly `iss-00392`; otherwise stop.
-5. Rerun issue finish. Since #392 is already closed, require `already_closed=true`, no additional close event, active cleared true. If post-sync fails, repeat once more. After three failed attempts stop; no accepted payload.
-6. The accepted payload records all attempts/restores and references the final successful interval. Earlier rows must be post-sync-failed; attempts 2/3 must already-closed true. The original close event remains the only close evidence.
-7. Ambiguous/multiple close events, reopen, failed active restoration, status mismatch or fourth attempt is hard stop. Never run `close --id iss-00392`.
+4. Before the next attempt, run exact active-set command, require its observable exit/stdout/stderr contract, run exact active-show readback and require its observable exit/stdout/stderr/active-ID contract. Do not infer or record active-set post-sync.
+5. Rerun issue finish. Since #392 is already closed, require `already_closed=true`, no additional close event and active cleared true. If issue-finish post-sync fails, repeat restore+finish once more. After three failed finish attempts stop; no accepted payload.
+6. The accepted payload records all attempt and restore observations and references the final successful finish interval. Earlier finish rows are post-sync-failed; attempts 2/3 have already-closed true. The original close event remains the only close evidence.
+7. Ambiguous/multiple close events, reopen, active-set failure, active-show mismatch, stdout/stderr hash mismatch, third finish failure or fourth attempt is a hard stop. Never run `close --id iss-00392`.
 
 ### I392-D-023 — Attestation emitter and append-only comments
 
@@ -634,17 +672,17 @@ Exact emitter argv is D-019. Inputs contain only already measured facts. Output 
 
 ### I392-D-024 — Workspace and workflow lifecycle
 
-Local owner states are open, child-running, sealed, upload-pending, upload-confirmed, cleaned, preserved-on-failure. Actions background owner receives exact control messages but path/nonce alone confers no cleanup. It retains live descriptors through upload and confirms actual artifact ID/name/digest. Raw archives are retained through aggregate/compatibility/S80 verification and then cleaned only through the live handle. Every plan command uses the exact exported reserved-tree variable from D-007.
+Local owner states are open, child-running, sealed, upload-pending, upload-confirmed, cleaned, preserved-on-failure. Actions background owner receives exact control messages but path/nonce alone confers no cleanup. It retains live descriptors through upload and confirms actual artifact ID/name/digest. For each verifier step, one owner controls API capture, raw download, empty extraction destinations, verifier stdout and any upload confirmation under one reserved tree. Raw archives are retained through aggregate/compatibility/canary/S80 verification and then cleaned only through the live handle. Every plan command uses the exact exported reserved-tree variable from D-007.
 
 ### I392-D-025 — Heads, environment and structural tests
 
-S70 creates both compatibility and final tracked heads; final differs only by compatibility job removal. S80 is read-only. Qualification uses `specdock-linux-qualification-v1` and one exact fingerprint across 20 runs. Structural tests compare complete argv arrays, repeated option order, top-level/job permissions, needs, artifact names, authenticated raw download step, raw preservation, extraction calls, one packager and zero consumer builds. Any drift blocks PR-C.
+S70 creates both compatibility and final tracked heads; final differs only by compatibility job removal. S80 is read-only. Qualification uses `specdock-linux-qualification-v1` and one exact fingerprint across 20 runs. Structural tests compare complete argv arrays, repeated option order, top-level/job permissions, needs, artifact names, one-tree authenticated raw download/extraction/verifier flow, phase-aware API/job-state tables, evidence-artifact nullability, provider-tests gate polling, one packager and zero consumer builds. Any drift blocks PR-C.
 
 ## 9. Canonical evidence and attestation fixtures
 
-### I392-D-026 — `EVIDENCE-FIXTURE-V4`
+### I392-D-026 — `EVIDENCE-FIXTURE-V5`
 
-This is a normative serializer oracle, not a runtime identity allowlist. JSON is exact compact UTF-8 plus LF. Synthetic compatibility/final identities remain distinct. The post fixture deliberately demonstrates first-attempt post-sync failure, successful active restoration, and second-attempt already-closed finish. The table contains exactly twenty-six vectors. All sizes and hashes below are mechanically computed from the displayed bytes.
+This is a normative serializer oracle, not a runtime identity allowlist. JSON is exact compact UTF-8 plus LF. Synthetic compatibility/final identities remain distinct. The verifier stdout fixture is the exact `post-run-final` aggregate profile. The post fixture deliberately demonstrates first-attempt issue-finish post-sync failure, observable active-set/active-show restoration, and second-attempt already-closed finish. The table contains exactly twenty-six vectors. All sizes and hashes below are mechanically computed from the displayed bytes.
 
 | Fixture | Size bytes | SHA-256 |
 |---|---:|---|
@@ -660,19 +698,19 @@ This is a normative serializer oracle, not a runtime identity allowlist. JSON is
 | `provider-receipt-macos-delta.json` | 1249 | `cd1da241faff23a475fad5fc72463f62456dc2ac10ae21a6819c4640f48dad2e` |
 | `provider-evidence.json` | 4421 | `6b20606e234cbc0a43c6a89e98efdbc7fd59afe341293d4f6039bcfb166dbdfa` |
 | `pre-merge-attestation-v1.json` | 1706 | `81a8cb8ffac801b7aacb8909380b644be1e58e77a474127205d2785ebd8a1ea4` |
-| `post-merge-closure-v1.json` | 1515 | `20433930358f717cb7afc98c86f84f5a794032dc02b97c112c64c51d062d9dd4` |
-| `epic-closure-v1.json` | 519 | `87ca8c93aba0f9f1a6b2f8a134b3c42b5945b9fc5534ad71e9b7920434aed68e` |
+| `post-merge-closure-v1.json` | 2020 | `9ae45c0e264aeddf17d1c50b02a8966513c7ca902615a60435401b36aad31891` |
+| `epic-closure-v1.json` | 519 | `3eaf09de7b9096566d2b7960cd6f7e920228661b1fc9a594701def15a7d5a05e` |
 | `comment-receipt-pre-merge.json` | 584 | `aa100132e8a3d738c1a0959845a00d42cfd16a643ca19a936af1a063b969a1ae` |
-| `comment-receipt-post-merge.json` | 581 | `bdb84b6b3829b018806c5e9d72eb61c25e04a9f3abdfab6415b55170a72537f4` |
-| `comment-receipt-epic.json` | 574 | `af63e62c9c33af027763d154205b653295e6910c34eafef2e8e753c1b1bd9a99` |
+| `comment-receipt-post-merge.json` | 581 | `c194bd57126b0f57c8bcc9cd3b4b8e055e2696dc834e0f63934789cbe4e5f1d1` |
+| `comment-receipt-epic.json` | 574 | `eaadf4eefa92918d71bb775fec947ab59136ffa25668523fc6aa807342e4032c` |
 | `run-api.json` | 292 | `178e538f002baafbdbba399a117f5031c7ff07e1ae691abec0b12e2cef0160b9` |
 | `jobs-api.json` | 1702 | `753f6326ffa4b1d1e910e01ec2e07a8d73da6355186ec001dfca350ab4251549` |
 | `artifacts-api.json` | 2472 | `bb64c6c5ea9454c9855468663e4ad372d14e38692986ec0e366776dad439dec5` |
-| `verify-downloaded-artifact.stdout.json` | 2383 | `ce0538fb7643c2566b726fae1b074b0472926f7233df06f830c6638b3718937c` |
+| `verify-downloaded-artifact.stdout.json` | 2427 | `7e5b5a6d89be059873a8a1b92e56c59a0897c618dd9718fb4448b0a10e31d1d0` |
 | `emit-attestation.stdout.json` | 520 | `6f7e1fa7b579081cb7160389d45bb16825706b64655ad2bc521b73ce05b1a57b` |
 | `pre-merge-comment.md` | 1839 | `2138870e141753c991cfa33965f85dd99c0797064b8cbba65ad99688e514c06e` |
-| `post-merge-comment.md` | 1645 | `19e0b1ac27a0f22f7c8bfafbeed10d240f561a78382bc9a7cd0a06232737f6d7` |
-| `epic-closure-comment.md` | 643 | `ac686ebd6d22a963fcb411598736b510ad81b1134a3227d797e3c1cd43b13b8a` |
+| `post-merge-comment.md` | 2150 | `f1356b17832fd16da9408527eae338cf969291b941618a0e54d407262e830155` |
+| `epic-closure-comment.md` | 643 | `d7594f6f9f02b837fae1007372165ea11b6bd8311dcbfe53c79589da3bc69c35` |
 | `raw-artifact-archive.bin` | 128 | `f045719a6085e235f04e34bb12054b841ee0457dd4c424f7ecbd781c0f307368` |
 
 #### `environment-fingerprint-input.json`
@@ -750,13 +788,13 @@ This is a normative serializer oracle, not a runtime identity allowlist. JSON is
 #### `post-merge-closure-v1.json`
 
 ```json
-{"schema_version":1,"kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","issue_number":392,"pre_merge_comment_id":6001,"pre_merge_payload_sha256":"81a8cb8ffac801b7aacb8909380b644be1e58e77a474127205d2785ebd8a1ea4","final_head_sha":"cccccccccccccccccccccccccccccccccccccccc","final_head_tree":"dddddddddddddddddddddddddddddddddddddddd","merge_commit_sha":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","merge_commit_tree":"dddddddddddddddddddddddddddddddddddddddd","tree_equal":true,"merge_actor":"chemitaro","merged_at":"2026-09-02T02:00:00Z","issue_finish_command":"python3 ./spec-dock/scripts/spec-dock issue finish","max_finish_attempts":3,"issue_finish_attempts":[{"attempt":1,"started_at":"2026-09-02T02:05:00Z","completed_at":"2026-09-02T02:07:00Z","exit_code":1,"status":"post-sync-failed","already_closed":false,"active_cleared":true,"post_sync_status":"failed"},{"attempt":2,"started_at":"2026-09-02T02:10:00Z","completed_at":"2026-09-02T02:12:00Z","exit_code":0,"status":"finished","already_closed":true,"active_cleared":true,"post_sync_status":"completed"}],"active_restore_attempts":[{"before_attempt":2,"command":"python3 ./spec-dock/scripts/spec-dock active set --id iss-00392","started_at":"2026-09-02T02:08:00Z","completed_at":"2026-09-02T02:09:00Z","exit_code":0,"active_issue_id_after":"iss-00392","post_sync_status":"completed"}],"accepted_issue_finish_attempt":2,"github_issue_closed_event_id":7001,"github_issue_closed_at":"2026-09-02T02:06:00Z","generated_at":"2026-09-02T02:13:00Z"}
+{"schema_version":1,"kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","issue_number":392,"pre_merge_comment_id":6001,"pre_merge_payload_sha256":"81a8cb8ffac801b7aacb8909380b644be1e58e77a474127205d2785ebd8a1ea4","final_head_sha":"cccccccccccccccccccccccccccccccccccccccc","final_head_tree":"dddddddddddddddddddddddddddddddddddddddd","merge_commit_sha":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","merge_commit_tree":"dddddddddddddddddddddddddddddddddddddddd","tree_equal":true,"merge_actor":"chemitaro","merged_at":"2026-09-02T02:00:00Z","issue_finish_command":"python3 ./spec-dock/scripts/spec-dock issue finish","max_finish_attempts":3,"issue_finish_attempts":[{"attempt":1,"started_at":"2026-09-02T02:05:00Z","completed_at":"2026-09-02T02:07:00Z","exit_code":1,"status":"post-sync-failed","already_closed":false,"active_cleared":true,"post_sync_status":"failed"},{"attempt":2,"started_at":"2026-09-02T02:10:00Z","completed_at":"2026-09-02T02:12:00Z","exit_code":0,"status":"finished","already_closed":true,"active_cleared":true,"post_sync_status":"completed"}],"active_restore_attempts":[{"before_attempt":2,"command":"python3 ./spec-dock/scripts/spec-dock active set --id iss-00392","started_at":"2026-09-02T02:08:00Z","completed_at":"2026-09-02T02:08:20Z","exit_code":0,"stdout_sha256":"1967627d9f241b2dccef144b99af201ea0f196efe71941a59e1275d0f8bfc1cd","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","readback_command":"python3 ./spec-dock/scripts/spec-dock active show","readback_started_at":"2026-09-02T02:08:21Z","readback_completed_at":"2026-09-02T02:09:00Z","readback_exit_code":0,"readback_stdout_sha256":"7b85ea56ea35d990a60006e46d08482aef029c0f3e5ace33955b0d5d1867004a","readback_stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","active_issue_id_after":"iss-00392"}],"accepted_issue_finish_attempt":2,"github_issue_closed_event_id":7001,"github_issue_closed_at":"2026-09-02T02:06:00Z","generated_at":"2026-09-02T02:13:00Z"}
 ```
 
 #### `epic-closure-v1.json`
 
 ```json
-{"schema_version":1,"kind":"epic-closure-v1","repository":"chemitaro/spec-dock","epic_issue_number":384,"implementation_issue_number":392,"post_merge_comment_id":6002,"post_merge_payload_sha256":"20433930358f717cb7afc98c86f84f5a794032dc02b97c112c64c51d062d9dd4","implementation_issue_closed_event_id":7001,"implementation_issue_closed_at":"2026-09-02T02:06:00Z","epic_acceptance_status":"accepted","github_epic_closed_event_id":7002,"github_epic_closed_at":"2026-09-02T02:20:00Z","generated_at":"2026-09-02T02:21:00Z"}
+{"schema_version":1,"kind":"epic-closure-v1","repository":"chemitaro/spec-dock","epic_issue_number":384,"implementation_issue_number":392,"post_merge_comment_id":6002,"post_merge_payload_sha256":"9ae45c0e264aeddf17d1c50b02a8966513c7ca902615a60435401b36aad31891","implementation_issue_closed_event_id":7001,"implementation_issue_closed_at":"2026-09-02T02:06:00Z","epic_acceptance_status":"accepted","github_epic_closed_event_id":7002,"github_epic_closed_at":"2026-09-02T02:20:00Z","generated_at":"2026-09-02T02:21:00Z"}
 ```
 
 #### `comment-receipt-pre-merge.json`
@@ -768,13 +806,13 @@ This is a normative serializer oracle, not a runtime identity allowlist. JSON is
 #### `comment-receipt-post-merge.json`
 
 ```json
-{"schema_version":1,"kind":"comment-receipt-v1","attestation_kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","target_issue_number":392,"comment_id":6002,"comment_url":"https://api.github.com/repos/chemitaro/spec-dock/issues/comments/6002","author_login":"chemitaro","created_at":"2026-09-02T02:14:00Z","updated_at":"2026-09-02T02:14:00Z","payload_sha256":"20433930358f717cb7afc98c86f84f5a794032dc02b97c112c64c51d062d9dd4","body_sha256":"19e0b1ac27a0f22f7c8bfafbeed10d240f561a78382bc9a7cd0a06232737f6d7","body_size_bytes":1645,"verified_at":"2026-09-02T02:14:30Z"}
+{"schema_version":1,"kind":"comment-receipt-v1","attestation_kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","target_issue_number":392,"comment_id":6002,"comment_url":"https://api.github.com/repos/chemitaro/spec-dock/issues/comments/6002","author_login":"chemitaro","created_at":"2026-09-02T02:14:00Z","updated_at":"2026-09-02T02:14:00Z","payload_sha256":"9ae45c0e264aeddf17d1c50b02a8966513c7ca902615a60435401b36aad31891","body_sha256":"f1356b17832fd16da9408527eae338cf969291b941618a0e54d407262e830155","body_size_bytes":2150,"verified_at":"2026-09-02T02:14:30Z"}
 ```
 
 #### `comment-receipt-epic.json`
 
 ```json
-{"schema_version":1,"kind":"comment-receipt-v1","attestation_kind":"epic-closure-v1","repository":"chemitaro/spec-dock","target_issue_number":384,"comment_id":6003,"comment_url":"https://api.github.com/repos/chemitaro/spec-dock/issues/comments/6003","author_login":"chemitaro","created_at":"2026-09-02T02:22:00Z","updated_at":"2026-09-02T02:22:00Z","payload_sha256":"87ca8c93aba0f9f1a6b2f8a134b3c42b5945b9fc5534ad71e9b7920434aed68e","body_sha256":"ac686ebd6d22a963fcb411598736b510ad81b1134a3227d797e3c1cd43b13b8a","body_size_bytes":643,"verified_at":"2026-09-02T02:22:30Z"}
+{"schema_version":1,"kind":"comment-receipt-v1","attestation_kind":"epic-closure-v1","repository":"chemitaro/spec-dock","target_issue_number":384,"comment_id":6003,"comment_url":"https://api.github.com/repos/chemitaro/spec-dock/issues/comments/6003","author_login":"chemitaro","created_at":"2026-09-02T02:22:00Z","updated_at":"2026-09-02T02:22:00Z","payload_sha256":"3eaf09de7b9096566d2b7960cd6f7e920228661b1fc9a594701def15a7d5a05e","body_sha256":"d7594f6f9f02b837fae1007372165ea11b6bd8311dcbfe53c79589da3bc69c35","body_size_bytes":643,"verified_at":"2026-09-02T02:22:30Z"}
 ```
 
 #### `run-api.json`
@@ -798,7 +836,7 @@ This is a normative serializer oracle, not a runtime identity allowlist. JSON is
 #### `verify-downloaded-artifact.stdout.json`
 
 ```json
-{"schema_version":1,"status":"completed","code":"downloaded-artifact-verified","command":"verify-downloaded-artifact","scope":"aggregate","repository":"chemitaro/spec-dock","workflow_run_id":1101,"source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","candidate_artifact_name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","evidence_artifact_name":"provider-evidence-cccccccccccccccccccccccccccccccccccccccc","api_snapshots":[{"kind":"run","filename":"run.json","size_bytes":292,"sha256":"178e538f002baafbdbba399a117f5031c7ff07e1ae691abec0b12e2cef0160b9"},{"kind":"jobs","filename":"jobs.json","size_bytes":1702,"sha256":"753f6326ffa4b1d1e910e01ec2e07a8d73da6355186ec001dfca350ab4251549"},{"kind":"artifacts","filename":"artifacts.json","size_bytes":2472,"sha256":"bb64c6c5ea9454c9855468663e4ad372d14e38692986ec0e366776dad439dec5"}],"artifact_archives":[{"role":"candidate","artifact_id":3100,"artifact_name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","api_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","archive_filename":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc.zip","archive_size_bytes":128,"archive_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","extracted_directory":"/runner/_temp/spec-dock-iss-00392-fixture/artifacts/extracted/provider-candidate-cccccccccccccccccccccccccccccccccccccccc"},{"role":"provider-evidence","artifact_id":3110,"artifact_name":"provider-evidence-cccccccccccccccccccccccccccccccccccccccc","api_digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000","archive_filename":"provider-evidence-cccccccccccccccccccccccccccccccccccccccc.zip","archive_size_bytes":256,"archive_sha256":"0000000000000000000000000000000000000000000000000000000000000000","extracted_directory":"/runner/_temp/spec-dock-iss-00392-fixture/artifacts/extracted/provider-evidence-cccccccccccccccccccccccccccccccccccccccc"}],"receipt_roles":["producer","linux-canonical","sdist-smoke","macos-delta"],"evidence_files":["provider-receipt-producer.json","producer-build-evidence.json","provider-receipt-linux-canonical.json","linux-canonical-evidence.json","provider-receipt-sdist-smoke.json","sdist-smoke-evidence.json","provider-receipt-macos-delta.json","macos-delta-evidence.json"]}
+{"schema_version":1,"status":"completed","code":"downloaded-artifact-verified","command":"verify-downloaded-artifact","scope":"aggregate","verification_phase":"post-run-final","repository":"chemitaro/spec-dock","workflow_run_id":1101,"source_sha":"cccccccccccccccccccccccccccccccccccccccc","source_tree":"dddddddddddddddddddddddddddddddddddddddd","candidate_artifact_name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","evidence_artifact_name":"provider-evidence-cccccccccccccccccccccccccccccccccccccccc","api_snapshots":[{"kind":"run","filename":"run.json","size_bytes":292,"sha256":"178e538f002baafbdbba399a117f5031c7ff07e1ae691abec0b12e2cef0160b9"},{"kind":"jobs","filename":"jobs.json","size_bytes":1702,"sha256":"753f6326ffa4b1d1e910e01ec2e07a8d73da6355186ec001dfca350ab4251549"},{"kind":"artifacts","filename":"artifacts.json","size_bytes":2472,"sha256":"bb64c6c5ea9454c9855468663e4ad372d14e38692986ec0e366776dad439dec5"}],"artifact_archives":[{"role":"candidate","artifact_id":3100,"artifact_name":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc","api_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","archive_filename":"provider-candidate-cccccccccccccccccccccccccccccccccccccccc.zip","archive_size_bytes":128,"archive_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","extracted_directory":"/runner/_temp/spec-dock-iss-00392-fixture/verification/extracted/provider-candidate-cccccccccccccccccccccccccccccccccccccccc"},{"role":"provider-evidence","artifact_id":3110,"artifact_name":"provider-evidence-cccccccccccccccccccccccccccccccccccccccc","api_digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000","archive_filename":"provider-evidence-cccccccccccccccccccccccccccccccccccccccc.zip","archive_size_bytes":256,"archive_sha256":"0000000000000000000000000000000000000000000000000000000000000000","extracted_directory":"/runner/_temp/spec-dock-iss-00392-fixture/verification/extracted/provider-evidence-cccccccccccccccccccccccccccccccccccccccc"}],"receipt_roles":["producer","linux-canonical","sdist-smoke","macos-delta"],"evidence_files":["provider-receipt-producer.json","producer-build-evidence.json","provider-receipt-linux-canonical.json","linux-canonical-evidence.json","provider-receipt-sdist-smoke.json","sdist-smoke-evidence.json","provider-receipt-macos-delta.json","macos-delta-evidence.json"]}
 ```
 
 #### `emit-attestation.stdout.json`
@@ -819,18 +857,18 @@ This is a normative serializer oracle, not a runtime identity allowlist. JSON is
 #### `post-merge-comment.md`
 
 ````text
-<!-- spec-dock-attestation:post-merge-closure-v1:20433930358f717cb7afc98c86f84f5a794032dc02b97c112c64c51d062d9dd4 -->
+<!-- spec-dock-attestation:post-merge-closure-v1:9ae45c0e264aeddf17d1c50b02a8966513c7ca902615a60435401b36aad31891 -->
 ```json
-{"schema_version":1,"kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","issue_number":392,"pre_merge_comment_id":6001,"pre_merge_payload_sha256":"81a8cb8ffac801b7aacb8909380b644be1e58e77a474127205d2785ebd8a1ea4","final_head_sha":"cccccccccccccccccccccccccccccccccccccccc","final_head_tree":"dddddddddddddddddddddddddddddddddddddddd","merge_commit_sha":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","merge_commit_tree":"dddddddddddddddddddddddddddddddddddddddd","tree_equal":true,"merge_actor":"chemitaro","merged_at":"2026-09-02T02:00:00Z","issue_finish_command":"python3 ./spec-dock/scripts/spec-dock issue finish","max_finish_attempts":3,"issue_finish_attempts":[{"attempt":1,"started_at":"2026-09-02T02:05:00Z","completed_at":"2026-09-02T02:07:00Z","exit_code":1,"status":"post-sync-failed","already_closed":false,"active_cleared":true,"post_sync_status":"failed"},{"attempt":2,"started_at":"2026-09-02T02:10:00Z","completed_at":"2026-09-02T02:12:00Z","exit_code":0,"status":"finished","already_closed":true,"active_cleared":true,"post_sync_status":"completed"}],"active_restore_attempts":[{"before_attempt":2,"command":"python3 ./spec-dock/scripts/spec-dock active set --id iss-00392","started_at":"2026-09-02T02:08:00Z","completed_at":"2026-09-02T02:09:00Z","exit_code":0,"active_issue_id_after":"iss-00392","post_sync_status":"completed"}],"accepted_issue_finish_attempt":2,"github_issue_closed_event_id":7001,"github_issue_closed_at":"2026-09-02T02:06:00Z","generated_at":"2026-09-02T02:13:00Z"}
+{"schema_version":1,"kind":"post-merge-closure-v1","repository":"chemitaro/spec-dock","issue_number":392,"pre_merge_comment_id":6001,"pre_merge_payload_sha256":"81a8cb8ffac801b7aacb8909380b644be1e58e77a474127205d2785ebd8a1ea4","final_head_sha":"cccccccccccccccccccccccccccccccccccccccc","final_head_tree":"dddddddddddddddddddddddddddddddddddddddd","merge_commit_sha":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","merge_commit_tree":"dddddddddddddddddddddddddddddddddddddddd","tree_equal":true,"merge_actor":"chemitaro","merged_at":"2026-09-02T02:00:00Z","issue_finish_command":"python3 ./spec-dock/scripts/spec-dock issue finish","max_finish_attempts":3,"issue_finish_attempts":[{"attempt":1,"started_at":"2026-09-02T02:05:00Z","completed_at":"2026-09-02T02:07:00Z","exit_code":1,"status":"post-sync-failed","already_closed":false,"active_cleared":true,"post_sync_status":"failed"},{"attempt":2,"started_at":"2026-09-02T02:10:00Z","completed_at":"2026-09-02T02:12:00Z","exit_code":0,"status":"finished","already_closed":true,"active_cleared":true,"post_sync_status":"completed"}],"active_restore_attempts":[{"before_attempt":2,"command":"python3 ./spec-dock/scripts/spec-dock active set --id iss-00392","started_at":"2026-09-02T02:08:00Z","completed_at":"2026-09-02T02:08:20Z","exit_code":0,"stdout_sha256":"1967627d9f241b2dccef144b99af201ea0f196efe71941a59e1275d0f8bfc1cd","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","readback_command":"python3 ./spec-dock/scripts/spec-dock active show","readback_started_at":"2026-09-02T02:08:21Z","readback_completed_at":"2026-09-02T02:09:00Z","readback_exit_code":0,"readback_stdout_sha256":"7b85ea56ea35d990a60006e46d08482aef029c0f3e5ace33955b0d5d1867004a","readback_stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","active_issue_id_after":"iss-00392"}],"accepted_issue_finish_attempt":2,"github_issue_closed_event_id":7001,"github_issue_closed_at":"2026-09-02T02:06:00Z","generated_at":"2026-09-02T02:13:00Z"}
 ```
 ````
 
 #### `epic-closure-comment.md`
 
 ````text
-<!-- spec-dock-attestation:epic-closure-v1:87ca8c93aba0f9f1a6b2f8a134b3c42b5945b9fc5534ad71e9b7920434aed68e -->
+<!-- spec-dock-attestation:epic-closure-v1:3eaf09de7b9096566d2b7960cd6f7e920228661b1fc9a594701def15a7d5a05e -->
 ```json
-{"schema_version":1,"kind":"epic-closure-v1","repository":"chemitaro/spec-dock","epic_issue_number":384,"implementation_issue_number":392,"post_merge_comment_id":6002,"post_merge_payload_sha256":"20433930358f717cb7afc98c86f84f5a794032dc02b97c112c64c51d062d9dd4","implementation_issue_closed_event_id":7001,"implementation_issue_closed_at":"2026-09-02T02:06:00Z","epic_acceptance_status":"accepted","github_epic_closed_event_id":7002,"github_epic_closed_at":"2026-09-02T02:20:00Z","generated_at":"2026-09-02T02:21:00Z"}
+{"schema_version":1,"kind":"epic-closure-v1","repository":"chemitaro/spec-dock","epic_issue_number":384,"implementation_issue_number":392,"post_merge_comment_id":6002,"post_merge_payload_sha256":"9ae45c0e264aeddf17d1c50b02a8966513c7ca902615a60435401b36aad31891","implementation_issue_closed_event_id":7001,"implementation_issue_closed_at":"2026-09-02T02:06:00Z","epic_acceptance_status":"accepted","github_epic_closed_event_id":7002,"github_epic_closed_at":"2026-09-02T02:20:00Z","generated_at":"2026-09-02T02:21:00Z"}
 ```
 ````
 
@@ -854,4 +892,4 @@ Tests regenerate every fixture, recompute every size/hash, validate parent-child
 | I392-RQ-027–029 | D-013–021, D-025–026 |
 | I392-RQ-030–032 | D-022–023, D-025–026 |
 
-The four r10 remediation contracts map to D-002/D-005/D-006 and wire continuation; D-007/D-024 reserved trees; D-013–D-021 raw archive/CLI/permissions; and D-022/D-026 post-sync recovery.
+The four r11 remediation contracts map to: the seven cleanup-warning rows plus WIR-CONT-001/WIR-TEXT-001; D-007/D-019/D-021/D-024 single-tree aggregate verification; D-013/D-016/D-020/D-021/D-025 phase-aware in-workflow and post-run evidence; and D-022/D-026 observable active restoration without an active-set post-sync field.
