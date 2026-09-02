@@ -10,7 +10,7 @@ ID: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
+  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 要件定義
@@ -23,7 +23,7 @@ This is Epic #384's sole implementation-and-verification Issue. It remains block
 
 ### I392-RQ-001 — Specification freeze
 
-The replacement manifest, all canonical/support payload SHA-256 values and owner-recorded `SPEC_FREEZE_COMMIT` must match exact repository blobs. The implementation base must contain that commit and the independently admitted #387 merge. Repository evidence SHA `95d7562ca1762e0b2a717912484eba5a5c2377f1` is provenance, not a future blanket diff base.
+The replacement manifest, all canonical/support payload SHA-256 values and owner-recorded `SPEC_FREEZE_COMMIT` must match exact repository blobs. The implementation base must contain that commit and the independently admitted #387 merge. Repository evidence SHA `ea168b745d3f443f11a24b975f32e3bb6fb17b1a` is provenance, not a future blanket diff base.
 
 ### I392-RQ-002 — Mapping-only #387 report
 
@@ -45,17 +45,17 @@ Durable target authority is exactly four roots, two slots and `spec-dock/spec-do
 
 Every repository `spec-dock/.workbench/**` path is read-only protected. Initiatives/artifacts, seeds, unknown paths, unrelated skills and user data are protected except exact #392 `report.md` and `.meta.json`; a separate external exclusion ledger limits report to pre-freeze evidence sections and meta to `updated_at` only.
 
-### I392-RQ-007 — Independent purpose workspaces
+### I392-RQ-007 — Private owner roots and exact reserved trees
 
-Each used purpose creates its own external owner-bound `mkdtemp` and its own live non-serializable cleanup handle. The owner reserves top-level child trees before process launch, seals their descendants after exit and remains alive through artifact upload confirmation. Exact purpose/env mapping is fixed by Design. No aggregate root, nested shared workspace, serializable cleanup token or cleanup-from-path is allowed. Workspace and sentinel identities, mode, owner, outside-repository realpath and registered children are revalidated on cleanup.
+Each purpose creates an independent private owner root and live non-serializable handle. The owner root is never exported. The Design table maps each purpose to one exported `ISS392_WS_*` variable whose value is one exact reserved child tree. Before spawn, the live owner pre-registers every exact file or closed subtree policy; children cannot register, widen or clean. Every child command receives the reserved tree, never owner root. Unknown owner-root entry, unregistered or policy-invalid descendant, owner death or premature cleanup fails closed and preserves data. Paths, sentinels, nonces and child PIDs do not confer registration or cleanup authority.
 
 ### I392-RQ-008 — Persistent stage namespace
 
 Candidate/tombstone stage uses the same-filesystem `.spec-dock-provider-stages-v1` namespace. Exact sentinels, repository key, tuple key, ACTIVE and stage owner survive process exit. Discovery reads only exact index/path; no scan or orphan adoption. ACTIVE and stage owner include private result family in addition to resume tuple.
 
-### I392-RQ-009 — Mandatory terminal cleanup before dispatch
+### I392-RQ-009 — Mandatory terminal cleanup and deterministic continuation
 
-Every lifecycle invocation locks/binds repository, then runs terminal-cleanup recovery before interpreting the new requested operation. It handles ACTIVE ready, terminal-cleanup, already absent; stage present or already absent; ACTIVE unlink/fsync crash; and repeated cleanup failure. When ACTIVE is present, successful cleanup returns exact cleanup-only `terminal-cleanup-completed`; failure returns exact `terminal-cleanup-failed`. Both echo the actual init/update/uninstall invocation and expose the old ACTIVE tuple. Neither executes the new intent; caller re-runs after success. ACTIVE-absent fsync recovery dispatches normally.
+Every parser-valid lifecycle invocation locks/binds the repository and resolves terminal cleanup before normal dispatch. The private ACTIVE object stores immutable `cleanup_token` plus a nullable exact deferred-invocation object. A no-token public invocation is always desired, even when its base form is the same update/init-force form selected for old cleanup; only the generated hidden-token command is cleanup-retry. The first desired request is immutable. Tokenized retry, repeat, or any third desired request cannot replace it. Cleanup failure returns the tokenized retry as `continuation.next_command` and the first deferred desired command as `continuation.after_cleanup_command`. Cleanup success is cleanup-only and returns that desired command as the sole next command, or no action. No result says to rerun the same command, no caller infers intent from `result_family`, and no old install/update retry can replace a pending uninstall.
 
 ### I392-RQ-010 — Final version and strict record
 
@@ -87,7 +87,7 @@ Uninstall is dry-run by default and applies with `--apply`. It preserves contain
 
 ### I392-RQ-017 — Closed wire implementation
 
-Production enums/constructors/serializers/tests match 38 codes, 136 relation rows, four valid record goldens, twenty-nine public JSON review goldens, 23 phases, action relations and target order. Cleanup-warning rows have exact retry; terminal-cleanup failure has exact phase/digest/policy/action/retry/message. No unknown/catch-all branch exists.
+Production enums/constructors/serializers/tests match 38 codes, 142 relation rows, four valid record goldens, thirty-three public JSON review goldens, 23 phases, action relations and target order. The public result has exact 23-key order and a closed `continuation` object. Cleanup warning, cleanup failure, cleanup success and lifecycle partial rows have exact next/after-cleanup action-command relations. Unknown/catch-all branch or prose-derived next action is invalid.
 
 ### I392-RQ-018 — Exact legacy and old-package mutation-zero
 
@@ -113,17 +113,17 @@ S70 first creates replacement gate/environment/workflow/tests, then retires/repl
 
 Only `provider-build-artifacts` packages each workflow head once. Linux canonical, sdist, macOS download same candidate and build zero. `provider-attestation` needs producer+three roles and uploads one nine-file evidence artifact. `provider-gate` needs attestation only.
 
-### I392-RQ-024 — Compatibility job actual-byte verification
+### I392-RQ-024 — Compatibility and aggregate actual-byte verification
 
-At compatibility head, `provider-tests` needs exactly producer and attestation. It has read-only actions/contents/PR permissions, downloads exact candidate and evidence artifacts, fetches run/jobs/artifacts API JSON into an independent workflow-api workspace, stores downloads in an independent artifact-download workspace, invokes exact `verify-downloaded-artifact` flags and packages nothing. It ignores canary marker; only provider-gate reads it.
+Compatibility `provider-tests`, provider-attestation and S80 use the same closed verifier. Each authenticated Actions artifact download preserves the exact raw ZIP bytes, recomputes SHA-256 over the complete archive, and matches the REST `sha256:`-prefixed digest. Within the producing workflow, role-set verification also matches each bare `artifact-digest` job output. The verifier safely extracts into an empty registered reserved tree and receives both raw and extracted paths plus run/jobs/artifacts snapshots. Exact repeated role order and artifact inventory are mandatory. Compatibility packages nothing, ignores the canary marker and remains independently GREEN.
 
 ### I392-RQ-025 — Stable Linux qualification
 
 Environment ID is `specdock-linux-qualification-v1`, bound to tracked descriptor, pinned image/resources/toolchain and one fingerprint. Twenty runs share exact fingerprint; first five meet 600 seconds/CPU ratio 1.1; failures/flakes/retries zero; seeded-fault detection 100%.
 
-### I392-RQ-026 — Exact evidence/attestation schemas
+### I392-RQ-026 — Complete Provider Gate CLI, evidence schemas and permissions
 
-Issue Design D-015–D-026 fixes every ordered key/type/enum/nullability/unit, digest input, range, role relation, CLI success/failure number-code-message mapping, stdout bytes, fixture semantics and parent-child hash for candidate, role evidence, receipts, provider aggregate, pre/post/Epic payloads and comment receipts. Canonical compact UTF-8+LF and exact child hashes apply. Fixture compatibility/final identities are distinct and all hash chains are recomputed.
+Issue Design D-013–D-026 fixes all nine subcommand argv arrays, required flags, absolute/reserved path types, repeated-option order, outputs, success/failure stdout/stderr, codes/exits, raw archive semantics, safe extraction, ordered schemas, units, nullability, digest inputs, fixture bytes and parent-child relations. Workflow-level permissions are empty; every job has an exact least-privilege override. Structural tests reject missing/extra/inherited/write permissions, wrong needs, raw download, archive path, verifier argument, packager or upload.
 
 ### I392-RQ-027 — Distinct external two-head identities
 
@@ -137,9 +137,9 @@ Compatibility head emits both contexts. Human adds new while old remains, reads 
 
 Tracked report has pre-freeze method/implementation facts only. S80 owns no tracked path. Pre-merge payload includes external compatibility/final SHA/tree/run identities and final byte evidence, but not its own future comment identity. Human posts it to #392 and external comment receipt verifies actual comment.
 
-### I392-RQ-030 — Ordered post-merge closure
+### I392-RQ-030 — Ordered post-merge closure with post-sync recovery
 
-Human merge and tree equality precede SpecDock finish. Actual command is `python3 ./spec-dock/scripts/spec-dock issue finish`; current implementation closes #392 first, then clears active and post-syncs. Its returned close snapshot is bound to immediate close-event readback; no second `close --id iss-00392` command is allowed; then post-merge payload is created/posted/read back on #392. Only afterward is Epic acceptance re-evaluated, `epic-00384` closed/read, and Epic payload posted/read on #384. No future fact is invented.
+After human merge/tree equality, automation runs exact `issue finish`, whose current implementation closes #392 before active clear/post-sync. If exit 0, that interval is accepted. Exit 1 is recoverable only when measured facts prove #392 closed, active cleared and post-sync failed: read the unique original close event, restore active with exact `active set --id iss-00392`, require successful readback, and rerun issue finish against the already-closed Issue. At most three finish attempts are allowed; later attempts require `already_closed=true` and must not create a new close event. The accepted post payload includes all attempts/restores and identifies the final successful interval. Repeated sync failure, ambiguous close event or failed restore stops. No `close --id iss-00392` is run.
 
 ### I392-RQ-031 — Comment receipts
 
@@ -151,4 +151,4 @@ Only S30/S60/S80 are main gates. S60 owns lifecycle AGENTS text; S70 final test-
 
 ## 3. Acceptance summary
 
-Acceptance requires every requirement on the applicable exact source/tree, no repository workbench mutation, one handle per purpose, deterministic terminal cleanup, mapping-only #387 report, complete S60/S70 dogfood, independently GREEN current gates, compatibility/final actual-byte verification on distinct heads, measured closure order and human merge tree equality.
+Acceptance requires every requirement on the applicable exact source/tree, no repository workbench mutation, one private owner root and exported reserved tree per purpose, deterministic cleanup continuation, mapping-only #387 report, complete S60/S70 dogfood, independently GREEN current gates, raw-archive actual-byte verification with exact permissions, post-sync recovery and measured closure, and human merge tree equality.
