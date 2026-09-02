@@ -6,7 +6,7 @@ Issue: "iss-00392"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
+  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
 ---
 
 # Luna Max Implementation Handoff
@@ -15,7 +15,7 @@ repository_evidence:
 
 1. Execute Issue `plan.md`.
 2. Use Issue Requirement for behavior and Issue Design for exact symbols/schemas.
-3. Treat `provider-lifecycle-wire-contract.md` as the only public wire authority: 38 codes, 136 rows, four record and twenty-nine public JSON review goldens.
+3. Treat `provider-lifecycle-wire-contract.md` as the only public wire authority: 38 codes, 142 rows, four record and thirty-three public JSON review goldens.
 4. Treat `active-failure-disposition-register.md` rule `ISS387-THREE-WAY-V2` as the only #387 admission/terminalization authority.
 5. Use Epic R/D/P and ADR for merge governance.
 6. Follow root AGENTS until its S60/S70 owned-section transitions.
@@ -49,46 +49,23 @@ seeds: spec-dock/.gitignore, .github/workflows/ci.yml
 
 Record exact keys are `schema_version,state,operation,version,candidate_digest,seed_policy,skill_slots`. Resume tuple is operation/candidate/policy. Fresh init alone is create-if-absent; all other intents preserve-only.
 
-## 4. Persistent stage and terminal cleanup
+## 4. Persistent stage, deferred request and terminal cleanup
 
-```text
-<repo-parent>/.spec-dock-provider-stages-v1/
-  repositories/<repository-key>/ACTIVE.json
-  repositories/<repository-key>/stages/<tuple-key>/STAGE-OWNER.json
-```
+ACTIVE is the only index and stores old tuple/result family, immutable `cleanup_token`, and nullable normalized `deferred_invocation`. Before normal dispatch:
 
-ACTIVE is the only index; no scan. Its exact private fields include `result_family=install|legacy-migration|update|uninstall`. Before normal dispatch:
+1. classify role syntactically: token absent is desired; the exact generated hidden `--provider-cleanup-token <active token>` form is cleanup-retry;
+2. atomically store the first no-token desired request, even when its base form is update/init-force; tokenized retry, repeat, or third desired command preserves it byte-for-byte;
+3. validate/remove registered stage and ACTIVE;
+4. on failure return the tokenized cleanup retry now and deferred desired command after cleanup;
+5. on success return deferred desired command only, or no action;
+6. never dispatch lifecycle in the cleanup invocation.
 
-- terminal record + ACTIVE ready -> atomic terminal-cleanup;
-- stage present -> remove registered entries/stage;
-- stage already absent -> continue;
-- remove content-bound ACTIVE and fsync parent;
-- ACTIVE already absent -> fsync parent and continue;
-- crash after ACTIVE unlink -> next invocation fsyncs then dispatches;
-- cleanup failure -> public `terminal-cleanup-failed`, exact old-family retry, one failed `@provider-stage` action;
-- cleanup success -> requested new operation may differ from old tuple.
+Follow only public `continuation`. Never derive intent from result family or “same command”. Required RED: old install cleanup + desired uninstall; failure -> tokenized init-force retry -> success -> exact deferred uninstall; no-token desired update is distinct from tokenized update retry; pure retry with no deferred request -> success/no action.
+## 5. Private owner roots and exact reserved trees
 
-Cleanup-warning completions expose exact retry. A later invocation with present ACTIVE returns either actual-echo `terminal-cleanup-failed` or cleanup-only `terminal-cleanup-completed`; it never executes the new intent in that invocation. ACTIVE absent after unlink/fsync crash proceeds normally.
+Each purpose creates a private owner root/live handle, then reserves the exact child in Issue Design D-007. Only the reserved child path is exported. Examples: baseline-build exports its reserved `dist`; Full Regression exports reserved `full-regression`; artifact-download exports reserved `artifacts`; attestation exports reserved `attestation`; provider jobs export their `output|role|aggregate|verification` tree. Never append an implicit purpose directory to an owner root.
 
-## 5. Independent purpose workspaces
-
-Create one workspace and retain one non-serializable handle for each used purpose. Exact variables:
-
-```text
-ISS392_WS_ADMISSION
-ISS392_WS_BASELINE_BUILD
-ISS392_WS_PROTECTED_WITNESS
-ISS392_WS_FULL_REGRESSION_S00
-ISS392_WS_FULL_REGRESSION_S30
-ISS392_WS_FULL_REGRESSION_S60
-ISS392_WS_TRIPWIRE
-ISS392_WS_FRESH_CONSUMER
-ISS392_WS_WORKFLOW_API
-ISS392_WS_ARTIFACT_DOWNLOAD
-ISS392_WS_ATTESTATION_DRAFT
-```
-
-Never create an aggregate external-root variable. Never infer cleanup authority from an env-var path or nonce. The live owner reserves top-level trees before child launch, seals descendant inventory after exit, rejects unknown entries and remains alive through artifact upload confirmation before cleanup. Repository `.workbench` is protected read-only.
+The live owner alone reserves, pre-registers each fixed output or closed subtree policy, spawns, seals, begins upload, confirms actual artifact ID/name/digest and cleans. Children cannot create registration authority or clean. Exact registration policy IDs and layouts are Issue Design D-007. Unknown owner-root entry, unregistered or policy-invalid descendant, child escape, owner death, path-only reopen or cleanup before upload confirmation is a stop/preserve condition. All plan commands take the exported reserved tree.
 
 ## 6. Issue #387 admission
 
@@ -127,51 +104,37 @@ Old engine/tests removal; current Provider CI retarget; retained Full Regression
 
 ### S70
 
-Final provider gate/evidence/environment/tests/workflow, consumer-first old removal, final AGENTS/test-policy docs, complete second dogfood update and tracked report method. Commit compatibility head, complete the human context transition, then commit the distinct final head by removing only `provider-tests`. Store actual identities externally; no merge.
+Final Provider Gate/evidence/environment/tests/workflow, exact nine command argv, raw ZIP transport/safe extraction, empty workflow permissions plus read-only job overrides, consumer-first old removal, final docs, second dogfood update and tracked report. Commit compatibility head, complete human context transition, then final head by only removing provider-tests. Store identities externally; no merge.
 
 ### S80
 
-Tracked none. Read the already-created final head, rerun final workflow, use purpose-specific API/download/attestation workspaces, verify bytes and post/read back the pre-merge comment. No commit, workflow edit, local build, update or sync.
+Tracked none. Read final head, download and preserve authenticated raw candidate/evidence ZIPs plus API snapshots into exact reserved trees, safe-extract, invoke the aggregate verifier with raw/extracted/API inputs, verify permissions/metrics, and post/read pre-merge comment. No commit, build, update or sync.
 
-## 8. Compatibility workflow contract
+## 8. Compatibility workflow and permissions
 
-Compatibility graph adds:
+Compatibility job needs producer+attestation, creates private owner handles and exact reserved workflow-api/artifact-download/verification trees, downloads raw candidate/evidence ZIPs through authenticated Actions API, verifies API `sha256:<hex>` and upload `<hex>`, safe-extracts, and calls the exact aggregate verifier with repeated roles candidate then provider-evidence. It builds zero and ignores canary.
 
-```text
-provider-tests: [provider-build-artifacts,provider-attestation]
-```
+Workflow-level `permissions: {}`. Exact overrides: build `contents:read`; Linux/sdist/macOS/attestation `actions:read,contents:read`; gate `contents:read`; compatibility `actions:read,contents:read,pull-requests:read`. No workflow write permission. Human comment POST/readback is outside workflow.
 
-Permissions are `actions:read`, `contents:read`, `pull-requests:read`. It independently creates workflow-api and artifact-download workspaces; downloads `provider-candidate-<compat-sha>` and `provider-evidence-<compat-sha>`; fetches exact run/jobs/artifacts API JSON; invokes the same verifier flags as S80; builds zero; ignores `.github/provider-gate-canary-red`. Structural tests enforce every requirement.
+Final head removes only compatibility job and reruns all authoritative evidence.
 
-Final head differs from compatibility head only by removal of this job and must have a distinct SHA/tree. Final run rebuilds once for final head.
+## 9. Provider Gate and fixture authority
 
-## 9. Evidence and fixtures
+Issue Design D-013–D-026 is complete. Implement exactly nine subcommands and their ordered argv arrays, required flags, path containment, repeated role order, stdout/stderr, exits 2–14 and schemas. Raw archive bytes are first-class inputs; extracted-only verification is invalid. `RAW-ARCHIVE-DIGEST-V1` and `EVIDENCE-FIXTURE-V4` are serializer/transport oracles; regenerate size/SHA from displayed bytes, never copy an old hash after schema change.
 
-Issue Design D-015–D-026 is the complete Provider Gate schema/CLI authority. All evidence JSON is exact compact UTF-8 plus LF. `EVIDENCE-FIXTURE-V1` uses distinct identities:
+The 38-code/142-row wire remains finite but public result is now 23 keys with continuation. Implementer must not alter counts without canonical review.
 
-```text
-spec freeze: 8*40
-implementation base: 9*40
-compatibility head/tree: a*40 / b*40
-final head/tree: c*40 / d*40
-merge commit: e*40
-report blob: f*40
-```
+## 10. Closure and post-sync recovery
 
-Candidate, roles, receipts, aggregate, pre/post/Epic payloads and comment receipts have recomputed byte sizes/hashes. Do not hand-copy old fixture hashes.
+1. Human merge; verify tree equality.
+2. Run issue finish attempt 1 with start/end capture.
+3. If exit 0, accept attempt 1.
+4. If and only if #392 closed + active cleared + post-sync failed, bind the unique original close event, run exact `active set --id iss-00392`, require exit 0 and active readback, then run issue finish attempt 2 with `already_closed=true` and no new close event.
+5. Repeat restore+finish once for attempt 3 if the second post-sync fails. Three failures stop; no post payload.
+6. Post payload records all finish/restore rows and selects final successful attempt. No `close --id iss-00392`.
+7. Post/read receipt on #392, then measure Epic acceptance, close/read #384, and post/read Epic receipt.
 
-## 10. Closure sequence
-
-1. Human merges final head.
-2. Verify final-head tree equals merge tree.
-3. Capture start/end and run `python3 ./spec-dock/scripts/spec-dock issue finish`; it closes #392 first, then clears active/post-syncs.
-4. Bind returned close snapshot to immediate #392 state/timeline readback; no separate `close --id iss-00392`.
-5. Generate/post/read back `post-merge-closure-v1` on #392; create external comment receipt.
-6. Re-evaluate Epic acceptance.
-7. Run `python3 ./spec-dock/scripts/spec-dock close --id epic-00384`; read #384 close event.
-8. Generate/post/read back `epic-closure-v1` on #384; create external comment receipt.
-
-Pre-merge comment targets #392 before merge. No payload includes its own future comment ID/hash. Post payload may reference the existing pre comment; Epic payload may reference the existing post comment.
+Repeated sync failure, ambiguous/multiple close event, reopen or active restoration failure is a hard stop.
 
 ## 11. Stop matrix
 
@@ -180,19 +143,23 @@ Pre-merge comment targets #392 before merge. No payload includes its own future 
 | #387 report includes identity/future fact or PR discovery is zero/multiple | stop before S10 |
 | unknown register node/signature/mapping | stop before S10 |
 | aggregate external root/path-only cleanup/repository workbench write | destructive stop |
+| exported path is owner root or does not equal the exact reserved-tree mapping | preserve workspace; block step |
 | ACTIVE/stage/result-family/registered-entry mismatch | fail closed |
+| cleanup retry overwrites deferred desired request or continuation is ambiguous | block dispatch; fix wire implementation |
 | terminal cleanup success/failure lacks actual echo or cleanup-only return | block dispatch |
 | wire count/golden/relation mismatch | test defect; do not invent |
 | S40/S50 dogfood drift | restore exact legacy; no merge |
 | S60 current PR/main-push gate not independently GREEN | block PR-B |
 | compatibility verifier misses candidate/evidence/API input, packages, or sees canary | block context transition |
+| raw archive not preserved/rehashed/safe-extracted or workflow permission differs | block PR-C |
 | compatibility/final identities equal or final diff beyond job removal | repeat S70/two-head sequence |
 | final evidence not rerun on final head | block PR-C |
 | S80 creates a commit or tracked change | invalidate final evidence; return to S70 |
 | closure payload precedes measured finish/close facts | invalidate closure |
+| post-sync retry exceeds three attempts, active restore fails, or close event is ambiguous | no closure payload |
 | comment receipt/body/actor/timestamp mismatch | invalidate dependent closure |
 | merge tree mismatch | do not finish Issue |
 
 ## 12. Definition of done
 
-Only S30/S60/S80 are merge gates. All temporary data uses independent handles, terminal cleanup cannot permanently block new intent, #387 report is mapping-only, compatibility and final evidence are byte-verified on distinct heads, closure is measured in order, human merge remains pending until handoff, and `owner_decisions_required=[]`.
+Only S30/S60/S80 are merge gates. All temporary data uses independent handles, cleanup continuation cannot replace desired intent, each environment path is an exact reserved tree backed by a live handle, Provider Gate raw/extracted/API bytes and permissions are exact, #387 report remains mapping-only, distinct heads are verified, post-sync recovery selects one measured successful interval, human merge remains pending, and `owner_decisions_required=[]`.

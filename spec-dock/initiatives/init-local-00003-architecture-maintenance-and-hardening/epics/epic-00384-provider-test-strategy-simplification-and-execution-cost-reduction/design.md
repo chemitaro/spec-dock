@@ -10,7 +10,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
+  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
@@ -23,13 +23,13 @@ public CLI -> closed wire adapter -> lifecycle service
                                    |-> descriptor-bound target filesystem
                                    `-> process-independent stage namespace
 
-purpose workspace factory -> one mkdtemp + one cleanup handle per purpose
+purpose workspace factory -> private owner root + exported reserved tree per purpose
 protected witness         -> complete repository workbench/data observation
 
 PR-A/S30 -> dormant successor, old public product
 PR-B/S60 -> complete lifecycle + retained current gates + complete dogfood migration
 PR-C compatibility head -> old/new contexts + compatibility byte verifier
-PR-C final head         -> compatibility job removed + full evidence rerun
+PR-C final head         -> compatibility job removed + raw/archive/API evidence rerun
 S80                     -> read-only PR-C merge gate
 ```
 
@@ -41,11 +41,9 @@ Production source of truth is `src/spec_dock/`; checked-in `spec-dock/` is a con
 
 Four roots, two slots, record, fresh-only seeds and shared-container create authority are constants. No manifest-supplied mutation path, wildcard or historical obsolete path is accepted. Slot markers bind slot/version/candidate digest; candidate digest excludes record, seeds and generated markers.
 
-### E384-D-002 — Durable state, resume and cleanup
+### E384-D-002 — Durable state, deferred intent and public continuation
 
-Record keys are exactly `schema_version,state,operation,version,candidate_digest,seed_policy,skill_slots`. Resume identity is exact operation/candidate/policy. Persistent `ACTIVE.json` additionally stores private `result_family=install|legacy-migration|update|uninstall`, allowing a later process to render the correct cleanup retry without changing the resume tuple.
-
-Normal dispatch is preceded by `recover_terminal_cleanup()`. It validates exact stage ownership and final record, promotes `ACTIVE.ready` to `terminal-cleanup`, removes registered stage entries, tolerates an already-absent stage, content-bound removes ACTIVE and fsyncs its parent. ACTIVE already absent causes a parent fsync then dispatch. Cleanup failure returns closed code `terminal-cleanup-failed` with actual invocation echo; cleanup success from present ACTIVE returns cleanup-only `terminal-cleanup-completed`. Neither result executes the new intent. ACTIVE-absent fsync recovery alone continues normal dispatch.
+The seven-key record keeps exact resume identity. Persistent `ACTIVE.json` stores old result family, an exact identity-bound `cleanup_token`, and a nullable deferred-invocation object. Invocation role is syntactic and machine-visible: every public command without the hidden token is desired, while the exact generated command carrying `--provider-cleanup-token <active token>` is cleanup-only. The first desired request is stored immutably even when its base form equals the old retry; tokenized retry, repeat, or third command cannot overwrite it. Cleanup failure returns tokenized retry now and optionally the first desired command after cleanup. Cleanup success is cleanup-only and returns that desired command or no action. The wire continuation object is the sole caller authority.
 
 ### E384-D-003 — Publication
 
@@ -55,54 +53,17 @@ Repository/parent descriptors are no-follow and identity-bound under exclusive l
 
 ### E384-D-004 — Layout and private schema
 
-```text
-<repository-real-parent>/.spec-dock-provider-stages-v1/
-  NAMESPACE.json
-  repositories/<repository-key>/
-    REPOSITORY.json
-    ACTIVE.json
-    stages/<tuple-key>/
-      STAGE-OWNER.json
-      candidate/
-      tombstones/
-```
-
-`repository-key = sha256(repository_realpath_utf8 + NUL + st_dev + NUL + st_ino)` and `tuple-key = sha256(operation + NUL + candidate_digest + NUL + seed_policy)`. Directories are real, current-UID, 0700 and same-device; JSON files are regular/link-count-one/0600. `ACTIVE.json` is the only locator; directory scans and unknown orphan adoption are forbidden.
-
-`ACTIVE.json` and `STAGE-OWNER.json` include exact `result_family`. Allocation states are `allocating|ready|terminal-cleanup`. `result_family` is immutable for an ACTIVE lifetime and determines only retry rendering for terminal cleanup.
+The same-filesystem layout remains namespace sentinel, per-repository sentinel, one `ACTIVE.json`, and deterministic tuple-key stage. Repository/tuple keys are SHA-256 over exact identities. ACTIVE exact keys include immutable `cleanup_token` and nullable `deferred_invocation`; its desired invocation enum is the seven wire forms. The cleanup token is a 64-hex SHA-256 of the wire-defined repository/tuple/result-family input and is identity binding, not authorization. Namespace/repository/stage directories are real, current-UID, 0700; JSON is canonical, regular/link-one, 0600. ACTIVE is the only locator; scans and orphan adoption are forbidden.
 
 ### E384-D-005 — Recovery state machine
 
-- absent ACTIVE: no-replace allocate exact tuple index and deterministic stage;
-- allocating: initialize/reopen only exact empty/owned stage;
-- ready + incomplete record: same tuple lifecycle resume;
-- ready + terminal record: atomically transition to terminal-cleanup before new dispatch;
-- terminal-cleanup + stage present: validate registered entries, remove them/stage, then ACTIVE;
-- terminal-cleanup + stage absent: remove ACTIVE and fsync parent;
-- ACTIVE absent after prior unlink crash: fsync parent and continue;
-- any identity/sentinel/registered-entry mismatch: fail closed without scanning/deleting unknown data.
+Absent ACTIVE fsyncs parent then dispatches. Allocating/ready incomplete resumes exact tuple. Ready terminal atomically becomes cleanup. Before cleanup, a no-token invocation is persisted as the first desired request; an exact tokenized retry never changes it. Stage present/already absent and ACTIVE unlink crash are deterministic. Failure emits the exact tokenized cleanup retry plus the deferred desired request; success emits the desired request only, or none; both are cleanup-only. Wrong/missing token on a retry form and any identity/sentinel/entry mismatch fail closed.
 
 ## 4. Independent ephemeral workspaces and protection
 
-### E384-D-006 — Purpose workspace API
+### E384-D-006 — Private owner root and reserved-tree API
 
-`create_external_workspace(repository,purpose,parent=None)` returns `(path, ExternalWorkspaceHandle)`. No serializable token can recreate the handle. Exact environment variables map one-to-one to independently-created paths:
-
-```text
-ISS392_WS_ADMISSION
-ISS392_WS_BASELINE_BUILD
-ISS392_WS_PROTECTED_WITNESS
-ISS392_WS_FULL_REGRESSION_S00
-ISS392_WS_FULL_REGRESSION_S30
-ISS392_WS_FULL_REGRESSION_S60
-ISS392_WS_TRIPWIRE
-ISS392_WS_FRESH_CONSUMER
-ISS392_WS_WORKFLOW_API
-ISS392_WS_ARTIFACT_DOWNLOAD
-ISS392_WS_ATTESTATION_DRAFT
-```
-
-There is no aggregate external-root variable. An orchestrator may hold several handles simultaneously, but no workspace is a child of another. Each live owner reserves top-level child trees before launch, children write only beneath reserved descriptors, and the owner seals the complete descendant inventory. In Actions the background owner retains FDs through upload confirmation; unknown entries or premature cleanup fail closed.
+Each purpose creates a private mode-0700 owner root and live descriptor-backed handle. The root path is not exported. The owner reserves one exact top-level child, pre-registers every fixed output or closed subtree policy, and exports only the reserved child through the purpose-specific `ISS392_WS_*` variable. Exact mappings, policy IDs and layouts are Issue Design D-007. Children receive the reserved tree only and cannot create registration or cleanup authority. Owner seals output, remains alive through upload confirmation and cleans only via handle. Unknown or policy-invalid entries, root exposure, identity drift or premature owner death preserve and stop.
 
 ### E384-D-007 — Protected witness and exclusions
 
@@ -128,27 +89,13 @@ The retained workflow creates an independent `full-regression-s60` workspace bel
 
 ## 7. Final CI/evidence architecture
 
-### E384-D-011 — Compatibility and final job graphs
+### E384-D-011 — Compatibility/final graph, raw bytes and permissions
 
-Compatibility head:
+Compatibility graph is producer -> three roles; producer+roles -> attestation -> gate, with compatibility provider-tests depending producer+attestation. Final removes only provider-tests. Workflow-level permissions are `{}`; exact job overrides are fixed in Issue Design. Every role/attestation/compatibility download preserves authenticated raw ZIP bytes, matches API/upload SHA-256, safe-extracts and passes raw+extracted+API data to the same verifier. Only gate reads the canary.
 
-```text
-provider-build-artifacts: []
-provider-linux-canonical: [provider-build-artifacts]
-provider-sdist-smoke: [provider-build-artifacts]
-provider-macos-delta: [provider-build-artifacts]
-provider-attestation: [provider-build-artifacts,provider-linux-canonical,provider-sdist-smoke,provider-macos-delta]
-provider-gate: [provider-attestation]
-provider-tests: [provider-build-artifacts,provider-attestation]
-```
+### E384-D-012 — Byte graph, exact Provider Gate CLI and qualification
 
-`provider-tests` has `actions:read`, `contents:read`, `pull-requests:read`; downloads exact candidate and nine-file evidence artifacts, saves run/jobs/artifacts API snapshots in its own workflow-api workspace and artifacts in its own artifact-download workspace, then calls the exact downloaded verifier. It invokes no package build and does not read the canary marker. Only `provider-gate` reads `.github/provider-gate-canary-red`.
-
-Final head removes only `provider-tests`. Compatibility and final SHA/tree identities are external evidence only and must differ. Final head reruns all authoritative jobs.
-
-### E384-D-012 — Byte graph and qualification
-
-Only `provider-build-artifacts` packages once. Three role jobs build zero. `provider-attestation` verifies candidate bytes, four receipts, four role evidence files and API metadata, then uploads the exact nine-file `provider-evidence-<sha>`. S80 downloads candidate/evidence/API bytes and uses the same verifier interface. Linux evidence binds `specdock-linux-qualification-v1` and exact twenty-run fingerprint/metrics.
+Only producer packages once; consumers build zero. All nine provider-gate subcommands have exact argv, required flags, path types, repeated option order, stdout/stderr and number-code-message mapping in Issue Design. Provider evidence remains nine actual files and all raw archives/extracted files/API snapshots are independently verified. Linux evidence binds `specdock-linux-qualification-v1`, one fingerprint, twenty runs and fault metrics.
 
 ## 8. Attestation and closure
 
@@ -160,23 +107,29 @@ Tracked #392 report records method and implementation summaries but no actual co
 
 `emit-attestation` creates payload/comment bytes only. Human posts pre-merge and post-merge comments to #392 and Epic closure to #384. Each payload omits its own future comment ID/body hash. After posting, an external `comment-receipt-v1` records target, ID, URL, actor, created/updated timestamps, payload hash, body hash/size and verification time. It is not embedded in payload or tracked tree.
 
-### E384-D-015 — Closure state machine
+### E384-D-015 — Closure state machine with post-sync recovery
 
 ```text
 pre-merge #392 comment verified
--> human merge
--> final-head-tree == merge-tree
--> spec-dock issue finish starts
--> issue finish closes #392, clears active and post-syncs
--> returned close snapshot + #392 close event read
+-> human merge and tree equality
+-> issue finish attempt 1
+-> if post-sync failed after close/clear: bind unique original close event
+-> active set iss-00392 and retry issue finish as already-closed (maximum attempts 3)
+-> final successful interval selected
 -> post-merge payload/comment/receipt on #392
--> Epic acceptance re-evaluated
--> spec-dock close epic-00384
--> #384 close event read
+-> Epic acceptance
+-> close #384 and read event
 -> Epic payload/comment/receipt on #384
 ```
 
-No payload requires a future event. Epic closure may reference the already-observed post-merge comment ID and payload hash.
+No redundant #392 close command exists. Failed restore, ambiguous close event or three post-sync failures stops. Payload records all attempts/restores and the accepted final interval, while preserving the original close event.
+
+## 9. r10 cross-contract invariants
+
+- Wire continuation separates cleanup retry from desired request.
+- Workspace variables are reserved trees, never owner roots.
+- Provider Gate validates raw ZIP and extracted bytes under exact permissions.
+- Closure accepts only a final successful issue-finish attempt after bounded recovery.
 
 ## 9. Traceability
 

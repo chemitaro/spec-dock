@@ -11,7 +11,7 @@ Planning Level: "critical"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
+  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
@@ -44,31 +44,20 @@ repository_evidence:
 
 ### Independent purpose workspaces
 
-The orchestrator creates each used workspace independently and retains its non-serializable handle. Exact environment variables:
+For each purpose the orchestrator creates a private owner root and live handle, immediately reserves the Design D-007 exact top-level tree, and exports only the reserved tree path. Owner root is never exported. Exact variables include local purposes plus provider-build/role/attestation/verification/node/workflow purposes. Every command below receives the exported reserved tree; no command receives owner root or invents a top-level child.
 
-```text
-ISS392_WS_ADMISSION
-ISS392_WS_BASELINE_BUILD
-ISS392_WS_PROTECTED_WITNESS
-ISS392_WS_FULL_REGRESSION_S00
-ISS392_WS_FULL_REGRESSION_S30
-ISS392_WS_FULL_REGRESSION_S60
-ISS392_WS_TRIPWIRE
-ISS392_WS_FRESH_CONSUMER
-ISS392_WS_WORKFLOW_API
-ISS392_WS_ARTIFACT_DOWNLOAD
-ISS392_WS_ATTESTATION_DRAFT
-```
-
-No aggregate external-root variable, shared parent, implicit purpose subdirectory or path-only cleanup exists. The live owner calls `reserve_tree` before launching a child, passes only the reserved tree, calls `seal_tree` after exit, rejects every unreserved top-level entry, and retains its FDs through any Actions upload before `upload-confirmed` cleanup.
+Before spawning a child, the owner registers every fixed output or one exact closed subtree policy through `register_output()`. The child receives the reserved path and inherited descriptor but cannot create registration or cleanup authority. The owner seals the registered inventory after child exit, keeps FDs alive through reads/uploads, confirms actual artifact ID/name/digest, then cleans by handle. Unknown owner-root entry, unregistered or policy-invalid descendant, owner death, premature cleanup or path-only authority preserves data and stops.
 
 ### Full Regression command rule
 
 ```bash
-uv run python -m scripts.quality.verify_full_regression   --shards 4   --artifact-dir "$ISS392_WS_FULL_REGRESSION_<STEP>"
+uv run python -m scripts.quality.verify_full_regression   --shards 4   --artifact-dir "$ISS392_WS_FULL_REGRESSION_S00"
 ```
 
-S00/S30/S60 substitute the exact variable. Default verifier output is forbidden.
+S30 and S60 substitute `ISS392_WS_FULL_REGRESSION_S30` or `ISS392_WS_FULL_REGRESSION_S60`. Each variable is the reserved `full-regression` tree, not the private owner root. Default verifier output is forbidden.
+
+
+
 
 ## 3. Step graph
 
@@ -112,23 +101,38 @@ Admission parser rejects: report identity field; missing/duplicate mapping; zero
 5. Fetch head/merge commits; verify tree equality and main/implementation-base lineage.
 6. Read report/ledger/collection from merge tree; parse mapping-only schema4; apply register.
 7. Capture protected/exclusion manifests outside repository.
-8. Verify exact dogfood `0.2.3
-`, marker absence and fixed-tree digests.
+8. Verify exact dogfood `0.2.3\n`, marker absence and fixed-tree digests.
 9. Build baseline `0.2.3` once in baseline-build workspace and capture hashes.
 10. Run current ordinary/full gates with external output.
 
 **Focused verification commands**
 
+```text
+spawn_registered_child(
+  admission_handle,
+  ISS392_WS_ADMISSION,
+  registrations=[fixed-file-v1:inputs/issue-387-timeline.json],
+  argv=[
+    "gh","api","--paginate",
+    "-H","Accept: application/vnd.github+json",
+    "repos/chemitaro/spec-dock/issues/387/timeline"
+  ],
+  stdout_registration="inputs/issue-387-timeline.json"
+)
+```
+
 ```bash
-# Paths are created/exported by the long-lived handle-owning orchestrator.
-gh api --paginate -H 'Accept: application/vnd.github+json'   repos/chemitaro/spec-dock/issues/387/timeline   > "$ISS392_WS_ADMISSION/issue-387-timeline.json"
-# The admission parser fetches each referenced PR and /commits/<head>/pulls.
-uv build --sdist --wheel --out-dir "$ISS392_WS_BASELINE_BUILD/dist"
+# Each path below is an exported reserved tree backed by its live handle.
+uv build --sdist --wheel --out-dir "$ISS392_WS_BASELINE_BUILD"
 make lint
 uv run pytest -q
-uv run python -m scripts.quality.verify_full_regression   --shards 4 --artifact-dir "$ISS392_WS_FULL_REGRESSION_S00"
+uv run python -m scripts.quality.verify_full_regression \
+  --shards 4 \
+  --artifact-dir "$ISS392_WS_FULL_REGRESSION_S00"
 python3 ./spec-dock/scripts/spec-dock validate
 ```
+
+The admission parser uses the same registered-capture API for every referenced PR, `/commits/{head_sha}/pulls`, head commit, merge commit, report blob, ledger blob and collection result. No shell redirection or child-selected output path is permitted.
 
 **Expected result**
 
@@ -179,7 +183,7 @@ S00 GREEN.
 
 **RED evidence**
 
-38-code/136-row inventory; four record and twenty-nine public JSON goldens; terminal-cleanup code/retry/action/guidance; warning retries; strict result-family private enum; unknown/duplicate/order rejection; candidate/legacy safety.
+38-code/142-row inventory; four record and thirty-three public JSON goldens; hidden cleanup-token parser role; no-token desired update/init-force disambiguation; terminal-cleanup code/retry/action/guidance; warning retries; strict result-family private enum; unknown/duplicate/order rejection; candidate/legacy safety.
 
 **Smallest action**
 
@@ -276,10 +280,13 @@ S20 GREEN; independent `ISS392_WS_FULL_REGRESSION_S30` handle exists.
 - stage present/already absent;
 - ACTIVE present/already absent;
 - crash after stage removal and after ACTIVE unlink before fsync;
-- cleanup retry with next request same/different operation;
-- each of init, init-force, update, uninstall default/keep dry-run and uninstall default/keep apply echoes exactly on cleanup success/failure;
-- present-ACTIVE cleanup success returns cleanup-only and does not classify/execute the requested operation;
-- old-family retry success returns cleanup-only; caller must invoke the desired command again;
+- every no-token public command is atomically stored as the first desired `deferred_invocation`, even when update/init-force has the same base form as the old operation retry;
+- only the exact generated `--provider-cleanup-token <active token>` command has cleanup-retry role; a missing/wrong token is exact `invalid-request`;
+- each no-token init, init-force, update and four uninstall forms echoes exactly on cleanup success/failure;
+- failure exposes the tokenized cleanup retry in `continuation.next_command` and exact desired command in `continuation.after_cleanup_command`;
+- tokenized retry preserves deferred intent; successful retry returns that desired command, never the durable old mutation command;
+- a tokenized retry with no deferred request produces explicit no-next-action cleanup success;
+- present-ACTIVE cleanup success is cleanup-only and never dispatches the requested operation;
 - repeated cleanup failure exact `terminal-cleanup-failed`;
 - warning result non-null retry and next-call cleanup;
 - result-family retry mapping;
@@ -348,8 +355,7 @@ make lint
 
 **Expected/evidence**
 
-PR-B branch exposes final route, dogfood record remains exact `0.2.3
-` and fixed trees/marker absence byte-identical. Record CLI goldens and witness equality.
+PR-B branch exposes final route, dogfood record remains exact `0.2.3\n` and fixed trees/marker absence byte-identical. Record CLI goldens and witness equality.
 
 **Stop/cleanup/invariant**
 
@@ -387,7 +393,7 @@ S40 GREEN; independent baseline-build/tripwire/fresh-consumer handles.
 Exact/modified roots/slots/recovery, preserve-only policy, fault resume, old command matrix, Python/native positive controls, terminal-cleanup after migrated operation. Build only in baseline-build purpose; consumers under fresh-consumer/tripwire purpose.
 
 ```bash
-uv build --sdist --wheel --out-dir "$ISS392_WS_BASELINE_BUILD/final-dist"
+uv build --sdist --wheel --out-dir "$ISS392_WS_BASELINE_BUILD"
 uv run pytest --run-full-regression --full-regression-shard -q   tests/integration/test_provider_lifecycle_artifacts.py   tests/integration/test_provider_lifecycle_tripwire.py
 ```
 
@@ -484,11 +490,11 @@ S60 is only PR-B gate. Main receives complete final lifecycle and coherent curre
 
 I392-RQ-020–021/030/032; D-011–012; register.
 
-## I392-S70 — Consumer-first final gate, both tracked heads and second dogfood update
+## I392-S70 — Consumer-first final gate, exact CLI/permissions, both tracked heads and second dogfood update
 
 **Objective and visible outcome**
 
-Build final gate/evidence implementation, remove old policy consumer-first, complete second dogfood update, finalize tracked report method, push compatibility head, complete no-gap context transition and create distinct final head. No main merge.
+Build the final Provider Gate with exact raw-archive dataflow and least-privilege permissions; remove old policy consumer-first; complete the second dogfood update; finalize tracked report; create compatibility and final heads. S70 is non-main.
 
 **Owned paths**
 
@@ -496,7 +502,8 @@ Build final gate/evidence implementation, remove old policy consumer-first, comp
 scripts/provider_gate.py
 ci/linux-qualification.Dockerfile
 ci/linux-qualification-environment.json
-tests/unit/infra/test_provider_{gate,workflow}.py
+tests/unit/infra/test_provider_gate.py
+tests/unit/infra/test_provider_workflow.py
 tests/provider_test_ownership.json
 Makefile
 scripts/static_analysis/run.sh
@@ -510,93 +517,127 @@ all four dogfood roots, both slots, record and markers
 
 **No-touch**
 
-Protected paths/seeds; actual compatibility/final identities are not written to report; human settings are external.
+Protected data/seeds; actual compatibility/final identities are external; human setting writes/merge are not agent operations.
 
 **Prerequisites**
 
-PR-B S60 main state; current gates GREEN; human admin available.
+PR-B S60 main state and both current gates GREEN. Every D-007 reserved-tree owner implementation and raw archive transport test is available.
 
 **RED evidence**
 
-Evidence schemas/fixtures/hash chain; exact job needs; one producer; compatibility job candidate/evidence/API downloads, exact verifier flags, permissions, no build, canary isolation; old consumer inventory; final diff only job removal; actual head identities forbidden in report; second dogfood completeness.
+- exact argv array and required flags for all nine subcommands;
+- wrong/missing/duplicate/reordered repeated role options;
+- private owner root passed instead of reserved tree;
+- raw archive absent/truncated/digest mismatch/unsafe ZIP/extracted-byte mismatch;
+- API prefixed digest versus upload-output bare digest mismatch;
+- top-level empty permissions and every job override/needs/build/upload/download step;
+- compatibility job downloads raw candidate/evidence plus API snapshots and calls aggregate verifier;
+- one packager, consumers zero, canary isolation;
+- old consumer inventory zero before provider deletion;
+- distinct heads and exact one-job diff;
+- complete second dogfood candidate.
 
 **Smallest action**
 
-1. Add final tooling/environment/workflow/tests.
-2. Retire/replace every old consumer, prove zero, then delete old providers/ledger/timing/sharder/conftest/main-push workflow.
-3. Update final operator/test-policy docs.
-4. Perform complete candidate-wide dogfood update; finalize tracked report without actual head/run identities; commit.
-5. Push and record actual compatibility SHA/tree externally.
-6. Run compatibility workflow; require both contexts GREEN. Compatibility provider-tests independently verifies candidate/evidence/API bytes.
-7. Human adds new required while old remains; read back both.
-8. Canary adds only marker; prove new RED, old GREEN, blocked; close canary; restore compatibility GREEN.
-9. Human removes old required; read back new-only.
-10. Create one descendant commit removing only provider-tests; record distinct final SHA/tree externally. Do not add identity to report.
+1. Implement the nine exact Design D-019 commands and failure/success schemas.
+2. Implement owner-root-private/reserved-tree APIs and all provider-purpose workspace owners.
+3. Implement authenticated raw ZIP download steps, raw preservation, API/upload digest equality and safe extraction.
+4. Add final workflow with `permissions: {}` and exact job overrides/needs.
+5. Add structural tests comparing complete YAML job graph, permissions, artifact names and argv arrays.
+6. Retire/replace every old consumer, prove zero, then delete old providers/ledger/timing/sharder/conftest/main-push workflow.
+7. Update final operator/test-policy docs and perform complete candidate-wide dogfood update.
+8. Finalize tracked #392 report without head/run identities and commit `PRC_COMPAT_HEAD`.
+9. Run compatibility workflow and human no-gap context sequence; compatibility verifier independently GREEN.
+10. Commit distinct `PRC_FINAL_HEAD` by removing only job `provider-tests`. Record both identities externally. Do not merge.
 
 **Focused verification commands**
 
 ```bash
+REPOSITORY_ROOT="$(pwd -P)"
 uv run pytest -q tests/unit/infra/test_provider_gate.py tests/unit/infra/test_provider_workflow.py
-uv run python scripts/provider_gate.py verify-node-ownership --map tests/provider_test_ownership.json
+uv run python scripts/provider_gate.py verify-node-ownership \
+  --repository-root "$REPOSITORY_ROOT" \
+  --ownership-map "$REPOSITORY_ROOT/tests/provider_test_ownership.json" \
+  --collection-json "$ISS392_WS_PROVIDER_NODE_OWNERSHIP/collection.json" \
+  --workspace "$ISS392_WS_PROVIDER_NODE_OWNERSHIP" \
+  --json
+uv run python scripts/provider_gate.py verify-workflow-structure \
+  --repository-root "$REPOSITORY_ROOT" \
+  --workflow "$REPOSITORY_ROOT/.github/workflows/provider-ci.yml" \
+  --head-kind compatibility \
+  --workspace "$ISS392_WS_PROVIDER_WORKFLOW_STRUCTURE" \
+  --json
 make lint
 uv run pytest -q
 python3 ./spec-dock/scripts/spec-dock validate
-git diff --name-only "$PRC_COMPAT_HEAD" "$PRC_FINAL_HEAD"
 test "$(git diff --name-only "$PRC_COMPAT_HEAD" "$PRC_FINAL_HEAD")" = '.github/workflows/provider-ci.yml'
 test "$PRC_COMPAT_HEAD" != "$PRC_FINAL_HEAD"
 ```
 
-Compatibility job command uses its own purpose workspaces:
+Compatibility job creates private owners for `provider-verification`, `workflow-api` and `artifact-download`, exports their exact reserved trees, downloads raw archives by D-014, saves API JSON, and runs:
 
 ```bash
-uv run python scripts/provider_gate.py verify-downloaded-artifact   --repository chemitaro/spec-dock   --candidate-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/candidate"   --evidence-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/evidence"   --run-json "$ISS392_WS_WORKFLOW_API/run.json"   --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json"   --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json"   --source-sha "$PRC_COMPAT_HEAD" --source-tree "$PRC_COMPAT_TREE"   --workflow-run-id "$COMPAT_RUN_ID" --json
+REPOSITORY_ROOT="$(pwd -P)"
+uv run python scripts/provider_gate.py verify-downloaded-artifact \
+  --scope aggregate \
+  --repository chemitaro/spec-dock \
+  --repository-root "$REPOSITORY_ROOT" \
+  --source-sha "$PRC_COMPAT_HEAD" \
+  --source-tree "$PRC_COMPAT_TREE" \
+  --workflow-run-id "$COMPAT_RUN_ID" \
+  --workflow-run-attempt "$COMPAT_RUN_ATTEMPT" \
+  --run-json "$ISS392_WS_WORKFLOW_API/run.json" \
+  --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json" \
+  --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json" \
+  --artifact-archive "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-candidate-$PRC_COMPAT_HEAD.zip" \
+  --artifact-archive "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-evidence-$PRC_COMPAT_HEAD.zip" \
+  --artifact-dir "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-candidate-$PRC_COMPAT_HEAD" \
+  --artifact-dir "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-evidence-$PRC_COMPAT_HEAD" \
+  --workspace "$ISS392_WS_PROVIDER_VERIFICATION" \
+  --json
 ```
 
 **Expected/evidence**
 
-Old consumers/providers absent; second dogfood complete; report non-self-referential; compatibility candidate/evidence/API actual bytes verified; canary new RED/old GREEN; new required; distinct final head with only job removal.
+All nine CLI contracts and raw vectors GREEN; permissions/needs exact; old consumers/providers absent; second dogfood complete; compatibility candidate/evidence/API raw and extracted bytes verified; canary new RED/old GREEN; distinct final head with only compatibility job removal.
 
 **Stop/cleanup/invariant**
 
-Any schema/CLI choice, old consumer, partial dogfood, report identity, compatibility no-op/build/canary dependency, setting gap, equal heads or extra final diff stops. Before leaving S70, commit `PRC_COMPAT_HEAD`, complete the human context transition, then commit distinct `PRC_FINAL_HEAD` by removing only `provider-tests`; record both identities externally. Cleanup local pre-freeze purpose workspaces by handles. S70 is non-main; continue to read-only S80.
+Any unspecified CLI flag, raw/archive/API/permission mismatch, owner-root exposure, old consumer, partial dogfood, report identity, compatibility build/canary dependency, setting gap, equal heads or extra final diff stops. Handle cleanup occurs only after actual upload/read confirmation. S70 remains non-main; continue to read-only S80.
 
 **Trace**
 
-I392-RQ-022–029/032; D-013–025.
+I392-RQ-022–029/032; D-007, D-013–026.
 
-## I392-S80 — Read-only final-head evidence and PR-C gate
+## I392-S80 — Read-only final-head raw-byte evidence and PR-C gate
 
 **Objective and visible outcome**
 
-On clean distinct final head, run authoritative CI/evidence/qualification and pre-merge attestation without tracked edit/build/update/sync.
+On the clean S70-created final head, rerun authoritative CI, independently download raw archive/API bytes, verify them, and post pre-merge evidence without tracked edits.
 
 **Owned repository paths**
 
-None. External workflow-api, artifact-download, protected-witness and attestation-draft workspaces/handles only; GitHub read APIs and human append-only pre-merge comment.
-
-**No-touch**
-
-All tracked files, dogfood, report/meta, repository workbench, stage namespace except read-only clean check, settings except readback.
+None. Independent live handles/reserved trees only; GitHub read APIs; human append-only pre-merge comment.
 
 **Prerequisites**
 
-S70-created final head clean; compatibility sequence complete; new required context active; compatibility job absent; human review available. S80 may not create a commit or modify workflow bytes.
+Final head clean/distinct; compatibility sequence complete; new required active; compatibility job absent; final workflow structure test GREEN.
 
 **RED evidence**
 
-Run selector zero/multiple/wrong head; candidate/evidence/API missing or mismatched; final head equals compatibility; final diff extra; verifier typed failures; fixture/hash/environment/metric mismatch; tracked write/build/update/sync; comment/receipt mismatch.
+Zero/multiple/wrong run; wrong raw archive digest; missing preserved raw ZIP; unsafe extraction; API/upload digest mismatch; actual extracted bytes mismatch; wrong permissions/needs; candidate/evidence schema/metrics mismatch; tracked write/build/update/sync; comment/receipt mismatch.
 
 **Smallest action**
 
-1. Read and pin the already-existing S70 `PRC_FINAL_HEAD`/tree; create independent workflow-api, artifact-download, protected-witness and attestation-draft workspaces/handles.
-2. Verify final SHA/tree externally and allowed compatibility diff.
-3. Snapshot runs to workflow-api workspace; dispatch Provider CI for final head and qualification; select exactly one new run; wait success.
-4. Save exact run/jobs/artifacts API bytes to workflow-api workspace.
-5. Download exact final candidate/evidence to artifact-download workspace.
-6. Invoke exact verifier on actual bytes; inspect role metrics/build counts.
+1. Pin existing `PRC_FINAL_HEAD`/tree and create workflow-api, artifact-download, provider-verification, protected-witness and attestation-draft private owners/reserved trees.
+2. Dispatch exactly one final workflow run and wait success.
+3. Save exact run/jobs/artifacts API JSON in workflow-api reserved tree.
+4. Select exact candidate/evidence artifact IDs by name/run, authenticate-download their raw ZIP bytes into artifact-download `raw/`, preserve them and safe-extract to exact `extracted/` paths.
+5. Run the aggregate verifier with both raw and extracted options in exact order.
+6. Verify environment/20-run/fault/macOS/sdist evidence and final permissions/needs from actual bytes/API.
 7. Read back final required contexts/reviews.
-8. Render pre-merge payload/comment in attestation-draft workspace; human posts new #392 comment; read back; create comment receipt.
-9. Recheck head/tree/status, dogfood identity, protected witness and repository workbench.
+8. Emit pre-merge payload/comment in attestation reserved tree; human posts new #392 comment; read back and create receipt.
+9. Recheck head/tree/status, dogfood, protected witness and repository workbench.
 
 **Focused commands**
 
@@ -604,39 +645,63 @@ Run selector zero/multiple/wrong head; candidate/evidence/API missing or mismatc
 test "$(git rev-parse HEAD)" = "$PRC_FINAL_HEAD"
 test "$PRC_COMPAT_HEAD" != "$PRC_FINAL_HEAD"
 test -z "$(git status --short)"
-gh workflow run provider-ci.yml --ref "$BRANCH"   -f candidate_sha="$PRC_FINAL_HEAD" -f qualification=true
-uv run python scripts/provider_gate.py verify-downloaded-artifact   --repository chemitaro/spec-dock   --candidate-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/candidate"   --evidence-dir "$ISS392_WS_ARTIFACT_DOWNLOAD/evidence"   --run-json "$ISS392_WS_WORKFLOW_API/run.json"   --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json"   --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json"   --source-sha "$PRC_FINAL_HEAD" --source-tree "$PRC_FINAL_TREE"   --workflow-run-id "$FINAL_RUN_ID" --json
-uv run python scripts/provider_gate.py emit-attestation   --kind pre-merge-attestation-v1   --input-json "$ISS392_WS_ATTESTATION_DRAFT/input.json"   --output-json "$ISS392_WS_ATTESTATION_DRAFT/payload.json"   --output-comment "$ISS392_WS_ATTESTATION_DRAFT/comment.md" --json
+gh workflow run provider-ci.yml --ref "$BRANCH" -f candidate_sha="$PRC_FINAL_HEAD" -f qualification=true
+REPOSITORY_ROOT="$(pwd -P)"
+uv run python scripts/provider_gate.py verify-downloaded-artifact \
+  --scope aggregate \
+  --repository chemitaro/spec-dock \
+  --repository-root "$REPOSITORY_ROOT" \
+  --source-sha "$PRC_FINAL_HEAD" \
+  --source-tree "$PRC_FINAL_TREE" \
+  --workflow-run-id "$FINAL_RUN_ID" \
+  --workflow-run-attempt "$FINAL_RUN_ATTEMPT" \
+  --run-json "$ISS392_WS_WORKFLOW_API/run.json" \
+  --jobs-json "$ISS392_WS_WORKFLOW_API/jobs.json" \
+  --artifacts-json "$ISS392_WS_WORKFLOW_API/artifacts.json" \
+  --artifact-archive "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-candidate-$PRC_FINAL_HEAD.zip" \
+  --artifact-archive "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/raw/provider-evidence-$PRC_FINAL_HEAD.zip" \
+  --artifact-dir "candidate=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-candidate-$PRC_FINAL_HEAD" \
+  --artifact-dir "provider-evidence=$ISS392_WS_ARTIFACT_DOWNLOAD/extracted/provider-evidence-$PRC_FINAL_HEAD" \
+  --workspace "$ISS392_WS_PROVIDER_VERIFICATION" \
+  --json
+uv run python scripts/provider_gate.py emit-attestation \
+  --repository-root "$REPOSITORY_ROOT" \
+  --kind pre-merge-attestation-v1 \
+  --input-json "$ISS392_WS_ATTESTATION_DRAFT/input.json" \
+  --output-json "$ISS392_WS_ATTESTATION_DRAFT/payload.json" \
+  --output-comment "$ISS392_WS_ATTESTATION_DRAFT/comment.md" \
+  --workspace "$ISS392_WS_ATTESTATION_DRAFT" \
+  --json
 test "$(git rev-parse HEAD)" = "$PRC_FINAL_HEAD"
 test -z "$(git status --short)"
 ```
 
 **Expected/evidence**
 
-One final-head build invocation; all consumers zero; exact candidate/nine-file evidence/API bytes; stable 20-run qualification; final new-only context; append-only pre-merge #392 comment and external receipt; no tracked/workbench/dogfood change.
+One final producer build; consumers zero; raw candidate/evidence archives and extracted/API bytes all linked; stable qualification; final new-only context; append-only pre-merge comment/receipt; no tracked/workbench/dogfood change.
 
 **Stop/cleanup/invariant**
 
-Any tracked edit/local build/update/sync, wrong run/head/context, byte/schema/metric mismatch or comment failure invalidates S80. Return S70 and repeat final sequence. Handle-clean only after immutable evidence retained. S80 is only PR-C main gate.
+Any tracked edit/local build/update/sync, wrong run/head/context, raw/extracted/API/schema/permission/metric mismatch or comment failure invalidates S80. Return to S70 and repeat final sequence. Clean by live handles only after immutable evidence readback. S80 is the sole PR-C main gate.
 
 **Trace**
 
-I392-RQ-023–032; D-013–025.
+I392-RQ-023–032; D-013–026.
 
 ## 4. Human merge and measured external closure
 
-1. Human merges `PRC_FINAL_HEAD`.
-2. Fetch `MERGE_COMMIT`; require `git rev-parse "$PRC_FINAL_HEAD^{tree}" == git rev-parse "$MERGE_COMMIT^{tree}"`.
-3. Record command start, run `python3 ./spec-dock/scripts/spec-dock issue finish`, and record completion plus returned issue number, already-closed, active-clear and post-sync values. The command itself calls `close_node()` before clear/post-sync.
-4. Immediately read GitHub #392 state/timeline and select the unique close event satisfying Design D-022; do not invoke `close --id iss-00392`.
-5. Create a new attestation-draft purpose workspace; render `post-merge-closure-v1` from the measured command interval/result and close event; human posts to #392; read back and create external `comment-receipt-v1`.
-6. Re-evaluate all Epic acceptance.
-7. Run `python3 ./spec-dock/scripts/spec-dock close --id epic-00384`; read actual #384 close event.
-8. Create another independently-created attestation-draft workspace; render `epic-closure-v1`; human posts to #384; read back and create receipt.
+1. Human merges `PRC_FINAL_HEAD`; fetch `MERGE_COMMIT` and require tree equality.
+2. Create one fresh attestation-draft reserved tree and record finish attempt 1 start/end. Run `python3 ./spec-dock/scripts/spec-dock issue finish`.
+3. If exit 0, require returned issue 392, active cleared true, post-sync completed; attempt 1 is accepted.
+4. If exit 1, recovery is allowed only when result/readback proves #392 closed, active cleared true and post-sync failed. Immediately read #392 timeline and bind the unique original close event. No payload yet.
+5. For attempt 2, run `python3 ./spec-dock/scripts/spec-dock active set --id iss-00392`; require exit 0, post-sync completed and `active show` exactly selects `iss-00392`. Then rerun issue finish, requiring `already_closed=true` and no additional close event.
+6. If attempt 2 again has only post-sync failure, repeat the exact active-set/readback/finish sequence once for attempt 3. Three failed finish attempts, active restore failure, ambiguous/multiple close event, reopen, or any other failure is a hard stop.
+7. Build `post-merge-closure-v1` from all measured attempts/restores, the original close event and the final successful attempt number. Human posts to #392; read back and create comment receipt. Never invoke `close --id iss-00392`.
+8. Re-evaluate Epic acceptance. Run `python3 ./spec-dock/scripts/spec-dock close --id epic-00384`; read the actual #384 close event. Build/post/read Epic closure on #384 and create receipt.
 9. Tracked report/tree are never rewritten.
 
-No step creates payload fields for facts not yet observed. Post payload has no own comment ID; Epic payload may use already observed post comment ID/hash but has no own comment ID.
+The accepted post payload always references the final successful finish interval while preserving the original #392 close event. Retry attempts have `already_closed=true` and cannot create another close event.
 
 ## 5. Definition of done
 
-All I392-RQ-001–032 are verified. Only S30/S60/S80 are main gates. #387 report is mapping-only, terminal cleanup has exact cleanup-only success/failure echoes, each temporary purpose has a live registering/upload-surviving handle, provider-gate schemas/CLI mappings are closed, both tracked heads are created in S70, S80 is read-only, `issue finish` supplies #392 close evidence, and `owner_decisions_required=[]`.
+All I392-RQ-001–032 are verified. Only S30/S60/S80 are main gates. #387 report is mapping-only, terminal cleanup preserves desired continuation across tokenized cleanup retry, every exported workspace value is an exact reserved tree backed by a live upload-surviving handle, all nine Provider Gate argv/raw archive/permissions contracts are closed, both tracked heads are created in S70, S80 is read-only, issue-finish post-sync recovery is deterministic, and `owner_decisions_required=[]`.

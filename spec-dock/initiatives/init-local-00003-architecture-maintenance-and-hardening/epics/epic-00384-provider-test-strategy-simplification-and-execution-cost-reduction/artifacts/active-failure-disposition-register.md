@@ -8,7 +8,7 @@ ID: "active-failure-disposition-register-v5"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
+  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
 source_ledger:
   path: "full-regression-ledger.json"
   git_blob_sha1: "efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4"
@@ -26,7 +26,7 @@ The Issue #387 tracked report contains only a schema/rule declaration and the 12
 ## 2. Source ledger and row-count rule
 
 - Repository: `chemitaro/spec-dock`
-- Source commit: `95d7562ca1762e0b2a717912484eba5a5c2377f1`
+- Source commit: `ea168b745d3f443f11a24b975f32e3bb6fb17b1a`
 - Source ledger blob: `efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4`
 - Original identities: exactly 27
 - Conditional identities: source rows 4–15, exactly 12
@@ -119,7 +119,7 @@ Missing report block/entry, report identity field, unmapped new row, signature d
   "source": {
     "repository": "chemitaro/spec-dock",
     "branch": "codex/epic-00384-provider-test-strategy-planning",
-    "commit": "95d7562ca1762e0b2a717912484eba5a5c2377f1",
+    "commit": "ea168b745d3f443f11a24b975f32e3bb6fb17b1a",
     "path": "full-regression-ledger.json",
     "git_blob_sha1": "efb5cd87ec6cfcae05f1f38222e4d372fe6ff1e4",
     "original_row_count": 27,

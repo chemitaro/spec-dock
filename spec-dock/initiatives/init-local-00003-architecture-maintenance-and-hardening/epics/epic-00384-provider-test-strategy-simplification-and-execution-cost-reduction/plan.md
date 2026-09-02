@@ -10,7 +10,7 @@ ID: "epic-00384"
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "95d7562ca1762e0b2a717912484eba5a5c2377f1"
+  sha: "ea168b745d3f443f11a24b975f32e3bb6fb17b1a"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
@@ -21,23 +21,15 @@ GitHub #392 is the sole implementation-and-verification unit. #387 must be human
 
 ## 2. Purpose workspaces
 
-Before a purpose writes data, the orchestrator independently calls the external-workspace helper and retains its non-serializable handle. Exact variables are:
+For every purpose, the orchestrator creates a private owner root/live handle and reserves the exact child defined in Issue Design D-007. Only the reserved tree is exported in its one `ISS392_WS_*` variable. Commands receive that path directly. The private root is never exported or accepted by CLI. Owner performs reserve -> spawn -> seal -> read/upload-confirm -> cleanup; unknown entries or owner death preserve and stop.
 
-```text
-ISS392_WS_ADMISSION
-ISS392_WS_BASELINE_BUILD
-ISS392_WS_PROTECTED_WITNESS
-ISS392_WS_FULL_REGRESSION_S00
-ISS392_WS_FULL_REGRESSION_S30
-ISS392_WS_FULL_REGRESSION_S60
-ISS392_WS_TRIPWIRE
-ISS392_WS_FRESH_CONSUMER
-ISS392_WS_WORKFLOW_API
-ISS392_WS_ARTIFACT_DOWNLOAD
-ISS392_WS_ATTESTATION_DRAFT
+Full Regression uses the reserved trees directly:
+
+```bash
+uv run python -m scripts.quality.verify_full_regression --shards 4 --artifact-dir "$ISS392_WS_FULL_REGRESSION_S00"
 ```
 
-No aggregate root variable is created. Each cleanup uses only its captured handle after registered outputs are no longer required.
+S30/S60 substitute their exact variable. Provider jobs use their exact provider reserved-tree variables. No aggregate root exists.
 
 ## 3. Ordered execution and main gates
 
@@ -63,9 +55,9 @@ uv run python -m scripts.quality.verify_full_regression   --shards 4   --artifac
 
 ## 5. PR-A and PR-B
 
-- S10 implements strict model, 38 codes, 136 wire rows, valid four/twenty-nine goldens and table-driven rejection.
+- S10 implements strict model, 38 codes, 142 wire rows, valid four record and thirty-three public JSON goldens and table-driven rejection.
 - S20 implements descriptor-safe operations, process-independent ACTIVE/stage and fresh bootstrap.
-- S30 implements exact-tuple resume plus mandatory terminal-cleanup recovery and runs current gates using `ISS392_WS_FULL_REGRESSION_S30`.
+- S30 implements exact-tuple resume plus deferred desired invocation: cleanup failure says retry cleanup then desired command; cleanup success returns desired command or none; all cleanup returns are cleanup-only. It runs current gates using the reserved `ISS392_WS_FULL_REGRESSION_S30` tree.
 - S40 connects final public lifecycle/provider docs but does not touch checked-in dogfood.
 - S50 uses `ISS392_WS_BASELINE_BUILD`, `ISS392_WS_TRIPWIRE` and independently-created fresh-consumer workspaces only.
 - S60 terminalizes failures, retargets current Provider CI, externalizes retained Full Regression through an independent workflow workspace, updates lifecycle docs/AGENTS lifecycle text, removes old engine/tests and performs one complete dogfood migration.
@@ -74,11 +66,11 @@ PR-B cannot merge unless terminal cleanup crash/retry tests, current PR workflow
 
 ## 6. PR-C safe two-head plan
 
-### E384-P-001 — Compatibility head
+### E384-P-001 — Compatibility and final tracked heads
 
-S70 adds final provider-gate code, the complete D-015–D-026 schema/CLI/fixture contract, stable environment, structural tests and final operator/test-policy docs; removes old consumers before providers; performs the second complete dogfood update; finalizes the tracked #392 report; creates `PRC_COMPAT_HEAD`; completes the human context sequence; and commits distinct `PRC_FINAL_HEAD` by removing only compatibility job `provider-tests`. Actual head/run identities remain external.
+S70 implements all nine exact Provider Gate commands, raw ZIP transport/safe extraction, job permissions, evidence schemas, stable environment, structural tests and final operator docs. It removes old policy consumer-first, completes the second dogfood update and finalizes tracked report. It creates `PRC_COMPAT_HEAD`, runs both contexts and completes the human transition, then creates `PRC_FINAL_HEAD` by removing only compatibility `provider-tests`. Actual identities stay external. S70 owns both commits; S80 owns none.
 
-Push `PRC_COMPAT_HEAD` externally. Its workflow emits both contexts. Compatibility `provider-tests` needs producer and attestation, creates separate workflow-api and artifact-download workspaces, downloads candidate/evidence, fetches run/jobs/artifacts JSON, invokes the same verifier interface as S80, builds nothing and ignores the canary marker.
+Compatibility provider-tests independently creates private owners/reserved API/download/verification trees, preserves raw candidate/evidence ZIPs, safe-extracts, and invokes the aggregate verifier with raw/extracted/API inputs. It packages nothing and ignores the canary.
 
 ### E384-P-002 — Required-context transition
 
@@ -92,26 +84,26 @@ Push `PRC_COMPAT_HEAD` externally. Its workflow emits both contexts. Compatibili
 
 ### E384-P-003 — Read-only authoritative rerun
 
-S70 has already created the distinct descendant `PRC_FINAL_HEAD` by removing only compatibility job `provider-tests`. S80 freezes/reads that SHA/tree externally and owns no commit. No tracked report edit is allowed. Dispatch a new final run, rerun producer/all roles/attestation/gate, download candidate/evidence/API snapshots to purpose-specific workspaces, verify actual bytes and final required contexts, then emit/post/read back pre-merge attestation. Only final head may merge.
+S80 reads the S70-created final head. It dispatches a fresh final run, authenticates and preserves raw Actions archives, verifies API/upload digest equality, safe-extracts, passes exact raw/extracted/API options to the same verifier, reads final permissions/contexts and posts the pre-merge attestation. No tracked write, local build, update, sync or commit occurs.
 
 ## 7. Evidence and closure
 
-Tracked report contains pre-freeze methodology, implementation, terminalization and protection summaries only. Actual compatibility/final SHA/tree/run IDs are external.
+Tracked report has pre-freeze methodology/implementation facts only. External evidence binds heads, raw archives, extracted/API bytes, permissions, metrics and comments.
 
-After human merge, execute exactly:
+After human merge:
 
-1. fetch merge commit and compare final-head tree with merge tree;
-2. start `python3 ./spec-dock/scripts/spec-dock issue finish`; capture its start/end and returned issue number, already-closed flag, active-clear and post-sync result;
-3. immediately read #392 state/timeline and bind the selected close event to the issue-finish interval/reported already-closed relation; do not invoke `close --id iss-00392`;
-4. render/post/read back post-merge closure on #392, then create external comment receipt;
-5. re-evaluate Epic acceptance;
-6. `python3 ./spec-dock/scripts/spec-dock close --id epic-00384` and read actual #384 close event;
-7. render/post/read back Epic closure on #384, then create external comment receipt.
+1. compare final-head and merge tree;
+2. run issue-finish attempt 1 and capture exact interval/result;
+3. if success, select attempt 1;
+4. if only post-sync failed after #392 close/active clear, bind the unique original close event, run exact `active set --id iss-00392`, verify active readback, and retry issue finish with `already_closed=true`;
+5. repeat recovery once only if the second post-sync also fails; after three failed attempts stop;
+6. create post payload from all attempts/restores and the final successful interval; post/read receipt on #392;
+7. re-evaluate Epic, close/read #384, post/read Epic receipt.
 
-No payload predicts its own comment identity or a future close event.
+No `close --id iss-00392` is run. Retry finish attempts cannot create a second close event.
 
 ## 8. Stop policy
 
-Stop for specification/#387 identity mismatch; report identity fields; zero/multiple merged PR; repository workbench mutation; aggregate external root; workspace-handle mismatch; unsafe ACTIVE/stage; terminal-cleanup failure without exact wire result; wire count/golden drift; S40/S50 dogfood drift; partial S60/S70 dogfood; broken current/final gate; compatibility verifier missing candidate/evidence/API bytes; canary affecting old context; final head not distinct or diff beyond job removal; extra packager; evidence/environment mismatch; tracked report head identity; wrong closure order; comment edit/hash mismatch; or merge-tree mismatch.
+Stop for specification/#387 identity mismatch; cleanup continuation ambiguity or deferred-request loss; private owner-root exposure or reserved-tree mismatch; raw archive/API/upload digest, extraction or permission drift; report identity fields; zero/multiple merged PR; repository workbench mutation; aggregate external root; workspace-handle mismatch; unsafe ACTIVE/stage; terminal-cleanup failure without exact wire result; wire count/golden drift; S40/S50 dogfood drift; partial S60/S70 dogfood; broken current/final gate; compatibility verifier missing candidate/evidence/API bytes; canary affecting old context; final head not distinct or diff beyond job removal; extra packager; evidence/environment mismatch; tracked report head identity; post-sync recovery beyond three attempts, active restoration failure, ambiguous close event or wrong closure order; comment edit/hash mismatch; or merge-tree mismatch.
 
 Forward-fix in #392 only. `owner_decisions_required=[]`.
