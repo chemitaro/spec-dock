@@ -246,36 +246,6 @@ class TestCliActive(CliRuntimeHarness):
             for state in (state_index_all, state_tree_all, state_index, state_tree):
                 assert state["active"]["issue"]["id"] == "iss-00303"
 
-    @pytest.mark.skip(
-        reason="S05: covered by TestSetActiveApplication.test_set_active_resolves_id_and_repo_scoped_github_target_without_cli"
-    )
-    def test_active_set_without_github_local_issue_without_deps_is_ready(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_same_repo_linked_hierarchy(
-                target,
-                initiative_issue_number=101,
-                epic_issue_number=201,
-                issue_issue_number=301,
-                issue_title="Unknown issue",
-            )
-            self._materialize_local_compat_ids(target)
-            self._run_runtime(target, ["active", "clear"])
-
-            agent_dir = target / "spec-dock" / ".agent"
-            (agent_dir / "index-all.json").unlink(missing_ok=True)
-            (agent_dir / "index.json").unlink(missing_ok=True)
-
-            before = (agent_dir / "active.json").read_text(encoding="utf-8")
-            p = self._run_runtime_capture(target, ["active", "set", "iss-local-00001"])
-            assert p.returncode == 0, p.stdout + p.stderr
-            assert "spec-dock: ok (active set)" in p.stdout
-            after = (agent_dir / "active.json").read_text(encoding="utf-8")
-            assert after != before
-            active = json.loads(after)
-            assert active["issue"]["id"] == "iss-local-00001"
-
     def test_active_set_epic_and_initiative_ignore_dependency_readiness(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

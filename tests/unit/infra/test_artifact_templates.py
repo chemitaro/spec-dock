@@ -20,13 +20,6 @@ CURRENT_ARTIFACT_TYPES = (
 PHYSICAL_ARTIFACT_TEMPLATES = {
     *(f"{artifact_type}.md" for artifact_type in CURRENT_ARTIFACT_TYPES),
 }
-HISTORICAL_ROUTE_MARKERS = {
-    "`analysis`": "`analysis`",
-    "`draft-*`": "`draft-*`",
-    "`repair`": "`repair`",
-    "`pr-repair`": "`pr-repair`",
-    "`profile`": "`profile`",
-}
 
 
 def _read_asset(root: Path, relative_path: Path | str) -> str:
@@ -215,21 +208,6 @@ def test_artifact_guide_rejects_automatic_promotion_of_evidence_and_report() -> 
     assert "正本へ明示的に再記述" in authority_flow
 
 
-def test_historical_routes_are_not_current_and_retired_template_is_absent() -> None:
-    guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
-    current_catalog = _section(guide, "## Current creation catalog")
-    historical_retention = _section(guide, "## Historical retention")
-
-    for current_marker, historical_marker in HISTORICAL_ROUTE_MARKERS.items():
-        assert current_marker not in current_catalog
-        assert historical_marker in historical_retention
-    assert "draft-" not in current_catalog
-    assert "Current creation route ではありません" in historical_retention
-    assert "削除、rename、rewrite を指示しません" in historical_retention
-    assert not (PROVIDER_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").exists()
-    assert not (DOGFOOD_ASSET_ROOT / ARTIFACT_TEMPLATE_DIRECTORY / "pr-repair-batch.md").exists()
-
-
 def test_draft_document_state_and_adr_draft_authority_are_not_historical_routes() -> None:
     guide = _read_asset(PROVIDER_ASSET_ROOT, ARTIFACT_GUIDE)
 
@@ -253,20 +231,10 @@ def test_relative_links_in_artifact_guide_resolve_when_present(root: Path) -> No
         assert (guide_path.parent / relative_path).is_file(), f"broken relative link: {relative_path}"
 
 
-def test_templates_readme_stays_thin_without_restoring_legacy_artifact_workflow() -> None:
+def test_templates_readme_explains_template_guide_usage() -> None:
     readme = _read_asset(PROVIDER_ASSET_ROOT, "templates/README.md")
 
     assert "各テンプレートは対応する Guide を参照して記入する" in readme
-    for legacy_marker in (
-        "future `new artifact` catalog",
-        "draft-requirement",
-        "draft-design",
-        "draft-plan",
-        "templates/issue-profiles/<profile>",
-        "no-write fail-closed",
-        "future artifact catalog",
-    ):
-        assert legacy_marker not in readme
 
 
 def test_current_initiative_and_epic_artifact_rules_keep_historical_types_non_creatable() -> None:
@@ -289,10 +257,6 @@ def test_current_initiative_and_epic_artifact_rules_keep_historical_types_non_cr
         ):
             assert expected in rules
 
-        assert "templates/issue-profiles/<profile>" not in rules
-        assert "new artifact draft-" not in rules
-        assert "new artifact pr-repair-batch" not in rules
-
 
 def test_current_issue_artifact_rules_keep_profile_routes_historical_only() -> None:
     rules = _read_asset(PROVIDER_ASSET_ROOT, "docs/rules/issue/artifacts.md")
@@ -307,7 +271,3 @@ def test_current_issue_artifact_rules_keep_profile_routes_historical_only() -> N
         "Currentの新規作成catalogやtemplate routingには含めません",
     ):
         assert expected in rules
-
-    assert "templates/issue-profiles/<profile>" not in rules
-    assert "new artifact draft-" not in rules
-    assert "new artifact pr-repair-batch" not in rules

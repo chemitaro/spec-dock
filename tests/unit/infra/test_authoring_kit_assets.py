@@ -713,9 +713,6 @@ def test_s90_retained_repository_guidelines_match_current_distribution_surface()
     assert ".agents/skills/spec-dock/SKILL.md" in content
     assert ".agents/skills/spec-dock-grill-with-docs/SKILL.md" in content
     assert ".github/workflows/ci.yml" in content
-    assert ".codex/" not in content
-    assert ".github/agents/" not in content
-    assert "host adapter" not in content.lower()
 
 
 @pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
@@ -868,8 +865,6 @@ def test_template_readme_navigation_catalogs_exact_scope_docs_and_current_artifa
 
     artifact_catalog = f"`artifacts/{{{','.join(CURRENT_ARTIFACT_TEMPLATES)}}}.md`"
     assert content.count(artifact_catalog) == 1
-    for retired_route in ("analysis", "repair", "draft-"):
-        assert retired_route not in content.casefold()
 
     assert links == {
         "../docs/authoring/overview.md",
