@@ -5,105 +5,93 @@ ID: "epic-00384"
 関連GitHub: ["#384"]
 状態: "draft"
 最終更新: "2026-09-02"
-依存: ["requirement.md", "design.md", "artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md", "artifacts/provider-lifecycle-wire-contract.md", "artifacts/active-failure-disposition-register.md"]
+依存:
+  - "requirement.md"
+  - "design.md"
+  - "artifacts/20260902t070000z-adr-multi-issue-epic-integration-branch-and-rolling-wave-elaboration-policy.md"
+  - "artifacts/epic-integration-branch-contract.md"
+  - "artifacts/rolling-wave-issue-elaboration-contract.md"
 親: ["init-local-00003"]
+実装開始許可: false
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
+  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
+  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
 
-## 1. Governance
+## 1. Planning status
 
-GitHub #392 is the sole implementation-and-verification unit. #387 must be human-merged and admitted before S10; its canonical files are read-only to #392. #388–#390 remain superseded. Internal PRs, canary and evidence operations do not create additional Issues. Human review/merge and required-context writes remain external gates.
+本計画は三Issue deliveryを固定する親計画である。Issue #392を含め、まだimplementation startを許可しない。最初に本packをrepositoryへimportし、manifestとrelative linksを検証し、parent specificationの独立Strict reviewを完了する。
 
-## 2. Purpose workspaces
+## 2. Issue order and acceptance gates
 
-For every purpose, the orchestrator creates a private owner root/live handle and reserves the exact child defined in Issue Design D-007. Only the reserved tree is exported in its one `ISS392_WS_*` variable. Commands receive that path directly. The private root is never exported or accepted by CLI. Owner performs reserve -> spawn -> seal -> read/upload-confirm -> cleanup; unknown entries or owner death preserve and stop.
-
-Full Regression uses the reserved trees directly:
-
-```bash
-uv run python -m scripts.quality.verify_full_regression --shards 4 --artifact-dir "$ISS392_WS_FULL_REGRESSION_S00"
-```
-
-S30/S60 substitute their exact variable. Provider jobs use their exact provider reserved-tree variables. No aggregate root exists.
-
-## 3. Ordered execution and main gates
-
-| PR | Steps | Sole main gate | Main state |
+| Gate | Entry | Observable acceptance | Exit |
 |---|---|---|---|
-| PR-A | S00 admission; S10 model/wire; S20 filesystem/stage; S30 update/resume | S30 | Old public product and exact legacy dogfood; dormant successor; current gates GREEN. |
-| PR-B | S40 public cutover/docs; S50 legacy/tripwire; S60 terminalization/current-gate repair/dogfood migration | S60 | Complete `0.2.4`, closed wire including terminal cleanup, current workflows GREEN, active failures zero, complete dogfood. |
-| PR-C | S70 final gate/policy removal/dogfood update/compatibility head; S80 two-head final evidence | S80 | Distinct final head, compatibility job absent, final evidence rerun, new required context, old machinery absent. |
+| G0 Parent freeze | Current verified branch tip | R/D/P、ADRs、contracts、three Issue draftsが整合し、owner decisions 0 | `PARENT_FREEZE_SHA`を記録。#392 elaboration可能。 |
+| G1 #392 | G0 GREEN | Fixed ownership lifecycleがcomplete、wire適合、dogfood complete、14 active identities unchanged、transitional gates GREEN | Human merge to Epic branch、B1 GREEN readback。 |
+| G2 #395 | B1 GREEN | 14 active rowsがProduct修正でnormal pass、15 resolved、approved 0、transitional gates GREEN | Human merge、B2 GREEN readback。 |
+| G3 #396 | B2 GREEN | Build-once final gate、consumer-first old policy removal、final docs/dogfood、context/evidence GREEN | Human merge、B3 GREEN readback。 |
+| G4 Epic main | B3 accepted | Final human review、tree equality、required contexts、rollback record | One human merge to main、B4 closure。 |
 
-S40, S50 and S70 are non-main checkpoints.
+## 3. Rolling-wave cycle
 
-## 4. S00 admission
+各Issueについて同じcycleを適用する。
 
-S00 verifies replacement manifest/`SPEC_FREEZE_COMMIT`, external protected witness, exact legacy dogfood and Issue #387.
+- current Epic branch tip、dependency evidence、GREEN observationsを固定する。
+- Issue draft contractとparent stable contractsを比較する。
+- Current treeからowned/shared/no-touch inventory、representative RED、implementation design、tests、commands、rollback procedureを具体化する。
+- Issue-specific R/D/PとLuna Max handoffを独立Strict reviewする。
+- Review accept後にだけIssueをstartする。
+- 実装、Issue-level verification、human PR review、human integration mergeを完了する。
+- Exact merged tipでGREENを再確認し、Issue acceptanceを記録する。
+- 次Issueのelaborationまでbranchをsingle-writerに戻す。
 
-For #387 it does not read a candidate or PR identity from the report. It collects timeline/cross-reference PRs, validates each exact PR-head association through the commit-pulls endpoint, filters repository/base/merged/report/lineage, requires exactly one, verifies head-tree equals merge-tree, and reads report/ledger/collection from the merge tree. The report provides only the twelve mappings consumed by `ISS387-THREE-WAY-V2`.
+このcycleのimplementation detailは本parent Planに固定しない。
 
-Commands use purpose paths directly, for example:
+## 4. G1 — Issue #392 contract gate
 
-```bash
-uv run python -m scripts.quality.verify_full_regression   --shards 4   --artifact-dir "$ISS392_WS_FULL_REGRESSION_S00"
-```
+G1はlifecycle Product outcomeだけを受け入れる。Failure baselineのactive identitiesとcurrent regression systemはcompatibility inputであり、terminalizationまたはfinal policy cutoverを先取りしない。Lifecycle candidateを変更するためcomplete dogfood convergenceを必要とする。
 
-## 5. PR-A and PR-B
+## 5. G2 — Issue #395 contract gate
 
-- S10 implements strict model, 38 codes, 142 wire rows, valid four record and thirty-three public JSON goldens and table-driven rejection.
-- S20 implements descriptor-safe operations, process-independent ACTIVE/stage and fresh bootstrap.
-- S30 implements exact-tuple resume plus deferred desired invocation: cleanup failure says retry cleanup then desired command; cleanup success returns desired command or none; all cleanup returns are cleanup-only. It runs current gates using the reserved `ISS392_WS_FULL_REGRESSION_S30` tree.
-- S40 connects final public lifecycle/provider docs but does not touch checked-in dogfood.
-- S50 uses `ISS392_WS_BASELINE_BUILD`, `ISS392_WS_TRIPWIRE` and independently-created fresh-consumer workspaces only.
-- S60 terminalizes failures, retargets current Provider CI, externalizes retained Full Regression through an independent workflow workspace, updates lifecycle docs/AGENTS lifecycle text, removes old engine/tests and performs one complete dogfood migration.
+G2はregisterの14 active rowsだけをProduct defect scopeとして扱う。各rowは自身のRED/GREENとcurrent integrated behaviorを持つ。全検証をG3へ延期しない。Current policyを利用してactive/approved 0を証明し、final policy toolingを先取りしない。
 
-PR-B cannot merge unless terminal cleanup crash/retry tests, current PR workflow and current main-push verifier are independently GREEN.
+## 6. G3 — Issue #396 contract gate
 
-## 6. PR-C safe two-head plan
+G3はB2 clean baselineをadmission条件とする。Replacement gateを成立させた後、old consumersを0にしてからold providers/data/workflowを削除する。Build-once、same bytes、platform role、qualification、evidence、required-context transition、final operator guidanceを同一Issue acceptanceへ統合する。
 
-### E384-P-001 — Compatibility and final tracked heads
+## 7. Merge and rollback governance
 
-S70 implements all nine exact Provider Gate commands, raw ZIP transport/safe extraction, job permissions, evidence schemas, stable environment, structural tests and final operator docs. It removes old policy consumer-first, completes the second dogfood update and finalizes tracked report. It creates `PRC_COMPAT_HEAD`, runs both contexts and completes the human transition, then creates `PRC_FINAL_HEAD` by removing only compatibility `provider-tests`. Actual identities stay external. S70 owns both commits; S80 owns none.
+- Human alone merges Issue PRs and final Epic PR。
+- Issue PR merge後のGREEN未確認中は次Issue branchを作らない。
+- Revertはwhole Issue mergeを単位とする。
+- Later Issue開始前なら直前mergeをrevertできる。
+- Later Issue開始後のrollbackはunmerged workを破棄し、accepted suffixを逆順に戻す。
+- Partial stable-contract rollback、automatic Issue creation、automatic branch-setting change、agent mergeは禁止する。
+- Recoveryでstable contract変更が必要ならIssueを停止し、parent R/D/PとADRを再承認する。
 
-Compatibility provider-tests creates one private provider-verification owner/reserved tree containing API snapshots, raw candidate/evidence ZIPs, empty extraction destinations and verifier stdout. It waits until provider-gate is terminal, selects the exact green/canary verification phase, and invokes the verifier, which performs safe extraction. It packages nothing and ignores the canary file.
+## 8. Evidence and reporting
 
-### E384-P-002 — Required-context transition
+各Issue reportは既存draft scaffoldから、そのIssue実装時にだけ更新する。本packではIssue reportを置換しない。Epic reportはplanning adoptionとverified baselineだけを記録し、実装完了を主張しない。
 
-1. Record compatibility SHA/tree externally; require both contexts GREEN.
-2. Human adds `Provider CI / provider-gate` while old `Provider CI / provider-tests` remains required.
-3. Read back both contexts and review requirements.
-4. Dedicated non-merge canary adds only `.github/provider-gate-canary-red`.
-5. Prove new context RED, compatibility context GREEN, merge blocked.
-6. Close canary without merge; restore compatibility PR GREEN.
-7. Human removes only old required context and reads back new-only required.
+Required evidence is distributed:
 
-### E384-P-003 — Read-only authoritative rerun
+| Issue | Evidence category |
+|---|---|
+| #392 | Lifecycle behavior、migration/uninstall、filesystem recovery、wire、dogfood/protection、transitional-gate non-regression |
+| #395 | Exact row RED/GREEN、Product behavior、15-row terminal state、ordinary/full current gates、dogfood/protection |
+| #396 | Workflow structure、same artifact bytes、platform roles、qualification、policy consumer-zero/removal、contexts、final dogfood/docs |
+| Epic | Three merged-tip GREEN receipts、B3 tree、final main merge tree equality、closure readback |
 
-S80 reads the S70-created final head. It creates one provider-verification owner/tree, dispatches a fresh final run, stores API snapshots and raw Actions archives there, creates registered empty extraction destinations, and invokes `post-run-final`; the verifier performs safe extraction and actual-byte checks. It reads final permissions/contexts and posts the pre-merge attestation. No tracked write, local build, update, sync or commit occurs.
+## 9. Stop policy
 
-## 7. Evidence and closure
+Stop before Issue start or merge for dependency mismatch、non-GREEN branch、stable contract drift、unexpected baseline identity、scope outside Issue boundary、partial dogfood、protected-data drift、new approved failure、later-Issue tooling dependency、consumer-before-provider ordering violation、context gap、unreadable evidence、rollback ambiguity、or human gate bypass。
 
-Tracked report has pre-freeze methodology/implementation facts only. External evidence binds heads, raw archives, extracted/API bytes, permissions, metrics and comments.
+Stop result must return exact observed branch tip、failed contract ID、affected Issue、expected/actual state、and whether whole-merge revert is still available. Luna Max does not choose an alternate architecture.
 
-After human merge:
+## 10. Completion
 
-1. compare final-head and merge tree;
-2. run issue-finish attempt 1 and capture exact interval/result;
-3. if success, select attempt 1;
-4. if only issue-finish post-sync failed after #392 close/active clear, bind the unique original close event, run exact `active set --id iss-00392`, verify its exit/stdout/stderr, run `active show` and require exact active issue readback, then retry issue finish with `already_closed=true`; active-set supplies no post-sync status;
-5. repeat recovery once only if the second post-sync also fails; after three failed attempts stop;
-6. create post payload from all attempts/restores and the final successful interval; post/read receipt on #392;
-7. re-evaluate Epic, close/read #384, post/read Epic receipt.
-
-No `close --id iss-00392` is run. Retry finish attempts cannot create a second close event.
-
-## 8. Stop policy
-
-Stop for specification/#387 identity mismatch; cleanup continuation ambiguity or deferred-request loss; private owner-root exposure or reserved-tree mismatch; raw archive/API/upload digest, extraction or permission drift; report identity fields; zero/multiple merged PR; repository workbench mutation; aggregate external root; workspace-handle mismatch; unsafe ACTIVE/stage; terminal-cleanup failure without exact wire result; wire count/golden drift; S40/S50 dogfood drift; partial S60/S70 dogfood; broken current/final gate; compatibility verifier missing candidate/evidence/API bytes; canary affecting old context; final head not distinct or diff beyond job removal; extra packager; evidence/environment mismatch; tracked report head identity; post-sync recovery beyond three attempts, active restoration failure, ambiguous close event or wrong closure order; comment edit/hash mismatch; or merge-tree mismatch.
-
-Forward-fix in #392 only. `owner_decisions_required=[]`.
+Epic is complete only after G1–G3 are accepted on the integration branch and G4 is human-merged once to main. `owner_decisions_required=[]`.

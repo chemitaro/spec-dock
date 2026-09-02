@@ -6,129 +6,135 @@ ID: "epic-00384"
 状態: "draft"
 最終更新: "2026-09-02"
 親: ["init-local-00003"]
+実装開始許可: false
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78"
+  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
+  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
 
-Normative artifacts are `artifacts/provider-lifecycle-wire-contract.md` and `artifacts/active-failure-disposition-register.md`. Their finite public wire, failure-admission, evidence and closure rules are not delegated to implementation.
+本Epicの正本は、本書、[Design](design.md)、[Plan](plan.md)、accepted ADR、[Epic Integration Branch Contract](artifacts/epic-integration-branch-contract.md)、[Rolling-Wave Issue Elaboration Contract](artifacts/rolling-wave-issue-elaboration-contract.md)、[Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md)、[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md)である。
 
 ## 1. Outcome
 
-SpecDock replaces the historical per-file provider lifecycle and sharded failure-approval gate with one fixed-ownership lifecycle and one build-once provider gate. Acceptance requires these outcomes together.
+Epic #384は、一つの長大なimplementation Issueを三つの依存順vertical sliceへ置換する。各Issueは実装と自身の検証を一体で完了し、人間だけがIssue PRをEpic integration branchへmergeする。各merge後のintegration branchはGREENかつ内部整合でなければならない。三Issue完了後にだけ、同branchをmainへ一度だけ人間がmergeする。
 
-- Durable target authority is exactly four roots, two fixed skill slots and `spec-dock/spec-dock.version`; fresh seed/container creation is separately bounded.
-- The seven-key record carries immutable `seed_policy`; lifecycle resume is exact `(operation,candidate_digest,seed_policy)`.
-- Process-independent staging uses one deterministic namespace and `ACTIVE.json`; every cleanup warning/failure exposes the exact token-bearing `active.cleanup_retry_command`, while deferred invocation and public continuation preserve a distinct desired command. Cleanup-only return never dispatches.
-- Every evidence/build/download purpose has a private non-exported owner root and one exported exact reserved tree. Each downloaded-verification step keeps API snapshots, raw ZIPs, empty extraction destinations and stdout under one live-handle tree; a live FD-backed owner reserves, spawns, seals, upload-confirms and cleans.
-- Exact clean `0.2.3` alone migrates to `0.2.4`. S40/S50 preserve checked-in legacy dogfood, S60 performs one complete migration, S70 one complete update, and S80 is tracked-read-only.
-- Uninstall is tooling-only, dry-run by default, retains `tooling-absent-preserved-data`, and treats `--remove-specs` as mutation-zero exit 2.
-- The public wire is closed at 38 codes and 142 relation rows, including terminal-cleanup recovery, with four valid record goldens and thirty-three public JSON review goldens.
-- Issue #387 remains a blocking dependency. Its tracked report contains only the twelve remove/retain/split mappings. S00 independently discovers exactly one merged PR and applies `ISS387-THREE-WAY-V2` to merge-tree evidence.
-- The final evidence graph is produced by one Linux packager. Role-set, compatibility-green, compatibility-canary, canary-post-run and final-post-run verification use exact finite run/job/artifact-state profiles; evidence artifact name is null only before assembly. All actual bytes are verified under exact least privilege.
-- Required-context cutover uses distinct compatibility/final heads and reruns authoritative evidence after removal of the compatibility job.
-- Post-merge closure records only measured facts. If issue finish closes #392 but post-sync fails, exact active restoration and at most three already-closed finish attempts produce one accepted final interval while preserving the original close event.
-- GitHub #392 is the sole implementation-and-verification Issue; human alone merges and changes required contexts.
+実在するdelivery chainは次で固定する。
 
-## 2. Verified baseline
+| Order | SpecDock ID | GitHub | Outcome |
+|---:|---|---:|---|
+| predecessor | `iss-00387` | #387 | CLOSED、mainへmerge済み。Current surface residue cleanup。 |
+| 1 | `iss-00392` | #392 | Fixed Ownership Provider Lifecycle Hard Cutover。既存nodeをscope縮小して再利用。 |
+| 2 | `iss-00395` | #395 | Regression Baseline Terminalization and Product Defect Repair。`iss-00392`へ依存。 |
+| 3 | `iss-00396` | #396 | Build Once Provider Gate and Regression Policy Cutover。`iss-00395`へ依存。 |
 
-Repository authority for this authoring is `chemitaro/spec-dock`, branch `codex/epic-00384-provider-test-strategy-planning`, exact commit `0fafbf3e02d2fcd5b622d6a997323e0f98eb1c78`. At that revision the current root `AGENTS.md`, provider workflows, Full Regression verifier and exact legacy dogfood still represent the transitional `0.2.3` system. Issue #387 is being implemented separately and its canonical R/D/P must not be changed by this Epic.
+CLOSEDの`iss-00388`〜`iss-00390`はhistorical superseded nodeのまま保持し、再利用・reopen・dependency先への変更を行わない。
 
-The repository evidence SHA is authoring provenance. Adopted bytes are later bound by `SPEC_FREEZE_COMMIT`; the implementation base must contain that commit and the independently verified #387 merge.
+## 2. Verified current baseline
 
-## 3. Terms
+Authoring authorityはrepository `chemitaro/spec-dock`、branch `codex/epic-00384-provider-test-strategy-planning`、full SHA `240e561e94b50250a4a6309452a7fd0fb511458a`、tree `181f7eb28da0edff3ca1352edf4cb2ae1f21d433`である。
 
-- **fixed roots**: `spec-dock/docs`, `spec-dock/templates`, `spec-dock/system`, `spec-dock/scripts`.
-- **fixed slots**: `.agents/skills/spec-dock`, `.agents/skills/spec-dock-grill-with-docs`.
-- **record**: `spec-dock/spec-dock.version`; exact `0.2.3\n` legacy bytes or strict seven-key final JSON.
-- **resume tuple**: exact operation, candidate digest and seed policy.
-- **persistent stage namespace**: `<repository-real-parent>/.spec-dock-provider-stages-v1`, bound to repository device/inode and current UID.
-- **terminal cleanup**: mandatory cleanup-only prelude; private deferred invocation and public continuation preserve the desired next command across old-family cleanup retry.
-- **purpose workspace**: one private `mkdtemp` owner root/live handle plus one exported exact reserved tree; owner root is never a child input or cleanup token.
-- **Issue #387 mapping block**: pre-merge report JSON containing only schema/rule and twelve disposition entries; no repository/PR/commit/tree/merge identity.
-- **PRC_COMPAT_HEAD**: external identity at which both old and new required contexts are emitted.
-- **PRC_FINAL_HEAD**: distinct descendant that removes only the compatibility `provider-tests` job and owns final evidence.
-- **comment receipt**: external `comment-receipt-v1` created after posting; it binds observed comment identity/body without being embedded in the attestation payload.
+- `iss-00387` / GitHub #387はCLOSED/completedである。
+- PR #394はbase `main`、head `4f018da3790d7aeeb16410a386e6e586fb2e803d`、merge commit `db13d047e0a9fb2df31b1a5fc44da0673d8fb9cd`で、人間によりmainへmerge済みである。
+- Current branchはそのmergeを含むpost-#387 integration baselineである。
+- `iss-00395`と`iss-00396`は実在し、metadata dependencyはそれぞれ`iss-00392`、`iss-00395`である。
+- Packageとchecked-in dogfoodはtransitional `0.2.3`である。
+- Root `full-regression-ledger.json`の`failure_paths`は15行で、14 `active`、1 `resolved/superseded`である。
+- Root `full-regression-timing-weights.json`は243 node weightsを持つ。
+- Ledger top-levelの27件集計、古いhead SHA、conclusionはIssue #368時点のhistorical metadataであり、current row-count authorityではない。
+- Current Provider CI、policy skip、ledger evaluator、4-shard Full Regression、main-push workflowはまだtransitional stateとして存在する。
+- Issue #392は未startである。本packのimport、review、commitはIssue startではない。
 
-## 4. Requirements
+## 3. Requirements
 
-### E384-RQ-001 — Fixed ownership and protection
+### E384-RQ-001 — Epic integration branch authority
 
-Persistent target mutation authority is exactly the four roots, two slots and record. Fresh `init` may additionally create the absent shared container, absent seeds and exact absent `.github/workflows` parent chain. Consumer initiatives, artifacts, repository workbench, seeds after creation, unknown paths, unrelated skills and shared-container unknown children are preserved by type, mode, ownership, link target and bytes.
+`codex/epic-00384-provider-test-strategy-planning`をEpic integration branchとして使用する。各implementation Issue branchは、そのIssue start時点の同branch tipから分岐し、PR baseを同branchへ固定する。Issue PRをmainへ向けない。Direct push、partial cherry-pick、parallel writer、agent mergeを許可しない。
 
-### E384-RQ-002 — Private owner roots and exact reserved trees
+### E384-RQ-002 — Ordered human merge and GREEN state
 
-Each purpose independently creates a private owner root and live non-serializable handle. The root is never exported. Design maps every `ISS392_WS_*` variable to exactly one reserved child tree; all commands receive that tree only. A downloaded-verification invocation uses one tree for API/raw/extracted/output and never combines workflow-api, artifact-download and provider-verification roots. Before spawn the owner pre-registers each fixed output or closed subtree policy, seals inventory, remains alive through upload confirmation and cleans only by handle.
+Issue PRは`iss-00392`、`iss-00395`、`iss-00396`の順で、人間だけが一件ずつmergeする。各merge後にbranch-tip identityを固定し、required verificationを再実行し、GREENと内部整合を確認するまで次Issueをstartしない。
 
-### E384-RQ-003 — Persistent stage, deferred invocation and terminal cleanup
+### E384-RQ-003 — Rolling-wave elaboration
 
-`ACTIVE.json` binds the old resume tuple/result family, an exact `cleanup_token`, and a nullable exact deferred-invocation object. A public no-token command is always a desired request, even when its base command equals the old operation retry; the generated cleanup-only command is machine-distinct because it carries hidden `--provider-cleanup-token <active token>`. The first desired request is immutable; tokenized retry, repeat, or third command cannot replace it. Cleanup failure returns the tokenized retry plus optional desired-after-cleanup command; cleanup success is cleanup-only and returns that desired command or no action. The caller uses only the public continuation object, so an old install/update can never replace a pending uninstall.
+現在の各Issue R/D/Pはdraft contractであり、実装file、symbol、test code、exact command、step-by-step手順を固定しない。各Issue start直前にcurrent Epic branch tipへ再基準化し、stable contractを変更せずimplementation-ready R/D/PとLuna Max handoffを生成し、独立Strict reviewでacceptされてからだけstartできる。
 
-### E384-RQ-004 — Closed lifecycle wire
+### E384-RQ-004 — Fixed provider ownership and closed wire
 
-Durable/observed states and all public relations are exactly the wire artifact: 38 codes, 142 rows, 23 phases, four record goldens and thirty-three JSON review goldens. The 23-key result includes exact continuation `next_action,next_command,after_cleanup_action,after_cleanup_command`; cleanup-warning `retry_command` and `next_command` are always the matching tokenized `active.cleanup_retry_command`. No prose-derived action, catch-all token or alternative ordering exists.
+Durable provider mutation authorityは、四つのfixed roots、二つのfixed skill slots、`spec-dock/spec-dock.version`に限定する。Fresh-only seed creationとshared-container bootstrapは別にboundedとする。Public lifecycle record/result/action/text/JSON/exitはwire artifactのclosed inventoryだけを使用する。
 
-### E384-RQ-005 — Filesystem safety and fresh bootstrap
+### E384-RQ-005 — Legacy migration, seed policy and tooling-only uninstall
 
-Candidate validation and descriptor binding precede target mutation. Absent `spec-dock` is exclusively `mkdirat`-created, opened no-follow, identity-checked, fsynced and recorded in stage ownership before record publication. Pre-record rollback removes only the exact empty created identity. Roots/slots use Linux `renameat2` or macOS `renameatx_np` no-replace/exchange primitives; unavailable or changed bindings fail closed.
+Exact clean `0.2.3`だけを`0.2.4`へone-shot migrateする。Strict seven-key recordはimmutable `seed_policy`を保持し、resume identityをoperation/candidate/policyへ固定する。Uninstallはtooling-only、default dry-run、durable `tooling-absent-preserved-data`を保持する。`--remove-specs`はmutation-zero exit 2である。
 
-### E384-RQ-006 — Combined hard cutover and dogfood boundaries
+### E384-RQ-006 — Filesystem safety, recovery and protected data
 
-No uninstall-first bridge, intermediate public generation, runtime toggle, dual writer or old-engine fallback exists. S40/S50 are non-main and preserve every checked-in dogfood byte. S60 merges complete lifecycle, legacy proof, old-engine removal, current-gate continuity, final lifecycle docs/operator guidance and one complete dogfood migration. S70 completes final gate/policy candidate changes and one complete dogfood update. S80 edits no tracked path.
+Candidate validation、descriptor binding、no-follow、hard-link/special-type rejection、same-filesystem persistent stage、native no-replace/exchange、terminal cleanup continuationを維持する。Initiatives、Artifacts、repository workbench、consumer seeds、unknown path、unrelated skills、user dataをpreserveする。Lifecycle operationとevidence workspaceのcleanup authorityを混同しない。
 
-### E384-RQ-007 — Tooling-only uninstall, exact legacy and downgrade safety
+### E384-RQ-007 — Post-#387 regression baseline authority
 
-Uninstall removes only owned fixed roots/slots, preserves container/seeds/data and retains the durable absent record. `--keep-specs` is an alias; `--remove-specs` is the fixed removed-operation trap. Only exact clean `0.2.3` migrates. Old package commands against final states are mutation-zero under Python/native pre-call tripwires with positive controls.
+[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md)がcurrent regression debtの唯一のauthorityである。Current authorityはexact 15 rows、14 active、1 resolvedである。古い27-row conditional register、Issue #387 future-admission model、stale top-level countをcurrent authorityとして使用しない。
 
-### E384-RQ-008 — `ISS387-THREE-WAY-V2` admission without report identity
+### E384-RQ-008 — Issue #392 lifecycle outcome
 
-The #387 tracked report has exact top-level keys `schema_version,kind,issue_id,rule_id,entries` and twelve conditional mappings. It has no repository, PR number, candidate/head/tree, merge, ledger or collection identity. After human merge, S00 collects same-repository PR references from Issue #387 timeline/cross-reference evidence, fetches each PR, verifies its head commit association, filters to base `main` and merged state, and requires exactly one. It verifies PR-head-tree/merge-tree equality and main lineage, then reads report/ledger/collection from the merge tree and applies the register. No new #387 commit boundary or report-to-merge identity/tail rule is required.
+Issue #392はfixed ownership lifecycle、closed wire、exact migration、tooling-only uninstall、safe recovery、public compatibility、complete dogfood migration、old lifecycle writer removalを一つのobservable Product outcomeとして実装する。Regression terminalizationとfinal provider-gate redesignを所有しない。
 
-### E384-RQ-009 — Protected witness and exact exclusions
+### E384-RQ-009 — Issue #392 baseline and gate preservation
 
-The protected witness covers every repository `spec-dock/.workbench/**` entry and all initiative/artifact paths except exact #392 `report.md` and `.meta.json`. A separate external exclusion ledger limits report changes to authorized pre-freeze sections and meta changes to the existing `updated_at` scalar. No parent/glob exclusion exists. Witness and exclusion artifacts are stored in their own purpose workspaces outside the repository.
+Issue #392は14 active rowのnode identity、signature、lifecycleを追加・削除・変更しない。Current test-policy machineryを維持し、Issue merge後もknown baseline以外のunexpected failure 0、current PR gateとexact full-regression pathがGREENでなければならない。既にresolvedのrowは、old lifecycle test removalに必要なpre-decided behavior-preserving successor rebindingだけを許可する。
 
-### E384-RQ-010 — Transitional Full Regression external output
+### E384-RQ-010 — Issue #395 terminalization
 
-Every S00/S30/S60 invocation passes its exact purpose workspace path to `verify_full_regression --artifact-dir`. S60 minimally changes the retained main-push workflow to create an independent `full-regression-s60` workspace below `${{ runner.temp }}`, retain its cleanup handle for the job, pass the exact path, and upload that path. No repository workbench output is permitted.
+Issue #395はregisterの14 active rowsを、それぞれProduct実装修正によりnormal passへterminalizeする。Parentで別successorが明示されていないactive rowはfixed-in-placeとする。新しいapproved failure、skip、xfail、silent retirement、row追加、scope外cleanupを認めない。
 
-### E384-RQ-011 — Failure terminalization and PR-B gate continuity
+### E384-RQ-011 — Issue #395 current-gate continuity
 
-S00 admits every #387-permitted branch by the register. S60 mechanically fixes/supersedes admitted rows to active/approved count zero, retargets deleted distribution tests in current Provider CI, updates current lane consumers and keeps current PR and main-push workflows independently GREEN. S60 does not use final S70 tooling.
+Issue #395完了時は、15 rowsすべてresolved、active 0、approved failure 0、unexpected failure 0である。Current ledger、timing、sharder、policy hook、current PR workflow、main-push Full Regressionは整合したままGREENであり、Issue #396のtoolingへ依存しない。
 
-### E384-RQ-012 — Sole producer, raw-byte verifier and permissions
+### E384-RQ-012 — Issue #396 build-once provider gate
 
-Only Linux `provider-build-artifacts` packages a workflow head once. Every consuming job preserves authenticated raw artifact ZIP bytes, matches SHA-256 against API `sha256:<hex>` and upload output `<hex>`, and lets the verifier safe-extract within its one live-handle tree. Provider-attestation, compatibility normal/canary and S80 use exact verification phases with finite run/job/artifact relations and evidence-name nullability. Workflow-level permissions are empty and every job has the exact least-privilege override.
+Issue #396はclean zero-approved-failure baselineだけを入力とし、one Linux packaging producer、same-candidate downstream roles、Linux canonical、sdist smoke、macOS delta、stable qualification、actual-byte evidenceを持つfinal provider gateを実装する。
 
-### E384-RQ-013 — Stable qualification and complete Provider Gate CLI
+### E384-RQ-013 — Consumer-first regression-policy removal
 
-Qualification remains bound to `specdock-linux-qualification-v1`. Issue Design fixes exact argv/flags/path types/repeated ordering for all nine provider-gate subcommands, exact stdout/stderr/codes/exits, raw archive rules, evidence schemas, permissions and mechanically hashed fixture bytes. No CLI or evidence choice is deferred.
+Issue #396だけがold regression policyを削除できる。Replacement consumers/providersを先に成立させ、old consumer 0を証明してから、ledger、243-node timing、sharder、policy skip machinery、old policy hook、quality providers、main-push Full Regressionを同一Issue内で削除する。
 
-### E384-RQ-014 — Safe two-head required-context transition
+### E384-RQ-014 — Compatibility, required context and external evidence
 
-`PRC_COMPAT_HEAD` emits old and new contexts. Human adds the new context while old remains, reads back both, and proves intentional new-gate RED blocking on a dedicated non-merge canary while compatibility `provider-tests` remains GREEN. After implementation GREEN, human removes old required. `PRC_FINAL_HEAD` then removes only the compatibility job and is distinct from compatibility head. All authoritative CI/evidence/qualification is rerun on final head before merge.
+Final gate cutoverはold/new contextsのno-gap coexistence、new required contextのintentional RED block、GREEN recovery、old required context removal、final readbackを人間操作で行う。Workflow/API/artifact/evidenceはactual source/treeとactual bytesへ束縛し、tracked reportへfuture identityまたはpost-merge factを書かない。
 
-### E384-RQ-015 — Non-cyclic tracked/external evidence
+### E384-RQ-015 — Dogfood and documentation convergence
 
-Tracked #392 report contains pre-freeze methodology and implementation facts only. It contains neither actual compatibility/final head identities nor final source-bound artifacts or post-merge facts. Actual head/tree/run identities exist only in external evidence. Any final tracked change invalidates the evidence and requires a new compatibility/final sequence.
+Provider sourceを先に変更し、candidate-changing Issueは四roots、二slots、record、markersをcomplete candidateとしてdogfoodへ反映する。Partial projectionをmergeしない。Issue #392がlifecycle guidance、Issue #396がfinal test-policy/provider-gate guidanceを所有する。
 
-### E384-RQ-016 — Measured closure and bounded post-sync recovery
+### E384-RQ-016 — Rollback and recovery
 
-After tree equality, exact issue finish closes #392 before active clear/post-sync. Exit 0 is accepted. Exit 1 is recoverable only for measured closed+active-cleared+post-sync-failed: read the unique original close event, restore active with `active set --id iss-00392`, prove exit/stdout/stderr and an `active show` readback selecting `iss-00392`, then rerun issue finish with `already_closed=true`, at most three attempts. Active-set has no post-sync field and none is recorded. Ambiguous close events, restore/readback failure or repeated third finish failure stops.
+Rollback unitはIssue PR merge全体である。Dependent Issue start前は直前mergeをhuman revertできる。Dependent work開始後はsuffixを逆順revertするか、owned boundary内でforward-fixする。Stable contract writerの一部だけを戻すpartial rollback、automatic rollback、old writer fallbackを禁止する。
 
-### E384-RQ-017 — Documentation, single Issue and human gates
+### E384-RQ-017 — Evidence, Issue closure and final main merge
 
-S60 converges lifecycle README/provider/dogfood docs and AGENTS lifecycle/uninstall text while retaining current test-policy guidance. S70 converges final test-policy/provider-gate guidance and creates both compatibility and final tracked heads; S80 is read-only rerun/readback/comment. GitHub #392 is the only implementation Issue; #387 remains the dependency and #388–#390 remain superseded. Human alone changes settings and merges.
+各Issue acceptanceは、Issue PRのhuman merge、integration branch GREEN、acceptance evidence readback後に成立する。三Issue完了後だけEpic PRをmainへ一度human mergeし、final branch treeとmerge treeのequality、final main verification、Issue/Epic closure evidenceを取得する。
 
-## 5. Accepted merge points
+### E384-RQ-018 — Historical non-authority and no extra Issue
 
-| Gate | Required main state |
-|---|---|
-| PR-A / S30 | Old public product, dormant successor, exact legacy dogfood, current gates GREEN. |
-| PR-B / S60 | Complete final lifecycle/wire/docs/AGENTS lifecycle guidance, exact migration proof, old engine removed, failures zero, retained current workflows using purpose workspaces, complete S60 dogfood. |
-| PR-C / S80 | Distinct final head, compatibility job absent, raw/extracted/API byte evidence and permission structure verified, new required context read back, old policy absent, final docs/AGENTS, complete S70 dogfood, S80 tracked-read-only proof. |
+旧single-Issue HTML、historical research/discussions、single-Issue guide、CLOSED #388〜#390は削除せずhistorical evidenceとして保持するが、current implementation authorityではない。調査、意思決定、文書、test、verification-only Issueを追加しない。`owner_decisions_required=[]`。
 
-S40, S50 and S70 are not main merge handoff points. `owner_decisions_required=[]`.
+## 4. Parent acceptance coverage
+
+| Requirement | Primary owner | Shared consumers |
+|---|---|---|
+| E384-RQ-001–003 | Parent Epic | #392, #395, #396 |
+| E384-RQ-004–006 | #392 | #395 and #396 read-only |
+| E384-RQ-007 | Parent register | all three Issues |
+| E384-RQ-008–009 | #392 | Parent gate |
+| E384-RQ-010–011 | #395 | #392 output, #396 input |
+| E384-RQ-012–014 | #396 | Parent human gate |
+| E384-RQ-015 | #392 lifecycle / #396 final policy | #395 protection |
+| E384-RQ-016–018 | Parent Epic | all three Issues |
+
+## 5. Final acceptance
+
+Epic acceptance requires all three Issue merges on the integration branch, GREEN evidence after each merge, complete final provider gate, old regression-policy machinery absent, stable contracts unchanged, human review complete, and one final human merge to main. Main must never observe Issue-level intermediate states.
