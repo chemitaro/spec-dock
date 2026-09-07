@@ -4,7 +4,7 @@ ID: "20260902t070000z-adr"
 タイトル: "Multi-Issue Epic Integration Branch and Rolling-Wave Elaboration Policy"
 状態: "accepted"
 決定日: "2026-09-02"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 supersedes: "20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md"
 repository_evidence:
@@ -45,7 +45,7 @@ No research、decision、documentation、test-only、verification-only Issue is 
 
 ### ADR-MI-004 — Rolling-wave elaboration
 
-Current Issue R/D/P are contract-level drafts. File、symbol、test code、exact command and execution steps are authored only immediately before Issue start against current integration tip. Independent Strict review is mandatory. A stable-contract change returns to parent adjudication rather than being chosen by Luna Max。
+Current Issue R/D/P are contract-level drafts. File、symbol、test code、exact command and execution steps are authored only immediately before Issue start against current integration tip. Independent review under Rolling-Wave Contract §5 is mandatory. The current user-authorized route uses a fresh GPT-6 Max subagent and reuses that reviewer for revisions; external ChatGPT Strict is not claimed. A stable-contract change returns to parent adjudication rather than being chosen by Luna Max。
 
 ### ADR-MI-005 — Re-adopted lifecycle decisions
 
@@ -80,7 +80,7 @@ Old single-Issue ADR/HTML/guides and CLOSED #388〜#390 remain historical eviden
 - Main observes only the final B3 integration tree。
 - Integration branch temporarily contains non-main intermediate states, but every state is GREEN and internally coherent。
 - Each Issue has a smaller acceptance and rollback boundary。
-- Planning is rolling-wave; start latency includes a mandatory rebaseline and Strict review。
+- Planning is rolling-wave; start latency includes a mandatory rebaseline and independent review in a separate Issue worktree。
 - Parent contract maintenance is stricter because stable cross-Issue changes require ADR-level reassessment。
 - Qualification policy has one current numeric source; #396 carries implementation/evidence ownership without becoming a second policy source。
 

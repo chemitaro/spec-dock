@@ -4,7 +4,7 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "requirement.md"
   - "design.md"
@@ -25,13 +25,27 @@ repository_evidence:
 
 ## 1. Planning status
 
-本計画は三Issue deliveryを固定する親計画である。Qualification remediation packはfull SHA `177937163526c369108c97ef7c024adb3dd05f77`、tree `ec47247721e71d410a2553c8c94e24d7fa20726c`へcanonical adoption、structural validation、commit、push済みである。同じreviewer conversation `required-strict-github-connector-verificati-723`のexecution `required-strict-github-connector-verificati-740`は同SHAをreviewし、rolling-twenty all-member final-gate success/accepted predicateの欠落をP1、import/review state driftをP2としてschema-valid failを返した。Review 740はcompleted historyであり、現在pendingなのは本three-file correctionのparent adoption、同一reviewerによるexact pushed remediation tipのpass、external `PARENT_FREEZE_SHA` receipt、pass後のGitHub #384/#392/#395/#396 body projection/readbackだけである。Issue #392を含めimplementation startは許可せず、Product implementationも未startである。
+本計画は三つの実装・検証単位を順次統合する親計画である。2026-09-02の親候補 `1429c2f899c6d2086d5bd03c0dcea01f5b168435` はreview execution `required-strict-github-connector-verificati-747` でpass、findings `[]` となり、freeze receiptとGitHub body projection/readbackまで完了した。過去の「review 740 fail後の修正待ち」は現在の残作業ではない。後続編集のacceptanceは別のexact-candidate reviewで判定する。
+
+2026-09-08のユーザー指示により、この環境はEpicの要件・設計・Issue境界・統合契約の具体化に専念する。各Issueの詳細化も実装も、後日新しく作るIssue branch/worktreeで行う。本環境でIssue start、Issue branch/worktree作成、Product変更は行わない。
+
+### 作業場所と引き継ぎ境界
+
+| 場所 | 行うこと | 行わないこと |
+|---|---|---|
+| 本Epic worktree | 親R/D/P、横断契約、Issueのgoal/non-goal/acceptance境界、独立review、人間向け説明 | 個別Issueの詳細手順作成、Issue start、実装 |
+| 将来のIssue専用worktree | 受理済みEpic tipから分岐し、そのIssueだけの詳細R/D/PとLuna Max handoffを作る。review後に実装・検証 | 親の要件を推測変更すること、mainへの直接統合 |
+| Epic integration branch | 人間がIssue PRを順番にmergeし、各merged tipのGREENを確認する | 複数Issueの並列writer、検証を後続Issueへ先送りすること |
+
+### レビュー方式
+
+外部ChatGPT Useが動作しない状況について、ユーザーがGPT-6で進めることを明示的に承認した。現在の独立reviewはGPT-6（`gpt-6-astra`）・推論Maxのfreshサブエージェントで開始し、修正後は同じreviewerを再利用する。主担当が指摘を現物で判断し、親文書だけを修正する。Luna Maxは将来の実装担当であり、このEpicのreviewerには使用しない。既存Issue draftにある「Strict review」の現行経路・証拠要件は[Rolling-Wave Contract §5](artifacts/rolling-wave-issue-elaboration-contract.md)で一元的に定義する。ローカルreviewを外部ChatGPT Strict passとは呼ばない。
 
 ## 2. Issue order and acceptance gates
 
 | Gate | Entry | Observable acceptance | Exit |
 |---|---|---|---|
-| G0 Parent freeze | Imported failing candidate、authorized remediation、current connector-verified tip | R/D/P、ADRs、contracts、three Issue draftsと`E384-QUAL-001`が整合し、同一reviewerがP0/P1=0かつpass、owner decisions 0 | Reviewed tipをexternal `PARENT_FREEZE_SHA` receiptへ記録し、#384/#392/#395/#396 body projection/readback後に#392 elaboration可能。 |
+| G0 Parent freeze | 親候補、current Git-verified tip | R/D/P、ADRs、contracts、three Issue draftsと`E384-QUAL-001`が整合し、当該候補の独立reviewがP0/P1=0かつpass、owner decisions 0 | Reviewed tipをexternal `PARENT_FREEZE_SHA` receiptへ記録し、#384/#392/#395/#396 body projection/readback後に#392 elaboration可能。 |
 | G1 #392 | G0 GREEN | Fixed ownership lifecycleがcomplete、wire適合、dogfood complete、14 active identities unchanged、transitional gates GREEN | Human merge to Epic branch、B1 GREEN readback。 |
 | G2 #395 | B1 GREEN | 14 active rowsがProduct修正でnormal pass、15 resolved、approved 0、transitional gates GREEN | Human merge、B2 GREEN readback。 |
 | G3 #396 | B2 GREEN | Build-once final gate、`E384-QUAL-001` conformance evidence、consumer-first old policy removal、final docs/dogfood、context/evidence GREEN | Human merge、B3 GREEN readback。 |
@@ -44,7 +58,7 @@ repository_evidence:
 - external `PARENT_FREEZE_SHA` receiptまたはaccepted predecessor tip、dependency evidence、GREEN observationsを固定する。
 - Issue draft contractとparent stable contractsを比較する。
 - Current treeからowned/shared/no-touch inventory、representative RED、implementation design、tests、commands、rollback procedureを具体化する。
-- Issue-specific R/D/PとLuna Max handoffを独立Strict reviewする。
+- 別のIssue専用worktreeで作成したIssue-specific R/D/PとLuna Max handoffを、Rolling-Wave Contract §5に従って独立reviewする。
 - Review accept後にだけIssueをstartする。
 - 実装、Issue-level verification、human PR review、human integration mergeを完了する。
 - Exact merged tipでGREENを再確認し、Issue acceptanceを記録する。
@@ -95,4 +109,4 @@ Stop result must return exact observed branch tip、failed contract ID、affecte
 
 ## 10. Completion
 
-G0 is complete only after the same reviewer accepts the exact clean pushed remediation tip, external `PARENT_FREEZE_SHA` is recorded without a tracked self-reference, and all four GitHub Issue body projections are read back. Epic is complete only after G1–G3 are accepted on the integration branch and G4 is human-merged once to main. `owner_decisions_required=[]`.
+G0 is complete only after the independent reviewer accepts the exact candidate under the Rolling-Wave Contract, the accepted clean pushed tip is recorded as external `PARENT_FREEZE_SHA` without a tracked self-reference, and all four GitHub Issue body projections are read back. Epic is complete only after G1–G3 are accepted on the integration branch and G4 is human-merged once to main. `owner_decisions_required=[]`.

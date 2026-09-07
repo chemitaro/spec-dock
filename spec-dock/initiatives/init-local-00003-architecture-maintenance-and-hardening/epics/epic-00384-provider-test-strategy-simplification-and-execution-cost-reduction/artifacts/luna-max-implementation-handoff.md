@@ -3,7 +3,7 @@
 ID: "epic-00384-luna-max-rolling-wave-handoff-contract-v1"
 タイトル: "Luna Max Issue-Start Implementation Handoff Contract"
 状態: "accepted"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 active_issue: null
 implementation_allowed: false
@@ -19,7 +19,7 @@ repository_evidence:
 
 ## 1. Current prohibition
 
-This file is not an implementation handoff. It is the required contract for creating a future handoff immediately before each Issue starts. The imported candidate `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83` failed parent Strict review and is not a freeze identity. No Luna Max implementation may begin from the current parent or Issue draft documents. Issue #392 is specifically not started。
+This file is not an implementation handoff. It is the required contract for creating a future handoff immediately before each Issue starts. The parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review on 2026-09-02; this is parent planning evidence, not an Issue implementation-ready handoff. No Luna Max implementation may begin from the current parent or Issue draft documents. Issue #392 is specifically not started。
 
 ## 2. Authority order for future handoffs
 
@@ -39,14 +39,14 @@ Historical single-Issue ADR/HTML/guides and CLOSED #388〜#390 are not implement
 
 Every generated handoff contains:
 
-- repository、integration branch、Issue branch;
+- repository、integration branch、Issue branch and separate Issue worktree;
 - exact current integration base SHA/tree;
 - Issue ID、GitHub number and dependency metadata;
 - predecessor merge/acceptance evidence;
 - external `PARENT_FREEZE_SHA` receipt and post-pass GitHub Issue body projection receipt for #392 elaboration;
 - current integration state B0/B1/B2;
 - parent contract versions/hashes;
-- independent Strict review identity and result;
+- independent review identity, model/effort and result under Rolling-Wave Contract §5;
 - `implementation_allowed=true` only after all gates pass。
 
 ## 4. Required implementation detail
@@ -89,6 +89,6 @@ Luna Max may prepare commits/PR candidates and evidence according to the elabora
 
 ## 8. Replacement lifecycle
 
-At each Issue start this file may be replaced by an Issue-specific implementation handoff bound to that Issue's exact base. After Issue acceptance, the next Issue receives a newly generated handoff; a prior Issue handoff is historical and not reusable。
+This parent file remains the common handoff contract. In each separate Issue worktree, create the Issue-specific implementation handoff under that Issue's own canonical scope and bind it to that Issue's exact base. Do not overwrite this parent contract with a child handoff. After Issue acceptance, the next Issue receives a newly generated handoff; a prior Issue handoff is historical and not reusable。
 
 `owner_decisions_required=[]`.

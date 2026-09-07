@@ -4,7 +4,7 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "requirement.md"
   - "artifacts/20260902t070000z-adr-multi-issue-epic-integration-branch-and-rolling-wave-elaboration-policy.md"
@@ -35,7 +35,7 @@ post-#387 planning baseline
   -> final Epic PR          -> one human merge to main -> state B4
 ```
 
-Issue branches are short-lived writers. The Epic branch is the only integration target. Main is not an Issue-level integration target.
+Issue branches are short-lived writers in newly created, separate Issue worktrees. The current Epic worktree is reserved for parent specification; it does not elaborate or implement an Issue. The Epic branch is the only integration target. Main is not an Issue-level integration target.
 
 ## 2. Stable cross-Issue contracts
 
@@ -97,7 +97,7 @@ The current Issue designs specify responsibility, inputs, outputs and acceptance
 
 | State | Source | Required invariant |
 |---|---|---|
-| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; same-reviewer pass, external freeze receipt and post-pass Issue-body projection readback complete. |
+| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; independent review pass under the Rolling-Wave Contract, external freeze receipt and post-pass Issue-body projection readback complete. |
 | B1 | #392 merge | Complete final lifecycle and dogfood; old lifecycle writer absent; 14 active identities unchanged; transitional gates GREEN. |
 | B2 | #395 merge | 15 resolved, active/approved 0; Product repairs accepted; transitional gates independently GREEN. |
 | B3 | #396 merge | Final build-once gate and mechanical `E384-QUAL-001` evidence GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |
