@@ -4,7 +4,7 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 親: ["init-local-00003"]
 実装開始許可: false
 repository_evidence:
@@ -21,7 +21,7 @@ repository_evidence:
 
 ## 1. Outcome
 
-Epic #384は、一つの長大なimplementation Issueを三つの依存順vertical sliceへ置換する。各Issueは実装と自身の検証を一体で完了し、人間だけがIssue PRをEpic integration branchへmergeする。各merge後のintegration branchはGREENかつ内部整合でなければならない。三Issue完了後にだけ、同branchをmainへ一度だけ人間がmergeする。
+Epic #384は、一つの長大なimplementation Issueを三つの依存順の実装・検証単位へ分割する。各Issueは実装と自身の検証を一体で完了し、人間だけがIssue PRをEpic integration branchへmergeする。各merge後のintegration branchはGREENかつ内部整合でなければならない。三Issue完了後にだけ、同branchをmainへ一度だけ人間がmergeする。
 
 実在するdelivery chainは次で固定する。
 
@@ -34,13 +34,13 @@ Epic #384は、一つの長大なimplementation Issueを三つの依存順vertic
 
 CLOSEDの`iss-00388`〜`iss-00390`はhistorical superseded nodeのまま保持し、再利用・reopen・dependency先への変更を行わない。
 
-## 2. Identity roles and current remediation state
+## 2. Identity roles and planning baseline
 
 本書のfront matterにあるSHA `240e561e94b50250a4a6309452a7fd0fb511458a`とtree `181f7eb28da0edff3ca1352edf4cb2ae1f21d433`は、前回replacement packを生成した**authoring-source provenance**である。Current integration tipまたはfreeze identityではない。
 
-前回replacement packはrepositoryへimport、structural validation、commit、push済みである。Reviewer session `required-strict-github-connector-verificati-723`が評価したfailed reviewed candidateはfull SHA `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83`、tree `175408f56af05677fce2a42a169f735983a3a0af`である。このidentityはremediation baseかつfailed review historyであり、`PARENT_FREEZE_SHA`ではない。
+2026-09-02の親計画候補 `1429c2f899c6d2086d5bd03c0dcea01f5b168435` は、同一reviewer conversation `required-strict-github-connector-verificati-723` のexecution `required-strict-github-connector-verificati-747` による `review_status=pass`、findings `[]` を受けた。外部freeze receiptとGitHub #384/#392/#395/#396 body projection/readbackも記録済みである。このSHAは過去の合格地点であり、後続編集を自動的に認証しない。
 
-`CURRENT_INTEGRATION_TIP`は各parent gateでGitHub connectorから動的に解決する。`PARENT_FREEZE_SHA`は現在unsetであり、本remediationをadoptしたclean pushed tipについて同じreviewerが`P0/P1=0`かつ`review_status=pass`を返した後に、tracked tree外のparent-freeze receiptへ記録する。Future remediation SHAをtracked specificationへ予測記載しない。
+`CURRENT_INTEGRATION_TIP` は各gateでlocal HEAD・upstream・remoteを照合して解決する。`PARENT_FREEZE_SHA` は当該候補のreviewを通過したclean pushed tipをtracked tree外のreceiptへ記録する。既存receiptを後続候補のpassへ流用しない。過去のfailやremediation履歴は[再開時記録](artifacts/20260907t223421z-epic-resumption-and-gpt6-review.md)とReportを参照する。現在のreview方式は[Rolling-Wave Contract §5](artifacts/rolling-wave-issue-elaboration-contract.md)に従う。
 
 - `iss-00387` / GitHub #387はCLOSED/completedである。
 - PR #394はbase `main`、head `4f018da3790d7aeeb16410a386e6e586fb2e803d`、merge commit `db13d047e0a9fb2df31b1a5fc44da0673d8fb9cd`で、人間によりmainへmerge済みである。
@@ -65,7 +65,7 @@ Issue PRは`iss-00392`、`iss-00395`、`iss-00396`の順で、人間だけが一
 
 ### E384-RQ-003 — Rolling-wave elaboration
 
-現在の各Issue R/D/Pはdraft contractであり、実装file、symbol、test code、exact command、step-by-step手順を固定しない。Parent remediationを同一reviewerがacceptし、external `PARENT_FREEZE_SHA` receiptとGitHub #384/#392/#395/#396 body projection readbackが完了した後、各Issue start直前にcurrent Epic branch tipへ再基準化する。Stable contractを変更せずimplementation-ready R/D/PとLuna Max handoffを生成し、独立Strict reviewでacceptされてからだけstartできる。
+現在の各Issue R/D/Pはdraft contractであり、実装file、symbol、test code、exact command、step-by-step手順を固定しない。親候補の独立review、external `PARENT_FREEZE_SHA` receipt、GitHub #384/#392/#395/#396 body projection readbackを確認した後、各Issue start直前にcurrent Epic branch tipへ再基準化する。Issue詳細化と実装は、Epic具体化専用の本worktreeではなく、そのIssue用の新しいbranch/worktreeで行う。Stable contractを変更せずimplementation-ready R/D/PとLuna Max handoffを生成し、Rolling-Wave Contract §5の独立reviewでacceptされてからだけstartできる。
 
 ### E384-RQ-004 — Fixed provider ownership and closed wire
 
@@ -77,7 +77,7 @@ Exact clean `0.2.3`だけを`0.2.4`へone-shot migrateする。Strict seven-key 
 
 ### E384-RQ-006 — Filesystem safety, recovery and protected data
 
-Candidate validation、descriptor binding、no-follow、hard-link/special-type rejection、same-filesystem persistent stage、native no-replace/exchange、terminal cleanup continuationを維持する。Initiatives、Artifacts、repository workbench、consumer seeds、unknown path、unrelated skills、user dataをpreserveする。Lifecycle operationとevidence workspaceのcleanup authorityを混同しない。
+Candidate validation、descriptor binding、no-follow、hard-link/special-type rejection、same-filesystem persistent stage、native no-replace/exchange、terminal cleanup continuationを維持する。Wire v10のgeneration-bound completion receiptにより、cleanup完了応答前のクラッシュ後も、Consumerを変更せず完了と保存済みcontinuationを再提示できる。Receiptは既存private namespace内のbounded bookkeepingであり、新しいprovider-owned Consumer targetではない。Initiatives、Artifacts、repository workbench、consumer seeds、unknown path、unrelated skills、user dataをpreserveする。Lifecycle operationとevidence workspaceのcleanup authorityを混同しない。
 
 ### E384-RQ-007 — Post-#387 regression baseline authority
 
@@ -115,9 +115,9 @@ Issue #396はclean zero-approved-failure baselineだけを入力とし、build-o
 8. **Independent conjunction.** 五runすべてがwall predicateとCPU predicateをそれぞれ独立に満たす。Mean、median、p95、percentile、aggregate-total、rounded display valueまたはrun間相殺を代替判定にしない。
 9. **Correctness predicates.** 各canonical runのunexpected failures、approved failures、policy skips、duplicate node executionsはそれぞれexactly zeroである。Skip、approved failure、duplicate executionまたはretry後successをclean pass evidenceへ昇格しない。
 10. **Seeded-fault campaign.** Admitted fault catalogueはcandidate freeze時点でversioned、source-controlled、candidate-boundであり、実行前にdenominatorを固定する。全catalogue entryを実行し、detectionは`100 percent`でなければならない。Miss、unexecuted entryまたはpost-observation denominator reductionはqualification rejectionである。
-11. **Stability population.** Stability acceptanceは、同じgate contract versionとenvironment versionに属しcomplete identity evidenceを持つlatest exactly twenty chronological final-gate execution attemptsをwindowとする。Candidateは各executionで固定されるが、window membershipをsuccess結果でfilterしない。Windowがtwenty未満ならevidence incompleteである。
-12. **Stability predicates.** Rolling twenty windowの全memberは、それぞれoverall final-gate resultがsuccessfulかつacceptedでなければならない。Windowのflakesはexactly zero、retriesまたはrerunsはexactly zeroである。Failedまたはnon-accepted memberもwindowに残し、除外、置換または後続successで相殺しない。Retry/rerunを行ったexecutionを除外、置換またはclean passへ昇格しない。
-13. **Fail-closed rejection.** Fingerprint drift、missed seeded fault、flake、retry、rerun、rolling twenty window内のfailedまたはnon-accepted member、incomplete five-run evidence、incomplete rolling-twenty window、identity mismatchまたはmissing raw evidenceはqualification rejectionである。
+11. **Stability population.** Stability acceptanceは、同じgate contract versionとenvironment versionに属しcomplete identity evidenceを持つlatest exactly twenty chronological final-gate execution attemptsをwindowとする。Candidateは各executionで固定されるが、window membershipをsuccess結果でfilterしない。Windowがtwenty未満ならevidence incompleteである。各attemptの結果とwindow全体のqualification結果を別々に記録し、後者を前者の判定入力に戻さない。
+12. **Stability predicates.** Rolling twenty windowの全memberは、それぞれper-attempt final-gate resultがsuccessfulかつacceptedでなければならない。Per-attempt resultは、そのattemptの全roleの成否、candidate/environment/raw evidence、適用される全non-rolling predicatesを含み、pytest bodyの成否だけには縮小しない。除外する入力はrolling windowの不足および過去memberに基づくqualification判定だけである。Windowのflakesはexactly zero、retriesまたはrerunsはexactly zeroである。Failed、intentional REDまたはnon-accepted memberもwindowに残し、除外、置換または後続successで相殺しない。Retry/rerunを行ったexecutionを除外、置換またはclean passへ昇格しない。履歴不足だけでは正常なattemptの結果を書き換えないため、初期nineteen attemptsを経たtwentieth attemptで初めてwindowを評価できる。古いmemberはchronological latest-twenty境界から自然に外れる場合だけwindow外となり、当該attemptの記録自体は変更しない。
+13. **Fail-closed rejection.** Fingerprint drift、missed seeded fault、flake、retry、rerun、rolling twenty window内のfailedまたはnon-accepted per-attempt result、incomplete five-run evidence、incomplete rolling-twenty window、identity mismatchまたはmissing raw evidenceはqualification rejectionである。初期window不足を過去attemptのfailureへ再帰的に変換しないが、不足したwindowをB3/Epic qualification passとして受け入れることもない。
 14. **Forbidden escapes.** Additional worker、sharding、policy skip、approved failure、retry、rerunまたはhardware escalationは本contractを満たす手段にならない。Environmentを変更した場合はfingerprint driftとして既存campaignを失効させる。
 15. **Platform scope.** Wall/CPU performance predicatesはLinux canonical qualification bodyへだけ適用する。LinuxまたはmacOSの別platform-delta bodyに独立した`<= 600 seconds` predicateを追加しない。Platform role acceptanceはIssue #396のderived implementation contractで別途証明する。
 16. **Rolling-wave boundary.** Issue-start elaborationはmeasurement collector、workflow、schema field、test、commandおよびartifact layoutを具体化できるが、本項のvalue、population、window、aggregation、scope、rejectionまたはescape prohibitionを変更できない。
@@ -162,4 +162,4 @@ Rollback unitはIssue PR merge全体である。Dependent Issue start前は直�
 
 ## 5. Final acceptance
 
-Epic acceptance requires all three Issue merges on the integration branch, GREEN evidence after each merge, `E384-QUAL-001` conformance, complete final provider gate, old regression-policy machinery absent, stable contracts unchanged, human review complete, and one final human merge to main. Parent freeze and #392 elaboration additionally require same-reviewer pass and the post-pass GitHub Issue projection readback. Main must never observe Issue-level intermediate states.
+Epic acceptance requires all three Issue merges on the integration branch, GREEN evidence after each merge, `E384-QUAL-001` conformance, complete final provider gate, old regression-policy machinery absent, stable contracts unchanged, human review complete, and one final human merge to main. Parent freeze and #392 elaboration additionally require the independent review pass defined in the Rolling-Wave Contract and the post-pass GitHub Issue projection readback. Main must never observe Issue-level intermediate states.

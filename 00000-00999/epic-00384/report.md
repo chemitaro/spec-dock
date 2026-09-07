@@ -2,101 +2,44 @@
 種別: レポート（Epic）
 ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
-関連GitHub: ["#384"]
-状態: "planning-remediation"
-最終更新: "2026-09-02"
+状態: "parent-planning"
+最終更新: "2026-09-08"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-local-00003"]
-repository_evidence:
-  role: "authoring-source-provenance"
-  repository: "chemitaro/spec-dock"
-  branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
-  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
-reviewed_candidate_evidence:
-  role: "failed-reviewed-candidate-and-current-remediation-base"
-  sha: "177937163526c369108c97ef7c024adb3dd05f77"
-  tree: "ec47247721e71d410a2553c8c94e24d7fa20726c"
-  reviewer: "required-strict-github-connector-verificati-723"
-  execution: "required-strict-github-connector-verificati-740"
-  result: "fail"
-  findings: {P1: 1, P2: 1}
-parent_freeze_sha: null
 ---
 
 # Result Summary
 
 ## Outcome
 
-- Previous Strict session `required-strict-github-connector-verificati-720`の三Issue粒度判定を採用した。
-- `iss-00395` / GitHub #395と`iss-00396` / GitHub #396が実在し、依存は`iss-00395 -> iss-00392`、`iss-00396 -> iss-00395`である。
-- `iss-00392` / GitHub #392はFixed Ownership Provider Lifecycle Hard Cutoverへscope縮小して再利用する。
-- Single implementation Issueとthree main gatesの旧決定をsupersedeし、Issue PRを依存順にEpic integration branchへhuman mergeする方式を採用した。
-- All Issues complete後だけEpic branchをmainへ一度human mergeする。
-- Issue #392は未startであり、本reportはimplementation completionを表さない。
+Epicは三つの実装・検証単位（#392 → #395 → #396）と、一つのEpic integration branchへ順次統合する構成である。各IssueのR/D/Pは境界と受け入れ条件を定めるドラフトで、implementation-ready文書ではない。Product実装もIssue startも行っていない。
 
-## Import and review state
+2026-09-02の親候補 `1429c2f899c6d2086d5bd03c0dcea01f5b168435` は同一reviewer execution `required-strict-github-connector-verificati-747` により `review_status=pass`、findings `[]` となった。external freeze receiptとGitHub #384/#392/#395/#396のbody projection/readbackは実施済みである。以前の「review 740後の修正・freeze・projection待ち」はその当時の記録であり、現在の未実施作業ではない。
 
-前回multi-Issue replacement packのrepository import、structural validation、commit、pushはinitial failed reviewed candidate `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83`で完了した。その後、qualification remediation packはfull SHA `177937163526c369108c97ef7c024adb3dd05f77`、tree `ec47247721e71d410a2553c8c94e24d7fa20726c`へcanonical adoption、structural validation、commit、push済みである。いずれも再importをcurrent gateにしない。
+2026-09-08のユーザー指示を親PlanとRolling-Wave Contractへ反映した。この環境はEpic具体化専用であり、各Issueの詳細化・実装は別の新しいbranch/worktreeで行う。外部ChatGPTの代わりに、freshなGPT-6 Maxサブエージェントを独立reviewerとして使い、修正後も同じreviewerを再利用する。
 
-Dedicated analyst `required-strict-github-connector-verificati-727`のfollow-up execution `required-strict-github-connector-verificati-729`は、live #384/#392の未撤回Product guaranteeをparentへ復元するrequirement-preserving correctionをauthorized routeとして確定した。そのcorrectionにより`E384-QUAL-001`はsole normative sourceとなり、final-gate implementation/evidence ownershipは#396へ移管された。
+今回のreview findings、採否、検証範囲は[再開・レビュー記録](artifacts/20260907t223421z-epic-resumption-and-gpt6-review.md)へ分離した。[現行HTML](artifacts/epic-00384-current-plan-guide.html)が人間向けの3 Issue説明資料である。過去の10分割／単一Issue資料はhistorical表示付きで保持する。
 
-同じreviewer conversation `required-strict-github-connector-verificati-723`のexecution `required-strict-github-connector-verificati-740`は、exact SHA `177937163526c369108c97ef7c024adb3dd05f77`をreviewし、schema-valid `fail`、P1 x1、P2 x1を返した。P1はitem 11のchronological unfiltered rolling-twenty populationに対して全memberのoverall final-gate success/accepted predicateが欠落していること、P2はcurrent adoption/commit/push/review state driftである。Review 740はcompleted historyであり、本three-file correctionのparent adoptionと同一reviewer re-reviewは未実施である。
+## Verification
 
-## Identity roles
+2026-09-08の編集開始前に現物で確認した内容:
 
-| Identity | Role | State |
-|---|---|---|
-| `240e561e94b50250a4a6309452a7fd0fb511458a` / `181f7eb28da0edff3ca1352edf4cb2ae1f21d433` | Previous pack authoring-source provenance | Valid provenance only; never current/freeze identity. |
-| `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83` / `175408f56af05677fce2a42a169f735983a3a0af` | Initial imported failed reviewed candidate and prior remediation base | Historical fail; never `PARENT_FREEZE_SHA`. |
-| `177937163526c369108c97ef7c024adb3dd05f77` / `ec47247721e71d410a2553c8c94e24d7fa20726c` | Adopted qualification remediation and reviewer execution `required-strict-github-connector-verificati-740` candidate | Review fail; current remediation base; never `PARENT_FREEZE_SHA`. |
-| `CURRENT_INTEGRATION_TIP` | Connector-resolved dynamic branch tip | Resolve at each gate; do not predict in tracked content. |
-| `PARENT_FREEZE_SHA` | Exact clean pushed remediation tip accepted by the same reviewer | Currently unset; recorded externally after pass. |
+- Local HEAD、configured upstream、remote Epic branchはすべて `1429c2f899c6d2086d5bd03c0dcea01f5b168435`。Treeは `f912c71e79f37e8f52d7055a4df0cce4c632f9fa`。
+- Remote mainは `db13d047e0a9fb2df31b1a5fc44da0673d8fb9cd`。#387はCLOSED、PR #394はmainへMERGED。
+- mainから本Epic候補までの `src/`、`tests/`、`.github/`、`pyproject.toml`、`Makefile`、root ledger/timingに差分なし。
+- `./spec-dock/scripts/spec-dock validate`: exit 0、nodes=236。
+- ActiveはEpic `epic-00384`、Issueはnone。
+- `deps check --github`: #392はready=true、#395は#392待ち、#396は#392/#395待ち。Epic集約のready=falseを、#387未完了や#392の依存不成立とは解釈しない。
+- Ledgerは15 total / 14 active / 1 resolved、timingは243。古い27件集計はhistorical metadata。
 
-## Verified product baseline
+これは編集開始時点の観測であり、後続commitへのfreezeや製品テストの合格証明ではない。Current candidateの最終review/file identity/Git確認は別のreceiptへ記録する。仕様レビューを実装検証に読み替えない。
 
-- #387: CLOSED/completed、PR #394経由でmainへmerge済み。
-- Current package/dogfood: `0.2.3`。
-- Root ledger blob: `f181fd3098ef0cba8d0d17e47d00ea12fbbeb8b5`。
-- Current `failure_paths`: 15 total、14 active、1 resolved。
-- Timing blob: `bdeeb6238609c38085aaed8023b78319a3dd0c6d`、243 nodes。
-- Root ledgerのtop-level 27件集計、old head SHA、historical conclusionはIssue #368 metadataであり、current row-count authorityではない。
-- Current PR/main-push Full Regression policy machineryはtransitionalで、Issue #396まで保持する。
+## Residual Risks / Follow-ups
 
-## Qualification remediation
+1. 今回の親契約修正を同じGPT-6 Max reviewerで確認し、受理された候補のidentityと結果を記録する。過去のpassを後続仕様へ流用しない。
+2. 次のIssue担当は、current accepted Epic tip、依存関係、保護対象、GREEN evidenceを別worktreeで確認する。
+3. #392だけをimplementation-ready R/D/PとLuna Max handoffへ詳細化し、独立review後にstartする。ここではその詳細化・実装・Issue用branch/worktree作成を行わない。
+4. #395はB1、#396はB2が受理された後に詳細化する。Issueの検証を後続へ先送りしない。
+5. Human merge、required-context変更、final Epic merge、Issue/Epic closureは未実施である。
 
-`E384-QUAL-001` in Epic Requirement is the sole current normative source of quantitative final qualification values and aggregation semantics. The three-Issue pivot preserves the accepted guarantee and relocates final-gate implementation/evidence ownership from old #392 scope to #396. Derived current-authority documents reference the contract and do not independently define its values.
-
-Review 740 confirmed that item 11 already fixes an unfiltered latest-twenty chronological population. The bounded correction therefore changes no numeric value or population semantics: item 12 requires every window member's overall final-gate result to be successful and accepted, and item 13 rejects the window when any member is failed or non-accepted.
-
-## Historical non-authority
-
-`artifacts/20260831t152024z-adr-single-implementation-unit-and-provider-hard-cutover-policy.md`、historical discussions/research、HTML guides、single-Issue guide、CLOSED #388〜#390は削除しない。Current implementation authorityではなく、本remediationでは変更しない。
-
-## Current delivery state
-
-| Item | State |
-|---|---|
-| Initial multi-Issue pack import/validation/commit/push | Complete at failed candidate `ce7e46...` |
-| Qualification remediation pack adoption/validation/commit/push | Complete at reviewed candidate `177937163526c369108c97ef7c024adb3dd05f77` |
-| Same-reviewer execution `required-strict-github-connector-verificati-740` | Complete; schema-valid fail, P1 x1, P2 x1 |
-| Current bounded three-file correction | Authorized; parent adoption/structural validation/commit/push/re-review pending and not claimed by this report |
-| `PARENT_FREEZE_SHA` | Unset |
-| GitHub #384/#392/#395/#396 body projection | Pending; prohibited before same-reviewer pass |
-| Issue #392 | Open; not started |
-| Issue #395 | Open draft scaffold; blocked by #392 |
-| Issue #396 | Open draft scaffold; blocked by #395 |
-| Product implementation | Not started under this specification |
-| Final Epic merge | Not permitted |
-
-## Remaining gates
-
-1. Adopt the bounded three-file correction for Epic `requirement.md`、`plan.md`、`report.md` and perform parent-owned structural validation without changing any other canonical or Product surface。
-2. Commit and push one clean specification-only candidate without Product/test/workflow/GitHub Issue mutations。
-3. Re-run the same reviewer conversation `required-strict-github-connector-verificati-723` against that exact pushed tip。
-4. Require `P0/P1=0` and `review_status=pass`; otherwise remediate and repeat without freezing。
-5. Record the accepted tip as external `PARENT_FREEZE_SHA`; do not write the future/pass SHA back into tracked specifications。
-6. Project canonical topology and contract references to GitHub #384/#392/#395/#396 bodies, preserving title、state、labels、assignees、milestone、dependency and start status; read back and record an external projection receipt。
-7. Only then elaborate Issue #392 against the current integration tip. Do not start implementation until its implementation-ready pack passes its own Strict review。
-
-`owner_decisions_required=[]`.
+Parentの規範はR/D/Pとaccepted ADR/contractsである。本Reportだけでは新しい実装許可やProduct判断を作らない。

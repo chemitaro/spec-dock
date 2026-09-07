@@ -3,7 +3,7 @@
 ID: "epic-00384-integration-branch-contract-v1"
 タイトル: "Epic Integration Branch Contract"
 状態: "accepted"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   role: "authoring-source-provenance"
@@ -23,16 +23,16 @@ repository_evidence:
 - `PACK_AUTHORING_SOURCE_TREE`: `181f7eb28da0edff3ca1352edf4cb2ae1f21d433`
 - `FAILED_REVIEWED_CANDIDATE_SHA`: `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83`
 - `FAILED_REVIEWED_CANDIDATE_TREE`: `175408f56af05677fce2a42a169f735983a3a0af`
-- Source reviewer: `required-strict-github-connector-verificati-723`, result `fail`
-- `CURRENT_INTEGRATION_TIP`: dynamically resolved from the connector at every gate
-- `PARENT_FREEZE_SHA`: unset until the exact clean pushed remediation tip receives same-reviewer `P0/P1=0` and `review_status=pass`; then recorded in an external parent-freeze receipt
+- Historical reviewer: `required-strict-github-connector-verificati-723`; failed candidate above was later corrected and execution `required-strict-github-connector-verificati-747` passed `1429c2f899c6d2086d5bd03c0dcea01f5b168435`
+- `CURRENT_INTEGRATION_TIP`: dynamically resolved by comparing local HEAD, configured upstream and remote at every gate
+- `PARENT_FREEZE_SHA`: exact accepted clean pushed parent tip recorded externally under Rolling-Wave Contract §5; the historical receipt at `1429c2f899c6d2086d5bd03c0dcea01f5b168435` does not certify later edits
 - Human merge order: #392 -> #395 -> #396 -> Epic #384 to main
 
 The authoring-source identity is provenance only. The failed reviewed candidate is remediation history only and is never a freeze identity. This artifact does not predict a future remediation SHA, start any Issue or authorize direct repository mutation。
 
 ## 2. Branch rules
 
-1. Each Issue branch is created from the exact current integration tip after dependency acceptance。
+1. Each Issue branch and its new worktree are created from the exact current integration tip after dependency acceptance. Parent specification remains in the Epic worktree; all Issue elaboration and implementation happens in that Issue worktree。
 2. Each Issue PR base is the integration branch, never main or another Issue branch。
 3. Only one implementation Issue may have an active writer at a time。
 4. Human alone merges、reverts、changes required contexts or resolves branch protection。
@@ -58,7 +58,7 @@ GREEN is not only a checkmark. It requires:
 
 ### B0 — Parent freeze
 
-Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register、rolling-wave contract and `E384-QUAL-001` are coherent. The exact clean pushed tip has a same-reviewer pass、external parent-freeze receipt and successful readback of the post-pass GitHub #384/#392/#395/#396 body projections. #392 is not started。
+Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register、rolling-wave contract and `E384-QUAL-001` are coherent. The exact clean pushed tip has an independent review pass under Rolling-Wave Contract §5、external parent-freeze receipt and successful readback of the post-pass GitHub #384/#392/#395/#396 body projections. #392 is not started。
 
 ### B1 — After #392 merge
 
@@ -116,6 +116,6 @@ Partial lifecycle writer rollback、ledger-only rollback that violates gate cons
 
 ## 7. Issue acceptance and closure
 
-Parent B0 is not accepted until same-reviewer pass、external freeze receipt and Issue-body projection readback are complete. An Issue may be marked complete only after its PR is human-merged to the integration branch and the exact merged tip is GREEN. Issue closure does not assert deployment to main. Epic closure occurs only after B4。
+Parent B0 is not accepted until the independent review pass under Rolling-Wave Contract §5、external freeze receipt and Issue-body projection readback are complete. An Issue may be marked complete only after its PR is human-merged to the integration branch and the exact merged tip is GREEN. Issue closure does not assert deployment to main. Epic closure occurs only after B4。
 
 `owner_decisions_required=[]`.

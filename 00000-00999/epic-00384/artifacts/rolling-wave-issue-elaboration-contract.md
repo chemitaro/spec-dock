@@ -3,7 +3,7 @@
 ID: "epic-00384-rolling-wave-issue-elaboration-contract-v1"
 タイトル: "Rolling-Wave Issue Elaboration Contract"
 状態: "accepted"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   role: "authoring-source-provenance"
@@ -17,7 +17,7 @@ repository_evidence:
 
 ## 1. Purpose
 
-Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Those details are generated once, immediately before each Issue starts, against the current accepted integration tip。
+Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Those details are generated immediately before each Issue starts, against the current accepted integration tip, in a newly created Issue branch/worktree. The current Epic worktree authors only parent contracts and does not elaborate or implement an Issue。
 
 ## 2. Immutable parent inputs
 
@@ -68,9 +68,18 @@ The issue-start specification pack must produce implementation-ready R/D/P and a
 - requirement-to-design-to-plan traceability;
 - `owner_decisions_required=[]` or an explicit parent stop。
 
-## 5. Independent Strict review
+## 5. Independent review — current authorized route
 
-Implementation-ready outputs require a new independent Strict review bound to the exact base SHA/tree. Review must cover architecture consistency、boundary ownership、unsafe intermediate state、testability、compatibility、rollback/recovery、evidence identity and human gates. P0/P1 findings block Issue start。
+2026-09-08のユーザー指示により、外部ChatGPT Useが機能しない状況での現在のreview経路は、独立したGPT-6（`gpt-6-astra`）・推論Maxのサブエージェントである。親／Issue draft中の「Strict review」「same-reviewer pass」は、現在の運用では本節の独立性・候補固定・再レビュー条件を満たすreviewを指す。外部ChatGPT Strictを実行したとは主張しない。過去の外部Strict passはその過去SHAだけの証拠として保持する。
+
+- 一つのreview周期の初回はfresh reviewerを使う。修正後は同じreviewerを再利用する。
+- 主担当がauthoringと指摘の採否を担当し、reviewerはread-onlyで独立に判断する。主担当自身のself-reviewだけでacceptしない。
+- Luna Maxは将来の実装担当である。このEpicのreviewerはGPT-6 Maxとする。
+- Reviewはexact base SHA/treeと候補のfile/diff identityへ束縛する。Working-tree review後にcommitする場合、review済み内容との一致を確認し、最終clean pushed tipのreceiptをtracked tree外へ記録する。後続の仕様変更を過去passで認証しない。
+- 要件・設計・責務境界・安全な中間状態・testability・互換性・recovery・evidence identity・human gateを確認する。`P0/P1=0` かつ `review_status=pass` がacceptance条件である。
+- Epicでは親契約とIssue draft境界をreviewする。まだ存在しないIssue詳細実装手順の欠如は、それ自体をEpicの欠陥としない。
+- Issueでは、そのIssue専用worktreeで作られたimplementation-ready R/D/PとLuna Max handoffを独立reviewする。Epic passやdependency `ready=true` はIssue実装許可を代替しない。
+- 別環境の新しい担当は、review開始時のユーザー指示を再確認する。明示的な変更がなければ本節の経路を用い、故障した外部経路の再試行を開始条件にしない。
 
 ## 6. Allowed rolling-wave choices
 
@@ -94,6 +103,6 @@ The return payload identifies exact contract ID、expected/actual evidence、sco
 
 ## 8. Current status
 
-The imported candidate `ce7e46cf2603e6fc52b4d4339faa7d3f7f3bac83` failed parent Strict review and is not `PARENT_FREEZE_SHA`. No implementation-ready elaboration has been accepted for #392、#395 or #396 under this contract. Issue #392 must not start from the current draft documents or before the external parent-freeze and Issue-body projection receipts exist。
+The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed its external review, with freeze/projection receipts recorded. That historical acceptance does not certify later edits. No implementation-ready elaboration has been accepted for #392、#395 or #396 under this contract. Issue #392 is dependency-ready, but it must not start from current drafts. Its next stage is elaboration in a separate Issue branch/worktree after the current parent candidate is accepted under §5。
 
 `owner_decisions_required=[]`.
