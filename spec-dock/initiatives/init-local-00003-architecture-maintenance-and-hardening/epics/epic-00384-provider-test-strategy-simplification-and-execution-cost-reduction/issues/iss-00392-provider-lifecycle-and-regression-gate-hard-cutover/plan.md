@@ -4,82 +4,542 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
-状態: "draft-parent-return"
-詳細化状態: "blocked-by-parent-wire"
-親差し戻し: ["P392-001", "P392-002"]
+状態: "detailed-review-candidate"
+詳細化状態: "independent-review-pending"
 最終更新: "2026-09-08"
 依存:
   - "requirement.md"
   - "design.md"
-  - "../../plan.md"
-  - "../../artifacts/rolling-wave-issue-elaboration-contract.md"
+  - "artifacts/20260908t011846z-luna-max-implementation-handoff.md"
+  - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
 親: ["epic-00384", "init-local-00003"]
-Planning Level: "critical-contract-only"
+Planning Level: "critical"
 実装開始許可: false
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "14a72044738ce698c3113a0ee70f052015e3be8a"
-  tree: "af8e50ed3e20e5a03ef1e2a46332142befa1251f"
+  sha: "dc638e936e763cc7a6087f258201ed9ed654e7fb"
+  tree: "17ce38234033393c385c4b17e40c0ccdc78bfc19"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
 
-## 1. Current planning state
+## 1. 結論と実行単位
 
-本Planはまだcontract-levelであり、実行可能なProduct実装手順ではない。正式start後に詳細化を開始したが、親wireの通常I/O失敗・最初のincomplete record公開失敗が未被覆と判明した。Rolling-Wave Contract §2・§7に従い親へ差し戻す。コーダーの起動、Product変更、旧writer除去、dogfood更新は行わない。
+#392は四つのcausal checkpointを順に実装し、最後に一つのPRとして人間がEpic integration branchへmergeします。Checkpointはレビューしやすい内部状態であり、単独merge、単独Issue closure、main向けPR、#395開始条件にはなりません。
 
-## 2. Entry gate
+1. CP1: closed model、wire projection、candidate/legacy identity、private state、native filesystem。
+2. CP2: installer engine/public CLI hard cutover、recovery、migration/uninstall、旧writer撤去。
+3. CP3: frozen runtime bootstrap、lease/helper/handoff、pinned checkout、worktree B/hook。
+4. CP4: provider-first packaging、complete dogfood、test migration、current gate、B1受入。
 
-Entry requires parent G0 accepted、external `PARENT_FREEZE_SHA` and post-pass GitHub Issue projection receipts、integration state B0 GREEN、#387 completion verified、Issue #392 open and formal selection authorized、15/14/1 register exact、legacy candidate exact、current policy operational and no conflicting writer。
+各checkpointは最初にRED testを追加し、そのREDが意図した欠落だけを示すことを確認してからProductを変更します。次checkpointへ進む条件は、当該checkpointのcompletion stateとnarrow verificationが揃い、stop conditionが0件であることです。
 
-## 3. Required Issue outcome
+## 2. G0 — Product実装前gate
 
-One PR must deliver the complete lifecycle output in Requirement without terminalizing registered behavior failures、replacing regression policy or implementing parent `E384-QUAL-001`. Final qualification remains a preserved read-only parent/#396 contract. Internal checkpoints are permitted during implementation but none is independently acceptable or mergeable。
+現時点の値は`implementation_allowed=false`です。次の全条件が外部証拠として成立したときだけ、CodexがCP1 packetをLuna Maxへ渡します。
 
-## 4. Evidence owned by this Issue
+- 本Requirement/Design/Plan/Handoff/Test Artifactを一つの候補として独立reviewし、P0=0、P1=0、`review_status=pass`。
+- Review対象bytesのmanifest/hashが固定されている。
+- 同内容がIssue branchへcommit/pushされ、remote branch tipのfull SHAが取得済み。
+- GitHub #392 body/projectionがそのfreeze identityを参照し、readback確認済み。
+- Epic integration branch B0 GREEN、predecessor #387 completion、15 rows/14 active/1 resolved、243 timing entries、four required-fastが再確認済み。
+- User/Codexが「次の一checkpoint」であるCP1開始を許可している。
 
-- lifecycle and public-wire conformance;
-- filesystem and fault recovery, including every Wire §16 shared/exclusive admission, pre-import, writing-helper/parent-death, both-wrapper handoff and ready/incomplete acceptance case;
-- same-generation managed checkout, actual-target worktree coordination, entrypoint-last crash safety, reused-path preservation and nonlocking original-target consumer-hook handoff, including existing bootstrap-result compatibility;
-- parent-approved legacy migration and resolved existing-branch checkout boundary;
-- exact legacy migration and uninstall;
-- old-package mutation safety;
-- complete dogfood and protected-data proof;
-- 14-active-identity preservation;
-- current transitional gate GREEN at the candidate and merged integration tip。
+不足時は仕様packを改善するだけで、Product fileを変更しません。
 
-## 5. Handoff and merge gate
+## 3. 共通実行規則
 
-The implementation-ready Plan will define exact implementation order and commands. Merge readiness at this contract level requires all owned evidence、independent review under Rolling-Wave Contract §5、human PR review、whole-Issue rollback record and no stop condition. Human merges to the Epic branch and revalidates B1 before Issue closure。
+- Repository root `AGENTS.md`を毎checkpoint開始時に再読します。
+- Baseはその時点のexact Issue branch tipです。別branch、default branch、mainへ黙って切り替えません。
+- Product sourceの正本は`src/spec_dock/`、dogfoodは最後のprojectionです。
+- Test削除はsuccessor GREEN後だけです。
+- Parent Wire、accepted ADR、register、#395/#396文書を編集しません。
+- Unexpected failure、wire drift、baseline driftをapproved/skip/xfailで隠しません。
+- 各packetの変更対象外fileに差分が出たら、そのcheckpointを停止します。
+- Product code、tests、docs、packagingの変更は#392 branch内に保持し、人間merge前にIssueを完了扱いにしません。
 
-## 6. Rollback / recovery
+## 4. CP1 — Closed lifecycle foundation
 
-Before #395 start, rollback is a human whole-merge revert to B0. During Issue work, recovery follows only the lifecycle contract; preserve unmerged branch/worktree content until a human decides its disposition. No partial old-writer restore、skip、approved failure or final-gate dependency is accepted。
+### 4.1 Entry state
 
-## 7. Stop / return
+- G0成立済み。
+- Productは0.2.3、旧`managed_distribution.py`がproduction ownerのまま。
+- Parent Wire v12はread-only。
+- 旧public routeをまだ変更しない。
+- Baseline 15/14/1、required-fast、timing 243が一致。
 
-Return to parent if current tree requires a stable wire change、baseline identity change、scope crossing into #395/#396、`E384-QUAL-001` implementation or reinterpretation、unsafe compatibility state、non-complete dogfood、or unresolved Product decision. Return evidence must identify exact contract ID and current tip。
+### 4.2 最初のRED test
 
-## 8. Issue-start elaboration gate
+最初に次を追加し、Product変更前に実行します。
 
-The replacement implementation Plan must satisfy [Rolling-Wave Issue Elaboration Contract](../../artifacts/rolling-wave-issue-elaboration-contract.md), add exact owned/no-touch paths、symbols、tests、commands、RED/GREEN ordering and cleanup, and pass independent review under Rolling-Wave Contract §5 before `implementation_allowed` becomes true。
+- `tests/unit/provider_lifecycle/test_wire.py::test_t01_wire_v12_inventory_and_generated_projection_are_exact`
+- `tests/unit/provider_lifecycle/test_private_state.py::test_t04_stage_payload_cannot_exist_without_durable_prepared_active`
+- `tests/unit/provider_lifecycle/test_atomic_filesystem.py::test_t05_native_atomic_adapter_has_no_copy_or_unlink_fallback`
 
-親の `E384-DEC-001` / `E384-DEC-002` は採用済みのまま維持する。2026-09-08に正式startし、このIssue branchで詳細化を開始した。その結果、通常のstage I/O失敗と最初のincomplete record公開失敗を親wireで表現できない `P392-001/002` を確認した。[調査証拠・親への差し戻し](artifacts/20260908t010201z-issue-392-elaboration-parent-return.md)を参照。
+Expected RED:
 
-親契約を変更する承認は未取得であり、修正を仮採用しない。過去の `owner_decisions_required=[]` とEpic review passは、今回新しく見つかった不足の解消やIssue実装許可を意味しない。親の修正・独立review・freeze後に詳細化を再開し、完全なR/D/PとLuna Max handoffの独立reviewまで `実装開始許可: false` を維持する。
+- import先`spec_dock.provider_lifecycle`またはgenerated projectionが存在せずfail。
+- Existing unrelated test failureをRED理由にしない。
+- Parent Wire countsはtest側で6/41/23/24/168/40/4としてparse成功する。
 
-## 9. 詳細化を再開するためのチェックリスト
+### 4.3 Exact owned files and symbols
 
-以下は仕様作成の残作業であり、実装ステップや別Issueではない。
+**NEW**
 
-- [x] 当該Issue branch・base SHA/tree・親固定契約を確認する。
-- [x] 現行installer/runtime/testの接点と親契約の不足を調査し、fresh GPT-6 Max reviewerと照合する。
-- [ ] 親修正の承認を得て、P392-001/002の状態・結果・retry/fault契約を親ADR/wireで閉じ、独立reviewとfreeze/projection手順を完了する。
-- [ ] その固定点に対するexact owned/shared/no-touch file list、module/symbol、private schema、OS Adapter、旧test dispositionをDesignへ定義する。
-- [ ] Requirementに受入条件とnegative/fault/concurrency/migration/baseline traceを揃える。
-- [ ] 本Planを唯一のcritical-level実装計画へ置換する。各因果的stepに開始状態・編集対象・最初のRED・完了状態・exact command/expected exit・停止条件を定義する。途中単独mergeは不可。
-- [ ] Luna Max handoffを生成し、同じIssue reviewerで完全な候補をreviewする。P0/P1=0とpassを確認するまで実装開始許可はfalse。
+- `src/spec_dock/provider_lifecycle/__init__.py`
+- `src/spec_dock/provider_lifecycle/contracts.py`
+- `src/spec_dock/provider_lifecycle/_wire_generated.py`
+- `src/spec_dock/provider_lifecycle/wire.py`
+- `src/spec_dock/provider_lifecycle/candidate.py`
+- `src/spec_dock/provider_lifecycle/legacy_fixture.py`
+- `src/spec_dock/provider_lifecycle/private_state.py`
+- `src/spec_dock/provider_lifecycle/filesystem.py`
+- `src/spec_dock/provider_lifecycle/coordination.py`
+- `scripts/maintenance/generate_provider_lifecycle_wire.py`
+- `scripts/maintenance/generate_provider_lifecycle_legacy_fixture.py`
+- `src/spec_dock/assets/provider_lifecycle/legacy-0.2.3.json`
+- `tests/unit/provider_lifecycle/test_wire.py`
+- `tests/unit/provider_lifecycle/test_candidate.py`
+- `tests/unit/provider_lifecycle/test_authority.py`
+- `tests/unit/provider_lifecycle/test_private_state.py`
+- `tests/unit/provider_lifecycle/test_atomic_filesystem.py`
 
-将来の実装担当は `coder`（GPT-5.6 Luna / Max）、レビュー担当は `gpt-6-astra` / Max。今回の調査結果だけを根拠に実装を委譲しない。
+**Exact new symbols**
+
+- `contracts.py`: Design §8のdataclass/literalのみ。
+- `wire.py`: `parse_installation_record`、`serialize_installation_record`、`parse_slot_marker`、`serialize_slot_marker`、`build_public_result`、`validate_public_result`。
+- `candidate.py`: `capture_packaged_candidate`、`compute_candidate_digest`、`validate_staged_candidate`。
+- `legacy_fixture.py`: `load_legacy_fixture`、`classify_exact_legacy_workspace`。
+- `private_state.py`: `resolve_private_namespace`、`ActiveStateStore`、`CompletionReceiptStore`、`StageStore`。
+- `filesystem.py`: `NativeAtomicFilesystem`、`LinuxRenameAt2Adapter`、`MacOSRenameAtXAdapter`。
+- `coordination.py`: `RepositoryLease`、SH/EX/inherited validation functions。
+
+### 4.4 Implementation order
+
+1. Wire generatorをtest-only inputとして作り、Parent Wire v12のinventory/order/golden parseをGREENにします。
+2. `_wire_generated.py`を生成し、manual edit guardとsource SHAを固定します。
+3. Record/marker parser・serializerを実装します。Public result constructorはrelation table未一致を例外にします。
+4. Candidate six-domain captureとcanonical digestを実装します。
+5. Legacy fixture generatorをexact commitへ固定し、compact fixtureを生成します。Regeneration equality testを追加します。
+6. `InodeWitness`とdescriptor-relative captureを実装します。
+7. Linux/macOS Adapterを実装し、native capability unavailableでfail closedにします。
+8. Private namespace、ACTIVE/STAGE/receipt parser/writer、P0/P1/P2 classifierを実装します。
+9. Unknown/foreign/temp re-entry、P1 rebuild、P2 no-rewriteのfault testsをGREENにします。
+10. このcheckpointでは`src/spec_dock/cli.py`と旧writerのproduction routeを変更しません。
+
+### 4.5 Narrow verification
+
+```bash
+uv run pytest -q \
+  tests/unit/provider_lifecycle/test_wire.py \
+  tests/unit/provider_lifecycle/test_candidate.py \
+  tests/unit/provider_lifecycle/test_authority.py \
+  tests/unit/provider_lifecycle/test_private_state.py \
+  tests/unit/provider_lifecycle/test_atomic_filesystem.py
+make lint
+```
+
+Expected result:
+
+- Both commands exit 0。
+- Wire counts 6/41/23/24/168/40/4。
+- Generated wire/legacy fixture diff 0。
+- P1だけstage rebuild、P2 stage write count 0。
+- Linux runnerはrenameat2実operation、macOS runnerはrenameatx_np実operationを後続matrixで実行可能な状態。
+- Existing public routeはまだ旧ownerであるため、#392 acceptanceではない。
+
+### 4.6 Completion state
+
+- New foundationはisolated unit testsでGREEN。
+- Parent Wire、legacy source commit、private schema、digest、native Adapterに未決判断がない。
+- 旧Product routeと旧testsは残存。
+- Baseline identityに差分なし。
+
+### 4.7 Stop condition
+
+- Wire parserがfinite inventoryを一意に生成できない。
+- Candidate digestがslot markerとの循環を生む。
+- Legacy fixtureをverified commitのGit objectsだけから生成できない。
+- Private namespaceをsame-filesystemで置けない一般ケースが、既存wireで表せない新public判断を要求する。
+- macOS/Linux native no-replace/exchangeがdescriptor-relativeに実装不能。
+
+### 4.8 Next-step handoff
+
+CP1 summaryにchanged files、generated hashes、RED/GREEN commands、remaining old routeを記録し、CP2 packetだけを新規に渡します。CP1成果を単独mergeしません。
+
+## 5. CP2 — Installer lifecycle hard cutover
+
+### 5.1 Entry state
+
+- CP1 completion済み。
+- New foundation GREEN、旧public route/旧writerは現存。
+- Parent wire/fixture hashes固定。
+- No baseline drift。
+
+### 5.2 最初のRED test
+
+- `tests/unit/provider_lifecycle/test_engine_faults.py::test_t06_every_fixed_publish_boundary_resumes_to_exact_wire_result`
+- `tests/unit/provider_lifecycle/test_migration_uninstall.py::test_t07_remove_specs_is_exit_2_mutation_zero_before_observation`
+- `tests/integration/test_provider_lifecycle_distribution.py::test_t12_public_cli_uses_only_provider_lifecycle_engine`
+
+Expected REDはengine/route未実装または旧purge routeが呼ばれることです。旧test failureをassertion削除で解消しません。
+
+### 5.3 Exact owned files and symbols
+
+**NEW**
+
+- `src/spec_dock/provider_lifecycle/engine.py`
+- `tests/unit/provider_lifecycle/test_engine_faults.py`
+- `tests/unit/provider_lifecycle/test_migration_uninstall.py`
+- `tests/integration/test_provider_lifecycle_distribution.py`
+
+**MODIFY**
+
+- `src/spec_dock/cli.py`
+- `pyproject.toml`（versionだけ先に0.2.4へ。package/dogfood acceptanceはCP4）
+- Lifecycle-related portions of `tests/unit/infra/test_init_update.py`
+- Lifecycle-related portions of `tests/cli_runtime/test_distribution_cutover.py`
+- `tests/integration/test_epic_00343_distribution.py`
+
+**DELETE after successors GREEN**
+
+- `src/spec_dock/managed_distribution.py`
+- `src/spec_dock/assets/managed_distribution.json`
+- obsolete-only nodes in `tests/unit/infra/test_managed_distribution.py`
+
+### 5.4 Implementation order
+
+1. `ProviderLifecycleEngine.execute`にcommon admissionとpending cleanup precedenceを実装します。
+2. Prepared ACTIVE→stage→bootstrap/incomplete→runningの順を実装します。
+3. Install/update/migrationのfour roots/two slots/seeds/verify/ready/terminal/cleanupを実装します。
+4. Uninstall dry-run/applyとtooling-absent recordを実装します。
+5. Completion receipt、deferred invocation、token replay、new-operation invalidationを実装します。
+6. Fault injectorのfixed IDsでP0/P1/P2、全root/slot、terminal、cleanup、response-lossを網羅します。
+7. `src/spec_dock/cli.py`をthin adapterへ切り替えます。Public outputはnew wire constructorだけから生成します。
+8. `--remove-specs`をtarget/private observation前のrequest errorへ切り替えます。
+9. Existing CLI compatibility/golden testsをnew resultへ置換します。
+10. Exact legacy/ready/incomplete/tooling-absent normal and fault integrationをGREENにします。
+11. New routeとabsence guardsがGREENになってから旧module、旧manifest、旧journal/retry testsを削除します。
+12. `grep`/AST testで旧writer import/call/path string 0を証明します。
+
+### 5.5 Narrow verification
+
+```bash
+uv run pytest -q \
+  tests/unit/provider_lifecycle/test_engine_faults.py \
+  tests/unit/provider_lifecycle/test_migration_uninstall.py \
+  tests/integration/test_provider_lifecycle_distribution.py \
+  tests/integration/test_epic_00343_distribution.py
+uv run pytest -q tests/cli_runtime/test_distribution_cutover.py \
+  -k 'retained_skill_identity_matches_current_provider_and_dogfood or provider_lifecycle'
+make lint
+```
+
+Expected result:
+
+- Commands exit 0、unexpected failure 0。
+- 168 relation rowsと40/4 goldensがpublic CLIでbyte一致。
+- 全fault retryがexact tuple、P2 stage writes 0。
+- Protected sentinel不変。
+- Exact 0.2.3だけmigration。
+- Tooling uninstall後はrecord残存、roots/slots absent。
+- `--remove-specs` exit 2/mutation 0。
+- `src/spec_dock/managed_distribution.py`とold manifest absent、production references 0。
+- Resolved successor nodeは同nodeidでpass。
+
+### 5.6 Completion state
+
+- External installer public lifecycleはnew engineだけ。
+- Old writer/manifestはrepositoryから除去。
+- Runtime wrapperはまだCP3前のため、B1 acceptanceではない。
+- Source-level lifecycle tests GREEN。
+
+### 5.7 Stop condition
+
+- Existing wire rowでは区別不能なfaultが発生。
+- Protected dataを読む/直す必要が発生。
+- Old writerをcompatibility fallbackとして残す必要が発生。
+- Existing public commandのalias/flagをWire外で変更する必要が発生。
+- `test_s40b_retained_skill_identity_matches_current_provider_and_dogfood`を維持できない。
+
+### 5.8 Next-step handoff
+
+CP2 summaryでold writer absenceとpublic wire conformanceを示し、CP3 packetだけを渡します。外部installerが完成していても、runtime coordination前にmergeしません。
+
+## 6. CP3 — Runtime/Git/worktree coordination
+
+### 6.1 Entry state
+
+- CP2 completion済み。
+- External installerは0.2.4 new lifecycle。
+- Repo-local wrapperはまだpre-import SH/terminal handoff未対応。
+- Existing issue-start/worktree behavior testsは残存。
+
+### 6.2 最初のRED test
+
+- `tests/cli_runtime/test_provider_lifecycle_bootstrap.py::test_t08_installer_ex_blocks_before_any_runtime_module_import`
+- `tests/cli_runtime/test_provider_lifecycle_handoff.py::test_t09_parent_sigkill_does_not_release_writer_lease`
+- `tests/cli_runtime/test_generation_checkout.py::test_t10_existing_branch_different_provider_generation_stops_before_checkout`
+- `tests/cli_runtime/test_worktree_lifecycle_coordination.py::test_t11_worktree_entrypoint_is_published_last`
+
+Expected REDはcurrent wrapperがline 19でlease前importすること、Git helperにfd lifetimeがないこと、checkoutがbranch名だけであること、worktree createがentrypointを先に公開してmakeをuse-case内実行することです。
+
+### 6.3 Exact owned files and symbols
+
+**MODIFY provider and mirror**
+
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+- `spec-dock/scripts/spec-dock`
+- `spec_dock_runtime/app.py`
+- `spec_dock_runtime/cli/dispatch.py`
+- `spec_dock_runtime/commands/contracts.py`
+- `spec_dock_runtime/commands/update.py`
+- `spec_dock_runtime/commands/uninstall.py`
+- `spec_dock_runtime/application/contracts.py`
+- `spec_dock_runtime/application/ports.py`
+- `spec_dock_runtime/application/set_active.py`
+- `spec_dock_runtime/application/issue_lifecycle.py`
+- `spec_dock_runtime/application/worktree.py`
+- `spec_dock_runtime/infra/git_cli.py`
+- `spec_dock_runtime/infra/make_cli.py`
+
+**NEW provider and mirror**
+
+- `spec_dock_runtime/infra/git_helper.py`
+- `tests/cli_runtime/test_provider_lifecycle_bootstrap.py`
+- `tests/cli_runtime/test_provider_lifecycle_handoff.py`
+- `tests/cli_runtime/test_generation_checkout.py`
+- `tests/cli_runtime/test_worktree_lifecycle_coordination.py`
+
+**REPLACE current assertions**
+
+- `tests/cli_runtime/test_update.py`
+- `tests/cli_runtime/test_uninstall.py`
+- bootstrap-specific node in `tests/cli_runtime/test_wrappers.py`
+- checkout-specific nodes in `tests/cli_runtime/test_issue_lifecycle.py`
+- create/remove/hook-specific nodes in `tests/cli_runtime/test_worktree.py`
+
+### 6.4 Implementation order
+
+1. Frozen bootstrapへcomponent-wise root open、SH NB、ready admission、exact diagnosticsを実装します。
+2. `app.run`/`dispatch`/`CommandOutcome`をreturn-onlyにし、ordinary emitをbootstrapへ移します。
+3. update/uninstallを`InstallerExecRequest`へ変更し、bootstrapのclose→exec、direct streams/status、127を実装します。
+4. `git_helper.py`と`pass_fds` allowlistを実装し、real process lifetime/SIGKILL testをGREENにします。
+5. `GitCapabilityAssessment`（`post-checkout`、`reference-transaction`、`post-index-change`を含むeffective hook guard）とGit object provider closure digestを実装します。
+6. Existing/new pinned checkoutとpre/post generation guardを実装します。
+7. `issue_start`へpost-checkout revalidationを挿入し、drift時active/sync 0を保証します。
+8. Worktree createをno-checkout/pinned materialization/entrypoint-lastへ変更します。
+9. Worktree removeをB EX/original inode/path C preservationへ変更します。
+10. `ConsumerHookRequest`、nonlocking B fd、bootstrap fchdir make runner、existing status/warning/outer exitを実装します。
+11. Provider runtime testsをGREENにしてからmirrorへbyte同期します。
+12. Source/mirror bootstrap SHAを固定し、candidate digestへ反映します。
+
+### 6.5 Narrow verification
+
+```bash
+uv run pytest -q \
+  tests/cli_runtime/test_provider_lifecycle_bootstrap.py \
+  tests/cli_runtime/test_provider_lifecycle_handoff.py \
+  tests/cli_runtime/test_generation_checkout.py \
+  tests/cli_runtime/test_worktree_lifecycle_coordination.py \
+  tests/cli_runtime/test_update.py \
+  tests/cli_runtime/test_uninstall.py \
+  tests/cli_runtime/test_wrappers.py \
+  tests/cli_runtime/test_issue_lifecycle.py \
+  tests/cli_runtime/test_worktree.py
+make lint
+```
+
+Expected result:
+
+- Commands exit 0。
+- Module import spyはSH acquisition/ready validation後にだけ発火。
+- Runtime SH vs installer EX、two SH coexistence、busy/unavailable/unsafe/not-ready exact diagnostics。
+- Parent-only SIGKILL中はinstaller busy、helper exit後EX succeeds。
+- A→B/B→A、same/cross target、全retained flagsでold-module return 0。
+- Existing/new checkout accepted、三種のwriting hookを含むdifferent/unprovable capabilityでpre-checkout mutation 0、post drift active/sync 0。
+- Worktree create before entrypoint publicationはruntime unavailable、after publicationはcomplete/clean。
+- Remove path C preserved。
+- make hookはlocking fd 0でoriginal B cwd、nested installer self-contentionなし、outer exit 0。
+
+### 6.6 Completion state
+
+- Cooperative lifecycle/runtime/Git/worktree modelがend-to-end GREEN。
+- Bootstrap bytes固定。
+- Provider runtimeとdogfood mirrorはbyte一致。
+- Packaging/full suiteはCP4待ち。
+
+### 6.7 Stop condition
+
+- Frozen bootstrapがreplaceable moduleをlease前にimportする必要がある。
+- Helperがwriting descendantへleaseを保持できない。
+- Git capabilityを無断disableしなければ同一bytesを証明できない。
+- Existing branch checkoutでGitのother-worktree/merge/rebase guardを迂回する必要がある。
+- Worktree B entrypoint-lastでfinal clean index/HEADを証明できない。
+- Consumer hookをold moduleへ戻らずrenderできない。
+
+### 6.8 Next-step handoff
+
+CP3 summaryにreal concurrency process evidence、bootstrap SHA、Git/worktree behaviorを記録し、CP4 packetだけを渡します。まだmergeしません。
+
+## 7. CP4 — Packaging, dogfood, test migration and B1 acceptance
+
+### 7.1 Entry state
+
+- CP1–CP3 completion済み。
+- Source/new runtime focused tests GREEN。
+- Old writer absent。
+- Provider/dogfood mirrorは同期候補。
+- Full current gatesとbuilt artifactsは未受入。
+
+### 7.2 最初のRED test
+
+- `tests/integration/test_provider_lifecycle_dogfood.py::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical`
+- `tests/integration/test_issue_392_acceptance.py::test_t14_old_writer_absent_and_transitional_gate_contract_unchanged`
+
+Expected REDはversion/package inventory/dogfood/test disposition/provider-ci commandがまだfinal candidateへ整列していないことです。
+
+### 7.3 Exact owned files
+
+**MODIFY**
+
+- `pyproject.toml`
+- 必要な場合だけ`setup.py`のpackage/stale-prune allowlist
+- `.github/workflows/provider-ci.yml`
+- `README.md`
+- `src/spec_dock/assets/spec_dock/docs/README.md`
+- `src/spec_dock/assets/spec_dock/docs/migration.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_worktree.md`
+- matching dogfood docs under `spec-dock/docs/`
+- `.agents/skills/spec-dock/**` provider/dogfood pair
+- `.agents/skills/spec-dock-grill-with-docs/**` provider/dogfood pair
+- Test files classified REPLACE/RETIRE in the test Artifact
+
+**NEW**
+
+- `tests/integration/test_provider_lifecycle_dogfood.py`
+- `tests/integration/test_issue_392_acceptance.py`
+
+**NO-TOUCH**
+
+- 14 active node identities/signatures/lifecycle
+- 243 timing entries
+- final gate implementation
+
+### 7.4 Implementation order
+
+1. Version 0.2.4、package data、fixture、new package inventoryを整列します。
+2. Wheel/sdistをbuildし、isolated environmentでinstalled packageだけをimportしてcandidate/fixture/bootstrapを検証します。
+3. Provider docs/skillsをnew lifecycleへ更新します。Consumer protected dataとmaintenance windowを明記します。
+4. Provider sourceからdogfood scripts/docs/skillsをbyte同期します。
+5. Existing test filesをtest ArtifactどおりKEEP/REPLACE/RETIREします。Successor GREEN前削除はしません。
+6. Resolved successor nodeidを維持します。
+7. Provider CIのold focused commandをnew lifecycle focused commandへ差し替え、PR-only/Linux-macOS/no-continue-on-error/current full pathsを維持します。
+8. Static acceptanceでold imports/path strings 0、Wire counts、required-fast、15/14/1、243、mirror parityを検証します。
+9. Default fast、current explicit full verifier、platform parityを実行します。
+10. Review findingsを修正し、全変更を一つの#392 PRへまとめます。
+
+### 7.5 Narrow and final verification
+
+Focused:
+
+```bash
+uv run pytest -q \
+  tests/integration/test_provider_lifecycle_dogfood.py \
+  tests/integration/test_issue_392_acceptance.py \
+  tests/unit/infra/test_init_update.py \
+  tests/cli_runtime/test_distribution_cutover.py \
+  tests/integration/test_epic_00343_distribution.py
+```
+
+Current required gates:
+
+```bash
+make lint
+uv run pytest
+uv run python -m scripts.quality.verify_full_regression --shards 4
+```
+
+Provider parity commands retained in `.github/workflows/provider-ci.yml`:
+
+```bash
+uv run pytest tests/unit/provider_lifecycle
+uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py
+uv run pytest --run-full-regression --full-regression-shard tests/integration/test_epic_00343_distribution.py
+```
+
+Expected result:
+
+- All commands exit 0、unexpected failure 0。
+- Required-fast four nodeids collected/executed as current policy requires。
+- Register 15 rows/14 active/1 resolved、active signatures/lifecycle unchanged。
+- Timing entries exactly243。
+- Source/wheel/sdist/installed/dogfood candidate/fixture/bootstrap parity。
+- Linux/macOS provider parity GREEN。
+- Old writer/manifest/journal authority references 0。
+- No `continue-on-error`、skip/xfail/approved failure追加。
+
+### 7.6 Completion state
+
+- #392 Product、tests、docs、packaging、dogfoodが一つのcandidateとしてGREEN。
+- PR baseはEpic integration branch、mergeは未実施。
+- Reportへ実行したexact commands/results/hashを記録。
+- Human merge gateへ渡せる。
+
+### 7.7 Stop condition
+
+- Full/current gateを通すため#395 active failureを修正する必要がある。
+- #396 toolingを先取りする必要がある。
+- Built artifactとsource/dogfoodが一致しない。
+- Provider CIを弱める、skip/xfail/continue-on-errorが必要になる。
+- Human merge前にmainへ向ける必要がある。
+
+### 7.8 Next-step handoff
+
+Luna Maxの実装作業は終了し、Codexがwhole diff、review、PR準備を行います。人間だけがPRをEpic integration branchへmergeします。
+
+## 8. Human merge and B1 post-merge gate
+
+1. PR baseが`codex/epic-00384-provider-test-strategy-planning`であることを確認する。
+2. Candidate head SHA、review pass、all required checks、baseline integrityを確認する。
+3. 人間がmergeする。Agentはmergeしない。
+4. Merged Epic branch tipのfull SHAを固定する。
+5. CP4 current required gatesとprovider parityをmerged tipで再実行する。
+6. Source/dogfood/ledger/timing/required-fastを再検証する。
+7. 全てGREENならB1を記録し、#392をclose可能とする。
+8. B1 GREEN後だけ#395をstartする。
+
+Merge後failureでは#395を開始せず、#392 mergeをhuman revertしてB0へ戻すか、#392 PR相当のrepairを人間判断します。Partial cherry-pickで状態を混ぜません。
+
+## 9. Operational risk plan
+
+| Concern | Applicability / control |
+|---|---|
+| Security/privacy | Applicable。No-follow、owner/mode、fd allowlist、content-free public diagnostics、private stateへuser data/credential非格納をtestする。 |
+| Blast radius | High。Installer、runtime、Git、worktree、packagingを跨ぐ。Checkpointで局所化するがmergeは一つ。 |
+| Migration | Applicable。Exact-clean 0.2.3 only、human maintenance window、external installer、post-mutation forward recovery。 |
+| Staged rollout | Production feature flag rolloutはN/A。Integration branch B0→B1が唯一のstaged rolloutで、mainへ直接出さない。 |
+| Kill switch | Runtime toggleはN/Aかつ禁止。Human PR merge停止またはwhole merge revertがkill switch。 |
+| Backup/restore | User-data backupをlifecycleが作るのはN/A。Provider rootsのold generationはoperation中stageにのみ存在し、完了後は破棄。Git branch/repository backupはhuman運用。 |
+| Forward recovery | Applicable。ACTIVE/stage/receiptとexact tuple/tokenだけ。Manual private deletion、operation switch、old writer fallback禁止。 |
+| Rollback | Unmergedはbranch discard、merged B1 failureはhuman whole-merge revert。Partial old writer restore禁止。 |
+| Incident response | New invocation停止、exact root/ACTIVE/receipt/record bytesとpublic result保存、protected dataへ触れずparentへ報告。Cleanup tokenを公開ログへ不要に転載しない。 |
+| Ownership | #392 owns lifecycle。#395/#396 read-only。Post-merge保守はrepository maintainer。 |
+| Human gate | Spec review、clean pushed freeze/projection、PR review/merge、B1 revalidation、legacy maintenance windowはhuman/Codex gate。 |
+
+## 10. Incident response procedure
+
+1. 新規SpecDock command/automationを停止する。
+2. Consumerのspec/Artifact/workbenchを移動・修正しない。
+3. External installerのpublic JSON/text、exit、candidate digest、target labelを保存する。
+4. Private pathはownerがread-only確認する。Unknown objectを削除しない。
+5. ACTIVE/receipt/recordのhash、repository `(dev,ino)`、OS、native capability、operation generationを記録する。秘密tokenは必要な担当者以外へ出さない。
+6. Wireのexact continuationがある場合だけそのcommandを実行する。別operationへ切り替えない。
+7. Wireにない状態、identity drift、foreign objectなら停止し、parentへcontract gapとして返す。
+8. B1 merge後のincidentでは#395を開始せず、human revert判断を行う。
+
+## 11. Plan completion and current gate
+
+本Planはcritical-level唯一の実装計画候補です。Checkpoint packetは[実装引継ぎ](artifacts/20260908t011846z-luna-max-implementation-handoff.md)に定義します。独立内容reviewとclean pushed freeze/projectionが未完了であるため、現時点でProduct実装を開始しません。
