@@ -228,8 +228,7 @@ Expected REDはengine/route未実装または旧purge routeが呼ばれること
 
 ```bash
 uv run pytest -q \
-  tests/unit/provider_lifecycle/test_engine_faults.py \
-  tests/unit/provider_lifecycle/test_migration_uninstall.py \
+  tests/unit/provider_lifecycle/test_engine.py \
   tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent \
   tests/integration/test_epic_00343_distribution.py
 uv run pytest -q tests/cli_runtime/test_distribution_cutover.py \
