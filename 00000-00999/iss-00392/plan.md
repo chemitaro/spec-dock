@@ -75,8 +75,8 @@ repository_evidence:
 最初に次を追加し、Product変更前に実行します。
 
 - `tests/unit/provider_lifecycle/test_wire.py::test_t01_wire_v12_inventory_and_generated_projection_are_exact`
-- `tests/unit/provider_lifecycle/test_private_state.py::test_t04_stage_payload_cannot_exist_without_durable_prepared_active`
-- `tests/unit/provider_lifecycle/test_atomic_filesystem.py::test_t05_native_atomic_adapter_has_no_copy_or_unlink_fallback`
+- `tests/unit/provider_lifecycle/test_private_state.py::test_t04_prepared_active_precedes_stage_and_p1_only_rebuilds_registered_entries`
+- `tests/unit/provider_lifecycle/test_atomic_filesystem.py::test_t05_linux_and_macos_native_atomic_adapters_have_no_unsafe_fallback`
 
 Expected RED:
 
@@ -181,8 +181,8 @@ CP1 summaryにchanged files、generated hashes、RED/GREEN commands、remaining 
 
 ### 5.2 最初のRED test
 
-- `tests/unit/provider_lifecycle/test_engine_faults.py::test_t06_every_fixed_publish_boundary_resumes_to_exact_wire_result`
-- `tests/unit/provider_lifecycle/test_migration_uninstall.py::test_t07_remove_specs_is_exit_2_mutation_zero_before_observation`
+- `tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations`
+- `tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero`
 - `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent`
 
 Expected REDはengine/route未実装または旧purge routeが呼ばれることです。旧test failureをassertion削除で解消しません。
@@ -192,8 +192,7 @@ Expected REDはengine/route未実装または旧purge routeが呼ばれること
 **NEW**
 
 - `src/spec_dock/provider_lifecycle/engine.py`
-- `tests/unit/provider_lifecycle/test_engine_faults.py`
-- `tests/unit/provider_lifecycle/test_migration_uninstall.py`
+- `tests/unit/provider_lifecycle/test_engine.py`
 - `tests/integration/test_issue_392_acceptance.py`
 
 **MODIFY**
@@ -280,10 +279,10 @@ CP2 summaryでold writer absenceとpublic wire conformanceを示し、CP3 packet
 
 ### 6.2 最初のRED test
 
-- `tests/cli_runtime/test_provider_lifecycle_bootstrap.py::test_t08_installer_ex_blocks_before_any_runtime_module_import`
-- `tests/cli_runtime/test_provider_lifecycle_handoff.py::test_t09_parent_sigkill_does_not_release_writer_lease`
-- `tests/cli_runtime/test_generation_checkout.py::test_t10_existing_branch_different_provider_generation_stops_before_checkout`
-- `tests/cli_runtime/test_worktree_lifecycle_coordination.py::test_t11_worktree_entrypoint_is_published_last`
+- `tests/cli_runtime/test_provider_lifecycle_bootstrap.py::test_t08_pre_import_shared_lease_and_ready_admission_are_enforced`
+- `tests/cli_runtime/test_provider_lifecycle_handoff.py::test_t09_update_uninstall_exec_and_helper_lease_lifetime_are_terminal`
+- `tests/cli_runtime/test_generation_checkout.py::test_t10_existing_and_new_checkout_are_pinned_and_generation_safe`
+- `tests/cli_runtime/test_worktree_lifecycle_coordination.py::test_t11_worktree_b_create_remove_and_make_handoff_are_inode_bound`
 
 Expected REDはcurrent wrapperがline 19でlease前importすること、Git helperにfd lifetimeがないこと、checkoutがbranch名だけであること、worktree createがentrypointを先に公開してmakeをuse-case内実行することです。
 
@@ -293,6 +292,7 @@ Expected REDはcurrent wrapperがline 19でlease前importすること、Git help
 
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/dispatch.py`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/contracts.py`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/update.py`
