@@ -49,6 +49,16 @@ reflected_to: ["../requirement.md", "../design.md", "../plan.md", "provider-life
 - 受入済みProduct実装がないため再開点はB0。parent-only文書修正を選択中Issue branchへ含めても、Issue PRはEpic branchをbaseにし、Product受入と人間mergeを省略しない。
 - 旧親passはv11の証拠として残す。v12の独立reviewと、完成した#392詳細R/D/Pのreviewは候補identityで区別する。
 
+## 2026-09-08 clarification — Public-record staging mode
+
+Wire v12のpublic installation recordはmode0644かつnative atomic replaceである一方、private tempの一般則を`RECORD-TEMP`にもmode0600として適用すると、rename/exchangeがmodeを保存するため両者を同時に満たせない。このため既存Decisionの意味を次のように明確化する。
+
+- `RECORD-TEMP`はprivate metadata tempではなくpublic-record staging objectであり、最終public mode0644、regular/link1/owner euid/max4096、exact seven-key record bytesだけを許可する唯一のmode例外とする。
+- `ACTIVE.json`、completion receipt、`STAGE-OWNER.json`と各metadata atomic tempはmode0600、private directoriesはmode0700を維持する。
+- Publicへmode0600で公開してからchmodする遷移は禁止する。
+- Exchange後に`RECORD-TEMP`へ移った旧public recordは、ACTIVEのoriginal-record bytes/hash/inode witnessと一致するときだけown residueとしてexpected-bound unlink/fsyncできる。Content-equalなforeign inodeはpreserve-and-blockする。
+- このclarificationはpublic status/code/phase/relation/golden、三Issue責務、recovery保証を変更しない。親WireとIssue #392仕様を同じ候補で再review・再freezeする。
+
 ## References
 
 - [不足を確認した調査](../issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/artifacts/20260908t010201z-issue-392-elaboration-parent-return.md)

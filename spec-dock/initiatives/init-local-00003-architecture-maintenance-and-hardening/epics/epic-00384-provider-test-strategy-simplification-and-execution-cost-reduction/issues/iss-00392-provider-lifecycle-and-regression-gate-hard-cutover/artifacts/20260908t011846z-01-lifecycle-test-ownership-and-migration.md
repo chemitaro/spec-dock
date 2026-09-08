@@ -191,22 +191,22 @@ RETIRE:
 
 ## 4. New test IDs and exact owners
 
-| T-ID | Exact primary node | Requirement proof |
-|---|---|---|
-| T01 | `tests/unit/provider_lifecycle/test_wire.py::test_t01_wire_v12_inventory_and_generated_projection_are_exact` | 6/41/23/24/168/40/4、relation closure、generation determinism。 |
-| T02 | `tests/unit/provider_lifecycle/test_candidate.py::test_t02_candidate_record_marker_and_legacy_fixture_are_closed_and_deterministic` | Candidate digest、7-key record、4-key marker、exact-clean 0.2.3 fixture。 |
-| T03 | `tests/unit/provider_lifecycle/test_authority.py::test_t03_fixed_roots_slots_seeds_and_protected_sentinels_are_exact` | Four roots、two slots、fresh-only seeds、protected data、unknown preservation。 |
-| T04 | `tests/unit/provider_lifecycle/test_private_state.py::test_t04_prepared_active_precedes_stage_and_p1_only_rebuilds_registered_entries` | Private namespace、ACTIVE/receipt/inode schema、P0/P1/P2。 |
-| T05 | `tests/unit/provider_lifecycle/test_atomic_filesystem.py::test_t05_linux_and_macos_native_atomic_adapters_have_no_unsafe_fallback` | Native no-replace/exchange、no-follow、identity drift、fsync。 |
-| T06 | `tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations` | Write order、root interruption、terminal/cleanup/receipt/replay、response loss。 |
-| T07 | `tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero` | Exact migration、tooling-absent record、purge rejection、old-package guard。 |
-| T08 | `tests/cli_runtime/test_provider_lifecycle_bootstrap.py::test_t08_pre_import_shared_lease_and_ready_admission_are_enforced` | Stdlib bootstrap、SH/NB、busy/not-ready/unsafe/unavailable、no pre-admission import。 |
-| T09 | `tests/cli_runtime/test_provider_lifecycle_handoff.py::test_t09_update_uninstall_exec_and_helper_lease_lifetime_are_terminal` | Release-to-exec、streams/status/127、pass_fds、parent-only SIGKILL。 |
-| T10 | `tests/cli_runtime/test_generation_checkout.py::test_t10_existing_and_new_checkout_are_pinned_and_generation_safe` | Existing/new branch pin、三種のwriting hookを含むcapability guard、pre/post drift、normal Git guard維持。 |
-| T11 | `tests/cli_runtime/test_worktree_lifecycle_coordination.py::test_t11_worktree_b_create_remove_and_make_handoff_are_inode_bound` | B EX、entrypoint-last、path C preservation、nonlocking B fd、make compatibility。 |
-| T12 | `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent` | Sole route、old module/manifest/journal references 0、public compatibility。 |
-| T13 | `tests/integration/test_provider_lifecycle_dogfood.py::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical` | Provider-first、package inventory、bootstrap/fixture/skills/dogfood parity。 |
-| T14 | `tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged` | Required-fast、15/14/1、243、provider CI、#395/#396 no-touch。 |
+| T-ID | Checkpoint owner | Exact primary node | Requirement proof |
+|---|---|---|---|
+| T01 | CP1 | `tests/unit/provider_lifecycle/test_wire.py::test_t01_wire_v12_inventory_and_generated_projection_are_exact` | 6/41/23/24/168/40/4、relation closure、generation determinism。 |
+| T02 | CP1 | `tests/unit/provider_lifecycle/test_candidate.py::test_t02_candidate_record_marker_and_legacy_fixture_are_closed_and_deterministic` | Candidate digest、7-key record、4-key marker、exact-clean 0.2.3 fixture。 |
+| T03 | CP1 | `tests/unit/provider_lifecycle/test_authority.py::test_t03_fixed_roots_slots_seeds_and_protected_sentinels_are_exact` | Four roots、two slots、fresh-only seeds、protected data、unknown preservation。 |
+| T04 | CP1 | `tests/unit/provider_lifecycle/test_private_state.py::test_t04_prepared_active_precedes_stage_and_p1_only_rebuilds_registered_entries` | Private namespace、closed rendered-command allowlist、RECORD-TEMP witness、ACTIVE/receipt/inode schema、P0/P1/P2。 |
+| T05 | CP1 | `tests/unit/provider_lifecycle/test_atomic_filesystem.py::test_t05_linux_and_macos_native_atomic_adapters_have_no_unsafe_fallback` | Native no-replace/exchange、RECORD-TEMP/public record mode0644保存、no-follow、identity drift、fsync。 |
+| T06 | CP2 | `tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations` | Write order、record exchange residue、root interruption、terminal/cleanup/receipt/replay、response loss。 |
+| T07 | CP2 | `tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero` | Exact migration、tooling-absent record、purge rejection、old-package guard。 |
+| T08 | CP3 | `tests/cli_runtime/test_provider_lifecycle_bootstrap.py::test_t08_pre_import_shared_lease_and_ready_admission_are_enforced` | Stdlib bootstrap、SH/NB、busy/not-ready/unsafe/unavailable、no pre-admission import。 |
+| T09 | CP3 | `tests/cli_runtime/test_provider_lifecycle_handoff.py::test_t09_update_uninstall_exec_and_helper_lease_lifetime_are_terminal` | Release-to-exec、streams/status/127、pass_fds、parent-only SIGKILL。 |
+| T10 | CP3 | `tests/cli_runtime/test_generation_checkout.py::test_t10_existing_and_new_checkout_are_pinned_and_generation_safe` | Existing/new branch pin、三種のwriting hookを含むcapability guard、pre/post drift、normal Git guard維持。 |
+| T11 | CP3 | `tests/cli_runtime/test_worktree_lifecycle_coordination.py::test_t11_worktree_b_create_remove_and_make_handoff_are_inode_bound` | B EX、entrypoint-last、path C preservation、nonlocking B fd、make compatibility。 |
+| T12 | CP2 | `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent` | Sole route、old module/manifest/journal references 0、public compatibility。 |
+| T13 | CP4 | `tests/integration/test_provider_lifecycle_dogfood.py::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical` | Provider-first、package inventory、bootstrap/fixture/docs/skills/fresh install/dogfood parity。 |
+| T14 | CP4 | `tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged` | Required-fast、15/14/1、243、provider CI、#395/#396 no-touch。 |
 
 各primary nodeはparameterized subcaseを持てますが、T-IDの責務を別Issueへ分けません。Fault/platform evidenceは同T-IDのsubcaseまたは同file内の補助nodeに置きます。
 
@@ -218,6 +218,7 @@ RETIRE:
 | ACTIVE temp write/fsync/rename/parent fsync | rename前/後 | foreign tempを削除せず、durable preparedを一意判定。 |
 | Stage owner/payload create/copy/fsync | 各fixed entry | P1だけregistered entry再構築、P2 stage bytes/inode unchanged。 |
 | Incomplete record temp/write/rename/fsync | 各点 | Originalまたはown expected incompleteだけを許容。 |
+| Record no-replace/exchange/residue | 各publish境界とparent fsync loss | Public/temp mode0644、exchange後旧recordはoriginal bytes/hash/inode一致時だけcleanup。 |
 | Each root detach/publish | docs/templates/system/scripts | Scripts last、re-entryがtarget/stage identityから一意。 |
 | Each skill slot detach/publish | two exact slots | Marker authority、other skill/parent scan 0。 |
 | Seed create | container/file/fsync | Missing+create-if-absentのみ。既存seed unchanged。 |
@@ -249,6 +250,8 @@ Windowsは#392 supported lifecycle platformではありません。Silent path-b
 
 T13は同一build sessionで次を採取し、aggregate candidate digest、six domain digests、fixture bytes、frozen bootstrap SHA-256、two skill tree digestsを比較します。
 
+CP3のT08–T11はprovider asset treeまたはそこから作ったtemporary installを対象とし、checked-in dogfood parityを前提にしません。CP4でcomplete provider candidateを確定しsource testsをGREENにした後、同一source treeからartifact proofを取り、そのproofがGREENになった後だけdogfoodを一括projectします。
+
 1. Source tree。
 2. Built wheel。
 3. Built sdist。
@@ -263,10 +266,10 @@ Wheel/sdistはlegacy fixture、new package、runtime bootstrapを欠いてはな
 1. T01–T05をREDにする。
 2. Foundation実装でGREENにする。
 3. T06/T07をRED→GREENにし、新installer public routeを通す。
-4. T12のold production reference scanをGREENにする。
+4. CP2で`tests/integration/test_issue_392_acceptance.py`を作成し、T12のold production reference scanをGREENにする。
 5. その後にだけ`managed_distribution.py`、`managed_distribution.json`、旧writer専用testsを削除する。
 6. T08–T11をRED→GREENにする。
-7. T13/T14をGREENにし、既存KEEP nodeを実行する。
+7. CP4で同じacceptance fileへT14だけを追加し、artifact proof後にcomplete dogfoodを一括projectしてT13/T14をGREENにし、既存KEEP nodeを実行する。
 8. Default fast、current full verifier、Linux/macOS provider parityがGREENになって初めてPR受入候補とする。
 
 削除が先行した場合はstopです。Successor testを同じcommitで追加していても、そのtestの実行証拠がなければ削除を正当化しません。

@@ -125,8 +125,8 @@ Expected RED:
 5. Legacy fixture generatorをexact commitへ固定し、compact fixtureを生成します。Regeneration equality testを追加します。
 6. `InodeWitness`とdescriptor-relative captureを実装します。
 7. Linux/macOS Adapterを実装し、native capability unavailableでfail closedにします。
-8. Private namespace、ACTIVE/STAGE/receipt parser/writer、P0/P1/P2 classifierを実装します。
-9. Unknown/foreign/temp re-entry、P1 rebuild、P2 no-rewriteのfault testsをGREENにします。
+8. Private namespace、ACTIVE/STAGE/receipt parser/writer、mode0644 `RECORD-TEMP` witness、P0/P1/P2 classifierを実装します。
+9. Unknown/foreign/temp re-entry、record no-replace/exchange前後のmode/witness/residue、P1 rebuild、P2 no-rewriteのfault testsをGREENにします。
 10. このcheckpointでは`src/spec_dock/cli.py`と旧writerのproduction routeを変更しません。
 
 ### 4.5 Narrow verification
@@ -147,6 +147,7 @@ Expected result:
 - Wire counts 6/41/23/24/168/40/4。
 - Generated wire/legacy fixture diff 0。
 - P1だけstage rebuild、P2 stage write count 0。
+- `RECORD-TEMP`とpublic recordはno-replace/exchange前後ともmode0644で、exchange residueはoriginal-record witness一致時だけcleanup。
 - Linux runnerはrenameat2実operation、macOS runnerはrenameatx_np実operationを後続matrixで実行可能な状態。
 - Existing public routeはまだ旧ownerであるため、#392 acceptanceではない。
 
@@ -182,7 +183,7 @@ CP1 summaryにchanged files、generated hashes、RED/GREEN commands、remaining 
 
 - `tests/unit/provider_lifecycle/test_engine_faults.py::test_t06_every_fixed_publish_boundary_resumes_to_exact_wire_result`
 - `tests/unit/provider_lifecycle/test_migration_uninstall.py::test_t07_remove_specs_is_exit_2_mutation_zero_before_observation`
-- `tests/integration/test_provider_lifecycle_distribution.py::test_t12_public_cli_uses_only_provider_lifecycle_engine`
+- `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent`
 
 Expected REDはengine/route未実装または旧purge routeが呼ばれることです。旧test failureをassertion削除で解消しません。
 
@@ -193,12 +194,12 @@ Expected REDはengine/route未実装または旧purge routeが呼ばれること
 - `src/spec_dock/provider_lifecycle/engine.py`
 - `tests/unit/provider_lifecycle/test_engine_faults.py`
 - `tests/unit/provider_lifecycle/test_migration_uninstall.py`
-- `tests/integration/test_provider_lifecycle_distribution.py`
+- `tests/integration/test_issue_392_acceptance.py`
 
 **MODIFY**
 
 - `src/spec_dock/cli.py`
-- `pyproject.toml`（versionだけ先に0.2.4へ。package/dogfood acceptanceはCP4）
+- `pyproject.toml`の`[project].version`だけを0.2.4へ更新（package/dogfood acceptanceはCP4）
 - Lifecycle-related portions of `tests/unit/infra/test_init_update.py`
 - Lifecycle-related portions of `tests/cli_runtime/test_distribution_cutover.py`
 - `tests/integration/test_epic_00343_distribution.py`
@@ -230,7 +231,7 @@ Expected REDはengine/route未実装または旧purge routeが呼ばれること
 uv run pytest -q \
   tests/unit/provider_lifecycle/test_engine_faults.py \
   tests/unit/provider_lifecycle/test_migration_uninstall.py \
-  tests/integration/test_provider_lifecycle_distribution.py \
+  tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent \
   tests/integration/test_epic_00343_distribution.py
 uv run pytest -q tests/cli_runtime/test_distribution_cutover.py \
   -k 'retained_skill_identity_matches_current_provider_and_dogfood or provider_lifecycle'
@@ -288,26 +289,25 @@ Expected REDはcurrent wrapperがline 19でlease前importすること、Git help
 
 ### 6.3 Exact owned files and symbols
 
-**MODIFY provider and mirror**
+**MODIFY provider source only**
 
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock`
-- `spec-dock/scripts/spec-dock`
-- `spec_dock_runtime/app.py`
-- `spec_dock_runtime/cli/dispatch.py`
-- `spec_dock_runtime/commands/contracts.py`
-- `spec_dock_runtime/commands/update.py`
-- `spec_dock_runtime/commands/uninstall.py`
-- `spec_dock_runtime/application/contracts.py`
-- `spec_dock_runtime/application/ports.py`
-- `spec_dock_runtime/application/set_active.py`
-- `spec_dock_runtime/application/issue_lifecycle.py`
-- `spec_dock_runtime/application/worktree.py`
-- `spec_dock_runtime/infra/git_cli.py`
-- `spec_dock_runtime/infra/make_cli.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/dispatch.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/contracts.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/update.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/uninstall.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/make_cli.py`
 
-**NEW provider and mirror**
+**NEW provider source and tests**
 
-- `spec_dock_runtime/infra/git_helper.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_helper.py`
 - `tests/cli_runtime/test_provider_lifecycle_bootstrap.py`
 - `tests/cli_runtime/test_provider_lifecycle_handoff.py`
 - `tests/cli_runtime/test_generation_checkout.py`
@@ -333,8 +333,7 @@ Expected REDはcurrent wrapperがline 19でlease前importすること、Git help
 8. Worktree createをno-checkout/pinned materialization/entrypoint-lastへ変更します。
 9. Worktree removeをB EX/original inode/path C preservationへ変更します。
 10. `ConsumerHookRequest`、nonlocking B fd、bootstrap fchdir make runner、existing status/warning/outer exitを実装します。
-11. Provider runtime testsをGREENにしてからmirrorへbyte同期します。
-12. Source/mirror bootstrap SHAを固定し、candidate digestへ反映します。
+11. Provider runtime testsをGREENにし、provider bootstrap/runtime bytesを固定してcandidate digestへ反映します。Dogfoodへは投影しません。
 
 ### 6.5 Narrow verification
 
@@ -368,7 +367,8 @@ Expected result:
 
 - Cooperative lifecycle/runtime/Git/worktree modelがend-to-end GREEN。
 - Bootstrap bytes固定。
-- Provider runtimeとdogfood mirrorはbyte一致。
+- Provider runtime sourceのfocused testsとbootstrap hashが固定。
+- Dogfoodは旧projectionのままで、CP4 artifact proof前には部分同期しない。
 - Packaging/full suiteはCP4待ち。
 
 ### 6.7 Stop condition
@@ -391,21 +391,23 @@ CP3 summaryにreal concurrency process evidence、bootstrap SHA、Git/worktree b
 - CP1–CP3 completion済み。
 - Source/new runtime focused tests GREEN。
 - Old writer absent。
-- Provider/dogfood mirrorは同期候補。
+- Dogfoodは旧projectionのままで、CP4のartifact proof後にだけcomplete candidateへ同期する。
 - Full current gatesとbuilt artifactsは未受入。
 
 ### 7.2 最初のRED test
 
 - `tests/integration/test_provider_lifecycle_dogfood.py::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical`
-- `tests/integration/test_issue_392_acceptance.py::test_t14_old_writer_absent_and_transitional_gate_contract_unchanged`
+- `tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`
 
-Expected REDはversion/package inventory/dogfood/test disposition/provider-ci commandがまだfinal candidateへ整列していないことです。
+Expected REDはpackage inventory/dogfood/test disposition/provider-ci commandがまだfinal candidateへ整列していないことです。Version 0.2.4はCP2で固定済みです。
 
 ### 7.3 Exact owned files
 
-**MODIFY**
+**READ-ONLY**
 
-- `pyproject.toml`
+- `pyproject.toml`の`[project].version=0.2.4`。実buildで追加設定が必要と判明した場合は、exact keyを指定したpacket訂正へ戻る。
+
+**MODIFY**
 - 必要な場合だけ`setup.py`のpackage/stale-prune allowlist
 - `.github/workflows/provider-ci.yml`
 - `README.md`
@@ -420,7 +422,10 @@ Expected REDはversion/package inventory/dogfood/test disposition/provider-ci co
 **NEW**
 
 - `tests/integration/test_provider_lifecycle_dogfood.py`
-- `tests/integration/test_issue_392_acceptance.py`
+
+**MODIFY EXISTING**
+
+- CP2で作成済みの`tests/integration/test_issue_392_acceptance.py`へT14だけを追加
 
 **NO-TOUCH**
 
@@ -430,16 +435,17 @@ Expected REDはversion/package inventory/dogfood/test disposition/provider-ci co
 
 ### 7.4 Implementation order
 
-1. Version 0.2.4、package data、fixture、new package inventoryを整列します。
-2. Wheel/sdistをbuildし、isolated environmentでinstalled packageだけをimportしてcandidate/fixture/bootstrapを検証します。
-3. Provider docs/skillsをnew lifecycleへ更新します。Consumer protected dataとmaintenance windowを明記します。
-4. Provider sourceからdogfood scripts/docs/skillsをbyte同期します。
-5. Existing test filesをtest ArtifactどおりKEEP/REPLACE/RETIREします。Successor GREEN前削除はしません。
-6. Resolved successor nodeidを維持します。
-7. Provider CIのold focused commandをnew lifecycle focused commandへ差し替え、PR-only/Linux-macOS/no-continue-on-error/current full pathsを維持します。
-8. Static acceptanceでold imports/path strings 0、Wire counts、required-fast、15/14/1、243、mirror parityを検証します。
-9. Default fast、current explicit full verifier、platform parityを実行します。
-10. Review findingsを修正し、全変更を一つの#392 PRへまとめます。
+1. CP2で固定済みのversion 0.2.4をread-only確認し、provider package data、fixture、docs、two skills、new package inventoryをcomplete candidateへ整列します。
+2. Provider source testsをGREENにし、complete provider candidate digestを固定します。
+3. 同じsource treeからwheel/sdistをbuildし、isolated environmentでinstalled packageだけをimportしてcandidate/fixture/bootstrap/docs/skillsを検証します。
+4. Artifact proofがGREENになった後だけ、provider sourceからdogfood scripts/docs/two skillsを一括byte projectionします。Partial projectionは禁止します。
+5. T13でsource/wheel/sdist/isolated install/fresh install/dogfood parityを検証します。
+6. Existing test filesをtest ArtifactどおりKEEP/REPLACE/RETIREします。Successor GREEN前削除はしません。
+7. Resolved successor nodeidを維持します。
+8. Provider CIのold focused commandをnew lifecycle focused commandへ差し替え、PR-only/Linux-macOS/no-continue-on-error/current full pathsを維持します。
+9. T14とstatic acceptanceでold imports/path strings 0、Wire counts、required-fast、15/14/1、243、mirror parityを検証します。
+10. Default fast、current explicit full verifier、platform parityを実行します。
+11. Review findingsを修正し、全変更を一つの#392 PRへまとめます。
 
 ### 7.5 Narrow and final verification
 
@@ -517,7 +523,7 @@ Merge後failureでは#395を開始せず、#392 mergeをhuman revertしてB0へ�
 
 | Concern | Applicability / control |
 |---|---|
-| Security/privacy | Applicable。No-follow、owner/mode、fd allowlist、content-free public diagnostics、private stateへuser data/credential非格納をtestする。 |
+| Security/privacy | Applicable。No-follow、owner/mode、fd allowlist、content-free public diagnostics、private stateへuser data/credential非格納をtestする。Wireのclosed continuation二fieldだけはnormalized targetのabsolute pathを含み得るため、任意path field禁止と不要なevidence転載禁止も検証する。 |
 | Blast radius | High。Installer、runtime、Git、worktree、packagingを跨ぐ。Checkpointで局所化するがmergeは一つ。 |
 | Migration | Applicable。Exact-clean 0.2.3 only、human maintenance window、external installer、post-mutation forward recovery。 |
 | Staged rollout | Production feature flag rolloutはN/A。Integration branch B0→B1が唯一のstaged rolloutで、mainへ直接出さない。 |

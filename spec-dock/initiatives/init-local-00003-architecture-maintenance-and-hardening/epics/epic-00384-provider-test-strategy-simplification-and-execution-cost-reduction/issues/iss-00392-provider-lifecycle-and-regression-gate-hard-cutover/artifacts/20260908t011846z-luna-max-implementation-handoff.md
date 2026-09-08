@@ -123,8 +123,8 @@ Expected: new package/projection/Adapterが存在しないためfailし、Wire p
 2. Strict compact JSON parser/serializerとimmutable contractsを実装します。
 3. Six-domain candidate grammarとslot marker注入を実装します。
 4. Verified Git objectだけからlegacy fixtureを生成し、regeneration mismatchをfailさせます。
-5. Repository/euid-bound private namespace、strict stores、bounded inode witness、P0/P1/P2 classifierを実装します。
-6. Linux/macOS native Adapterを実装し、fallback禁止をtestします。
+5. Repository/euid-bound private namespace、strict stores、mode0644 `RECORD-TEMP` witness、bounded inode witness、P0/P1/P2 classifierを実装します。Private schemaのabsolute pathはWireの二種のclosed `rendered_command`だけに許可し、任意path fieldを拒否します。
+6. Linux/macOS native Adapterを実装し、record no-replace/exchange前後のmode0644保存とfallback禁止をtestします。
 7. SH/EX lease primitiveとinherited-fd validatorを追加します。Runtime接続はしません。
 
 ### Verification
@@ -136,7 +136,7 @@ uv run python scripts/maintenance/generate_provider_lifecycle_legacy_fixture.py 
 make lint
 ```
 
-Expected: exit0、generated diff 0、P2 stage inode/bytes unchanged、native fallback references 0、Consumer mutation 0。
+Expected: exit0、generated diff 0、P2 stage inode/bytes unchanged、record no-replace/exchange前後mode0644、exchange residueはoriginal witness一致時だけcleanup、native fallback references 0、Consumer mutation 0。
 
 ### Stop
 
@@ -163,15 +163,17 @@ Foundationへ`ProviderLifecycleEngine`を追加し、init/update/uninstall publi
 - NEW `src/spec_dock/provider_lifecycle/engine.py`
 - MODIFY `src/spec_dock/provider_lifecycle/__init__.py`
 - MODIFY `src/spec_dock/cli.py`の`_parse_args`、`main`とlifecycle adapter。Old helper群はsuccessor GREEN後削除。
+- MODIFY `pyproject.toml`の`[project].version`だけを0.2.4へ更新。
 - DELETE after proof `src/spec_dock/managed_distribution.py`
 - DELETE after proof `src/spec_dock/assets/managed_distribution.json`
 - NEW `tests/unit/provider_lifecycle/test_engine.py`
+- NEW `tests/integration/test_issue_392_acceptance.py`へT12だけを追加。
 - MODIFY/RETIRE exact test families in test ownership Artifact。
 
 ### First RED
 
 ```bash
-uv run pytest -q   tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations   tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero
+uv run pytest -q   tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations   tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero   tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent
 ```
 
 Expected: engine/public route不在またはold ownerへ到達してfail。Protected sentinels test自体は実行可能です。
@@ -181,11 +183,11 @@ Expected: engine/public route不在またはold ownerへ到達してfail。Prote
 1. Read-only admissionとdry-runを実装します。
 2. Prepared ACTIVE→stage→incomplete record→runningの順を実装します。
 3. Roots docs/templates/system/scripts、slots、seeds、verify、ACTIVE ready、terminal recordの順を実装します。
-4. Terminal cleanup、receipt、token replay、response loss/deferred requestを実装します。
+4. Terminal cleanup、receipt、token replay、response loss/deferred requestを実装し、cleanup/deferred `rendered_command`のexact invocation/target round-tripと不要なevidence転載0を検証します。
 5. Exact-clean 0.2.3 migrationとmaintenance-window diagnosticsを実装します。
 6. Tooling-only uninstall/absent recordと`--remove-specs` exit2/mutation0を実装します。
 7. CLIをvalidated `LifecycleResult` emit-only adapterへ切替します。
-8. T06/T07/T12 successorをGREENにします。
+8. T06/T07とexact T12 successorをGREENにします。
 9. Production reference scanが0になった後だけold module/manifest/helper/testを削除します。
 
 ### Verification
@@ -222,9 +224,9 @@ Frozen bootstrapへpre-import SH admissionを入れ、update/uninstallをrelease
 ### Owned files/symbols
 
 - MODIFY provider runtime `src/spec_dock/assets/spec_dock/scripts/spec-dock`
-- MODIFY provider runtime `spec_dock_runtime/{app.py,cli/bootstrap.py,cli/dispatch.py,commands/contracts.py,commands/update.py,commands/uninstall.py,application/contracts.py,application/ports.py,application/set_active.py,application/issue_lifecycle.py,application/worktree.py,infra/git_cli.py,infra/make_cli.py`
-- NEW `spec_dock_runtime/infra/git_helper.py`
-- Mirror copies under `spec-dock/scripts/**` only after provider tests GREEN。
+- MODIFY provider runtime `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{app.py,cli/bootstrap.py,cli/dispatch.py,commands/contracts.py,commands/update.py,commands/uninstall.py,application/contracts.py,application/ports.py,application/set_active.py,application/issue_lifecycle.py,application/worktree.py,infra/git_cli.py,infra/make_cli.py}`
+- NEW `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_helper.py`
+- Dogfood `spec-dock/scripts/**`はCP4 artifact proof前に変更しない。
 - NEW T08–T11 test files in Plan/Test Artifact。
 
 ### First RED
@@ -247,7 +249,7 @@ Expected: current wrapper imports before lease、returns after subprocess、bran
 8. Worktree createを`--no-checkout`、B EX、object materialization、entrypoint-lastへ変更します。
 9. RemoveをB EX、helper lifetime、former-path inode checkへ変更しCを保存します。
 10. Make detect/runをterminal `ConsumerHookRequest`へ変え、nonlocking original-B fd、全lease release後fchdir、outer status compatibilityを実装します。
-11. Provider runtime GREEN後にdogfood runtimeをbyte同期します。
+11. Provider runtime testsをGREENにしてbootstrap/runtime bytesを固定します。Dogfoodへは投影しません。
 
 ### Verification
 
@@ -264,29 +266,32 @@ Lease前import、helper fd lifetime不成立、三種のwriting hookを含むGit
 
 ### Receipt
 
-Bootstrap hash、real process traces、fd allowlist、checkout pin/closure evidence、B/C inode evidence、hook status matrix、provider/dogfood byte parityを返します。CP4を開始しません。
+Bootstrap hash、real process traces、fd allowlist、checkout pin/closure evidence、B/C inode evidence、hook status matrix、dogfood未投影の確認を返します。CP4を開始しません。
 
 ## 6. CP4 concrete packet — Packaging, dogfood and acceptance
 
 ### Objective
 
-Version/package inventoryを0.2.4へ整列し、source→wheel→sdist→isolated install→dogfoodを同一candidateへ収束させます。Test ArtifactどおりKEEP/REPLACE/RETIREし、current gatesを弱めず#392 PR acceptance候補を作ります。
+CP2で固定済みのversion 0.2.4を確認し、complete provider candidate→source GREEN→wheel/sdist→isolated install proof→complete dogfood projectionの順で同一candidateへ収束させます。Test ArtifactどおりKEEP/REPLACE/RETIREし、current gatesを弱めず#392 PR acceptance候補を作ります。
 
 ### Entry state
 
 - CP1–CP3 receipts review済み。
 - Focused Product/runtime tests GREEN。
 - Old production writer absent。
+- Package versionは0.2.4固定済みで、dogfoodは旧projectionのまま。
 - Human merge、B1、#395開始は未実施。
 
 ### Owned files/symbols
 
-- MODIFY `pyproject.toml`、必要時のみ`setup.py` package/stale-prune inventory。
+- READ-ONLY verify `pyproject.toml`の`[project].version=0.2.4`。Package設定不足が判明した場合はexact keyを指定したpacket訂正へ戻る。
+- MODIFY 必要時のみ`setup.py` package/stale-prune inventory。
 - MODIFY `.github/workflows/provider-ci.yml` without trigger/job/protection weakening。
 - MODIFY provider README/migration/reference_worktree and exact dogfood mirrors。
 - MODIFY provider/dogfood two skill slots。
 - MODIFY/DELETE tests exactly per test Artifact。
-- NEW `tests/integration/test_provider_lifecycle_dogfood.py`、`tests/integration/test_issue_392_acceptance.py`。
+- NEW `tests/integration/test_provider_lifecycle_dogfood.py`。
+- MODIFY CP2で作成済みの`tests/integration/test_issue_392_acceptance.py`へT14だけを追加。
 
 ### First RED
 
@@ -294,19 +299,20 @@ Version/package inventoryを0.2.4へ整列し、source→wheel→sdist→isolate
 uv run pytest -q   tests/integration/test_provider_lifecycle_dogfood.py::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical   tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged
 ```
 
-Expected: version/package/dogfood/provider-ci/test dispositionがfinal candidateへ未整列のためfail。
+Expected: package/dogfood/provider-ci/test dispositionがfinal candidateへ未整列のためfail。VersionはCP2で0.2.4固定済みです。
 
 ### Implementation sequence
 
-1. 0.2.4 versionとpackage dataを整列します。
-2. Wheel/sdistをbuildし、checkout fallbackなしisolated installでcandidate/fixture/bootstrapを検証します。
-3. Provider docs/skillsを更新し、maintenance window、protected data、recoveryを記載します。
-4. Providerからdogfoodへcomplete byte projectionします。
-5. Test Artifactのordered registryでtestsを移行し、successor GREEN後だけRETIREします。
-6. Resolved successor、14 active rows、four required-fast、243 timingを再検証します。
-7. Provider CI focused commandだけをnew pathsへ更新し、PR-only/Linux/macOS/SHA assert/no continue-on-errorを維持します。
-8. Focused、default fast、current full verifier、packaging/dogfood、platform parityを実行します。
-9. Whole diff review用evidenceをReportへ記録し、一つの#392 PR候補にします。
+1. CP2で固定済みの0.2.4をread-only確認し、provider package data、fixture、docs、two skillsをcomplete candidateへ整列します。
+2. Provider source testsをGREENにし、complete candidate digestを固定します。
+3. 同じsource treeからwheel/sdistをbuildし、checkout fallbackなしisolated installでcandidate/fixture/bootstrap/docs/skillsを検証します。
+4. Artifact proofがGREENになった後だけproviderからdogfood scripts/docs/two skillsへcomplete byte projectionします。Partial projectionは禁止します。
+5. T13でsource/wheel/sdist/isolated/fresh install/dogfood parityを検証します。
+6. Test Artifactのordered registryでtestsを移行し、successor GREEN後だけRETIREします。
+7. Resolved successor、14 active rows、four required-fast、243 timingを再検証します。
+8. Provider CI focused commandだけをnew pathsへ更新し、PR-only/Linux/macOS/SHA assert/no continue-on-errorを維持します。
+9. Focused、default fast、current full verifier、packaging/dogfood、platform parityを実行します。
+10. Whole diff review用evidenceをReportへ記録し、一つの#392 PR候補にします。
 
 ### Verification
 
