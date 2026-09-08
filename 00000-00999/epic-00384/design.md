@@ -61,6 +61,8 @@ A later Issue may consume an earlier output but may not redefine it. An earlier 
 
 [Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md) is frozen by the parent. Issue #392 is the sole production writer for lifecycle behavior and owns conformance. Issues #395 and #396 are read-only consumers and may neither extend nor reinterpret lifecycle fields, codes, ordering, retry, compatibility or filesystem semantics.
 
+WIR-PREP-001は準備/record初回公開の失敗、bounded prepared authority、元record/自分のincomplete recordの再入場、ready先行公開の順序を固定する。Content review中の親修正は[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従う。旧wire passで改訂後の内容を認証しない。
+
 ### E384-C-004 — Protected data and dogfood
 
 The fixed provider target set, consumer preservation, private owner-bound workspaces and complete-candidate dogfood rule apply to every Issue. Candidate-changing Issues must converge provider and dogfood completely before merge. #395 may change dogfood only when its Product repair changes shipped candidate bytes.
@@ -105,7 +107,7 @@ One final-gate attempt executes one role graph with one Linux canonical body. Th
 
 | State | Source | Required invariant |
 |---|---|---|
-| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; E384-RQ-019/wire and E384-DEC-001/002 resolved; independent review pass under the Rolling-Wave Contract, external freeze receipt and post-pass Issue-body projection readback complete. |
+| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 Product implementation not started (formal selection may already be complete); baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; E384-RQ-019/wire and E384-DEC-001/002 resolved; independent review pass under the Rolling-Wave Contract, external freeze receipt and post-pass Issue-body projection readback complete. |
 | B1 | #392 merge | Complete final lifecycle, shared runtime coordination/handoff/crash proof and dogfood; old lifecycle writer absent; 14 active identities unchanged; transitional gates GREEN. |
 | B2 | #395 merge | 15 resolved, active/approved 0; Cause-appropriate Product/test repairs accepted; transitional gates independently GREEN. |
 | B3 | #396 merge | Final build-once gate and mechanical `E384-QUAL-001` evidence GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |

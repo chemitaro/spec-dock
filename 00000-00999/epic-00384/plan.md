@@ -25,7 +25,7 @@ repository_evidence:
 
 ## 1. 今回の位置づけ
 
-この作業はEpic全体の再評価を完了し、親計画をcommit/pushした後、最初のIssue #392を正式startする。ユーザーが2026-09-08にこの順序を依頼した。Product実装は今回行わず、Issue branchでの詳細化・独立review後に許可する。過去のGPT-5.6/外部Strict passも、直前の限定的GPT-6 review passも、新しい候補のacceptanceに流用しない。
+親計画のcommit/pushと最初のIssue #392の正式startは完了した。現在はユーザー承認のもと、同Issue branchでP392-001/002を親wire v12へ反映し、続けて#392の詳細R/D/Pを作成する。Product実装は今回行わず、Issue branchでの詳細化・独立review後に許可する。過去のGPT-5.6/外部Strict passも、直前の限定的GPT-6 review passも、新しい候補のacceptanceに流用しない。
 
 目的はprovider状態数・重複検証・実行コストの削減であり、文書数やIssue数を増やすことではない。実装・検証単位は#392 → #395 → #396の三件を維持する。各Issue PRをEpic branchへ人間が順次mergeし、最後にmainへ一度mergeする。
 
@@ -37,7 +37,7 @@ repository_evidence:
 - SpecDock `issue start` はbranch/activeの正式選択であり、Product実装開始許可ではない。
 - Issue詳細R/D/P、Luna Max handoff、独立reviewが揃うまでProduct実装を行わない。formal startだけ、Epic passだけ、dependency readyだけを実装許可にしない。
 
-以前のstart/checkout保留は、2026-09-08の明示的な開始依頼で解除された。G0のreview・commit/push・freeze/projection確認後に#392を正式startする。#395/#396を先にstartしない。
+以前のstart/checkout保留は、2026-09-08の明示的な開始依頼で解除された。#392の正式startを繰り返さない。改訂候補の内容review後、Product実装の開始前にその候補のcommit/push・freeze/projectionを確認する。#395/#396を先にstartしない。
 
 ## 3. 依存順と受入条件
 
@@ -97,6 +97,10 @@ Replacement consumers/providersを先に成立させ、old consumer 0を確認�
 Issue PR baseは常にEpic branch。人間だけがmerge/revert/required-context設定を行う。Integration rollbackはwhole Issue merge単位で、後続作業があれば停止して依存suffixの逆順revertまたはowned境界のforward-fixを選ぶ。Agentは未merge作業を勝手に削除しない。
 
 Dependency/identity不一致、未決判断、非GREEN、保護データ変化、未説明のfailure、他Issueの責務、evidence不足、context gap、回復不能の曖昧さでは停止して親へ戻す。実装者にProduct/Policy判断を推測させない。
+
+### 9.1 直列実装中の親修正
+
+[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従い、Product未着手の#392 branchで親修正を行う。親とIssueの内容reviewはworking-tree manifestで固定できるが、公開freezeの完了は別証拠とする。後続Issueの責務は参照確認だけ行う。Review完了後も未公開候補をLuna Maxへ実装委譲しない。
 
 ## 10. 完了
 

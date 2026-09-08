@@ -4,7 +4,9 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
-状態: "draft"
+状態: "draft-parent-return"
+詳細化状態: "blocked-by-parent-wire"
+親差し戻し: ["P392-001", "P392-002"]
 最終更新: "2026-09-08"
 依存:
   - "requirement.md"
@@ -14,11 +16,11 @@ ID: "iss-00392"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: false
 repository_evidence:
-  role: "authoring-source-provenance"
+  role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
-  branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
-  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
+  branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
+  sha: "14a72044738ce698c3113a0ee70f052015e3be8a"
+  tree: "af8e50ed3e20e5a03ef1e2a46332142befa1251f"
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
@@ -26,6 +28,8 @@ repository_evidence:
 ## 1. Design objective
 
 Lifecycle state、mutation authority、public wire、filesystem recovery、migration and dogfoodを一つのProduct boundaryに置き、regression repairとprovider-gate policyを別writerへ分離する。
+
+**詳細設計は未完了。** 現行sourceとの照合で親wireの不足が確定したため、closed result/schemaや復旧手順をコーダーの裁量で補わない。[調査証拠](artifacts/20260908t010201z-issue-392-elaboration-parent-return.md) §5〜§6に実在する編集接点と未採用のmodule/handoff案を保存した。これらは親修正後の詳細化入力であり、実装指示ではない。
 
 ## 2. Current / target
 
@@ -97,4 +101,6 @@ At Issue start, current repository topology determines concrete modules、symbol
 | Current policy breaks after old test removal | Referential integrity is part of B1 GREEN. |
 | Unsafe recovery | Wire and parent filesystem contracts are immutable. |
 
-Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。
+親の `E384-DEC-001` / `E384-DEC-002` は採用済みのまま維持する。2026-09-08に正式startし、このIssue branchで詳細化を開始した。その結果、通常のstage I/O失敗と最初のincomplete record公開失敗を親wireで表現できない `P392-001/002` を確認した。[調査証拠・親への差し戻し](artifacts/20260908t010201z-issue-392-elaboration-parent-return.md)を参照。
+
+親契約を変更する承認は未取得であり、修正を仮採用しない。過去の `owner_decisions_required=[]` とEpic review passは、今回新しく見つかった不足の解消やIssue実装許可を意味しない。親の修正・独立review・freeze後に詳細化を再開し、完全なR/D/PとLuna Max handoffの独立reviewまで `実装開始許可: false` を維持する。

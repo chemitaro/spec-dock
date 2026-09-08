@@ -34,6 +34,8 @@ Elaboration may not change:
 
 A required change to any item is a parent stop, not an elaboration choice。
 
+2026-09-08、P392-001/002についてユーザーが親修正を明示承認した。[準備失敗ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に限り、選択済み#392 branchで親を改訂する。内容reviewにpassした親manifestを固定してIssue詳細化へ進めるが、Product実装前にはclean pushed candidateのfreeze/projectionを別途確認する。再start/再分岐は不要で、3 Issue直列実装とhuman mergeを維持する。
+
 ## 3. Start and elaboration gate inputs
 
 Before formal Issue start:
@@ -107,6 +109,6 @@ The return payload identifies exact contract ID、expected/actual evidence、sco
 
 ## 8. Current status
 
-The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies the 2026-09-08 whole-plan changes. No implementation-ready elaboration has been accepted for #392、#395 or #396. #392 is dependency-ready. Both E384-DEC-001/002 were adopted by the user. G0 still requires the exact candidate review/publication receipts. The explicit request to start #392 has been received; after G0, formal start selects its branch in this same worktree, followed by elaboration and independent implementation-readiness review.
+The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies the 2026-09-08 whole-plan changes. #392は正式start済みで、v12親修正と詳細化を進めている。#395/#396はcontract-level draftのまま。Issue内容のreadiness reviewと公開freezeを別々に確認する。 Both E384-DEC-001/002 were adopted by the user. G0 still requires the exact candidate review/publication receipts. The explicit request to start #392 has been executed in this same worktree; continue elaboration and independent implementation-readiness review without repeating scope selection.
 
 `owner_decisions_required=[]`. Both decisions are adopted; do not reopen them without new evidence. See [whole-plan reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md).

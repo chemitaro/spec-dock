@@ -1,6 +1,6 @@
 ---
 種別: Normative Artifact
-ID: "provider-lifecycle-wire-contract-v11"
+ID: "provider-lifecycle-wire-contract-v12"
 タイトル: "Provider Lifecycle Wire Contract"
 状態: "parent-contract-candidate"
 最終更新: "2026-09-08"
@@ -15,7 +15,9 @@ repository_evidence:
 
 # Provider Lifecycle Wire Contract
 
-> **2026-09-08 親契約改訂:** `E384-DEC-001` と `E384-DEC-002` はユーザー採用済みである。v11は初回だけの停止移行、以後のruntime/lifecycle共有coordination、同世代checkout、変更先worktreeの排他と公開/handoff境界を§16で固定する。v10のrecord/cleanup/replay契約を維持し、pre-observationのclosed code二つ・関係行四つ・public JSON例二つを追加した。前候補のwire-only fail/whole-plan blockedは履歴として保存し、本候補の独立review・公開freezeは候補hashに紐づく外部receiptで別に証明する。本書の存在だけをIssue startまたは実装許可のreceiptにしない。詳しくは[全体再評価ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md)。
+> **2026-09-08 v12 親契約改訂:** ユーザーがP392-001/002の親修正を承認した。準備・初期レコード公開の失敗をWIR-PREP-001で閉じる。旧35 public goldensと4 record goldensは保持し、closed codeを1個、relationを16行、public goldenを5個追加する。詳細は[準備失敗ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)。以下のv11採用経緯は履歴であり、v12のreview/freezeは別候補として証明する。
+
+> **v11履歴:** `E384-DEC-001` と `E384-DEC-002` はユーザー採用済みである。v11は初回だけの停止移行、以後のruntime/lifecycle共有coordination、同世代checkout、変更先worktreeの排他と公開/handoff境界を§16で固定する。v10のrecord/cleanup/replay契約を維持し、pre-observationのclosed code二つ・関係行四つ・public JSON例二つを追加した。前候補のwire-only fail/whole-plan blockedは履歴として保存し、本候補の独立review・公開freezeは候補hashに紐づく外部receiptで別に証明する。本書の存在だけをIssue startまたは実装許可のreceiptにしない。詳しくは[全体再評価ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md)。
 
 ## 1. Authority and closed-world rule
 
@@ -30,7 +32,7 @@ repository_evidence:
 | Issue #395 | Read-only consumer. Product defect repairs must preserve lifecycle semantics and serialized values. |
 | Issue #396 | Read-only consumer. Provider-gate and policy cutover may verify but not redefine this wire. |
 
-Any semantic change requires a superseding parent ADR, revalidation of affected Issue drafts, dependency-chain restart from the affected state and independent review under the Rolling-Wave Contract. When Issue boundaries or copied values change, regenerate those draft portions. Before any Issue implementation is accepted, the restart point is B0; unchanged reference-only Issue drafts need no invented implementation detail. Revision v10 was governed by [Preimplementation Clarifications ADR](20260907t223933z-adr-preimplementation-recovery-and-qualification-clarifications.md); v11 adds the parent-adopted coordination boundary under [Whole-plan Reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md). Rolling-wave elaboration may add implementation details and tests but cannot change this artifact.
+Any semantic change requires a superseding parent ADR, revalidation of affected Issue drafts, dependency-chain restart from the affected state and independent review under the Rolling-Wave Contract. When Issue boundaries or copied values change, regenerate those draft portions. Before any Issue implementation is accepted, the restart point is B0; unchanged reference-only Issue drafts need no invented implementation detail. Revision v10 was governed by [Preimplementation Clarifications ADR](20260907t223933z-adr-preimplementation-recovery-and-qualification-clarifications.md); v11 adds the parent-adopted coordination boundary under [Whole-plan Reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md). The user-authorized v12 revision is governed by [Preparation Failure ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md). It is authored while #392 is selected but before any Product implementation. Rolling-wave elaboration may add implementation details and tests but cannot change this artifact.
 
 ## 2. Canonical scalar and serialization conventions
 
@@ -53,19 +55,19 @@ The normative finite inventory is exact:
 | Item | Count |
 |---|---:|
 | public status values | 6 |
-| public code values | 40 |
+| public code values | 41 |
 | `phase` values | 23 |
 | `last_completed_phase` values | 24 |
 | durable record goldens | 4 |
-| complete code/context relation rows | 152 |
-| public JSON review goldens | 35 |
+| complete code/context relation rows | 168 |
+| public JSON review goldens | 40 |
 
-The implementation test extracts the §10 table and all fenced JSON review goldens from this file, verifies these counts, parses every JSON block, and asserts one terminal LF. It additionally parameterizes all seven cleanup-warning rows and requires `retry_command == continuation.next_command == active.cleanup_retry_command` with a matching hidden token. The thirty-five public JSON review goldens include two pre-observation coordination outcomes; the existing thirty-three and the four durable goldens are retained byte-for-byte. Warning tokenization remains proven by the seven finite matrix rows. WIR-COORD-004's four runtime bootstrap diagnostics are a separate pre-parser surface, not four additional lifecycle codes or lifecycle JSON goldens. A count drift is a specification/test defect and is not auto-accepted.
+The implementation test extracts the §10 table and all fenced JSON review goldens from this file, verifies these counts, parses every JSON block, and asserts one terminal LF. It additionally parameterizes all seven cleanup-warning rows and requires `retry_command == continuation.next_command == active.cleanup_retry_command` with a matching hidden token. The forty public JSON review goldens include five preparation outcomes; the existing thirty-five and the four durable goldens are retained byte-for-byte. Warning tokenization remains proven by the seven finite matrix rows. WIR-COORD-004's four runtime bootstrap diagnostics are a separate pre-parser surface, not four additional lifecycle codes or lifecycle JSON goldens. A count drift is a specification/test defect and is not auto-accepted.
 
 Table expressions are exact value functions:
 
 - `request.candidate_digest`: validated packaged candidate digest selected for the invocation.
-- `record.candidate_digest` / `record.seed_policy` / `record.operation`: exact values parsed from the valid record.
+- `record.candidate_digest` / `record.seed_policy` / `record.operation`: exact values parsed from the valid record. In the existing resume-mismatch rows only, WIR-PREP-001 extends an "incomplete operation" context to a validated prepared ACTIVE: these three values then come from that bound recovery tuple, without asserting that an incomplete Consumer record exists. All non-resume rows keep their literal record meaning.
 - `legacy_fixture.aggregate_digest`: exact deterministic aggregate of the recognized `0.2.3` roots/slots.
 - `owned_target_digest`: `record.candidate_digest` for final-format state, otherwise `legacy_fixture.aggregate_digest` for exact legacy state.
 - `null`: public JSON null. These expressions are not implementation choices.
@@ -324,6 +326,38 @@ complete
 - Every blocked row uses its exact §10 pair. No derived rejected phase exists.
 
 Parser errors and `uninstall --remove-specs` are request-validation outcomes and do not enter lifecycle cleanup. Every other parser-valid lifecycle invocation normalizes its echo before WIR-COORD-001 repository locking. Coordination admission precedes target classification, ACTIVE/receipt observation, stage preparation and every cleanup/replay path:
+
+
+### WIR-PREP-001 — Preparation admission and initial-record failure
+
+This section closes preparation failures only; it does not catch arbitrary lifecycle exceptions. The finite new code is `lifecycle-preparation-failed`. A caught expected filesystem resource/access/I/O failure is mapped only at the operations listed below. Root/parent rebinding, unsupported type, hard links, foreign owner, record/schema invalidity, digest mismatch and unavailable native/lock capabilities retain their existing specific diagnostics and precedence. Programming defects remain untyped process/test defects.
+
+**Owner-bound namespace and re-entry.** The private namespace remains outside Consumer data on the same filesystem. Its path is a deterministic function of the bound repository identity and effective user. Its fixed directory chain must be no-follow, owned by that user, mode0700, and on the bound filesystem; creation uses exclusive mkdir and fsync, then binding verification. An exactly bound empty reserved directory left by an interrupted mkdir is valid preparation, not foreign payload. Only the fixed metadata slots and their individually named atomic-write temporary slots are provider bookkeeping; regular/link1/user-owned/mode0600 temporary slots may contain incomplete bytes and may be discarded and recreated after owner/binding validation. An unlisted entry, unsafe directory, foreign owner or unsafe metadata/temp type is preserve-and-block, never a reason to sweep the directory. The Issue fixes the physical path and finite private filenames before implementation. Do not create a stage payload before a valid prepared ACTIVE is durable. Thus an interruption before ACTIVE publication leaves at most this re-enterable bounded namespace/bookkeeping, not an unregistered payload tree. No directory scan discovers other repositories, historical generations or cleanup candidates.
+
+**Prepared operation.** Complete nonmutating admission determines the operation/candidate/seed tuple, result family and exact original record-or-absence before recording a fresh generation. Invalidate an old valid completion receipt only at the existing WIR-CLEANUP-002 accepted new-operation boundary. Atomically publish/fsync `ACTIVE.state=prepared` before stage payload creation or any Consumer write. It binds the tuple/generation, registered fixed stage entries, original fixed-root identities, original record bytes/identity-or-absence, the expected incomplete record bytes, and any same-generation bootstrap-container identity. These are bounded operation witnesses, not per-file history, arbitrary action checkpoints or a rollback image.
+
+A failure publishing prepared ACTIVE has no stage payload and no Consumer mutation. After the I/O condition is repaired, the exact ordinary retry may establish ACTIVE afresh; existing validated prepared authority instead retains its tuple and generation. New candidate bytes may be re-read, but a mismatching tuple does not replace prepared authority. Mismatch uses the existing operation/candidate/seed diagnostics and `stage-owner-mismatch` where appropriate. The diagnostics referring to an incomplete operation include this durable prepared operation; they do not imply that a Consumer record already exists.
+
+**Prepared re-entry.** A no-token request must resolve to the same operation/candidate/seed tuple. Compare the bound target to either (a) the original record-or-absence and fixed-root witnesses or (b) this generation's exact expected incomplete record and still-unpublished fixed roots. Validate both bytes and safe identity; case (b) permits the atomically published replacement inode, not an arbitrary content-equal foreign substitution. The record publication temporary inode is bound before rename in the fixed private witness; it is not a per-file payload journal. If (b) is present after a rename/fsync interruption, re-fsync/revalidate it before advancing. No root is published/detached while ACTIVE remains prepared. Stage payload may be rebuilt only within its already registered, safely bound entries; foreign data is preserved. A preserved same-generation bootstrap container is re-bound, not recreated or inferred from seed presence.
+
+After expected incomplete record and its parent are fsynced and revalidated, atomically publish/fsync `ACTIVE.state=running`, then begin the fixed root sequence. Failure updating ACTIVE at this boundary is still an initial-record preparation failure. Prepared plus expected incomplete is a valid re-entry pair. Neither prepared nor running plus an old terminal record is interpreted as completed work. Once all target content is verified, durably set ACTIVE to `ready` **before** publishing the terminal record; ready plus incomplete retries terminal publication, and ready plus the matching terminal record enters WIR-CLEANUP-001. This closes same-candidate updates whose old and new terminal bytes can be identical.
+
+**Closed failure regions and result selection.**
+
+| Region | Exact boundary | Result |
+|---|---|---|
+| P0 | Expected I/O while establishing/reading/fsyncing initial private authority, before it can be trusted and before Consumer writes. | §10 preflight apply/dry-run rows; operation/digest/policy null; no retry; Consumer mutation false. Invalid owner/type uses the two preflight stage-owner-mismatch rows, not this code. |
+| P1 | After nonmutating candidate/tuple admission, prepared ACTIVE publication and candidate/tombstone stage mkdir/write/fsync, before bootstrap or incomplete publication. | Four §10 candidate-staging rows; Consumer mutation false; exact ordinary tuple retry. No payload exists without durable prepared ACTIVE. |
+| P2a | Initial record temporary write/rename/fsync or prepared-to-running update fails, and the original Consumer pre-state is still exact: no same-generation container remains created and no expected incomplete record has been published. | Four blocked §10 publish-incomplete-record rows, empty actions, exact ordinary tuple retry. |
+| P2b | The same P2 failure with a same-generation created bootstrap container remaining or own expected incomplete record visible/published (including rename success with parent fsync failure). | Four partial_failure §10 publish-incomplete-record rows and AP-PREP-PARTIAL; exact ordinary tuple retry. |
+
+For P2 the flag describes whether this prepared operation has left a Consumer mutation relative to its recorded original state, including a previous interrupted attempt. Private namespace/stage writes alone never make this flag true. Inability to verify ownership/binding or distinguish the recorded original versus own publication uses the existing safety failure, preserving data; it is not guessed as P2a. P0 is an unadmitted current invocation and does not assert that a previous operation never mutated the Consumer.
+
+The preceding table cannot replace a terminal cleanup result. Once matching terminal cleanup authority is established, failures persisting a desired request, reconciling ACTIVE, removing owned stage, publishing/replaying a completion receipt, or unlinking ACTIVE keep WIR-CLEANUP-001/002 and continuation-owner precedence. The four P1 and eight P2 rows apply only to apply operations. Uninstall dry-run observes prepared state without resuming it: when the original/expected-incomplete state is a validated uninstall preparation, report the ordinary remaining uninstall plan; another prepared operation is a resume-operation-mismatch. Do not capture a desired request as deferred terminal cleanup for a prepared operation.
+
+All preparation retries are non-tokenized WIR-TEXT-001 commands. A token is valid only for already-defined terminal cleanup/replay; prepared/running never accept it as a preparation bypass. No retry queue, implicit operation switch, auto rollback or private-state manual deletion is introduced.
+
+Required fault evidence includes every P0/P1 mkdir/write/fsync boundary, initial ACTIVE before/after durable publication, expected incomplete record before/after rename and parent fsync, prepared-to-running publication failure, same-candidate update, fresh bootstrap retained versus unchanged ready pre-state, interruption before/after ACTIVE ready and terminal record, token rejection during preparation, safe namespace/temp re-entry, and foreign/malformed state preservation. Each uses the exact §10 outcome and repeats the exact continuation when present until the I/O condition is repaired and ready/tooling-absent is reached.
 
 ### WIR-CLEANUP-001 — Invocation role, durable desired request and cleanup-only return
 
@@ -607,6 +641,23 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 | `terminal-cleanup-completed` | receipt-only token replay `uninstall-apply-keep; specs_mode=keep; deferred=present` | `completed` | `apply` | `true` | `receipt.operation` | `receipt.candidate_digest` | `receipt.seed_policy` | false | false | `complete` | `cleanup-stage` | `null` | `empty` | 0 | `CLEANUP-REPLAY-DEFERRED` |
 | `terminal-cleanup-completed` | receipt-only token replay `uninstall-apply-keep; specs_mode=keep; deferred=null` | `completed` | `apply` | `true` | `receipt.operation` | `receipt.candidate_digest` | `receipt.seed_policy` | false | false | `complete` | `cleanup-stage` | `null` | `empty` | 0 | `CLEANUP-REPLAY-NONE` |
 
+| `lifecycle-preparation-failed` | `initial authority I/O/apply` | `blocked` | `apply` | true | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | `1` | `NONE` |
+| `stage-owner-mismatch` | `initial private authority/apply` | `blocked` | `apply` | true | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | `1` | `NONE` |
+| `lifecycle-preparation-failed` | `initial authority I/O/dry-run` | `blocked` | `dry-run` | false | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | `1` | `NONE` |
+| `stage-owner-mismatch` | `initial private authority/dry-run` | `blocked` | `dry-run` | false | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | `1` | `NONE` |
+| `lifecycle-preparation-failed` | `install/create-if-absent/staging` | `blocked` | `apply` | true | `install` | `request.candidate_digest` | `create-if-absent` | false | false | `candidate-staging` | `preflight` | `install/create-if-absent retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `install/create-if-absent/initial-record/original-state` | `blocked` | `apply` | true | `install` | `request.candidate_digest` | `create-if-absent` | false | false | `publish-incomplete-record` | `bootstrap-container` | `install/create-if-absent retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `install/create-if-absent/initial-record/consumer-mutated` | `partial_failure` | `apply` | true | `install` | `request.candidate_digest` | `create-if-absent` | true | false | `publish-incomplete-record` | `bootstrap-container` | `install/create-if-absent retry` | `AP-PREP-PARTIAL` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `install/preserve-only/staging` | `blocked` | `apply` | true | `install` | `request.candidate_digest` | `preserve-only` | false | false | `candidate-staging` | `preflight` | `install/preserve-only retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `install/preserve-only/initial-record/original-state` | `blocked` | `apply` | true | `install` | `request.candidate_digest` | `preserve-only` | false | false | `publish-incomplete-record` | `bootstrap-container` | `install/preserve-only retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `install/preserve-only/initial-record/consumer-mutated` | `partial_failure` | `apply` | true | `install` | `request.candidate_digest` | `preserve-only` | true | false | `publish-incomplete-record` | `bootstrap-container` | `install/preserve-only retry` | `AP-PREP-PARTIAL` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `update/preserve-only/staging` | `blocked` | `apply` | true | `update` | `request.candidate_digest` | `preserve-only` | false | false | `candidate-staging` | `preflight` | `update retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `update/preserve-only/initial-record/original-state` | `blocked` | `apply` | true | `update` | `request.candidate_digest` | `preserve-only` | false | false | `publish-incomplete-record` | `candidate-staging` | `update retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `update/preserve-only/initial-record/consumer-mutated` | `partial_failure` | `apply` | true | `update` | `request.candidate_digest` | `preserve-only` | true | false | `publish-incomplete-record` | `candidate-staging` | `update retry` | `AP-PREP-PARTIAL` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `uninstall/preserve-only/staging` | `blocked` | `apply` | true | `uninstall` | `owned_target_digest` | `preserve-only` | false | false | `candidate-staging` | `preflight` | `uninstall retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `uninstall/preserve-only/initial-record/original-state` | `blocked` | `apply` | true | `uninstall` | `owned_target_digest` | `preserve-only` | false | false | `publish-incomplete-record` | `candidate-staging` | `uninstall retry` | `empty` | `1` | `LIFECYCLE-RETRY` |
+| `lifecycle-preparation-failed` | `uninstall/preserve-only/initial-record/consumer-mutated` | `partial_failure` | `apply` | true | `uninstall` | `owned_target_digest` | `preserve-only` | true | false | `publish-incomplete-record` | `candidate-staging` | `uninstall retry` | `AP-PREP-PARTIAL` | `1` | `LIFECYCLE-RETRY` |
+
 No other code/variant/relation is valid.
 ## 11. Retry, continuation, messages and guidance
 
@@ -636,6 +687,7 @@ Cleanup warning: `Provider tooling reached the requested terminal state, but the
 
 | Code | Exact error string |
 |---|---|
+| `lifecycle-preparation-failed` | `Lifecycle preparation could not be completed; preserve the current state and follow the continuation object exactly.` |
 | `already-initialized` | `SpecDock tooling is already installed; use init --force or update.` |
 | `tooling-not-installed` | `SpecDock tooling is not installed for this target.` |
 | `installation-record-invalid` | `The SpecDock installation record is invalid.` |
@@ -671,7 +723,8 @@ Success/planned codes, including `terminal-cleanup-completed`, have no error. Cl
 ### WIR-TEXT-003 — Guidance
 
 - `active-legacy-recovery`: `Run the last compatible SpecDock package with the same legacy operation until its recovery markers are cleared.` then `Do not delete, rename, or convert legacy recovery files manually.`
-- Lifecycle partial: `Run continuation.next_command to resume the exact lifecycle operation.` then `Do not switch operation, candidate package, or seed policy.`
+- Lifecycle partial (`install-partial-failure`, `update-partial-failure`, `uninstall-partial-failure` only): `Run continuation.next_command to resume the exact lifecycle operation.` then `Do not switch operation, candidate package, or seed policy.`
+- `lifecycle-preparation-failed`: empty array in every region/status; its continuation alone owns the next action.
 - Cleanup warning: `Run continuation.next_command to finish owned stage cleanup.` then `The requested terminal tooling state is already durable.`
 - Cleanup failure with deferred request: `Run continuation.next_command to retry owned stage cleanup.` then `After cleanup succeeds, run continuation.after_cleanup_command.` then `The requested terminal tooling state is already durable.`
 - Cleanup failure without deferred request: `Run continuation.next_command to retry owned stage cleanup.` then `No lifecycle request is pending after cleanup.` then `The requested terminal tooling state is already durable.`
@@ -735,6 +788,13 @@ Finite action profiles:
 6. `terminal-cleanup-completed` has exactly one action: `@provider-stage`, category `stage`, status `completed`, reason `candidate-stage-cleanup`; both path arrays are empty.
 7. `terminal-cleanup-failed` has exactly one action: `@provider-stage`, category `stage`, status `failed`, reason `candidate-stage-cleanup`; `failed_paths=["@provider-stage"]`, `pending_paths=[]`.
 8. `failed_paths`/`pending_paths` derive exactly from action statuses and target order. Blocked/error arrays are empty.
+
+
+### WIR-ACT-006 — Initial-record failure actions
+
+`AP-PREP-PARTIAL` has exactly one failed row: `spec-dock/spec-dock.version,record,failed,incomplete-record-publish`. Include the shared container as completed/fresh-container-create only if this generation created it, otherwise preserved/shared-container-preserve. No provider root/slot has been published or detached at this boundary.
+
+For install/update, each of the six fixed targets is pending, using candidate-root-create/candidate-slot-create when absent in the accepted original observation, otherwise candidate-root-replace/candidate-slot-replace. For uninstall, each original present fixed target is pending/owned-root-remove or owned-slot-remove; each absent target is preserved/owned-root-absent or owned-slot-absent. Preserve-only seeds are preserved/preserve-only-seed. Create-if-absent seeds are preserved/consumer-seed-present when already present, otherwise pending/fresh-seed-create; include absent required .github/.github/workflows parents as pending/container/fresh-container-create, and omit their rows when already present. End with pending `@provider-stage,stage,pending,candidate-stage-cleanup`. Do not expose temporary paths or add consumer-data rows. Use TARGET_PATH_ORDER and derived summary/failed/pending exactly. P0/P1/P2a remain empty-action blocked results regardless of private writes.
 
 ## 13. JSON goldens
 
@@ -950,6 +1010,36 @@ Digest fixture is 64 lowercase `d` characters. Every block is independently pars
 {"schema_version":1,"target":"/tmp/consumer","mode":"dry-run","apply":false,"specs_mode":null,"status":"blocked","code":"repository-coordination-unavailable","operation":null,"candidate_digest":null,"seed_policy":null,"mutation_started":false,"bootstrap_rolled_back":false,"phase":"preflight","last_completed_phase":"request-validation","retry_command":null,"continuation":{"next_action":"none","next_command":null,"after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["Required repository coordination is unavailable; no operation was executed."]}
 ```
 
+### WIR-GOLDEN-P1 — Initial authority I/O (apply)
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"blocked","code":"lifecycle-preparation-failed","operation":null,"candidate_digest":null,"seed_policy":null,"mutation_started":false,"bootstrap_rolled_back":false,"phase":"preflight","last_completed_phase":"request-validation","retry_command":null,"continuation":{"next_action":"none","next_command":null,"after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["Lifecycle preparation could not be completed; preserve the current state and follow the continuation object exactly."]}
+```
+
+### WIR-GOLDEN-P2 — Update staging I/O
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"blocked","code":"lifecycle-preparation-failed","operation":"update","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"candidate-staging","last_completed_phase":"preflight","retry_command":"spec-dock update -- /tmp/consumer","continuation":{"next_action":"run-request","next_command":"spec-dock update -- /tmp/consumer","after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["Lifecycle preparation could not be completed; preserve the current state and follow the continuation object exactly."]}
+```
+
+### WIR-GOLDEN-P3 — Update initial-record failure without Consumer mutation
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"blocked","code":"lifecycle-preparation-failed","operation":"update","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":false,"bootstrap_rolled_back":false,"phase":"publish-incomplete-record","last_completed_phase":"candidate-staging","retry_command":"spec-dock update -- /tmp/consumer","continuation":{"next_action":"run-request","next_command":"spec-dock update -- /tmp/consumer","after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["Lifecycle preparation could not be completed; preserve the current state and follow the continuation object exactly."]}
+```
+
+### WIR-GOLDEN-P4 — Update initial-record failure after own record publication
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"partial_failure","code":"lifecycle-preparation-failed","operation":"update","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"preserve-only","mutation_started":true,"bootstrap_rolled_back":false,"phase":"publish-incomplete-record","last_completed_phase":"candidate-staging","retry_command":"spec-dock update -- /tmp/consumer","continuation":{"next_action":"run-request","next_command":"spec-dock update -- /tmp/consumer","after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":["spec-dock/spec-dock.version"],"pending_paths":["spec-dock/docs","spec-dock/templates","spec-dock/system","spec-dock/scripts",".agents/skills/spec-dock",".agents/skills/spec-dock-grill-with-docs","@provider-stage"],"summary":{"planned":0,"completed":0,"preserved":3,"pending":7,"failed":1,"warnings":0},"actions":[{"path":"spec-dock","category":"container","status":"preserved","reason":"shared-container-preserve"},{"path":"spec-dock/spec-dock.version","category":"record","status":"failed","reason":"incomplete-record-publish"},{"path":"spec-dock/docs","category":"root","status":"pending","reason":"candidate-root-replace"},{"path":"spec-dock/templates","category":"root","status":"pending","reason":"candidate-root-replace"},{"path":"spec-dock/system","category":"root","status":"pending","reason":"candidate-root-replace"},{"path":"spec-dock/scripts","category":"root","status":"pending","reason":"candidate-root-replace"},{"path":".agents/skills/spec-dock","category":"slot","status":"pending","reason":"candidate-slot-replace"},{"path":".agents/skills/spec-dock-grill-with-docs","category":"slot","status":"pending","reason":"candidate-slot-replace"},{"path":"spec-dock/.gitignore","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":".github/workflows/ci.yml","category":"seed","status":"preserved","reason":"preserve-only-seed"},{"path":"@provider-stage","category":"stage","status":"pending","reason":"candidate-stage-cleanup"}],"guidance":[],"warnings":[],"errors":["Lifecycle preparation could not be completed; preserve the current state and follow the continuation object exactly."]}
+```
+
+### WIR-GOLDEN-P5 — Initial authority I/O (explicit keep dry-run)
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"dry-run","apply":false,"specs_mode":"keep","status":"blocked","code":"lifecycle-preparation-failed","operation":null,"candidate_digest":null,"seed_policy":null,"mutation_started":false,"bootstrap_rolled_back":false,"phase":"preflight","last_completed_phase":"request-validation","retry_command":null,"continuation":{"next_action":"none","next_command":null,"after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["Lifecycle preparation could not be completed; preserve the current state and follow the continuation object exactly."]}
+```
+
 ## 14. Public text
 
 Init/update clean success remains `spec-dock: ok (init) -> /tmp/consumer
@@ -966,6 +1056,8 @@ after-cleanup: ${AFTER_COMMAND_OR_NONE}
 `. Values use the continuation object; null is rendered `none`. A displayed cleanup retry includes the hidden token exactly as supplied by `continuation.next_command`; text never strips or reconstructs it.
 
 For init/update coordination admission failures (`repository-operation-busy`, `repository-coordination-unavailable`, or pre-observation `unsafe-repository-binding`), stdout is empty; stderr is exactly `error: ${code}: ${WIR-TEXT-002 error}\n`, with one terminal LF and exit 1. There is no retry/next line because continuation is NONE.
+
+Init/update `lifecycle-preparation-failed` writes no stdout and exactly `error: lifecycle-preparation-failed: Lifecycle preparation could not be completed; preserve the current state and follow the continuation object exactly.\nnext: ${NEXT_COMMAND_OR_NONE}\n` to stderr, exit 1. The command is taken from continuation; null renders `none`. Guidance is empty for this code, including its partial rows; do not apply the older lifecycle-partial guidance to it. Uninstall uses its ordinary ordered text/JSON renderer for the same code and result.
 
 Uninstall text exact line order:
 
@@ -993,7 +1085,7 @@ Action, guidance, warning and error lines follow in array order. JSON mode emits
 
 Required tests additionally cover every WIR-CLEANUP-002 fault boundary and all six receipt-only replay rows, including zero mutation and correct continuation. Required tests include desired uninstall during old install cleanup; cleanup failure -> tokenized retry -> deferred uninstall; no-token desired update/init-force distinct from the tokenized base form; cleanup retry with no deferred request; a third explicit command preserving the first deferred request; crash after ACTIVE update/unlink; and table-driven continuation rendering for all seven invocation IDs.
 
-Table-driven tests enumerate all 152 §10 rows and all 40 codes and reject every unlisted relation; all seven actual invocation echoes for both terminal-cleanup success and failure; cleanup-only return/no-dispatch; all sequences/partial and mandatory-cleanup pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 35 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact terminal-cleanup crash/retry cases and the complete Issue #392 lifecycle/dogfood acceptance state.
+Table-driven tests enumerate all 168 §10 rows and all 41 codes and reject every unlisted relation; all seven actual invocation echoes for both terminal-cleanup success and failure; cleanup-only return/no-dispatch; all sequences/partial and mandatory-cleanup pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 40 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact terminal-cleanup crash/retry cases and the complete Issue #392 lifecycle/dogfood acceptance state.
 
 Normative trace: Epic E384-RQ-004–006,008–009,019; Issue I392-RQ-002–009; cross-Issue ownership WIR-OWN-001. Required concurrency/admission proof is additionally fixed in WIR-COORD-006 below. Issues #395 and #396 consume this artifact read-only. Owner decisions required: none.
 

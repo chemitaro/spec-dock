@@ -58,7 +58,9 @@ GREEN is not only a checkmark. It requires:
 
 ### B0 — Parent freeze
 
-Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register、rolling-wave contract and `E384-QUAL-001` are coherent; E384-RQ-019 and `E384-DEC-001`/`E384-DEC-002` are fully resolved. The exact clean pushed tip has an independent review pass under Rolling-Wave Contract §5、external parent-freeze receipt and successful readback of the post-pass GitHub #384/#392/#395/#396 body projections. #392 is not started。
+Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register、rolling-wave contract and `E384-QUAL-001` are coherent; E384-RQ-019 and `E384-DEC-001`/`E384-DEC-002` are fully resolved. The exact clean pushed tip has an independent review pass under Rolling-Wave Contract §5、external parent-freeze receipt and successful readback of the post-pass GitHub #384/#392/#395/#396 body projections. #392 Product implementation is not started; formal Issue selection may already be complete。
+
+ユーザーが直列実装中の親修正を承認した場合、Product未着手の選択済みIssue branchでparent-only文書修正を行える。[準備失敗ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)の内容reviewと公開freezeを分離する手順に従い、Product実装前のfreeze/projectionを省略しない。Epic branchへのProduct統合は従来どおりIssue PRの人間mergeだけである。
 
 ### B1 — After #392 merge
 

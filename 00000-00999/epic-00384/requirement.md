@@ -51,7 +51,7 @@ CLOSEDの`iss-00388`〜`iss-00390`はhistorical superseded nodeのまま保持�
 - Root `full-regression-timing-weights.json`は243 node weightsを持つ。
 - Ledger top-levelの27件集計、古いhead SHA、conclusionはIssue #368時点のhistorical metadataであり、current row-count authorityではない。
 - Current Provider CI、policy skip、ledger evaluator、4-shard Full Regression、main-push workflowはまだtransitional stateとして存在する。
-- Issue #392は未startであり、Product implementationも未startである。Specification import、review、remediationはIssue startではない。
+- Issue #392は2026-09-08に正式start済み。Product implementationは未startである。現在は同Issue branchでユーザー承認済みの親v12修正とIssue詳細化を行う。正式start、内容review、公開freeze、実装許可を区別する。
 
 ## 3. Requirements
 
@@ -77,7 +77,7 @@ Exact clean `0.2.3`だけを`0.2.4`へone-shot migrateする。Strict seven-key 
 
 ### E384-RQ-006 — Filesystem safety, recovery and protected data
 
-Candidate validation、descriptor binding、no-follow、hard-link/special-type rejection、same-filesystem persistent stage、native no-replace/exchange、terminal cleanup continuationを維持する。Wire v11のgeneration-bound completion receiptにより、cleanup完了応答前のクラッシュ後も、Consumerを変更せず完了と保存済みcontinuationを再提示できる。Receiptは既存private namespace内のbounded bookkeepingであり、新しいprovider-owned Consumer targetではない。Initiatives、Artifacts、repository workbench、consumer seeds、unknown path、unrelated skills、user dataをpreserveする。Lifecycle operationとevidence workspaceのcleanup authorityを混同しない。
+Candidate validation、descriptor binding、no-follow、hard-link/special-type rejection、same-filesystem persistent stage、native no-replace/exchange、terminal cleanup continuationを維持する。Wire v12のgeneration-bound completion receiptにより、cleanup完了応答前のクラッシュ後も、Consumerを変更せず完了と保存済みcontinuationを再提示できる。Receiptは既存private namespace内のbounded bookkeepingであり、新しいprovider-owned Consumer targetではない。Initiatives、Artifacts、repository workbench、consumer seeds、unknown path、unrelated skills、user dataをpreserveする。Lifecycle operationとevidence workspaceのcleanup authorityを混同しない。準備・初期incomplete recordの通常I/O失敗もWIR-PREP-001のclosed resultとexact recoveryへ含める。元Consumer状態と同世代record/container変更後を区別し、未公開operationをcleanup完了と誤認しない。
 
 ### E384-RQ-007 — Post-#387 regression baseline authority
 
@@ -177,5 +177,7 @@ Rollback unitはIssue PR merge全体である。Dependent Issue start前は直�
 ## 5. Final acceptance
 
 Epic acceptance requires all three Issue merges on the integration branch, GREEN evidence after each merge, `E384-QUAL-001` conformance, complete final provider gate, old regression-policy machinery absent, stable contracts unchanged, human review complete, and one final human merge to main. Parent freeze and #392 elaboration additionally require the independent review pass defined in the Rolling-Wave Contract and the post-pass GitHub Issue projection readback. Main must never observe Issue-level intermediate states.
+
+2026-09-08に[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)の親修正をユーザーが承認した。現在の内容reviewは当該修正を含む候補へ束縛し、Product実装前の公開freezeは別gateにする。
 
 Current parent decision: `owner_decisions_required=[]`。`E384-DEC-001` / `E384-DEC-002` はユーザー採用済み。今回の実測・採否は[全体再評価ADR](artifacts/20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md)を参照する。
