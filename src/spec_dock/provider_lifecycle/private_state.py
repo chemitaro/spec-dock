@@ -1,0 +1,1370 @@
+"""Owner-bound private lifecycle state and stage stores."""
+
+from __future__ import annotations
+
+import base64
+from collections.abc import Mapping
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+from typing import TYPE_CHECKING, Literal, NoReturn, cast
+
+from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
+from spec_dock.provider_lifecycle.contracts import (
+    ActiveState,
+    CompletionReceipt,
+    InodeWitness,
+    Operation,
+    SeedPolicy,
+    StageOwner,
+)
+from spec_dock.provider_lifecycle.filesystem import NativeAtomicFilesystem
+from spec_dock.provider_lifecycle.wire import parse_installation_record, serialize_installation_record
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
+PRIVATE_NAMESPACE_PREFIX = ".spec-dock-provider-lifecycle-v1-euid-"
+PRIVATE_DIRECTORY_MODE = 0o700
+PRIVATE_METADATA_MODE = 0o600
+RECORD_TEMP_MODE = 0o644
+ACTIVE_NAME = "ACTIVE.json"
+ACTIVE_TEMP_NAME = "ACTIVE.json.tmp"
+RECEIPT_NAME = "CLEANUP-COMPLETED.json"
+RECEIPT_TEMP_NAME = "CLEANUP-COMPLETED.json.tmp"
+RECORD_TEMP_NAME = "RECORD-TEMP"
+STAGE_NAME = "STAGE"
+STAGE_OWNER_NAME = "STAGE-OWNER.json"
+PRIVATE_ENTRY_NAMES = (
+    ACTIVE_NAME,
+    ACTIVE_TEMP_NAME,
+    RECEIPT_NAME,
+    RECEIPT_TEMP_NAME,
+    RECORD_TEMP_NAME,
+    STAGE_NAME,
+)
+STAGE_ENTRY_NAMES = (
+    "docs",
+    "templates",
+    "system",
+    "scripts",
+    "slot-spec-dock",
+    "slot-spec-dock-grill-with-docs",
+)
+STAGE_TARGET_PATHS = tuple(domain[1] for domain in FIXED_DOMAINS)
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_GENERATION = re.compile(r"^[0-9a-f]{32}$")
+_INVOCATION_IDS = {
+    "init",
+    "init-force",
+    "update",
+    "uninstall-dry-run",
+    "uninstall-dry-run-keep",
+    "uninstall-apply",
+    "uninstall-apply-keep",
+}
+_CLEANUP_IDS = {"init-force", "update", "uninstall-apply-keep"}
+
+
+class PrivateStateError(RuntimeError):
+    """Private state is absent, invalid, foreign, or unsafe to mutate."""
+
+
+class PrivateStateForeignError(PrivateStateError):
+    """A fixed private object must be preserved and cannot be adopted."""
+
+
+def _fail(message: str) -> NoReturn:
+    raise PrivateStateError(message)
+
+
+def _directory_open_flags() -> int:
+    return os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+
+
+def _open_absolute_directory_no_follow(path: str | os.PathLike[str]) -> int:
+    """Open every component of an absolute directory path without following links."""
+
+    raw_path = os.fspath(path)
+    if not Path(raw_path).is_absolute() or "\x00" in raw_path:
+        raise PrivateStateError("directory path must be absolute and NUL-free")
+    components = Path(raw_path).parts[1:]
+    current_fd = os.open(os.sep, _directory_open_flags())
+    try:
+        for component in components:
+            if component in {"", ".", ".."}:
+                raise PrivateStateError("directory path contains an unsafe component")
+            next_fd = os.open(component, _directory_open_flags(), dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+        return current_fd
+    except BaseException:
+        os.close(current_fd)
+        raise
+
+
+def _exact(value: Mapping[str, object], keys: Sequence[str], label: str) -> None:
+    if tuple(value.keys()) != tuple(keys):
+        _fail(f"{label} keys are not exact")
+
+
+def _string(value: object, label: str, *, allow_null: bool = False) -> str | None:
+    if value is None and allow_null:
+        return None
+    if not isinstance(value, str) or "\x00" in value:
+        _fail(f"{label} must be a NUL-free string")
+    return cast("str", value)
+
+
+def _integer(value: object, label: str, *, nonnegative: bool = False) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        _fail(f"{label} must be an integer")
+    if nonnegative and value < 0:
+        _fail(f"{label} must be non-negative")
+    return cast("int", value)
+
+
+def _digest(value: object, label: str, *, allow_null: bool = False) -> str | None:
+    value = _string(value, label, allow_null=allow_null)
+    if value is None:
+        return None
+    if _DIGEST.fullmatch(value) is None:
+        _fail(f"{label} must be a lowercase SHA-256 digest")
+    return value
+
+
+def _generation(value: object, label: str) -> str:
+    value = _string(value, label)
+    assert value is not None
+    if _GENERATION.fullmatch(value) is None:
+        _fail(f"{label} must be 32 lowercase hexadecimal characters")
+    return value
+
+
+def _json_bytes(value: Mapping[str, object]) -> bytes:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8") + b"\n"
+
+
+def _read_json_bytes(raw: bytes, maximum: int, label: str) -> Mapping[str, object]:
+    if len(raw) > maximum or not raw.endswith(b"\n") or raw[:-1].find(b"\n") >= 0:
+        _fail(f"{label} has invalid size or line ending")
+    try:
+        text = raw[:-1].decode("utf-8")
+    except UnicodeDecodeError as exc:
+        _fail(f"{label} is not UTF-8: {exc}")
+
+    def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, item in items:
+            if key in result:
+                _fail(f"{label} has duplicate key {key!r}")
+            result[key] = item
+        return result
+
+    try:
+        value = json.loads(text, object_pairs_hook=pairs, parse_constant=lambda constant: _fail(constant))
+    except PrivateStateError:
+        raise
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        _fail(f"{label} is not JSON: {exc}")
+    if not isinstance(value, Mapping):
+        _fail(f"{label} must be an object")
+    if _json_bytes(value) != raw:
+        _fail(f"{label} must be compact canonical JSON")
+    return value
+
+
+def _mapping(value: object, label: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        _fail(f"{label} must be an object")
+    return cast("Mapping[str, object]", value)
+
+
+def _base64(value: object, label: str) -> bytes:
+    value = _string(value, label)
+    assert value is not None
+    try:
+        return base64.b64decode(value, validate=True)
+    except (TypeError, ValueError) as exc:
+        _fail(f"{label} is not valid base64: {exc}")
+
+
+def repository_key_for(device: int, inode: int, euid: int) -> str:
+    """Compute the exact repository identity key without a terminal LF."""
+
+    payload = json.dumps(
+        ["spec-dock-repository-key-v1", device, inode, euid],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def tuple_key_for(operation: str, candidate_digest: str, seed_policy: str) -> str:
+    """Compute the exact operation tuple key without a terminal LF."""
+
+    _digest(candidate_digest, "candidate_digest")
+    payload = json.dumps(
+        ["spec-dock-lifecycle-tuple-v1", operation, candidate_digest, seed_policy],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def cleanup_token_for(repository_key: str, tuple_key: str, result_family: str, operation_generation: str) -> str:
+    """Compute the generation-bound WIR-INV-001 cleanup token."""
+
+    for value, label in ((repository_key, "repository_key"), (tuple_key, "tuple_key")):
+        _digest(value, label)
+    _generation(operation_generation, "operation_generation")
+    payload = json.dumps(
+        ["spec-dock-terminal-cleanup-v2", repository_key, tuple_key, result_family, operation_generation],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _inode_mapping(witness: InodeWitness) -> dict[str, object]:
+    if not isinstance(witness, InodeWitness):
+        _fail("inode witness must be InodeWitness")
+    return {
+        "kind": witness.kind,
+        "device": witness.device,
+        "inode": witness.inode,
+        "ctime_ns": witness.ctime_ns,
+        "mode": witness.mode,
+        "link_count": witness.link_count,
+        "size": witness.size,
+        "sha256": witness.sha256,
+    }
+
+
+def _parse_inode(value: object, label: str, *, allow_null: bool = False) -> InodeWitness | None:
+    if value is None and allow_null:
+        return None
+    mapping = _mapping(value, label)
+    _exact(mapping, ("kind", "device", "inode", "ctime_ns", "mode", "link_count", "size", "sha256"), label)
+    kind = _string(mapping["kind"], f"{label}.kind")
+    if kind not in {"regular", "directory"}:
+        _fail(f"{label}.kind is invalid")
+    device = _integer(mapping["device"], f"{label}.device", nonnegative=True)
+    inode = _integer(mapping["inode"], f"{label}.inode", nonnegative=True)
+    ctime_ns = _integer(mapping["ctime_ns"], f"{label}.ctime_ns", nonnegative=True)
+    mode = _integer(mapping["mode"], f"{label}.mode", nonnegative=True)
+    link_count = _integer(mapping["link_count"], f"{label}.link_count", nonnegative=True)
+    size = mapping["size"]
+    digest = mapping["sha256"]
+    if kind == "directory":
+        if size is not None or digest is not None:
+            _fail(f"{label} directory witness must have null size/sha256")
+        parsed_size = None
+        parsed_digest = None
+    else:
+        parsed_size = _integer(size, f"{label}.size", nonnegative=True)
+        parsed_digest = _digest(digest, f"{label}.sha256")
+    return InodeWitness(kind, device, inode, ctime_ns, mode, link_count, parsed_size, parsed_digest)  # type: ignore[arg-type]
+
+
+def _record_ref(value: object, label: str) -> dict[str, object]:
+    mapping = _mapping(value, label)
+    _exact(mapping, ("kind", "bytes_base64", "sha256", "witness"), label)
+    kind = _string(mapping["kind"], f"{label}.kind")
+    if kind not in {"absent", "legacy-0.2.3", "final"}:
+        _fail(f"{label}.kind is invalid")
+    raw = mapping["bytes_base64"]
+    digest = mapping["sha256"]
+    witness = mapping["witness"]
+    if kind == "absent":
+        if raw is not None or digest is not None or witness is not None:
+            _fail(f"{label} absent record must contain null fields")
+    else:
+        data = _base64(raw, f"{label}.bytes_base64")
+        parsed_digest = _digest(digest, f"{label}.sha256")
+        parsed_witness = _parse_inode(witness, f"{label}.witness")
+        if (
+            parsed_witness is None
+            or parsed_witness.kind != "regular"
+            or parsed_witness.mode != RECORD_TEMP_MODE
+            or parsed_witness.link_count != 1
+        ):
+            _fail(f"{label}.witness must be a mode0644 regular file")
+        assert parsed_digest is not None
+        if hashlib.sha256(data).hexdigest() != parsed_digest:
+            _fail(f"{label}.sha256 does not match bytes")
+    return dict(mapping)
+
+
+def _expected_record(value: object) -> dict[str, str]:
+    mapping = _mapping(value, "expected_incomplete_record")
+    _exact(mapping, ("bytes_base64", "sha256"), "expected_incomplete_record")
+    data = _base64(mapping["bytes_base64"], "expected_incomplete_record.bytes_base64")
+    if len(data) > 4096:
+        _fail("expected incomplete record is oversized")
+    digest = _digest(mapping["sha256"], "expected_incomplete_record.sha256")
+    assert digest is not None
+    try:
+        parse_installation_record(data)
+    except ValueError as exc:
+        _fail(f"expected incomplete record is invalid: {exc}")
+    if hashlib.sha256(data).hexdigest() != digest:
+        _fail("expected incomplete record digest does not match bytes")
+    encoded = _string(mapping["bytes_base64"], "expected_incomplete_record.bytes_base64")
+    assert encoded is not None
+    return {"bytes_base64": encoded, "sha256": digest}
+
+
+def _bootstrap(value: object) -> dict[str, object]:
+    mapping = _mapping(value, "bootstrap_container")
+    _exact(mapping, ("disposition", "witness"), "bootstrap_container")
+    disposition = _string(mapping["disposition"], "bootstrap_container.disposition")
+    if disposition not in {"existing", "planned-create", "created"}:
+        _fail("bootstrap_container disposition is invalid")
+    witness = _parse_inode(mapping["witness"], "bootstrap_container.witness", allow_null=True)
+    if disposition == "planned-create" and witness is not None:
+        _fail("planned-create bootstrap must have null witness")
+    if disposition != "planned-create" and (witness is None or witness.kind != "directory"):
+        _fail("bound bootstrap must have a directory witness")
+    return dict(mapping)
+
+
+def _owned_targets(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list) or len(value) != 6:
+        _fail("owned_target_witnesses must contain six entries")
+    raw: list[object] = value
+    result: list[dict[str, object]] = []
+    for index, item in enumerate(raw):
+        mapping = _mapping(item, "owned_target_witness")
+        _exact(
+            mapping,
+            (
+                "path",
+                "original_kind",
+                "original_tree_digest",
+                "original_inode",
+                "terminal_kind",
+                "terminal_tree_digest",
+            ),
+            "owned_target_witness",
+        )
+        path = _string(mapping["path"], "owned_target_witness.path")
+        if path != STAGE_TARGET_PATHS[index]:
+            _fail("owned target witness path order is not fixed")
+        for key in ("original_kind", "terminal_kind"):
+            kind = _string(mapping[key], f"owned_target_witness.{key}", allow_null=True)
+            if kind not in {None, "absent", "directory"}:
+                _fail(f"owned_target_witness.{key} is invalid")
+        for key in ("original_tree_digest", "terminal_tree_digest"):
+            _digest(mapping[key], f"owned_target_witness.{key}", allow_null=True)
+        original_kind = mapping["original_kind"]
+        terminal_kind = mapping["terminal_kind"]
+        original_inode = _parse_inode(mapping["original_inode"], "owned_target_witness.original_inode", allow_null=True)
+        if original_kind == "directory" and original_inode is None:
+            _fail("directory original target needs an inode witness")
+        if original_kind != "directory" and original_inode is not None:
+            _fail("absent original target cannot have an inode witness")
+        if terminal_kind == "directory" and mapping["terminal_tree_digest"] is None:
+            _fail("directory terminal target needs a tree digest")
+        result.append(dict(mapping))
+    return result
+
+
+def _registered_entries(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list) or len(value) != 6:
+        _fail("registered_stage_entries must contain six entries")
+    raw: list[object] = value
+    result: list[dict[str, object]] = []
+    for index, item in enumerate(raw):
+        mapping = _mapping(item, "registered_stage_entry")
+        _exact(
+            mapping, ("name", "target_path", "candidate_tree_digest", "original_tree_digest"), "registered_stage_entry"
+        )
+        if mapping["name"] != STAGE_ENTRY_NAMES[index] or mapping["target_path"] != STAGE_TARGET_PATHS[index]:
+            _fail("registered stage entry order is not fixed")
+        _digest(mapping["candidate_tree_digest"], "candidate_tree_digest", allow_null=True)
+        _digest(mapping["original_tree_digest"], "original_tree_digest", allow_null=True)
+        result.append(dict(mapping))
+    return result
+
+
+def _invocation(value: object, label: str, *, cleanup: bool = False) -> dict[str, str]:
+    mapping = _mapping(value, label)
+    expected = (
+        ("role", "invocation_id", "cleanup_token", "rendered_command")
+        if cleanup
+        else ("invocation_id", "rendered_command")
+    )
+    _exact(mapping, expected, label)
+    if cleanup:
+        if mapping["role"] != "cleanup-retry":
+            _fail(f"{label}.role is invalid")
+        _digest(mapping["cleanup_token"], f"{label}.cleanup_token")
+        invocation_id = _string(mapping["invocation_id"], f"{label}.invocation_id")
+        if invocation_id not in _CLEANUP_IDS:
+            _fail(f"{label}.invocation_id is invalid")
+    else:
+        invocation_id = _string(mapping["invocation_id"], f"{label}.invocation_id")
+        if invocation_id not in _INVOCATION_IDS:
+            _fail(f"{label}.invocation_id is invalid")
+    rendered = _string(mapping["rendered_command"], f"{label}.rendered_command")
+    assert invocation_id is not None and rendered is not None
+    return {key: value for key, value in mapping.items() if isinstance(value, str)}
+
+
+def _active_mapping(state: ActiveState) -> dict[str, object]:
+    return {
+        "schema_version": state.schema_version,
+        "state": state.state,
+        "repository_key": state.repository_key,
+        "repository_identity": dict(state.repository_identity),
+        "tuple_key": state.tuple_key,
+        "operation_generation": state.operation_generation,
+        "operation": state.operation,
+        "candidate_digest": state.candidate_digest,
+        "seed_policy": state.seed_policy,
+        "result_family": state.result_family,
+        "original_record": dict(state.original_record),
+        "expected_incomplete_record": dict(state.expected_incomplete_record),
+        "bootstrap_container": dict(state.bootstrap_container),
+        "owned_target_witnesses": [dict(item) for item in state.owned_target_witnesses],
+        "registered_stage_entries": [dict(item) for item in state.registered_stage_entries],
+        "record_temp_witness": None if state.record_temp_witness is None else _inode_mapping(state.record_temp_witness),
+        "terminal_record_digest": state.terminal_record_digest,
+        "cleanup_token": state.cleanup_token,
+        "cleanup_retry_invocation": dict(state.cleanup_retry_invocation),
+        "deferred_invocation": None if state.deferred_invocation is None else dict(state.deferred_invocation),
+    }
+
+
+def _parse_active(value: Mapping[str, object]) -> ActiveState:
+    keys = (
+        "schema_version",
+        "state",
+        "repository_key",
+        "repository_identity",
+        "tuple_key",
+        "operation_generation",
+        "operation",
+        "candidate_digest",
+        "seed_policy",
+        "result_family",
+        "original_record",
+        "expected_incomplete_record",
+        "bootstrap_container",
+        "owned_target_witnesses",
+        "registered_stage_entries",
+        "record_temp_witness",
+        "terminal_record_digest",
+        "cleanup_token",
+        "cleanup_retry_invocation",
+        "deferred_invocation",
+    )
+    _exact(value, keys, "ACTIVE")
+    if value["schema_version"] != 1:
+        _fail("ACTIVE schema_version must be 1")
+    state = _string(value["state"], "ACTIVE.state")
+    if state not in {"prepared", "running", "ready", "terminal-cleanup"}:
+        _fail("ACTIVE.state is invalid")
+    repository_key = _digest(value["repository_key"], "ACTIVE.repository_key")
+    tuple_key = _digest(value["tuple_key"], "ACTIVE.tuple_key")
+    operation_generation = _generation(value["operation_generation"], "ACTIVE.operation_generation")
+    operation = _string(value["operation"], "ACTIVE.operation")
+    if operation not in {"install", "update", "uninstall"}:
+        _fail("ACTIVE.operation is invalid")
+    candidate_digest = _digest(value["candidate_digest"], "ACTIVE.candidate_digest")
+    seed_policy = _string(value["seed_policy"], "ACTIVE.seed_policy")
+    if seed_policy not in {"create-if-absent", "preserve-only"}:
+        _fail("ACTIVE.seed_policy is invalid")
+    result_family = _string(value["result_family"], "ACTIVE.result_family")
+    if result_family not in {"install", "legacy-migration", "update", "uninstall"}:
+        _fail("ACTIVE.result_family is invalid")
+    identity = _mapping(value["repository_identity"], "ACTIVE.repository_identity")
+    _exact(identity, ("device", "inode", "euid"), "ACTIVE.repository_identity")
+    identity_value = {
+        key: _integer(identity[key], f"ACTIVE.repository_identity.{key}", nonnegative=True) for key in identity
+    }
+    original_record = _record_ref(value["original_record"], "ACTIVE.original_record")
+    expected_record = _expected_record(value["expected_incomplete_record"])
+    bootstrap = _bootstrap(value["bootstrap_container"])
+    owned = _owned_targets(value["owned_target_witnesses"])
+    registered = _registered_entries(value["registered_stage_entries"])
+    record_temp = _parse_inode(value["record_temp_witness"], "ACTIVE.record_temp_witness", allow_null=True)
+    if record_temp is not None and (
+        record_temp.kind != "regular" or record_temp.mode != RECORD_TEMP_MODE or record_temp.link_count != 1
+    ):
+        _fail("ACTIVE.record_temp_witness must be mode0644 regular")
+    terminal_digest = _digest(value["terminal_record_digest"], "ACTIVE.terminal_record_digest")
+    cleanup_token = _digest(value["cleanup_token"], "ACTIVE.cleanup_token")
+    cleanup_invocation = _invocation(value["cleanup_retry_invocation"], "ACTIVE.cleanup_retry_invocation", cleanup=True)
+    deferred = (
+        None
+        if value["deferred_invocation"] is None
+        else _invocation(value["deferred_invocation"], "ACTIVE.deferred_invocation")
+    )
+    assert (
+        repository_key is not None
+        and tuple_key is not None
+        and candidate_digest is not None
+        and terminal_digest is not None
+        and cleanup_token is not None
+    )
+    if cleanup_token_for(repository_key, tuple_key, result_family, operation_generation) != cleanup_token:
+        _fail("ACTIVE.cleanup_token does not match identity")
+    return ActiveState(
+        1,
+        state,  # type: ignore[arg-type]
+        repository_key,
+        identity_value,
+        tuple_key,
+        operation_generation,
+        operation,  # type: ignore[arg-type]
+        candidate_digest,
+        seed_policy,  # type: ignore[arg-type]
+        result_family,  # type: ignore[arg-type]
+        original_record,
+        expected_record,
+        bootstrap,
+        owned,
+        registered,
+        record_temp,
+        terminal_digest,
+        cleanup_token,
+        cleanup_invocation,
+        deferred,
+    )
+
+
+def _receipt_mapping(receipt: CompletionReceipt) -> dict[str, object]:
+    return {
+        "schema_version": receipt.schema_version,
+        "repository_key": receipt.repository_key,
+        "tuple_key": receipt.tuple_key,
+        "operation_generation": receipt.operation_generation,
+        "operation": receipt.operation,
+        "candidate_digest": receipt.candidate_digest,
+        "seed_policy": receipt.seed_policy,
+        "result_family": receipt.result_family,
+        "terminal_record_digest": receipt.terminal_record_digest,
+        "cleanup_token": receipt.cleanup_token,
+        "cleanup_retry_invocation": dict(receipt.cleanup_retry_invocation),
+        "deferred_invocation": None if receipt.deferred_invocation is None else dict(receipt.deferred_invocation),
+    }
+
+
+def _parse_receipt(value: Mapping[str, object]) -> CompletionReceipt:
+    keys = (
+        "schema_version",
+        "repository_key",
+        "tuple_key",
+        "operation_generation",
+        "operation",
+        "candidate_digest",
+        "seed_policy",
+        "result_family",
+        "terminal_record_digest",
+        "cleanup_token",
+        "cleanup_retry_invocation",
+        "deferred_invocation",
+    )
+    _exact(value, keys, "CLEANUP-COMPLETED")
+    if value["schema_version"] != 1:
+        _fail("receipt schema_version must be 1")
+    repository_key = _digest(value["repository_key"], "receipt.repository_key")
+    tuple_key = _digest(value["tuple_key"], "receipt.tuple_key")
+    generation = _generation(value["operation_generation"], "receipt.operation_generation")
+    operation = _string(value["operation"], "receipt.operation")
+    if operation not in {"install", "update", "uninstall"}:
+        _fail("receipt operation is invalid")
+    digest = _digest(value["candidate_digest"], "receipt.candidate_digest")
+    seed = _string(value["seed_policy"], "receipt.seed_policy")
+    if seed not in {"create-if-absent", "preserve-only"}:
+        _fail("receipt seed_policy is invalid")
+    family = _string(value["result_family"], "receipt.result_family")
+    if family not in {"install", "legacy-migration", "update", "uninstall"}:
+        _fail("receipt result_family is invalid")
+    terminal = _digest(value["terminal_record_digest"], "receipt.terminal_record_digest")
+    token = _digest(value["cleanup_token"], "receipt.cleanup_token")
+    cleanup = _invocation(value["cleanup_retry_invocation"], "receipt.cleanup_retry_invocation", cleanup=True)
+    deferred = (
+        None
+        if value["deferred_invocation"] is None
+        else _invocation(value["deferred_invocation"], "receipt.deferred_invocation")
+    )
+    assert (
+        repository_key is not None
+        and tuple_key is not None
+        and digest is not None
+        and terminal is not None
+        and token is not None
+    )
+    assert family is not None
+    if cleanup_token_for(repository_key, tuple_key, cast("str", family), generation) != token:
+        _fail("receipt cleanup token does not match identity")
+    return CompletionReceipt(
+        1,
+        repository_key,
+        tuple_key,
+        generation,
+        cast("Operation", operation),
+        digest,
+        cast("SeedPolicy", seed),
+        cast("Literal['install', 'legacy-migration', 'update', 'uninstall']", family),
+        terminal,
+        token,
+        cleanup,
+        deferred,
+    )
+
+
+def _owner_mapping(owner: StageOwner) -> dict[str, object]:
+    return {
+        "schema_version": owner.schema_version,
+        "repository_key": owner.repository_key,
+        "tuple_key": owner.tuple_key,
+        "operation_generation": owner.operation_generation,
+        "operation": owner.operation,
+        "candidate_digest": owner.candidate_digest,
+        "seed_policy": owner.seed_policy,
+        "result_family": owner.result_family,
+        "entry_names": list(owner.entry_names),
+        "candidate_domain_digests": list(owner.candidate_domain_digests),
+        "original_domain_digests": list(owner.original_domain_digests),
+    }
+
+
+def _parse_owner(value: Mapping[str, object]) -> StageOwner:
+    keys = (
+        "schema_version",
+        "repository_key",
+        "tuple_key",
+        "operation_generation",
+        "operation",
+        "candidate_digest",
+        "seed_policy",
+        "result_family",
+        "entry_names",
+        "candidate_domain_digests",
+        "original_domain_digests",
+    )
+    _exact(value, keys, "STAGE-OWNER")
+    if value["schema_version"] != 1:
+        _fail("STAGE-OWNER schema_version must be 1")
+    repository_key = _digest(value["repository_key"], "STAGE-OWNER.repository_key")
+    tuple_key = _digest(value["tuple_key"], "STAGE-OWNER.tuple_key")
+    generation = _generation(value["operation_generation"], "STAGE-OWNER.operation_generation")
+    operation = _string(value["operation"], "STAGE-OWNER.operation")
+    if operation not in {"install", "update", "uninstall"}:
+        _fail("STAGE-OWNER operation is invalid")
+    candidate_digest = _digest(value["candidate_digest"], "STAGE-OWNER.candidate_digest")
+    seed = _string(value["seed_policy"], "STAGE-OWNER.seed_policy")
+    if seed not in {"create-if-absent", "preserve-only"}:
+        _fail("STAGE-OWNER seed_policy is invalid")
+    family = _string(value["result_family"], "STAGE-OWNER.result_family")
+    if family not in {"install", "legacy-migration", "update", "uninstall"}:
+        _fail("STAGE-OWNER result_family is invalid")
+    names = value["entry_names"]
+    if not isinstance(names, list) or tuple(names) != STAGE_ENTRY_NAMES:
+        _fail("STAGE-OWNER entry_names are not fixed")
+    candidate_digests = value["candidate_domain_digests"]
+    original_digests = value["original_domain_digests"]
+    if (
+        not isinstance(candidate_digests, list)
+        or len(candidate_digests) != 6
+        or not isinstance(original_digests, list)
+        or len(original_digests) != 6
+    ):
+        _fail("STAGE-OWNER domain digest arrays must contain six entries")
+    for item in [*candidate_digests, *original_digests]:
+        _digest(item, "STAGE-OWNER domain digest", allow_null=True)
+    assert repository_key is not None and tuple_key is not None and candidate_digest is not None
+    return StageOwner(
+        1,
+        repository_key,
+        tuple_key,
+        generation,
+        cast("Operation", operation),
+        candidate_digest,
+        cast("SeedPolicy", seed),
+        cast("Literal['install', 'legacy-migration', 'update', 'uninstall']", family),
+        tuple(names),
+        tuple(candidate_digests),
+        tuple(original_digests),
+    )  # type: ignore[arg-type]
+
+
+class _PrivateStore:
+    filename: str
+    maximum: int
+    mode: int
+
+    def __init__(self, namespace: str | os.PathLike[str], filename: str, maximum: int, mode: int) -> None:
+        self.namespace = Path(namespace)
+        self.filename = filename
+        self.maximum = maximum
+        self.mode = mode
+
+    def _open_namespace(self) -> int:
+        if not self.namespace.is_absolute():
+            raise PrivateStateError("private namespace must be absolute")
+        try:
+            fd = _open_absolute_directory_no_follow(self.namespace)
+        except OSError as exc:
+            raise PrivateStateError("private namespace cannot be opened") from exc
+        try:
+            opened = os.fstat(fd)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or opened.st_nlink < 2
+                or opened.st_uid != _effective_euid()
+                or stat.S_IMODE(opened.st_mode) != PRIVATE_DIRECTORY_MODE
+            ):
+                raise PrivateStateForeignError("private namespace directory is unsafe")
+            names = os.listdir(fd)  # noqa: PTH208
+            if any(name not in PRIVATE_ENTRY_NAMES for name in names):
+                raise PrivateStateForeignError("private namespace contains an unknown entry")
+            return fd
+        except BaseException:
+            os.close(fd)
+            raise
+
+    def _read_bytes(
+        self, filename: str | None = None, maximum: int | None = None, mode: int | None = None
+    ) -> bytes | None:
+        name = self.filename if filename is None else filename
+        maximum = self.maximum if maximum is None else maximum
+        mode = self.mode if mode is None else mode
+        fd = self._open_namespace()
+        try:
+            try:
+                value = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return None
+            if (
+                not stat.S_ISREG(value.st_mode)
+                or value.st_nlink != 1
+                or value.st_uid != _effective_euid()
+                or stat.S_IMODE(value.st_mode) != mode
+            ):
+                raise PrivateStateForeignError(f"private object {name} is unsafe")
+            if value.st_size > maximum:
+                raise PrivateStateForeignError(f"private object {name} is oversized")
+            object_fd = os.open(
+                name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0), dir_fd=fd
+            )
+            try:
+                opened = os.fstat(object_fd)
+                if (
+                    opened.st_dev != value.st_dev
+                    or opened.st_ino != value.st_ino
+                    or opened.st_ctime_ns != value.st_ctime_ns
+                ):
+                    raise PrivateStateForeignError(f"private object {name} changed while opening")
+                data = os.read(object_fd, maximum + 1)
+                after = os.fstat(object_fd)
+                if (
+                    after.st_dev != opened.st_dev
+                    or after.st_ino != opened.st_ino
+                    or after.st_ctime_ns != opened.st_ctime_ns
+                    or len(data) > maximum
+                ):
+                    raise PrivateStateForeignError(f"private object {name} changed while reading")
+                return data
+            finally:
+                os.close(object_fd)
+        finally:
+            os.close(fd)
+
+    def _publish_bytes(
+        self,
+        payload: bytes,
+        *,
+        filename: str | None = None,
+        temporary: str | None = None,
+        mode: int | None = None,
+        maximum: int | None = None,
+        expected_existing: InodeWitness | None = None,
+    ) -> None:
+        name = self.filename if filename is None else filename
+        temporary = f"{name}.tmp" if temporary is None else temporary
+        mode = self.mode if mode is None else mode
+        maximum = self.maximum if maximum is None else maximum
+        if len(payload) > maximum:
+            raise PrivateStateError(f"{name} payload is oversized")
+        namespace_fd = self._open_namespace()
+        filesystem = NativeAtomicFilesystem()
+        temporary_fd = -1
+        try:
+            try:
+                temporary_fd = os.open(
+                    temporary,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                    mode,
+                    dir_fd=namespace_fd,
+                )
+            except FileExistsError as exc:
+                raise PrivateStateForeignError(f"private temporary object {temporary} already exists") from exc
+            os.fchmod(temporary_fd, mode)
+            cursor = 0
+            while cursor < len(payload):
+                cursor += os.write(temporary_fd, payload[cursor:])
+            os.fsync(temporary_fd)
+            os.close(temporary_fd)
+            temporary_fd = -1
+            existing = self._read_bound_witness(namespace_fd, name, mode, maximum=maximum)
+            if expected_existing is not None and existing is None:
+                raise PrivateStateForeignError(f"private object {name} disappeared during update")
+            if existing is None:
+                filesystem.rename_no_replace(namespace_fd, temporary, namespace_fd, name)
+            else:
+                if expected_existing is None or existing != expected_existing:
+                    raise PrivateStateForeignError(f"private object {name} belongs to another operation")
+                filesystem.exchange(namespace_fd, temporary, namespace_fd, name)
+                old = filesystem.capture_inode(namespace_fd, temporary, "regular")
+                if old is None or not NativeAtomicFilesystem._same_content_identity(old, expected_existing):
+                    if old is not None:
+                        filesystem.exchange(namespace_fd, temporary, namespace_fd, name)
+                        replacement = filesystem.capture_inode(namespace_fd, temporary, "regular")
+                        if replacement is not None:
+                            filesystem.unlink_bound(namespace_fd, temporary, replacement)
+                        filesystem.fsync_directory(namespace_fd)
+                    raise PrivateStateForeignError(f"old private object {name} changed during exchange")
+                filesystem.unlink_bound(namespace_fd, temporary, old)
+            filesystem.fsync_directory(namespace_fd)
+        finally:
+            if temporary_fd >= 0:
+                os.close(temporary_fd)
+            os.close(namespace_fd)
+
+    @staticmethod
+    def _read_bound_witness(
+        parent_fd: int,
+        name: str,
+        mode: int,
+        *,
+        maximum: int | None = None,
+    ) -> InodeWitness | None:
+        try:
+            value = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+        if (
+            not stat.S_ISREG(value.st_mode)
+            or value.st_nlink != 1
+            or value.st_uid != _effective_euid()
+            or stat.S_IMODE(value.st_mode) != mode
+        ):
+            raise PrivateStateForeignError(f"private object {name} is unsafe")
+        if maximum is not None and value.st_size > maximum:
+            raise PrivateStateForeignError(f"private object {name} is oversized")
+        object_fd = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        try:
+            opened = os.fstat(object_fd)
+            if not NativeAtomicFilesystem._same_inode(value, opened):
+                raise PrivateStateForeignError(f"private object {name} changed while opening")
+            digest = hashlib.sha256()
+            while True:
+                chunk = os.read(object_fd, 1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+            after = os.fstat(object_fd)
+            if not NativeAtomicFilesystem._same_inode(opened, after):
+                raise PrivateStateForeignError(f"private object {name} changed while reading")
+            return NativeAtomicFilesystem._witness(after, "regular", digest.hexdigest())
+        finally:
+            os.close(object_fd)
+
+    def _current_witness(self) -> InodeWitness | None:
+        namespace_fd = self._open_namespace()
+        try:
+            return self._read_bound_witness(namespace_fd, self.filename, self.mode, maximum=self.maximum)
+        finally:
+            os.close(namespace_fd)
+
+
+def _effective_euid() -> int:
+    return os.geteuid() if hasattr(os, "geteuid") else os.getuid()
+
+
+def resolve_private_namespace(repository_root: str | os.PathLike[str], *, effective_euid: int | None = None) -> Path:
+    """Create and return the deterministic same-filesystem private namespace."""
+
+    root = Path(repository_root)
+    if not root.is_absolute() or "\x00" in os.fspath(root):
+        raise PrivateStateError("repository root must be absolute")
+    if not root.name:
+        raise PrivateStateError("repository root must have a final directory component")
+    euid = _effective_euid() if effective_euid is None else effective_euid
+    try:
+        parent_fd = _open_absolute_directory_no_follow(root.parent)
+    except OSError as exc:
+        raise PrivateStateError("repository parent cannot be opened without following links") from exc
+    try:
+        parent_stat = os.fstat(parent_fd)
+        root_stat = os.stat(root.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(root_stat.st_mode)
+            or not stat.S_ISDIR(parent_stat.st_mode)
+            or parent_stat.st_dev != root_stat.st_dev
+        ):
+            raise PrivateStateError("repository root/parent binding is unsafe")
+        if root_stat.st_uid != euid:
+            raise PrivateStateError("repository root owner is not the effective user")
+        repository_key = repository_key_for(root_stat.st_dev, root_stat.st_ino, euid)
+        top_name = f"{PRIVATE_NAMESPACE_PREFIX}{euid}"
+        _mkdir_private(parent_fd, top_name, parent_stat.st_dev, euid)
+        top_fd = os.open(
+            top_name,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        try:
+            top_stat = os.fstat(top_fd)
+            _check_private_directory(top_stat, parent_stat.st_dev, euid)
+            _mkdir_private(top_fd, repository_key, parent_stat.st_dev, euid)
+            namespace_fd = os.open(
+                repository_key,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=top_fd,
+            )
+            try:
+                namespace_stat = os.fstat(namespace_fd)
+                _check_private_directory(namespace_stat, parent_stat.st_dev, euid)
+            finally:
+                os.close(namespace_fd)
+        finally:
+            os.close(top_fd)
+        return root.parent / top_name / repository_key
+    finally:
+        os.close(parent_fd)
+
+
+def _check_private_directory(value: os.stat_result, device: int, euid: int) -> None:
+    if (
+        not stat.S_ISDIR(value.st_mode)
+        or value.st_dev != device
+        or value.st_uid != euid
+        or stat.S_IMODE(value.st_mode) != PRIVATE_DIRECTORY_MODE
+    ):
+        raise PrivateStateForeignError("private directory binding is unsafe")
+
+
+def _mkdir_private(parent_fd: int, name: str, device: int, euid: int) -> None:
+    try:
+        os.mkdir(name, PRIVATE_DIRECTORY_MODE, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+    except FileExistsError:
+        pass
+    except OSError as exc:
+        raise PrivateStateError(f"cannot create private directory {name}") from exc
+    fd = os.open(
+        name,
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=parent_fd,
+    )
+    try:
+        _check_private_directory(os.fstat(fd), device, euid)
+    finally:
+        os.close(fd)
+
+
+class ActiveStateStore(_PrivateStore):
+    """Strict ACTIVE.json store and public RECORD-TEMP staging seam."""
+
+    def __init__(self, namespace: str | os.PathLike[str]) -> None:
+        namespace_path = _coerce_namespace(namespace)
+        super().__init__(namespace_path, ACTIVE_NAME, 32768, PRIVATE_METADATA_MODE)
+
+    def load(self) -> ActiveState | None:
+        raw = self._read_bytes()
+        return None if raw is None else _parse_active(_read_json_bytes(raw, self.maximum, "ACTIVE"))
+
+    read = load
+
+    def save(self, state: ActiveState) -> None:
+        value = _active_mapping(state)
+        parsed = _parse_active(value)
+        existing = self.load()
+        expected_existing = None
+        if existing is not None:
+            if (
+                existing.repository_key,
+                existing.tuple_key,
+                existing.operation_generation,
+                existing.operation,
+                existing.candidate_digest,
+                existing.seed_policy,
+                existing.result_family,
+            ) != (
+                parsed.repository_key,
+                parsed.tuple_key,
+                parsed.operation_generation,
+                parsed.operation,
+                parsed.candidate_digest,
+                parsed.seed_policy,
+                parsed.result_family,
+            ):
+                raise PrivateStateForeignError("ACTIVE belongs to another operation")
+            expected_existing = self._current_witness()
+            if expected_existing is None:
+                raise PrivateStateForeignError("ACTIVE disappeared before update")
+        self._publish_bytes(_json_bytes(_active_mapping(parsed)), expected_existing=expected_existing)
+
+    write = save
+
+    def write_record_temp(self, payload: bytes) -> InodeWitness:
+        record = parse_installation_record(payload)
+        canonical = serialize_installation_record(record)
+        if payload != canonical:
+            raise PrivateStateError("RECORD-TEMP must contain canonical public record bytes")
+        namespace_fd = self._open_namespace()
+        try:
+            try:
+                fd = os.open(
+                    RECORD_TEMP_NAME,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                    RECORD_TEMP_MODE,
+                    dir_fd=namespace_fd,
+                )
+            except FileExistsError:
+                existing = self._read_bound_witness(
+                    namespace_fd,
+                    RECORD_TEMP_NAME,
+                    RECORD_TEMP_MODE,
+                    maximum=4096,
+                )
+                active = self.load()
+                if (
+                    existing is None
+                    or active is None
+                    or active.record_temp_witness is None
+                    or active.record_temp_witness != existing
+                    or self._read_bytes(RECORD_TEMP_NAME, 4096, RECORD_TEMP_MODE) != payload
+                ):
+                    raise PrivateStateForeignError("existing RECORD-TEMP is not the expected public record") from None
+                return existing
+            try:
+                cursor = 0
+                while cursor < len(payload):
+                    cursor += os.write(fd, payload[cursor:])
+                os.fchmod(fd, RECORD_TEMP_MODE)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            os.fsync(namespace_fd)
+            witness = self._read_bound_witness(
+                namespace_fd,
+                RECORD_TEMP_NAME,
+                RECORD_TEMP_MODE,
+                maximum=4096,
+            )
+            if witness is None:
+                raise PrivateStateError("RECORD-TEMP disappeared after publication")
+            return witness
+        finally:
+            os.close(namespace_fd)
+
+    def load_record_temp(self) -> bytes | None:
+        return self._read_bytes(RECORD_TEMP_NAME, 4096, RECORD_TEMP_MODE)
+
+
+class CompletionReceiptStore(_PrivateStore):
+    """Strict completion receipt store."""
+
+    def __init__(self, namespace: str | os.PathLike[str]) -> None:
+        namespace_path = _coerce_namespace(namespace)
+        super().__init__(namespace_path, RECEIPT_NAME, 16384, PRIVATE_METADATA_MODE)
+
+    def load(self) -> CompletionReceipt | None:
+        raw = self._read_bytes()
+        return None if raw is None else _parse_receipt(_read_json_bytes(raw, self.maximum, "CLEANUP-COMPLETED"))
+
+    read = load
+
+    def save(self, receipt: CompletionReceipt) -> None:
+        value = _receipt_mapping(receipt)
+        parsed = _parse_receipt(value)
+        existing = self.load()
+        expected_existing = None
+        if existing is not None:
+            if (
+                existing.repository_key,
+                existing.tuple_key,
+                existing.operation_generation,
+                existing.operation,
+                existing.candidate_digest,
+                existing.seed_policy,
+                existing.result_family,
+            ) != (
+                parsed.repository_key,
+                parsed.tuple_key,
+                parsed.operation_generation,
+                parsed.operation,
+                parsed.candidate_digest,
+                parsed.seed_policy,
+                parsed.result_family,
+            ):
+                raise PrivateStateForeignError("completion receipt belongs to another operation")
+            expected_existing = self._current_witness()
+            if expected_existing is None:
+                raise PrivateStateForeignError("completion receipt disappeared before update")
+        self._publish_bytes(_json_bytes(_receipt_mapping(parsed)), expected_existing=expected_existing)
+
+    write = save
+
+
+class StageStore:
+    """Fixed six-entry stage ownership with P1 rebuild/P2 reuse semantics."""
+
+    def __init__(self, namespace: str | os.PathLike[str], active_store: ActiveStateStore | None = None) -> None:
+        self.namespace = _coerce_namespace(namespace)
+        self.active_store = active_store
+        self.write_count = 0
+
+    def _namespace_fd(self) -> int:
+        return _PrivateStore(self.namespace, "", 1, PRIVATE_METADATA_MODE)._open_namespace()
+
+    def _ensure_stage(self) -> None:
+        namespace_fd = self._namespace_fd()
+        try:
+            try:
+                os.mkdir(STAGE_NAME, PRIVATE_DIRECTORY_MODE, dir_fd=namespace_fd)
+                os.fsync(namespace_fd)
+            except FileExistsError:
+                pass
+            stage_fd = os.open(
+                STAGE_NAME,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=namespace_fd,
+            )
+            try:
+                value = os.fstat(stage_fd)
+                _check_private_directory(value, os.fstat(namespace_fd).st_dev, _effective_euid())
+            finally:
+                os.close(stage_fd)
+        finally:
+            os.close(namespace_fd)
+
+    def _stage_fd(self) -> int:
+        namespace_fd = self._namespace_fd()
+        try:
+            return os.open(
+                STAGE_NAME,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=namespace_fd,
+            )
+        except FileNotFoundError as exc:
+            raise PrivateStateError("STAGE is not durable") from exc
+        finally:
+            os.close(namespace_fd)
+
+    def _read_owner_bytes(self) -> bytes | None:
+        try:
+            stage_fd = self._stage_fd()
+        except PrivateStateError:
+            return None
+        try:
+            try:
+                value = os.stat(STAGE_OWNER_NAME, dir_fd=stage_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return None
+            if (
+                not stat.S_ISREG(value.st_mode)
+                or value.st_uid != _effective_euid()
+                or value.st_nlink != 1
+                or stat.S_IMODE(value.st_mode) != PRIVATE_METADATA_MODE
+            ):
+                raise PrivateStateForeignError("STAGE-OWNER.json is unsafe")
+            fd = os.open(
+                STAGE_OWNER_NAME,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=stage_fd,
+            )
+            try:
+                raw = os.read(fd, 8193)
+            finally:
+                os.close(fd)
+            if len(raw) > 8192:
+                raise PrivateStateForeignError("STAGE-OWNER.json is oversized")
+            return raw
+        finally:
+            os.close(stage_fd)
+
+    def load_owner(self) -> StageOwner | None:
+        raw = self._read_owner_bytes()
+        return None if raw is None else _parse_owner(_read_json_bytes(raw, 8192, "STAGE-OWNER"))
+
+    read_owner = load_owner
+
+    def _validate_stage_entries(self) -> tuple[str, ...]:
+        stage_fd = self._stage_fd()
+        try:
+            names = tuple(sorted(os.listdir(stage_fd), key=lambda name: os.fsencode(name)))  # noqa: PTH208
+            allowed = {STAGE_OWNER_NAME, *STAGE_ENTRY_NAMES}
+            if any(name not in allowed for name in names):
+                raise PrivateStateForeignError("STAGE contains an unknown entry")
+            for name in names:
+                if name == STAGE_OWNER_NAME:
+                    continue
+                value = os.stat(name, dir_fd=stage_fd, follow_symlinks=False)
+                if (
+                    not stat.S_ISDIR(value.st_mode)
+                    or value.st_uid != _effective_euid()
+                    or stat.S_IMODE(value.st_mode) != PRIVATE_DIRECTORY_MODE
+                ):
+                    raise PrivateStateForeignError(f"stage entry {name} is unsafe")
+            return tuple(name for name in STAGE_ENTRY_NAMES if name in names)
+        finally:
+            os.close(stage_fd)
+
+    def _require_prepared_active(self) -> ActiveState:
+        if self.active_store is None:
+            raise PrivateStateError("stage writes require an ActiveStateStore binding")
+        active = self.active_store.load()
+        if active is None or active.state not in {"prepared", "running", "ready", "terminal-cleanup"}:
+            raise PrivateStateError("durable ACTIVE must precede stage writes")
+        return active
+
+    def save_owner(self, owner: StageOwner) -> None:
+        self._require_prepared_active()
+        self._ensure_stage()
+        value = _owner_mapping(owner)
+        parsed = _parse_owner(value)
+        existing_owner = self.load_owner()
+        if existing_owner is not None:
+            if existing_owner != parsed:
+                raise PrivateStateForeignError("STAGE-OWNER.json belongs to another operation")
+            return
+        payload = _json_bytes(_owner_mapping(parsed))
+        if len(payload) > 8192:
+            raise PrivateStateError("STAGE-OWNER is oversized")
+        stage_fd = self._stage_fd()
+        try:
+            fd = os.open(
+                STAGE_OWNER_NAME,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                PRIVATE_METADATA_MODE,
+                dir_fd=stage_fd,
+            )
+            try:
+                cursor = 0
+                while cursor < len(payload):
+                    cursor += os.write(fd, payload[cursor:])
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            os.fsync(stage_fd)
+            self.write_count += 1
+        except FileExistsError as exc:
+            raise PrivateStateForeignError("STAGE-OWNER.json already exists") from exc
+        finally:
+            os.close(stage_fd)
+
+    @staticmethod
+    def _owner_exists(stage_fd: int) -> bool:
+        try:
+            os.stat(STAGE_OWNER_NAME, dir_fd=stage_fd, follow_symlinks=False)
+            return True
+        except FileNotFoundError:
+            return False
+
+    def ensure_registered_entries(self, names: Sequence[str] = STAGE_ENTRY_NAMES) -> None:
+        self._require_prepared_active()
+        self._ensure_stage()
+        if any(name not in STAGE_ENTRY_NAMES for name in names):
+            raise PrivateStateError("stage rebuild attempted an unregistered entry")
+        stage_fd = self._stage_fd()
+        try:
+            for name in names:
+                try:
+                    os.mkdir(name, PRIVATE_DIRECTORY_MODE, dir_fd=stage_fd)
+                except FileExistsError:
+                    value = os.stat(name, dir_fd=stage_fd, follow_symlinks=False)
+                    if (
+                        not stat.S_ISDIR(value.st_mode)
+                        or value.st_uid != _effective_euid()
+                        or stat.S_IMODE(value.st_mode) != PRIVATE_DIRECTORY_MODE
+                    ):
+                        raise PrivateStateForeignError(f"stage entry {name} is unsafe") from None
+                else:
+                    self.write_count += 1
+            os.fsync(stage_fd)
+        finally:
+            os.close(stage_fd)
+
+    def reuse_if_valid(self, owner: StageOwner) -> bool:
+        current = self.load_owner()
+        if current is None or current != owner:
+            return False
+        entries = self._validate_stage_entries()
+        return entries == STAGE_ENTRY_NAMES
+
+    def rebuild_registered_entries(
+        self,
+        owner: StageOwner,
+        registered_names: Sequence[str] = STAGE_ENTRY_NAMES,
+        builder: Callable[[str, int], None] | None = None,
+    ) -> None:
+        """Rebuild only already-registered names; P2 reuse never reaches this method."""
+
+        self._require_prepared_active()
+        if tuple(registered_names) != STAGE_ENTRY_NAMES or any(
+            name not in STAGE_ENTRY_NAMES for name in registered_names
+        ):
+            raise PrivateStateError("stage rebuild names are not the fixed registered set")
+        self.ensure_registered_entries(registered_names)
+        self.save_owner(owner)
+        stage_fd = self._stage_fd()
+        try:
+            for name in registered_names:
+                if builder is not None:
+                    builder(name, stage_fd)
+            os.fsync(stage_fd)
+        finally:
+            os.close(stage_fd)
+
+
+def _coerce_namespace(value: str | os.PathLike[str]) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        return resolve_private_namespace(path)
+    if path.name == "STAGE":
+        path = path.parent
+    if re.fullmatch(r"[0-9a-f]{64}", path.name) and path.parent.name.startswith(PRIVATE_NAMESPACE_PREFIX):
+        return path
+    return resolve_private_namespace(path)
+
+
+__all__ = [
+    "ACTIVE_NAME",
+    "PRIVATE_ENTRY_NAMES",
+    "RECEIPT_NAME",
+    "RECORD_TEMP_NAME",
+    "STAGE_ENTRY_NAMES",
+    "ActiveStateStore",
+    "CompletionReceiptStore",
+    "PrivateStateError",
+    "PrivateStateForeignError",
+    "StageStore",
+    "cleanup_token_for",
+    "repository_key_for",
+    "resolve_private_namespace",
+    "tuple_key_for",
+]
