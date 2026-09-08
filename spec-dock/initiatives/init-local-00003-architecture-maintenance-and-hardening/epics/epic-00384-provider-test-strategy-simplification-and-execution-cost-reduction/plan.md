@@ -23,90 +23,83 @@ repository_evidence:
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
 
-## 1. Planning status
+## 1. 今回の位置づけ
 
-本計画は三つの実装・検証単位を順次統合する親計画である。2026-09-02の親候補 `1429c2f899c6d2086d5bd03c0dcea01f5b168435` はreview execution `required-strict-github-connector-verificati-747` でpass、findings `[]` となり、freeze receiptとGitHub body projection/readbackまで完了した。過去の「review 740 fail後の修正待ち」は現在の残作業ではない。後続編集のacceptanceは別のexact-candidate reviewで判定する。
+この作業はEpic全体の再評価を完了し、親計画をcommit/pushした後、最初のIssue #392を正式startする。ユーザーが2026-09-08にこの順序を依頼した。Product実装は今回行わず、Issue branchでの詳細化・独立review後に許可する。過去のGPT-5.6/外部Strict passも、直前の限定的GPT-6 review passも、新しい候補のacceptanceに流用しない。
 
-2026-09-08のユーザー指示により、この環境はEpicの要件・設計・Issue境界・統合契約の具体化に専念する。各Issueの詳細化も実装も、後日新しく作るIssue branch/worktreeで行う。本環境でIssue start、Issue branch/worktree作成、Product変更は行わない。
+目的はprovider状態数・重複検証・実行コストの削減であり、文書数やIssue数を増やすことではない。実装・検証単位は#392 → #395 → #396の三件を維持する。各Issue PRをEpic branchへ人間が順次mergeし、最後にmainへ一度mergeする。
 
-### 作業場所と引き継ぎ境界
+## 2. 作業場所と開始の区別
 
-| 場所 | 行うこと | 行わないこと |
-|---|---|---|
-| 本Epic worktree | 親R/D/P、横断契約、Issueのgoal/non-goal/acceptance境界、独立review、人間向け説明 | 個別Issueの詳細手順作成、Issue start、実装 |
-| 将来のIssue専用worktree | 受理済みEpic tipから分岐し、そのIssueだけの詳細R/D/PとLuna Max handoffを作る。review後に実装・検証 | 親の要件を推測変更すること、mainへの直接統合 |
-| Epic integration branch | 人間がIssue PRを順番にmergeし、各merged tipのGREENを確認する | 複数Issueの並列writer、検証を後続Issueへ先送りすること |
+- Integration branchは `codex/epic-00384-provider-test-strategy-planning` のまま残す。
+- 各Issueは最新の受理済みintegration tipから分岐した専用branchで作業する。
+- 専用branchは新worktreeでも、ユーザーが明示した本worktreeの再利用でもよい。作業場所の選択はIssueの受入単位やPR baseを変えない。
+- SpecDock `issue start` はbranch/activeの正式選択であり、Product実装開始許可ではない。
+- Issue詳細R/D/P、Luna Max handoff、独立reviewが揃うまでProduct実装を行わない。formal startだけ、Epic passだけ、dependency readyだけを実装許可にしない。
 
-### レビュー方式
+以前のstart/checkout保留は、2026-09-08の明示的な開始依頼で解除された。G0のreview・commit/push・freeze/projection確認後に#392を正式startする。#395/#396を先にstartしない。
 
-外部ChatGPT Useが動作しない状況について、ユーザーがGPT-6で進めることを明示的に承認した。現在の独立reviewはGPT-6（`gpt-6-astra`）・推論Maxのfreshサブエージェントで開始し、修正後は同じreviewerを再利用する。主担当が指摘を現物で判断し、親文書だけを修正する。Luna Maxは将来の実装担当であり、このEpicのreviewerには使用しない。既存Issue draftにある「Strict review」の現行経路・証拠要件は[Rolling-Wave Contract §5](artifacts/rolling-wave-issue-elaboration-contract.md)で一元的に定義する。ローカルreviewを外部ChatGPT Strict passとは呼ばない。
+## 3. 依存順と受入条件
 
-## 2. Issue order and acceptance gates
-
-| Gate | Entry | Observable acceptance | Exit |
+| Gate | 必要な入力 | 受入条件 | 次の段階 |
 |---|---|---|---|
-| G0 Parent freeze | 親候補、current Git-verified tip | R/D/P、ADRs、contracts、three Issue draftsと`E384-QUAL-001`が整合し、当該候補の独立reviewがP0/P1=0かつpass、owner decisions 0 | Reviewed tipをexternal `PARENT_FREEZE_SHA` receiptへ記録し、#384/#392/#395/#396 body projection/readback後に#392 elaboration可能。 |
-| G1 #392 | G0 GREEN | Fixed ownership lifecycleがcomplete、wire適合、dogfood complete、14 active identities unchanged、transitional gates GREEN | Human merge to Epic branch、B1 GREEN readback。 |
-| G2 #395 | B1 GREEN | 14 active rowsがProduct修正でnormal pass、15 resolved、approved 0、transitional gates GREEN | Human merge、B2 GREEN readback。 |
-| G3 #396 | B2 GREEN | Build-once final gate、`E384-QUAL-001` conformance evidence、consumer-first old policy removal、final docs/dogfood、context/evidence GREEN | Human merge、B3 GREEN readback。 |
-| G4 Epic main | B3 accepted | Final human review、tree equality、required contexts、rollback record | One human merge to main、B4 closure。 |
+| G0 Parent freeze | 現行親R/D/P、三Issue draft、契約、原因別register | 同一候補の独立GPT-6 Max review pass、P0/P1=0、親の未決判断0。clean pushed tipのfreeze receiptと4 Issue body projection readback | ユーザーの開始依頼後、#392の正式startと詳細化 |
+| G1 #392 | G0、#387完了、current transitional baseline | fixed lifecycle、migration/uninstall/recovery、runtime coordination、complete dogfood、旧writer撤去、current gates GREEN | 人間merge後のB1を確認 |
+| G2 #395 | B1、exact 15-row register | 原因に対応した12件のtest側修復と2件のProduct側修復、全accepted behavior正常pass、15 resolved、例外0、current gates GREEN | 人間merge後のB2を確認 |
+| G3 #396 | B2 clean baseline | build-once role graph、E384-QUAL-001、consumer-first旧policy撤去、context無空白切替、最終docs/dogfood | 人間merge後のB3を確認 |
+| G4 Epic main | B3と全受入証拠 | 最終human review、tree/context/evidence整合 | mainへ一度human merge、B4/closure確認 |
 
-## 3. Rolling-wave cycle
+`E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、親の未決判断は0件である。G0は改訂候補の独立review・clean pushed freeze receipt・projection readbackで受理する。採用だけでG0や実装開始を完了扱いにしない。
 
-各Issueについて同じcycleを適用する。
+## 4. 各Issueで繰り返す進め方
 
-- external `PARENT_FREEZE_SHA` receiptまたはaccepted predecessor tip、dependency evidence、GREEN observationsを固定する。
-- Issue draft contractとparent stable contractsを比較する。
-- Current treeからowned/shared/no-touch inventory、representative RED、implementation design、tests、commands、rollback procedureを具体化する。
-- 別のIssue専用worktreeで作成したIssue-specific R/D/PとLuna Max handoffを、Rolling-Wave Contract §5に従って独立reviewする。
-- Review accept後にだけIssueをstartする。
-- 実装、Issue-level verification、human PR review、human integration mergeを完了する。
-- Exact merged tipでGREENを再確認し、Issue acceptanceを記録する。
-- 次Issueのelaborationまでbranchをsingle-writerに戻す。
+1. 受理済みEpic tip、前Issueのmerge/GREEN、dependency、main driftを確認する。
+2. ユーザーが開始を依頼したら、現行CLIの正式`issue start`で専用branch/activeを選択する。worktreeはユーザーの指定を守る。
+3. 選択したIssueの契約をcurrent treeへ具体化し、R/D/PとIssue専用handoffを作る。調査Issueは作らない。
+4. 初回fresh、修正後same-contextのGPT-6 Max reviewerで独立reviewする。Product実装はpassまで開始しない。
+5. 実装・そのIssue自身のテスト/保護/回復確認を行い、Epic baseのPRをmerge-readyにする。
+6. 人間merge後のexact integrated tipで、その段階のGREENを確認してからIssueを完了する。
+7. 次Issueは前の受入後にだけ詳細化する。
 
-このcycleのimplementation detailは本parent Planに固定しない。
+詳細なfile/symbol/test実装/command sequenceはIssue着手時の計画に置く。親で将来の全micro-stepを固定しない。
 
-## 4. G1 — Issue #392 contract gate
+## 5. #392 — ライフサイクルの簡素化
 
-G1はlifecycle Product outcomeだけを受け入れる。Failure baselineのactive identitiesとcurrent regression systemはcompatibility inputであり、terminalizationまたはfinal policy cutoverを先取りしない。Final qualification guaranteeは削除せず、parent `E384-QUAL-001`と#396へ移管済みのread-only non-goalとして保持する。Lifecycle candidateを変更するためcomplete dogfood convergenceを必要とする。
+四root・二slot・closed record/wire・exact migration・tooling-only uninstall・保護データ不変を一体で実装する。旧lifecycle writerとその廃止された振る舞いだけを検証するtestsは、代替contract proofの成立と同じIssueで除く。
 
-## 5. G2 — Issue #395 contract gate
+`system`交換とruntime lockの競合はE384-RQ-019 / Wire §16を実現して閉じる。初回移行の停止運用はユーザー承認済みである。共有root lease、module import前admission、busyのmutation-zero、update/uninstall双方のrelease→exec、親異常終了時もhelper書込み完了まで保つlease、incomplete後の外部復旧を#392自身で検証する。#395/#396の実装を先取りせず、current baseline/PR/full verifierを整合させる。
 
-G2はregisterの14 active rowsだけをProduct defect scopeとして扱う。各rowは自身のRED/GREENとcurrent integrated behaviorを持つ。全検証をG3へ延期しない。Current policyを利用してactive/approved 0を証明し、final policy toolingまたは`E384-QUAL-001` implementationを先取りしない。
+## 6. #395 — 既知失敗が表す契約の回復
 
-## 6. G3 — Issue #396 contract gate
+register §6.1が原因と修復責務の正本である。「全部Product bug」「全部testを直せばよい」のどちらにも決め打ちしない。廃止CLIを復活させず、現行portへtest doubleを追随させ、Product責務混線は本番側で修正する。
 
-G3はB2 clean baselineをadmission条件とする。Replacement gateを成立させた後、old consumersを0にしてからold providers/data/workflowを削除する。Build-once、same bytes、platform role、`E384-QUAL-001`のmechanical evaluation/evidence、required-context transition、final operator guidanceを同一Issue acceptanceへ統合する。Issue-start elaborationはimplementation mechanismを具体化できるが、`E384-QUAL-001`のvalue、population、window、aggregation、scope、rejectionまたはescape prohibitionを変更・複製しない。
+14件のnode/signature履歴とaccepted behaviorを保持し、元の振る舞いがnormal passになった証拠でresolvedへ移す。Skip/xfail/approved failure/assertion弱化を認めない。修復途中の部分集合でmerge/完了しない。
 
-## 7. Merge and rollback governance
+## 7. #396 — 最終検証基盤への切替
 
-- Human alone merges Issue PRs and final Epic PR。
-- Issue PR merge後のGREEN未確認中は次Issue branchを作らない。
-- Revertはwhole Issue mergeを単位とする。
-- Later Issue開始前なら直前mergeをrevertできる。
-- Later Issue開始後のrollbackはunmerged workを破棄し、accepted suffixを逆順に戻す。
-- Partial stable-contract rollback、automatic Issue creation、automatic branch-setting change、agent mergeは禁止する。
-- Recoveryでstable contract変更が必要ならIssueを停止し、parent R/D/PとADRを再承認する。
+通常のPR gateは一回のrole graphとper-attempt判定で閉じる。五回測定と二十件履歴の関係、cancel/missing evidence、retry/rerun、環境能力境界は親E384-QUAL-001をそのまま実装する。初期qualificationを五回×二十件の入れ子ループへしない。
 
-## 8. Evidence and reporting
+Required-contextのintentional REDは五回campaign freeze前に実施し、二十件履歴へは失敗として残す。RED後に必要な二十成功attemptは初期導入証拠の実コストとして扱い、削除・取り直しで隠さない。同一candidateのbuildは一回だけで、後続attemptは同じ保存artifactを使う。
 
-各Issue reportは既存draft scaffoldから、そのIssue実装時にだけ更新する。本packではIssue reportを置換しない。Epic reportはplanning adoptionとverified baselineだけを記録し、実装完了を主張しない。
+Replacement consumers/providersを先に成立させ、old consumer 0を確認してからledger/timing/sharder/skip/hook/old workflowを削除する。Compatibility-only surface除去後の最終sourceで証拠を取得する。
 
-Required evidence is distributed:
+## 8. レビューと証拠を増殖させない
 
-| Issue | Evidence category |
-|---|---|
-| #392 | Lifecycle behavior、migration/uninstall、filesystem recovery、wire、dogfood/protection、transitional-gate non-regression |
-| #395 | Exact row RED/GREEN、Product behavior、15-row terminal state、ordinary/full current gates、dogfood/protection |
-| #396 | Workflow structure、same artifact bytes、platform roles、`E384-QUAL-001` raw/mechanical evidence、policy consumer-zero/removal、contexts、final dogfood/docs |
-| Epic | Three merged-tip GREEN receipts、B3 tree、final main merge tree equality、closure readback |
+- 現在の独立review経路はRolling-Wave Contract §5。外部ChatGPT/Oracleの復旧待ちは開始条件にしない。
+- Authorとreviewerを分離する。同一周期は初回fresh・以後same reviewerを使う。
+- 変更対象と候補identityを固定し、指摘の原因を直す。未実装のIssue micro-step不足だけでEpicを再設計しない。
+- 親の横断契約を変えない実装詳細はIssue側に閉じ、影響のない受入済み親部分を最初から書き直さない。
+- 同じraw observationを複数の必要な集計から参照してよい。見せる資料のためだけに製品テストを重複実行しない。
+- Review pass、formal start、implementation-ready、実装検証、merge、closureは別々に報告する。
 
-## 9. Stop policy
+## 9. Merge・回復・停止
 
-Stop before Issue start or merge for dependency mismatch、non-GREEN branch、stable contract drift、unexpected baseline identity、`E384-QUAL-001` omission/duplication/semantic drift/incomplete evidence、scope outside Issue boundary、partial dogfood、protected-data drift、new approved failure、later-Issue tooling dependency、consumer-before-provider ordering violation、context gap、unreadable evidence、rollback ambiguity、or human gate bypass。
+Issue PR baseは常にEpic branch。人間だけがmerge/revert/required-context設定を行う。Integration rollbackはwhole Issue merge単位で、後続作業があれば停止して依存suffixの逆順revertまたはowned境界のforward-fixを選ぶ。Agentは未merge作業を勝手に削除しない。
 
-Stop result must return exact observed branch tip、failed contract ID、affected Issue、expected/actual state、and whether whole-merge revert is still available. Luna Max does not choose an alternate architecture.
+Dependency/identity不一致、未決判断、非GREEN、保護データ変化、未説明のfailure、他Issueの責務、evidence不足、context gap、回復不能の曖昧さでは停止して親へ戻す。実装者にProduct/Policy判断を推測させない。
 
-## 10. Completion
+## 10. 完了
 
-G0 is complete only after the independent reviewer accepts the exact candidate under the Rolling-Wave Contract, the accepted clean pushed tip is recorded as external `PARENT_FREEZE_SHA` without a tracked self-reference, and all four GitHub Issue body projections are read back. Epic is complete only after G1–G3 are accepted on the integration branch and G4 is human-merged once to main. `owner_decisions_required=[]`.
+親計画は、未決判断を閉じ、同一候補の独立reviewと公開済みtipの受入記録を揃えた時点で具体化完了とする。Epic製品完了は、G1–G3の受入とG4の人間merge後だけである。
+
+Current parent decision: `owner_decisions_required=[]`。両decisionはユーザー採用済み。

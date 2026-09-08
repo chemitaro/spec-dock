@@ -2,7 +2,7 @@
 種別: Normative Artifact
 ID: "epic-00384-rolling-wave-issue-elaboration-contract-v1"
 タイトル: "Rolling-Wave Issue Elaboration Contract"
-状態: "accepted"
+状態: "draft"
 最終更新: "2026-09-08"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
@@ -17,7 +17,7 @@ repository_evidence:
 
 ## 1. Purpose
 
-Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Those details are generated immediately before each Issue starts, against the current accepted integration tip, in a newly created Issue branch/worktree. The current Epic worktree authors only parent contracts and does not elaborate or implement an Issue。
+Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Parent G0、dependency evidence and an explicit user start request permit formal `issue start` to select the Issue branch/active scope. Detailed R/D/P and handoff are then authored on that branch against the accepted integration tip; independent acceptance is required before Product implementation. Use a new worktree or an existing worktree explicitly selected by the user. The user requested parent commit/push followed by #392 formal start on 2026-09-08; this proceeds only after G0. Product implementation remains outside this task.
 
 ## 2. Immutable parent inputs
 
@@ -25,7 +25,7 @@ Elaboration may not change:
 
 - Issue count、IDs、GitHub numbers、dependency direction;
 - integration branch and human merge topology;
-- stable cross-Issue contracts E384-C-001〜C-011 and parent `E384-QUAL-001`;
+- stable cross-Issue contracts E384-C-001〜C-012 and parent `E384-QUAL-001`;
 - lifecycle wire values and #392 sole-writer/read-only rule;
 - 15/14/1 baseline identities and Issue ownership;
 - current-policy-through-#395 and consumer-first-#396 rule;
@@ -34,30 +34,34 @@ Elaboration may not change:
 
 A required change to any item is a parent stop, not an elaboration choice。
 
-## 3. Start gate inputs
+## 3. Start and elaboration gate inputs
 
-Before elaboration:
+Before formal Issue start:
 
 1. Resolve exact current integration branch tip and tree。
-2. For #392, require external `PARENT_FREEZE_SHA` receipt for that accepted parent tip and readback receipts for the post-pass GitHub #384/#392/#395/#396 body projections。
+2. Require accepted parent G0 with `owner_decisions_required=[]`. For #392, require external `PARENT_FREEZE_SHA` receipt for that accepted parent tip and readback receipts for the post-pass GitHub #384/#392/#395/#396 body projections。
 3. Verify predecessor Issue merged and accepted, or #387 completed for #392。
 4. Verify current state B0/B1/B2 as applicable is GREEN。
 5. Verify Issue metadata ID、GitHub number and `depends_on` relation。
 6. Verify no other Issue writer is active。
 7. Compare main drift and classify overlap。
 8. Re-read root `AGENTS.md` and current parent contracts。
-9. Verify current Issue remains open and not already started。
+9. Verify current Issue remains open and not already started. Require an explicit user start request; review completion alone does not resume the cancelled start。
+
+After formal start, verify the selected branch/active Issue and perform elaboration there. `issue start` is scope selection, not permission to dispatch a coder. Elaboration/review may leave the Issue active while Product implementation remains prohibited.
 
 ## 4. Required elaboration outputs
 
-The issue-start specification pack must produce implementation-ready R/D/P and a Luna Max handoff containing:
+Before Product implementation, the elaboration pack must produce implementation-ready R/D/P and a Luna Max handoff containing:
 
 - exact base SHA/tree and accepted predecessor evidence;
 - observable goal and non-goals copied without semantic change;
 - owned/shared/no-touch file inventory;
 - component and symbol responsibilities;
 - stable input/output schemas and compatibility points;
-- for #396, exact measurement/evidence implementation and boundary tests that mechanically realize `E384-QUAL-001` without duplicating its policy values;
+- for #392, resolved legacy admission, shared runtime/lifecycle coordination, wrapper handoff and interruption/concurrency evidence under E384-RQ-019;
+- for #395, the register §6.1 cause-specific repair map, including faithful harness repairs and guarded Product boundaries;
+- for #396, exact measurement/evidence implementation and boundary tests that mechanically realize `E384-QUAL-001` without duplicating its policy values, including one role graph per attempt, shared five-run/twenty-window observations and environment capability proof;
 - first RED and representative failure evidence;
 - complete test ownership and exact test cases;
 - exact commands and expected results;
@@ -78,7 +82,7 @@ The issue-start specification pack must produce implementation-ready R/D/P and a
 - Reviewはexact base SHA/treeと候補のfile/diff identityへ束縛する。Working-tree review後にcommitする場合、review済み内容との一致を確認し、最終clean pushed tipのreceiptをtracked tree外へ記録する。後続の仕様変更を過去passで認証しない。
 - 要件・設計・責務境界・安全な中間状態・testability・互換性・recovery・evidence identity・human gateを確認する。`P0/P1=0` かつ `review_status=pass` がacceptance条件である。
 - Epicでは親契約とIssue draft境界をreviewする。まだ存在しないIssue詳細実装手順の欠如は、それ自体をEpicの欠陥としない。
-- Issueでは、そのIssue専用worktreeで作られたimplementation-ready R/D/PとLuna Max handoffを独立reviewする。Epic passやdependency `ready=true` はIssue実装許可を代替しない。
+- Issueでは、選択されたIssue branch/worktreeで作られたimplementation-ready R/D/PとLuna Max handoffを独立reviewする。Epic passやdependency `ready=true` はIssue実装許可を代替しない。
 - 別環境の新しい担当は、review開始時のユーザー指示を再確認する。明示的な変更がなければ本節の経路を用い、故障した外部経路の再試行を開始条件にしない。
 
 ## 6. Allowed rolling-wave choices
@@ -87,7 +91,7 @@ The elaborator may choose exact implementation files、symbols、helper decompos
 
 ## 7. Stop and return
 
-Return to the parent owner without starting the Issue when:
+Return to the parent owner without formal start if not yet active, or without Product implementation if already active, when:
 
 - dependency or branch-tip evidence differs;
 - current branch is not GREEN;
@@ -103,6 +107,6 @@ The return payload identifies exact contract ID、expected/actual evidence、sco
 
 ## 8. Current status
 
-The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed its external review, with freeze/projection receipts recorded. That historical acceptance does not certify later edits. No implementation-ready elaboration has been accepted for #392、#395 or #396 under this contract. Issue #392 is dependency-ready, but it must not start from current drafts. Its next stage is elaboration in a separate Issue branch/worktree after the current parent candidate is accepted under §5。
+The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies the 2026-09-08 whole-plan changes. No implementation-ready elaboration has been accepted for #392、#395 or #396. #392 is dependency-ready. Both E384-DEC-001/002 were adopted by the user. G0 still requires the exact candidate review/publication receipts. The explicit request to start #392 has been received; after G0, formal start selects its branch in this same worktree, followed by elaboration and independent implementation-readiness review.
 
-`owner_decisions_required=[]`.
+`owner_decisions_required=[]`. Both decisions are adopted; do not reopen them without new evidence. See [whole-plan reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md).

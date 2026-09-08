@@ -4,7 +4,7 @@ ID: "iss-00395"
 タイトル: "Regression Baseline Terminalization and Product Defect Repair"
 関連GitHub: ["#395"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "iss-00392"
   - "../../requirement.md"
@@ -28,13 +28,15 @@ repository_evidence:
 
 Parent: [Epic Requirement](../../requirement.md) / [Baseline Register](../../artifacts/active-failure-disposition-register.md)
 
+Formal `issue start` selects the Issue branch/active context after parent/dependency admission and an explicit user request. It does not authorize Product implementation. The workspace may be new or explicitly reused; implementation-ready R/D/P and handoff plus independent review are still required. The current Epic reassessment does not start this Issue.
+
 ## 1. Observable outcome
 
-Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledgerの14 active rowsがすべてProduct実装修正によりnormal passとなる。Ledgerは15 total、0 active、15 resolved、approved failure 0となり、current PR gateとcurrent Full Regressionが独立してGREENになる。
+Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledgerの14 active rowsが表す契約を原因に対応したProduct/test側修復でnormal passへ戻す。Ledgerは15 total、0 active、15 resolved、approved failure 0となり、current PR gateとcurrent Full Regressionが独立してGREENになる。
 
 ## 2. Goal
 
-- Exact 14 active rowsが示すProduct defectsを修正する。
+- Exact 14 active rowsのaccepted behaviorを回復する。親register §6.1に従い、12件のharness/observer不整合と2件のProduct責務境界を修復する。
 - Row identity、signature、accepted behaviorをparent registerへ一致させる。
 - Current regression systemを利用してclean baselineを成立させる。
 - #396がpolicy cutoverできるstable zero-failure inputを提供する。
@@ -44,7 +46,7 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 - Lifecycle wire、ownership、migration、uninstall semanticsの変更。
 - Ledger、timing、sharder、policy skip machinery、current workflowsの最終削除。
 - Build-once gate、evidence、parent `E384-QUAL-001` implementation、required-context transition。
-- New Product feature、general dead-code cleanup、test-only terminalization。
+- New Product feature、general dead-code cleanup、振る舞いを弱めるtest-only terminalization。
 - Mainへの直接merge。
 
 ## 4. Stable input
@@ -73,7 +75,7 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 
 **Owned:** E384-RQ-010、011 and Product-repair portion of E384-RQ-015。
 
-**Shared/read-only:** E384-RQ-001〜003、006、007、009、016〜018 and parent `E384-QUAL-001`。E384-RQ-004〜005 and E384-RQ-012〜014 implementation are non-owned。
+**Shared/read-only:** E384-RQ-001〜003、006、007、009、016〜019 and parent `E384-QUAL-001`。E384-RQ-004〜005 and E384-RQ-012〜014 implementation are non-owned。
 
 ## 7. Requirements
 
@@ -81,9 +83,9 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 
 Issue starts only when the register matches exact 15/14/1 and #392 B1 is GREEN. Stale 27-row top-level metadata is not admission authority。
 
-### I395-RQ-002 — Product repair
+### I395-RQ-002 — Cause-appropriate contract repair
 
-Each active row is repaired through production behavior. The existing node becomes a normal pass unless parent register explicitly defines another stable successor. Current register defines all 14 active rows as fixed-in-place。
+Repair the cause adjudicated in parent register §6.1: twelve test-harness/observer repairs and two Product boundary repairs. Keep the existing nodes and accepted behavior; all fourteen are fixed-in-place. A faithful fixture/observer correction is permitted; restoring retired CLI flags or replacing the production descriptor-bound API with its obsolete predecessor is forbidden. Production defects revealed behind a corrected harness remain owned only if they violate the same accepted row behavior。
 
 ### I395-RQ-003 — No masking
 
@@ -107,11 +109,11 @@ Candidate-changing Product repairs update dogfood completely when necessary and 
 
 ### I395-RQ-008 — Issue-start gate
 
-Concrete owner surfaces、repair hypotheses、RED/GREEN tests、commands and ordering are generated only against B1 current tip and independently Strict-reviewed before start. Elaboration does not implement or redefine `E384-QUAL-001`。
+Concrete owner surfaces、repair hypotheses、RED/GREEN tests、commands and ordering are generated only against B1 current tip and independently reviewed under Rolling-Wave Contract §5 before Product implementation. Elaboration does not implement or redefine `E384-QUAL-001`。
 
 ## 8. Verification evidence categories
 
-Row-by-row RED/GREEN、Product behavior、current ledger evaluation、ordinary/full current gate、lifecycle non-regression、dogfood/protected data、merged-tip GREEN。
+Row-by-row RED/GREEN、current behavior and faithful test observers、current ledger evaluation、ordinary/full current gate、lifecycle non-regression、dogfood/protected data、merged-tip GREEN。
 
 ## 9. Rollback and recovery boundary
 
@@ -121,4 +123,4 @@ Whole #395 merge is the rollback unit. Revert returns to accepted B1 with the kn
 
 Stop for unknown row/signature、already-changed active identity、required lifecycle redesign、need to remove current policy early、`E384-QUAL-001` implementation or reinterpretation、new Product scope、unresolvable behavior ambiguity、or non-GREEN B1。Return exact row and evidence to the parent; do not choose a new disposition。
 
-`owner_decisions_required=[]`.
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。

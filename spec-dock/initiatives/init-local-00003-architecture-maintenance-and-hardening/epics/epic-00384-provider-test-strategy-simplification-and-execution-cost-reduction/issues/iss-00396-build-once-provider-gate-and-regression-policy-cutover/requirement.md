@@ -4,7 +4,7 @@ ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "iss-00395"
   - "../../requirement.md"
@@ -27,6 +27,8 @@ repository_evidence:
 # iss-00396 Build Once Provider Gate and Regression Policy Cutover — 要件定義
 
 Parent: [Epic Requirement](../../requirement.md) / [E384-QUAL-001](../../requirement.md) / [Integration Contract](../../artifacts/epic-integration-branch-contract.md)
+
+Formal `issue start` selects the Issue branch/active context after parent/dependency admission and an explicit user request. It does not authorize Product implementation. The workspace may be new or explicitly reused; implementation-ready R/D/P and handoff plus independent review are still required. The current Epic reassessment does not start this Issue.
 
 ## 1. Observable outcome
 
@@ -76,7 +78,7 @@ Accepted B2 clean baseline上で、Provider CIがparent `E384-QUAL-001`へ適合
 
 **Owned:** E384-RQ-012、013、014、parent `E384-QUAL-001`のimplementation/evidence responsibility and final test-policy/documentation portion of E384-RQ-015。The parent remains the sole policy/value authority。
 
-**Shared/read-only:** E384-RQ-001〜003、006、007、011、016〜018。Lifecycle and Product repair contracts are non-owned。
+**Shared/read-only:** E384-RQ-001〜003、006、007、011、016〜019。Lifecycle and Product repair contracts are non-owned。
 
 ## 7. Requirements
 
@@ -86,7 +88,7 @@ Issue starts only when B2 proves 15 resolved、active/approved/unexpected 0. An 
 
 ### I396-RQ-002 — Sole packaging producer
 
-The packaging/consumer graph mechanically implements the build-invocation and same-candidate requirements of parent `E384-QUAL-001`. Its concrete job names and commands are rolling-wave implementation detail。
+The packaging/consumer graph mechanically implements the build-invocation and same-candidate requirements of parent `E384-QUAL-001`. Its concrete job names and commands are rolling-wave implementation detail。A normal final-gate attempt executes one role graph; the campaign's first five attempts supply the five performance observations, and the same observations may also belong to the latest-twenty window. Do not run five times inside every attempt. Started failures, cancellations and missing evidence cannot be discarded; same-candidate campaign re-registration cannot select a replacement sample。
 
 ### I396-RQ-003 — Closed execution ownership
 
@@ -118,7 +120,7 @@ After human merge, B3 final gate、complete `E384-QUAL-001` conformance evidence
 
 ### I396-RQ-010 — Issue-start gate
 
-Concrete workflow、modules、measurement collector、schemas、commands、tests、compatibility sequence and evidence implementation are authored only at B2 tip and independently Strict-reviewed before start. Elaboration may not change or duplicate `E384-QUAL-001` semantics。
+Concrete workflow、modules、measurement collector、schemas、commands、tests、compatibility sequence and evidence implementation are authored only at B2 tip and independently reviewed under Rolling-Wave Contract §5 before Product implementation. Elaboration may not change or duplicate `E384-QUAL-001` semantics。
 
 ## 8. Verification evidence categories
 
@@ -132,4 +134,4 @@ Whole #396 merge is the rollback unit and returns to B2 clean current-policy sta
 
 Stop for non-clean B2、required Product/lifecycle change、consumer remaining、`E384-QUAL-001` ambiguity/duplication/non-conformance/incomplete evidence、evidence identity gap、context gap、partial policy removal、partial dogfood、protected-data drift or non-empty owner decision. Return exact evidence; do not choose new qualification values or satisfy the contract through a prohibited escape。
 
-`owner_decisions_required=[]`.
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。

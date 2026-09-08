@@ -1,8 +1,8 @@
 ---
 種別: Normative Artifact
-ID: "provider-lifecycle-wire-contract-v10"
+ID: "provider-lifecycle-wire-contract-v11"
 タイトル: "Provider Lifecycle Wire Contract"
-状態: "accepted"
+状態: "parent-contract-candidate"
 最終更新: "2026-09-08"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
@@ -14,6 +14,8 @@ repository_evidence:
 ---
 
 # Provider Lifecycle Wire Contract
+
+> **2026-09-08 親契約改訂:** `E384-DEC-001` と `E384-DEC-002` はユーザー採用済みである。v11は初回だけの停止移行、以後のruntime/lifecycle共有coordination、同世代checkout、変更先worktreeの排他と公開/handoff境界を§16で固定する。v10のrecord/cleanup/replay契約を維持し、pre-observationのclosed code二つ・関係行四つ・public JSON例二つを追加した。前候補のwire-only fail/whole-plan blockedは履歴として保存し、本候補の独立review・公開freezeは候補hashに紐づく外部receiptで別に証明する。本書の存在だけをIssue startまたは実装許可のreceiptにしない。詳しくは[全体再評価ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md)。
 
 ## 1. Authority and closed-world rule
 
@@ -28,7 +30,7 @@ repository_evidence:
 | Issue #395 | Read-only consumer. Product defect repairs must preserve lifecycle semantics and serialized values. |
 | Issue #396 | Read-only consumer. Provider-gate and policy cutover may verify but not redefine this wire. |
 
-Any semantic change requires a superseding parent ADR, revalidation of affected Issue drafts, dependency-chain restart from the affected state and independent review under the Rolling-Wave Contract. When Issue boundaries or copied values change, regenerate those draft portions. Before any Issue implementation is accepted, the restart point is B0; unchanged reference-only Issue drafts need no invented implementation detail. Revision v10 is governed by [Preimplementation Clarifications ADR](20260907t223933z-adr-preimplementation-recovery-and-qualification-clarifications.md). Rolling-wave elaboration may add implementation details and tests but cannot change this artifact.
+Any semantic change requires a superseding parent ADR, revalidation of affected Issue drafts, dependency-chain restart from the affected state and independent review under the Rolling-Wave Contract. When Issue boundaries or copied values change, regenerate those draft portions. Before any Issue implementation is accepted, the restart point is B0; unchanged reference-only Issue drafts need no invented implementation detail. Revision v10 was governed by [Preimplementation Clarifications ADR](20260907t223933z-adr-preimplementation-recovery-and-qualification-clarifications.md); v11 adds the parent-adopted coordination boundary under [Whole-plan Reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md). Rolling-wave elaboration may add implementation details and tests but cannot change this artifact.
 
 ## 2. Canonical scalar and serialization conventions
 
@@ -51,14 +53,14 @@ The normative finite inventory is exact:
 | Item | Count |
 |---|---:|
 | public status values | 6 |
-| public code values | 38 |
+| public code values | 40 |
 | `phase` values | 23 |
 | `last_completed_phase` values | 24 |
 | durable record goldens | 4 |
-| complete code/context relation rows | 148 |
-| public JSON review goldens | 33 |
+| complete code/context relation rows | 152 |
+| public JSON review goldens | 35 |
 
-The implementation test extracts the §10 table and all fenced JSON review goldens from this file, verifies these counts, parses every JSON block, and asserts one terminal LF. It additionally parameterizes all seven cleanup-warning rows and requires `retry_command == continuation.next_command == active.cleanup_retry_command` with a matching hidden token. The thirty-three JSON review goldens remain unchanged in count; warning tokenization is proven by the seven finite matrix rows rather than a new review golden. A count drift is a specification/test defect and is not auto-accepted.
+The implementation test extracts the §10 table and all fenced JSON review goldens from this file, verifies these counts, parses every JSON block, and asserts one terminal LF. It additionally parameterizes all seven cleanup-warning rows and requires `retry_command == continuation.next_command == active.cleanup_retry_command` with a matching hidden token. The thirty-five public JSON review goldens include two pre-observation coordination outcomes; the existing thirty-three and the four durable goldens are retained byte-for-byte. Warning tokenization remains proven by the seven finite matrix rows. WIR-COORD-004's four runtime bootstrap diagnostics are a separate pre-parser surface, not four additional lifecycle codes or lifecycle JSON goldens. A count drift is a specification/test defect and is not auto-accepted.
 
 Table expressions are exact value functions:
 
@@ -321,7 +323,7 @@ complete
 - Request errors use `request-validation/not-started`.
 - Every blocked row uses its exact §10 pair. No derived rejected phase exists.
 
-Parser errors and `uninstall --remove-specs` are request-validation outcomes and do not enter lifecycle cleanup. Every other parser-valid lifecycle invocation normalizes its echo before repository locking:
+Parser errors and `uninstall --remove-specs` are request-validation outcomes and do not enter lifecycle cleanup. Every other parser-valid lifecycle invocation normalizes its echo before WIR-COORD-001 repository locking. Coordination admission precedes target classification, ACTIVE/receipt observation, stage preparation and every cleanup/replay path:
 
 ### WIR-CLEANUP-001 — Invocation role, durable desired request and cleanup-only return
 
@@ -490,6 +492,10 @@ Every valid result matches exactly one row after evaluating its finite Variant. 
 | `candidate-digest-mismatch` | `install/preserve-only` | `blocked` | `apply` | `true` | `install` | `request.candidate_digest` | `preserve-only` | false | false | `candidate-staging` | `preflight` | `null` | `empty` | 1 | `NONE` |
 | `candidate-invalid` | `update/preserve-only` | `blocked` | `apply` | `true` | `update` | `null` | `preserve-only` | false | false | `candidate-staging` | `preflight` | `null` | `empty` | 1 | `NONE` |
 | `candidate-digest-mismatch` | `update/preserve-only` | `blocked` | `apply` | `true` | `update` | `request.candidate_digest` | `preserve-only` | false | false | `candidate-staging` | `preflight` | `null` | `empty` | 1 | `NONE` |
+| `repository-operation-busy` | `apply` | `blocked` | `apply` | `true` | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
+| `repository-operation-busy` | `dry-run` | `blocked` | `dry-run` | `false` | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
+| `repository-coordination-unavailable` | `apply` | `blocked` | `apply` | `true` | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
+| `repository-coordination-unavailable` | `dry-run` | `blocked` | `dry-run` | `false` | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
 | `unsafe-repository-binding` | `apply` | `blocked` | `apply` | `true` | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
 | `unsafe-repository-binding` | `dry-run` | `blocked` | `dry-run` | `false` | `null` | `null` | `null` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
 | `unsafe-parent-binding` | `install/create-if-absent` | `blocked` | `apply` | `true` | `install` | `null` | `create-if-absent` | false | false | `preflight` | `request-validation` | `null` | `empty` | 1 | `NONE` |
@@ -639,6 +645,8 @@ Cleanup warning: `Provider tooling reached the requested terminal state, but the
 | `resume-seed-policy-mismatch` | `The incomplete operation can be resumed only with the same seed policy.` |
 | `candidate-invalid` | `The packaged provider candidate is invalid.` |
 | `candidate-digest-mismatch` | `The staged provider candidate digest does not match the packaged candidate.` |
+| `repository-operation-busy` | `Another SpecDock command holds repository coordination; retry after it exits.` |
+| `repository-coordination-unavailable` | `Required repository coordination is unavailable; no operation was executed.` |
 | `unsafe-repository-binding` | `The repository root binding is unsafe or changed during the operation.` |
 | `unsafe-parent-binding` | `A required parent directory binding is unsafe or changed during the operation.` |
 | `unsafe-target-type` | `A fixed provider target has an unsupported filesystem type.` |
@@ -930,6 +938,18 @@ Digest fixture is 64 lowercase `d` characters. Every block is independently pars
 {"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"completed","code":"terminal-cleanup-completed","operation":"install","candidate_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","seed_policy":"create-if-absent","mutation_started":true,"bootstrap_rolled_back":false,"phase":"complete","last_completed_phase":"cleanup-stage","retry_command":null,"continuation":{"next_action":"run-request","next_command":"spec-dock uninstall --apply --keep-specs -- /tmp/consumer","after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":1,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[{"path":"@provider-stage","category":"stage","status":"completed","reason":"candidate-stage-cleanup"}],"guidance":["Owned provider stage cleanup completed; no lifecycle operation was executed.","Run continuation.next_command to execute the preserved requested operation."],"warnings":[],"errors":[]}
 ```
 
+### WIR-JSON-034 — Busy apply before target observation
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"apply","apply":true,"specs_mode":null,"status":"blocked","code":"repository-operation-busy","operation":null,"candidate_digest":null,"seed_policy":null,"mutation_started":false,"bootstrap_rolled_back":false,"phase":"preflight","last_completed_phase":"request-validation","retry_command":null,"continuation":{"next_action":"none","next_command":null,"after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["Another SpecDock command holds repository coordination; retry after it exits."]}
+```
+
+### WIR-JSON-035 — Coordination unavailable for dry-run
+
+```json
+{"schema_version":1,"target":"/tmp/consumer","mode":"dry-run","apply":false,"specs_mode":null,"status":"blocked","code":"repository-coordination-unavailable","operation":null,"candidate_digest":null,"seed_policy":null,"mutation_started":false,"bootstrap_rolled_back":false,"phase":"preflight","last_completed_phase":"request-validation","retry_command":null,"continuation":{"next_action":"none","next_command":null,"after_cleanup_action":"none","after_cleanup_command":null},"failed_paths":[],"pending_paths":[],"summary":{"planned":0,"completed":0,"preserved":0,"pending":0,"failed":0,"warnings":0},"actions":[],"guidance":[],"warnings":[],"errors":["Required repository coordination is unavailable; no operation was executed."]}
+```
+
 ## 14. Public text
 
 Init/update clean success remains `spec-dock: ok (init) -> /tmp/consumer
@@ -944,6 +964,8 @@ next: ${NEXT_COMMAND_OR_NONE}
 next: ${continuation.next_command}
 after-cleanup: ${AFTER_COMMAND_OR_NONE}
 `. Values use the continuation object; null is rendered `none`. A displayed cleanup retry includes the hidden token exactly as supplied by `continuation.next_command`; text never strips or reconstructs it.
+
+For init/update coordination admission failures (`repository-operation-busy`, `repository-coordination-unavailable`, or pre-observation `unsafe-repository-binding`), stdout is empty; stderr is exactly `error: ${code}: ${WIR-TEXT-002 error}\n`, with one terminal LF and exit 1. There is no retry/next line because continuation is NONE.
 
 Uninstall text exact line order:
 
@@ -971,6 +993,125 @@ Action, guidance, warning and error lines follow in array order. JSON mode emits
 
 Required tests additionally cover every WIR-CLEANUP-002 fault boundary and all six receipt-only replay rows, including zero mutation and correct continuation. Required tests include desired uninstall during old install cleanup; cleanup failure -> tokenized retry -> deferred uninstall; no-token desired update/init-force distinct from the tokenized base form; cleanup retry with no deferred request; a third explicit command preserving the first deferred request; crash after ACTIVE update/unlink; and table-driven continuation rendering for all seven invocation IDs.
 
-Table-driven tests enumerate all 148 §10 rows and all 38 codes and reject every unlisted relation; all seven actual invocation echoes for both terminal-cleanup success and failure; cleanup-only return/no-dispatch; all sequences/partial and mandatory-cleanup pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 33 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact terminal-cleanup crash/retry cases and the complete Issue #392 lifecycle/dogfood acceptance state.
+Table-driven tests enumerate all 152 §10 rows and all 40 codes and reject every unlisted relation; all seven actual invocation echoes for both terminal-cleanup success and failure; cleanup-only return/no-dispatch; all sequences/partial and mandatory-cleanup pairs; action relations; target ordering and exact failed/pending equality; all 4 durable record goldens, all 35 public JSON review goldens, and exact text goldens; duplicate/unknown values; CLI/service parity; exact terminal-cleanup crash/retry cases and the complete Issue #392 lifecycle/dogfood acceptance state.
 
-Normative trace: Epic E384-RQ-004–006,008–009; Issue I392-RQ-002–009; cross-Issue ownership WIR-OWN-001. Issues #395 and #396 consume this artifact read-only. Owner decisions required: none.
+Normative trace: Epic E384-RQ-004–006,008–009,019; Issue I392-RQ-002–009; cross-Issue ownership WIR-OWN-001. Required concurrency/admission proof is additionally fixed in WIR-COORD-006 below. Issues #395 and #396 consume this artifact read-only. Owner decisions required: none.
+
+## 16. Runtime/lifecycle coordination
+
+### WIR-COORD-001 — One repository identity, shared/exclusive admission
+
+The coordination object is the **repository root directory inode itself**, not `system/.runtime/create.lock`, a file under any disposable root, or a new persistent namespace. Open it read-only with `O_DIRECTORY|O_NOFOLLOW` and close-on-exec by default. Bind `(st_dev,st_ino)` to the visible non-symlink directory before and after lock acquisition; keep that descriptor and the binding checks through the operation. A symlink, substitution, missing/changed root or unsafe binding fails as `unsafe-repository-binding`.
+
+| Participant | Acquisition | Lifetime |
+|---|---|---|
+| Supported repo-local runtime entrypoint | `flock(LOCK_SH|LOCK_NB)` | Before importing replaceable runtime modules or reading provider payload; through observation, command output and completion of managed writes/helpers. |
+| External installer: init/init-force/update/uninstall | `flock(LOCK_EX|LOCK_NB)` | After parser normalization but before target classification, record/ACTIVE/receipt observation, staging, cleanup or mutation; through all writes and output. Dry-run and receipt-only replay use the same exclusive admission. |
+
+Only the already-defined parser errors and removed-purge trap precede coordination. On contention return immediately: no waiting queue, automatic retry, lock upgrade, stale-lock removal or second lock identity. Recheck root binding before classifying contention; unsafe binding takes precedence. A valid bound root plus EAGAIN/EWOULDBLOCK is `repository-operation-busy`. Absent required lock/descriptor capability or another expected lock-system failure on a safe root is `repository-coordination-unavailable`; untyped programming defects are not mapped here. No supported fallback lock protocol is selected.
+
+For these two new lifecycle codes, §10's four rows completely determine the result. Mode/apply/specs_mode echo the actual normalized invocation (including explicit keep); operation, candidate_digest and seed_policy are null because no target was classified. All paths/actions/guidance/warnings are empty, summary counts zero, mutation/rollback false, retry null and continuation NONE; errors contain the one exact §11 diagnostic. No ACTIVE, completion receipt, stage, seed, marker or consumer file is created, read as lifecycle authority, repaired or changed. A human may submit a new invocation after the competing command finishes; this is not a generated lifecycle resume.
+
+Ordinary runtime shared holders may coexist. Existing create/import serialization may keep `system/.runtime/create.lock` **inside** the outer shared lease. Lifecycle cannot replace that lock's containing root until all shared holders have ended, so it is not the cross-generation authority.
+
+### WIR-COORD-002 — Pre-import bootstrap and ready admission
+
+The supported operational entrypoint is `spec-dock/scripts/spec-dock`. Its minimal stdlib-only bootstrap obtains the root lease and validates admission before importing any `spec_dock_runtime` module, loading templates/system assets or writing bytecode. All 0.2.4 candidates under this protocol use the same bootstrap bytes, fixed and recorded at #392 acceptance; #395/#396 preserve those bytes. Do not embed the full candidate digest into its own bootstrap or add an external daemon/second public entrypoint.
+
+The invariant bootstrap may already have been read by the interpreter just before a lifecycle replacement. After obtaining its lease it resolves and validates the **currently installed** payload, not cached old paths/modules. Strict seven-key ready record, supported 0.2.4 protocol, and safely bound fixed roots/slots and matching markers are required. Lifecycle terminal publication is the authority for complete candidate contents; do not rehash the entire candidate on every runtime command. Normal commands never attempt private cleanup or use incomplete data as an old-generation fallback.
+
+Absent, invalid, incomplete, tooling-absent or incompatible ready metadata/payload is `runtime-installation-not-ready` before command dispatch. Root identity failures use the root-binding diagnostic instead. A terminal ready installation with cleanup pending is allowed: the complete payload is already published, and only the external installer owns that residual cleanup. The runtime does not need to inspect ACTIVE or the completion receipt to decide admission.
+
+If the script itself is absent or cannot be loaded after interruption/uninstall, the interpreter cannot promise a structured bootstrap diagnostic; normal execution still cannot proceed. Use the external installer and the existing exact operation/candidate/seed-policy recovery contract. The wrapper is not a recovery bypass for a failed admission.
+
+### WIR-COORD-003 — Managed helper lifetime and installer handoff
+
+Normal runtime helpers that may write the repository (including Git operations) retain the root shared lease through their last write. The parent passes the already-acquired shared descriptor only to explicitly managed writing helpers, using a narrow inherited-descriptor allowlist; it remains closed-on-exec for unrelated children. Helpers must retain it through any writing descendants. No detached writer may outlive the lease. The parent normally waits/reaps all writers before closing its reference. If only the parent is killed, the writing helper's reference still prevents installer EX acquisition. Release references with close; an explicit LOCK_UN on a shared reference must not release the whole lease while another writer remains. A helper that cannot honor this lifetime is not admitted as an unprotected writer. #392 must prove the real managed helper paths, not merely a mocked context-manager finally block.
+
+Descriptor inheritance above is **only lifetime retention**, never installer authorization. Repo-local `update` **and** `uninstall` wrappers, for dry-run/apply and same-root/cross-target requests, follow this separate handoff:
+
+1. Under the invoking root's shared lease, validate the wrapper request and materialize the existing external command/target/flags as primitive data. Do not mutate the target as part of handoff.
+2. Return control to the immutable bootstrap, finish/reap any invoking-root writers, close all shared-lease references, then `exec` the external `uvx` installer. Do not keep root A locked while acquiring target B.
+3. The installer independently binds the requested target, obtains EX and repeats full preflight. No inherited descriptor, environment variable, argument token or “already locked” shortcut permits skipping admission.
+4. Once the installer starts, never resume the old installed Python modules to render a result, sync or write state. Propagate the external process streams/status directly. If uvx cannot be executed, only the immutable bootstrap may emit the existing exit-127 diagnostic: `error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry.\n`. Do not fall back to the old lifecycle implementation.
+
+Direct imports/internal module calls are test seams, not supported concurrent operational or recovery entrypoints. This cooperative protocol excludes lifecycle/runtime overlap; it does not claim exclusion against arbitrary manual Git/filesystem edits, arbitrary consumer hooks, external writers or nonparticipating legacy commands. Managed checkout and worktree creation/removal are **not** excluded: WIR-COORD-007 through 009 bind their generation, actual target and terminal handoff. E384-DEC-002 was explicitly adopted on 2026-09-08. An invoking-root lease alone never proves coordination of another root.
+
+### WIR-COORD-004 — Closed pre-parser runtime diagnostics
+
+These are entrypoint admission diagnostics, not lifecycle results and not additions to the lifecycle 23-key JSON object. Even if a runtime command requested JSON, admission failure has empty stdout, exit 1 and exactly one stderr line `error: ${code}: ${diagnostic}\n`. No payload import, command handler, user-data write or private cleanup occurs.
+
+| Runtime code | Exact diagnostic |
+|---|---|
+| `repository-operation-busy` | `Another SpecDock command holds repository coordination; retry after it exits.` |
+| `repository-coordination-unavailable` | `Required repository coordination is unavailable; no operation was executed.` |
+| `unsafe-repository-binding` | `The repository root binding is unsafe or changed during the operation.` |
+| `runtime-installation-not-ready` | `SpecDock tooling is not ready; use the external installer to complete recovery before running repository commands.` |
+
+Busy is not evidence of corruption or incomplete state. Unavailable is not permission to bypass coordination. Not-ready recovery uses the external package, preserving exact existing resume/continuation rules; no new retry command is invented by the runtime.
+
+### WIR-COORD-005 — Accepted one-time legacy maintenance boundary
+
+E384-DEC-001 was explicitly adopted by the user on 2026-09-08. The first exact-clean 0.2.3→0.2.4 migration is an offline tooling operation:
+
+1. The operator stops new SpecDock command/automation starts and waits for existing legacy commands and their writing helpers to finish. This is a human operating precondition, not something inferred from an empty process snapshot or absence of a lock file.
+2. Invoke the external 0.2.4 installer directly, not the old repo-local update/uninstall wrapper. Exact clean legacy admission, protected-data preservation and all wire checks still apply.
+3. Keep the window closed through interruption and recovery. After durable mutation, resume only with the admitted external operation/candidate/seed-policy and cleanup continuation; do not run old commands or patch their runtime in place.
+4. Reopen normal commands after ready and complete candidate verification. If the attempt blocks before any mutation and preserves exact legacy state, the operator may explicitly end the window and resume the old installation. Tooling-only legacy uninstall likewise requires quiescence and ends with tooling absent, not permission to run old tooling.
+
+There is no new maintenance-proof flag, automatic process kill, hidden pause of user automation, legacy bridge package or scheduler. From 0.2.4 onward, successful shared/exclusive coordination replaces the maintenance-window requirement for ordinary lifecycle operations.
+
+### WIR-COORD-006 — #392 required acceptance cases
+
+#392 owns executable evidence for:
+
+- Runtime SH held → each installer invocation, including uninstall dry-run and cleanup replay, fails busy before target/private-state observation and with zero mutation.
+- Installer EX held → representative new/import/active/sync runtime entrypoints fail before payload import or data writes. Two ordinary shared holders coexist, and the inner create/import lock still serializes their existing critical section.
+- Bootstrap bytes loaded before an intervening successful replacement → admission/import uses the complete current generation. #395/#396 candidate checks reject bootstrap drift.
+- Each durable lifecycle interruption boundary → normal runtime is busy while EX survives, then not-ready after lease loss if incomplete; exact external recovery alone reaches ready. Physically missing script and ready-with-cleanup-warning have the distinct behavior stated above.
+- Root symlink/rebinding and unavailable lock facilities fail closed without creating bookkeeping. Linux and macOS prove real descriptor/flock semantics.
+- Writing helper paused after launch, parent alone SIGKILLed → installer remains busy until the helper's last write/exit; afterward EX succeeds. No early LOCK_UN, unexpected descriptor leak or detached unprotected writer.
+- Both wrappers, every retained target/flag form, same-root and crossed A→B/B→A: no held invoking-root lease, no installer bypass, no old-module return, external stdout/stderr/status preserved, and uvx-missing exit 127.
+- Exact-clean legacy maintenance, pre-mutation rejection and post-mutation recovery preserve the agreed operating boundary; tests do not pretend to prove that all human/automation launchers are stopped.
+
+- Same-closure existing-branch checkout and a new branch at current HEAD succeed. Different or unprovable target closure stops before checkout/active/sync. Post-checkout drift stops active/sync, reports the actual branch side effect and never silently rolls back.
+- Installer EX on worktree B prevents invocation A from removing B before destructive Git/filesystem work; removal EX on B prevents B runtime/installer entry. Parent-only SIGKILL does not release B while a managed removal helper is writing.
+- Removal followed by same-path creation of different-inode C preserves C during post-cleanup and reports partial removal instead of following the reused pathname.
+- Creation pins the source closure, reserves and binds empty B, holds B EX through materialization, and publishes its public entrypoint last. Every interruption before publication leaves normal B runtime unavailable after lease loss; publication implies the complete verified candidate. Source mismatch and a root reservation/contamination race preserve other data and disclose any newly created partial root.
+- Both make dry-run/detection and make init execute only after all A/B lease references are released, using a separately opened nonlocking binding to original B. Nested external installer admission is ordinary and does not self-contend. B→C pathname substitution must never execute C's hook.
+- Missing/detection-failed/skipped/succeeded/failed bootstrap observations retain the existing worktree-create exit and warning semantics. A returned hook observation is not a claim that B remains ready after arbitrary consumer code.
+
+These tests are part of the lifecycle implementation unit, not a separate investigation or final-verification Issue.
+
+
+### WIR-COORD-007 — Accepted same-generation managed checkout
+
+E384-DEC-002 was explicitly adopted by the user on 2026-09-08. Under the invoking root's lease, a managed checkout (including issue start and active branch selection) pins the target ref to one commit before any checkout, active update or sync. Compare its provider-owned closure with the admitted installed generation: the fixed four roots, two slots, record/markers and frozen entrypoint, with content/mode and safe binding sufficient to establish identity. User-authored specs outside that closure are not required to be identical. Different or unprovable provider generation is rejected **before checkout**, using the existing command error envelope with the reason `runtime-generation-change-blocked`; no active/sync side effect is allowed.
+
+Creating a new branch at the admitted current HEAD remains the normal supported path. A moving ref cannot substitute a different commit after preflight. Immediately after checkout and before any active update, sync or other old-module write, revalidate the provider closure. Unexpected drift stops with reason `runtime-generation-drift`, reporting the before/after branch and the fact that checkout already occurred. Do not auto-rollback the branch, hot-reload modules, start an installer or fall through to old-generation writes. These two post-dispatch command reasons are not WIR-COORD-004 pre-parser diagnostics and do not add lifecycle codes or fields.
+
+This does not authorize arbitrary manual Git changes during execution. It closes the known managed self-replacement path without changing every runtime SH lease to EX.
+
+### WIR-COORD-008 — Actual worktree target admission and publication
+
+A command invoked in root A that creates or removes worktree B must coordinate **B itself**, not merely retain A's SH. Preserve the existing target/containment, current/main-worktree and unsafe-removal guards. All acquisitions are nonblocking; never wait while holding another root, upgrade a lease, remove a lock or bypass a failed target guard.
+
+**Removal.** Bind B and acquire its EX before destructive work. Repeat target/identity guards under the lease; retain B EX through managed Git removal helpers and subsequent filesystem cleanup, with the helper lifetime rules of WIR-COORD-003 applied to every necessary A/B descriptor. A valid busy/unavailable B rejects before destructive work using the existing worktree error envelope (`remove_blocked` plus the corresponding coordination reason); it is not a lifecycle 23-key result. Root substitution uses the unsafe-binding reason.
+
+The open B inode does not reserve its pathname after removal. Before any post-remove cleanup, resolve without following symlinks and compare with original B. Expected absence is successful removal; a different inode/symlink C at the former path is preserved without cleanup and reported as `post_remove_cleanup_failed`, with the existing partial-removal facts and an unsafe-binding reason. Do not turn pathname reuse into authority to delete C. Existing actual partial outcomes remain visible; no low-level Git metadata workaround or speculative rollback is added.
+
+**Creation.** Pin the intended source commit and verify its provider closure matches the admitted generation before materialization; do not silently copy legacy, incomplete or different-generation provider assets from a divergent HEAD. For the existing valid absent-target path, exclusive directory creation reserves empty B. Open/bind it without following symlinks, acquire B EX and recheck identity and emptiness before populating it. A collision, contention or contamination preserves others' data and stops. If this invocation already created the empty root, disclose that partial artifact in the existing creation failure envelope; do not falsely claim zero mutation or blindly remove it.
+
+Populate the pinned Git worktree while withholding the public `spec-dock/scripts/spec-dock` entrypoint. No arbitrary consumer hook may run during this unpublished phase. Verify the complete intended payload, strict ready metadata/markers and source closure (accounting for the withheld entrypoint), then publish the frozen bootstrap by same-directory atomic rename **last**. Preserve the final tracked index/HEAD and mode consistency; a successful creation must not depend on hiding a dirty bootstrap. Exact Git materialization calls are selected and tested during #392 elaboration, but entrypoint-last and source/binding verification are fixed acceptance conditions.
+
+A copied ready record alone is insufficient to expose an incomplete B: until final publication, its public runtime entrypoint is absent. A crash before publication therefore leaves normal runtime unable to dispatch even after all leases disappear; a crash after publication leaves the complete verified candidate. Preserve actual partial artifacts/errors on failure, without automatic migration, retry or guessed cleanup. This publication barrier does not add a new lifecycle ACTIVE/receipt state or a legacy bridge.
+
+### WIR-COORD-009 — Consumer bootstrap hook as terminal external handoff
+
+The existing optional `make -n init` detection and `make init` are both arbitrary consumer code; dry-run is not a safe read-only exemption. They run only after B's entrypoint-last publication. While B EX still proves its identity, independently open a **nonlocking** root directory descriptor and verify it is the same B inode. Do not duplicate the locking descriptor: a dup would retain its open-file-description lease.
+
+Materialize the creation result and hook request as primitive data, return to the immutable bootstrap, finish/reap all managed A/B writers and close **all** A/B flock references. Only then terminally hand off hook execution, using the nonlocking original-B directory binding as cwd (fchdir or an equivalent descriptor-bound operation), without resolving the pathname to a replacement C. Never return to old installed modules for result rendering, sync or mutation. A binding mismatch before handoff skips the hook with the existing failed/detection observation; after directory removal, ordinary hook failure is reported, never redirected to C.
+
+Hook-invoked SpecDock commands acquire their own ordinary admission; a nested external installer obtains B EX independently and is not given a bypass or self-conflicting inherited lease. The nonlocking directory descriptor preserves identity only, not authorization or exclusion. Arbitrary raw Git/filesystem writes by this user-owned hook remain outside the cooperative SpecDock protocol. That explicit consumer-code boundary must not be used to exclude managed worktree writes before handoff.
+
+Preserve worktree-create's current compatibility: successful creation returns exit 0 with its existing bootstrap status (`skipped`, `detection_failed`, `succeeded` or `failed`) and warning as applicable; make failure does not undo creation or become the installer's directly propagated exit status. The returned result means “B was completely published, then this hook outcome was observed”; it does **not** recertify B's current ready state after arbitrary consumer code. No automatic cleanup, reinstall or new resume command follows hook failure.

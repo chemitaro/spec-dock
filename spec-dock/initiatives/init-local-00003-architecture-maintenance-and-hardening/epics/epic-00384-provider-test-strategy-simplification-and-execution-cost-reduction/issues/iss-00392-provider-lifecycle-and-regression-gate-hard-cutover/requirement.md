@@ -5,7 +5,7 @@ ID: "iss-00392"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "../../requirement.md"
   - "../../design.md"
@@ -31,6 +31,8 @@ repository_evidence:
 
 Parent: [Epic Requirement](../../requirement.md) / [Integration Contract](../../artifacts/epic-integration-branch-contract.md) / [Rolling-Wave Contract](../../artifacts/rolling-wave-issue-elaboration-contract.md)
 
+Formal `issue start` selects the Issue branch/active context after parent/dependency admission and an explicit user request. It does not authorize Product implementation. The workspace may be new or explicitly reused; implementation-ready R/D/P and handoff plus independent review are still required. The current Epic reassessment does not start this Issue.
+
 ## 1. Observable outcome
 
 Epic integration branch上で、SpecDockのpublic provider lifecycleがfixed ownership modelへhard cutoverされる。Fresh、exact legacy `0.2.3`、ready、incomplete、tooling-absent-preserved-dataの各stateに対し、install、update、tooling-only uninstall、reinstallがclosed wireとsafe recoveryへ一致する。Old lifecycle writerはなく、checked-in dogfoodは一つのcomplete `0.2.4` candidateになる。
@@ -45,7 +47,7 @@ Epic integration branch上で、SpecDockのpublic provider lifecycleがfixed own
 
 ## 3. Non-goals
 
-- Registerの14 active Product failuresを修正またはterminalizeすること。
+- Registerの14 active behavior failuresを修正またはterminalizeすること。
 - Approved-failure policy、ledger、timing、sharder、policy skip machineryを削除すること。
 - Build-once Provider Gate、parent `E384-QUAL-001`のimplementation/evidence、required-context transitionを実装すること。
 - 調査、文書、test、verificationだけの別Issueを作ること。
@@ -56,7 +58,7 @@ Epic integration branch上で、SpecDockのpublic provider lifecycleがfixed own
 | Input | Required state |
 |---|---|
 | Predecessor | #387 CLOSED/completed and merged |
-| Integration branch | Current B0 tip, GREEN, parent freeze accepted |
+| Integration branch | Current B0 tip, GREEN, parent freeze accepted, E384-DEC-001 closed |
 | Product baseline | Exact transitional `0.2.3` package/dogfood and old lifecycle writer |
 | Regression baseline | 15 rows, 14 active, 1 resolved; active identities/signatures fixed |
 | Test policy | Current ledger/timing/sharder/policy/current workflows operational |
@@ -101,7 +103,7 @@ The parent wire is implemented without added、missing or reinterpreted values. 
 
 ### I392-RQ-005 — Safe filesystem and recovery
 
-Preflight、descriptor binding、same-filesystem stage、native atomic publication、bootstrap rollback、terminal cleanup and fault convergence preserve unknown data and fail closed on identity drift。
+Preflight、descriptor binding、same-filesystem stage、native atomic publication、bootstrap rollback、terminal cleanup and fault convergence preserve unknown data and fail closed on identity drift。E384-RQ-019のruntime/lifecycle coordinationも本Issueが所有する。disposable system内lockの交換で排他を切らず、legacy初回移行は親で確定したadmission条件に従う。
 
 ### I392-RQ-006 — Exact migration and uninstall
 
@@ -121,7 +123,7 @@ After human merge, B1 satisfies lifecycle acceptance and current transitional ga
 
 ### I392-RQ-010 — Issue-start gate
 
-Current draft is not implementation-ready. Exact implementation R/D/P and Luna Max handoff must be generated against the accepted external `PARENT_FREEZE_SHA`/B0 tip after post-pass GitHub Issue body projection readback, and independently Strict-reviewed before start。
+Current draft is not implementation-ready. Exact implementation R/D/P and Luna Max handoff must be generated against the accepted external `PARENT_FREEZE_SHA`/B0 tip after post-pass GitHub Issue body projection readback, and independently reviewed under Rolling-Wave Contract §5 before Product implementation。
 
 ## 8. Verification evidence categories
 
@@ -135,4 +137,4 @@ Rollback unit is the complete #392 integration merge. Before #395 starts, human 
 
 Stop before implementation or merge if the wire must change、active identity/signature drifts、current gate cannot remain coherent、candidate cannot converge completely、protected data changes、`E384-QUAL-001` implementation or any #395/#396 responsibility is required、or owner decision becomes non-empty。Return exact contract/evidence mismatch to the parent。
 
-`owner_decisions_required=[]`.
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。
