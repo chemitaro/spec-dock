@@ -256,10 +256,22 @@ class NativeAtomicFilesystem:
                 raise FilesystemSafetyError("unsupported tree entry")
         return DomainTreeIdentity(hashlib.sha256(stream).hexdigest(), len(entries), entries)
 
-    def rename_no_replace(self, src_parent_fd: int, src_name: str, dst_parent_fd: int, dst_name: str) -> None:
+    def rename_no_replace(
+        self,
+        src_parent_fd: int,
+        src_name: str,
+        dst_parent_fd: int,
+        dst_name: str,
+        *,
+        expected_source: InodeWitness | None = None,
+    ) -> None:
         source = self._capture_any(src_parent_fd, src_name)
         self._ensure_directory_fd(src_parent_fd)
         self._ensure_directory_fd(dst_parent_fd)
+        if expected_source is not None and (
+            source is None or not self._same_content_identity(source[1], expected_source)
+        ):
+            raise FilesystemSafetyError("native no-replace source identity changed before mutation")
         self.adapter.rename_no_replace(src_parent_fd, src_name, dst_parent_fd, dst_name)
         destination = self._capture_any(dst_parent_fd, dst_name)
         if (
@@ -270,11 +282,21 @@ class NativeAtomicFilesystem:
         ):
             raise FilesystemSafetyError("native no-replace postcondition changed the source identity")
 
-    def exchange(self, src_parent_fd: int, src_name: str, dst_parent_fd: int, dst_name: str) -> None:
+    def exchange(
+        self,
+        src_parent_fd: int,
+        src_name: str,
+        dst_parent_fd: int,
+        dst_name: str,
+        *,
+        expected_destination: InodeWitness | None = None,
+    ) -> None:
         source = self._capture_any(src_parent_fd, src_name)
         destination = self._capture_any(dst_parent_fd, dst_name)
         if source is None or destination is None:
             raise FilesystemSafetyError("native exchange requires two existing entries")
+        if expected_destination is not None and not self._same_content_identity(destination[1], expected_destination):
+            raise FilesystemSafetyError("native exchange destination identity changed before mutation")
         self._ensure_directory_fd(src_parent_fd)
         self._ensure_directory_fd(dst_parent_fd)
         self.adapter.exchange(src_parent_fd, src_name, dst_parent_fd, dst_name)

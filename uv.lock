@@ -310,7 +310,7 @@ wheels = [
 
 [[package]]
 name = "spec-dock"
-version = "0.2.3"
+version = "0.2.4"
 source = { editable = "." }
 dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },

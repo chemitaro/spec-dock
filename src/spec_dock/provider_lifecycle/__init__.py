@@ -1,8 +1,7 @@
-"""Closed provider-lifecycle foundation types.
-
-The package is deliberately not connected to the public installer in CP1.
-"""
+"""Provider-owned lifecycle engine and its closed public contracts."""
 
 from __future__ import annotations
 
-__all__: tuple[str, ...] = ()
+from spec_dock.provider_lifecycle.engine import FaultInjector, ProviderLifecycleEngine
+
+__all__ = ["FaultInjector", "ProviderLifecycleEngine"]
