@@ -2,7 +2,7 @@
 種別: artifact
 ID: "20260908t011846z-01"
 タイトル: "ライフサイクルのテスト所有と移行対応"
-状態: "detailed-review-candidate"
+状態: "approved"
 作成者: "blue-team specification author"
 最終更新: "2026-09-08"
 親: ["iss-00392"]

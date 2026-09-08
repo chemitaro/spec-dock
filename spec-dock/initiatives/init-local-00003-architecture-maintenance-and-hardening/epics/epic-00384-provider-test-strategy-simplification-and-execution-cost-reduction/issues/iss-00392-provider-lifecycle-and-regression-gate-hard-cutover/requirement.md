@@ -4,11 +4,11 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
-状態: "detailed-review-candidate"
-詳細化状態: "independent-review-pending"
+状態: "approved"
+詳細化状態: "independent-review-passed"
 最終更新: "2026-09-08"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: false
+実装開始許可: true
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
