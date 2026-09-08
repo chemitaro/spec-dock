@@ -87,7 +87,7 @@ verified commitで確認した主要接点は次のとおりです。
 
 ### 3.3 Runtime package and dogfood
 
-Provider asset側とchecked-in dogfood側を同じ変更集合で同期します。以下で`<RUNTIME>`は`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime`、`<DOGFOOD>`は`spec-dock/scripts/spec_dock_runtime`です。
+Provider asset側をCP3で完成させ、checked-in dogfood側はCP4のartifact proof後にcomplete candidateとして一括同期します。CP3でのpartial dogfood projectionは禁止します。以下で`<RUNTIME>`は`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime`、`<DOGFOOD>`は`spec-dock/scripts/spec_dock_runtime`です。表のProvider source列はCP3 ownership、Dogfood mirror列はCP4 projection対象です。
 
 | Status | Provider source | Dogfood mirror | Responsibility |
 |---|---|---|---|
@@ -162,7 +162,7 @@ Rules:
 6. `seed_policy`
 7. `skill_slots`
 
-`skill_slots`のnested key orderは`spec-dock`、`spec-dock-grill-with-docs`です。UTF-8、compact separators、one LF、max4096、regular/link1/mode0644です。Atomic publicationはprivate `RECORD-TEMP`からrecord parentへnative rename/exchangeし、parent fsync後に成立します。
+`skill_slots`のnested key orderは`spec-dock`、`spec-dock-grill-with-docs`です。UTF-8、compact separators、one LF、max4096、regular/link1/mode0644です。Public-record staging `RECORD-TEMP`は最終public mode0644でcreate/write/fsyncし、private namespace内でwitnessをdurable化してからrecord parentへnative rename/exchangeします。Rename/exchangeがmode0644を保存し、record parent fsync後に成立します。Publicへmode0600で公開してからchmodする遷移は禁止します。
 
 ### 5.2 Slot marker
 
@@ -240,7 +240,16 @@ Top directory内の他repository keyをlist/scanしません。Exact repository-
 - `RECORD-TEMP`
 - `STAGE`
 
-Unknown entryはpreserve-and-blockです。Metadata/tempはregular/link1/owner euid/mode0600。`STAGE`はdirectory/owner euid/mode0700。Unsafe objectを削除して進みません。
+Unknown entryはpreserve-and-blockです。Entry modeは次のclosed matrixです。
+
+| Class | Exact entries | Type/owner/mode |
+|---|---|---|
+| Private metadata | `ACTIVE.json`、`CLEANUP-COMPLETED.json`、`STAGE/STAGE-OWNER.json` | regular/link1/owner euid/mode0600 |
+| Private metadata atomic temp | `ACTIVE.json.tmp`、`CLEANUP-COMPLETED.json.tmp` | regular/link1/owner euid/mode0600 |
+| Public-record staging | `RECORD-TEMP` | regular/link1/owner euid/mode0644/max4096 |
+| Private directories | repository namespace、`STAGE` | directory/owner euid/mode0700 |
+
+`RECORD-TEMP`はexact expected seven-key public record、またはexchange後にACTIVEのoriginal-record bytes/hash/inode witnessへ一致する旧public recordだけを許可します。Content-equalなforeign inodeを採用せずpreserve-and-blockします。Unsafe objectを削除して進みません。
 
 ### 7.2 Repository and tuple identities
 
@@ -305,7 +314,7 @@ Nested exact schemas:
 - `bootstrap_container`: `disposition,witness`。`disposition=existing|planned-create|created`。planned-createだけwitness null。
 - `owned_target_witnesses`: fixed six objects、domain order。各object exact keys `path,original_kind,original_tree_digest,original_inode,terminal_kind,terminal_tree_digest`。Kindは`absent|directory`、対応しないdigest/inodeはnull。
 - `registered_stage_entries`: fixed six objects、domain order。各object exact keys `name,target_path,candidate_tree_digest,original_tree_digest`。`name`は`docs|templates|system|scripts|slot-spec-dock|slot-spec-dock-grill-with-docs`。
-- `record_temp_witness`: nullまたは`InodeWitness`。Tempをfsync後、rename前にACTIVEへ記録し、parent fsync後にnullへ戻します。
+- `record_temp_witness`: nullまたは`InodeWitness`。Publish前はmode0644のexact expected record staging inodeを表します。Exchange後はmode0644で戻った旧public recordをACTIVEの`original_record` witnessと照合してexpected-bound unlink/fsyncするまで表します。No-replace後はabsentを確認します。Foreign/content-equal別inodeは採用せず、record parent fsyncとresidue cleanup後にnullへ戻します。
 - `terminal_record_digest`: operation admission時に決定したexact expected terminal record bytesのSHA-256。
 - `cleanup_retry_invocation`: exact keys `role,invocation_id,cleanup_token,rendered_command`。`role=cleanup-retry`。
 - `deferred_invocation`: nullまたはexact keys `invocation_id,rendered_command`。
@@ -365,8 +374,8 @@ max16384、mode0600。Stage removal/fsync後にreceiptをatomic publish/fsyncし
 ### 9.2 Install/update/migration
 
 1. Absent toolingで必要なら`spec-dock` containerをbounded create/fsyncし、ACTIVEのbootstrap witnessを`created`へ更新する。
-2. `RECORD-TEMP`へexpected incomplete recordを書き、fsync、witnessをACTIVEへ記録する。
-3. Native no-replace/exchangeでrecordを公開し、record parentをfsync、再検証する。
+2. `RECORD-TEMP`をmode0644で作成し、expected incomplete recordを書いてfsyncし、そのwitnessをACTIVEへdurableに記録する。
+3. Native no-replace/exchangeでrecordを公開し、mode0644とrecord parentをfsync・再検証する。No-replace後はtemp absent、exchange後はACTIVEのoriginal-record witnessへ一致する旧recordだけをexpected-bound unlink/fsyncし、foreign substitutionはpreserve-and-blockする。
 4. ACTIVEを`running`へatomic publish/fsyncする。
 5. `docs`をpublish/exchangeし、target/stage parentsをfsync・再検証する。
 6. `templates`、`system`、`scripts`の順に同じ処理をする。
@@ -374,7 +383,7 @@ max16384、mode0600。Stage removal/fsync後にreceiptをatomic publish/fsyncし
 8. `create-if-absent`の場合だけ`.gitignore`、consumer CIをnative no-replaceで作成する。既存ならbytesを読まずpreserved actionとする。
 9. Six domains、markers、record relation、protected root witnessesを検証する。
 10. ACTIVEを`ready`へpublish/fsyncする。
-11. `RECORD-TEMP`からterminal ready recordをpublish/fsync・再検証する。
+11. Mode0644の`RECORD-TEMP`からterminal ready recordをpublish/fsync・再検証し、exchange後の旧record residueを同じwitness規則でcleanupする。
 12. ACTIVEを`terminal-cleanup`へpublish/fsyncする。
 13. Registered stage entriesとSTAGEをremove/fsyncする。
 14. Completion receiptをpublish/fsyncする。
@@ -415,7 +424,7 @@ Fault injectorは次のoperation IDだけを受け付け、Productにfree-form h
 - `active-temp-open/write/fsync/rename/parent-fsync`（prepared/running/ready/terminal-cleanup各transition）
 - `stage-mkdir/owner-write/owner-fsync`、各six entryの`create/write/fsync`、`stage-parent-fsync`
 - `bootstrap-container-mkdir/fsync`
-- `record-temp-open/write/fsync`、`record-publish`、`record-parent-fsync`
+- `record-temp-open/write/fsync`、`record-publish-no-replace|exchange`、`record-parent-fsync`、`record-exchange-residue-unlink`、`record-temp-parent-fsync`
 - 各root/slotの`publish-or-detach`、`source-parent-fsync`、`target-parent-fsync`
 - 各seedの`no-replace-create`、`parent-fsync`
 - `target-verify`
@@ -441,7 +450,7 @@ Fault injectorは次のoperation IDだけを受け付け、Productにfree-form h
 - `remove_tree_bound(parent_fd,name,expected_tree)`
 - `fsync_directory(fd)`
 
-全methodはoperation直前・直後にfdとtarget witnessを再検証します。`Path.resolve`、recursive follow、absolute mutation pathを使いません。
+全methodはoperation直前・直後にfdとtarget witnessを再検証します。Rename/exchangeはsource inodeのmodeを変更せず、public record publicationでは前後ともmode0644であることをpostconditionに含めます。`Path.resolve`、recursive follow、absolute mutation pathを使いません。
 
 ### 11.2 Linux
 
@@ -680,16 +689,18 @@ Generatorは親Wire pathをexplicit引数で受け、次を機械検査します
 
 ## 19. Packaging and dogfood
 
-- `pyproject.toml` versionを0.2.4へ更新します。
+- CP2で`pyproject.toml` versionを0.2.4へ固定し、CP4ではread-only確認します。
+- Provider runtime、provider-shipped docs、two provider skills、fixture、package inventoryをcomplete candidateとして先に完成させ、source testsをGREENにしてcandidate digestを固定します。
 - Existing `assets/**/*` package dataへnew fixtureが入ることをwheel/sdist inventoryで検証します。
 - `setup.py`のstale build pruningがnew fixture、provider_lifecycle package、bootstrapを削除しないことを確認し、必要な場合だけexact allowlistを更新します。
-- Source→wheel→sdist→isolated installed packageのcandidate digest、fixture bytes、bootstrap SHA、two skill tree digestsを比較します。
-- Provider source GREEN後に、`spec-dock/scripts/**`、`.agents/skills/spec-dock/**`、`.agents/skills/spec-dock-grill-with-docs/**`、provider-shipped docsをdogfoodへ同期します。
+- 固定した同一source treeからwheel/sdistをbuildし、isolated installed packageのcandidate digest、fixture bytes、bootstrap SHA、docs、two skill tree digestsを比較します。Build後にprovider candidate bytesを変更した場合、artifact proofをやり直します。
+- Artifact proofがGREENになった後だけ、`spec-dock/scripts/**`、`spec-dock/docs/**`、`.agents/skills/spec-dock/**`、`.agents/skills/spec-dock-grill-with-docs/**`へcomplete candidateを一括同期します。Partial dogfood projectionは禁止します。
+- T13でsource、wheel、sdist、isolated installed package、fresh install、checked-in dogfoodのparityを検証します。
 - `.github/workflows/provider-ci.yml`はcurrent PR jobsを維持し、旧`test_managed_distribution.py` commandをT01–T07のfocused commandへ置換します。full final gateを追加しません。
 
 ## 20. Security and privacy properties
 
-- Private schemaにspec本文、Artifact content、absolute user path、credential、Git remote userinfoを保存しません。
+- Private schemaはspec本文、Artifact content、credential、Git remote userinfo、任意のpath list、ambient cwd/home、environment dumpを保存しません。例外として、Wire v12が要求する`ACTIVE.cleanup_retry_invocation.rendered_command`、`ACTIVE.deferred_invocation.rendered_command`、および`CLEANUP-COMPLETED.json`内の同じ二fieldだけはWIR-TEXT-001のexact renderer出力をdurable保存し、normalized targetがabsoluteならabsolute pathを含み得ます。別のstandalone absolute-path fieldや任意commandは禁止し、operational metadataを不要なlog、telemetry、Reportへ転載しません。
 - Public diagnosticはWireのcontent-free exact textだけです。
 - Candidate/legacy fixtureはprovider-owned bytesのdigestと必要なlegacy record bytesだけを保持します。
 - Unknown/foreign objectを削除・chmod・renameして進みません。

@@ -3,7 +3,7 @@
 ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 関連GitHub: ["#392"]
-状態: "specification-pack-created"
+状態: "specification-review-remediation"
 最終更新: "2026-09-08"
 依存:
   - "requirement.md"
@@ -28,7 +28,7 @@ repository_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-今回行ったのは調査、仕様作成、静的自己検証です。SpecDock Product source、tests、workflow、docs、skills、dogfood、Git branchには変更を加えていません。Product test、fault injection、package build、Linux/macOS lifecycle verification、commit、push、GitHub projection変更、PR作成、merge、B1再検証は実行していません。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様7成果物をcommit `449fefc7864aa1f983aa66e6e768faee74a7eda1`としてpushし、独立Strict reviewを実施しました。SpecDock Product source、tests、workflow、provider docs/skills、dogfoodには変更を加えていません。Product test、fault injection、package build、Linux/macOS lifecycle verification、GitHub projection変更、PR作成、merge、B1再検証は実行していません。
 
 ## 2. Source verification facts
 
@@ -56,7 +56,7 @@ Issue #392の実装可能な仕様候補として、Requirement、Design、criti
 
 ## 4. Specification decisions recorded
 
-本packは親Wireを変更せず、次をIssue実装判断として閉じました。
+本packは親Wireのpublic inventoryを変更せず、`RECORD-TEMP`のmodeだけ既存atomic-publication要件から一意に導かれるclarificationとして親Wireへ反映し、次をIssue実装判断として閉じます。
 
 1. Four fixed roots、two exact skill slots、strict seven-key compact JSON record、two fresh-only seeds、protected consumer data。
 2. Six-domain candidate digest、digest外のslot marker、verified Git objects由来のexact-clean 0.2.3 fixture。
@@ -88,7 +88,18 @@ Issue #392の実装可能な仕様候補として、Requirement、Design、criti
 
 このself-verificationは仕様packの構造・整合性を対象とし、Product behaviorのGREENを意味しません。
 
-## 6. Implementation and merge gate
+## 6. Independent review and remediation
+
+- Reviewed SHA: `449fefc7864aa1f983aa66e6e768faee74a7eda1`
+- Reviewer session: `required-strict-github-connector-verificati-763`
+- Review artifact SHA-256: `4f5820536480bd5456316d7ab2aa3865b8b1f43f5174d150cf06e6bab9047fbb`
+- Result: `review_status=fail`、P1×4、P2×1
+
+P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mode、CP3/CP4 dogfood順序です。P2はclosed `rendered_command`へabsolute targetが入り得る事実とprivacy説明の不一致です。Product変更やProduct testはまだありません。
+
+同じブルーチームauthoring conversationによる分析で5件を再現しました。T12/version ownership、`RECORD-TEMP`、dogfood順序、privacy説明は既存authorityから一意に訂正します。Directory modeはcanonical値の人間判断が未完了です。全訂正をclean commit/pushし、同じreviewerでP0=0/P1=0/passとなるまで`implementation_allowed=false`を維持します。
+
+## 7. Implementation and merge gate
 
 `implementation_allowed=false`です。次の事実が成立するまでCP1 packetを実装者へ渡しません。
 
@@ -101,8 +112,8 @@ Issue #392の実装可能な仕様候補として、Requirement、Design、criti
 
 CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provider-test-strategy-planning`へmergeし、merged tipでB1を再検証します。B1 GREEN後だけ#395を開始します。
 
-## 7. Residual blocker and uncertainty
+## 8. Residual blocker and uncertainty
 
-Reviewed Wire v12の範囲では、追加の親public valueまたはIssue責務変更を必要とする不足は観測しませんでした。ただし、これは本仕様作成者の照合結果であり、独立review receiptまたは公開freezeの代用ではありません。
+親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。Directory modeのcanonical値、訂正候補の同一reviewer pass、clean pushed freeze/projectionは未完了です。
 
 残るblockerは、独立内容review、clean pushed freeze/projection、Product実装・platform/fault/package verification、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssue実装完了、Product GREEN、merge完了を主張しません。

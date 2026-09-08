@@ -94,7 +94,7 @@ Candidate digestはDesignで固定したcanonical byte streamのSHA-256とし、
 
 ### I392-RQ-003 — Installation recordとslot marker
 
-Installation recordはWire v12のexact seven keys/order/type/nullabilityを満たし、duplicate、unknown、missing、wrong type、oversize、symlink、hard linkを拒否します。各slot markerはWire v12のexact four keys/orderを満たします。record/markerのpublic bytesはdeterministicで、末尾LFは一つです。
+Installation recordはWire v12のexact seven keys/order/type/nullabilityを満たし、duplicate、unknown、missing、wrong type、oversize、symlink、hard linkを拒否します。各slot markerはWire v12のexact four keys/orderを満たします。record/markerのpublic bytesはdeterministicで、末尾LFは一つです。`RECORD-TEMP`はpublic-record staging objectとして最終public mode0644で作成・fsyncし、native rename/exchangeでそのmodeを保ったまま公開します。Private metadata/tempのmode0600一般則からの唯一の例外で、post-publication chmodは禁止します。
 
 ### I392-RQ-004 — Seed policy
 
@@ -107,6 +107,8 @@ Designのclosed fixtureに一致する`0.2.3`だけをmigration対象としま�
 ### I392-RQ-006 — Private authorityとpreparation recovery
 
 Private namespaceはConsumer外、repository parentと同一filesystem、effective user owner、mode0700、no-followです。Durable prepared ACTIVEより先にstage payloadまたはConsumer mutationを作成しません。
+
+Private metadataとそのatomic tempはmode0600、private directoryはmode0700です。例外の`RECORD-TEMP`はexact expected public record、またはexchange後にACTIVEのoriginal-record witnessへ一致する旧public recordだけをmode0644で保持します。Foreign substitutionはcontent-equalでもpreserve-and-blockします。
 
 - P0: initial private authorityを信頼可能にできない。operation/digest/policy null、retryなし、Consumer mutation false。
 - P1: prepared ACTIVEはdurableだがstageがabsent/incomplete。registered fixed stage entryだけ再構築できます。
@@ -185,7 +187,7 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 | AC-08 | Existing/new checkout、effective Git guard、pre/post driftがexact envelopeでGREEN。 | T10 |
 | AC-09 | Worktree B create/remove、entrypoint-last、C reuse、consumer hook handoffがGREEN。 | T11 |
 | AC-10 | Exact clean 0.2.3だけがmigrationし、old package mutation 0、purge trap exit 2。 | T02、T07、T12 |
-| AC-11 | Source/wheel/sdist/isolated install/dogfoodが同candidate、bootstrap、skills、docsを持つ。 | T12、T13 |
+| AC-11 | Source/wheel/sdist/isolated install/fresh install/dogfoodが同candidate、fixture、bootstrap、skills、docsを持つ。 | T13 |
 | AC-12 | Four required-fast、15/14/1 register、resolved successor、243 timing entries、current gatesが不変。 | T14 |
 | AC-13 | PR base、human merge、B1 post-merge verificationがIntegration Contractどおり。 | human gate receipt |
 | AC-14 | Product test/merge未実行の時点ではReportが成功を主張せず、実装開始許可はfalse。 | document review |
@@ -205,9 +207,9 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 | T09 | Installer EX、managed helper lifetime、wrapper release-to-exec、stream/status/127。 |
 | T10 | Pinned existing/new checkout、effective Git capability guard、post-drift behavior。 |
 | T11 | Worktree B create/remove、entrypoint-last、path C、consumer hook terminal handoff。 |
-| T12 | Public CLI integration、built artifact、isolated installed package、legacy fixture。 |
-| T13 | Complete dogfood、docs/skills/runtime bytes、protected data。 |
-| T14 | Old writer absence、required-fast、15/14/1、243 entries、current gate continuity。 |
+| T12 | Public installer CLI sole route、old writer/manifest/journal production reference 0、public compatibility、旧owner削除のacceptance。 |
+| T13 | Source/wheel/sdist/isolated installed package/fresh install/dogfoodのcandidate、fixture、bootstrap、docs、skills parityとprotected data。 |
+| T14 | Required-fast、15/14/1、243 entries、current gate continuity、#395/#396境界。 |
 
 詳細なKEEP/REPLACE/RETIRE分類は[ライフサイクルのテスト所有と移行対応](artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md)、checkpointの実行順は[実装計画](plan.md)、一回に一checkpointだけ渡すpacketは[Luna Max実装引継ぎ](artifacts/20260908t011846z-luna-max-implementation-handoff.md)を参照します。
 
