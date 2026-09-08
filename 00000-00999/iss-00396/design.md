@@ -4,7 +4,7 @@ ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "requirement.md"
   - "iss-00395"
@@ -40,7 +40,7 @@ Clean Product baselineを入力に、packaging、test ownership、platform roles
 
 ## 3. Responsibility boundary
 
-#396 owns provider test execution architecture、packaging ownership、platform roles、`E384-QUAL-001` measurement/evaluation/evidence implementation、qualification environment、artifact/evidence verification、old policy consumer/provider removal、required-context transition and final operator guidance。
+#396 owns provider test execution architecture、packaging ownership、platform roles、`E384-QUAL-001` measurement/evaluation/evidence implementation、qualification environment realization within the parent's fixed capability boundary、artifact/evidence verification、old policy consumer/provider removal、required-context transition and final operator guidance。
 
 #396 does not own Product defect repair、lifecycle semantics or qualification policy values/aggregation. A discovered Product failure or an `E384-QUAL-001` semantic ambiguity stops admission rather than becoming a policy exception or local design choice。
 
@@ -65,6 +65,10 @@ Neither side is a separate Issue or mergeable state。
 ## 6. Compatibility and context
 
 Compatibility is temporary CI coexistence, not Product dual behavior. Old and new required contexts overlap until intentional RED demonstrates the new gate blocks. Only after GREEN recovery may old context be removed. Final evidence belongs to the final source after compatibility-only surface removal。
+
+### Attemptと最終qualificationの分離
+
+通常PR required contextはper-attempt result、B3/Epic acceptanceはcurrent-candidate five-run campaign・seeded-fault catalogue・rolling twentyの合成結果を判定する。Campaign/window集計をattempt自身へ戻さない。Artifact producerはcandidateごと一回、後続attemptは同じbytesをconsumeする。初回REDはcampaign freeze前に実施し、履歴には残す。実装者は回数やeligible定義の変更でコストを削らない。
 
 ## 7. Evidence model
 
@@ -95,4 +99,6 @@ Implementation-ready elaboration defines concrete structural tests、role execut
 | Context gap | Human no-gap sequence and before/after readback. |
 | Irreversible cutover | Whole-merge rollback to B2 and settings restore. |
 
-`owner_decisions_required=[]`.
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。
+
+Wire §16のbootstrap bytes、runtime/lifecycle admissionとlease/handoff契約はread-onlyである。Candidate変更時も#392受入時のbootstrap identityを保持し、別の互換機構や運用例外を発明しない。

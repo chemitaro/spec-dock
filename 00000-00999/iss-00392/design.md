@@ -5,7 +5,7 @@ ID: "iss-00392"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "requirement.md"
   - "../../design.md"
@@ -41,9 +41,11 @@ Lifecycle state、mutation authority、public wire、filesystem recovery、migra
 
 ## 3. Responsibility boundary
 
+#392 additionally owns E384-RQ-019 and Wire §16: repository-root SH/EX admission, immutable pre-import bootstrap, update/uninstall release→exec handoff, parent-death-safe writing-helper lifetime, and external-only incomplete recovery. The replaceable create lock may remain only as inner create serialization. One-time legacy maintenance E384-DEC-001 is user-adopted; existing-branch checkout E384-DEC-002 is also user-adopted. Worktree creation/removal must coordinate the actual target root through managed publication/removal and cleanup; consumer-owned make hooks cross an explicit terminal external-handoff boundary.
+
 #392 owns state classification、candidate ownership、record/marker behavior、safe publication、migration、uninstall、public lifecycle output、lifecycle documentation and complete dogfood convergence。
 
-#392 does not own the semantics represented by the 14 active baseline failures, their Product repair, test-policy architecture, final workflow/evidence, parent `E384-QUAL-001` implementation or required-context transition。
+#392 does not own the semantics represented by the 14 active baseline failures, their Product/test repair, test-policy architecture, final workflow/evidence, parent `E384-QUAL-001` implementation or required-context transition。
 
 ## 4. Stable interfaces
 
@@ -59,7 +61,7 @@ Lifecycle state、mutation authority、public wire、filesystem recovery、migra
 ```text
 completed #387 + parent B0
   -> #392 lifecycle output B1
-  -> #395 Product repair
+  -> #395 regression contract recovery
   -> #396 gate cutover
 ```
 
@@ -95,4 +97,4 @@ At Issue start, current repository topology determines concrete modules、symbol
 | Current policy breaks after old test removal | Referential integrity is part of B1 GREEN. |
 | Unsafe recovery | Wire and parent filesystem contracts are immutable. |
 
-`owner_decisions_required=[]`.
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。

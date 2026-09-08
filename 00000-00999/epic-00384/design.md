@@ -35,7 +35,7 @@ post-#387 planning baseline
   -> final Epic PR          -> one human merge to main -> state B4
 ```
 
-Issue branches are short-lived writers in newly created, separate Issue worktrees. The current Epic worktree is reserved for parent specification; it does not elaborate or implement an Issue. The Epic branch is the only integration target. Main is not an Issue-level integration target.
+Issue branches are short-lived writers. A new worktree or an explicitly user-selected existing worktree may host that branch; directory reuse does not change the integration topology. The user requested parent commit/push followed by #392 formal start on 2026-09-08. Complete parent G0 first and reuse this worktree for the dedicated Issue branch; formal start does not permit Product implementation. The Epic branch is the only integration target. Main is not an Issue-level integration target.
 
 ## 2. Stable cross-Issue contracts
 
@@ -67,7 +67,7 @@ The fixed provider target set, consumer preservation, private owner-bound worksp
 
 ### E384-C-005 — Regression baseline
 
-[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md) freezes the current 15 rows. Its `failure_paths` identities are current authority; stale 27-row top-level metadata remains historical context only. #392 preserves the 14 active identities, #395 terminalizes them, and #396 consumes only the clean result.
+[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md) freezes the current 15 rows. Its `failure_paths` identities are current authority; stale 27-row top-level metadata remains historical context only. #392 preserves the 14 active identities, #395 restores the represented contracts using the parent-adjudicated repair surfaces (12 test-harness/observer, 2 Product boundaries), and #396 consumes only the clean result.
 
 ### E384-C-006 — Transitional gate
 
@@ -93,13 +93,21 @@ The current Issue designs specify responsibility, inputs, outputs and acceptance
 
 `E384-QUAL-001` in Epic Requirement is the sole current quantitative qualification authority. Issue #396 owns measurement, evaluation, evidence schemas and workflow realization, but does not own the policy values or aggregation semantics. #392 and #395 may verify non-interference only. A required semantic change returns to parent adjudication before Issue start.
 
+### E384-C-012 — Replaceable payload versus runtime coordination
+
+E384-RQ-019 is owned by #392. [Wire §16](artifacts/provider-lifecycle-wire-contract.md) fixes the repository-root inode as the common coordination identity, outside all replaced roots. Normal runtime admission holds a nonblocking shared lease before replaceable module imports; every parser-valid lifecycle path holds a nonblocking exclusive lease before target/stage observation. The fixed bootstrap, ready admission, helper lifetime and release→exec handoff for both `update` and `uninstall` are mandatory. A writing helper retains the shared lease if its parent dies; inherited descriptors are not installer authorization or a lock-acquisition bypass. The existing create lock may serialize creates inside the outer lease but is not cross-generation authority. E384-DEC-001 was accepted by the user on 2026-09-08: only the first 0.2.3 migration uses a maintenance window; 0.2.4 onward uses coordination. This excludes lifecycle/runtime overlap, not all possible Git changes. E384-DEC-002 is user-adopted: managed checkout preserves the admitted provider closure and rejects different/uncertain generations before active/sync. Worktree creation/removal binds the actual affected root, not only the invoking root; Wire §16 owns the target birth, helper lifetime and terminal external-hook handoff. No new Issue is introduced.
+
+### Final-gate execution model
+
+One final-gate attempt executes one role graph with one Linux canonical body. The first five registered attempts of the fixed candidate/campaign supply the performance samples; their same observations may also belong to the latest-twenty stability window. Five-run, seeded-fault and twenty-member qualification aggregation belongs to B3/Epic acceptance, not to every PR's per-attempt status. Started failures/cancellations/missing evidence remain members, and the campaign cannot be reset to select better samples. Parent `E384-QUAL-001` alone defines values and environment capability limits.
+
 ## 3. Integration states
 
 | State | Source | Required invariant |
 |---|---|---|
-| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; independent review pass under the Rolling-Wave Contract, external freeze receipt and post-pass Issue-body projection readback complete. |
-| B1 | #392 merge | Complete final lifecycle and dogfood; old lifecycle writer absent; 14 active identities unchanged; transitional gates GREEN. |
-| B2 | #395 merge | 15 resolved, active/approved 0; Product repairs accepted; transitional gates independently GREEN. |
+| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; #392 not started; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; E384-RQ-019/wire and E384-DEC-001/002 resolved; independent review pass under the Rolling-Wave Contract, external freeze receipt and post-pass Issue-body projection readback complete. |
+| B1 | #392 merge | Complete final lifecycle, shared runtime coordination/handoff/crash proof and dogfood; old lifecycle writer absent; 14 active identities unchanged; transitional gates GREEN. |
+| B2 | #395 merge | 15 resolved, active/approved 0; Cause-appropriate Product/test repairs accepted; transitional gates independently GREEN. |
 | B3 | #396 merge | Final build-once gate and mechanical `E384-QUAL-001` evidence GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |
 | B4 | Epic main merge | Main tree equals accepted B3 tree; final context and closure evidence read back. |
 
@@ -108,7 +116,7 @@ The current Issue designs specify responsibility, inputs, outputs and acceptance
 | Issue | Sole write authority | Explicit read-only input | Forbidden ownership |
 |---|---|---|---|
 | #392 | Provider lifecycle semantics, wire conformance, migration/uninstall/recovery, lifecycle docs and candidate | Post-#387 active identities and transitional gate | Product defect terminalization; final gate/policy removal |
-| #395 | Product behavior represented by the 14 active rows and their terminal state | #392 lifecycle output, wire, current policy | Lifecycle redesign; final gate/policy removal |
+| #395 | Product behavior or test harness/observer represented by the 14 active rows, as adjudicated in register §6.1, and their terminal state | #392 lifecycle output, wire, current policy | Lifecycle redesign; final gate/policy removal |
 | #396 | Provider test ownership, build-once CI, `E384-QUAL-001` implementation/evidence, policy cutover and final guidance | Clean #395 baseline, #392 lifecycle and parent qualification policy | New Product behavior, lifecycle semantic change or qualification policy change |
 
 ## 5. Compatibility design
@@ -147,3 +155,4 @@ Historical research, discussions, HTML guides and CLOSED #388–#390 remain in t
 | E384-RQ-007–011 | C-005, C-006 and B0–B2 |
 | E384-RQ-012–014 and E384-QUAL-001 | C-007, C-008, C-011 and B3 |
 | E384-RQ-015–018 | C-004, C-008, C-009 and B4 |
+| E384-RQ-019 | C-012 and #392 admission/concurrency proof |

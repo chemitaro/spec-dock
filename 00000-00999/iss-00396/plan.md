@@ -4,7 +4,7 @@ ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
 状態: "draft"
-最終更新: "2026-09-02"
+最終更新: "2026-09-08"
 依存:
   - "requirement.md"
   - "design.md"
@@ -26,7 +26,7 @@ repository_evidence:
 
 ## 1. Current planning state
 
-This Plan defines final-gate acceptance only. Parent `E384-QUAL-001` is an immutable input and the sole quantitative/aggregation authority. This Plan intentionally omits exact workflow structure、files、symbols、measurement collector、schemas、tests、commands and implementation order. #396 cannot start before accepted B2 and a new implementation-ready Strict-reviewed pack。
+This Plan defines final-gate acceptance only. Parent `E384-QUAL-001` is an immutable input and the sole quantitative/aggregation authority. This Plan intentionally omits exact workflow structure、files、symbols、measurement collector、schemas、tests、commands and implementation order. #396 cannot formally start before accepted B2 and explicit user authorization. Product implementation additionally requires a new implementation-ready pack independently accepted under Rolling-Wave Contract §5。
 
 ## 2. Entry gate
 
@@ -38,7 +38,8 @@ One Issue PR establishes the complete build-once gate and then removes the old p
 
 ## 4. Evidence owned by this Issue
 
-- replacement gate structure and execution ownership;
+- replacement gate structure, one role graph per attempt, shared observation references for five-run/twenty-member aggregation, and no sample replacement;
+- parent reference-environment capability limits fixed before the first measurement;
 - build and same-candidate role graph conformance to `E384-QUAL-001`;
 - every raw qualification input and the mechanical per-predicate `E384-QUAL-001` result;
 - qualification environment identity and fingerprint evidence;
@@ -49,7 +50,7 @@ One Issue PR establishes the complete build-once gate and then removes the old p
 
 ## 5. Handoff and merge gate
 
-Implementation-ready elaboration specifies concrete topology、measurement implementation and evidence schemas without changing `E384-QUAL-001`. Merge readiness requires complete parent-contract evidence on the final source、all old policy machinery absent、new required context effective、independent Strict review、human PR review and whole-merge rollback/settings recovery record. Human merges to the Epic branch only。
+Implementation-ready elaboration specifies concrete topology、measurement implementation and evidence schemas without changing `E384-QUAL-001`. Merge readiness requires complete parent-contract evidence on the final source、all old policy machinery absent、new required context effective、independent review under Rolling-Wave Contract §5、human PR review and whole-merge rollback/settings recovery record. Human merges to the Epic branch only。
 
 ## 6. Rollback / recovery
 
@@ -61,6 +62,6 @@ Return to parent for non-clean baseline、Product/lifecycle change、consumer-ze
 
 ## 8. Issue-start elaboration gate
 
-The replacement Plan must satisfy the rolling-wave contract and contain exact B2 tip、workflow/jobs/permissions、measurement collector、artifacts/schemas、boundary tests、commands、consumer-removal ordering、context operations、`E384-QUAL-001` raw evidence/readback、cleanup and rollback. It must demonstrate that all policy values and aggregation are references to the parent contract rather than independently managed literals. P0/P1 findings block start。
+The replacement Plan must satisfy the rolling-wave contract and contain exact B2 tip、workflow/jobs/permissions、measurement collector、artifacts/schemas、boundary tests、commands、consumer-removal ordering、context operations、`E384-QUAL-001` raw evidence/readback、cleanup and rollback. It must demonstrate that all policy values and aggregation are references to the parent contract rather than independently managed literals. P0/P1 findings block Product implementation。
 
-`owner_decisions_required=[]`.
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。
