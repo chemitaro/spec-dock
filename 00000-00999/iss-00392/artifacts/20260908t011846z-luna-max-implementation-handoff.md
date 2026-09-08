@@ -2,7 +2,7 @@
 種別: artifact
 ID: "20260908t011846z"
 タイトル: "Luna Max 実装引継ぎ"
-状態: "detailed-review-candidate"
+状態: "approved"
 作成者: "blue-team specification author"
 最終更新: "2026-09-08"
 親: ["iss-00392"]
@@ -10,7 +10,7 @@ template: "blank"
 authority: "evidence"
 derived_from: ["../requirement.md", "../design.md", "../plan.md", "20260908t011846z-01-lifecycle-test-ownership-and-migration.md"]
 reflected_to: ["../plan.md"]
-implementation_allowed: false
+implementation_allowed: true
 repository_evidence:
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"

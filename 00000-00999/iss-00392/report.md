@@ -3,7 +3,7 @@
 ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 関連GitHub: ["#392"]
-状態: "specification-review-remediation"
+状態: "approved"
 最終更新: "2026-09-08"
 依存:
   - "requirement.md"
@@ -13,7 +13,7 @@ ID: "iss-00392"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
   - "artifacts/issue-392-human-guide.html"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: false
+実装開始許可: true
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
