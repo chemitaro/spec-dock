@@ -90,6 +90,39 @@ class TestCliWorktree(CliRuntimeHarness):
         assert item["classification_reason"] == reason, case_label
         assert item["origin"] == "classification_unavailable", case_label
 
+    def test_nonlocking_hook_fd_rejects_replacement_of_locked_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
+            sys_path_inserted = False
+
+            if str(runtime_scripts_dir) not in sys.path:
+                sys.path.insert(0, str(runtime_scripts_dir))
+                sys_path_inserted = True
+            try:
+                from spec_dock_runtime.application import worktree as app_worktree
+            finally:
+                if sys_path_inserted:
+                    sys.path.pop(0)
+
+            worktree_path = Path(tmp) / "worktree"
+            replacement_path = Path(tmp) / "replacement"
+            worktree_path.mkdir()
+            replacement_path.mkdir()
+            target_fd = app_worktree._open_exclusive_worktree(worktree_path)
+            try:
+                worktree_path.rename(Path(tmp) / "worktree.original")
+                replacement_path.rename(worktree_path)
+
+                with pytest.raises(RuntimeError, match="consumer hook binding"):
+                    app_worktree._open_nonlocking_worktree_bound_to_exclusive(
+                        worktree_path,
+                        exclusive_fd=target_fd,
+                    )
+            finally:
+                app_worktree._close_fd(target_fd)
+
     def test_worktree_record_payload_includes_classification_diagnostics(self) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"

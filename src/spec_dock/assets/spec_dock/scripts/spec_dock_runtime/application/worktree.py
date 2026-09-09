@@ -191,6 +191,24 @@ def _open_nonlocking_worktree(path: Path, *, allow_symlink_at: Path | None = Non
     return _open_directory_no_follow(path, allow_symlink_at=allow_symlink_at)
 
 
+def _open_nonlocking_worktree_bound_to_exclusive(
+    path: Path,
+    *,
+    exclusive_fd: int,
+    allow_symlink_at: Path | None = None,
+) -> tuple[int, os.stat_result]:
+    fd = _open_nonlocking_worktree(path, allow_symlink_at=allow_symlink_at)
+    try:
+        exclusive_stat = os.fstat(exclusive_fd)
+        observed_stat = os.fstat(fd)
+        if (exclusive_stat.st_dev, exclusive_stat.st_ino) != (observed_stat.st_dev, observed_stat.st_ino):
+            raise RuntimeError("consumer hook binding changed worktree inode")
+        return fd, observed_stat
+    except BaseException:
+        _close_fd(fd)
+        raise
+
+
 def _close_fd(fd: int | None) -> None:
     if fd is None:
         return
@@ -333,8 +351,11 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 pinned_commit=pinned_commit,
                 target_fd=target_fd,
             )
-            bound_fd = _open_nonlocking_worktree(worktree_path, allow_symlink_at=central_root)
-            bound_stat = os.fstat(bound_fd)
+            bound_fd, bound_stat = _open_nonlocking_worktree_bound_to_exclusive(
+                worktree_path,
+                exclusive_fd=target_fd,
+                allow_symlink_at=central_root,
+            )
             return WorktreeCreateResult(
                 id=worktree_id,
                 main_worktree_path=main_worktree,
