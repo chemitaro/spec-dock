@@ -39,7 +39,7 @@ def _ensure_git_available() -> None:
         raise RuntimeError("'git' CLI not found. Install Git, or disable git-dependent operations.")
 
 
-def require_clean_working_tree(repo_root: Path) -> None:
+def require_clean_working_tree(repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None:
     _ensure_git_available()
     try:
         p = subprocess.run(
@@ -52,10 +52,13 @@ def require_clean_working_tree(repo_root: Path) -> None:
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"git failed: git status --porcelain\n{(e.stderr or '').strip()}") from e
 
-    out = (p.stdout or "").strip()
-    if out:
-        head = "\n".join(out.splitlines()[:20])
-        more = "" if len(out.splitlines()) <= 20 else "\n..."
+    allowed = set(allowed_missing_paths)
+    dirty_lines = [
+        line for line in (p.stdout or "").splitlines() if not (line[:2] in {" D", "D "} and line[3:] in allowed)
+    ]
+    if dirty_lines:
+        head = "\n".join(dirty_lines[:20])
+        more = "" if len(dirty_lines) <= 20 else "\n..."
         raise RuntimeError(
             "Working tree is not clean; aborting checkout for safety.\n"
             "Please commit/stash your changes first.\n\n"
@@ -122,20 +125,20 @@ def local_branch_exists(repo_root: Path, branch: str) -> bool:
     return p.returncode == 0
 
 
-def checkout_branch(repo_root: Path, branch: str) -> None:
+def checkout_branch(repo_root: Path, branch: str, *, lease_fd: int | None = None) -> None:
     _ensure_git_available()
     cmd = ["git", "checkout", branch]
     try:
-        _run_git_write(repo_root, cmd)
+        _run_git_write(repo_root, cmd, lease_fd=lease_fd)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
 
 
-def create_and_checkout_branch(repo_root: Path, branch: str) -> None:
+def create_and_checkout_branch(repo_root: Path, branch: str, *, lease_fd: int | None = None) -> None:
     _ensure_git_available()
     cmd = ["git", "checkout", "-b", branch]
     try:
-        _run_git_write(repo_root, cmd)
+        _run_git_write(repo_root, cmd, lease_fd=lease_fd)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
 
@@ -257,17 +260,19 @@ def remove_worktree(
     force: bool,
     source_fd: int | None = None,
     target_fd: int | None = None,
+    lease_fd: int | None = None,
 ) -> None:
     _ensure_git_available()
     cmd = ["git", "worktree", "remove"]
     if force:
-        cmd.extend(["--force", "--force"])
+        cmd.append("--force")
     cmd.append(str(path))
     try:
         _run_git_write(
             repo_root,
             cmd,
             bound_fds=tuple(fd for fd in (source_fd, target_fd) if fd is not None),
+            lease_fd=lease_fd,
         )
     except subprocess.CalledProcessError as e:
         stderr = (e.stderr or "").strip()
@@ -617,7 +622,9 @@ def assess_capabilities(
         text=True,
         check=False,
     )
-    if any(line.startswith("S ") for line in (sparse_bits.stdout or "").splitlines()):
+    if sparse_bits.returncode != 0:
+        reasons.append("skip-worktree-probe-unavailable")
+    elif any(line.startswith("S ") for line in (sparse_bits.stdout or "").splitlines()):
         reasons.append("skip-worktree-bit-set")
 
     if (_config(repo_root, "core.autocrlf") or "false").lower() not in {"false", "0", "off"}:
@@ -719,6 +726,7 @@ def pinned_checkout(
     pinned_commit: str,
     checkout_kind: str,
     closure_paths: tuple[str, ...] = _PROVIDER_CLOSURE_PATHS,
+    lease_fd: int | None = None,
 ) -> PinnedCheckout:
     before_branch = current_branch_or_none(repo_root)
     before_head = current_head_or_none(repo_root)
@@ -739,11 +747,15 @@ def pinned_checkout(
     if closure_digest is None:
         raise RuntimeError("Git capability guard failed: provider closure is unprovable")
     if checkout_kind == "existing":
-        _run_git_write(repo_root, ["git", "update-ref", f"refs/heads/{branch}", pinned_commit, pinned_commit])
+        _run_git_write(
+            repo_root,
+            ["git", "update-ref", f"refs/heads/{branch}", pinned_commit, pinned_commit],
+            lease_fd=lease_fd,
+        )
         if before_branch != branch:
-            _run_git_write(repo_root, ["git", "switch", branch])
+            _run_git_write(repo_root, ["git", "switch", branch], lease_fd=lease_fd)
     elif checkout_kind == "new":
-        _run_git_write(repo_root, ["git", "switch", "-c", branch, pinned_commit])
+        _run_git_write(repo_root, ["git", "switch", "-c", branch, pinned_commit], lease_fd=lease_fd)
     else:
         raise RuntimeError(f"unsupported checkout kind: {checkout_kind}")
     checkout = PinnedCheckout(
@@ -793,12 +805,14 @@ def add_worktree_pinned(
     pinned_commit: str,
     source_fd: int | None = None,
     target_fd: int | None = None,
+    lease_fd: int | None = None,
 ) -> None:
     bound_fds = tuple(fd for fd in (source_fd, target_fd) if fd is not None)
     _run_git_write(
         repo_root,
         ["git", "worktree", "add", "--no-checkout", "-b", branch, str(path), pinned_commit],
         bound_fds=bound_fds,
+        lease_fd=lease_fd,
     )
 
 
@@ -1049,8 +1063,15 @@ def materialize_worktree(repo_root: Path, *, path: Path, pinned_commit: str, tar
             _materialize_tree_entry(target_fd, entry, repo_root=repo_root)
         if pending_entrypoint is None:
             raise RuntimeError("worktree entrypoint is missing from the pinned tree")
-        _publish_entrypoint(target_fd, pending_entrypoint, repo_root=repo_root)
     except subprocess.CalledProcessError as error:
         raise RuntimeError(f"git failed: {' '.join(command)}\n{(error.stderr or '').strip()}") from error
     except OSError as error:
         raise RuntimeError(f"worktree materialization filesystem operation failed: {error}") from error
+
+
+def publish_worktree_entrypoint(repo_root: Path, *, target_fd: int, pinned_commit: str) -> None:
+    entries = _tree_entries(_ls_tree_all(repo_root, pinned_commit))
+    pending_entrypoint = next((entry for entry in entries if entry[3] == "spec-dock/scripts/spec-dock"), None)
+    if pending_entrypoint is None:
+        raise RuntimeError("worktree entrypoint is missing from the pinned tree")
+    _publish_entrypoint(target_fd, pending_entrypoint, repo_root=repo_root)

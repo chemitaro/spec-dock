@@ -314,6 +314,14 @@ def _acquire_shared_lease(root_fd: int) -> None:
         raise _BootstrapError("repository coordination is unavailable") from error
 
 
+def _bind_process_cwd(fd: int) -> Path:
+    try:
+        os.fchdir(fd)
+    except OSError as error:
+        raise _BootstrapError("repository descriptor path is unavailable") from error
+    return Path(".")
+
+
 def _emit(text: object) -> None:
     for warning in getattr(text, "warnings", ()):
         print(f"spec-dock: (warn) {warning}", file=sys.stderr)
@@ -503,12 +511,18 @@ def main() -> int:
         specdock_fd = None
         _validate_fixed_domains(root_fd, candidate_digest)
 
-        scripts_dir = repo_root_path / "spec-dock" / "scripts"
+        _bind_process_cwd(root_fd)
+        scripts_dir = Path("spec-dock") / "scripts"
         sys.path.insert(0, str(scripts_dir))
         from spec_dock_runtime.app import run
         from spec_dock_runtime.cli.bootstrap import build_runtime
 
-        context = build_runtime(repo_root_path / "spec-dock", repo_root=repo_root_path)
+        context = build_runtime(
+            repo_root_path / "spec-dock",
+            repo_root=repo_root_path,
+            repo_root_fd=root_fd,
+            repo_root_binding=(before.st_dev, before.st_ino),
+        )
         outcome = run(sys.argv[1:], context)
         terminal = outcome.terminal
         if terminal is not None:

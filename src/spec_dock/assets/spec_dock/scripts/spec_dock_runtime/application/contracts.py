@@ -256,6 +256,7 @@ class WorktreeRecordView:
     managed_classification_available: bool = True
     classification_reason: WorktreeClassificationReason = "root_valid"
     origin: WorktreeOrigin | str = ""
+    locked: bool = False
 
     def __post_init__(self) -> None:
         if self.classification_reason not in WORKTREE_CLASSIFICATION_REASONS:

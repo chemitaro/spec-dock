@@ -895,6 +895,17 @@ class ProviderLifecycleEngine:
             return self._blocked(request, "unsafe-repository-binding")
         with bound:
             try:
+                lease.revalidate()
+                bound_stat = os.fstat(bound.fd)
+            except (RepositoryCoordinationError, OSError):
+                return self._blocked(request, "unsafe-repository-binding")
+            if (
+                not stat.S_ISDIR(bound_stat.st_mode)
+                or bound_stat.st_dev != lease.binding.device
+                or bound_stat.st_ino != lease.binding.inode
+            ):
+                return self._blocked(request, "unsafe-repository-binding")
+            try:
                 candidate = None if operation == "uninstall" else self._candidate()
             except (CandidateError, OSError, ValueError):
                 return self._blocked(

@@ -152,7 +152,7 @@ class DepsTopologyReader(Protocol):
 
 
 class GitGateway(Protocol):
-    def require_clean_working_tree(self, repo_root: Path) -> None: ...
+    def require_clean_working_tree(self, repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None: ...
 
     def current_branch_or_none(self, repo_root: Path) -> str | None: ...
 
@@ -224,6 +224,8 @@ class GitGateway(Protocol):
     ) -> None: ...
 
     def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str, target_fd: int) -> None: ...
+
+    def publish_worktree_entrypoint(self, repo_root: Path, *, target_fd: int, pinned_commit: str) -> None: ...
 
 
 class GitHubCapabilityGateway(Protocol):
@@ -306,3 +308,5 @@ class Ports:
     filesystem_gateway: FilesystemGateway | None = None
     explicit_file_source_guard: ExplicitFileSourceGuard | None = None
     explicit_file_artifact_publisher: ExplicitFileArtifactPublisher | None = None
+    repo_root_fd: int | None = None
+    repo_root_binding: tuple[int, int] | None = None

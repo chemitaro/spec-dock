@@ -776,37 +776,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert "classification_reason=root_valid" in text_removed.stdout
             assert "remove_blockers=-" in text_removed.stdout
 
-    def test_worktree_remove_untracked_default_removes_directory_and_keeps_branch(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            self._prepare_git_repo(target)
-
-            created = self._run_runtime_capture(
-                target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root)
-            )
-            assert created.returncode == 0, created.stderr
-            worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
-            branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
-            assert branch
-            (worktree_path / "cache.tmp").write_text("dirty\n", encoding="utf-8")
-
-            removed = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "dirty", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            assert removed.returncode == 0, removed.stderr or removed.stdout
-            payload = json.loads(removed.stdout)
-            assert payload["status"] == "ok"
-            assert payload["removed_record"]
-            assert payload["removed_directory"]
-            assert not payload["branch_deleted"]
-            assert not worktree_path.exists()
-            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
-
     def test_worktree_remove_deletes_nonempty_workbench_without_special_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
@@ -842,77 +811,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert not payload["branch_deleted"]
             assert not worktree_path.exists()
             assert not workbench_file.exists()
-            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
-
-    def test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            self._prepare_git_repo(target)
-
-            created = self._run_runtime_capture(
-                target, ["worktree", "create", "modified"], env=self._worktree_env(central_root)
-            )
-            assert created.returncode == 0, created.stderr
-            worktree_path = central_root / "sample-repo" / "sample-repo-modified"
-            branch = self._run_git(
-                target, ["branch", "--list", "*-modified", "--format=%(refname:short)"]
-            ).stdout.strip()
-            assert branch
-            tracked_file = worktree_path / "tracked.txt"
-            tracked_file.write_text("tracked\n", encoding="utf-8")
-            self._run_git(worktree_path, ["add", "tracked.txt"])
-            self._run_git(
-                worktree_path,
-                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "add tracked"],
-            )
-            tracked_file.write_text("tracked modified\n", encoding="utf-8")
-
-            removed = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "modified", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            assert removed.returncode == 0, removed.stderr or removed.stdout
-            payload = json.loads(removed.stdout)
-            assert payload["status"] == "ok"
-            assert payload["removed_record"]
-            assert payload["removed_directory"]
-            assert not payload["branch_deleted"]
-            assert not worktree_path.exists()
-            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
-
-    def test_worktree_remove_force_compatibility_removes_dirty_directory(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            self._prepare_git_repo(target)
-
-            created = self._run_runtime_capture(
-                target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root)
-            )
-            assert created.returncode == 0, created.stderr
-            worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
-            branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
-            assert branch
-            (worktree_path / "cache.tmp").write_text("dirty\n", encoding="utf-8")
-
-            removed = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "dirty", "--force", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            assert removed.returncode == 0, removed.stderr or removed.stdout
-            payload = json.loads(removed.stdout)
-            assert payload["status"] == "ok"
-            assert payload["removed_record"]
-            assert payload["removed_directory"]
-            assert not payload["branch_deleted"]
-            assert not worktree_path.exists()
             assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
             assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
@@ -1140,6 +1038,9 @@ class TestCliWorktree(CliRuntimeHarness):
                         app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
                     ]
 
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
                 def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append((path, force))
                     raise RuntimeError("git refused")
@@ -1160,7 +1061,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
             assert raised.value.code == "git_worktree_remove_failed"
-            assert git_gateway.remove_calls == [(worktree_path, True)]
+            assert git_gateway.remove_calls == [(worktree_path, False)]
 
     def test_worktree_remove_locked_default_uses_force_equivalent_git_call(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1199,6 +1100,9 @@ class TestCliWorktree(CliRuntimeHarness):
                             path=worktree_path, head="def", branch="main-locked", locked=True
                         ),
                     ]
+
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
 
                 def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append((path, force))
@@ -1251,6 +1155,9 @@ class TestCliWorktree(CliRuntimeHarness):
             class FakeGitGateway:
                 def __init__(self) -> None:
                     self.remove_calls: list[Path] = []
+
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
 
                 def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
@@ -1437,6 +1344,9 @@ class TestCliWorktree(CliRuntimeHarness):
                     ]
                     return initial_records if self.calls == 1 else self.refreshed_records
 
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
                 def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
                     shutil.rmtree(path)
@@ -1529,6 +1439,9 @@ class TestCliWorktree(CliRuntimeHarness):
                     index = min(self.calls, len(self.records_by_call) - 1)
                     self.calls += 1
                     return self.records_by_call[index]
+
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
 
                 def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
@@ -1629,6 +1542,9 @@ class TestCliWorktree(CliRuntimeHarness):
                         app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
                         app_contracts.GitWorktreeRecord(path=manual, head="def", branch="manual"),
                     ]
+
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
 
                 def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)

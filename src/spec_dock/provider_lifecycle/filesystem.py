@@ -236,9 +236,19 @@ class NativeAtomicFilesystem:
         root_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
         if not stat.S_ISDIR(root_stat.st_mode):
             raise FilesystemSafetyError(f"{name!r} is not a directory")
-        entries = tuple(
-            sorted(self._capture_entries(parent_fd, name, ""), key=lambda entry: entry.path.encode("utf-8"))
-        )
+        root_fd = os.open(name, _fd_flags() | getattr(os, "O_NOFOLLOW", 0), dir_fd=parent_fd)
+        try:
+            opened = os.fstat(root_fd)
+            if not self._same_inode(root_stat, opened):
+                raise FilesystemSafetyError(f"{name!r} changed while opening")
+            entries = tuple(
+                sorted(self._capture_entries_from_fd(root_fd, ""), key=lambda entry: entry.path.encode("utf-8"))
+            )
+            after_scan = os.fstat(root_fd)
+            if not self._same_inode(opened, after_scan):
+                raise FilesystemSafetyError(f"{name!r} changed while reading")
+        finally:
+            os.close(root_fd)
         stream = bytearray()
         for entry in entries:
             relative = entry.path.encode("utf-8")
@@ -400,32 +410,49 @@ class NativeAtomicFilesystem:
             dir_fd=parent_fd,
         )
         try:
-            names = sorted(os.listdir(directory_fd), key=lambda item: os.fsencode(item))  # noqa: PTH208
-            for child_name in names:
-                child_relative = posixpath.join(relative_prefix, child_name) if relative_prefix else child_name
-                child_stat = os.stat(child_name, dir_fd=directory_fd, follow_symlinks=False)
-                kind = _object_kind(child_stat.st_mode)
-                if kind == "directory":
-                    yield TreeEntry("directory", child_relative)
-                    yield from self._capture_entries(directory_fd, child_name, child_relative)
-                elif kind == "regular":
-                    child_fd = os.open(
-                        child_name,
-                        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
-                        dir_fd=directory_fd,
-                    )
-                    try:
-                        content = self._sha256_fd(child_fd)
-                    finally:
-                        os.close(child_fd)
-                    yield TreeEntry("regular", child_relative, stat.S_IMODE(child_stat.st_mode), content)
-                elif kind == "symlink":
-                    target = os.readlink(child_name, dir_fd=directory_fd)
-                    yield TreeEntry("symlink", child_relative, target=target)
-                else:
-                    raise FilesystemSafetyError(f"unsupported tree entry at {child_relative!r}")
+            yield from self._capture_entries_from_fd(directory_fd, relative_prefix)
         finally:
             os.close(directory_fd)
+
+    def _capture_entries_from_fd(self, directory_fd: int, relative_prefix: str) -> Iterable[TreeEntry]:
+        names = sorted(os.listdir(directory_fd), key=lambda item: os.fsencode(item))
+        for child_name in names:
+            child_relative = posixpath.join(relative_prefix, child_name) if relative_prefix else child_name
+            child_stat = os.stat(child_name, dir_fd=directory_fd, follow_symlinks=False)
+            kind = _object_kind(child_stat.st_mode)
+            if kind == "directory":
+                yield TreeEntry("directory", child_relative)
+                child_fd = os.open(
+                    child_name,
+                    _fd_flags() | getattr(os, "O_NOFOLLOW", 0),
+                    dir_fd=directory_fd,
+                )
+                try:
+                    opened = os.fstat(child_fd)
+                    if not self._same_inode(child_stat, opened):
+                        raise FilesystemSafetyError(f"{child_relative!r} changed while opening")
+                    yield from self._capture_entries_from_fd(child_fd, child_relative)
+                    after_scan = os.fstat(child_fd)
+                    if not self._same_inode(opened, after_scan):
+                        raise FilesystemSafetyError(f"{child_relative!r} changed while reading")
+                finally:
+                    os.close(child_fd)
+            elif kind == "regular":
+                child_fd = os.open(
+                    child_name,
+                    os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+                    dir_fd=directory_fd,
+                )
+                try:
+                    content = self._sha256_fd(child_fd)
+                finally:
+                    os.close(child_fd)
+                yield TreeEntry("regular", child_relative, stat.S_IMODE(child_stat.st_mode), content)
+            elif kind == "symlink":
+                target = os.readlink(child_name, dir_fd=directory_fd)
+                yield TreeEntry("symlink", child_relative, target=target)
+            else:
+                raise FilesystemSafetyError(f"unsupported tree entry at {child_relative!r}")
 
     def _remove_tree(
         self,
@@ -440,6 +467,12 @@ class NativeAtomicFilesystem:
             if self._witness(opened, "directory", None) != expected_root:
                 raise FilesystemSafetyError("tree root changed before removal")
             self._remove_directory_contents(directory_fd, "", entries)
+            current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != (
+                expected_root.device,
+                expected_root.inode,
+            ):
+                raise FilesystemSafetyError("tree root changed before final removal")
             os.rmdir(name, dir_fd=parent_fd)
         finally:
             os.close(directory_fd)
@@ -464,9 +497,18 @@ class NativeAtomicFilesystem:
                     raise FilesystemSafetyError("directory disappeared during bound removal")
                 child_fd = os.open(name, _fd_flags() | getattr(os, "O_NOFOLLOW", 0), dir_fd=directory_fd)
                 try:
+                    opened = os.fstat(child_fd)
+                    if (opened.st_dev, opened.st_ino) != (witness.device, witness.inode):
+                        raise FilesystemSafetyError("directory changed before bound removal")
                     self._remove_directory_contents(child_fd, relative, entries)
                 finally:
                     os.close(child_fd)
+                current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                if not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != (
+                    witness.device,
+                    witness.inode,
+                ):
+                    raise FilesystemSafetyError("directory changed before final removal")
                 os.rmdir(name, dir_fd=directory_fd)
             elif entry.kind == "regular":
                 witness = self.capture_inode(directory_fd, name, "regular")

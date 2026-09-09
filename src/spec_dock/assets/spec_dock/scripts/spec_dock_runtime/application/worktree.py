@@ -174,6 +174,49 @@ def _open_exclusive_worktree(path: Path, *, allow_symlink_at: Path | None = None
         raise
 
 
+def _open_exclusive_worktree_at(parent_fd: int, name: str) -> int:
+    fd = os.open(
+        name,
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=parent_fd,
+    )
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if os.listdir(fd):  # noqa: PTH208 - inspect the descriptor bound by the lease
+            raise RuntimeError("worktree target is not empty")
+        return fd
+    except BaseException:
+        _close_fd(fd)
+        raise
+
+
+def _open_created_exclusive_worktree(path: Path, *, allow_symlink_at: Path | None = None) -> int:
+    parent_fd = _open_directory_no_follow(path.parent, allow_symlink_at=allow_symlink_at)
+    try:
+        os.mkdir(path.name, 0o755, dir_fd=parent_fd)
+        created = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISDIR(created.st_mode):
+            raise RuntimeError("worktree target is not a directory")
+        fd = _open_exclusive_worktree_at(parent_fd, path.name)
+        try:
+            opened = os.fstat(fd)
+            if (opened.st_dev, opened.st_ino) != (created.st_dev, created.st_ino):
+                raise RuntimeError("worktree target changed between mkdir and exclusive open")
+            return fd
+        except BaseException:
+            _close_fd(fd)
+            raise
+    finally:
+        _close_fd(parent_fd)
+
+
+def _verify_worktree_path_binding(path: Path, fd: int) -> None:
+    opened = os.fstat(fd)
+    observed = path.stat(follow_symlinks=False)
+    if not stat.S_ISDIR(observed.st_mode) or (observed.st_dev, observed.st_ino) != (opened.st_dev, opened.st_ino):
+        raise RuntimeError("worktree target binding changed before Git mutation")
+
+
 def _open_exclusive_existing_worktree(path: Path, *, allow_symlink_at: Path | None = None) -> int:
     fd = _open_directory_no_follow(path, allow_symlink_at=allow_symlink_at)
     try:
@@ -237,6 +280,18 @@ def _materialize_and_verify_worktree(
         path=worktree_path,
         pinned_commit=pinned_commit,
         target_fd=target_fd,
+    )
+    head = ports.git_gateway.current_head_or_none(worktree_path)
+    if head != pinned_commit:
+        raise RuntimeError(f"worktree generation drift: expected {pinned_commit}, observed {head}")
+    ports.git_gateway.require_clean_working_tree(
+        worktree_path,
+        allowed_missing_paths=(_ENTRYPOINT_PATH,),
+    )
+    ports.git_gateway.publish_worktree_entrypoint(
+        ports.repo_root,
+        target_fd=target_fd,
+        pinned_commit=pinned_commit,
     )
     head = ports.git_gateway.current_head_or_none(worktree_path)
     if head != pinned_commit:
@@ -309,8 +364,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             ) from exc
 
         try:
-            worktree_path.mkdir()
-            target_fd = _open_exclusive_worktree(worktree_path, allow_symlink_at=central_root)
+            target_fd = _open_created_exclusive_worktree(worktree_path, allow_symlink_at=central_root)
         except OSError as exc:
             last_reason = f"worktree path could not be exclusively bound: {exc}"
             continue
@@ -319,6 +373,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
         try:
             source_fd = _open_source_shared(repo_root)
             _require_same_filesystem(source_fd, target_fd)
+            _verify_worktree_path_binding(worktree_path, target_fd)
             ports.git_gateway.add_worktree_pinned(
                 repo_root,
                 path=worktree_path,
@@ -490,13 +545,29 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
 
     try:
         remove_worktree = ports.git_gateway.remove_worktree
+        try:
+            ports.git_gateway.require_clean_working_tree(refreshed_worktree.path)
+        except (OSError, RuntimeError) as exc:
+            raise WorktreeCommandError(
+                code="remove_blocked",
+                message="worktree remove blocked",
+                command="remove",
+                target=req.target,
+                worktree=refreshed_worktree,
+                remove_blockers=["dirty_or_untracked"],
+                git_error=str(exc),
+            ) from exc
         remove_worktree(
             ports.repo_root,
             path=refreshed_worktree.path,
-            force=True,
+            force=refreshed_worktree.locked,
             source_fd=source_fd,
             target_fd=target_fd,
         )
+    except WorktreeCommandError:
+        _close_fd(target_fd)
+        _close_fd(source_fd)
+        raise
     except RuntimeError as exc:
         _close_fd(target_fd)
         _close_fd(source_fd)
@@ -722,6 +793,7 @@ def _build_inventory_from_records(
             managed_classification_available=classification.available,
             classification_reason=classification.reason,
             origin=_worktree_origin(managed=managed, classification=classification),
+            locked=record.locked,
         )
     return [views_by_index[index] for index in range(len(records))]
 

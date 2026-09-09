@@ -59,7 +59,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
         fake_git.write_text(
             "#!/bin/sh\n"
             'if [ "$1" = worktree ] && [ "$2" = remove ]; then\n'
-            f'  /bin/mv "$5" "$5.original"\n  /bin/ln -s {outside} "$5"\n'
+            f'  /bin/mv "$3" "$3.original"\n  /bin/ln -s {outside} "$3"\n'
             "  exit 0\n"
             "fi\n"
             f'exec {real_git} "$@"\n',
@@ -125,6 +125,9 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
                         app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
                         app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-stable"),
                     ]
+
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
 
                 def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     # Simulate Git removing only its record while leaving the
