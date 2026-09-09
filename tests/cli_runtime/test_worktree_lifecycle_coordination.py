@@ -97,7 +97,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
         finally:
             sys.path.pop(0)
 
-    def test_t11_original_worktree_inode_is_removed_through_bound_parent(self) -> None:
+    def test_t11_original_worktree_inode_is_preserved_when_git_leaves_it(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime_scripts_dir = (
                 Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -145,8 +145,12 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
                 environment_gateway=FakeEnvironmentGateway(),
             )
 
-            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="stable"), ports)
+            with pytest.raises(app_contracts.WorktreeCommandError) as error_info:
+                app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="stable"), ports)
 
-            assert result.removed_record
-            assert result.removed_directory
-            assert not worktree_path.exists()
+            error = error_info.value
+            assert error.code == "post_remove_cleanup_failed"
+            assert error.removed_record
+            assert error.removed_directory is False
+            assert worktree_path.is_dir()
+            assert worktree_path.is_symlink() is False

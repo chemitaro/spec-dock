@@ -627,9 +627,7 @@ def _remove_original_worktree_directory(
             return True
         if (after_stat.st_dev, after_stat.st_ino) != (target_stat.st_dev, target_stat.st_ino):
             raise RuntimeError("unsafe-binding: replacement target has a different inode")
-        os.rmdir(path.name, dir_fd=parent_fd)
-        os.fsync(parent_fd)
-        return True
+        raise RuntimeError("unsafe-binding: original target remains after Git removal")
     except OSError as exc:
         raise RuntimeError(f"unsafe-binding: original target cleanup failed: {exc}") from exc
     finally:
