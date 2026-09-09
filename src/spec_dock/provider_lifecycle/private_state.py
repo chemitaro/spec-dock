@@ -1240,8 +1240,9 @@ class StageStore:
 
     def _stage_fd(self) -> int:
         namespace_fd = self._namespace_fd()
+        stage_fd: int | None = None
         try:
-            return os.open(
+            stage_fd = os.open(
                 STAGE_NAME,
                 os.O_RDONLY
                 | getattr(os, "O_DIRECTORY", 0)
@@ -1249,6 +1250,13 @@ class StageStore:
                 | getattr(os, "O_CLOEXEC", 0),
                 dir_fd=namespace_fd,
             )
+            try:
+                _check_private_directory(os.fstat(stage_fd), os.fstat(namespace_fd).st_dev, _effective_euid())
+            except BaseException:
+                os.close(stage_fd)
+                stage_fd = None
+                raise
+            return stage_fd
         except FileNotFoundError as exc:
             raise PrivateStateError("STAGE is not durable") from exc
         finally:
@@ -1257,6 +1265,8 @@ class StageStore:
     def _read_owner_bytes(self) -> bytes | None:
         try:
             stage_fd = self._stage_fd()
+        except PrivateStateForeignError:
+            raise
         except PrivateStateError:
             return None
         try:
@@ -1394,6 +1404,17 @@ class StageStore:
             return False
         entries = self._validate_stage_entries()
         return entries == STAGE_ENTRY_NAMES
+
+    def require_valid(self, owner: StageOwner) -> None:
+        """Validate prepared-stage authority without changing private state."""
+
+        current = self.load_owner()
+        if current is None:
+            raise PrivateStateForeignError("STAGE-OWNER.json is missing")
+        if current != owner:
+            raise PrivateStateForeignError("STAGE-OWNER.json belongs to another operation")
+        if self._validate_stage_entries() != STAGE_ENTRY_NAMES:
+            raise PrivateStateForeignError("STAGE entries are incomplete")
 
     def rebuild_registered_entries(
         self,

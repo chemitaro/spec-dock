@@ -1647,19 +1647,7 @@ class ProviderLifecycleEngine:
         active: ActiveState,
         candidate: CandidateIdentity | None,
     ) -> None:
-        owner = StageOwner(
-            1,
-            active.repository_key,
-            active.tuple_key,
-            active.operation_generation,
-            active.operation,
-            active.candidate_digest,
-            active.seed_policy,
-            active.result_family,
-            STAGE_ENTRY_NAMES,
-            tuple(cast("str | None", item["candidate_tree_digest"]) for item in active.registered_stage_entries),
-            tuple(cast("str | None", item["original_tree_digest"]) for item in active.registered_stage_entries),
-        )
+        owner = self._stage_owner(active)
         if stage_store.reuse_if_valid(owner) and self._stage_payload_valid(stage_store, candidate):
             return
         self._check_fault("stage-mkdir")
@@ -1696,6 +1684,22 @@ class ProviderLifecycleEngine:
             os.fsync(stage_fd)
         finally:
             os.close(stage_fd)
+
+    @staticmethod
+    def _stage_owner(active: ActiveState) -> StageOwner:
+        return StageOwner(
+            1,
+            active.repository_key,
+            active.tuple_key,
+            active.operation_generation,
+            active.operation,
+            active.candidate_digest,
+            active.seed_policy,
+            active.result_family,
+            STAGE_ENTRY_NAMES,
+            tuple(cast("str | None", item["candidate_tree_digest"]) for item in active.registered_stage_entries),
+            tuple(cast("str | None", item["original_tree_digest"]) for item in active.registered_stage_entries),
+        )
 
     def _stage_payload_valid(self, stage_store: StageStore, candidate: CandidateIdentity | None) -> bool:
         if candidate is None:
@@ -3102,6 +3106,30 @@ class ProviderLifecycleEngine:
                     operation=active.operation,
                     candidate_digest=active.candidate_digest,
                     seed_policy=active.seed_policy,
+                )
+            if stage_store is None:
+                return self._blocked(request, "lifecycle-preparation-failed")
+            try:
+                stage_store.require_valid(self._stage_owner(active))
+            except PrivateStateForeignError:
+                return self._blocked(
+                    request,
+                    "stage-owner-mismatch",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    phase="candidate-staging",
+                    last_completed_phase="preflight",
+                )
+            except (PrivateStateError, OSError):
+                return self._blocked(
+                    request,
+                    "lifecycle-preparation-failed",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    phase="candidate-staging",
+                    last_completed_phase="preflight",
                 )
             targets = self._observe_domains(root_fd)
             container = self._observe_container(root_fd)

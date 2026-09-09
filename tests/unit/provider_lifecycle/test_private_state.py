@@ -145,6 +145,24 @@ def test_t04_prepared_active_precedes_stage_and_p1_only_rebuilds_registered_entr
     assert stage.write_count == initial_writes + 1
 
 
+def test_t04_stage_root_binding_is_validated_on_p2_reuse(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    namespace, active, owner = _state(repository)
+    active_store = ActiveStateStore(namespace)
+    stage = StageStore(namespace, active_store)
+    active_store.save(active)
+    stage.ensure_registered_entries()
+    stage.save_owner(owner)
+    initial_writes = stage.write_count
+
+    (namespace / "STAGE").chmod(0o755)
+
+    with pytest.raises(PrivateStateForeignError, match="private directory binding is unsafe"):
+        stage.reuse_if_valid(owner)
+    assert stage.write_count == initial_writes
+
+
 def test_t04_private_modes_and_record_temp_exception_are_exact(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()

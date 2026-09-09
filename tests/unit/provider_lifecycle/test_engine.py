@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from io import BytesIO
+import os
 from pathlib import Path
 import subprocess
 import tarfile
+from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
-from spec_dock.provider_lifecycle.contracts import LifecycleMode, LifecycleRequest, Operation
+from spec_dock.provider_lifecycle.contracts import ActiveState, LifecycleMode, LifecycleRequest, Operation
 from spec_dock.provider_lifecycle.engine import FAULT_POINTS, ProviderLifecycleEngine
 from spec_dock.provider_lifecycle.legacy_fixture import LEGACY_SOURCE_COMMIT
-from spec_dock.provider_lifecycle.private_state import PrivateStateError, PrivateStateForeignError
+from spec_dock.provider_lifecycle.private_state import PrivateStateError, PrivateStateForeignError, StageStore
 from spec_dock.provider_lifecycle.wire import parse_installation_record, serialize_public_result
 
 
@@ -206,3 +209,60 @@ def test_t04_foreign_stage_owner_is_stage_owner_mismatch_in_candidate_staging(mo
     assert result.last_completed_phase == "preflight"
     assert result.mutation_started is False
     assert result.actions == ()
+
+
+def test_t04_prepared_uninstall_dry_run_validates_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "prepared-uninstall").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "uninstall", mode="dry-run")
+    active = cast(
+        "ActiveState",
+        SimpleNamespace(
+            operation="uninstall",
+            seed_policy="preserve-only",
+            result_family="uninstall",
+            repository_key="a" * 64,
+            tuple_key="b" * 64,
+            operation_generation="0" * 32,
+            candidate_digest="c" * 64,
+            registered_stage_entries=({"candidate_tree_digest": None, "original_tree_digest": None},) * 6,
+        ),
+    )
+
+    class ForeignStage:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def require_valid(self, owner) -> None:
+            self.calls += 1
+            raise PrivateStateForeignError("foreign prepared stage")
+
+    foreign_stage = ForeignStage()
+    stage = cast("StageStore", foreign_stage)
+    engine = ProviderLifecycleEngine()
+    monkeypatch.setattr(engine, "_observe_domains", lambda _root_fd: pytest.fail("target was observed"))
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        result = engine._resume_or_block(
+            request,
+            "uninstall",
+            "preserve-only",
+            None,
+            active,
+            None,
+            None,
+            stage,
+            root_fd,
+            force=None,
+        )
+    finally:
+        os.close(root_fd)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest == "c" * 64
+    assert result.seed_policy == "preserve-only"
+    assert result.mutation_started is False
+    assert foreign_stage.calls == 1

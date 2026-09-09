@@ -328,6 +328,71 @@ class TestCliWorktree(CliRuntimeHarness):
         assert attempts[0].is_dir()
         assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in str(raised.value)
 
+    def test_worktree_create_reports_git_failure_after_reservation_without_retry(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import (
+                contracts as app_contracts,
+                ports as app_ports,
+                worktree as app_worktree,
+            )
+        finally:
+            sys.path.pop(0)
+
+        repo_root = tmp_path / "repo"
+        central_root = tmp_path / "worktrees"
+        repo_root.mkdir()
+        central_root.mkdir()
+        attempts: list[Path] = []
+
+        class FakeGitGateway:
+            def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                return None
+
+            def current_branch_or_none(self, repo_root_arg):
+                return "main"
+
+            def worktree_list(self, repo_root_arg):
+                return [app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")]
+
+            def local_branch_exists(self, repo_root_arg, branch):
+                return False
+
+            def check_ref_format_branch(self, repo_root_arg, branch):
+                return True
+
+            def add_worktree_pinned(self, repo_root_arg, *, path, **kwargs):
+                attempts.append(path)
+                raise subprocess.CalledProcessError(
+                    128,
+                    ["git", "worktree", "add"],
+                    stderr="fatal: a branch named 'main-wt1' already exists",
+                )
+
+        class FakeEnvironmentGateway:
+            def getenv(self, name):
+                return str(central_root)
+
+        monkeypatch.setattr(app_worktree, "_pin_worktree_source", lambda repo_root_arg, ports: "abc")
+        ports = app_ports.Ports(
+            node_reader=object(),
+            repo_root=repo_root,
+            git_gateway=FakeGitGateway(),
+            environment_gateway=FakeEnvironmentGateway(),
+        )
+
+        with pytest.raises(RuntimeError, match="git worktree add failed after target reservation") as raised:
+            app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(label="demo"), ports)
+
+        assert len(attempts) == 1
+        assert attempts[0].is_dir()
+        assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in str(raised.value)
+
     def test_materializer_rejects_foreign_existing_descendant_directory(self, tmp_path: Path) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"

@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
 from typing import TYPE_CHECKING
 
@@ -31,11 +32,6 @@ if TYPE_CHECKING:
 
 _LABEL_RE = re.compile(r"^[a-z0-9-]+$")
 _MAX_ATTEMPTS = 10000
-_RETRYABLE_GIT_WORKTREE_ERRORS = (
-    "already exists",
-    "is already checked out",
-    "a branch named",
-)
 _WORKTREE_ROOT_ENV = "SPEC_DOCK_WORKTREE_ROOT"
 _WORKTREE_ROOT_EXAMPLE = 'export SPEC_DOCK_WORKTREE_ROOT="$HOME/workspace/worktrees"'
 _PROVIDER_CLOSURE_PATHS = (
@@ -397,15 +393,17 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 source_fd=source_fd,
                 target_fd=target_fd,
             )
-        except RuntimeError as exc:
-            message = str(exc)
+        except (RuntimeError, subprocess.CalledProcessError) as exc:
+            if isinstance(exc, subprocess.CalledProcessError):
+                command = " ".join(str(item) for item in exc.cmd) if isinstance(exc.cmd, list) else str(exc.cmd)
+                message = f"git failed: {command}"
+                details = (exc.stderr or exc.output or "").strip()
+                if details:
+                    message += f"\n{details}"
+            else:
+                message = str(exc)
             _close_fd(source_fd)
             _close_fd(target_fd)
-            if _is_retryable_worktree_add_error(message):
-                records = ports.git_gateway.worktree_list(repo_root)
-                known_paths = {_canonical_path(record.path) for record in records}
-                last_reason = f"retryable git collision: {message}"
-                continue
             state = _artifact_state(
                 repo_root=repo_root,
                 worktree_path=worktree_path,
@@ -415,7 +413,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 refresh_records=True,
             )
             raise RuntimeError(
-                "git worktree add failed for non-retryable reason: "
+                "git worktree add failed after target reservation: "
                 f"id={worktree_id} path={worktree_path} branch={branch_name} {state}\n{message}"
             ) from exc
         except BaseException:
@@ -1062,11 +1060,6 @@ def _protected_cleanup_paths(ports: Ports, *, main: WorktreeRecordView) -> list[
     if classification.namespace is not None:
         paths.append(classification.namespace)
     return paths
-
-
-def _is_retryable_worktree_add_error(message: str) -> bool:
-    lowered = message.lower()
-    return any(fragment in lowered for fragment in _RETRYABLE_GIT_WORKTREE_ERRORS)
 
 
 def _coordination_failure_kind(error: OSError) -> str | None:
