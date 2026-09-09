@@ -299,4 +299,21 @@ T08–T11のreal concurrency/platform nodesが別fileにある場合、同jobへ
 - Unexpected failure/error/skip/xfail/approved failure additions: 0。
 - Old production writer/manifest/current-authority references: 0。
 
-現時点ではこれらProduct testsを実行していません。本Artifactは移行契約であり、GREEN証拠ではありません。
+仕様pack作成時点ではこれらProduct testsを実行していません。本Artifactは移行契約であり、実装時点のGREEN証拠は次節に追記します。
+
+## 11. Implementation verification update
+
+2026-09-09時点の実装candidate `e75bc8887e022f9b4a2ebf4716cb443d3542b70c`（tree
+`d925a51f86347b6cdf127ad617bfce9bd609703b`）に対して、次の証拠を採取しました。
+
+- Classification registry: `unclassified=0`, `overlap=0`, `prematurely_retired=0`。
+- T01–T07のprimaryを含むprovider lifecycle unitは`23 passed`。
+- T08–T11のprimaryを含むCP3 parityは`10 passed`。
+- T12/T14 acceptance（classification registryを含む）は`3 passed`、T13 package/dogfood parityは`1 passed`。
+- Required-fastはexact fourで`4 passed`、default fastは`878 passed, 831 skipped`。
+- `make lint`はruff check/formatとmypyを含めてpass。
+- Ledgerはtotal15/active14/resolved1、timingは243 entriesのまま。T14がexact bytes/count/signatureを検証します。
+- `tests/unit/infra/test_managed_distribution.py`は未収集で、T12のproduction old writer/manifest reference scanもpassしました。全successor primaryはcollectionへ存在し、上記のfocused runでpassしています。
+- current full verifierは`1709 tests collected`、status=`ledger-mismatch`、violation=`10`でした。10件は#395が所有するactive baselineの既知signature/coverage mismatchだけで、今回のIssue由来のunexpected failure/error/skip/xfail追加はありません。#392はこのbaselineを変更していません。
+
+したがって、旧managed distribution testのRETIRE条件（whole-file classification、successor GREEN、production reference 0）はcandidate上で確認済みです。ただしcurrent full verifierの#395 baselineと、人間merge後のB1再検証は未完了です。本証拠は#392実装candidateの受入証跡であり、#395の修正やIssue全体の最終完了を意味しません。
