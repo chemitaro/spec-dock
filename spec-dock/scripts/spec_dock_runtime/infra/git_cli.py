@@ -655,9 +655,18 @@ def assess_capabilities(
         for index in range(0, len(fields) - 2, 3):
             attribute = fields[index + 1].decode("utf-8", errors="replace")
             value = fields[index + 2].decode("utf-8", errors="replace")
-            if attribute in {"eol", "text", "working-tree-encoding", "ident", "filter"} and value not in {
+            if attribute in {
+                "eol",
+                "text",
+                "working-tree-encoding",
+                "ident",
+                "filter",
+                "diff",
+                "merge",
+            } and value not in {
                 "unspecified",
                 "",
+                "-",
             }:
                 reasons.append(f"attribute-enabled:{attribute}={value}")
                 break
@@ -716,7 +725,7 @@ def pinned_checkout(
     if before_head is not None:
         admitted_closure = provider_closure(repo_root, before_head)
         if admitted_closure.digest != target_closure.digest:
-            raise RuntimeError("runtime-generation-drift: target closure differs from admitted generation")
+            raise RuntimeError("runtime-generation-change-blocked: target closure differs from admitted generation")
     assessment = assess_capabilities(
         repo_root,
         pinned_commit=pinned_commit,

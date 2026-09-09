@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
 import stat
-from typing import TYPE_CHECKING
+import sys
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TestGenerationCheckout(CliRuntimeHarness):
@@ -81,6 +81,48 @@ class TestGenerationCheckout(CliRuntimeHarness):
         blocked = self._run_runtime_capture(target, ["issue", "start", "3"])
 
         assert blocked.returncode != 0
-        assert "runtime-generation-drift" in blocked.stderr
+        assert "runtime-generation-change-blocked" in blocked.stderr
+        assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == before_branch
+        assert self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip() == before_head
+
+    @pytest.mark.parametrize("attribute", ("diff=custom", "merge=custom"))
+    def test_t10_effective_diff_and_merge_attributes_are_rejected_before_mutation(
+        self,
+        tmp_path: Path,
+        attribute: str,
+    ) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+        self._init_origin_repo(target)
+        self._run_git(target, ["add", "-A"])
+        self._run_git(target, ["commit", "-m", "baseline"])
+        attributes = target / ".gitattributes"
+        attributes.write_text(f"spec-dock/docs/README.md {attribute}\n", encoding="utf-8")
+        self._run_git(target, ["add", ".gitattributes"])
+        self._run_git(target, ["commit", "-m", "configure Git attribute"])
+        before_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
+        before_head = self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip()
+
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import git_cli
+
+            pinned_commit = self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip()
+            assessment = git_cli.assess_capabilities(
+                target,
+                pinned_commit=pinned_commit,
+                closure_paths=git_cli._PROVIDER_CLOSURE_PATHS,
+                branch="main",
+                check_other_worktree=False,
+            )
+        finally:
+            sys.path.pop(0)
+
+        assert not assessment.allowed
+        assert f"attribute-enabled:{attribute.split('=', 1)[0]}=custom" in assessment.reasons
         assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == before_branch
         assert self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip() == before_head

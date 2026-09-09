@@ -209,6 +209,13 @@ def _open_nonlocking_worktree_bound_to_exclusive(
         raise
 
 
+def _require_same_filesystem(source_fd: int, target_fd: int) -> None:
+    source_stat = os.fstat(source_fd)
+    target_stat = os.fstat(target_fd)
+    if source_stat.st_dev != target_stat.st_dev:
+        raise RuntimeError("worktree source and target must share a filesystem")
+
+
 def _close_fd(fd: int | None) -> None:
     if fd is None:
         return
@@ -311,6 +318,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
         source_fd: int | None = None
         try:
             source_fd = _open_source_shared(repo_root)
+            _require_same_filesystem(source_fd, target_fd)
             ports.git_gateway.add_worktree_pinned(
                 repo_root,
                 path=worktree_path,
@@ -502,21 +510,14 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         ) from exc
     _close_fd(source_fd)
     source_fd = None
-    removed_directory = True
+    removed_directory = False
     try:
         _guard_remove_containment(refreshed_worktree, refreshed_inventory, ports, command="remove", target=req.target)
-        try:
-            refreshed_worktree.path.lstat()
-        except FileNotFoundError:
-            removed_directory = True
-        else:
-            try:
-                after_stat = refreshed_worktree.path.lstat()
-            except OSError as exc:
-                raise RuntimeError(f"unsafe-binding: replacement target could not be inspected: {exc}") from exc
-            if (after_stat.st_dev, after_stat.st_ino) != (target_stat.st_dev, target_stat.st_ino):
-                raise RuntimeError("unsafe-binding: replacement target has a different inode")
-            raise RuntimeError("unsafe-binding: original target remains; pathname cleanup is not permitted")
+        removed_directory = _remove_original_worktree_directory(
+            refreshed_worktree.path,
+            target_stat=target_stat,
+            allow_symlink_at=central_root,
+        )
     except RuntimeError as exc:
         _close_fd(target_fd)
         raise WorktreeCommandError(
@@ -539,6 +540,29 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         branch_deleted=False,
         warnings=[],
     )
+
+
+def _remove_original_worktree_directory(
+    path: Path,
+    *,
+    target_stat: os.stat_result,
+    allow_symlink_at: Path | None,
+) -> bool:
+    parent_fd = _open_directory_no_follow(path.parent, allow_symlink_at=allow_symlink_at)
+    try:
+        try:
+            after_stat = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return True
+        if (after_stat.st_dev, after_stat.st_ino) != (target_stat.st_dev, target_stat.st_ino):
+            raise RuntimeError("unsafe-binding: replacement target has a different inode")
+        os.rmdir(path.name, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+        return True
+    except OSError as exc:
+        raise RuntimeError(f"unsafe-binding: original target cleanup failed: {exc}") from exc
+    finally:
+        _close_fd(parent_fd)
 
 
 def _normalize_label(label: str | None) -> str | None:

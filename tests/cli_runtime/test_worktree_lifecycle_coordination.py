@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import shutil
-from typing import TYPE_CHECKING
+import sys
+import tempfile
+from types import SimpleNamespace
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
@@ -76,3 +78,72 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
         assert "post-remove target cleanup failed" in removed.stderr
         assert replacement.is_symlink()
         assert outside.is_dir()
+
+    def test_t11_cross_filesystem_worktree_admission_is_rejected_before_git_mutation(self, monkeypatch) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import worktree as app_worktree
+
+            monkeypatch.setattr(
+                app_worktree.os,
+                "fstat",
+                lambda fd: SimpleNamespace(st_dev={10: 1, 11: 2}[fd]),
+            )
+            with pytest.raises(RuntimeError, match="share a filesystem"):
+                app_worktree._require_same_filesystem(10, 11)
+        finally:
+            sys.path.pop(0)
+
+    def test_t11_original_worktree_inode_is_removed_through_bound_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
+            sys.path.insert(0, str(runtime_scripts_dir))
+            try:
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
+            finally:
+                sys.path.pop(0)
+
+            root = Path(tmp)
+            repo_root = root / "repo"
+            central_root = root / "central"
+            worktree_path = central_root / "repo" / "repo-stable"
+            repo_root.mkdir()
+            worktree_path.mkdir(parents=True)
+
+            class FakeGitGateway:
+                def worktree_list(self, repo_root_arg):
+                    return [
+                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
+                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-stable"),
+                    ]
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                    # Simulate Git removing only its record while leaving the
+                    # original empty directory for descriptor-bound cleanup.
+                    return None
+
+            class FakeEnvironmentGateway:
+                def getenv(self, name):
+                    return str(central_root)
+
+            ports = app_ports.Ports(
+                node_reader=object(),
+                repo_root=repo_root,
+                git_gateway=FakeGitGateway(),
+                environment_gateway=FakeEnvironmentGateway(),
+            )
+
+            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="stable"), ports)
+
+            assert result.removed_record
+            assert result.removed_directory
+            assert not worktree_path.exists()

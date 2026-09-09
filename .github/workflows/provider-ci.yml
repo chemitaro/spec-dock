@@ -48,5 +48,7 @@ jobs:
         run: uv run pytest tests/unit/provider_lifecycle
       - name: Run distribution cutover focused tests
         run: uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py
+      - name: Run provider lifecycle platform tests
+        run: uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_provider_lifecycle_bootstrap.py tests/cli_runtime/test_provider_lifecycle_handoff.py tests/cli_runtime/test_generation_checkout.py tests/cli_runtime/test_worktree_lifecycle_coordination.py
       - name: Run packaged distribution parity tests
         run: uv run pytest --run-full-regression --full-regression-shard tests/integration/test_epic_00343_distribution.py

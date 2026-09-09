@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 from spec_dock import cli
 from tests.conftest import REQUIRED_FAST_NODE_IDS
@@ -123,6 +126,69 @@ _ISSUE_BOUNDARY_SHA256 = {
     "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/plan.md": "45eacc30d921563ad627adac584ea64f835afd1dcdc3902f78c396d11ac6a095",
 }
 
+_RETIREMENT_SUCCESSOR_SUFFIXES = frozenset({
+    "::test_t01_wire_v12_inventory_and_generated_projection_are_exact",
+    "::test_t02_candidate_record_marker_and_legacy_fixture_are_closed_and_deterministic",
+    "::test_t03_fixed_roots_slots_seeds_and_protected_sentinels_are_exact",
+    "::test_t04_prepared_active_precedes_stage_and_p1_only_rebuilds_registered_entries",
+    "::test_t05_linux_and_macos_native_atomic_adapters_have_no_unsafe_fallback",
+    "::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations",
+    "::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero",
+    "::test_t08_pre_import_shared_lease_and_ready_admission_are_enforced",
+    "::test_t09_update_uninstall_exec_and_helper_lease_lifetime_are_terminal",
+    "::test_t10_existing_and_new_checkout_are_pinned_and_generation_safe",
+    "::test_t11_worktree_b_create_remove_and_make_handoff_are_inode_bound",
+    "::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent",
+    "::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical",
+    "::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged",
+})
+
+_BASELINE_NODE_IDS = frozenset(row[1] for row in _EXPECTED_BASELINE_ROWS)
+
+
+def _explicit_classification_matches(nodeid: str) -> tuple[str, ...]:
+    matches: list[str] = []
+    if nodeid in _BASELINE_NODE_IDS:
+        matches.append("KEEP-baseline")
+    if nodeid in _EXPECTED_REQUIRED_FAST_NODE_IDS:
+        matches.append("KEEP-required-fast")
+    if nodeid.startswith("tests/unit/provider_lifecycle/"):
+        matches.append("KEEP-provider-lifecycle-successors")
+    if nodeid.startswith((
+        "tests/cli_runtime/test_provider_lifecycle_bootstrap.py::",
+        "tests/cli_runtime/test_provider_lifecycle_handoff.py::",
+        "tests/cli_runtime/test_generation_checkout.py::",
+        "tests/cli_runtime/test_worktree_lifecycle_coordination.py::",
+    )):
+        matches.append("KEEP-runtime-lifecycle-successors")
+    if nodeid.startswith((
+        "tests/integration/test_provider_lifecycle_dogfood.py::",
+        "tests/integration/test_issue_392_acceptance.py::",
+    )):
+        matches.append("KEEP-integration-successors")
+    if nodeid.startswith("tests/cli_runtime/test_distribution_cutover.py::") and nodeid not in _BASELINE_NODE_IDS:
+        matches.append("KEEP-distribution-cutover")
+    if nodeid.startswith("tests/unit/infra/test_init_update.py::") and nodeid not in _EXPECTED_REQUIRED_FAST_NODE_IDS:
+        matches.append("KEEP-init-update")
+    if not matches:
+        matches.append("KEEP-default")
+    return tuple(matches)
+
+
+def _collect_all_node_ids(repository: Path) -> set[str]:
+    environment = os.environ.copy()
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"],
+        cwd=repository,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return {line for line in result.stdout.splitlines() if line.startswith("tests/") and "::" in line}
+
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -160,6 +226,30 @@ def test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent(tmp_pat
     uninstall = json.loads(capsys.readouterr().out)
     assert uninstall["code"] == "uninstall-completed"
     assert (target / "spec-dock/spec-dock.version").is_file()
+
+
+def test_t14_classification_registry_has_no_unclassified_overlap_or_premature_retirement() -> None:
+    repository = Path(__file__).parents[2]
+    collected = _collect_all_node_ids(repository)
+    classifications = {nodeid: _explicit_classification_matches(nodeid) for nodeid in collected}
+    unclassified = sorted(nodeid for nodeid, matches in classifications.items() if not matches)
+    overlap = sorted(f"{nodeid}: {matches}" for nodeid, matches in classifications.items() if len(matches) != 1)
+
+    retired_file = repository / "tests/unit/infra/test_managed_distribution.py"
+    retired_nodes = [
+        nodeid for nodeid in collected if nodeid.startswith("tests/unit/infra/test_managed_distribution.py::")
+    ]
+    missing_successors = sorted(
+        suffix for suffix in _RETIREMENT_SUCCESSOR_SUFFIXES if not any(nodeid.endswith(suffix) for nodeid in collected)
+    )
+    prematurely_retired = []
+    if retired_file.exists() or retired_nodes:
+        prematurely_retired.append("tests/unit/infra/test_managed_distribution.py is still collected")
+    prematurely_retired.extend(f"missing successor: {suffix}" for suffix in missing_successors)
+
+    assert not unclassified
+    assert not overlap
+    assert not prematurely_retired
 
 
 def test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged() -> None:
@@ -215,6 +305,13 @@ def test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged() -> N
     for command in (
         "uv run pytest tests/unit/provider_lifecycle",
         "uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py",
+        (
+            "uv run pytest --run-full-regression --full-regression-shard "
+            "tests/cli_runtime/test_provider_lifecycle_bootstrap.py "
+            "tests/cli_runtime/test_provider_lifecycle_handoff.py "
+            "tests/cli_runtime/test_generation_checkout.py "
+            "tests/cli_runtime/test_worktree_lifecycle_coordination.py"
+        ),
         "uv run pytest --run-full-regression --full-regression-shard tests/integration/test_epic_00343_distribution.py",
     ):
         assert f"run: {command}" in workflow
