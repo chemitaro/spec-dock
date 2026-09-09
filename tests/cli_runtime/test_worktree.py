@@ -265,8 +265,16 @@ class TestCliWorktree(CliRuntimeHarness):
             assert str(expected_path.resolve()) in worktree_list
             assert f"branch refs/heads/{current_branch}-wt1" in worktree_list
 
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            BlockingIOError(11, "worktree target is busy"),
+            RuntimeError("worktree target binding changed"),
+        ],
+        ids=["os-error", "runtime-error"],
+    )
     def test_worktree_create_reports_post_mkdir_reservation_failure_without_retry(
-        self, monkeypatch, tmp_path: Path
+        self, monkeypatch, tmp_path: Path, failure: Exception
     ) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -310,7 +318,7 @@ class TestCliWorktree(CliRuntimeHarness):
         def fail_after_mkdir(path: Path, *, allow_symlink_at=None) -> int:
             attempts.append(path)
             path.mkdir()
-            raise BlockingIOError(11, "worktree target is busy")
+            raise failure
 
         monkeypatch.setattr(app_worktree, "_pin_worktree_source", lambda repo_root_arg, ports: "abc")
         monkeypatch.setattr(app_worktree, "_open_created_exclusive_worktree", fail_after_mkdir)
@@ -327,6 +335,75 @@ class TestCliWorktree(CliRuntimeHarness):
         assert len(attempts) == 1
         assert attempts[0].is_dir()
         assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in str(raised.value)
+
+    def test_worktree_create_reports_materialization_failure_and_partial_payload_without_retry(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import (
+                contracts as app_contracts,
+                ports as app_ports,
+                worktree as app_worktree,
+            )
+        finally:
+            sys.path.pop(0)
+
+        repo_root = tmp_path / "repo"
+        central_root = tmp_path / "worktrees"
+        repo_root.mkdir()
+        central_root.mkdir()
+        attempts: list[Path] = []
+
+        class FakeGitGateway:
+            def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                return None
+
+            def current_branch_or_none(self, repo_root_arg):
+                return "main"
+
+            def current_head_or_none(self, repo_root_arg):
+                return "abc"
+
+            def worktree_list(self, repo_root_arg):
+                return [app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")]
+
+            def local_branch_exists(self, repo_root_arg, branch):
+                return False
+
+            def check_ref_format_branch(self, repo_root_arg, branch):
+                return True
+
+            def add_worktree_pinned(self, repo_root_arg, *, path, **kwargs):
+                attempts.append(path)
+
+            def materialize_worktree(self, repo_root_arg, *, path, **kwargs):
+                raise RuntimeError("materializer stopped after Git metadata creation")
+
+        class FakeEnvironmentGateway:
+            def getenv(self, name):
+                return str(central_root)
+
+        monkeypatch.setattr(app_worktree, "_pin_worktree_source", lambda repo_root_arg, ports: "abc")
+        ports = app_ports.Ports(
+            node_reader=object(),
+            repo_root=repo_root,
+            git_gateway=FakeGitGateway(),
+            environment_gateway=FakeEnvironmentGateway(),
+        )
+
+        with pytest.raises(RuntimeError, match="phase=materialization") as raised:
+            app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(label="demo"), ports)
+
+        assert len(attempts) == 1
+        assert attempts[0].is_dir()
+        message = str(raised.value)
+        assert "worktree create failed after target reservation" in message
+        assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in message
+        assert "payload_paths:0/7,entrypoint_exists:False" in message
 
     def test_worktree_create_reports_git_failure_after_reservation_without_retry(
         self, monkeypatch, tmp_path: Path

@@ -19,6 +19,7 @@ from spec_dock.provider_lifecycle.private_state import (
     cleanup_token_for,
     resolve_private_namespace,
     tuple_key_for,
+    validate_private_namespace,
 )
 from spec_dock.provider_lifecycle.wire import serialize_installation_record
 
@@ -161,6 +162,25 @@ def test_t04_stage_root_binding_is_validated_on_p2_reuse(tmp_path: Path) -> None
     with pytest.raises(PrivateStateForeignError, match="private directory binding is unsafe"):
         stage.reuse_if_valid(owner)
     assert stage.write_count == initial_writes
+
+
+def test_t04_private_namespace_reopens_only_with_a_validated_full_chain(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    namespace, active, _owner = _state(repository)
+    active_store = ActiveStateStore(namespace, repository_root=repository)
+    active_store.save(active)
+
+    assert validate_private_namespace(repository, namespace)
+    before = (namespace / "ACTIVE.json").read_bytes(), os.lstat(namespace / "ACTIVE.json").st_ino
+    top = namespace.parent
+    top.chmod(0o755)
+
+    with pytest.raises(PrivateStateForeignError, match="private directory binding is unsafe"):
+        validate_private_namespace(repository, namespace)
+    with pytest.raises(PrivateStateForeignError, match="private directory binding is unsafe"):
+        active_store.load()
+    assert ((namespace / "ACTIVE.json").read_bytes(), os.lstat(namespace / "ACTIVE.json").st_ino) == before
 
 
 def test_t04_private_modes_and_record_temp_exception_are_exact(tmp_path: Path) -> None:

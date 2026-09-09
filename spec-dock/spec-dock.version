@@ -1,1 +1,1 @@
-{"schema_version":1,"state":"ready","operation":null,"version":"0.2.4","candidate_digest":"e9e878c663d2512832098a4196da0efc064716423edad3c4db8c181a0a88d144","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}}
+{"schema_version":1,"state":"ready","operation":null,"version":"0.2.4","candidate_digest":"a790d668d89822ee225bbec18c5142fe8d294d5e3c8192244576517e85558035","seed_policy":"preserve-only","skill_slots":{"spec-dock":"0.2.4","spec-dock-grill-with-docs":"0.2.4"}}

@@ -80,6 +80,7 @@ from spec_dock.provider_lifecycle.private_state import (
     repository_key_for,
     resolve_private_namespace,
     tuple_key_for,
+    validate_private_namespace,
 )
 from spec_dock.provider_lifecycle.wire import (
     WireValidationError,
@@ -1041,18 +1042,14 @@ class ProviderLifecycleEngine:
             for point in ("private-top-mkdir", "private-top-fsync", "private-repo-mkdir", "private-repo-fsync"):
                 self._check_fault(point)
             namespace = resolve_private_namespace(target)
-            active = ActiveStateStore(namespace)
-            receipt = CompletionReceiptStore(namespace)
-            return active, receipt, StageStore(namespace, active)
-        try:
-            value = os.lstat(namespace)
-        except FileNotFoundError:
+            active = ActiveStateStore(namespace, repository_root=target)
+            receipt = CompletionReceiptStore(namespace, repository_root=target)
+            return active, receipt, StageStore(namespace, active, repository_root=target)
+        if not validate_private_namespace(target, namespace):
             return None, None, None
-        if not stat.S_ISDIR(value.st_mode) or stat.S_ISLNK(value.st_mode):
-            raise PrivateStateForeignError("private namespace is not a directory")
-        active = ActiveStateStore(namespace)
-        receipt = CompletionReceiptStore(namespace)
-        return active, receipt, StageStore(namespace, active)
+        active = ActiveStateStore(namespace, repository_root=target)
+        receipt = CompletionReceiptStore(namespace, repository_root=target)
+        return active, receipt, StageStore(namespace, active, repository_root=target)
 
     def _receipt_matches_repository(self, receipt: CompletionReceipt, lease: RepositoryLease) -> bool:
         binding = lease.binding

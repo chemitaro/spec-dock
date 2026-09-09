@@ -271,9 +271,12 @@ def _materialize_and_verify_worktree(
     pinned_commit: str,
     source_fd: int,
     target_fd: int,
+    phase: list[str] | None = None,
 ) -> None:
     assert ports.repo_root is not None
     assert ports.git_gateway is not None
+    if phase is not None:
+        phase[0] = "materialization"
     directory_witnesses = ports.git_gateway.materialize_worktree(
         ports.repo_root,
         path=worktree_path,
@@ -281,6 +284,8 @@ def _materialize_and_verify_worktree(
         source_fd=source_fd,
         target_fd=target_fd,
     )
+    if phase is not None:
+        phase[0] = "pre-publication-verification"
     head = ports.git_gateway.current_head_or_none(worktree_path)
     if head != pinned_commit:
         raise RuntimeError(f"worktree generation drift: expected {pinned_commit}, observed {head}")
@@ -288,12 +293,16 @@ def _materialize_and_verify_worktree(
         worktree_path,
         allowed_missing_paths=(_ENTRYPOINT_PATH,),
     )
+    if phase is not None:
+        phase[0] = "entrypoint-publication"
     ports.git_gateway.publish_worktree_entrypoint(
         ports.repo_root,
         target_fd=target_fd,
         pinned_commit=pinned_commit,
         directory_witnesses=directory_witnesses,
     )
+    if phase is not None:
+        phase[0] = "post-publication-verification"
     head = ports.git_gateway.current_head_or_none(worktree_path)
     if head != pinned_commit:
         raise RuntimeError(f"worktree generation drift: expected {pinned_commit}, observed {head}")
@@ -301,6 +310,17 @@ def _materialize_and_verify_worktree(
     entrypoint = worktree_path / _ENTRYPOINT_PATH
     if not entrypoint.is_file() or entrypoint.is_symlink():
         raise RuntimeError("worktree entrypoint was not published as the final verified object")
+
+
+def _format_worktree_error(error: Exception) -> str:
+    if isinstance(error, subprocess.CalledProcessError):
+        command = " ".join(str(item) for item in error.cmd) if isinstance(error.cmd, list) else str(error.cmd)
+        message = f"git failed: {command}"
+        details = (error.stderr or error.output or "").strip()
+        if details:
+            message += f"\n{details}"
+        return message
+    return str(error)
 
 
 def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateResult:
@@ -366,7 +386,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
 
         try:
             target_fd = _open_created_exclusive_worktree(worktree_path, allow_symlink_at=central_root)
-        except OSError as exc:
+        except (OSError, RuntimeError) as exc:
             state = _artifact_state(
                 repo_root=repo_root,
                 worktree_path=worktree_path,
@@ -377,7 +397,8 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             )
             raise RuntimeError(
                 "worktree target reservation failed after candidate creation: "
-                f"id={worktree_id} path={worktree_path} branch={branch_name} {state}\n{exc}"
+                f"id={worktree_id} path={worktree_path} branch={branch_name} phase=target-reservation {state}\n"
+                f"{_format_worktree_error(exc)}"
             ) from exc
 
         source_fd: int | None = None
@@ -393,15 +414,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 source_fd=source_fd,
                 target_fd=target_fd,
             )
-        except (RuntimeError, subprocess.CalledProcessError) as exc:
-            if isinstance(exc, subprocess.CalledProcessError):
-                command = " ".join(str(item) for item in exc.cmd) if isinstance(exc.cmd, list) else str(exc.cmd)
-                message = f"git failed: {command}"
-                details = (exc.stderr or exc.output or "").strip()
-                if details:
-                    message += f"\n{details}"
-            else:
-                message = str(exc)
+        except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
             _close_fd(source_fd)
             _close_fd(target_fd)
             state = _artifact_state(
@@ -414,7 +427,8 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             )
             raise RuntimeError(
                 "git worktree add failed after target reservation: "
-                f"id={worktree_id} path={worktree_path} branch={branch_name} {state}\n{message}"
+                f"id={worktree_id} path={worktree_path} branch={branch_name} phase=git-worktree-add {state}\n"
+                f"{_format_worktree_error(exc)}"
             ) from exc
         except BaseException:
             _close_fd(source_fd)
@@ -422,6 +436,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             raise
 
         bound_fd: int | None = None
+        phase = ["materialization"]
         try:
             assert source_fd is not None
             _materialize_and_verify_worktree(
@@ -430,7 +445,9 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 pinned_commit=pinned_commit,
                 source_fd=source_fd,
                 target_fd=target_fd,
+                phase=phase,
             )
+            phase[0] = "consumer-hook-binding"
             bound_fd, bound_stat = _open_nonlocking_worktree_bound_to_exclusive(
                 worktree_path,
                 exclusive_fd=target_fd,
@@ -450,6 +467,23 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 bound_device=bound_stat.st_dev,
                 bound_inode=bound_stat.st_ino,
             )
+        except Exception as exc:
+            _close_fd(bound_fd)
+            _close_fd(source_fd)
+            _close_fd(target_fd)
+            state = _artifact_state(
+                repo_root=repo_root,
+                worktree_path=worktree_path,
+                branch_name=branch_name,
+                known_paths=known_paths,
+                ports=ports,
+                refresh_records=True,
+            )
+            raise RuntimeError(
+                "worktree create failed after target reservation: "
+                f"id={worktree_id} path={worktree_path} branch={branch_name} phase={phase[0]} {state}\n"
+                f"{_format_worktree_error(exc)}"
+            ) from exc
         except BaseException:
             _close_fd(bound_fd)
             raise
@@ -1095,4 +1129,10 @@ def _artifact_state(
         branch_exists = "unknown"
     path_exists = worktree_path.exists()
     record_exists = _canonical_path(worktree_path) in record_paths
-    return f"artifact_state=path_exists:{path_exists},branch_exists:{branch_exists},record_exists:{record_exists}"
+    payload_paths = sum((worktree_path / relative).exists() for relative in _PROVIDER_CLOSURE_PATHS)
+    entrypoint = worktree_path / _ENTRYPOINT_PATH
+    entrypoint_exists = entrypoint.is_file() and not entrypoint.is_symlink()
+    return (
+        f"artifact_state=path_exists:{path_exists},branch_exists:{branch_exists},record_exists:{record_exists},"
+        f"payload_paths:{payload_paths}/{len(_PROVIDER_CLOSURE_PATHS)},entrypoint_exists:{entrypoint_exists}"
+    )

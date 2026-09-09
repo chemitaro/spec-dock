@@ -780,17 +780,31 @@ class _PrivateStore:
     maximum: int
     mode: int
 
-    def __init__(self, namespace: str | os.PathLike[str], filename: str, maximum: int, mode: int) -> None:
+    def __init__(
+        self,
+        namespace: str | os.PathLike[str],
+        filename: str,
+        maximum: int,
+        mode: int,
+        *,
+        repository_root: str | os.PathLike[str] | None = None,
+    ) -> None:
         self.namespace = Path(namespace)
         self.filename = filename
         self.maximum = maximum
         self.mode = mode
+        self.repository_root = None if repository_root is None else Path(repository_root)
 
     def _open_namespace(self) -> int:
         if not self.namespace.is_absolute():
             raise PrivateStateError("private namespace must be absolute")
         try:
-            fd = _open_absolute_directory_no_follow(self.namespace)
+            if self.repository_root is None:
+                fd = _open_absolute_directory_no_follow(self.namespace)
+            else:
+                opened_namespace = _open_private_namespace(self.repository_root, self.namespace)
+                assert opened_namespace is not None
+                fd = opened_namespace
         except OSError as exc:
             raise PrivateStateError("private namespace cannot be opened") from exc
         try:
@@ -973,6 +987,112 @@ def _effective_euid() -> int:
     return os.geteuid() if hasattr(os, "geteuid") else os.getuid()
 
 
+def _open_private_namespace(
+    repository_root: str | os.PathLike[str],
+    namespace: str | os.PathLike[str],
+    *,
+    effective_euid: int | None = None,
+    allow_missing: bool = False,
+) -> int | None:
+    """Open a namespace only after binding the complete private directory chain."""
+
+    root = Path(repository_root)
+    namespace_path = Path(namespace)
+    if (
+        not root.is_absolute()
+        or not root.name
+        or "\x00" in os.fspath(root)
+        or not namespace_path.is_absolute()
+        or "\x00" in os.fspath(namespace_path)
+    ):
+        raise PrivateStateError("repository/private namespace paths must be absolute and NUL-free")
+    euid = _effective_euid() if effective_euid is None else effective_euid
+    try:
+        parent_fd = _open_absolute_directory_no_follow(root.parent)
+    except OSError as exc:
+        raise PrivateStateError("repository parent cannot be opened without following links") from exc
+    top_fd: int | None = None
+    namespace_fd: int | None = None
+    try:
+        parent_stat = os.fstat(parent_fd)
+        try:
+            root_stat = os.stat(root.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise PrivateStateError("repository root cannot be opened without following links") from exc
+        if (
+            not stat.S_ISDIR(root_stat.st_mode)
+            or not stat.S_ISDIR(parent_stat.st_mode)
+            or parent_stat.st_dev != root_stat.st_dev
+        ):
+            raise PrivateStateError("repository root/parent binding is unsafe")
+        if root_stat.st_uid != euid:
+            raise PrivateStateError("repository root owner is not the effective user")
+
+        repository_key = repository_key_for(root_stat.st_dev, root_stat.st_ino, euid)
+        top_name = f"{PRIVATE_NAMESPACE_PREFIX}{euid}"
+        expected_namespace = root.parent / top_name / repository_key
+        if namespace_path != expected_namespace:
+            raise PrivateStateForeignError("private namespace binding is unsafe")
+
+        try:
+            top_value = os.stat(top_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            if allow_missing:
+                return None
+            raise PrivateStateError("private namespace cannot be opened") from exc
+        _check_private_directory(top_value, parent_stat.st_dev, euid)
+        top_fd = os.open(top_name, _directory_open_flags(), dir_fd=parent_fd)
+        opened_top = os.fstat(top_fd)
+        if (opened_top.st_dev, opened_top.st_ino) != (top_value.st_dev, top_value.st_ino):
+            raise PrivateStateForeignError("private top directory changed while opening")
+        _check_private_directory(opened_top, parent_stat.st_dev, euid)
+
+        try:
+            namespace_value = os.stat(repository_key, dir_fd=top_fd, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            if allow_missing:
+                return None
+            raise PrivateStateError("private namespace cannot be opened") from exc
+        _check_private_directory(namespace_value, parent_stat.st_dev, euid)
+        namespace_fd = os.open(repository_key, _directory_open_flags(), dir_fd=top_fd)
+        opened_namespace = os.fstat(namespace_fd)
+        if (opened_namespace.st_dev, opened_namespace.st_ino) != (
+            namespace_value.st_dev,
+            namespace_value.st_ino,
+        ):
+            raise PrivateStateForeignError("private namespace changed while opening")
+        _check_private_directory(opened_namespace, parent_stat.st_dev, euid)
+        result = namespace_fd
+        namespace_fd = None
+        return result
+    finally:
+        if namespace_fd is not None:
+            os.close(namespace_fd)
+        if top_fd is not None:
+            os.close(top_fd)
+        os.close(parent_fd)
+
+
+def validate_private_namespace(
+    repository_root: str | os.PathLike[str],
+    namespace: str | os.PathLike[str],
+    *,
+    effective_euid: int | None = None,
+) -> bool:
+    """Validate the complete private namespace chain without creating or changing it."""
+
+    fd = _open_private_namespace(
+        repository_root,
+        namespace,
+        effective_euid=effective_euid,
+        allow_missing=True,
+    )
+    if fd is None:
+        return False
+    os.close(fd)
+    return True
+
+
 def resolve_private_namespace(repository_root: str | os.PathLike[str], *, effective_euid: int | None = None) -> Path:
     """Create and return the deterministic same-filesystem private namespace."""
 
@@ -1061,9 +1181,20 @@ def _mkdir_private(parent_fd: int, name: str, device: int, euid: int) -> None:
 class ActiveStateStore(_PrivateStore):
     """Strict ACTIVE.json store and public RECORD-TEMP staging seam."""
 
-    def __init__(self, namespace: str | os.PathLike[str]) -> None:
+    def __init__(
+        self,
+        namespace: str | os.PathLike[str],
+        *,
+        repository_root: str | os.PathLike[str] | None = None,
+    ) -> None:
         namespace_path = _coerce_namespace(namespace)
-        super().__init__(namespace_path, ACTIVE_NAME, 32768, PRIVATE_METADATA_MODE)
+        super().__init__(
+            namespace_path,
+            ACTIVE_NAME,
+            32768,
+            PRIVATE_METADATA_MODE,
+            repository_root=repository_root,
+        )
 
     def load(self) -> ActiveState | None:
         raw = self._read_bytes()
@@ -1161,9 +1292,20 @@ class ActiveStateStore(_PrivateStore):
 class CompletionReceiptStore(_PrivateStore):
     """Strict completion receipt store."""
 
-    def __init__(self, namespace: str | os.PathLike[str]) -> None:
+    def __init__(
+        self,
+        namespace: str | os.PathLike[str],
+        *,
+        repository_root: str | os.PathLike[str] | None = None,
+    ) -> None:
         namespace_path = _coerce_namespace(namespace)
-        super().__init__(namespace_path, RECEIPT_NAME, 16384, PRIVATE_METADATA_MODE)
+        super().__init__(
+            namespace_path,
+            RECEIPT_NAME,
+            16384,
+            PRIVATE_METADATA_MODE,
+            repository_root=repository_root,
+        )
 
     def load(self) -> CompletionReceipt | None:
         raw = self._read_bytes()
@@ -1206,13 +1348,26 @@ class CompletionReceiptStore(_PrivateStore):
 class StageStore:
     """Fixed six-entry stage ownership with P1 rebuild/P2 reuse semantics."""
 
-    def __init__(self, namespace: str | os.PathLike[str], active_store: ActiveStateStore | None = None) -> None:
+    def __init__(
+        self,
+        namespace: str | os.PathLike[str],
+        active_store: ActiveStateStore | None = None,
+        *,
+        repository_root: str | os.PathLike[str] | None = None,
+    ) -> None:
         self.namespace = _coerce_namespace(namespace)
         self.active_store = active_store
+        self.repository_root = None if repository_root is None else Path(repository_root)
         self.write_count = 0
 
     def _namespace_fd(self) -> int:
-        return _PrivateStore(self.namespace, "", 1, PRIVATE_METADATA_MODE)._open_namespace()
+        return _PrivateStore(
+            self.namespace,
+            "",
+            1,
+            PRIVATE_METADATA_MODE,
+            repository_root=self.repository_root,
+        )._open_namespace()
 
     def _ensure_stage(self) -> None:
         namespace_fd = self._namespace_fd()
@@ -1467,4 +1622,5 @@ __all__ = [
     "repository_key_for",
     "resolve_private_namespace",
     "tuple_key_for",
+    "validate_private_namespace",
 ]
