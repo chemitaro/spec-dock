@@ -223,7 +223,15 @@ class GitGateway(Protocol):
         target_fd: int | None = None,
     ) -> None: ...
 
-    def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str, target_fd: int) -> None: ...
+    def materialize_worktree(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        pinned_commit: str,
+        source_fd: int,
+        target_fd: int,
+    ) -> None: ...
 
     def publish_worktree_entrypoint(self, repo_root: Path, *, target_fd: int, pinned_commit: str) -> None: ...
 

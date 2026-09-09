@@ -355,8 +355,22 @@ class _GitGateway:
             lease_fd=self._validated_repository_root_fd(),
         )
 
-    def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str, target_fd: int) -> None:
-        infra_git_cli.materialize_worktree(repo_root, path=path, pinned_commit=pinned_commit, target_fd=target_fd)
+    def materialize_worktree(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        pinned_commit: str,
+        source_fd: int,
+        target_fd: int,
+    ) -> None:
+        infra_git_cli.materialize_worktree(
+            repo_root,
+            path=path,
+            pinned_commit=pinned_commit,
+            source_fd=source_fd,
+            target_fd=target_fd,
+        )
 
     def publish_worktree_entrypoint(self, repo_root: Path, *, target_fd: int, pinned_commit: str) -> None:
         infra_git_cli.publish_worktree_entrypoint(repo_root, target_fd=target_fd, pinned_commit=pinned_commit)

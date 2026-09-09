@@ -1049,10 +1049,23 @@ def _publish_entrypoint(
         os.close(parent_fd)
 
 
-def materialize_worktree(repo_root: Path, *, path: Path, pinned_commit: str, target_fd: int) -> None:
+def materialize_worktree(
+    repo_root: Path,
+    *,
+    path: Path,
+    pinned_commit: str,
+    source_fd: int,
+    target_fd: int,
+) -> None:
     command = ["git", "read-tree", "--reset", pinned_commit]
     try:
-        _run_git_write(path, command, lease_fd=target_fd, cwd_fd=target_fd)
+        _run_git_write(
+            path,
+            command,
+            bound_fds=(source_fd,),
+            lease_fd=target_fd,
+            cwd_fd=target_fd,
+        )
         entries = _tree_entries(_ls_tree_all(path, pinned_commit))
         entrypoint = "spec-dock/scripts/spec-dock"
         pending_entrypoint: tuple[str, str, str, str] | None = None

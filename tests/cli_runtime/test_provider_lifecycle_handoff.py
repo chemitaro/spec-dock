@@ -3,10 +3,14 @@ from __future__ import annotations
 import fcntl
 import os
 from pathlib import Path
+import shlex
+import shutil
 import signal
 import subprocess
 import sys
 import time
+
+import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
@@ -32,6 +36,98 @@ def _wait_for(path: Path, process: subprocess.Popen[str], *, timeout: float = 5.
 
 
 class TestProviderLifecycleHandoff(CliRuntimeHarness):
+    def test_t09_worktree_create_read_tree_child_retains_source_and_target_leases_after_parent_sigkill(
+        self, tmp_path: Path
+    ) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+        self._init_origin_repo(target)
+        (target / "README.md").write_text("baseline\n", encoding="utf-8")
+        self._run_git(target, ["add", "-A"])
+        self._run_git(target, ["commit", "-m", "baseline"])
+
+        worktree_root = tmp_path / "worktrees"
+        fake_bin = tmp_path / "fake-bin"
+        fake_bin.mkdir()
+        ready = tmp_path / "read-tree-ready"
+        release = tmp_path / "read-tree-release"
+        done = tmp_path / "read-tree-done"
+        real_git = shutil.which("git")
+        assert real_git is not None
+        fake_git = fake_bin / "git"
+        fake_git.write_text(
+            "#!/bin/sh\n"
+            'if [ "$1" = "read-tree" ]; then\n'
+            f"  : > {shlex.quote(str(ready))}\n"
+            f"  while [ ! -f {shlex.quote(str(release))} ]; do sleep 0.01; done\n"
+            f"  : > {shlex.quote(str(done))}\n"
+            "fi\n"
+            f'exec {shlex.quote(real_git)} "$@"\n',
+            encoding="utf-8",
+        )
+        fake_git.chmod(0o755)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{fake_bin}{os.pathsep}{env.get('PATH', '')}"
+        env["SPEC_DOCK_WORKTREE_ROOT"] = str(worktree_root)
+        script = target / "spec-dock" / "scripts" / "spec-dock"
+        process = subprocess.Popen(
+            [sys.executable, str(script), "worktree", "create", "demo"],
+            cwd=target,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        worktree_path = worktree_root / target.name / f"{target.name}-demo"
+        source_contender: int | None = None
+        target_contender: int | None = None
+        try:
+            _wait_for(ready, process)
+            assert worktree_path.is_dir()
+
+            source_contender = os.open(target, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(source_contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            target_contender = os.open(worktree_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(target_contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            process.send_signal(signal.SIGKILL)
+            process.wait(timeout=5)
+
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(source_contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(target_contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            release.touch()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not done.exists():
+                time.sleep(0.01)
+            assert done.exists()
+
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                try:
+                    fcntl.flock(source_contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(target_contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    time.sleep(0.01)
+            else:
+                raise AssertionError("read-tree helper did not release source and target leases")
+        finally:
+            release.touch()
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+            if source_contender is not None:
+                os.close(source_contender)
+            if target_contender is not None:
+                os.close(target_contender)
+
     def test_t09_update_uninstall_exec_and_helper_lease_lifetime_are_terminal(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()

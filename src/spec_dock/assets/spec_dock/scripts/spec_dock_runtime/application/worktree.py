@@ -271,6 +271,7 @@ def _materialize_and_verify_worktree(
     *,
     worktree_path: Path,
     pinned_commit: str,
+    source_fd: int,
     target_fd: int,
 ) -> None:
     assert ports.repo_root is not None
@@ -279,6 +280,7 @@ def _materialize_and_verify_worktree(
         ports.repo_root,
         path=worktree_path,
         pinned_commit=pinned_commit,
+        source_fd=source_fd,
         target_fd=target_fd,
     )
     head = ports.git_gateway.current_head_or_none(worktree_path)
@@ -403,15 +405,19 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 "git worktree add failed for non-retryable reason: "
                 f"id={worktree_id} path={worktree_path} branch={branch_name} {state}\n{message}"
             ) from exc
-        finally:
+        except BaseException:
             _close_fd(source_fd)
+            _close_fd(target_fd)
+            raise
 
         bound_fd: int | None = None
         try:
+            assert source_fd is not None
             _materialize_and_verify_worktree(
                 ports,
                 worktree_path=worktree_path,
                 pinned_commit=pinned_commit,
+                source_fd=source_fd,
                 target_fd=target_fd,
             )
             bound_fd, bound_stat = _open_nonlocking_worktree_bound_to_exclusive(
@@ -437,6 +443,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             _close_fd(bound_fd)
             raise
         finally:
+            _close_fd(source_fd)
             _close_fd(target_fd)
 
     mode = "label" if label is not None else "auto"
@@ -527,8 +534,49 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
             refreshed_worktree.path,
             allow_symlink_at=central_root,
         )
-        target_stat = os.fstat(target_fd)
         source_fd = _open_source_shared(ports.repo_root)
+        bound_inventory = _build_inventory(ports, command="remove", target=req.target)
+        try:
+            bound_worktree = resolve_worktree_target(req.target, bound_inventory, command="remove")
+        except WorktreeCommandError as exc:
+            if exc.code != "target_not_found":
+                raise
+            raise WorktreeCommandError(
+                code="remove_blocked",
+                message="worktree record is no longer present",
+                command="remove",
+                target=req.target,
+                worktree=refreshed_worktree,
+                remove_blockers=["record_missing"],
+            ) from exc
+        if _canonical_path(bound_worktree.path) != _canonical_path(refreshed_worktree.path):
+            raise WorktreeCommandError(
+                code="remove_blocked",
+                message="worktree record changed after target binding",
+                command="remove",
+                target=req.target,
+                worktree=refreshed_worktree,
+                remove_blockers=["record_missing"],
+            )
+        blockers = _non_bypassable_remove_blockers(bound_worktree)
+        if blockers:
+            raise WorktreeCommandError(
+                code="remove_blocked",
+                message="worktree remove blocked",
+                command="remove",
+                target=req.target,
+                worktree=bound_worktree,
+                remove_blockers=blockers,
+            )
+        _guard_remove_containment(bound_worktree, bound_inventory, ports, command="remove", target=req.target)
+        _verify_worktree_path_binding(bound_worktree.path, target_fd)
+        refreshed_inventory = bound_inventory
+        refreshed_worktree = bound_worktree
+        target_stat = os.fstat(target_fd)
+    except WorktreeCommandError:
+        _close_fd(target_fd)
+        _close_fd(source_fd)
+        raise
     except (OSError, RuntimeError) as exc:
         _close_fd(target_fd)
         _close_fd(source_fd)
