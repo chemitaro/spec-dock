@@ -1485,6 +1485,11 @@ class TestCliNew(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
+            root_template = target / "spec-dock" / "templates" / "root" / ".workbench" / "README.md"
+            root_workbench = target / "spec-dock" / ".workbench"
+            root_workbench.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(root_template, root_workbench / "README.md")
+
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"

@@ -2033,6 +2033,10 @@ class TestCliValidate(CliRuntimeHarness):
             dot_meta_path = issue_dir / ".meta.json"
             legacy_meta_path = issue_dir / "meta.json"
             before_text = dot_meta_path.read_text(encoding="utf-8")
+
+            self._run_runtime(target, ["active", "clear"])
+            (target / "spec-dock" / ".agent" / "active.json").unlink()
+
             dot_meta_path.rename(legacy_meta_path)
 
             active_dir = target / "spec-dock" / "active"
