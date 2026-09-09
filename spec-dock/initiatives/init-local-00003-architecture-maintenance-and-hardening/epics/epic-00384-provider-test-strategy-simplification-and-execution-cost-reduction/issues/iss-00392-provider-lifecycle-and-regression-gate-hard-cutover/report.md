@@ -4,7 +4,7 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 関連GitHub: ["#392"]
 状態: "approved"
-最終更新: "2026-09-08"
+最終更新: "2026-09-09"
 依存:
   - "requirement.md"
   - "design.md"
@@ -21,8 +21,8 @@ repository_evidence:
   sha: "dc638e936e763cc7a6087f258201ed9ed654e7fb"
   tree: "17ce38234033393c385c4b17e40c0ccdc78bfc19"
 implementation_evidence:
-  candidate_sha: "e75bc8887e022f9b4a2ebf4716cb443d3542b70c"
-  candidate_tree: "d925a51f86347b6cdf127ad617bfce9bd609703b"
+  candidate_sha: "615fa4ec83511abc194a040707e0ea1de048592c"
+  candidate_tree: "eb71789456ae66baa36e2e3130ea045efd77913f"
 ---
 
 # #392 仕様・実装レポート
@@ -106,8 +106,8 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 `実装開始許可=true`です。CP1–CP4の実装candidateを固定し、次の最終ゲートが残っています。
 
-1. 修正後candidateのclean pushとupstream SHA一致。
-2. 修正後candidateに対する独立Code Review StrictのP0/P1ゼロ・pass。
+1. 修正後candidateのclean pushとupstream SHA一致（実装修正時点の`615fa4ec83511abc194a040707e0ea1de048592c`で成立。Report更新後は新しいSHAで再確認）。
+2. 修正後candidateに対する独立Code Review StrictのP0/P1ゼロ・pass。直近レビューはexact SHA検証後にevidence-limited failとなったため、Reportを含む完全な証拠でfresh reviewを再実施する。
 3. 最終Quality Gate Strictの実施条件成立。
 4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
 
@@ -115,21 +115,23 @@ CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provid
 
 ## 8. Residual blocker and uncertainty
 
-親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証は完了していますが、修正後Strict review、current full verifierの#395 baseline解消、人間PR merge、merged-tip B1は未完了です。
+親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証は完了していますが、Report更新後のclean pushed Strict review、Final Quality Gate Strict、current full verifierの#395 baseline解消、人間PR merge、merged-tip B1は未完了です。
 
-残るblockerは、修正後のclean pushed Strict review、#395が所有する10件のactive baseline mismatch、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssue実装完了、Product GREEN、merge完了を主張しません。
+残るblockerは、Report更新後のclean pushed Strict review、Final Quality Gate Strict、#395が所有する10件のactive baseline mismatch、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssue実装完了、Product GREEN、merge完了を主張しません。
 
 ## 9. Implementation verification update
 
-2026-09-09時点の実装candidate `e75bc8887e022f9b4a2ebf4716cb443d3542b70c`（tree
-`d925a51f86347b6cdf127ad617bfce9bd609703b`）に対して、次の証拠を採取しました。
+2026-09-09時点の実装candidate `615fa4ec83511abc194a040707e0ea1de048592c`（tree
+`eb71789456ae66baa36e2e3130ea045efd77913f`）に対して、次の証拠を採取しました。
 
-- Code Review Strictの初回candidate `1f07cf46480a0a612f474a5874cf4ccaeeb3b5cf`ではP1×4、P2×2でした。全6件を分析し、P1のCI parity、RETIRE根拠、same-filesystem、diff/merge capability、P2のgeneration分類とbound cleanupをcandidateへ修正しました。
+- Strict reviewで検出されたworktree後処理のP1に対し、Git helper後に元のworktree inodeが残った場合のpathname `rmdir`を削除し、`post_remove_cleanup_failed`として元inodeも異なるinodeのCも保持するfail-closed処理へ修正しました。provider runtimeとdogfood runtimeを同期し、元ディレクトリを削除して成功扱いするobsolete assertionを、安全境界を検証するテストへ置換しました。
+- Code Review Strictの直近実行はcandidate `615fa4ec83511abc194a040707e0ea1de048592c`に対して、GitHub repository/branch/exact SHAの検証には成功しましたが、必要なimplementation・test・dogfood parity・report証拠を`review-method.md`に従ってすべて再確認できなかったため、具体的なfindingなしのevidence-limited `review_status=fail`でした。P0/P1は主張されていません。レビュー本文JSONは保持し、添付パスは受け入れていません。
 - Classification registryは`unclassified=0`、`overlap=0`、`prematurely_retired=0`。
-- T01–T07のprimaryを含むprovider lifecycle unitは`23 passed`、T08–T11のCP3 parityは`10 passed`、T12/T14 acceptanceは`3 passed`、T13 package/dogfood parityは`1 passed`。
-- Required-fastはexact fourで`4 passed`、default fastは`878 passed, 831 skipped`、`make lint`はruff check/formatとmypyを含めてpass。
+- Worktree/atomic focused suiteは`44 passed`、distribution・dogfood・Issue #392 acceptance・candidate・lifecycle coordination focused suiteは`69 passed`、`make lint`はruff check/formatとmypyを含めてpass。
+- Current candidate digestは`1c32e8ca673d44d54756a4f178e6b5ba51af485ae20bdb14057ed1a2102bc6c6`で、両slot markerとdogfood `spec-dock.version`を同期しました。
+- Required-fastはexact fourで`4 passed`、default fastは直近の実装修正前candidateで`878 passed, 830 skipped`。Report更新後のfinal candidateで再実行します。
 - Ledgerはtotal15/active14/resolved1、timingは243 entriesのまま。#392はbaseline rowのnodeid、signature、lifecycleを変更していません。
 - `tests/unit/infra/test_managed_distribution.py`は未収集で、T12のproduction old writer/manifest reference scanもpassしました。全successor primaryはcollectionへ存在し、上記focused runでpassしています。
-- clean candidateでcurrent full verifierは`1709 tests collected`、status=`ledger-mismatch`、violation=`10`でした。10件は#395所有のactive baseline（runtime import 8、runtime shell 1、workbench 1）だけで、今回のIssue由来のunexpected failure/error/skip/xfail追加はありません。#392はledgerを変更していません。
+- 実装修正前のclean candidateでcurrent full verifierは`1708 tests collected`、status=`ledger-mismatch`、violation=`10`でした。10件は#395所有のactive baseline（runtime import 8、runtime shell 1、workbench 1）だけで、今回のIssue由来のunexpected failure/error/skip/xfail追加はありません。#392はledgerを変更していません。final candidateで同じ検証を再実行します。
 
-上記により、#392の実装candidateと旧managed distribution test RETIREの現時点の証拠は揃っています。Strict再レビュー、#395のbaseline修正、PR merge後B1、Final Quality Gateは未完了です。
+上記により、#392の実装candidateと旧managed distribution test RETIREのfocused証拠は揃っています。Report更新後のStrict再レビュー、Final Quality Gate、#395のbaseline修正、PR merge後B1は未完了です。
