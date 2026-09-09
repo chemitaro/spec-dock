@@ -363,8 +363,8 @@ class _GitGateway:
         pinned_commit: str,
         source_fd: int,
         target_fd: int,
-    ) -> None:
-        infra_git_cli.materialize_worktree(
+    ) -> tuple[tuple[str, tuple[int, int]], ...]:
+        return infra_git_cli.materialize_worktree(
             repo_root,
             path=path,
             pinned_commit=pinned_commit,
@@ -372,8 +372,20 @@ class _GitGateway:
             target_fd=target_fd,
         )
 
-    def publish_worktree_entrypoint(self, repo_root: Path, *, target_fd: int, pinned_commit: str) -> None:
-        infra_git_cli.publish_worktree_entrypoint(repo_root, target_fd=target_fd, pinned_commit=pinned_commit)
+    def publish_worktree_entrypoint(
+        self,
+        repo_root: Path,
+        *,
+        target_fd: int,
+        pinned_commit: str,
+        directory_witnesses: tuple[tuple[str, tuple[int, int]], ...],
+    ) -> None:
+        infra_git_cli.publish_worktree_entrypoint(
+            repo_root,
+            target_fd=target_fd,
+            pinned_commit=pinned_commit,
+            directory_witnesses=directory_witnesses,
+        )
 
 
 @dataclass(frozen=True)

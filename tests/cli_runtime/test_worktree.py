@@ -265,6 +265,93 @@ class TestCliWorktree(CliRuntimeHarness):
             assert str(expected_path.resolve()) in worktree_list
             assert f"branch refs/heads/{current_branch}-wt1" in worktree_list
 
+    def test_worktree_create_reports_post_mkdir_reservation_failure_without_retry(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import (
+                contracts as app_contracts,
+                ports as app_ports,
+                worktree as app_worktree,
+            )
+        finally:
+            sys.path.pop(0)
+
+        repo_root = tmp_path / "repo"
+        central_root = tmp_path / "worktrees"
+        repo_root.mkdir()
+        central_root.mkdir()
+        attempts: list[Path] = []
+
+        class FakeGitGateway:
+            def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                return None
+
+            def current_branch_or_none(self, repo_root_arg):
+                return "main"
+
+            def worktree_list(self, repo_root_arg):
+                return [app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")]
+
+            def local_branch_exists(self, repo_root_arg, branch):
+                return False
+
+            def check_ref_format_branch(self, repo_root_arg, branch):
+                return True
+
+        class FakeEnvironmentGateway:
+            def getenv(self, name):
+                return str(central_root)
+
+        def fail_after_mkdir(path: Path, *, allow_symlink_at=None) -> int:
+            attempts.append(path)
+            path.mkdir()
+            raise BlockingIOError(11, "worktree target is busy")
+
+        monkeypatch.setattr(app_worktree, "_pin_worktree_source", lambda repo_root_arg, ports: "abc")
+        monkeypatch.setattr(app_worktree, "_open_created_exclusive_worktree", fail_after_mkdir)
+        ports = app_ports.Ports(
+            node_reader=object(),
+            repo_root=repo_root,
+            git_gateway=FakeGitGateway(),
+            environment_gateway=FakeEnvironmentGateway(),
+        )
+
+        with pytest.raises(RuntimeError, match="reservation failed after candidate creation") as raised:
+            app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(label="demo"), ports)
+
+        assert len(attempts) == 1
+        assert attempts[0].is_dir()
+        assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in str(raised.value)
+
+    def test_materializer_rejects_foreign_existing_descendant_directory(self, tmp_path: Path) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import git_cli
+        finally:
+            sys.path.pop(0)
+
+        worktree_path = tmp_path / "worktree"
+        (worktree_path / "spec-dock").mkdir(parents=True)
+        root_fd = os.open(worktree_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            with pytest.raises(RuntimeError, match="foreign directory: spec-dock"):
+                git_cli._open_relative_parent(
+                    root_fd,
+                    ("spec-dock", "docs", "README.md"),
+                    created_directory_witnesses={},
+                )
+            assert not (worktree_path / "spec-dock" / "docs").exists()
+        finally:
+            os.close(root_fd)
+
     def test_worktree_create_retries_collisions_and_accepts_label(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
@@ -515,19 +602,23 @@ class TestCliWorktree(CliRuntimeHarness):
             lambda repo_root_arg, pinned_commit: b"100755 blob entrypoint\tspec-dock/scripts/spec-dock\0",
         )
 
-        git_cli.materialize_worktree(
-            repo_root,
-            path=worktree_path,
-            pinned_commit="abc123",
-            source_fd=11,
-            target_fd=12,
-        )
+        target_fd = os.open(worktree_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            git_cli.materialize_worktree(
+                repo_root,
+                path=worktree_path,
+                pinned_commit="abc123",
+                source_fd=11,
+                target_fd=target_fd,
+            )
+        finally:
+            os.close(target_fd)
 
         assert len(calls) == 1
         _, kwargs = calls[0]
         assert kwargs["bound_fds"] == (11,)
-        assert kwargs["lease_fd"] == 12
-        assert kwargs["cwd_fd"] == 12
+        assert kwargs["lease_fd"] == target_fd
+        assert kwargs["cwd_fd"] == target_fd
 
     def test_worktree_create_fails_when_namespace_path_is_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

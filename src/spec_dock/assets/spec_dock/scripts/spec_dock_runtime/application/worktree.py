@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass
+import errno
 import fcntl
 import os
 from pathlib import Path
@@ -277,7 +278,7 @@ def _materialize_and_verify_worktree(
 ) -> None:
     assert ports.repo_root is not None
     assert ports.git_gateway is not None
-    ports.git_gateway.materialize_worktree(
+    directory_witnesses = ports.git_gateway.materialize_worktree(
         ports.repo_root,
         path=worktree_path,
         pinned_commit=pinned_commit,
@@ -295,6 +296,7 @@ def _materialize_and_verify_worktree(
         ports.repo_root,
         target_fd=target_fd,
         pinned_commit=pinned_commit,
+        directory_witnesses=directory_witnesses,
     )
     head = ports.git_gateway.current_head_or_none(worktree_path)
     if head != pinned_commit:
@@ -369,8 +371,18 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
         try:
             target_fd = _open_created_exclusive_worktree(worktree_path, allow_symlink_at=central_root)
         except OSError as exc:
-            last_reason = f"worktree path could not be exclusively bound: {exc}"
-            continue
+            state = _artifact_state(
+                repo_root=repo_root,
+                worktree_path=worktree_path,
+                branch_name=branch_name,
+                known_paths=known_paths,
+                ports=ports,
+                refresh_records=False,
+            )
+            raise RuntimeError(
+                "worktree target reservation failed after candidate creation: "
+                f"id={worktree_id} path={worktree_path} branch={branch_name} {state}\n{exc}"
+            ) from exc
 
         source_fd: int | None = None
         try:
@@ -578,7 +590,41 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         _close_fd(target_fd)
         _close_fd(source_fd)
         raise
-    except (OSError, RuntimeError) as exc:
+    except OSError as exc:
+        _close_fd(target_fd)
+        _close_fd(source_fd)
+        coordination = _coordination_failure_kind(exc)
+        if coordination == "busy":
+            raise WorktreeCommandError(
+                code="remove_blocked",
+                message="worktree remove blocked",
+                command="remove",
+                target=req.target,
+                worktree=refreshed_worktree,
+                remove_blockers=["coordination_busy"],
+                git_error=f"repository-operation-busy: {exc}",
+            ) from exc
+        if coordination == "unavailable":
+            raise WorktreeCommandError(
+                code="remove_blocked",
+                message="worktree remove blocked",
+                command="remove",
+                target=req.target,
+                worktree=refreshed_worktree,
+                remove_blockers=["coordination_unavailable"],
+                git_error=f"repository-coordination-unavailable: {exc}",
+            ) from exc
+        raise WorktreeCommandError(
+            code="post_remove_cleanup_failed",
+            message="worktree target could not be safely bound",
+            command="remove",
+            target=req.target,
+            worktree=refreshed_worktree,
+            git_error=f"unsafe-binding: {exc}",
+            removed_record=False,
+            removed_directory=False,
+        ) from exc
+    except RuntimeError as exc:
         _close_fd(target_fd)
         _close_fd(source_fd)
         raise WorktreeCommandError(
@@ -1021,6 +1067,17 @@ def _protected_cleanup_paths(ports: Ports, *, main: WorktreeRecordView) -> list[
 def _is_retryable_worktree_add_error(message: str) -> bool:
     lowered = message.lower()
     return any(fragment in lowered for fragment in _RETRYABLE_GIT_WORKTREE_ERRORS)
+
+
+def _coordination_failure_kind(error: OSError) -> str | None:
+    if isinstance(error, BlockingIOError) or error.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
+        return "busy"
+    unavailable = {errno.ENOLCK, errno.ENOSYS, errno.EOPNOTSUPP}
+    if hasattr(errno, "ENOTSUP"):
+        unavailable.add(errno.ENOTSUP)
+    if error.errno in unavailable:
+        return "unavailable"
+    return None
 
 
 def _artifact_state(

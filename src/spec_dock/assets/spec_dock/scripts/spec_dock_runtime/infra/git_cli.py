@@ -33,6 +33,8 @@ _PROVIDER_CLOSURE_PATHS = (
     ".agents/skills/spec-dock-grill-with-docs",
 )
 _WRITING_GIT_COMMANDS = frozenset({"checkout", "switch", "update-ref", "worktree"})
+DirectoryWitness = tuple[int, int]
+DirectoryWitnesses = tuple[tuple[str, DirectoryWitness], ...]
 
 
 def _ensure_git_available() -> None:
@@ -826,26 +828,69 @@ def _relative_components(path: str) -> tuple[str, ...]:
     return components
 
 
-def _open_or_create_directory(parent_fd: int, name: str) -> int:
+def _directory_witness(value: os.stat_result) -> DirectoryWitness:
+    if not stat.S_ISDIR(value.st_mode):
+        raise RuntimeError("materializer directory binding is not a directory")
+    return (value.st_dev, value.st_ino)
+
+
+def _open_or_create_directory(
+    parent_fd: int,
+    name: str,
+    *,
+    relative_path: str,
+    created_directory_witnesses: dict[str, DirectoryWitness],
+) -> int:
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     try:
-        return os.open(name, flags, dir_fd=parent_fd)
+        fd = os.open(name, flags, dir_fd=parent_fd)
     except FileNotFoundError:
         os.mkdir(name, 0o755, dir_fd=parent_fd)
-        fd = os.open(name, flags, dir_fd=parent_fd)
+        created_fd: int | None = None
         try:
-            os.fchmod(fd, 0o755)
+            created = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            created_fd = os.open(name, flags, dir_fd=parent_fd)
+            opened = os.fstat(created_fd)
+            if (opened.st_dev, opened.st_ino) != (created.st_dev, created.st_ino):
+                raise RuntimeError(f"materializer directory binding changed: {relative_path}")
+            os.fchmod(created_fd, 0o755)
+            created_directory_witnesses[relative_path] = _directory_witness(os.fstat(created_fd))
+            return created_fd
         except BaseException:
-            os.close(fd)
+            if created_fd is not None:
+                os.close(created_fd)
             raise
+    try:
+        expected = created_directory_witnesses.get(relative_path)
+        if expected is None:
+            raise RuntimeError(f"materializer encountered a foreign directory: {relative_path}")
+        observed = _directory_witness(os.fstat(fd))
+        if observed != expected:
+            raise RuntimeError(f"materializer directory binding changed: {relative_path}")
         return fd
+    except BaseException:
+        os.close(fd)
+        raise
 
 
-def _open_relative_parent(root_fd: int, components: tuple[str, ...]) -> int:
+def _open_relative_parent(
+    root_fd: int,
+    components: tuple[str, ...],
+    *,
+    created_directory_witnesses: dict[str, DirectoryWitness],
+) -> int:
     current = os.dup(root_fd)
+    relative_components: list[str] = []
     try:
         for component in components[:-1]:
-            next_fd = _open_or_create_directory(current, component)
+            relative_components.append(component)
+            relative_path = "/".join(relative_components)
+            next_fd = _open_or_create_directory(
+                current,
+                component,
+                relative_path=relative_path,
+                created_directory_witnesses=created_directory_witnesses,
+            )
             os.close(current)
             current = next_fd
         return current
@@ -941,10 +986,15 @@ def _materialize_tree_entry(
     entry: tuple[str, str, str, str],
     *,
     repo_root: Path,
+    created_directory_witnesses: dict[str, DirectoryWitness],
 ) -> None:
     mode, object_type, object_id, relative_path = entry
     components = _relative_components(relative_path)
-    parent_fd = _open_relative_parent(target_fd, components)
+    parent_fd = _open_relative_parent(
+        target_fd,
+        components,
+        created_directory_witnesses=created_directory_witnesses,
+    )
     try:
         payload = _git_object_bytes(repo_root, object_type=object_type, object_id=object_id)
         if mode == "100644":
@@ -1005,12 +1055,17 @@ def _publish_entrypoint(
     entry: tuple[str, str, str, str],
     *,
     repo_root: Path,
+    created_directory_witnesses: dict[str, DirectoryWitness],
 ) -> None:
     mode, object_type, object_id, relative_path = entry
     if mode != "100755" or object_type != "blob":
         raise RuntimeError("worktree entrypoint has an unsupported Git binding")
     components = _relative_components(relative_path)
-    parent_fd = _open_relative_parent(target_fd, components)
+    parent_fd = _open_relative_parent(
+        target_fd,
+        components,
+        created_directory_witnesses=created_directory_witnesses,
+    )
     temp_name: str | None = None
     temp_witness: os.stat_result | None = None
     try:
@@ -1057,7 +1112,7 @@ def materialize_worktree(
     pinned_commit: str,
     source_fd: int,
     target_fd: int,
-) -> None:
+) -> DirectoryWitnesses:
     command = ["git", "read-tree", "--reset", pinned_commit]
     try:
         _run_git_write(
@@ -1070,22 +1125,47 @@ def materialize_worktree(
         entries = _tree_entries(_ls_tree_all(path, pinned_commit))
         entrypoint = "spec-dock/scripts/spec-dock"
         pending_entrypoint: tuple[str, str, str, str] | None = None
+        created_directory_witnesses: dict[str, DirectoryWitness] = {}
         for entry in entries:
             if entry[3] == entrypoint:
                 pending_entrypoint = entry
                 continue
-            _materialize_tree_entry(target_fd, entry, repo_root=repo_root)
+            _materialize_tree_entry(
+                target_fd,
+                entry,
+                repo_root=repo_root,
+                created_directory_witnesses=created_directory_witnesses,
+            )
         if pending_entrypoint is None:
             raise RuntimeError("worktree entrypoint is missing from the pinned tree")
+        entrypoint_components = _relative_components(pending_entrypoint[3])
+        entrypoint_parent_fd = _open_relative_parent(
+            target_fd,
+            entrypoint_components,
+            created_directory_witnesses=created_directory_witnesses,
+        )
+        os.close(entrypoint_parent_fd)
+        return tuple(sorted(created_directory_witnesses.items()))
     except subprocess.CalledProcessError as error:
         raise RuntimeError(f"git failed: {' '.join(command)}\n{(error.stderr or '').strip()}") from error
     except OSError as error:
         raise RuntimeError(f"worktree materialization filesystem operation failed: {error}") from error
 
 
-def publish_worktree_entrypoint(repo_root: Path, *, target_fd: int, pinned_commit: str) -> None:
+def publish_worktree_entrypoint(
+    repo_root: Path,
+    *,
+    target_fd: int,
+    pinned_commit: str,
+    directory_witnesses: DirectoryWitnesses,
+) -> None:
     entries = _tree_entries(_ls_tree_all(repo_root, pinned_commit))
     pending_entrypoint = next((entry for entry in entries if entry[3] == "spec-dock/scripts/spec-dock"), None)
     if pending_entrypoint is None:
         raise RuntimeError("worktree entrypoint is missing from the pinned tree")
-    _publish_entrypoint(target_fd, pending_entrypoint, repo_root=repo_root)
+    _publish_entrypoint(
+        target_fd,
+        pending_entrypoint,
+        repo_root=repo_root,
+        created_directory_witnesses=dict(directory_witnesses),
+    )

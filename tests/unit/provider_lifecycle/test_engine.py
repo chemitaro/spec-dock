@@ -5,10 +5,13 @@ from pathlib import Path
 import subprocess
 import tarfile
 
+import pytest
+
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
 from spec_dock.provider_lifecycle.contracts import LifecycleMode, LifecycleRequest, Operation
 from spec_dock.provider_lifecycle.engine import FAULT_POINTS, ProviderLifecycleEngine
 from spec_dock.provider_lifecycle.legacy_fixture import LEGACY_SOURCE_COMMIT
+from spec_dock.provider_lifecycle.private_state import PrivateStateError, PrivateStateForeignError
 from spec_dock.provider_lifecycle.wire import parse_installation_record, serialize_public_result
 
 
@@ -146,3 +149,60 @@ def test_t07_legacy_migration_uninstall_and_old_package_mutation_zero(tmp_path: 
     assert rejected.status == "error"
     assert rejected.code == "spec-history-purge-removed"
     assert _workspace_snapshot(workspace) == before_rejected_purge
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_code"),
+    [
+        (PrivateStateForeignError("foreign private authority"), "stage-owner-mismatch"),
+        (PrivateStateError("private authority I/O"), "lifecycle-preparation-failed"),
+    ],
+)
+def test_t04_initial_private_authority_preserves_foreign_vs_io_wire_codes(
+    monkeypatch, tmp_path: Path, failure: PrivateStateError, expected_code: str
+) -> None:
+    modes: tuple[LifecycleMode, ...] = ("apply", "dry-run")
+    for index, mode in enumerate(modes):
+        workspace = (tmp_path / f"authority-{expected_code}-{index}").resolve()
+        workspace.mkdir()
+        engine = ProviderLifecycleEngine()
+
+        def fail_stores(*_args, **_kwargs):
+            raise failure
+
+        monkeypatch.setattr(engine, "_stores", fail_stores)
+        before = _workspace_snapshot(workspace)
+        result = engine.execute(_request(workspace, "install", mode=mode), force=True)
+
+        serialize_public_result(result)
+        assert result.status == "blocked"
+        assert result.code == expected_code
+        assert result.operation is None
+        assert result.candidate_digest is None
+        assert result.seed_policy is None
+        assert result.mutation_started is False
+        assert result.continuation["next_action"] == "none"
+        assert _workspace_snapshot(workspace) == before
+
+
+def test_t04_foreign_stage_owner_is_stage_owner_mismatch_in_candidate_staging(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "stage-owner").resolve()
+    workspace.mkdir()
+    engine = ProviderLifecycleEngine()
+
+    def fail_prepare_stage(*_args, **_kwargs):
+        raise PrivateStateForeignError("foreign stage owner")
+
+    monkeypatch.setattr(engine, "_prepare_stage", fail_prepare_stage)
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.operation == "install"
+    assert result.candidate_digest is not None
+    assert result.seed_policy == "create-if-absent"
+    assert result.phase == "candidate-staging"
+    assert result.last_completed_phase == "preflight"
+    assert result.mutation_started is False
+    assert result.actions == ()

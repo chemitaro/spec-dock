@@ -458,57 +458,7 @@ def _hook_child(
             os._exit(0)
 
 
-def _consumer_hook(request: object, root_fd: int) -> int:
-    bound_fd = int(request.bound_cwd_fd)
-    expected_device = int(request.bound_device)
-    expected_inode = int(request.bound_inode)
-    detection_argv = tuple(getattr(request, "detection_argv", ()))
-    execution_argv = tuple(getattr(request, "execution_argv", ()))
-    if detection_argv != ("make", "-n", "init") or execution_argv != ("make", "init"):
-        _close(root_fd)
-        _close(bound_fd)
-        print("error: invalid consumer hook request", file=sys.stderr)
-        return 1
-    bound_stat = os.fstat(bound_fd)
-    if (
-        not stat.S_ISDIR(bound_stat.st_mode)
-        or bound_stat.st_dev != expected_device
-        or bound_stat.st_ino != expected_inode
-    ):
-        _close(bound_fd)
-        _close(root_fd)
-        print("error: unsafe worktree binding", file=sys.stderr)
-        return 1
-    _close(root_fd)
-    root_fd = -1
-    read_fd, write_fd = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        _close(read_fd)
-        _close(root_fd)
-        _hook_child(bound_fd, write_fd, detection_argv, execution_argv)
-        raise AssertionError("hook child returned unexpectedly")
-    _close(write_fd)
-    _close(bound_fd)
-    _close(root_fd)
-    chunks: list[bytes] = []
-    while True:
-        chunk = os.read(read_fd, 4096)
-        if not chunk:
-            break
-        chunks.append(chunk)
-    _close(read_fd)
-    _pid, status = os.waitpid(pid, 0)
-    del status
-    try:
-        result = json.loads(b"".join(chunks).decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        result = {
-            "status": "detection_failed",
-            "command": "make -n init",
-            "exit_code": None,
-            "warning": "hook result unavailable",
-        }
+def _render_consumer_hook_result(request: object, result: dict[str, object]) -> int:
     payload = dict(getattr(request, "result_payload", {}))
     payload["bootstrap_status"] = result.get("status")
     payload["bootstrap_command"] = result.get("command")
@@ -531,6 +481,105 @@ def _consumer_hook(request: object, root_fd: int) -> int:
         for warning in warnings:
             print(f"spec-dock: (warn) {warning}", file=sys.stderr)
     return 0
+
+
+def _consumer_hook(request: object, root_fd: int) -> int:
+    bound_fd = int(request.bound_cwd_fd)
+    expected_device = int(request.bound_device)
+    expected_inode = int(request.bound_inode)
+    detection_argv = tuple(getattr(request, "detection_argv", ()))
+    execution_argv = tuple(getattr(request, "execution_argv", ()))
+    if detection_argv != ("make", "-n", "init") or execution_argv != ("make", "init"):
+        _close(root_fd)
+        _close(bound_fd)
+        print("error: invalid consumer hook request", file=sys.stderr)
+        return 1
+    try:
+        bound_stat = os.fstat(bound_fd)
+    except OSError as error:
+        _close(bound_fd)
+        _close(root_fd)
+        return _render_consumer_hook_result(
+            request,
+            {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": f"worktree hook binding unavailable: {error}",
+            },
+        )
+    if (
+        not stat.S_ISDIR(bound_stat.st_mode)
+        or bound_stat.st_dev != expected_device
+        or bound_stat.st_ino != expected_inode
+    ):
+        _close(bound_fd)
+        _close(root_fd)
+        return _render_consumer_hook_result(
+            request,
+            {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": "unsafe worktree binding",
+            },
+        )
+    _close(root_fd)
+    root_fd = -1
+    read_fd: int | None = None
+    write_fd: int | None = None
+    child_pid: int | None = None
+    try:
+        read_fd, write_fd = os.pipe()
+        assert read_fd is not None and write_fd is not None
+        child_pid = os.fork()
+        if child_pid == 0:
+            _close(read_fd)
+            _close(root_fd)
+            _hook_child(bound_fd, write_fd, detection_argv, execution_argv)
+            raise AssertionError("hook child returned unexpectedly")
+        _close(write_fd)
+        write_fd = None
+        _close(bound_fd)
+        bound_fd = -1
+        _close(root_fd)
+        chunks: list[bytes] = []
+        assert read_fd is not None and child_pid is not None
+        while True:
+            chunk = os.read(read_fd, 4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        _close(read_fd)
+        read_fd = None
+        _pid, status = os.waitpid(child_pid, 0)
+        del status
+        try:
+            result = json.loads(b"".join(chunks).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            result = {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": "hook result unavailable",
+            }
+        return _render_consumer_hook_result(request, result)
+    except OSError as error:
+        _close(read_fd)
+        _close(write_fd)
+        _close(bound_fd)
+        if child_pid is not None:
+            with contextlib.suppress(OSError):
+                os.waitpid(child_pid, 0)
+        return _render_consumer_hook_result(
+            request,
+            {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": f"consumer hook failed: {error}",
+            },
+        )
 
 
 def main() -> int:

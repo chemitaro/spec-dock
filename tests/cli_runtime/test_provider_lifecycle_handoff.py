@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import fcntl
+import importlib.machinery
+import importlib.util
+import json
 import os
 from pathlib import Path
 import shlex
@@ -9,6 +12,7 @@ import signal
 import subprocess
 import sys
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -36,6 +40,86 @@ def _wait_for(path: Path, process: subprocess.Popen[str], *, timeout: float = 5.
 
 
 class TestProviderLifecycleHandoff(CliRuntimeHarness):
+    def test_t11_consumer_hook_parent_io_failure_is_detection_failure_with_exit_zero(
+        self, monkeypatch, capsys, tmp_path: Path
+    ) -> None:
+        script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
+        loader = importlib.machinery.SourceFileLoader("frozen_spec_dock_bootstrap", str(script))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        assert spec is not None
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+
+        worktree = tmp_path / "worktree"
+        worktree.mkdir()
+        root_fd = os.open(worktree, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        bound_fd = os.open(worktree, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        value = os.fstat(bound_fd)
+        request = SimpleNamespace(
+            bound_cwd_fd=bound_fd,
+            bound_device=value.st_dev,
+            bound_inode=value.st_ino,
+            detection_argv=("make", "-n", "init"),
+            execution_argv=("make", "init"),
+            result_format="worktree-create-json-v1",
+            result_payload={"id": "demo", "warnings": []},
+        )
+
+        def fail_pipe():
+            raise OSError(5, "pipe failed")
+
+        monkeypatch.setattr(module.os, "pipe", fail_pipe)
+        try:
+            assert module._consumer_hook(request, root_fd) == 0
+        finally:
+            module._close(root_fd)
+            module._close(bound_fd)
+
+        captured = capsys.readouterr()
+        payload = json.loads(captured.out)
+        assert payload["bootstrap_status"] == "detection_failed"
+        assert payload["bootstrap_command"] == "make -n init"
+        assert payload["bootstrap_exit_code"] is None
+        assert payload["warnings"][-1] == "consumer hook failed: [Errno 5] pipe failed"
+        assert captured.err == ""
+
+    def test_t11_consumer_hook_binding_mismatch_is_detection_failure_with_exit_zero(
+        self, capsys, tmp_path: Path
+    ) -> None:
+        script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
+        loader = importlib.machinery.SourceFileLoader("frozen_spec_dock_bootstrap_binding", str(script))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        assert spec is not None
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+
+        worktree = tmp_path / "worktree"
+        worktree.mkdir()
+        root_fd = os.open(worktree, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        bound_fd = os.open(worktree, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        value = os.fstat(bound_fd)
+        request = SimpleNamespace(
+            bound_cwd_fd=bound_fd,
+            bound_device=value.st_dev,
+            bound_inode=value.st_ino + 1,
+            detection_argv=("make", "-n", "init"),
+            execution_argv=("make", "init"),
+            result_format="worktree-create-json-v1",
+            result_payload={"id": "demo", "warnings": []},
+        )
+
+        try:
+            assert module._consumer_hook(request, root_fd) == 0
+        finally:
+            module._close(root_fd)
+            module._close(bound_fd)
+
+        captured = capsys.readouterr()
+        payload = json.loads(captured.out)
+        assert payload["bootstrap_status"] == "detection_failed"
+        assert payload["warnings"][-1] == "unsafe worktree binding"
+        assert captured.err == ""
+
     def test_t09_worktree_create_read_tree_child_retains_source_and_target_leases_after_parent_sigkill(
         self, tmp_path: Path
     ) -> None:

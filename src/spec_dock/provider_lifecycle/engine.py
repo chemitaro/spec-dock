@@ -926,12 +926,16 @@ class ProviderLifecycleEngine:
             try:
                 namespace = self._namespace_for(request.target, lease)
                 active_store, receipt_store, stage_store = self._stores(namespace, request.apply, request.target)
-            except (PrivateStateError, PrivateStateForeignError, OSError, _InjectedFailure):
+            except PrivateStateForeignError:
+                return self._blocked(request, "stage-owner-mismatch")
+            except (PrivateStateError, OSError, _InjectedFailure):
                 return self._blocked(request, "lifecycle-preparation-failed")
             try:
                 active = active_store.load() if active_store is not None else None
                 receipt = receipt_store.load() if receipt_store is not None else None
-            except (PrivateStateError, PrivateStateForeignError, OSError):
+            except PrivateStateForeignError:
+                return self._blocked(request, "stage-owner-mismatch")
+            except (PrivateStateError, OSError):
                 return self._blocked(request, "lifecycle-preparation-failed")
 
             if cleanup_token is not None:
@@ -1455,6 +1459,23 @@ class ProviderLifecycleEngine:
                 else None
             )
             return self._preparation_failure(request, operation, digest, seed_policy, failure)
+        except PrivateStateForeignError:
+            foreign_digest = (
+                candidate.aggregate_digest
+                if candidate is not None
+                else record.candidate_digest
+                if record is not None
+                else None
+            )
+            return self._blocked(
+                request,
+                "stage-owner-mismatch",
+                operation=operation,
+                candidate_digest=foreign_digest,
+                seed_policy=seed_policy,
+                phase="candidate-staging",
+                last_completed_phase="preflight",
+            )
         except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
             current = active_store.load()
             if current is None:
@@ -3117,6 +3138,16 @@ class ProviderLifecycleEngine:
             return self._blocked(request, "lifecycle-preparation-failed")
         try:
             self._prepare_stage(stage_store, active, candidate)
+        except PrivateStateForeignError:
+            return self._blocked(
+                request,
+                "stage-owner-mismatch",
+                operation=active.operation,
+                candidate_digest=active.candidate_digest,
+                seed_policy=active.seed_policy,
+                phase="candidate-staging",
+                last_completed_phase="preflight",
+            )
         except (
             AtomicRenameUnavailable,
             FilesystemSafetyError,

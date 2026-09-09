@@ -231,9 +231,16 @@ class GitGateway(Protocol):
         pinned_commit: str,
         source_fd: int,
         target_fd: int,
-    ) -> None: ...
+    ) -> tuple[tuple[str, tuple[int, int]], ...]: ...
 
-    def publish_worktree_entrypoint(self, repo_root: Path, *, target_fd: int, pinned_commit: str) -> None: ...
+    def publish_worktree_entrypoint(
+        self,
+        repo_root: Path,
+        *,
+        target_fd: int,
+        pinned_commit: str,
+        directory_witnesses: tuple[tuple[str, tuple[int, int]], ...],
+    ) -> None: ...
 
 
 class GitHubCapabilityGateway(Protocol):
