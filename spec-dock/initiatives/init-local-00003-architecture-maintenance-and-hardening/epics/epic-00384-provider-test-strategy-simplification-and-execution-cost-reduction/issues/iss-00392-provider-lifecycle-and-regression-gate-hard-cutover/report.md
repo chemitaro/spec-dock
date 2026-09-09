@@ -20,15 +20,18 @@ repository_evidence:
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
   sha: "dc638e936e763cc7a6087f258201ed9ed654e7fb"
   tree: "17ce38234033393c385c4b17e40c0ccdc78bfc19"
+implementation_evidence:
+  candidate_sha: "e75bc8887e022f9b4a2ebf4716cb443d3542b70c"
+  candidate_tree: "d925a51f86347b6cdf127ad617bfce9bd609703b"
 ---
 
-# #392 仕様作成レポート
+# #392 仕様・実装レポート
 
 ## 1. Outcome
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様7成果物をcommit `449fefc7864aa1f983aa66e6e768faee74a7eda1`としてpushし、独立Strict reviewを実施しました。SpecDock Product source、tests、workflow、provider docs/skills、dogfoodには変更を加えていません。Product test、fault injection、package build、Linux/macOS lifecycle verification、GitHub projection変更、PR作成、merge、B1再検証は実行していません。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、focused test、package/dogfood parity、default fast、current full verifierを実行しました。実装時点の詳細な証拠は§9に記録します。
 
 ## 2. Source verification facts
 
@@ -95,25 +98,38 @@ Issue #392の実装可能な仕様候補として、Requirement、Design、criti
 - Review artifact SHA-256: `4f5820536480bd5456316d7ab2aa3865b8b1f43f5174d150cf06e6bab9047fbb`
 - Result: `review_status=fail`、P1×4、P2×1
 
-P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mode、CP3/CP4 dogfood順序です。P2はclosed `rendered_command`へabsolute targetが入り得る事実とprivacy説明の不一致です。Product変更やProduct testはまだありません。
+P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mode、CP3/CP4 dogfood順序です。P2はclosed `rendered_command`へabsolute targetが入り得る事実とprivacy説明の不一致です。これは仕様review時点の記録であり、実装と実装後のreview結果は§9に記録します。
 
-同じブルーチームauthoring conversationによる分析で5件を再現しました。T12/version ownership、`RECORD-TEMP`、dogfood順序、privacy説明は既存authorityから一意に訂正します。Directory modeはcanonical値の人間判断が未完了です。全訂正をclean commit/pushし、同じreviewerでP0=0/P1=0/passとなるまで`implementation_allowed=false`を維持します。
+同じブルーチームauthoring conversationによる分析で5件を再現しました。T12/version ownership、`RECORD-TEMP`、dogfood順序、privacy説明は既存authorityから一意に訂正し、Directory modeはcanonical値を確認した上で仕様へ反映しました。実装後の独立Code Review Strictで検出された指摘と修正は§9へ移管します。
 
 ## 7. Implementation and merge gate
 
-`implementation_allowed=false`です。次の事実が成立するまでCP1 packetを実装者へ渡しません。
+`実装開始許可=true`です。CP1–CP4の実装candidateを固定し、次の最終ゲートが残っています。
 
-1. 本packの同一bytesに対する独立内容reviewがP0=0/P1=0/pass。
-2. Review対象manifest/hashを固定。
-3. 同内容をIssue branchへclean commit/pushし、remote full tipをreadback。
-4. GitHub #392 projectionがfreeze identityを参照していることをreadback。
-5. B0、15/14/1、243、required-fast fourを再確認。
-6. CodexがCP1一件だけのexecution packetを承認。
+1. 修正後candidateのclean pushとupstream SHA一致。
+2. 修正後candidateに対する独立Code Review StrictのP0/P1ゼロ・pass。
+3. 最終Quality Gate Strictの実施条件成立。
+4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
 
 CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provider-test-strategy-planning`へmergeし、merged tipでB1を再検証します。B1 GREEN後だけ#395を開始します。
 
 ## 8. Residual blocker and uncertainty
 
-親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。Directory modeのcanonical値、訂正候補の同一reviewer pass、clean pushed freeze/projectionは未完了です。
+親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証は完了していますが、修正後Strict review、current full verifierの#395 baseline解消、人間PR merge、merged-tip B1は未完了です。
 
-残るblockerは、独立内容review、clean pushed freeze/projection、Product実装・platform/fault/package verification、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssue実装完了、Product GREEN、merge完了を主張しません。
+残るblockerは、修正後のclean pushed Strict review、#395が所有する10件のactive baseline mismatch、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssue実装完了、Product GREEN、merge完了を主張しません。
+
+## 9. Implementation verification update
+
+2026-09-09時点の実装candidate `e75bc8887e022f9b4a2ebf4716cb443d3542b70c`（tree
+`d925a51f86347b6cdf127ad617bfce9bd609703b`）に対して、次の証拠を採取しました。
+
+- Code Review Strictの初回candidate `1f07cf46480a0a612f474a5874cf4ccaeeb3b5cf`ではP1×4、P2×2でした。全6件を分析し、P1のCI parity、RETIRE根拠、same-filesystem、diff/merge capability、P2のgeneration分類とbound cleanupをcandidateへ修正しました。
+- Classification registryは`unclassified=0`、`overlap=0`、`prematurely_retired=0`。
+- T01–T07のprimaryを含むprovider lifecycle unitは`23 passed`、T08–T11のCP3 parityは`10 passed`、T12/T14 acceptanceは`3 passed`、T13 package/dogfood parityは`1 passed`。
+- Required-fastはexact fourで`4 passed`、default fastは`878 passed, 831 skipped`、`make lint`はruff check/formatとmypyを含めてpass。
+- Ledgerはtotal15/active14/resolved1、timingは243 entriesのまま。#392はbaseline rowのnodeid、signature、lifecycleを変更していません。
+- `tests/unit/infra/test_managed_distribution.py`は未収集で、T12のproduction old writer/manifest reference scanもpassしました。全successor primaryはcollectionへ存在し、上記focused runでpassしています。
+- clean candidateでcurrent full verifierは`1709 tests collected`、status=`ledger-mismatch`、violation=`10`でした。10件は#395所有のactive baseline（runtime import 8、runtime shell 1、workbench 1）だけで、今回のIssue由来のunexpected failure/error/skip/xfail追加はありません。#392はledgerを変更していません。
+
+上記により、#392の実装candidateと旧managed distribution test RETIREの現時点の証拠は揃っています。Strict再レビュー、#395のbaseline修正、PR merge後B1、Final Quality Gateは未完了です。
