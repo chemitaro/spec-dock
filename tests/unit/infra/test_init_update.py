@@ -5369,12 +5369,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             if old_file is not None:
                 cli.__file__ = old_file
 
-    def test_no_skill_option_is_rejected(self) -> None:
+    def test_no_skill_option_is_rejected(self, capsys: pytest.CaptureFixture[str]) -> None:
         import spec_dock.cli as cli
 
-        with pytest.raises(SystemExit) as cm:
-            cli._parse_args(["init", "--no-skill", "."])
-        assert cm.value.code == 2
+        assert cli.main(["init", "--no-skill", ".", "--json"]) == 2
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        payload = json.loads(captured.out)
+        assert payload["status"] == "error"
+        assert payload["code"] == "invalid-request"
+        assert payload["operation"] is None
+        assert payload["candidate_digest"] is None
+        assert payload["seed_policy"] is None
+        assert payload["mutation_started"] is False
 
     def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
         install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"

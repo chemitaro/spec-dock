@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from spec_dock_runtime.commands.contracts import (
     CommandArgs,
@@ -25,6 +25,50 @@ _PURGE_REMOVED_GUIDANCE = (
     "Use tooling-only uninstall without --remove-specs.",
     "Spec history and Workbench data remain consumer-owned.",
 )
+
+
+def _none(value: object) -> str:
+    return "none" if value is None else str(value)
+
+
+def _bool_text(value: bool) -> str:
+    return "true" if value else "false"
+
+
+def _render_uninstall_text(payload: dict[str, object]) -> list[str]:
+    continuation = cast("dict[str, object]", payload["continuation"])
+    summary = cast("dict[str, int]", payload["summary"])
+    actions = cast("list[dict[str, str]]", payload["actions"])
+    guidance = cast("list[str]", payload["guidance"])
+    warnings = cast("list[str]", payload["warnings"])
+    errors = cast("list[str]", payload["errors"])
+    lines = [
+        f"spec-dock uninstall {payload['mode']} for {payload['target']}",
+        f"status: {payload['status']}",
+        f"code: {payload['code']}",
+        f"phase: {payload['phase']}",
+        f"last-completed-phase: {payload['last_completed_phase']}",
+        f"operation: {_none(payload['operation'])}",
+        f"candidate-digest: {_none(payload['candidate_digest'])}",
+        f"seed-policy: {_none(payload['seed_policy'])}",
+        f"mutation-started: {_bool_text(bool(payload['mutation_started']))}",
+        f"bootstrap-rolled-back: {_bool_text(bool(payload['bootstrap_rolled_back']))}",
+        f"next-action: {continuation['next_action']}",
+        f"next-command: {_none(continuation['next_command'])}",
+        f"after-cleanup-action: {continuation['after_cleanup_action']}",
+        f"after-cleanup-command: {_none(continuation['after_cleanup_command'])}",
+        "summary: "
+        f"planned={summary['planned']} completed={summary['completed']} preserved={summary['preserved']} "
+        f"pending={summary['pending']} failed={summary['failed']} warnings={summary['warnings']}",
+    ]
+    lines.extend(
+        f"action: {action['path']} category={action['category']} status={action['status']} reason={action['reason']}"
+        for action in actions
+    )
+    lines.extend(f"guidance: {item}" for item in guidance)
+    lines.extend(f"warning: {warning}" for warning in warnings)
+    lines.extend(f"error: {error}" for error in errors)
+    return lines
 
 
 @dataclass(frozen=True)
@@ -169,10 +213,7 @@ def _removed_purge_outcome(args: UninstallArgs) -> CommandOutcome:
     if args.json:
         stdout_lines = [json.dumps(payload, ensure_ascii=False, separators=(",", ":"))]
     else:
-        stdout_lines = [
-            f"spec-dock: error ({_PURGE_REMOVED_CODE}) -> {target}",
-            f"error: {_PURGE_REMOVED_ERROR}",
-        ]
+        stdout_lines = _render_uninstall_text(payload)
     return CommandOutcome(
         exit_code=2,
         text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]),

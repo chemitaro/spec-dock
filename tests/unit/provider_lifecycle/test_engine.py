@@ -92,10 +92,22 @@ def test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations(tmp_path:
         serialize_public_result(first)
         assert first.status in {"blocked", "partial_failure", "completed", "completed_with_warnings"}
 
-        retry = ProviderLifecycleEngine().execute(request, force=True)
-        serialize_public_result(retry)
+        retry = first
+        for _attempt in range(4):
+            if retry.status == "completed":
+                break
+            if retry.continuation["next_action"] == "retry-cleanup":
+                command = retry.continuation["next_command"]
+                assert isinstance(command, str)
+                token = command.split("--provider-cleanup-token ", 1)[1].split(" -- ", 1)[0]
+                retry = ProviderLifecycleEngine().execute(request, force=True, cleanup_token=token)
+            else:
+                if retry.continuation["next_action"] != "none":
+                    assert retry.continuation["next_action"] == "run-request"
+                retry = ProviderLifecycleEngine().execute(request, force=True)
+            serialize_public_result(retry)
         assert retry.status == "completed"
-        assert retry.code == "install-completed"
+        assert retry.code in {"install-completed", "update-completed", "terminal-cleanup-completed"}
 
 
 def test_t07_legacy_migration_uninstall_and_old_package_mutation_zero(tmp_path: Path) -> None:

@@ -49,6 +49,30 @@ class _BusyError(_BootstrapError):
     pass
 
 
+class _UnavailableError(_BootstrapError):
+    pass
+
+
+class _UnsafeBindingError(_BootstrapError):
+    pass
+
+
+class _NotReadyError(_BootstrapError):
+    pass
+
+
+_BOOTSTRAP_DIAGNOSTICS = {
+    "repository-operation-busy": "Another SpecDock command holds repository coordination; retry after it exits.",
+    "repository-coordination-unavailable": "Required repository coordination is unavailable; no operation was executed.",
+    "unsafe-repository-binding": "The repository root binding is unsafe or changed during the operation.",
+    "runtime-installation-not-ready": "SpecDock tooling is not ready; use the external installer to complete recovery before running repository commands.",
+}
+
+
+def _emit_bootstrap_error(code: str) -> None:
+    print(f"error: {code}: {_BOOTSTRAP_DIAGNOSTICS[code]}", file=sys.stderr)
+
+
 def _directory_flags() -> int:
     return os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
 
@@ -71,22 +95,22 @@ def _close(fd: int | None) -> None:
 
 def _lexical_absolute(path: str) -> str:
     if "\x00" in path:
-        raise _BootstrapError("repository root contains NUL")
+        raise _UnsafeBindingError("repository root contains NUL")
     if not Path(path).is_absolute():
-        raise _BootstrapError("repository root must be absolute")
+        raise _UnsafeBindingError("repository root must be absolute")
     return str(Path(path).absolute())
 
 
 def _open_absolute_directory(path: str) -> int:
     lexical = _lexical_absolute(path)
     if Path(lexical).is_symlink():
-        raise _BootstrapError("repository root must not be a symlink")
+        raise _UnsafeBindingError("repository root must not be a symlink")
     absolute = Path(lexical)
     current = os.open(os.sep, _directory_flags())
     try:
         for index, component in enumerate(absolute.parts[1:]):
             if component in {"", ".", ".."}:
-                raise _BootstrapError("repository root contains an unsafe component")
+                raise _UnsafeBindingError("repository root contains an unsafe component")
             try:
                 binding = os.stat(component, dir_fd=current, follow_symlinks=False)
             except FileNotFoundError:
@@ -99,7 +123,7 @@ def _open_absolute_directory(path: str) -> int:
                     and os.readlink(component, dir_fd=current) in {"/private/var", "private/var"}
                 )
                 if not allowed_var_alias:
-                    raise _BootstrapError("repository root contains an unsafe symlink component")
+                    raise _UnsafeBindingError("repository root contains an unsafe symlink component")
                 private_fd = os.open("private", _directory_flags(), dir_fd=current)
                 _close(current)
                 current = private_fd
@@ -111,21 +135,36 @@ def _open_absolute_directory(path: str) -> int:
             _close(current)
             current = next_fd
         return current
+    except _BootstrapError:
+        _close(current)
+        raise
+    except OSError as error:
+        _close(current)
+        raise _UnsafeBindingError("repository root binding is unavailable") from error
     except BaseException:
         _close(current)
         raise
 
 
 def _open_directory(base_fd: int, components: tuple[str, ...]) -> int:
-    current = os.dup(base_fd)
+    try:
+        current = os.dup(base_fd)
+    except OSError as error:
+        raise _NotReadyError("runtime directory is unavailable") from error
     try:
         for component in components:
             if component in {"", ".", ".."} or "/" in component or "\x00" in component:
-                raise _BootstrapError("runtime path contains an unsafe component")
+                raise _NotReadyError("runtime path contains an unsafe component")
             next_fd = os.open(component, _directory_flags(), dir_fd=current)
             _close(current)
             current = next_fd
         return current
+    except _BootstrapError:
+        _close(current)
+        raise
+    except OSError as error:
+        _close(current)
+        raise _NotReadyError("runtime directory is unavailable") from error
     except BaseException:
         _close(current)
         raise
@@ -139,19 +178,22 @@ def _open_regular(
     allowed_modes: frozenset[int],
 ) -> tuple[bytes, os.stat_result]:
     if name in {"", ".", ".."} or "/" in name or "\x00" in name:
-        raise _BootstrapError("runtime file contains an unsafe component")
+        raise _NotReadyError("runtime file contains an unsafe component")
     try:
         lexical = os.stat(name, dir_fd=base_fd, follow_symlinks=False)
     except OSError as error:
-        raise _BootstrapError(f"runtime file is unavailable: {name}") from error
+        raise _NotReadyError(f"runtime file is unavailable: {name}") from error
     if (
         not stat.S_ISREG(lexical.st_mode)
         or lexical.st_nlink != 1
         or stat.S_IMODE(lexical.st_mode) not in allowed_modes
         or lexical.st_size > maximum
     ):
-        raise _BootstrapError(f"runtime file has an unsafe binding: {name}")
-    fd = os.open(name, _regular_flags(), dir_fd=base_fd)
+        raise _NotReadyError(f"runtime file has an unsafe binding: {name}")
+    try:
+        fd = os.open(name, _regular_flags(), dir_fd=base_fd)
+    except OSError as error:
+        raise _NotReadyError(f"runtime file is unavailable: {name}") from error
     try:
         before = os.fstat(fd)
         if (
@@ -159,9 +201,9 @@ def _open_regular(
             or before.st_nlink != 1
             or stat.S_IMODE(before.st_mode) not in allowed_modes
         ):
-            raise _BootstrapError(f"runtime file has an unsafe binding: {name}")
+            raise _NotReadyError(f"runtime file has an unsafe binding: {name}")
         if (before.st_dev, before.st_ino) != (lexical.st_dev, lexical.st_ino):
-            raise _BootstrapError(f"runtime file changed while opening: {name}")
+            raise _NotReadyError(f"runtime file changed while opening: {name}")
         chunks: list[bytes] = []
         total = 0
         while True:
@@ -171,7 +213,7 @@ def _open_regular(
             chunks.append(chunk)
             total += len(chunk)
             if total > maximum:
-                raise _BootstrapError(f"runtime file is too large: {name}")
+                raise _NotReadyError(f"runtime file is too large: {name}")
         payload = b"".join(chunks)
         after = os.fstat(fd)
         if (
@@ -189,7 +231,7 @@ def _open_regular(
             after.st_size,
             after.st_mode,
         ):
-            raise _BootstrapError(f"runtime file changed while reading: {name}")
+            raise _NotReadyError(f"runtime file changed while reading: {name}")
         return payload, before
     finally:
         _close(fd)
@@ -197,7 +239,7 @@ def _open_regular(
 
 def _parse_json(payload: bytes, label: str) -> OrderedDict[str, object]:
     if not payload.endswith(b"\n") or payload[:-1].find(b"\n") != -1:
-        raise _BootstrapError(f"{label} is invalid")
+        raise _NotReadyError(f"{label} is invalid")
 
     def reject_duplicate(pairs: list[tuple[str, object]]) -> OrderedDict[str, object]:
         value: OrderedDict[str, object] = OrderedDict()
@@ -221,9 +263,9 @@ def _parse_json(payload: bytes, label: str) -> OrderedDict[str, object]:
         if canonical.encode("utf-8") != payload:
             raise ValueError("non-canonical JSON")
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
-        raise _BootstrapError(f"{label} is invalid") from error
+        raise _NotReadyError(f"{label} is invalid") from error
     if not isinstance(value, OrderedDict):
-        raise _BootstrapError(f"{label} must be an object")
+        raise _NotReadyError(f"{label} must be an object")
     return value
 
 
@@ -231,21 +273,21 @@ def _validate_ready_record(specdock_fd: int) -> str:
     payload, _stat = _open_regular(specdock_fd, _RECORD_NAME, maximum=4096, allowed_modes=frozenset({0o644}))
     record = _parse_json(payload, "installation record")
     if tuple(record.keys()) != _READY_RECORD_KEYS:
-        raise _BootstrapError("repository runtime is not ready")
+        raise _NotReadyError("repository runtime is not ready")
     if type(record.get("schema_version")) is not int or record.get("schema_version") != 1 or record.get("state") != "ready":
-        raise _BootstrapError("repository runtime is not ready")
+        raise _NotReadyError("repository runtime is not ready")
     if record.get("operation") is not None or record.get("version") != _PROTOCOL_VERSION:
-        raise _BootstrapError("repository runtime is not ready")
+        raise _NotReadyError("repository runtime is not ready")
     digest = record.get("candidate_digest")
     if not isinstance(digest, str) or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
-        raise _BootstrapError("repository runtime is not ready")
+        raise _NotReadyError("repository runtime is not ready")
     if record.get("seed_policy") not in {"create-if-absent", "preserve-only"}:
-        raise _BootstrapError("repository runtime is not ready")
+        raise _NotReadyError("repository runtime is not ready")
     slots = record.get("skill_slots")
     if not isinstance(slots, OrderedDict) or tuple(slots.keys()) != tuple(name for name, _path in _SLOT_PATHS):
-        raise _BootstrapError("repository runtime is not ready")
+        raise _NotReadyError("repository runtime is not ready")
     if any(value != _PROTOCOL_VERSION for value in slots.values()):
-        raise _BootstrapError("repository runtime is not ready")
+        raise _NotReadyError("repository runtime is not ready")
     return digest
 
 
@@ -266,7 +308,7 @@ def _validate_fixed_domains(root_fd: int, candidate_digest: str) -> None:
                 allowed_modes=frozenset({0o755}),
             )
             if not payload.startswith(b"#!"):
-                raise _BootstrapError("repository runtime is not ready")
+                raise _NotReadyError("repository runtime is not ready")
         finally:
             _close(scripts_fd)
     finally:
@@ -287,7 +329,7 @@ def _validate_fixed_domains(root_fd: int, candidate_digest: str) -> None:
                 )
                 marker = _parse_json(payload, "provider slot marker")
                 if tuple(marker.keys()) != _MARKER_KEYS:
-                    raise _BootstrapError("repository runtime is not ready")
+                    raise _NotReadyError("repository runtime is not ready")
                 if (
                     type(marker.get("schema_version")) is not int
                     or marker.get("schema_version") != 1
@@ -295,12 +337,12 @@ def _validate_fixed_domains(root_fd: int, candidate_digest: str) -> None:
                     or marker.get("version") != _PROTOCOL_VERSION
                     or marker.get("candidate_digest") != candidate_digest
                 ):
-                    raise _BootstrapError("repository runtime is not ready")
+                    raise _NotReadyError("repository runtime is not ready")
                 marker_digests.add(str(marker["candidate_digest"]))
             finally:
                 _close(slot_fd)
         if marker_digests != {candidate_digest}:
-            raise _BootstrapError("repository runtime is not ready")
+            raise _NotReadyError("repository runtime is not ready")
     finally:
         _close(agents_fd)
 
@@ -311,14 +353,14 @@ def _acquire_shared_lease(root_fd: int) -> None:
     except OSError as error:
         if error.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
             raise _BusyError("repository coordination is busy") from error
-        raise _BootstrapError("repository coordination is unavailable") from error
+        raise _UnavailableError("repository coordination is unavailable") from error
 
 
 def _bind_process_cwd(fd: int) -> Path:
     try:
         os.fchdir(fd)
     except OSError as error:
-        raise _BootstrapError("repository descriptor path is unavailable") from error
+        raise _UnsafeBindingError("repository descriptor path is unavailable") from error
     return Path(".")
 
 
@@ -500,11 +542,17 @@ def main() -> int:
         repo_root_path = script_path.parent.parent.parent
         repo_root = str(repo_root_path)
         root_fd = _open_absolute_directory(repo_root)
-        before = os.fstat(root_fd)
+        try:
+            before = os.fstat(root_fd)
+        except OSError as error:
+            raise _UnsafeBindingError("repository root binding changed") from error
         _acquire_shared_lease(root_fd)
-        after = os.fstat(root_fd)
+        try:
+            after = os.fstat(root_fd)
+        except OSError as error:
+            raise _UnsafeBindingError("repository root binding changed") from error
         if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
-            raise _BootstrapError("repository root binding changed")
+            raise _UnsafeBindingError("repository root binding changed")
         specdock_fd = _open_directory(root_fd, ("spec-dock",))
         candidate_digest = _validate_ready_record(specdock_fd)
         _close(specdock_fd)
@@ -533,22 +581,31 @@ def main() -> int:
                 result = _consumer_hook(terminal, root_fd)
                 root_fd = None
                 return result
-            raise _BootstrapError("unknown terminal runtime request")
+            raise _NotReadyError("unknown terminal runtime request")
         _emit(outcome.text)
         _close(root_fd)
         root_fd = None
         return int(outcome.exit_code)
-    except _BusyError as error:
-        print(f"error: {error}", file=sys.stderr)
+    except _BusyError:
+        _emit_bootstrap_error("repository-operation-busy")
         return 1
-    except _BootstrapError as error:
-        print(f"error: {error}", file=sys.stderr)
+    except _UnavailableError:
+        _emit_bootstrap_error("repository-coordination-unavailable")
         return 1
-    except OSError as error:
-        print(f"error: repository coordination is unavailable ({error.strerror or error})", file=sys.stderr)
+    except _UnsafeBindingError:
+        _emit_bootstrap_error("unsafe-repository-binding")
         return 1
-    except Exception as error:
-        print(f"error: {error}", file=sys.stderr)
+    except _NotReadyError:
+        _emit_bootstrap_error("runtime-installation-not-ready")
+        return 1
+    except _BootstrapError:
+        _emit_bootstrap_error("runtime-installation-not-ready")
+        return 1
+    except OSError:
+        _emit_bootstrap_error("runtime-installation-not-ready")
+        return 1
+    except Exception:
+        _emit_bootstrap_error("runtime-installation-not-ready")
         return 1
     finally:
         _close(specdock_fd)

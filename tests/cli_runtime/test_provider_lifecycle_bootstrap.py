@@ -78,7 +78,10 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
             )
             assert busy.returncode != 0
             assert busy.stdout == ""
-            assert "repository coordination is busy" in busy.stderr
+            assert busy.stderr == (
+                "error: repository-operation-busy: Another SpecDock command holds repository coordination; "
+                "retry after it exits.\n"
+            )
             assert not imported.exists(), "runtime was imported before shared lease admission"
         finally:
             lock_process.send_signal(signal.SIGTERM)
@@ -96,7 +99,10 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
             text=True,
         )
         assert not_ready.returncode != 0
-        assert "repository runtime is not ready" in not_ready.stderr
+        assert not_ready.stderr == (
+            "error: runtime-installation-not-ready: SpecDock tooling is not ready; use the external installer "
+            "to complete recovery before running repository commands.\n"
+        )
         assert not imported.exists(), "runtime was imported before ready admission"
 
     def test_t08_strict_record_admission_rejects_unsafe_bindings_before_import(self, tmp_path: Path) -> None:
@@ -156,10 +162,9 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
             )
             assert result.returncode != 0, label
             assert result.stdout == "", label
-            assert (
-                "repository runtime is not ready" in result.stderr
-                or "installation record is invalid" in result.stderr
-                or "runtime file has an unsafe binding" in result.stderr
+            assert result.stderr == (
+                "error: runtime-installation-not-ready: SpecDock tooling is not ready; use the external installer "
+                "to complete recovery before running repository commands.\n"
             ), label
             assert not imported.exists(), label
 
@@ -179,7 +184,10 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
                 timeout=3,
             )
             assert result.returncode != 0
-            assert "runtime file has an unsafe binding" in result.stderr
+            assert result.stderr == (
+                "error: runtime-installation-not-ready: SpecDock tooling is not ready; use the external installer "
+                "to complete recovery before running repository commands.\n"
+            )
             assert not imported.exists()
         finally:
             hardlink.unlink(missing_ok=True)
@@ -200,7 +208,10 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
                 timeout=3,
             )
             assert result.returncode != 0
-            assert "runtime file has an unsafe binding" in result.stderr
+            assert result.stderr == (
+                "error: runtime-installation-not-ready: SpecDock tooling is not ready; use the external installer "
+                "to complete recovery before running repository commands.\n"
+            )
             assert not imported.exists()
         finally:
             record.unlink(missing_ok=True)
@@ -218,7 +229,10 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
                     timeout=3,
                 )
                 assert result.returncode != 0
-                assert "runtime file has an unsafe binding" in result.stderr
+                assert result.stderr == (
+                    "error: runtime-installation-not-ready: SpecDock tooling is not ready; use the external installer "
+                    "to complete recovery before running repository commands.\n"
+                )
                 assert not imported.exists()
             finally:
                 record.unlink(missing_ok=True)
@@ -240,7 +254,10 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
                 timeout=3,
             )
             assert result.returncode != 0
-            assert "runtime file has an unsafe binding" in result.stderr
+            assert result.stderr == (
+                "error: runtime-installation-not-ready: SpecDock tooling is not ready; use the external installer "
+                "to complete recovery before running repository commands.\n"
+            )
             assert not imported.exists()
         finally:
             marker.chmod(marker_mode)

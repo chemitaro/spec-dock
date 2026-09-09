@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import stat
 from typing import TYPE_CHECKING, Literal, NoReturn, cast
 
@@ -67,6 +68,27 @@ _INVOCATION_IDS = {
     "uninstall-apply-keep",
 }
 _CLEANUP_IDS = {"init-force", "update", "uninstall-apply-keep"}
+
+_DESIRED_INVOCATION_PREFIXES = {
+    "init": ("spec-dock", "init"),
+    "init-force": ("spec-dock", "init", "--force"),
+    "update": ("spec-dock", "update"),
+    "uninstall-dry-run": ("spec-dock", "uninstall"),
+    "uninstall-dry-run-keep": ("spec-dock", "uninstall", "--keep-specs"),
+    "uninstall-apply": ("spec-dock", "uninstall", "--apply"),
+    "uninstall-apply-keep": ("spec-dock", "uninstall", "--apply", "--keep-specs"),
+}
+_CLEANUP_INVOCATION_PREFIXES = {
+    "init-force": ("spec-dock", "init", "--force", "--provider-cleanup-token"),
+    "update": ("spec-dock", "update", "--provider-cleanup-token"),
+    "uninstall-apply-keep": (
+        "spec-dock",
+        "uninstall",
+        "--apply",
+        "--keep-specs",
+        "--provider-cleanup-token",
+    ),
+}
 
 
 class PrivateStateError(RuntimeError):
@@ -391,6 +413,37 @@ def _registered_entries(value: object) -> list[dict[str, object]]:
     return result
 
 
+def _validate_rendered_invocation(
+    invocation_id: str,
+    rendered: str,
+    *,
+    cleanup_token: str | None = None,
+) -> None:
+    prefixes = _CLEANUP_INVOCATION_PREFIXES if cleanup_token is not None else _DESIRED_INVOCATION_PREFIXES
+    prefix = prefixes.get(invocation_id)
+    if prefix is None:
+        _fail("invocation_id is not supported")
+    try:
+        tokens = shlex.split(rendered, posix=True)
+    except ValueError as exc:
+        _fail(f"rendered invocation is not canonical: {exc}")
+    expected_length = len(prefix) + (3 if cleanup_token is not None else 2)
+    if "\x00" in rendered or len(tokens) != expected_length:
+        _fail("rendered invocation is not canonical")
+    if tuple(tokens[: len(prefix)]) != prefix:
+        _fail("rendered invocation does not match invocation_id")
+    if cleanup_token is not None and tokens[len(prefix)] != cleanup_token:
+        _fail("rendered cleanup invocation token does not match")
+    separator_index = len(prefix) + (1 if cleanup_token is not None else 0)
+    if tokens[separator_index] != "--":
+        _fail("rendered invocation must use the fixed target separator")
+    target = tokens[separator_index + 1]
+    if not target.startswith("/") or target in {"", "/"}:
+        _fail("rendered invocation target must be normalized absolute path")
+    if shlex.join(tokens) != rendered:
+        _fail("rendered invocation is not canonical")
+
+
 def _invocation(value: object, label: str, *, cleanup: bool = False) -> dict[str, str]:
     mapping = _mapping(value, label)
     expected = (
@@ -412,6 +465,11 @@ def _invocation(value: object, label: str, *, cleanup: bool = False) -> dict[str
             _fail(f"{label}.invocation_id is invalid")
     rendered = _string(mapping["rendered_command"], f"{label}.rendered_command")
     assert invocation_id is not None and rendered is not None
+    _validate_rendered_invocation(
+        invocation_id,
+        rendered,
+        cleanup_token=cast("str", mapping["cleanup_token"]) if cleanup else None,
+    )
     return {key: value for key, value in mapping.items() if isinstance(value, str)}
 
 
@@ -472,9 +530,10 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
     repository_key = _digest(value["repository_key"], "ACTIVE.repository_key")
     tuple_key = _digest(value["tuple_key"], "ACTIVE.tuple_key")
     operation_generation = _generation(value["operation_generation"], "ACTIVE.operation_generation")
-    operation = _string(value["operation"], "ACTIVE.operation")
-    if operation not in {"install", "update", "uninstall"}:
+    raw_operation = _string(value["operation"], "ACTIVE.operation")
+    if raw_operation not in {"install", "update", "uninstall"}:
         _fail("ACTIVE.operation is invalid")
+    operation = cast("str", raw_operation)
     candidate_digest = _digest(value["candidate_digest"], "ACTIVE.candidate_digest")
     seed_policy = _string(value["seed_policy"], "ACTIVE.seed_policy")
     if seed_policy not in {"create-if-absent", "preserve-only"}:
@@ -489,6 +548,7 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
     }
     original_record = _record_ref(value["original_record"], "ACTIVE.original_record")
     expected_record = _expected_record(value["expected_incomplete_record"])
+    expected_record_model = parse_installation_record(base64.b64decode(expected_record["bytes_base64"]))
     bootstrap = _bootstrap(value["bootstrap_container"])
     owned = _owned_targets(value["owned_target_witnesses"])
     registered = _registered_entries(value["registered_stage_entries"])
@@ -512,6 +572,23 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
         and terminal_digest is not None
         and cleanup_token is not None
     )
+    if (
+        expected_record_model.state != "incomplete"
+        or expected_record_model.operation != operation
+        or expected_record_model.candidate_digest != candidate_digest
+        or expected_record_model.seed_policy != seed_policy
+    ):
+        _fail("ACTIVE expected incomplete record does not match operation identity")
+    if tuple_key_for(operation, candidate_digest, seed_policy) != tuple_key:
+        _fail("ACTIVE tuple_key does not match operation identity")
+    if result_family == "legacy-migration" and (operation != "install" or seed_policy != "preserve-only"):
+        _fail("ACTIVE legacy-migration relation is invalid")
+    if result_family == "update" and (operation != "update" or seed_policy != "preserve-only"):
+        _fail("ACTIVE update relation is invalid")
+    if result_family == "uninstall" and (operation != "uninstall" or seed_policy != "preserve-only"):
+        _fail("ACTIVE uninstall relation is invalid")
+    if result_family == "install" and operation != "install":
+        _fail("ACTIVE install relation is invalid")
     if cleanup_token_for(repository_key, tuple_key, result_family, operation_generation) != cleanup_token:
         _fail("ACTIVE.cleanup_token does not match identity")
     return ActiveState(
@@ -602,6 +679,8 @@ def _parse_receipt(value: Mapping[str, object]) -> CompletionReceipt:
         and token is not None
     )
     assert family is not None
+    if tuple_key_for(cast("str", operation), cast("str", digest), cast("str", seed)) != tuple_key:
+        _fail("receipt tuple_key does not match operation identity")
     if cleanup_token_for(repository_key, tuple_key, cast("str", family), generation) != token:
         _fail("receipt cleanup token does not match identity")
     return CompletionReceipt(

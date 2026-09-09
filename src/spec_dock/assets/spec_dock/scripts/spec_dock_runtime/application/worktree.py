@@ -42,6 +42,7 @@ _PROVIDER_CLOSURE_PATHS = (
     "spec-dock/templates",
     "spec-dock/system",
     "spec-dock/scripts",
+    "spec-dock/spec-dock.version",
     ".agents/skills/spec-dock",
     ".agents/skills/spec-dock-grill-with-docs",
 )

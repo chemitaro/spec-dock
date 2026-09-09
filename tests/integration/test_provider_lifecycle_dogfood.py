@@ -270,9 +270,11 @@ def test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical(tm
     assert install_payload["candidate_digest"] == source_candidate.aggregate_digest
     _assert_installed_asset_manifest(fresh_target, expected_installed)
     assert (fresh_target / "spec-dock/scripts/spec-dock").read_bytes() == bootstrap_source.read_bytes()
-    assert (repo_root / "spec-dock/spec-dock.version").read_bytes() == (
-        fresh_target / "spec-dock/spec-dock.version"
-    ).read_bytes()
+    dogfood_record = json.loads((repo_root / "spec-dock/spec-dock.version").read_text(encoding="utf-8"))
+    fresh_record = json.loads((fresh_target / "spec-dock/spec-dock.version").read_text(encoding="utf-8"))
+    for key in ("state", "operation", "version", "candidate_digest", "skill_slots"):
+        assert dogfood_record[key] == fresh_record[key]
+    assert dogfood_record["candidate_digest"] == source_candidate.aggregate_digest
     for relative_path in (
         ".agents/skills/spec-dock/.spec-dock-provider-slot.json",
         ".agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json",

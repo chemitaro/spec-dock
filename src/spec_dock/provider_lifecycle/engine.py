@@ -343,6 +343,24 @@ def _cleanup_invocation(request: LifecycleRequest, operation: str, seed_policy: 
     }
 
 
+def _cleanup_request_matches(
+    request: LifecycleRequest,
+    *,
+    force: bool | None,
+    token: str,
+    expected: Mapping[str, str],
+) -> bool:
+    """Require the caller's hidden cleanup form to be the derived exact form."""
+
+    desired = _desired_invocation(request, force=force)
+    if desired["invocation_id"] != expected.get("invocation_id"):
+        return False
+    operation = _operation_from_request(request)
+    seed_policy = _seed_from_request(request, operation)
+    actual = _cleanup_invocation(request, operation, seed_policy, token)
+    return actual == dict(expected)
+
+
 def _record_mapping(record: InstallationRecord) -> dict[str, object]:
     return {
         "schema_version": record.schema_version,
@@ -906,18 +924,6 @@ class ProviderLifecycleEngine:
             ):
                 return self._blocked(request, "unsafe-repository-binding")
             try:
-                candidate = None if operation == "uninstall" else self._candidate()
-            except (CandidateError, OSError, ValueError):
-                return self._blocked(
-                    request,
-                    "candidate-invalid",
-                    operation=operation,
-                    candidate_digest=None,
-                    seed_policy=seed_policy,
-                    phase="candidate-staging",
-                )
-            candidate_digest = candidate.aggregate_digest if candidate is not None else None
-            try:
                 namespace = self._namespace_for(request.target, lease)
                 active_store, receipt_store, stage_store = self._stores(namespace, request.apply, request.target)
             except (PrivateStateError, PrivateStateForeignError, OSError, _InjectedFailure):
@@ -938,6 +944,7 @@ class ProviderLifecycleEngine:
                     receipt_store,
                     stage_store,
                     bound.fd,
+                    force=force,
                 )
             if active is not None:
                 if active.state in {"ready", "terminal-cleanup"}:
@@ -948,6 +955,19 @@ class ProviderLifecycleEngine:
                         receipt_store,
                         stage_store,
                         bound.fd,
+                        force=force,
+                        receipt=receipt,
+                    )
+                try:
+                    candidate = None if operation == "uninstall" else self._candidate()
+                except (CandidateError, OSError, ValueError):
+                    return self._blocked(
+                        request,
+                        "candidate-invalid",
+                        operation=operation,
+                        candidate_digest=None,
+                        seed_policy=seed_policy,
+                        phase="candidate-staging",
                     )
                 return self._resume_or_block(
                     request,
@@ -964,6 +984,18 @@ class ProviderLifecycleEngine:
 
             if receipt is not None and not self._receipt_matches_repository(receipt, lease):
                 return self._blocked(request, "invalid-request")
+            try:
+                candidate = None if operation == "uninstall" else self._candidate()
+            except (CandidateError, OSError, ValueError):
+                return self._blocked(
+                    request,
+                    "candidate-invalid",
+                    operation=operation,
+                    candidate_digest=None,
+                    seed_policy=seed_policy,
+                    phase="candidate-staging",
+                )
+            candidate_digest = candidate.aggregate_digest if candidate is not None else None
             try:
                 return self._dispatch_new(
                     request,
@@ -1050,10 +1082,12 @@ class ProviderLifecycleEngine:
         phase: str = "candidate-staging",
         last_completed_phase: str = "preflight",
         mutation_started: bool = False,
+        actions: Sequence[LifecycleAction] = (),
     ) -> LifecycleResult:
         """Map an I/O admission failure to the one closed preparation row."""
 
         retry = ProviderLifecycleEngine._retry_for(request, operation, seed_policy)
+        failed_paths, pending_paths = _action_path_sets(actions)
         return build_public_result(
             request,
             status="partial_failure" if mutation_started else "blocked",
@@ -1066,6 +1100,83 @@ class ProviderLifecycleEngine:
             last_completed_phase=last_completed_phase,
             retry_command=retry,
             continuation=_lifecycle_continuation(retry) if retry is not None else _empty_continuation(),
+            failed_paths=failed_paths,
+            pending_paths=pending_paths,
+            actions=actions,
+        )
+
+    def _preparation_partial_actions(
+        self,
+        active: ActiveState,
+        root_fd: int,
+    ) -> tuple[LifecycleAction, ...]:
+        """Describe the bounded Consumer state left by an initial-record failure."""
+
+        disposition = active.bootstrap_container.get("disposition")
+        container_action = (
+            _make_action("spec-dock", "container", "completed", "fresh-container-create")
+            if disposition == "created"
+            else _make_action("spec-dock", "container", "preserved", "shared-container-preserve")
+        )
+        actions: list[LifecycleAction] = [
+            container_action,
+            _make_action("spec-dock/spec-dock.version", "record", "failed", "incomplete-record-publish"),
+        ]
+        for index, (category, path, _source) in enumerate(FIXED_DOMAINS):
+            original = active.owned_target_witnesses[index]
+            if active.operation == "uninstall":
+                if original.get("original_kind") == "directory":
+                    actions.append(_make_action(path, category, "pending", f"owned-{category}-remove"))
+                else:
+                    actions.append(_make_action(path, category, "preserved", f"owned-{category}-absent"))
+                continue
+            suffix = "replace" if original.get("original_kind") == "directory" else "create"
+            actions.append(_make_action(path, category, "pending", f"candidate-{category}-{suffix}"))
+
+        seed_observations = {path: self._observe_target(root_fd, path, expect_tree=False) for path in SEED_PATHS}
+        if active.seed_policy == "preserve-only":
+            actions.extend(_make_action(path, "seed", "preserved", "preserve-only-seed") for path in SEED_PATHS)
+        else:
+            first_seed = seed_observations["spec-dock/.gitignore"]
+            actions.append(
+                _make_action(
+                    "spec-dock/.gitignore",
+                    "seed",
+                    "pending" if first_seed.kind == "absent" else "preserved",
+                    "fresh-seed-create" if first_seed.kind == "absent" else "consumer-seed-present",
+                )
+            )
+            for parent in (".github", ".github/workflows"):
+                if self._observe_target(root_fd, parent, expect_tree=False).kind == "absent":
+                    actions.append(_make_action(parent, "container", "pending", "fresh-container-create"))
+            second_seed = seed_observations[".github/workflows/ci.yml"]
+            actions.append(
+                _make_action(
+                    ".github/workflows/ci.yml",
+                    "seed",
+                    "pending" if second_seed.kind == "absent" else "preserved",
+                    "fresh-seed-create" if second_seed.kind == "absent" else "consumer-seed-present",
+                )
+            )
+        actions.append(_make_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"))
+        return tuple(actions)
+
+    def _preparation_mutation_started(self, active: ActiveState, root_fd: int) -> bool:
+        if active.bootstrap_container.get("disposition") == "created":
+            return True
+        try:
+            raw, _witness, record, record_kind = self._observe_record("", root_fd)
+        except (FilesystemSafetyError, OSError, ValueError, WireValidationError):
+            return False
+        expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+        return (
+            raw == expected
+            and record_kind == "final"
+            and record is not None
+            and record.state == "incomplete"
+            and record.operation == active.operation
+            and record.candidate_digest == active.candidate_digest
+            and record.seed_policy == active.seed_policy
         )
 
     @staticmethod
@@ -1125,31 +1236,62 @@ class ProviderLifecycleEngine:
                 candidate_digest=None,
                 seed_policy=seed_policy,
             )
-        if operation == "update" and record is None and record_kind != "legacy-0.2.3":
+        requested_force = force is True
+        durable_operation = operation
+        if record_kind == "legacy-0.2.3":
+            if operation == "install" and not requested_force:
+                fixture_digest = cast("str", load_legacy_fixture()["aggregate_digest"])
+                raise _AdmissionFailure(
+                    "already-initialized",
+                    operation="install",
+                    candidate_digest=fixture_digest,
+                    seed_policy="preserve-only",
+                )
+            durable_operation = "install"
+            seed_policy = "preserve-only"
+            result_family = "legacy-migration"
+        elif record is None:
+            durable_operation = "install"
+            seed_policy = "create-if-absent" if operation == "install" else "preserve-only"
+            result_family = "install"
+        elif record.state == "incomplete":
             raise _AdmissionFailure(
-                "tooling-not-installed",
-                operation=operation,
-                candidate_digest=candidate.aggregate_digest,
-                seed_policy=seed_policy,
+                "installation-record-state-inconsistent",
+                candidate_digest=record.candidate_digest,
+                seed_policy=record.seed_policy,
             )
-        if operation == "install" and record is not None and not force:
-            seed_policy = record.seed_policy
+        elif record.state == "tooling-absent-preserved-data":
+            durable_operation = "install"
+            seed_policy = "preserve-only"
+            result_family = "install"
+        elif operation == "install" and not requested_force:
             raise _AdmissionFailure(
                 "already-initialized",
-                operation=operation,
-                candidate_digest=candidate.aggregate_digest,
-                seed_policy=seed_policy,
+                operation="install",
+                candidate_digest=record.candidate_digest,
+                seed_policy=record.seed_policy,
             )
-        result_family = "legacy-migration" if record_kind == "legacy-0.2.3" else operation
-        if result_family == "legacy-migration":
+        else:
+            durable_operation = "update"
             seed_policy = "preserve-only"
+            result_family = "update"
         targets = self._observe_domains(root_fd)
         if any(item.kind not in {"absent", "directory"} for item in targets):
             raise _AdmissionFailure(
                 "unsafe-target-type",
-                operation=operation,
+                operation=durable_operation,
                 candidate_digest=None,
                 seed_policy=seed_policy,
+            )
+        if (
+            record is not None
+            and record.state == "tooling-absent-preserved-data"
+            and any(item.kind == "directory" for item in targets)
+        ):
+            raise _AdmissionFailure(
+                "installation-record-state-inconsistent",
+                candidate_digest=record.candidate_digest,
+                seed_policy=record.seed_policy,
             )
         if result_family != "legacy-migration":
             self._admit_existing_targets(
@@ -1160,7 +1302,7 @@ class ProviderLifecycleEngine:
             )
         return self._start_or_run(
             request,
-            operation,
+            durable_operation,
             seed_policy,
             result_family,
             candidate,
@@ -1196,13 +1338,28 @@ class ProviderLifecycleEngine:
         if record is None and record_kind != "legacy-0.2.3":
             if any(item.kind == "directory" for item in targets):
                 raise _AdmissionFailure("installation-record-invalid", operation="uninstall", seed_policy=seed_policy)
-            digest = self._candidate().aggregate_digest
-            return self._uninstall_absent_result(request, digest, targets, container, root_fd)
+            return self._uninstall_not_installed_result(request)
         if record_kind == "legacy-0.2.3":
             fixture = load_legacy_fixture()
             candidate_digest = cast("str", fixture["aggregate_digest"])
         else:
             assert record is not None
+            if record.state == "tooling-absent-preserved-data":
+                if container.kind != "directory" or any(item.kind == "directory" for item in targets):
+                    raise _AdmissionFailure(
+                        "installation-record-state-inconsistent",
+                        operation="uninstall",
+                        candidate_digest=record.candidate_digest,
+                        seed_policy=record.seed_policy,
+                    )
+                return self._uninstall_already_absent_result(request, record)
+            if record.state == "incomplete" and record.operation != "uninstall":
+                raise _AdmissionFailure(
+                    "resume-operation-mismatch",
+                    operation=record.operation,
+                    candidate_digest=record.candidate_digest,
+                    seed_policy=record.seed_policy,
+                )
             candidate_digest = record.candidate_digest
             seed_policy = record.seed_policy
             self._admit_existing_slots(root_fd, targets, candidate_digest)
@@ -1759,26 +1916,39 @@ class ProviderLifecycleEngine:
             actions=actions,
         )
 
-    def _uninstall_absent_result(
-        self,
-        request: LifecycleRequest,
-        candidate_digest: str,
-        targets: Sequence[_ObservedTarget],
-        container: _ObservedTarget,
-        _root_fd: int,
-    ) -> LifecycleResult:
-        if request.mode == "dry-run":
-            return self._uninstall_plan_result(request, candidate_digest, targets, container, None)
+    def _uninstall_not_installed_result(self, request: LifecycleRequest) -> LifecycleResult:
         return build_public_result(
             request,
-            status="completed",
+            status="blocked",
+            code="tooling-not-installed",
+            operation="uninstall",
+            candidate_digest=None,
+            seed_policy="preserve-only",
+            phase="preflight",
+            last_completed_phase="request-validation",
+        )
+
+    def _uninstall_already_absent_result(
+        self,
+        request: LifecycleRequest,
+        record: InstallationRecord,
+    ) -> LifecycleResult:
+        actions = (
+            _make_action("spec-dock", "container", "preserved", "shared-container-preserve"),
+            _make_action("spec-dock/spec-dock.version", "record", "preserved", "terminal-record-current"),
+            _make_action("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+            _make_action(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        )
+        return build_public_result(
+            request,
+            status="completed" if request.mode == "apply" else "planned",
             code="uninstall-already-absent",
             operation="uninstall",
-            candidate_digest=candidate_digest,
+            candidate_digest=record.candidate_digest,
             seed_policy="preserve-only",
             phase="complete",
             last_completed_phase="preflight",
-            actions=self._uninstall_actions(targets, container, None, planned=False, include_stage=False),
+            actions=actions,
         )
 
     def _install_actions(
@@ -1891,6 +2061,27 @@ class ProviderLifecycleEngine:
             result.append(_make_action("@provider-stage", "stage", "completed", "candidate-stage-cleanup"))
         return tuple(result)
 
+    @staticmethod
+    def _cleanup_completed_result(request: LifecycleRequest, active: ActiveState) -> LifecycleResult:
+        return build_public_result(
+            request,
+            status="completed",
+            code="terminal-cleanup-completed",
+            operation=active.operation,
+            candidate_digest=active.candidate_digest,
+            seed_policy=active.seed_policy,
+            mutation_started=True,
+            phase="complete",
+            last_completed_phase="cleanup-stage",
+            continuation=_completed_cleanup_continuation(active.deferred_invocation),
+            actions=(LifecycleAction("@provider-stage", "stage", "completed", "candidate-stage-cleanup"),),
+            guidance=(
+                CLEANUP_COMPLETED_DEFERRED_GUIDANCE
+                if active.deferred_invocation is not None
+                else CLEANUP_COMPLETED_GUIDANCE
+            ),
+        )
+
     def _run_active(
         self,
         request: LifecycleRequest,
@@ -1901,14 +2092,6 @@ class ProviderLifecycleEngine:
         stage_store: StageStore,
         root_fd: int,
     ) -> LifecycleResult:
-        if active.operation != _operation_from_request(request):
-            return self._blocked(
-                request,
-                "resume-operation-mismatch",
-                operation=active.operation,
-                candidate_digest=active.candidate_digest,
-                seed_policy=active.seed_policy,
-            )
         if candidate is not None and candidate.aggregate_digest != active.candidate_digest:
             return self._blocked(
                 request,
@@ -2326,33 +2509,37 @@ class ProviderLifecycleEngine:
         receipt_store: CompletionReceiptStore,
         stage_store: StageStore,
         root_fd: int,
+        *,
+        receipt: CompletionReceipt | None = None,
+        cleanup_only: bool = False,
     ) -> LifecycleResult:
         try:
             self._cleanup_stage(stage_store)
             self._check_fault("stage-parent-fsync")
-            receipt = CompletionReceipt(
-                1,
-                active.repository_key,
-                active.tuple_key,
-                active.operation_generation,
-                active.operation,
-                active.candidate_digest,
-                active.seed_policy,
-                active.result_family,
-                active.terminal_record_digest,
-                active.cleanup_token,
-                active.cleanup_retry_invocation,
-                active.deferred_invocation,
-            )
-            for point in (
-                "receipt-temp-open",
-                "receipt-temp-write",
-                "receipt-temp-fsync",
-                "receipt-temp-rename",
-                "receipt-parent-fsync",
-            ):
-                self._check_fault(point)
-            receipt_store.save(receipt)
+            if receipt is None:
+                receipt = CompletionReceipt(
+                    1,
+                    active.repository_key,
+                    active.tuple_key,
+                    active.operation_generation,
+                    active.operation,
+                    active.candidate_digest,
+                    active.seed_policy,
+                    active.result_family,
+                    active.terminal_record_digest,
+                    active.cleanup_token,
+                    active.cleanup_retry_invocation,
+                    active.deferred_invocation,
+                )
+                for point in (
+                    "receipt-temp-open",
+                    "receipt-temp-write",
+                    "receipt-temp-fsync",
+                    "receipt-temp-rename",
+                    "receipt-parent-fsync",
+                ):
+                    self._check_fault(point)
+                receipt_store.save(receipt)
             self._check_fault("active-expected-unlink")
             namespace_fd = active_store._open_namespace()
             try:
@@ -2376,8 +2563,16 @@ class ProviderLifecycleEngine:
         except _InjectedFailure:
             # The durable terminal state is already complete.  The seam models
             # a lost response without manufacturing a second mutation attempt.
-            return self._completed_result(request, active, root_fd)
-        return self._completed_result(request, active, root_fd)
+            return (
+                self._cleanup_completed_result(request, active)
+                if cleanup_only
+                else self._completed_result(request, active, root_fd)
+            )
+        return (
+            self._cleanup_completed_result(request, active)
+            if cleanup_only
+            else self._completed_result(request, active, root_fd)
+        )
 
     def _cleanup_stage(self, stage_store: StageStore) -> None:
         try:
@@ -2499,6 +2694,8 @@ class ProviderLifecycleEngine:
             return self._terminal_cleanup_failure(request, active, failure)
         point = getattr(failure, "point", "")
         phase = self._phase_for_fault(point, active.operation)
+        if active.state == "prepared" and phase == "cleanup-stage" and point.startswith("active-"):
+            phase = "publish-incomplete-record"
         if phase == "bootstrap-container":
             return self._preparation_failure(
                 request,
@@ -2510,6 +2707,9 @@ class ProviderLifecycleEngine:
                 last_completed_phase="bootstrap-container",
             )
         if active.state == "prepared" and phase in {"candidate-staging", "publish-incomplete-record"}:
+            mutation_started = phase == "publish-incomplete-record" and self._preparation_mutation_started(
+                active, root_fd
+            )
             return self._preparation_failure(
                 request,
                 active.operation,
@@ -2517,8 +2717,15 @@ class ProviderLifecycleEngine:
                 active.seed_policy,
                 failure,
                 phase=phase,
-                last_completed_phase="preflight" if phase == "candidate-staging" else "bootstrap-container",
-                mutation_started=phase == "publish-incomplete-record" and not point.startswith("record-temp-"),
+                last_completed_phase=(
+                    "preflight"
+                    if phase == "candidate-staging"
+                    else "candidate-staging"
+                    if active.original_record.get("kind") == "final"
+                    else "bootstrap-container"
+                ),
+                mutation_started=mutation_started,
+                actions=self._preparation_partial_actions(active, root_fd) if mutation_started else (),
             )
         if phase == "preflight":
             return self._blocked(request, "lifecycle-preparation-failed")
@@ -2644,12 +2851,44 @@ class ProviderLifecycleEngine:
         receipt_store: CompletionReceiptStore | None,
         stage_store: StageStore | None,
         root_fd: int,
+        *,
+        force: bool | None,
     ) -> LifecycleResult:
-        if active is not None and active.cleanup_token == token:
+        if active is not None:
+            if active.cleanup_token != token or not _cleanup_request_matches(
+                request,
+                force=force,
+                token=token,
+                expected=active.cleanup_retry_invocation,
+            ):
+                return self._blocked(request, "invalid-request")
             if active_store is None or receipt_store is None or stage_store is None:
                 return self._blocked(request, "lifecycle-preparation-failed")
-            return self._finish_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
+            return self._complete_pending_cleanup(
+                request,
+                active,
+                active_store,
+                receipt_store,
+                stage_store,
+                root_fd,
+                force=force,
+                receipt=receipt,
+                capture_desired=False,
+            )
         if receipt is not None and receipt.cleanup_token == token:
+            if not _cleanup_request_matches(
+                request,
+                force=force,
+                token=token,
+                expected=receipt.cleanup_retry_invocation,
+            ) or not self._terminal_record_matches(
+                root_fd,
+                operation=receipt.operation,
+                candidate_digest=receipt.candidate_digest,
+                seed_policy=receipt.seed_policy,
+                terminal_record_digest=receipt.terminal_record_digest,
+            ):
+                return self._blocked(request, "invalid-request")
             return build_public_result(
                 request,
                 status="completed",
@@ -2659,15 +2898,39 @@ class ProviderLifecycleEngine:
                 seed_policy=receipt.seed_policy,
                 phase="complete",
                 last_completed_phase="cleanup-stage",
-                actions=(LifecycleAction("@provider-stage", "stage", "completed", "candidate-stage-cleanup"),),
                 continuation=_completed_cleanup_continuation(receipt.deferred_invocation),
+                actions=(),
                 guidance=(
                     CLEANUP_COMPLETED_DEFERRED_GUIDANCE
                     if receipt.deferred_invocation is not None
                     else CLEANUP_COMPLETED_GUIDANCE
                 ),
             )
-        return self._blocked(request, "lifecycle-preparation-failed")
+        return self._blocked(request, "invalid-request")
+
+    def _terminal_record_matches(
+        self,
+        root_fd: int,
+        *,
+        operation: str,
+        candidate_digest: str,
+        seed_policy: str,
+        terminal_record_digest: str,
+    ) -> bool:
+        try:
+            raw, _witness, record, record_kind = self._observe_record("", root_fd)
+        except (FilesystemSafetyError, OSError, ValueError, WireValidationError):
+            return False
+        if raw is None or record is None or record_kind != "final":
+            return False
+        expected_state = "tooling-absent-preserved-data" if operation == "uninstall" else "ready"
+        return (
+            record.state == expected_state
+            and record.operation is None
+            and record.candidate_digest == candidate_digest
+            and record.seed_policy == seed_policy
+            and hashlib.sha256(raw).hexdigest() == terminal_record_digest
+        )
 
     def _complete_pending_cleanup(
         self,
@@ -2677,11 +2940,32 @@ class ProviderLifecycleEngine:
         receipt_store: CompletionReceiptStore | None,
         stage_store: StageStore | None,
         root_fd: int,
+        *,
+        force: bool | None = None,
+        receipt: CompletionReceipt | None = None,
+        capture_desired: bool = True,
     ) -> LifecycleResult:
         if active_store is None or receipt_store is None or stage_store is None:
             return self._blocked(request, "lifecycle-preparation-failed")
-        if active.state == "ready":
-            active = replace(active, state="terminal-cleanup")
+        if receipt is not None and not self._receipt_matches_active(receipt, active):
+            return self._blocked(request, "invalid-request")
+        if receipt is not None:
+            if active.deferred_invocation is not None and active.deferred_invocation != receipt.deferred_invocation:
+                return self._blocked(request, "invalid-request")
+            if active.deferred_invocation != receipt.deferred_invocation:
+                active = replace(active, deferred_invocation=receipt.deferred_invocation)
+                try:
+                    self._save_active(active_store, active)
+                except (
+                    AtomicRenameUnavailable,
+                    FilesystemSafetyError,
+                    PrivateStateError,
+                    OSError,
+                    _InjectedFailure,
+                ) as failure:
+                    return self._terminal_cleanup_failure(request, active, failure)
+        elif capture_desired and active.deferred_invocation is None:
+            active = replace(active, deferred_invocation=_desired_invocation(request, force=force))
             try:
                 self._save_active(active_store, active)
             except (
@@ -2692,7 +2976,80 @@ class ProviderLifecycleEngine:
                 _InjectedFailure,
             ) as failure:
                 return self._terminal_cleanup_failure(request, active, failure)
-        return self._finish_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
+
+        try:
+            if not self._terminal_record_matches(
+                root_fd,
+                operation=active.operation,
+                candidate_digest=active.candidate_digest,
+                seed_policy=active.seed_policy,
+                terminal_record_digest=active.terminal_record_digest,
+            ):
+                raw, _witness, record, record_kind = self._observe_record(request.target, root_fd)
+                expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+                if (
+                    raw != expected
+                    or record is None
+                    or record_kind != "final"
+                    or record.state != "incomplete"
+                    or record.operation != active.operation
+                    or record.candidate_digest != active.candidate_digest
+                    or record.seed_policy != active.seed_policy
+                ):
+                    return self._blocked(request, "installation-record-state-inconsistent")
+                self._write_public_record(request, active, self._terminal_record_bytes(active), active_store, root_fd)
+                active = active_store.load() or active
+                if not self._terminal_record_matches(
+                    root_fd,
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    terminal_record_digest=active.terminal_record_digest,
+                ):
+                    return self._blocked(request, "installation-record-state-inconsistent")
+            if receipt is not None and not self._terminal_record_matches(
+                root_fd,
+                operation=receipt.operation,
+                candidate_digest=receipt.candidate_digest,
+                seed_policy=receipt.seed_policy,
+                terminal_record_digest=receipt.terminal_record_digest,
+            ):
+                return self._blocked(request, "invalid-request")
+            if active.state == "ready":
+                active = replace(active, state="terminal-cleanup")
+                self._save_active(active_store, active)
+        except (
+            AtomicRenameUnavailable,
+            FilesystemSafetyError,
+            PrivateStateError,
+            OSError,
+            _InjectedFailure,
+        ) as failure:
+            return self._terminal_cleanup_failure(request, active, failure)
+        return self._finish_cleanup(
+            request,
+            active,
+            active_store,
+            receipt_store,
+            stage_store,
+            root_fd,
+            receipt=receipt,
+            cleanup_only=True,
+        )
+
+    @staticmethod
+    def _receipt_matches_active(receipt: CompletionReceipt, active: ActiveState) -> bool:
+        return (
+            receipt.repository_key == active.repository_key
+            and receipt.tuple_key == active.tuple_key
+            and receipt.operation_generation == active.operation_generation
+            and receipt.operation == active.operation
+            and receipt.candidate_digest == active.candidate_digest
+            and receipt.seed_policy == active.seed_policy
+            and receipt.result_family == active.result_family
+            and receipt.terminal_record_digest == active.terminal_record_digest
+            and receipt.cleanup_token == active.cleanup_token
+        )
 
     def _resume_or_block(
         self,
@@ -2708,8 +3065,7 @@ class ProviderLifecycleEngine:
         *,
         force: bool | None,
     ) -> LifecycleResult:
-        del force
-        if active.operation != operation:
+        if not self._request_admits_active(operation, seed_policy, active, force=force):
             return self._blocked(
                 request,
                 "resume-operation-mismatch",
@@ -2717,6 +3073,36 @@ class ProviderLifecycleEngine:
                 candidate_digest=active.candidate_digest,
                 seed_policy=active.seed_policy,
             )
+        if request.mode == "dry-run":
+            if active.operation != "uninstall":
+                return self._blocked(
+                    request,
+                    "resume-operation-mismatch",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                )
+            targets = self._observe_domains(root_fd)
+            container = self._observe_container(root_fd)
+            raw_record, _record_witness, record, record_kind = self._observe_record(request.target, root_fd)
+            expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+            if raw_record is not None and (
+                raw_record != expected
+                or record is None
+                or record_kind != "final"
+                or record.state != "incomplete"
+                or record.operation != "uninstall"
+                or record.candidate_digest != active.candidate_digest
+                or record.seed_policy != "preserve-only"
+            ):
+                return self._blocked(
+                    request,
+                    "installation-record-state-inconsistent",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                )
+            return self._uninstall_plan_result(request, active.candidate_digest, targets, container, record)
         if candidate is not None and candidate.aggregate_digest != active.candidate_digest:
             return self._blocked(
                 request,
@@ -2726,14 +3112,6 @@ class ProviderLifecycleEngine:
                 seed_policy=active.seed_policy,
                 phase="candidate-staging",
                 last_completed_phase="preflight",
-            )
-        if seed_policy != active.seed_policy and operation != "uninstall":
-            return self._blocked(
-                request,
-                "resume-seed-policy-mismatch",
-                operation=operation,
-                candidate_digest=active.candidate_digest,
-                seed_policy=active.seed_policy,
             )
         if active_store is None or receipt_store is None or stage_store is None:
             return self._blocked(request, "lifecycle-preparation-failed")
@@ -2748,3 +3126,33 @@ class ProviderLifecycleEngine:
         ) as failure:
             return self._partial_failure_result(request, active, failure, root_fd)
         return self._run_active(request, active, candidate, active_store, receipt_store, stage_store, root_fd)
+
+    @staticmethod
+    def _request_admits_active(
+        operation: str,
+        seed_policy: str,
+        active: ActiveState,
+        *,
+        force: bool | None,
+    ) -> bool:
+        """Classify a retry against the durable operation tuple, not raw flags alone."""
+
+        if active.operation == operation:
+            return seed_policy == active.seed_policy or (
+                active.result_family == "install" and active.seed_policy == "preserve-only" and operation == "install"
+            )
+        if (
+            active.result_family == "install"
+            and active.operation == "install"
+            and active.seed_policy == "preserve-only"
+        ):
+            return operation == "update" and seed_policy == "preserve-only"
+        if active.result_family == "legacy-migration" and active.operation == "install":
+            return (operation == "update" and seed_policy == "preserve-only") or (
+                operation == "install" and seed_policy == "create-if-absent" and force is True
+            )
+        if active.result_family == "update" and active.operation == "update":
+            return (operation == "update" and seed_policy == "preserve-only") or (
+                operation == "install" and seed_policy == "create-if-absent" and force is True
+            )
+        return False

@@ -376,9 +376,15 @@ def _validate_record_mapping(value: Mapping[str, object]) -> InstallationRecord:
             _fail("skill slot version must be 0.2.4")
         assert slot_version is not None
         normalized_slots[slot] = slot_version
-    if state == "incomplete" and operation is None:
-        _fail("incomplete installation record requires operation")
-    if state != "incomplete" and operation is not None:
+    if state == "incomplete":
+        if operation is None:
+            _fail("incomplete installation record requires operation")
+        if operation in ("update", "uninstall") and seed_policy != "preserve-only":
+            _fail("incomplete update or uninstall record requires preserve-only seed_policy")
+    elif state == "tooling-absent-preserved-data":
+        if operation is not None or seed_policy != "preserve-only":
+            _fail("tooling-absent-preserved-data record requires null operation and preserve-only seed_policy")
+    elif operation is not None:
         _fail("terminal installation record requires null operation")
     return InstallationRecord(
         1,
@@ -663,6 +669,380 @@ def _continuation_matches(value: Mapping[str, str | None], profile: str, retry_c
     return False
 
 
+_LIFECYCLE_ACTION_PATHS = (
+    "spec-dock",
+    "spec-dock/spec-dock.version",
+    "spec-dock/docs",
+    "spec-dock/templates",
+    "spec-dock/system",
+    "spec-dock/scripts",
+    ".agents/skills/spec-dock",
+    ".agents/skills/spec-dock-grill-with-docs",
+    "spec-dock/.gitignore",
+    ".github/workflows/ci.yml",
+    "@provider-stage",
+)
+_UNINSTALL_TARGET_PATHS = _LIFECYCLE_ACTION_PATHS[2:8]
+_UNINSTALL_SEED_PATHS = _LIFECYCLE_ACTION_PATHS[8:10]
+_INSTALL_TARGET_CATEGORIES = ("root", "root", "root", "root", "slot", "slot")
+
+
+def _action(
+    path: str,
+    category: str,
+    status: str,
+    reason: str,
+) -> dict[str, str]:
+    return {"path": path, "category": category, "status": status, "reason": reason}
+
+
+def _action_profile_matches(
+    actions: Sequence[Mapping[str, str]],
+    profile: str,
+    *,
+    operation: str | None,
+    seed_policy: str | None,
+    phase: str,
+) -> bool:
+    """Validate the finite action profile named by a generated Wire row."""
+
+    if profile == "empty":
+        return not actions
+    if profile == "terminal cleanup completed action set":
+        return list(actions) == [_action("@provider-stage", "stage", "completed", "candidate-stage-cleanup")]
+    if profile == "terminal cleanup retry-failed action set":
+        return list(actions) == [_action("@provider-stage", "stage", "failed", "candidate-stage-cleanup")]
+    if profile == "bootstrap cleanup-failed action set":
+        return list(actions) == [_action("spec-dock", "container", "failed", "fresh-container-create")]
+    if profile == "AP-PREP-PARTIAL":
+        if operation not in {"install", "update", "uninstall"} or not 11 <= len(actions) <= 13:
+            return False
+        if [item["path"] for item in actions[:2]] != list(_LIFECYCLE_ACTION_PATHS[:2]):
+            return False
+        if operation == "uninstall":
+            if actions[0] != _action("spec-dock", "container", "preserved", "shared-container-preserve"):
+                return False
+        elif actions[0] not in (
+            _action("spec-dock", "container", "preserved", "shared-container-preserve"),
+            _action("spec-dock", "container", "completed", "fresh-container-create"),
+        ):
+            return False
+        if actions[1] != _action("spec-dock/spec-dock.version", "record", "failed", "incomplete-record-publish"):
+            return False
+        if operation == "uninstall":
+            for action, path, category in zip(
+                actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+            ):
+                if action not in (
+                    _action(path, category, "pending", f"owned-{category}-remove"),
+                    _action(path, category, "preserved", f"owned-{category}-absent"),
+                ):
+                    return False
+        else:
+            for action, path, category in zip(
+                actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+            ):
+                if action not in (
+                    _action(path, category, "pending", f"candidate-{category}-create"),
+                    _action(path, category, "pending", f"candidate-{category}-replace"),
+                ):
+                    return False
+        position = 8
+        if seed_policy == "preserve-only":
+            for path in _UNINSTALL_SEED_PATHS:
+                if actions[position] != _action(path, "seed", "preserved", "preserve-only-seed"):
+                    return False
+                position += 1
+        elif operation == "install" and seed_policy == "create-if-absent":
+            if actions[position]["path"] != "spec-dock/.gitignore":
+                return False
+            if actions[position] not in (
+                _action("spec-dock/.gitignore", "seed", "pending", "fresh-seed-create"),
+                _action("spec-dock/.gitignore", "seed", "preserved", "consumer-seed-present"),
+            ):
+                return False
+            position += 1
+            parent_paths = []
+            while position < len(actions) and actions[position]["path"] in {".github", ".github/workflows"}:
+                parent_paths.append(actions[position]["path"])
+                if actions[position] != _action(
+                    actions[position]["path"], "container", "pending", "fresh-container-create"
+                ):
+                    return False
+                position += 1
+            if parent_paths == [".github"]:
+                return False
+            if position >= len(actions) or actions[position]["path"] != ".github/workflows/ci.yml":
+                return False
+            if actions[position] not in (
+                _action(".github/workflows/ci.yml", "seed", "pending", "fresh-seed-create"),
+                _action(".github/workflows/ci.yml", "seed", "preserved", "consumer-seed-present"),
+            ):
+                return False
+            position += 1
+        else:
+            return False
+        return position + 1 == len(actions) and actions[position] == _action(
+            "@provider-stage", "stage", "pending", "candidate-stage-cleanup"
+        )
+    if profile == "AP-U-ABSENT":
+        return list(actions) == [
+            _action("spec-dock", "container", "preserved", "shared-container-preserve"),
+            _action("spec-dock/spec-dock.version", "record", "preserved", "terminal-record-current"),
+            _action("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+            _action(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        ]
+    if profile.startswith("AP-U-"):
+        if operation != "uninstall" or seed_policy != "preserve-only":
+            return False
+        if profile.endswith("-PLAN"):
+            expected = [_action("spec-dock", "container", "preserved", "shared-container-preserve")]
+            expected.append(_action("spec-dock/spec-dock.version", "record", "planned", "terminal-record-publish"))
+            expected.extend(
+                _action(path, category, "planned", f"owned-{category}-remove")
+                for path, category in zip(_UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True)
+            )
+            expected.extend(_action(path, "seed", "preserved", "preserve-only-seed") for path in _UNINSTALL_SEED_PATHS)
+            if len(actions) != len(expected):
+                return False
+            if actions[:2] != expected[:2] or actions[8:] != expected[8:]:
+                return False
+            return all(
+                action
+                in (
+                    _action(path, category, "planned", f"owned-{category}-remove"),
+                    _action(path, category, "preserved", f"owned-{category}-absent"),
+                )
+                for action, path, category in zip(
+                    actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+                )
+            )
+        if profile.endswith("-TERM") or profile.endswith("-WARN"):
+            stage_status = "warning" if profile.endswith("-WARN") else "completed"
+            expected = [_action("spec-dock", "container", "preserved", "shared-container-preserve")]
+            expected.append(_action("spec-dock/spec-dock.version", "record", "completed", "terminal-record-publish"))
+            expected_targets = tuple(zip(_UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True))
+            expected.extend(
+                _action(path, category, "completed", f"owned-{category}-remove") for path, category in expected_targets
+            )
+            expected.extend(_action(path, "seed", "preserved", "preserve-only-seed") for path in _UNINSTALL_SEED_PATHS)
+            expected.append(
+                _action(
+                    "@provider-stage",
+                    "stage",
+                    stage_status,
+                    "candidate-stage-cleanup" if stage_status == "completed" else "candidate-stage-cleanup-warning",
+                )
+            )
+            if (
+                len(actions) != len(expected)
+                or actions[:2] != expected[:2]
+                or actions[8:10] != expected[8:10]
+                or actions[10] != expected[10]
+            ):
+                return False
+            return all(
+                action
+                in (
+                    _action(path, category, "completed", f"owned-{category}-remove"),
+                    _action(path, category, "preserved", f"owned-{category}-absent"),
+                )
+                for action, path, category in zip(
+                    actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+                )
+            )
+        return False
+    if profile.startswith("exact ") and " partial action set at " in profile:
+        prefix, expected_phase = profile.split(" at ", 1)
+        if phase != expected_phase or operation not in {"install", "update", "uninstall"}:
+            return False
+        if len(actions) != len(_LIFECYCLE_ACTION_PATHS) or [item["path"] for item in actions] != list(
+            _LIFECYCLE_ACTION_PATHS
+        ):
+            return False
+        if actions[0] != _action("spec-dock", "container", "preserved", "shared-container-preserve"):
+            return False
+        if actions[-1] != _action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"):
+            return False
+        if prefix.startswith("exact uninstall"):
+            if seed_policy != "preserve-only":
+                return False
+            if actions[1]["category"] != "record" or actions[1]["reason"] != "incomplete-record-publish":
+                return False
+            for action, path, category in zip(
+                actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+            ):
+                if action["path"] != path or action["category"] != category:
+                    return False
+                if action["reason"] not in {f"owned-{category}-remove", f"owned-{category}-absent"}:
+                    return False
+                if action["status"] not in {"preserved", "completed", "failed", "pending"}:
+                    return False
+            return all(
+                action == _action(path, "seed", "preserved", "preserve-only-seed")
+                for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
+            )
+        if not prefix.startswith(("exact install", "exact update")):
+            return False
+        if prefix.startswith("exact install") and seed_policy not in {"create-if-absent", "preserve-only"}:
+            return False
+        if prefix.startswith("exact update") and seed_policy != "preserve-only":
+            return False
+        if actions[1]["category"] != "record" or actions[1]["status"] != "completed":
+            return False
+        if actions[1]["reason"] not in {"terminal-record-publish", "incomplete-record-publish"}:
+            return False
+        for action, path, category in zip(
+            actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+        ):
+            if action["path"] != path or action["category"] != category:
+                return False
+            if action["reason"] not in {
+                f"candidate-{category}-create",
+                f"candidate-{category}-replace",
+                f"candidate-{category}-current",
+            }:
+                return False
+            if action["status"] not in {"preserved", "completed", "failed", "pending"}:
+                return False
+        if prefix.startswith("exact update") or seed_policy == "preserve-only":
+            return all(
+                action == _action(path, "seed", "preserved", "preserve-only-seed")
+                for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
+            )
+        return all(
+            action["path"] == path
+            and action["category"] == "seed"
+            and action["reason"] in {"fresh-seed-create", "consumer-seed-present"}
+            and action["status"] in {"completed", "preserved", "failed", "pending"}
+            for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
+        )
+    if profile in {
+        "install-create terminal action set",
+        "install-preserve terminal action set",
+        "update terminal action set",
+    }:
+        if operation not in {"install", "update"} or seed_policy not in {"create-if-absent", "preserve-only"}:
+            return False
+        if len(actions) != len(_LIFECYCLE_ACTION_PATHS) or [item["path"] for item in actions] != list(
+            _LIFECYCLE_ACTION_PATHS
+        ):
+            return False
+        if (
+            actions[0]["category"] != "container"
+            or actions[0]["reason"]
+            not in {
+                "shared-container-preserve",
+                "fresh-container-create",
+            }
+            or actions[0]["status"] not in {"preserved", "completed"}
+        ):
+            return False
+        if actions[1] != _action("spec-dock/spec-dock.version", "record", "completed", "terminal-record-publish"):
+            return False
+        for action, path, category in zip(
+            actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+        ):
+            if action["path"] != path or action["category"] != category:
+                return False
+            if action["reason"] == f"candidate-{category}-current":
+                if action["status"] != "preserved":
+                    return False
+            elif action["reason"] in {f"candidate-{category}-create", f"candidate-{category}-replace"}:
+                if action["status"] != "completed":
+                    return False
+            else:
+                return False
+        for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True):
+            if action["path"] != path or action["category"] != "seed":
+                return False
+            if seed_policy == "preserve-only":
+                if action != _action(path, "seed", "preserved", "preserve-only-seed"):
+                    return False
+            elif action["reason"] == "fresh-seed-create":
+                if action["status"] != "completed":
+                    return False
+            elif action != _action(path, "seed", "preserved", "consumer-seed-present"):
+                return False
+        return actions[-1] == _action("@provider-stage", "stage", "completed", "candidate-stage-cleanup")
+    if profile in {
+        "install-create terminal + one stage warning",
+        "install-preserve terminal + one stage warning",
+        "update terminal + one stage warning",
+    }:
+        if not _action_profile_matches(
+            actions[:-1],
+            profile.removesuffix(" + one stage warning") + " action set",
+            operation=operation,
+            seed_policy=seed_policy,
+            phase=phase,
+        ):
+            return False
+        return actions[-1] == _action("@provider-stage", "stage", "warning", "candidate-stage-cleanup-warning")
+    return False
+
+
+def _variant_matches(
+    variant: str,
+    *,
+    operation: str | None,
+    specs_mode: str | None,
+    retry_command: str | None,
+    continuation: Mapping[str, str | None],
+) -> bool:
+    """Use public command echoes to narrow rows where the closed result permits it."""
+
+    if not variant.startswith("desired "):
+        if "specs_mode=keep" in variant and specs_mode != "keep":
+            return False
+        if "specs_mode=null" in variant and specs_mode is not None:
+            return False
+    if variant.startswith("cleanup-retry "):
+        base = variant.removeprefix("cleanup-retry ").split(" token", 1)[0]
+        expected_operation = {"init-force": "install", "update": "update", "uninstall-apply-keep": "uninstall"}.get(
+            base
+        )
+        if expected_operation != operation:
+            return False
+        if retry_command is None:
+            return continuation["next_action"] == "none"
+        if base == "init-force" and not retry_command.startswith("spec-dock init --force --provider-cleanup-token "):
+            return False
+        if base == "update" and not retry_command.startswith("spec-dock update --provider-cleanup-token "):
+            return False
+        if base == "uninstall-apply-keep" and not retry_command.startswith(
+            "spec-dock uninstall --apply --keep-specs --provider-cleanup-token "
+        ):
+            return False
+    if variant.startswith("receipt-only token replay "):
+        base = variant.removeprefix("receipt-only token replay ").split(";", 1)[0].strip("`")
+        if base == "uninstall-apply-keep" and specs_mode != "keep":
+            return False
+        if base in {"init-force", "update"} and specs_mode is not None:
+            return False
+    if variant.startswith("desired `"):
+        command_label = variant.removeprefix("desired `").split(";", 1)[0]
+        command_prefix = {
+            "init": "spec-dock init -- ",
+            "init --force": "spec-dock init --force -- ",
+            "update": "spec-dock update -- ",
+            "uninstall dry-run default": "spec-dock uninstall -- ",
+            "uninstall dry-run keep": "spec-dock uninstall --keep-specs -- ",
+            "uninstall apply default": "spec-dock uninstall --apply -- ",
+            "uninstall apply keep": "spec-dock uninstall --apply --keep-specs -- ",
+        }.get(command_label)
+        if command_prefix is None:
+            return False
+        command_echo = (
+            continuation["after_cleanup_command"]
+            if continuation["next_action"] == "retry-cleanup"
+            else continuation["next_command"]
+        )
+        if command_echo is not None and not command_echo.startswith(command_prefix):
+            return False
+    return True
+
+
 def _expected_guidance(code: str, continuation: Mapping[str, str | None]) -> tuple[str, ...]:
     if code == "active-legacy-recovery":
         return _ACTIVE_LEGACY_GUIDANCE
@@ -705,6 +1085,8 @@ def _validate_relation(
     retry_command: str | None,
     continuation: Mapping[str, str | None],
     target: str,
+    specs_mode: str | None,
+    actions: Sequence[Mapping[str, str]],
 ) -> None:
     matches = []
     for row in wire.RELATION_ROWS:
@@ -717,6 +1099,7 @@ def _validate_relation(
         row_seed = cast("str", row["seed_policy"])
         row_retry = cast("str | None", row["retry"])
         row_continuation = cast("str", row["continuation"])
+        row_actions = cast("str", row["actions"])
         if not _relation_accepts(operation, row_operation):
             continue
         if not _relation_accepts(candidate_digest, row_candidate):
@@ -730,6 +1113,22 @@ def _validate_relation(
         if not _retry_matches(retry_command, row_retry, target, operation, seed_policy):
             continue
         if not _continuation_matches(continuation, row_continuation, retry_command):
+            continue
+        if not _action_profile_matches(
+            actions,
+            row_actions,
+            operation=operation,
+            seed_policy=seed_policy,
+            phase=phase,
+        ):
+            continue
+        if not _variant_matches(
+            cast("str", row["variant"]),
+            operation=operation,
+            specs_mode=specs_mode,
+            retry_command=retry_command,
+            continuation=continuation,
+        ):
             continue
         matches.append(row)
     if not matches:
@@ -819,14 +1218,6 @@ def _validate_result_mapping(value: Mapping[str, object]) -> dict[str, object]:
         _fail("warning text does not match the closed diagnostic profile")
     if tuple(guidance) != _expected_guidance(code, continuation):
         _fail("guidance does not match the closed diagnostic profile")
-    if code == "terminal-cleanup-completed" and actions != [
-        {"path": "@provider-stage", "category": "stage", "status": "completed", "reason": "candidate-stage-cleanup"}
-    ]:
-        _fail("terminal-cleanup-completed must expose the cleanup action")
-    if code == "terminal-cleanup-failed" and actions != [
-        {"path": "@provider-stage", "category": "stage", "status": "failed", "reason": "candidate-stage-cleanup"}
-    ]:
-        _fail("terminal-cleanup-failed must expose the cleanup action")
     _validate_relation(
         mode=mode,
         apply=apply,
@@ -842,6 +1233,8 @@ def _validate_result_mapping(value: Mapping[str, object]) -> dict[str, object]:
         retry_command=retry_command,
         continuation=continuation,
         target=target,
+        specs_mode=specs_mode,
+        actions=actions,
     )
     return {
         "schema_version": 1,

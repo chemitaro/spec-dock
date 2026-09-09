@@ -74,7 +74,23 @@ class TestUninstallCommand(CliRuntimeHarness):
         assert text_result.returncode == 2
         assert text_result.stderr == ""
         assert text_result.stdout == (
-            f"spec-dock: error (spec-history-purge-removed) -> {missing_target}\n"
+            f"spec-dock uninstall dry-run for {missing_target}\n"
+            "status: error\n"
+            "code: spec-history-purge-removed\n"
+            "phase: request-validation\n"
+            "last-completed-phase: not-started\n"
+            "operation: none\n"
+            "candidate-digest: none\n"
+            "seed-policy: none\n"
+            "mutation-started: false\n"
+            "bootstrap-rolled-back: false\n"
+            "next-action: none\n"
+            "next-command: none\n"
+            "after-cleanup-action: none\n"
+            "after-cleanup-command: none\n"
+            "summary: planned=0 completed=0 preserved=0 pending=0 failed=0 warnings=0\n"
+            "guidance: Use tooling-only uninstall without --remove-specs.\n"
+            "guidance: Spec history and Workbench data remain consumer-owned.\n"
             "error: Spec history purge has been removed; uninstall is tooling-only.\n"
         )
         assert not missing_target.exists()
