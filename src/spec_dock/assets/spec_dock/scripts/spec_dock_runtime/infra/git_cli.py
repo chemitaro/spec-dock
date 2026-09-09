@@ -607,7 +607,8 @@ def assess_capabilities(
     fsmonitor = _config(repo_root, "core.fsmonitor")
     if fsmonitor is not None and fsmonitor.lower() not in {"false", "0", "off", "no", "none"}:
         reasons.append("fsmonitor-enabled")
-    if _config(repo_root, "core.sparseCheckout") in {"true", "1", "yes", "on"}:
+    sparse_checkout = _config(repo_root, "core.sparseCheckout")
+    if sparse_checkout is not None and sparse_checkout.lower() in {"true", "1", "yes", "on"}:
         reasons.append("sparse-checkout-enabled")
     sparse_bits = subprocess.run(
         ["git", "ls-files", "-v"],
@@ -616,7 +617,7 @@ def assess_capabilities(
         text=True,
         check=False,
     )
-    if any(line.startswith("s ") for line in (sparse_bits.stdout or "").splitlines()):
+    if any(line.startswith("S ") for line in (sparse_bits.stdout or "").splitlines()):
         reasons.append("skip-worktree-bit-set")
 
     if (_config(repo_root, "core.autocrlf") or "false").lower() not in {"false", "0", "off"}:
@@ -631,7 +632,7 @@ def assess_capabilities(
         reasons.append("provider-closure-unprovable")
 
     try:
-        target_entries = _tree_entries(_ls_tree(repo_root, pinned_commit, closure_paths))
+        target_entries = _tree_entries(_ls_tree_all(repo_root, pinned_commit))
     except RuntimeError:
         target_entries = []
         reasons.append("target-tree-unprovable")

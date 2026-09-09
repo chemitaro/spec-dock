@@ -126,3 +126,78 @@ class TestGenerationCheckout(CliRuntimeHarness):
         assert f"attribute-enabled:{attribute.split('=', 1)[0]}=custom" in assessment.reasons
         assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == before_branch
         assert self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip() == before_head
+
+    def test_t10_capability_guard_covers_materialized_tree_outside_provider_closure(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+        self._init_origin_repo(target)
+        self._run_git(target, ["add", "-A"])
+        self._run_git(target, ["commit", "-m", "baseline"])
+        pinned_commit = self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip()
+        self._run_git(
+            target,
+            ["update-index", "--add", "--cacheinfo", f"160000,{pinned_commit},external/submodule"],
+        )
+        self._run_git(target, ["commit", "-m", "record external submodule"])
+        before_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
+        before_head = self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip()
+
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import git_cli
+
+            assessment = git_cli.assess_capabilities(
+                target,
+                pinned_commit=before_head,
+                closure_paths=git_cli._PROVIDER_CLOSURE_PATHS,
+                branch=before_branch,
+                check_other_worktree=False,
+            )
+        finally:
+            sys.path.pop(0)
+
+        assert not assessment.allowed
+        assert "submodule:external/submodule" in assessment.reasons
+        assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == before_branch
+        assert self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip() == before_head
+
+    def test_t10_sparse_checkout_effective_values_and_skip_worktree_are_rejected(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+        self._init_origin_repo(target)
+        (target / "README.md").write_text("baseline\n", encoding="utf-8")
+        self._run_git(target, ["add", "-A"])
+        self._run_git(target, ["commit", "-m", "baseline"])
+        self._run_git(target, ["sparse-checkout", "init", "--no-cone"])
+        self._run_git(target, ["sparse-checkout", "set", "README.md"])
+        self._run_git(target, ["config", "core.sparseCheckout", "TRUE"])
+        before_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
+        before_head = self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip()
+
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import git_cli
+
+            assessment = git_cli.assess_capabilities(
+                target,
+                pinned_commit=before_head,
+                closure_paths=git_cli._PROVIDER_CLOSURE_PATHS,
+                branch=before_branch,
+                check_other_worktree=False,
+            )
+        finally:
+            sys.path.pop(0)
+
+        assert not assessment.allowed
+        assert "sparse-checkout-enabled" in assessment.reasons
+        assert "skip-worktree-bit-set" in assessment.reasons
+        assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == before_branch
+        assert self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip() == before_head
