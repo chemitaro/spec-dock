@@ -21,8 +21,8 @@ repository_evidence:
   sha: "dc638e936e763cc7a6087f258201ed9ed654e7fb"
   tree: "17ce38234033393c385c4b17e40c0ccdc78bfc19"
 implementation_evidence:
-  candidate_sha: "fbbce60d7c9fb00221e1c8dfeebe45ff0178a4c7"
-  candidate_tree: "a8df40a05d2710cb3a46b7c178abcba14346650b"
+  candidate_sha: "d94b218a1344fbba65239a13dfaae4f19bb5d579"
+  candidate_tree: "e5f3636e064605f3566b07420ea3a1d9da71dfac"
 ---
 
 # #392 仕様・実装レポート
@@ -106,8 +106,8 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 `実装開始許可=true`です。CP1–CP4の実装candidateを固定し、次の最終ゲートが残っています。
 
-1. 修正後candidateのclean pushとupstream SHA一致（`fbbce60d7c9fb00221e1c8dfeebe45ff0178a4c7`で成立。次のReport更新commit後に再確認）。
-2. 修正後candidateに対する独立Code Review StrictのP0/P1ゼロ・pass。直近レビューはexact SHA検証後にevidence-limited failとなったため、Reportを含む完全な証拠でfresh reviewを再実施する。
+1. 実装candidate `d94b218a1344fbba65239a13dfaae4f19bb5d579`のclean pushとupstream SHA一致（成立）。
+2. このcandidateと更新後Reportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
 3. 最終Quality Gate Strictの実施条件成立。
 4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
 
@@ -117,21 +117,19 @@ CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provid
 
 親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証は完了していますが、Report更新後のclean pushed Strict review、Final Quality Gate Strict、current full verifierの#395 baseline解消、人間PR merge、merged-tip B1は未完了です。
 
-残るblockerは、Report更新後のclean pushed Strict review、Final Quality Gate Strict、#395が所有する10件のactive baseline mismatch、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssue実装完了、Product GREEN、merge完了を主張しません。
+current full verifierの`ledger-mismatch` 10件は#395が所有するactive baselineのsignature/coverage mismatchであり、#392の責務へ取り込まず、skip/xfailやledger変更で隠していません。残るgateはReport更新後のclean pushed Strict review、Final Quality Gate Strict、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssueの最終certification、Product GREEN、merge完了を主張しません。
 
 ## 9. Implementation verification update
 
-2026-09-09時点の実装candidate `fbbce60d7c9fb00221e1c8dfeebe45ff0178a4c7`（tree
-`a8df40a05d2710cb3a46b7c178abcba14346650b`）に対して、次の証拠を採取しました。
+2026-09-09時点の実装candidate `d94b218a1344fbba65239a13dfaae4f19bb5d579`（tree
+`e5f3636e064605f3566b07420ea3a1d9da71dfac`）に対して、次の証拠を採取しました。
 
-- Strict reviewで検出されたworktree後処理のP1に対し、Git helper後に元のworktree inodeが残った場合のpathname `rmdir`を削除し、`post_remove_cleanup_failed`として元inodeも異なるinodeのCも保持するfail-closed処理へ修正しました。provider runtimeとdogfood runtimeを同期し、元ディレクトリを削除して成功扱いするobsolete assertionを、安全境界を検証するテストへ置換しました。
-- Code Review Strictの直近実行はcandidate `615fa4ec83511abc194a040707e0ea1de048592c`に対して、GitHub repository/branch/exact SHAの検証には成功しましたが、必要なimplementation・test・dogfood parity・report証拠を`review-method.md`に従ってすべて再確認できなかったため、具体的なfindingなしのevidence-limited `review_status=fail`でした。P0/P1は主張されていません。レビュー本文JSONは保持し、添付パスは受け入れていません。
-- Classification registryは`unclassified=0`、`overlap=0`、`prematurely_retired=0`。
-- Worktree/atomic focused suiteは`44 passed`、distribution・dogfood・Issue #392 acceptance・candidate・lifecycle coordination focused suiteは`69 passed`、`make lint`はruff check/formatとmypyを含めてpass。
-- Current candidate digestは`1c32e8ca673d44d54756a4f178e6b5ba51af485ae20bdb14057ed1a2102bc6c6`で、両slot markerとdogfood `spec-dock.version`を同期しました。
-- Required-fastはexact fourで`4 passed`、default fastはclean candidate `fbbce60d7c9fb00221e1c8dfeebe45ff0178a4c7`で`878 passed, 830 skipped`でした。
-- Ledgerはtotal15/active14/resolved1、timingは243 entriesのまま。#392はbaseline rowのnodeid、signature、lifecycleを変更していません。
-- `tests/unit/infra/test_managed_distribution.py`は未収集で、T12のproduction old writer/manifest reference scanもpassしました。全successor primaryはcollectionへ存在し、上記focused runでpassしています。
-- clean candidate `fbbce60d7c9fb00221e1c8dfeebe45ff0178a4c7`でcurrent full verifierは`1708 tests collected`、status=`ledger-mismatch`、violation=`10`でした。10件は#395所有のactive baseline（runtime import 8、runtime shell 1、workbench 1）だけで、今回のIssue由来のunexpected failure/error/skip/xfail追加はありません。実際のshard failureにも#392の新規nodeはなく、#392はledgerを変更していません。
+- Blue-teamのChatGPT UseをGPT-5.6 Sol／Extra High／fresh browser sessionで再試行しました。レートリミットをbundle縮小で回避せず、前回と同じ11ファイルの完全bundleを投入し、Issue仕様3ファイル、provider runtime 4ファイル、lifecycle test 3ファイルを対象に、Code Review StrictのP1を分析しました。結論は「Aのsource lease継承」と「B EX後のrecord再検証」の2件とも有効なmerge-blocking P1で、#395の責務外というものでした。
+- Aの修正として`source_fd`をPorts→bootstrap→Git CLI→managed helperへ伝播し、`read-tree`子プロセスがsource Aとtarget Bのleaseを保持するようにしました。`worktree_create`はmaterialize・verification完了後の`finally`までsource fdを保持し、成功・例外の両経路で閉じます。Bの修正として、exclusive open後にinventory／record／blocker／containment／path bindingを再取得・再検証し、recordの消失・別パス・same-pathのinode交換時はGit removeを呼ばずfail closedにしました。
+- provider runtimeとchecked-in dogfood runtimeを同期し、candidate digest `92f3d5716338bd458c5cb0840a5c3672ce5c6d5343179d628cf8a1c613ea7144`、二つのslot marker、dogfood `spec-dock.version`を一致させました。`seed_policy=create-if-absent`の既存fixture semanticsは保持しています。
+- 追加した回帰は、直接infraでsource leaseをhelperへ渡すこと、record再検証後の別パス拒否、same-path異inode拒否、親SIGKILL中のread-tree子プロセスによるA/B lease保持です。Worktree／lifecycle focused suiteは`46 passed`、CP4のdistribution・dogfood・Issue #392 acceptance全件は`82 passed`でした。obsolete behaviorのassertionは残していません。
+- `make lint`はruff check、ruff format、mypyすべてpass、`uv build`もpassしました。default fastは`878 passed, 834 skipped`です。
+- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`1712 tests collected`、status=`ledger-mismatch`でした。ledgerはtotal15／active14／resolved1、timing 243 entriesを維持し、evaluationのviolationは10件（runtime import 8、runtime shell 1、workbench 1）で、いずれも#395 active baselineです。#392の新規node failure、ledger／timing／required-fastの変更はありません。
+- 直前の独立Code Review Strictは、exact SHA `9f8a1e14a92d90c7e4a65b9e58be1cac61c2668b`でP1×2を検出しました。上記修正はその指摘に対応したものであり、Report更新後の最終SHAについてfresh Code Review Strictを未実施です。Final Quality Gate Strict、#395のbaseline修正、PR merge後B1も未完了です。
 
-上記により、#392の実装candidateと旧managed distribution test RETIREのfocused証拠は揃っています。Report更新後のStrict再レビュー、Final Quality Gate、#395のbaseline修正、PR merge後B1は未完了です。
+以上により、#392の実装candidate、provider-first packaging、dogfood parity、回帰テスト、current gate観測の証拠は揃っています。最終Strict reviewとFinal Quality Gateがpassするまで、Issue完了・Product GREEN・merge完了は主張しません。
