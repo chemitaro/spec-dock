@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "ac6a4b41b574f75b405f1288a05d6c2eff483110"
-  tree: "60c4bf6f45ab7ef53286831173a12a42dae0eb1a"
+  sha: "99c051fce144dd81f04dd98ce10f04fef56bbcf6"
+  tree: "21fc6deee7612e1bae8c6e8a06dd6de66a736ae6"
 implementation_evidence:
-  candidate_sha: "ac6a4b41b574f75b405f1288a05d6c2eff483110"
-  candidate_tree: "60c4bf6f45ab7ef53286831173a12a42dae0eb1a"
+  candidate_sha: "99c051fce144dd81f04dd98ce10f04fef56bbcf6"
+  candidate_tree: "21fc6deee7612e1bae8c6e8a06dd6de66a736ae6"
 ---
 
 # #392 仕様・実装レポート
@@ -104,7 +104,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4の実装candidate `ac6a4b41b574f75b405f1288a05d6c2eff483110`を固定し、次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4の実装candidate `99c051fce144dd81f04dd98ce10f04fef56bbcf6`を固定し、次の最終ゲートが残っています。
 
 1. 実装candidateのclean pushとupstream SHA一致。
 2. このcandidateと更新後Reportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
@@ -121,16 +121,15 @@ current full verifierの`ledger-mismatch` 10件は#395が所有するactive base
 
 ## 9. Implementation verification update
 
-2026-09-10時点の実装candidate `ac6a4b41b574f75b405f1288a05d6c2eff483110`（tree
-`60c4bf6f45ab7ef53286831173a12a42dae0eb1a`）に対して、次の証拠を採取しました。
+2026-09-10時点の実装candidate `99c051fce144dd81f04dd98ce10f04fef56bbcf6`（tree
+`21fc6deee7612e1bae8c6e8a06dd6de66a736ae6`）に対して、次の証拠を採取しました。
 
-- provider-firstでworktree Bの作成後予約失敗を候補再試行せず停止・開示し、materializerが自分で作成したディレクトリのdevice/inode witnessだけを再利用するようにしました。entrypoint親も同じwitnessで検証します。B削除前のflock busy/unavailableは`remove_blocked`としてGit remove前に停止し、既存の削除後binding failureとは分離しました。
-- 前回StrictレビューのP1（P2再入場時のSTAGE root未検証、prepared uninstall dry-runのSTAGE authority未検証、B予約後の実Git失敗がpartial-artifact envelopeを迂回）を修正しました。STAGE rootは全読取り経路で所有者・mode・deviceを検証し、prepared uninstall dry-runは対象観測より前に固定stage owner/entryをread-only検証します。B予約後は`RuntimeError`と`CalledProcessError`の双方を再試行せず、残存artifact stateを含めて停止します。
-- frozen provider bootstrapのconsumer hookは、B公開後のpipe/fork/fstat/wait系I/O failureとbinding mismatchを既存の`detection_failed`結果へ収束させ、CLI exit 0で返します。provider lifecycle engineではprivate authorityのI/O failureとforeign ownerをそれぞれ`lifecycle-preparation-failed`／`stage-owner-mismatch`へ写像しました。
-- provider runtimeとchecked-in dogfood runtimeを同期し、二つのslot markerとdogfood `spec-dock.version`のcandidate digest `e9e878c663d2512832098a4196da0efc064716423edad3c4db8c181a0a88d144`を一致させました。`seed_policy=preserve-only`のdogfood update semanticsはfresh installの`create-if-absent`と混同していません。provider/dogfoodの5つの同期対象はbyte一致を確認しました。
-- 追加した回帰は、B作成後の予約失敗の停止・残存開示、B予約後の実Git失敗の停止・残存開示、foreign descendant directoryの拒否、B削除前のbusy拒否、consumer hookのI/O/binding failure、private authorityのWire code分離、STAGE root再入場検証、prepared uninstall dry-runのstage authority検証です。full-regression shardのworktree／handoff／provider lifecycle focused suiteは`80 passed`、provider lifecycle unitは`28 passed`、Issue #392 acceptanceとdogfoodは`61 passed`、clean distribution cutover/integrationは`21 passed`です。obsolete behaviorのassertionは残していません。
-- `make lint`はruff check、ruff format、mypyすべてpass、`uv build`もpassしました。default fastは`883 passed, 841 skipped`です。
-- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`1724 tests collected`、status=`ledger-mismatch`、exit 1でした。ledgerはtotal15／active14／resolved1、timing 243 entriesを維持し、violationは10件（runtime import 8、runtime shell 1、workbench 1）で、いずれも#395 active baselineです。4 shardで同じ#395 baseline由来の実行失敗を観測しましたが、#392の新規node failure、dirty candidate receipt、ledger／timing／required-fastの変更はありません。
-- 直前の独立Code Review Strictはfresh browser sessionで旧candidateを対象に`review_status=fail`、P1×5を返しました。指摘は上記の5境界（B予約後停止、foreign directory adoption、削除前coordination分類、consumer hook failure分類、private authority code分類）で、同じ完全bundleを用いたblue-team分析で再現・修正しました。修正後candidateでは追加P1 3件（STAGE root再入場、prepared uninstall dry-run、B予約後の実Git失敗）を同じ手順で再現・修正済みです。Report更新後の最終SHAについてfresh Code Review StrictとFinal Quality Gate Strictを未実施です。#395のbaseline修正、PR merge後B1も未完了です。
+- provider-firstでprivate namespaceのrepository parent、固定top、repository-key namespaceをdescriptor-relative/no-followで再認証し、dry-runと各private storeの実読取り経路へ同じfull-chain bindingを適用しました。topまたはnamespaceのowner、mode、device、type、inodeが変化した場合はforeign private authorityとしてfail-closedし、dry-runでは作成・修正を行いません。
+- worktree Bはtarget reservation後の`OSError`、`RuntimeError`、`CalledProcessError`を候補再試行せず停止し、reservation、Git worktree add、materialization、pre/post-publication verification、consumer-hook bindingのphaseと、path、branch、Git record、payload path、entrypointのartifact stateを開示します。Git metadata取得後やmaterialization途中で失敗してもrollback・remove・別candidate retryを行いません。
+- provider runtimeとchecked-in dogfood runtimeを同期し、二つのslot markerとdogfood `spec-dock.version`のcandidate digest `a790d668d89822ee225bbec18c5142fe8d294d5e3c8192244576517e85558035`を一致させました。`seed_policy=preserve-only`のdogfood update semanticsはfresh installの`create-if-absent`と混同していません。provider/dogfoodの同期対象はbyte一致を確認しました。
+- 今回の回帰は、full private chainの再入場検証、top mode drift時のread-only拒否、reservation後`RuntimeError`の停止・残存開示、materialization failureのphase/payload開示です。修正後のworktree、handoff、provider lifecycle focused suiteは`83 passed`、provider lifecycle unitは`29 passed`、Issue #392 acceptanceとdogfoodは`61 passed`、clean distribution cutover/integrationは`21 passed`です。obsolete behaviorのassertionは残していません。
+- `make lint`はruff check、ruff format、mypyすべてpass、`uv build`もpassしました。default fastは`884 passed, 843 skipped`です。
+- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`1727 tests collected`、status=`ledger-mismatch`、exit 1でした。ledgerはtotal15／active14／resolved1、timing 243 entriesを維持し、violationは前回と同じ10件（runtime import 8、runtime shell 1、workbench 1）で、いずれも#395 active baselineです。4 shardで同じ#395 baseline由来の実行失敗を観測しましたが、#392の新規node failure、candidate receiptのdirty状態、ledger／timing／required-fastの変更はありません。
+- 修正前のfresh Code Review Strict（candidate `25572d3e930baab4027529325f33f0c302c72a38`、browser、GPT-5.6 Sol、Extra High、完全bundle）は本文JSONで`review_status=fail`、P1×3を返しました。Blue Teamのfresh ChatGPT Use Strict分析でも、full verifierの10件は#395-owned gate blockerで#392ではSTOP/no-touch、private chainとB post-reservation envelopeは#392で修正すべきP1と判定しました。#395のbaseline修正、Report更新後candidateのfresh Code Review Strict、Final Quality Gate Strict、PR merge後B1は未完了です。
 
-以上により、#392の実装candidate、provider-first packaging、dogfood parity、回帰テスト、current gate観測の証拠は揃っています。最終Strict reviewとFinal Quality Gateがpassするまで、Issue完了・Product GREEN・merge完了は主張しません。
+以上により、#392の実装candidate、provider-first packaging、dogfood parity、回帰テスト、current gate観測の証拠は更新済みです。ただしcurrent full verifierの#395 baseline blockerが残るため、Issue完了・Product GREEN・merge完了は主張しません。最終Strict reviewとFinal Quality Gateは、このReportを含む次のclean pushed SHAに対して実施します。
