@@ -39,6 +39,10 @@ class CandidateError(ValueError):
     """The fixed candidate contains an unsupported or unsafe object."""
 
 
+def _is_generated_python_cache(name: str) -> bool:
+    return name == "__pycache__" or name.endswith((".pyc", ".pyo"))
+
+
 @dataclass(frozen=True, slots=True)
 class _CapturedDomain:
     kind: str
@@ -117,6 +121,8 @@ def _capture_entries(root: Path, *, exclude_marker: bool) -> tuple[TreeEntry, ..
         except OSError as exc:
             raise CandidateError(f"cannot read candidate directory {directory}") from exc
         for child in children:
+            if _is_generated_python_cache(child.name):
+                continue
             relative = posixpath.join(prefix, child.name) if prefix else child.name
             if exclude_marker and not prefix and child.name == SLOT_MARKER_NAME:
                 continue

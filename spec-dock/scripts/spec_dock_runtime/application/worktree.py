@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
+import fcntl
+import os
 from pathlib import Path
 import re
+import stat
+import sys
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.contracts import (
@@ -32,6 +37,15 @@ _RETRYABLE_GIT_WORKTREE_ERRORS = (
 )
 _WORKTREE_ROOT_ENV = "SPEC_DOCK_WORKTREE_ROOT"
 _WORKTREE_ROOT_EXAMPLE = 'export SPEC_DOCK_WORKTREE_ROOT="$HOME/workspace/worktrees"'
+_PROVIDER_CLOSURE_PATHS = (
+    "spec-dock/docs",
+    "spec-dock/templates",
+    "spec-dock/system",
+    "spec-dock/scripts",
+    ".agents/skills/spec-dock",
+    ".agents/skills/spec-dock-grill-with-docs",
+)
+_ENTRYPOINT_PATH = "spec-dock/scripts/spec-dock"
 
 
 @dataclass(frozen=True)
@@ -42,19 +56,202 @@ class _WorktreeClassificationContext:
     reason: str
 
 
+def _pin_worktree_source(repo_root: Path, ports: Ports) -> str:
+    assert ports.git_gateway is not None
+    pinned_commit = ports.git_gateway.current_head_or_none(repo_root)
+    if not pinned_commit:
+        raise RuntimeError("worktree create cannot pin an unavailable HEAD")
+    provider_closure = ports.git_gateway.provider_closure(repo_root, pinned_commit)
+    assessment = ports.git_gateway.assess_capabilities(
+        repo_root,
+        pinned_commit=pinned_commit,
+        closure_paths=tuple(provider_closure.paths),
+        branch=ports.git_gateway.current_branch_or_none(repo_root),
+        check_other_worktree=False,
+    )
+    if not assessment.allowed:
+        raise RuntimeError("Git capability guard failed: " + ", ".join(assessment.reasons))
+    if assessment.provider_closure_digest != provider_closure.digest:
+        raise RuntimeError("provider closure changed during worktree preparation")
+    return pinned_commit
+
+
+def _open_source_shared(repo_root: Path) -> int:
+    fd = _open_directory_no_follow(repo_root)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except OSError:
+        _close_fd(fd)
+        raise
+    return fd
+
+
+def _open_directory_no_follow(path: Path, *, allow_symlink_at: Path | None = None) -> int:
+    raw = os.fspath(path)
+    if not raw.startswith(os.sep) or "\x00" in raw:
+        raise RuntimeError("bound directory must be absolute and NUL-free")
+    if Path(raw).is_symlink():
+        raise RuntimeError("bound directory must not be a symlink")
+    absolute = Path(raw)
+    allowed_prefix = Path(os.fspath(allow_symlink_at)).absolute() if allow_symlink_at is not None else None
+    current = os.open(
+        os.sep,
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+    )
+    try:
+        for index, component in enumerate(absolute.parts[1:]):
+            if component in {"", ".", ".."}:
+                raise RuntimeError("bound directory contains an unsafe component")
+            try:
+                binding = os.stat(component, dir_fd=current, follow_symlinks=False)
+            except FileNotFoundError:
+                binding = None
+            if binding is not None and stat.S_ISLNK(binding.st_mode):
+                prefix = Path(os.sep).joinpath(*absolute.parts[1 : index + 2])
+                allowed_var_alias = (
+                    sys.platform == "darwin"
+                    and index == 0
+                    and component == "var"
+                    and os.readlink(component, dir_fd=current) in {"/private/var", "private/var"}
+                )
+                if allowed_var_alias:
+                    private_fd = os.open(
+                        "private",
+                        os.O_RDONLY
+                        | getattr(os, "O_DIRECTORY", 0)
+                        | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0),
+                        dir_fd=current,
+                    )
+                    os.close(current)
+                    current = private_fd
+                    var_fd = os.open(
+                        "var",
+                        os.O_RDONLY
+                        | getattr(os, "O_DIRECTORY", 0)
+                        | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0),
+                        dir_fd=current,
+                    )
+                    os.close(current)
+                    current = var_fd
+                    continue
+                if allowed_prefix != prefix:
+                    raise RuntimeError("bound directory contains an unsafe symlink component")
+                next_fd = os.open(
+                    component,
+                    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=current,
+                )
+                os.close(current)
+                current = next_fd
+                continue
+            next_fd = os.open(
+                component,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=current,
+            )
+            os.close(current)
+            current = next_fd
+        return current
+    except BaseException:
+        _close_fd(current)
+        raise
+
+
+def _open_exclusive_worktree(path: Path, *, allow_symlink_at: Path | None = None) -> int:
+    fd = _open_directory_no_follow(path, allow_symlink_at=allow_symlink_at)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if os.listdir(fd):  # noqa: PTH208 - inspect the directory descriptor bound by the lease
+            raise RuntimeError("worktree target is not empty")
+        return fd
+    except BaseException:
+        _close_fd(fd)
+        raise
+
+
+def _open_exclusive_existing_worktree(path: Path, *, allow_symlink_at: Path | None = None) -> int:
+    fd = _open_directory_no_follow(path, allow_symlink_at=allow_symlink_at)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        value = os.fstat(fd)
+        if not stat.S_ISDIR(value.st_mode):
+            raise RuntimeError("worktree target is not a directory")
+        return fd
+    except BaseException:
+        _close_fd(fd)
+        raise
+
+
+def _open_nonlocking_worktree(path: Path, *, allow_symlink_at: Path | None = None) -> int:
+    return _open_directory_no_follow(path, allow_symlink_at=allow_symlink_at)
+
+
+def _open_nonlocking_worktree_bound_to_exclusive(
+    path: Path,
+    *,
+    exclusive_fd: int,
+    allow_symlink_at: Path | None = None,
+) -> tuple[int, os.stat_result]:
+    fd = _open_nonlocking_worktree(path, allow_symlink_at=allow_symlink_at)
+    try:
+        exclusive_stat = os.fstat(exclusive_fd)
+        observed_stat = os.fstat(fd)
+        if (exclusive_stat.st_dev, exclusive_stat.st_ino) != (observed_stat.st_dev, observed_stat.st_ino):
+            raise RuntimeError("consumer hook binding changed worktree inode")
+        return fd, observed_stat
+    except BaseException:
+        _close_fd(fd)
+        raise
+
+
+def _close_fd(fd: int | None) -> None:
+    if fd is None:
+        return
+    with contextlib.suppress(OSError):
+        os.close(fd)
+
+
+def _materialize_and_verify_worktree(
+    ports: Ports,
+    *,
+    worktree_path: Path,
+    pinned_commit: str,
+    target_fd: int,
+) -> None:
+    assert ports.repo_root is not None
+    assert ports.git_gateway is not None
+    ports.git_gateway.materialize_worktree(
+        ports.repo_root,
+        path=worktree_path,
+        pinned_commit=pinned_commit,
+        target_fd=target_fd,
+    )
+    head = ports.git_gateway.current_head_or_none(worktree_path)
+    if head != pinned_commit:
+        raise RuntimeError(f"worktree generation drift: expected {pinned_commit}, observed {head}")
+    ports.git_gateway.require_clean_working_tree(worktree_path)
+    entrypoint = worktree_path / _ENTRYPOINT_PATH
+    if not entrypoint.is_file() or entrypoint.is_symlink():
+        raise RuntimeError("worktree entrypoint was not published as the final verified object")
+
+
 def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateResult:
     if ports.repo_root is None:
         raise RuntimeError("worktree create requires a repository root")
     if ports.git_gateway is None:
         raise RuntimeError("worktree create requires a Git gateway")
-    if ports.bootstrap_gateway is None:
-        raise RuntimeError("worktree create requires a bootstrap gateway")
     if ports.environment_gateway is None:
         raise RuntimeError("worktree create requires an environment gateway")
 
     label = _normalize_label(req.label)
     central_root = _resolve_worktree_root(ports)
     repo_root = ports.repo_root
+    ports.git_gateway.require_clean_working_tree(repo_root)
     branch_prefix = ports.git_gateway.current_branch_or_none(repo_root)
     if branch_prefix is None:
         raise RuntimeError("worktree create requires a named current branch; detached HEAD is not supported")
@@ -63,6 +260,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
     if not records:
         raise RuntimeError("git worktree list returned no worktrees")
     main_worktree = records[0].path
+    pinned_commit = _pin_worktree_source(repo_root, ports)
     repo_basename = main_worktree.name
     container = central_root / repo_basename
     known_paths = {_canonical_path(record.path) for record in records}
@@ -104,9 +302,27 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             ) from exc
 
         try:
-            ports.git_gateway.add_worktree_with_new_branch(repo_root, path=worktree_path, branch=branch_name)
+            worktree_path.mkdir()
+            target_fd = _open_exclusive_worktree(worktree_path, allow_symlink_at=central_root)
+        except OSError as exc:
+            last_reason = f"worktree path could not be exclusively bound: {exc}"
+            continue
+
+        source_fd: int | None = None
+        try:
+            source_fd = _open_source_shared(repo_root)
+            ports.git_gateway.add_worktree_pinned(
+                repo_root,
+                path=worktree_path,
+                branch=branch_name,
+                pinned_commit=pinned_commit,
+                source_fd=source_fd,
+                target_fd=target_fd,
+            )
         except RuntimeError as exc:
             message = str(exc)
+            _close_fd(source_fd)
+            _close_fd(target_fd)
             if _is_retryable_worktree_add_error(message):
                 records = ports.git_gateway.worktree_list(repo_root)
                 known_paths = {_canonical_path(record.path) for record in records}
@@ -124,19 +340,41 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 "git worktree add failed for non-retryable reason: "
                 f"id={worktree_id} path={worktree_path} branch={branch_name} {state}\n{message}"
             ) from exc
+        finally:
+            _close_fd(source_fd)
 
-        bootstrap = ports.bootstrap_gateway.run_make_init_if_available(worktree_path)
-        return WorktreeCreateResult(
-            id=worktree_id,
-            main_worktree_path=main_worktree,
-            container_path=container,
-            worktree_path=worktree_path,
-            branch_name=branch_name,
-            bootstrap_status=bootstrap.status,
-            bootstrap_command=bootstrap.command,
-            bootstrap_exit_code=bootstrap.exit_code,
-            warnings=list(bootstrap.warnings),
-        )
+        bound_fd: int | None = None
+        try:
+            _materialize_and_verify_worktree(
+                ports,
+                worktree_path=worktree_path,
+                pinned_commit=pinned_commit,
+                target_fd=target_fd,
+            )
+            bound_fd, bound_stat = _open_nonlocking_worktree_bound_to_exclusive(
+                worktree_path,
+                exclusive_fd=target_fd,
+                allow_symlink_at=central_root,
+            )
+            return WorktreeCreateResult(
+                id=worktree_id,
+                main_worktree_path=main_worktree,
+                container_path=container,
+                worktree_path=worktree_path,
+                branch_name=branch_name,
+                bootstrap_status="skipped",
+                bootstrap_command=None,
+                bootstrap_exit_code=None,
+                warnings=[],
+                bound_cwd_fd=bound_fd,
+                bound_device=bound_stat.st_dev,
+                bound_inode=bound_stat.st_ino,
+            )
+        except BaseException:
+            _close_fd(bound_fd)
+            raise
+        finally:
+            _close_fd(target_fd)
 
     mode = "label" if label is not None else "auto"
     raise RuntimeError(
@@ -160,7 +398,7 @@ def worktree_show(req: WorktreeShowRequest, ports: Ports) -> WorktreeShowResult:
 
 
 def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveResult:
-    _require_repo_and_gateways(ports, command="worktree_remove", filesystem_required=True)
+    _require_repo_and_gateways(ports, command="worktree_remove")
     inventory = _build_inventory(ports, command="remove", target=req.target)
     worktree = resolve_worktree_target(req.target, inventory, command="remove")
     blockers = _non_bypassable_remove_blockers(worktree)
@@ -176,7 +414,6 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
 
     assert ports.repo_root is not None
     assert ports.git_gateway is not None
-    assert ports.filesystem_gateway is not None
     refreshed_inventory = _build_inventory_from_records(
         ports,
         records=_git_worktree_list(ports, command="remove", target=req.target),
@@ -217,9 +454,44 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         )
     _guard_remove_containment(refreshed_worktree, refreshed_inventory, ports, command="remove", target=req.target)
 
+    target_fd: int | None = None
+    source_fd: int | None = None
     try:
-        ports.git_gateway.remove_worktree(ports.repo_root, path=refreshed_worktree.path, force=True)
+        central_root: Path | None = None
+        with contextlib.suppress(RuntimeError):
+            central_root = _resolve_worktree_root(ports)
+        target_fd = _open_exclusive_existing_worktree(
+            refreshed_worktree.path,
+            allow_symlink_at=central_root,
+        )
+        target_stat = os.fstat(target_fd)
+        source_fd = _open_source_shared(ports.repo_root)
+    except (OSError, RuntimeError) as exc:
+        _close_fd(target_fd)
+        _close_fd(source_fd)
+        raise WorktreeCommandError(
+            code="post_remove_cleanup_failed",
+            message="worktree target could not be safely bound",
+            command="remove",
+            target=req.target,
+            worktree=refreshed_worktree,
+            git_error=f"unsafe-binding: {exc}",
+            removed_record=False,
+            removed_directory=False,
+        ) from exc
+
+    try:
+        remove_worktree = ports.git_gateway.remove_worktree
+        remove_worktree(
+            ports.repo_root,
+            path=refreshed_worktree.path,
+            force=True,
+            source_fd=source_fd,
+            target_fd=target_fd,
+        )
     except RuntimeError as exc:
+        _close_fd(target_fd)
+        _close_fd(source_fd)
         raise WorktreeCommandError(
             code="git_worktree_remove_failed",
             message="git worktree remove failed",
@@ -228,13 +500,25 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
             worktree=refreshed_worktree,
             git_error=str(exc),
         ) from exc
-
+    _close_fd(source_fd)
+    source_fd = None
     removed_directory = True
     try:
         _guard_remove_containment(refreshed_worktree, refreshed_inventory, ports, command="remove", target=req.target)
-        if ports.filesystem_gateway.path_exists(refreshed_worktree.path):
-            ports.filesystem_gateway.remove_target(refreshed_worktree.path)
+        try:
+            refreshed_worktree.path.lstat()
+        except FileNotFoundError:
+            removed_directory = True
+        else:
+            try:
+                after_stat = refreshed_worktree.path.lstat()
+            except OSError as exc:
+                raise RuntimeError(f"unsafe-binding: replacement target could not be inspected: {exc}") from exc
+            if (after_stat.st_dev, after_stat.st_ino) != (target_stat.st_dev, target_stat.st_ino):
+                raise RuntimeError("unsafe-binding: replacement target has a different inode")
+            raise RuntimeError("unsafe-binding: original target remains; pathname cleanup is not permitted")
     except RuntimeError as exc:
+        _close_fd(target_fd)
         raise WorktreeCommandError(
             code="post_remove_cleanup_failed",
             message="post-remove target cleanup failed",
@@ -245,6 +529,7 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
             removed_record=True,
             removed_directory=False,
         ) from exc
+    _close_fd(target_fd)
 
     return WorktreeRemoveResult(
         target=req.target,

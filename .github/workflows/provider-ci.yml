@@ -45,7 +45,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install uv
       - name: Run provider lifecycle focused tests
-        run: uv run pytest tests/unit/provider_lifecycle/test_engine.py
+        run: uv run pytest tests/unit/provider_lifecycle
       - name: Run distribution cutover focused tests
         run: uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py
       - name: Run packaged distribution parity tests

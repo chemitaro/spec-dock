@@ -27,6 +27,7 @@ from spec_dock.provider_lifecycle.candidate import (
     FIXED_DOMAINS,
     SLOT_MARKER_NAME,
     CandidateError,
+    _is_generated_python_cache,
     capture_packaged_candidate,
     marker_bytes,
 )
@@ -612,7 +613,10 @@ def _copy_source_entry(source_fd: int, name: str, destination_fd: int) -> None:
         )
         try:
             with os.scandir(child_source) as children:
-                child_names = sorted((child.name for child in children), key=os.fsencode)
+                child_names = sorted(
+                    (child.name for child in children if not _is_generated_python_cache(child.name)),
+                    key=os.fsencode,
+                )
             for child in child_names:
                 _copy_source_entry(child_source, child, child_destination)
         finally:
@@ -668,7 +672,10 @@ def _copy_tree(source: Path, destination_fd: int, *, slot: str | None, candidate
     source_fd = _source_directory(source)
     try:
         with os.scandir(source_fd) as children:
-            child_names = sorted((child.name for child in children), key=os.fsencode)
+            child_names = sorted(
+                (child.name for child in children if not _is_generated_python_cache(child.name)),
+                key=os.fsencode,
+            )
         for child in child_names:
             _copy_source_entry(source_fd, child, destination_fd)
         if slot is not None:

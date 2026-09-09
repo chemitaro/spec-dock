@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
 from typing import TYPE_CHECKING
 
-from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.contracts import (
+    CommandArgs,
+    CommandOutcome,
+    CommandSpec,
+    InstallerExecRequest,
+)
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
@@ -53,7 +57,7 @@ def _run_update(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     typed = _expect_update_args(args)
     target = Path(typed.target).expanduser().resolve()
-    command = [
+    command = (
         "uvx",
         "--no-cache",
         "--from",
@@ -61,24 +65,14 @@ def _run_update(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         "spec-dock",
         "update",
         str(target),
-    ]
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        return CommandOutcome(
-            exit_code=127,
-            text=CliText(
-                stdout_lines=[],
-                stderr_lines=["error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry."],
-                warnings=[],
-            ),
-        )
+    )
     return CommandOutcome(
-        exit_code=int(result.returncode),
-        text=CliText(
-            stdout_lines=result.stdout.splitlines(),
-            stderr_lines=result.stderr.splitlines(),
-            warnings=[],
+        exit_code=0,
+        text=CliText(stdout_lines=[], stderr_lines=[], warnings=[]),
+        terminal=InstallerExecRequest(
+            kind="installer-exec",
+            argv=command,
+            environment_policy="inherit-without-lock-bypass",
         ),
     )
 

@@ -53,7 +53,12 @@ def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in sorted(root.rglob("*"))
-        if path.is_file() and "__pycache__" not in path.parts and not path.name.endswith(".pyc")
+        if (
+            path.is_file()
+            and "__pycache__" not in path.parts
+            and path.suffix not in {".pyc", ".pyo"}
+            and path.name != ".spec-dock-provider-slot.json"
+        )
     }
 
 
@@ -70,7 +75,6 @@ def test_issue_334_init_and_update_install_current_target_catalog_byte_exact(tmp
     assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
     for skill_name in ("spec-dock", "spec-dock-grill-with-docs"):
         installed_skill = _managed_tree_bytes(target / ".agents/skills" / skill_name)
-        installed_skill.pop(".spec-dock-provider-slot.json", None)
         assert installed_skill == _managed_tree_bytes(provider_skills / skill_name)
 
     assert main(["update", str(target)]) == 0
@@ -5486,7 +5490,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert '        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"' in provider_parity_lines
         assert "continue-on-error:" not in provider_parity_text
         expected_provider_parity_commands = (
-            "        run: uv run pytest tests/unit/provider_lifecycle/test_engine.py",
+            "        run: uv run pytest tests/unit/provider_lifecycle",
             (
                 "        run: uv run pytest --run-full-regression --full-regression-shard "
                 "tests/cli_runtime/test_distribution_cutover.py"

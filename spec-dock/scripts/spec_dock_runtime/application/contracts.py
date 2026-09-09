@@ -5,6 +5,9 @@ from dataclasses import dataclass, field
 import os
 from typing import TYPE_CHECKING, Literal
 
+from spec_dock_runtime.domain.artifacts import (
+    CURRENT_CREATABLE_ARTIFACT_TYPES,  # noqa: F401 - runtime re-export for CLI contracts.
+)
 from spec_dock_runtime.domain.models import SpecNode  # noqa: TC001 - runtime re-export used by CLI/runtime callers.
 
 if TYPE_CHECKING:
@@ -166,6 +169,32 @@ class GitWorktreeRecord:
 
 
 @dataclass(frozen=True)
+class GitCapabilityAssessment:
+    allowed: bool
+    reasons: tuple[str, ...]
+    pinned_commit: str
+    closure_paths: tuple[str, ...]
+    provider_closure_digest: str | None = None
+
+
+@dataclass(frozen=True)
+class PinnedProviderClosure:
+    pinned_commit: str
+    paths: tuple[str, ...]
+    digest: str
+
+
+@dataclass(frozen=True)
+class PinnedCheckout:
+    target_branch: str
+    pinned_commit: str
+    before_branch: str | None
+    before_head: str | None
+    provider_closure_digest: str
+    checkout_kind: Literal["existing", "new"]
+
+
+@dataclass(frozen=True)
 class BootstrapResult:
     status: BootstrapStatus
     command: str | None
@@ -189,6 +218,9 @@ class WorktreeCreateResult:
     bootstrap_command: str | None
     bootstrap_exit_code: int | None
     warnings: list[str]
+    bound_cwd_fd: int | None = None
+    bound_device: int | None = None
+    bound_inode: int | None = None
 
 
 @dataclass(frozen=True)

@@ -1,22 +1,544 @@
 #!/usr/bin/env python3
-"""Thin runtime entrypoint for spec-dock."""
+"""Frozen, standard-library-only runtime admission bootstrap."""
+
 from __future__ import annotations
 
-import sys
+from collections import OrderedDict
+import contextlib
+import errno
+import fcntl
+import json
+import os
 from pathlib import Path
+import stat
+import subprocess
+import sys
 
-# Importing the installed runtime must not dirty the managed consumer repository.
-sys.dont_write_bytecode = True
+_PROTOCOL_VERSION = "0.2.4"
+_RECORD_NAME = "spec-dock.version"
+_SLOT_MARKER_NAME = ".spec-dock-provider-slot.json"
+_SLOT_PATHS = (
+    ("spec-dock", ".agents/skills/spec-dock"),
+    ("spec-dock-grill-with-docs", ".agents/skills/spec-dock-grill-with-docs"),
+)
+_FIXED_ROOTS = ("docs", "templates", "system", "scripts")
+_READY_RECORD_KEYS = (
+    "schema_version",
+    "state",
+    "operation",
+    "version",
+    "candidate_digest",
+    "seed_policy",
+    "skill_slots",
+)
+_MARKER_KEYS = ("schema_version", "slot", "version", "candidate_digest")
+_MISSING_INIT_FRAGMENTS = (
+    "no rule to make target 'init'",
+    "no rule to make target `init'",
+    "no rule to make target init",
+    "no targets specified and no makefile found",
+    "no makefile found",
+)
 
-_SCRIPT_DIR = Path(__file__).resolve().parent
-_RUNTIME_DIR = _SCRIPT_DIR / "spec_dock_runtime"
-_APP_PATH = _RUNTIME_DIR / "app.py"
-if not _APP_PATH.is_file():
-    raise SystemExit("error: spec-dock runtime module missing; run 'spec-dock update'")
 
-sys.path.insert(0, str(_SCRIPT_DIR))
+class _BootstrapError(RuntimeError):
+    pass
 
-from spec_dock_runtime.app import main
+
+class _BusyError(_BootstrapError):
+    pass
+
+
+def _directory_flags() -> int:
+    return os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+
+
+def _regular_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_NONBLOCK", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+
+
+def _close(fd: int | None) -> None:
+    if fd is None:
+        return
+    with contextlib.suppress(OSError):
+        os.close(fd)
+
+
+def _lexical_absolute(path: str) -> str:
+    if "\x00" in path:
+        raise _BootstrapError("repository root contains NUL")
+    if not Path(path).is_absolute():
+        raise _BootstrapError("repository root must be absolute")
+    return str(Path(path).absolute())
+
+
+def _open_absolute_directory(path: str) -> int:
+    lexical = _lexical_absolute(path)
+    if Path(lexical).is_symlink():
+        raise _BootstrapError("repository root must not be a symlink")
+    absolute = Path(lexical)
+    current = os.open(os.sep, _directory_flags())
+    try:
+        for index, component in enumerate(absolute.parts[1:]):
+            if component in {"", ".", ".."}:
+                raise _BootstrapError("repository root contains an unsafe component")
+            try:
+                binding = os.stat(component, dir_fd=current, follow_symlinks=False)
+            except FileNotFoundError:
+                binding = None
+            if binding is not None and stat.S_ISLNK(binding.st_mode):
+                allowed_var_alias = (
+                    sys.platform == "darwin"
+                    and index == 0
+                    and component == "var"
+                    and os.readlink(component, dir_fd=current) in {"/private/var", "private/var"}
+                )
+                if not allowed_var_alias:
+                    raise _BootstrapError("repository root contains an unsafe symlink component")
+                private_fd = os.open("private", _directory_flags(), dir_fd=current)
+                _close(current)
+                current = private_fd
+                var_fd = os.open("var", _directory_flags(), dir_fd=current)
+                _close(current)
+                current = var_fd
+                continue
+            next_fd = os.open(component, _directory_flags(), dir_fd=current)
+            _close(current)
+            current = next_fd
+        return current
+    except BaseException:
+        _close(current)
+        raise
+
+
+def _open_directory(base_fd: int, components: tuple[str, ...]) -> int:
+    current = os.dup(base_fd)
+    try:
+        for component in components:
+            if component in {"", ".", ".."} or "/" in component or "\x00" in component:
+                raise _BootstrapError("runtime path contains an unsafe component")
+            next_fd = os.open(component, _directory_flags(), dir_fd=current)
+            _close(current)
+            current = next_fd
+        return current
+    except BaseException:
+        _close(current)
+        raise
+
+
+def _open_regular(
+    base_fd: int,
+    name: str,
+    *,
+    maximum: int,
+    allowed_modes: frozenset[int],
+) -> tuple[bytes, os.stat_result]:
+    if name in {"", ".", ".."} or "/" in name or "\x00" in name:
+        raise _BootstrapError("runtime file contains an unsafe component")
+    try:
+        lexical = os.stat(name, dir_fd=base_fd, follow_symlinks=False)
+    except OSError as error:
+        raise _BootstrapError(f"runtime file is unavailable: {name}") from error
+    if (
+        not stat.S_ISREG(lexical.st_mode)
+        or lexical.st_nlink != 1
+        or stat.S_IMODE(lexical.st_mode) not in allowed_modes
+        or lexical.st_size > maximum
+    ):
+        raise _BootstrapError(f"runtime file has an unsafe binding: {name}")
+    fd = os.open(name, _regular_flags(), dir_fd=base_fd)
+    try:
+        before = os.fstat(fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) not in allowed_modes
+        ):
+            raise _BootstrapError(f"runtime file has an unsafe binding: {name}")
+        if (before.st_dev, before.st_ino) != (lexical.st_dev, lexical.st_ino):
+            raise _BootstrapError(f"runtime file changed while opening: {name}")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(fd, min(1024 * 1024, maximum + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > maximum:
+                raise _BootstrapError(f"runtime file is too large: {name}")
+        payload = b"".join(chunks)
+        after = os.fstat(fd)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_ctime_ns,
+            before.st_nlink,
+            before.st_size,
+            before.st_mode,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_ctime_ns,
+            after.st_nlink,
+            after.st_size,
+            after.st_mode,
+        ):
+            raise _BootstrapError(f"runtime file changed while reading: {name}")
+        return payload, before
+    finally:
+        _close(fd)
+
+
+def _parse_json(payload: bytes, label: str) -> OrderedDict[str, object]:
+    if not payload.endswith(b"\n") or payload[:-1].find(b"\n") != -1:
+        raise _BootstrapError(f"{label} is invalid")
+
+    def reject_duplicate(pairs: list[tuple[str, object]]) -> OrderedDict[str, object]:
+        value: OrderedDict[str, object] = OrderedDict()
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("duplicate key")
+            value[key] = item
+        return value
+
+    def reject_constant(value: str) -> object:
+        raise ValueError(f"non-finite JSON constant: {value}")
+
+    try:
+        text = payload[:-1].decode("utf-8")
+        value = json.loads(
+            text,
+            object_pairs_hook=reject_duplicate,
+            parse_constant=reject_constant,
+        )
+        canonical = json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
+        if canonical.encode("utf-8") != payload:
+            raise ValueError("non-canonical JSON")
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise _BootstrapError(f"{label} is invalid") from error
+    if not isinstance(value, OrderedDict):
+        raise _BootstrapError(f"{label} must be an object")
+    return value
+
+
+def _validate_ready_record(specdock_fd: int) -> str:
+    payload, _stat = _open_regular(specdock_fd, _RECORD_NAME, maximum=4096, allowed_modes=frozenset({0o644}))
+    record = _parse_json(payload, "installation record")
+    if tuple(record.keys()) != _READY_RECORD_KEYS:
+        raise _BootstrapError("repository runtime is not ready")
+    if type(record.get("schema_version")) is not int or record.get("schema_version") != 1 or record.get("state") != "ready":
+        raise _BootstrapError("repository runtime is not ready")
+    if record.get("operation") is not None or record.get("version") != _PROTOCOL_VERSION:
+        raise _BootstrapError("repository runtime is not ready")
+    digest = record.get("candidate_digest")
+    if not isinstance(digest, str) or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+        raise _BootstrapError("repository runtime is not ready")
+    if record.get("seed_policy") not in {"create-if-absent", "preserve-only"}:
+        raise _BootstrapError("repository runtime is not ready")
+    slots = record.get("skill_slots")
+    if not isinstance(slots, OrderedDict) or tuple(slots.keys()) != tuple(name for name, _path in _SLOT_PATHS):
+        raise _BootstrapError("repository runtime is not ready")
+    if any(value != _PROTOCOL_VERSION for value in slots.values()):
+        raise _BootstrapError("repository runtime is not ready")
+    return digest
+
+
+def _validate_fixed_domains(root_fd: int, candidate_digest: str) -> None:
+    specdock_fd = _open_directory(root_fd, ("spec-dock",))
+    try:
+        for name in _FIXED_ROOTS:
+            domain_fd = _open_directory(specdock_fd, (name,))
+            _close(domain_fd)
+        scripts_fd = _open_directory(specdock_fd, ("scripts",))
+        try:
+            runtime_fd = _open_directory(scripts_fd, ("spec_dock_runtime",))
+            _close(runtime_fd)
+            payload, _stat = _open_regular(
+                scripts_fd,
+                "spec-dock",
+                maximum=512 * 1024,
+                allowed_modes=frozenset({0o755}),
+            )
+            if not payload.startswith(b"#!"):
+                raise _BootstrapError("repository runtime is not ready")
+        finally:
+            _close(scripts_fd)
+    finally:
+        _close(specdock_fd)
+
+    agents_fd = _open_directory(root_fd, (".agents", "skills"))
+    try:
+        marker_digests: set[str] = set()
+        for _slot_name, slot_path in _SLOT_PATHS:
+            slot_components = tuple(slot_path.split("/"))[2:]
+            slot_fd = _open_directory(agents_fd, slot_components)
+            try:
+                payload, _stat = _open_regular(
+                    slot_fd,
+                    _SLOT_MARKER_NAME,
+                    maximum=2048,
+                    allowed_modes=frozenset({0o644}),
+                )
+                marker = _parse_json(payload, "provider slot marker")
+                if tuple(marker.keys()) != _MARKER_KEYS:
+                    raise _BootstrapError("repository runtime is not ready")
+                if (
+                    type(marker.get("schema_version")) is not int
+                    or marker.get("schema_version") != 1
+                    or marker.get("slot") != slot_path
+                    or marker.get("version") != _PROTOCOL_VERSION
+                    or marker.get("candidate_digest") != candidate_digest
+                ):
+                    raise _BootstrapError("repository runtime is not ready")
+                marker_digests.add(str(marker["candidate_digest"]))
+            finally:
+                _close(slot_fd)
+        if marker_digests != {candidate_digest}:
+            raise _BootstrapError("repository runtime is not ready")
+    finally:
+        _close(agents_fd)
+
+
+def _acquire_shared_lease(root_fd: int) -> None:
+    try:
+        fcntl.flock(root_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except OSError as error:
+        if error.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
+            raise _BusyError("repository coordination is busy") from error
+        raise _BootstrapError("repository coordination is unavailable") from error
+
+
+def _emit(text: object) -> None:
+    for warning in getattr(text, "warnings", ()):
+        print(f"spec-dock: (warn) {warning}", file=sys.stderr)
+    for line in getattr(text, "stderr_lines", ()):
+        print(line, file=sys.stderr)
+    for line in getattr(text, "stdout_lines", ()):
+        print(line)
+
+
+def _installer_exec(request: object, root_fd: int) -> int:
+    argv = tuple(getattr(request, "argv", ()))
+    if not argv or getattr(request, "environment_policy", None) != "inherit-without-lock-bypass":
+        raise _BootstrapError("invalid installer terminal request")
+    _close(root_fd)
+    try:
+        os.execvpe(argv[0], list(argv), os.environ.copy())
+    except FileNotFoundError:
+        print("error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry.", file=sys.stderr)
+        return 127
+    except OSError as error:
+        print(f"error: {error.strerror or 'installer could not be executed'}", file=sys.stderr)
+        return 1
+    raise AssertionError("execvpe returned unexpectedly")
+
+
+def _is_missing_init(stderr: str) -> bool:
+    lowered = stderr.lower()
+    return any(fragment in lowered for fragment in _MISSING_INIT_FRAGMENTS)
+
+
+def _hook_child(
+    bound_fd: int,
+    write_fd: int,
+    detection_argv: tuple[str, ...],
+    execution_argv: tuple[str, ...],
+) -> None:
+    try:
+        os.fchdir(bound_fd)
+        try:
+            detection = subprocess.run(
+                list(detection_argv),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            result = {
+                "status": "detection_failed",
+                "command": " ".join(detection_argv),
+                "exit_code": None,
+                "warning": "make command not found",
+            }
+        else:
+            stderr = (detection.stderr or "").strip()
+            if detection.returncode != 0:
+                if _is_missing_init(stderr):
+                    result = {"status": "skipped", "command": None, "exit_code": None, "warning": None}
+                else:
+                    result = {
+                        "status": "detection_failed",
+                        "command": " ".join(detection_argv),
+                        "exit_code": detection.returncode,
+                        "warning": stderr or "unknown error",
+                    }
+            else:
+                run = subprocess.run(list(execution_argv), check=False)
+                result = {
+                    "status": "succeeded" if run.returncode == 0 else "failed",
+                    "command": " ".join(execution_argv),
+                    "exit_code": run.returncode,
+                    "warning": None
+                    if run.returncode == 0
+                    else f"{' '.join(execution_argv)} failed: exit={run.returncode}",
+                }
+        os.write(write_fd, json.dumps(result, separators=(",", ":")).encode("utf-8"))
+        os._exit(0)
+    except BaseException as error:
+        try:
+            os.write(
+                write_fd,
+                json.dumps(
+                    {
+                        "status": "detection_failed",
+                        "command": " ".join(detection_argv),
+                        "exit_code": None,
+                        "warning": str(error),
+                    },
+                    separators=(",", ":"),
+                ).encode("utf-8"),
+            )
+        finally:
+            os._exit(0)
+
+
+def _consumer_hook(request: object, root_fd: int) -> int:
+    bound_fd = int(request.bound_cwd_fd)
+    expected_device = int(request.bound_device)
+    expected_inode = int(request.bound_inode)
+    detection_argv = tuple(getattr(request, "detection_argv", ()))
+    execution_argv = tuple(getattr(request, "execution_argv", ()))
+    if detection_argv != ("make", "-n", "init") or execution_argv != ("make", "init"):
+        _close(root_fd)
+        _close(bound_fd)
+        print("error: invalid consumer hook request", file=sys.stderr)
+        return 1
+    bound_stat = os.fstat(bound_fd)
+    if (
+        not stat.S_ISDIR(bound_stat.st_mode)
+        or bound_stat.st_dev != expected_device
+        or bound_stat.st_ino != expected_inode
+    ):
+        _close(bound_fd)
+        _close(root_fd)
+        print("error: unsafe worktree binding", file=sys.stderr)
+        return 1
+    _close(root_fd)
+    root_fd = -1
+    read_fd, write_fd = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        _close(read_fd)
+        _close(root_fd)
+        _hook_child(bound_fd, write_fd, detection_argv, execution_argv)
+        raise AssertionError("hook child returned unexpectedly")
+    _close(write_fd)
+    _close(bound_fd)
+    _close(root_fd)
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(read_fd, 4096)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    _close(read_fd)
+    _pid, status = os.waitpid(pid, 0)
+    del status
+    try:
+        result = json.loads(b"".join(chunks).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        result = {
+            "status": "detection_failed",
+            "command": "make -n init",
+            "exit_code": None,
+            "warning": "hook result unavailable",
+        }
+    payload = dict(getattr(request, "result_payload", {}))
+    payload["bootstrap_status"] = result.get("status")
+    payload["bootstrap_command"] = result.get("command")
+    payload["bootstrap_exit_code"] = result.get("exit_code")
+    warnings = list(payload.get("warnings", ()))
+    if result.get("warning"):
+        warnings.append(str(result["warning"]))
+    payload["warnings"] = warnings
+    if getattr(request, "result_format", None) == "worktree-create-json-v1":
+        print(json.dumps({"status": "ok", "command": "worktree create", **payload}, ensure_ascii=False, indent=2))
+    else:
+        print(
+            f"spec-dock: ok (worktree create) id={payload.get('id')} "
+            f"branch={payload.get('branch_name')} path={payload.get('worktree_path')}"
+        )
+        print(
+            "spec-dock: worktree bootstrap "
+            f"status={payload.get('bootstrap_status')} command={payload.get('bootstrap_command') or '-'}"
+        )
+        for warning in warnings:
+            print(f"spec-dock: (warn) {warning}", file=sys.stderr)
+    return 0
+
+
+def main() -> int:
+    sys.dont_write_bytecode = True
+    root_fd: int | None = None
+    specdock_fd: int | None = None
+    try:
+        script_path = Path(__file__).absolute()
+        repo_root_path = script_path.parent.parent.parent
+        repo_root = str(repo_root_path)
+        root_fd = _open_absolute_directory(repo_root)
+        before = os.fstat(root_fd)
+        _acquire_shared_lease(root_fd)
+        after = os.fstat(root_fd)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise _BootstrapError("repository root binding changed")
+        specdock_fd = _open_directory(root_fd, ("spec-dock",))
+        candidate_digest = _validate_ready_record(specdock_fd)
+        _close(specdock_fd)
+        specdock_fd = None
+        _validate_fixed_domains(root_fd, candidate_digest)
+
+        scripts_dir = repo_root_path / "spec-dock" / "scripts"
+        sys.path.insert(0, str(scripts_dir))
+        from spec_dock_runtime.app import run
+        from spec_dock_runtime.cli.bootstrap import build_runtime
+
+        context = build_runtime(repo_root_path / "spec-dock", repo_root=repo_root_path)
+        outcome = run(sys.argv[1:], context)
+        terminal = outcome.terminal
+        if terminal is not None:
+            kind = getattr(terminal, "kind", None)
+            if kind == "installer-exec":
+                return _installer_exec(terminal, root_fd)
+            if kind == "consumer-hook":
+                result = _consumer_hook(terminal, root_fd)
+                root_fd = None
+                return result
+            raise _BootstrapError("unknown terminal runtime request")
+        _emit(outcome.text)
+        _close(root_fd)
+        root_fd = None
+        return int(outcome.exit_code)
+    except _BusyError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    except _BootstrapError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    except OSError as error:
+        print(f"error: repository coordination is unavailable ({error.strerror or error})", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    finally:
+        _close(specdock_fd)
+        _close(root_fd)
 
 
 if __name__ == "__main__":
