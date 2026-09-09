@@ -4,7 +4,7 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 関連GitHub: ["#392"]
 状態: "approved"
-最終更新: "2026-09-09"
+最終更新: "2026-09-10"
 依存:
   - "requirement.md"
   - "design.md"
@@ -15,14 +15,14 @@ ID: "iss-00392"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: true
 repository_evidence:
-  role: "issue-elaboration-source-provenance"
+  role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "dc638e936e763cc7a6087f258201ed9ed654e7fb"
-  tree: "17ce38234033393c385c4b17e40c0ccdc78bfc19"
+  sha: "8e6dc3b86a91045408e49e0155c19b78bb3b62b6"
+  tree: "f6b88332c3c869a9ad866563ffdd11e75b8013ae"
 implementation_evidence:
-  candidate_sha: "d94b218a1344fbba65239a13dfaae4f19bb5d579"
-  candidate_tree: "e5f3636e064605f3566b07420ea3a1d9da71dfac"
+  candidate_sha: "8e6dc3b86a91045408e49e0155c19b78bb3b62b6"
+  candidate_tree: "f6b88332c3c869a9ad866563ffdd11e75b8013ae"
 ---
 
 # #392 仕様・実装レポート
@@ -36,12 +36,12 @@ Issue #392の実装可能な仕様候補として、Requirement、Design、criti
 ## 2. Source verification facts
 
 - GitHub connectorでrepository `chemitaro/spec-dock`、branch `iss-00392-provider-lifecycle-and-regression-gate-hard-cutover`を取得しました。
-- Branch tipのfull object IDは`dc638e936e763cc7a6087f258201ed9ed654e7fb`で、strict wrapperのexpected SHAと完全一致しました。
-- Verified commit treeは`17ce38234033393c385c4b17e40c0ccdc78bfc19`です。
+- 仕様確認時のbranch tipのfull object IDは`dc638e936e763cc7a6087f258201ed9ed654e7fb`で、strict wrapperのexpected SHAと完全一致しました。実装candidateの現在値はrepository_evidenceと§9に分離して記録しています。
+- 仕様確認時のverified commit treeは`17ce38234033393c385c4b17e40c0ccdc78bfc19`です。
 - 最初にroot `AGENTS.md`を読み、`src/spec_dock/`をProduct source、checked-in `spec-dock/`をdogfood projection、PR mergeをhuman-onlyとして扱いました。
 - `attachments-bundle.zip`を一時directoryへ展開し、relative pathを維持した68 filesを列挙・検索しました。内訳の19 `.pyc` filesは入力ノイズとして無視し、成果物へ含めていません。
 - 添付内のEpic/Issue canonical documentsとselected source filesは、verified commitのGitHub blob/pathへ照合しました。相違時はGitHubを優先する規則で処理しました。
-- GitHub上の`spec-dock/spec-dock.version`はexact bytes `0.2.3\n`でした。
+- 仕様確認時のGitHub上の`spec-dock/spec-dock.version`はexact bytes `0.2.3\n`でした。
 
 ## 3. Reviewed scope facts
 
@@ -104,9 +104,9 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4の実装candidateを固定し、次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4の実装candidate `8e6dc3b86a91045408e49e0155c19b78bb3b62b6`を固定し、次の最終ゲートが残っています。
 
-1. 実装candidate `d94b218a1344fbba65239a13dfaae4f19bb5d579`のclean pushとupstream SHA一致（成立）。
+1. 実装candidateのclean pushとupstream SHA一致。
 2. このcandidateと更新後Reportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
 3. 最終Quality Gate Strictの実施条件成立。
 4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
@@ -121,15 +121,15 @@ current full verifierの`ledger-mismatch` 10件は#395が所有するactive base
 
 ## 9. Implementation verification update
 
-2026-09-09時点の実装candidate `d94b218a1344fbba65239a13dfaae4f19bb5d579`（tree
-`e5f3636e064605f3566b07420ea3a1d9da71dfac`）に対して、次の証拠を採取しました。
+2026-09-10時点の実装candidate `8e6dc3b86a91045408e49e0155c19b78bb3b62b6`（tree
+`f6b88332c3c869a9ad866563ffdd11e75b8013ae`）に対して、次の証拠を採取しました。
 
-- Blue-teamのChatGPT UseをGPT-5.6 Sol／Extra High／fresh browser sessionで再試行しました。レートリミットをbundle縮小で回避せず、前回と同じ11ファイルの完全bundleを投入し、Issue仕様3ファイル、provider runtime 4ファイル、lifecycle test 3ファイルを対象に、Code Review StrictのP1を分析しました。結論は「Aのsource lease継承」と「B EX後のrecord再検証」の2件とも有効なmerge-blocking P1で、#395の責務外というものでした。
-- Aの修正として`source_fd`をPorts→bootstrap→Git CLI→managed helperへ伝播し、`read-tree`子プロセスがsource Aとtarget Bのleaseを保持するようにしました。`worktree_create`はmaterialize・verification完了後の`finally`までsource fdを保持し、成功・例外の両経路で閉じます。Bの修正として、exclusive open後にinventory／record／blocker／containment／path bindingを再取得・再検証し、recordの消失・別パス・same-pathのinode交換時はGit removeを呼ばずfail closedにしました。
-- provider runtimeとchecked-in dogfood runtimeを同期し、candidate digest `92f3d5716338bd458c5cb0840a5c3672ce5c6d5343179d628cf8a1c613ea7144`、二つのslot marker、dogfood `spec-dock.version`を一致させました。`seed_policy=create-if-absent`の既存fixture semanticsは保持しています。
-- 追加した回帰は、直接infraでsource leaseをhelperへ渡すこと、record再検証後の別パス拒否、same-path異inode拒否、親SIGKILL中のread-tree子プロセスによるA/B lease保持です。Worktree／lifecycle focused suiteは`46 passed`、CP4のdistribution・dogfood・Issue #392 acceptance全件は`82 passed`でした。obsolete behaviorのassertionは残していません。
-- `make lint`はruff check、ruff format、mypyすべてpass、`uv build`もpassしました。default fastは`878 passed, 834 skipped`です。
-- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`1712 tests collected`、status=`ledger-mismatch`でした。ledgerはtotal15／active14／resolved1、timing 243 entriesを維持し、evaluationのviolationは10件（runtime import 8、runtime shell 1、workbench 1）で、いずれも#395 active baselineです。#392の新規node failure、ledger／timing／required-fastの変更はありません。
-- 直前の独立Code Review Strictは、exact SHA `9f8a1e14a92d90c7e4a65b9e58be1cac61c2668b`でP1×2を検出しました。上記修正はその指摘に対応したものであり、Report更新後の最終SHAについてfresh Code Review Strictを未実施です。Final Quality Gate Strict、#395のbaseline修正、PR merge後B1も未完了です。
+- provider-firstでworktree Bの作成後予約失敗を候補再試行せず停止・開示し、materializerが自分で作成したディレクトリのdevice/inode witnessだけを再利用するようにしました。entrypoint親も同じwitnessで検証します。B削除前のflock busy/unavailableは`remove_blocked`としてGit remove前に停止し、既存の削除後binding failureとは分離しました。
+- frozen provider bootstrapのconsumer hookは、B公開後のpipe/fork/fstat/wait系I/O failureとbinding mismatchを既存の`detection_failed`結果へ収束させ、CLI exit 0で返します。provider lifecycle engineではprivate authorityのI/O failureとforeign ownerをそれぞれ`lifecycle-preparation-failed`／`stage-owner-mismatch`へ写像しました。
+- provider runtimeとchecked-in dogfood runtimeを同期し、二つのslot markerとdogfood `spec-dock.version`のcandidate digest `573b03d94ef9ceb1520adf907428dea75c01643486b6ba21d52bf3044ddc9070`を一致させました。`seed_policy=preserve-only`のdogfood update semanticsはfresh installの`create-if-absent`と混同していません。provider/dogfoodの5つの同期対象はbyte一致を確認しました。
+- 追加した回帰は、B作成後の予約失敗の停止・残存開示、foreign descendant directoryの拒否、B削除前のbusy拒否、consumer hookのI/O/binding failure、private authorityのWire code分離です。full-regression shardのworktree／handoff／provider lifecycle focused suiteは`56 passed`、provider lifecycle unitは`26 passed`、Issue #392 acceptanceとdogfoodは`61 passed`、distribution cutoverは`10 passed`です。clean candidateでdistribution integrationは`11 passed`でした。obsolete behaviorのassertionは残していません。
+- `make lint`はruff check、ruff format、mypyすべてpass、`uv build`もpassしました。default fastは`881 passed, 840 skipped`です。
+- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`1721 tests collected`、status=`ledger-mismatch`でした。ledgerはtotal15／active14／resolved1、timing 243 entriesを維持し、violationは10件（runtime import 8、runtime shell 1、workbench 1）で、いずれも#395 active baselineです。#392の新規node failure、dirty candidate receipt、ledger／timing／required-fastの変更はありません。
+- 直前の独立Code Review Strictはfresh browser sessionでexact candidateを対象に`review_status=fail`、P1×5を返しました。指摘は上記の5境界（B予約後停止、foreign directory adoption、削除前coordination分類、consumer hook failure分類、private authority code分類）で、同じ完全bundleを用いたblue-team分析で再現・修正しました。修正後の最終SHAについてfresh Code Review StrictとFinal Quality Gate Strictを未実施です。#395のbaseline修正、PR merge後B1も未完了です。
 
 以上により、#392の実装candidate、provider-first packaging、dogfood parity、回帰テスト、current gate観測の証拠は揃っています。最終Strict reviewとFinal Quality Gateがpassするまで、Issue完了・Product GREEN・merge完了は主張しません。
