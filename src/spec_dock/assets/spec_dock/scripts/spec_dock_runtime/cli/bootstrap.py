@@ -255,9 +255,6 @@ class _GitGateway:
     def worktree_list(self, repo_root: Path):
         return infra_git_cli.worktree_list(repo_root)
 
-    def add_worktree_with_new_branch(self, repo_root: Path, *, path: Path, branch: str) -> None:
-        infra_git_cli.add_worktree_with_new_branch(repo_root, path=path, branch=branch)
-
     def remove_worktree(
         self,
         repo_root: Path,
@@ -287,12 +284,14 @@ class _GitGateway:
         *,
         pinned_commit: str,
         closure_paths: tuple[str, ...],
+        branch: str | None = None,
         check_other_worktree: bool = True,
     ):
         return infra_git_cli.assess_capabilities(
             repo_root,
             pinned_commit=pinned_commit,
             closure_paths=closure_paths,
+            branch=branch,
             check_other_worktree=check_other_worktree,
         )
 
@@ -335,8 +334,8 @@ class _GitGateway:
             target_fd=target_fd,
         )
 
-    def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str) -> None:
-        infra_git_cli.materialize_worktree(repo_root, path=path, pinned_commit=pinned_commit)
+    def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str, target_fd: int) -> None:
+        infra_git_cli.materialize_worktree(repo_root, path=path, pinned_commit=pinned_commit, target_fd=target_fd)
 
 
 @dataclass(frozen=True)
@@ -352,9 +351,6 @@ class _FilesystemGateway:
 
     def remove_tree(self, path: Path) -> None:
         infra_fs_cli.remove_tree(path)
-
-    def remove_target(self, path: Path) -> None:
-        infra_fs_cli.remove_target(path)
 
     def path_kind(self, path: Path) -> str:
         return infra_fs_cli.path_kind(path)

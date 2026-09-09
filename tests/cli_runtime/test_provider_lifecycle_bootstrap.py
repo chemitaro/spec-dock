@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -97,3 +98,152 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
         assert not_ready.returncode != 0
         assert "repository runtime is not ready" in not_ready.stderr
         assert not imported.exists(), "runtime was imported before ready admission"
+
+    def test_t08_strict_record_admission_rejects_unsafe_bindings_before_import(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+
+        spy_dir = tmp_path / "spy"
+        imported = tmp_path / "imported"
+        _install_import_spy(spy_dir, imported)
+        env = os.environ.copy()
+        env["PYTHONPATH"] = f"{spy_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
+        script = target / "spec-dock" / "scripts" / "spec-dock"
+        record = target / "spec-dock" / "spec-dock.version"
+        original = record.read_bytes()
+        original_mode = stat.S_IMODE(record.stat().st_mode)
+        assert original_mode == 0o644
+        decoded = json.loads(original)
+
+        malformed = [
+            ("duplicate-key", b'{"schema_version":1,' + original[1:]),
+            (
+                "schema-bool",
+                (
+                    json.dumps({**decoded, "schema_version": True}, ensure_ascii=False, separators=(",", ":")) + "\n"
+                ).encode("utf-8"),
+            ),
+            (
+                "schema-float",
+                (
+                    json.dumps({**decoded, "schema_version": 1.0}, ensure_ascii=False, separators=(",", ":")) + "\n"
+                ).encode("utf-8"),
+            ),
+            ("non-canonical", json.dumps(decoded, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"),
+            (
+                "unknown-key",
+                (json.dumps({**decoded, "unknown": True}, ensure_ascii=False, separators=(",", ":")) + "\n").encode(
+                    "utf-8"
+                ),
+            ),
+            ("oversized", b"x" * 4097),
+            ("wrong-mode", original),
+        ]
+
+        for label, payload in malformed:
+            record.unlink(missing_ok=True)
+            record.write_bytes(payload)
+            record.chmod(0o755 if label == "wrong-mode" else original_mode)
+            imported.unlink(missing_ok=True)
+            result = subprocess.run(
+                [sys.executable, str(script), "--help"],
+                cwd=target,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            assert result.returncode != 0, label
+            assert result.stdout == "", label
+            assert (
+                "repository runtime is not ready" in result.stderr
+                or "installation record is invalid" in result.stderr
+                or "runtime file has an unsafe binding" in result.stderr
+            ), label
+            assert not imported.exists(), label
+
+        hardlink = tmp_path / "record-hardlink"
+        record.unlink(missing_ok=True)
+        record.write_bytes(original)
+        record.chmod(original_mode)
+        os.link(record, hardlink)
+        try:
+            imported.unlink(missing_ok=True)
+            result = subprocess.run(
+                [sys.executable, str(script), "--help"],
+                cwd=target,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            assert result.returncode != 0
+            assert "runtime file has an unsafe binding" in result.stderr
+            assert not imported.exists()
+        finally:
+            hardlink.unlink(missing_ok=True)
+
+        symlink_target = tmp_path / "record-symlink-target"
+        symlink_target.write_bytes(original)
+        symlink_target.chmod(original_mode)
+        record.unlink(missing_ok=True)
+        record.symlink_to(symlink_target)
+        try:
+            imported.unlink(missing_ok=True)
+            result = subprocess.run(
+                [sys.executable, str(script), "--help"],
+                cwd=target,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            assert result.returncode != 0
+            assert "runtime file has an unsafe binding" in result.stderr
+            assert not imported.exists()
+        finally:
+            record.unlink(missing_ok=True)
+
+        if hasattr(os, "mkfifo"):
+            os.mkfifo(record)
+            try:
+                imported.unlink(missing_ok=True)
+                result = subprocess.run(
+                    [sys.executable, str(script), "--help"],
+                    cwd=target,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                )
+                assert result.returncode != 0
+                assert "runtime file has an unsafe binding" in result.stderr
+                assert not imported.exists()
+            finally:
+                record.unlink(missing_ok=True)
+
+        record.write_bytes(original)
+        record.chmod(original_mode)
+        marker = target / ".agents" / "skills" / "spec-dock" / ".spec-dock-provider-slot.json"
+        marker_mode = stat.S_IMODE(marker.stat().st_mode)
+        assert marker_mode == 0o644
+        marker.chmod(0o755)
+        try:
+            imported.unlink(missing_ok=True)
+            result = subprocess.run(
+                [sys.executable, str(script), "--help"],
+                cwd=target,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            assert result.returncode != 0
+            assert "runtime file has an unsafe binding" in result.stderr
+            assert not imported.exists()
+        finally:
+            marker.chmod(marker_mode)
+
+        record.write_bytes(original)
+        record.chmod(original_mode)

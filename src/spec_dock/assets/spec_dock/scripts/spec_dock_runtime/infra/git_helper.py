@@ -16,6 +16,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--lease-fd", type=int, action="append", required=True)
     parser.add_argument("--expected-device", type=int, action="append", required=True)
     parser.add_argument("--expected-inode", type=int, action="append", required=True)
+    parser.add_argument("--cwd-fd", type=int, required=True)
     parser.add_argument("argv", nargs=argparse.REMAINDER)
     return parser
 
@@ -52,6 +53,9 @@ def main(argv: list[str] | None = None) -> int:
         ):
             _validate_fd(fd, device, inode)
             os.set_inheritable(fd, True)
+        if namespace.cwd_fd not in namespace.lease_fd:
+            raise RuntimeError("cwd fd must be one of the validated lease fds")
+        os.fchdir(namespace.cwd_fd)
         child = subprocess.Popen(child_argv, pass_fds=tuple(namespace.lease_fd))
         return int(child.wait())
     except RuntimeError as error:

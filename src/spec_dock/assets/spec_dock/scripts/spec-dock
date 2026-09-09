@@ -54,7 +54,12 @@ def _directory_flags() -> int:
 
 
 def _regular_flags() -> int:
-    return os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_NONBLOCK", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
 
 
 def _close(fd: int | None) -> None:
@@ -76,12 +81,32 @@ def _open_absolute_directory(path: str) -> int:
     lexical = _lexical_absolute(path)
     if Path(lexical).is_symlink():
         raise _BootstrapError("repository root must not be a symlink")
-    absolute = Path(lexical).resolve(strict=False)
+    absolute = Path(lexical)
     current = os.open(os.sep, _directory_flags())
     try:
-        for component in absolute.parts[1:]:
+        for index, component in enumerate(absolute.parts[1:]):
             if component in {"", ".", ".."}:
                 raise _BootstrapError("repository root contains an unsafe component")
+            try:
+                binding = os.stat(component, dir_fd=current, follow_symlinks=False)
+            except FileNotFoundError:
+                binding = None
+            if binding is not None and stat.S_ISLNK(binding.st_mode):
+                allowed_var_alias = (
+                    sys.platform == "darwin"
+                    and index == 0
+                    and component == "var"
+                    and os.readlink(component, dir_fd=current) in {"/private/var", "private/var"}
+                )
+                if not allowed_var_alias:
+                    raise _BootstrapError("repository root contains an unsafe symlink component")
+                private_fd = os.open("private", _directory_flags(), dir_fd=current)
+                _close(current)
+                current = private_fd
+                var_fd = os.open("var", _directory_flags(), dir_fd=current)
+                _close(current)
+                current = var_fd
+                continue
             next_fd = os.open(component, _directory_flags(), dir_fd=current)
             _close(current)
             current = next_fd
@@ -106,21 +131,48 @@ def _open_directory(base_fd: int, components: tuple[str, ...]) -> int:
         raise
 
 
-def _open_regular(base_fd: int, name: str, *, maximum: int) -> tuple[bytes, os.stat_result]:
+def _open_regular(
+    base_fd: int,
+    name: str,
+    *,
+    maximum: int,
+    allowed_modes: frozenset[int],
+) -> tuple[bytes, os.stat_result]:
     if name in {"", ".", ".."} or "/" in name or "\x00" in name:
         raise _BootstrapError("runtime file contains an unsafe component")
+    try:
+        lexical = os.stat(name, dir_fd=base_fd, follow_symlinks=False)
+    except OSError as error:
+        raise _BootstrapError(f"runtime file is unavailable: {name}") from error
+    if (
+        not stat.S_ISREG(lexical.st_mode)
+        or lexical.st_nlink != 1
+        or stat.S_IMODE(lexical.st_mode) not in allowed_modes
+        or lexical.st_size > maximum
+    ):
+        raise _BootstrapError(f"runtime file has an unsafe binding: {name}")
     fd = os.open(name, _regular_flags(), dir_fd=base_fd)
     try:
         before = os.fstat(fd)
         if (
             not stat.S_ISREG(before.st_mode)
             or before.st_nlink != 1
-            or stat.S_IMODE(before.st_mode) not in {0o644, 0o755}
+            or stat.S_IMODE(before.st_mode) not in allowed_modes
         ):
             raise _BootstrapError(f"runtime file has an unsafe binding: {name}")
-        payload = os.read(fd, maximum + 1)
-        if len(payload) > maximum:
-            raise _BootstrapError(f"runtime file is too large: {name}")
+        if (before.st_dev, before.st_ino) != (lexical.st_dev, lexical.st_ino):
+            raise _BootstrapError(f"runtime file changed while opening: {name}")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(fd, min(1024 * 1024, maximum + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > maximum:
+                raise _BootstrapError(f"runtime file is too large: {name}")
+        payload = b"".join(chunks)
         after = os.fstat(fd)
         if (
             before.st_dev,
@@ -128,12 +180,14 @@ def _open_regular(base_fd: int, name: str, *, maximum: int) -> tuple[bytes, os.s
             before.st_ctime_ns,
             before.st_nlink,
             before.st_size,
+            before.st_mode,
         ) != (
             after.st_dev,
             after.st_ino,
             after.st_ctime_ns,
             after.st_nlink,
             after.st_size,
+            after.st_mode,
         ):
             raise _BootstrapError(f"runtime file changed while reading: {name}")
         return payload, before
@@ -142,9 +196,31 @@ def _open_regular(base_fd: int, name: str, *, maximum: int) -> tuple[bytes, os.s
 
 
 def _parse_json(payload: bytes, label: str) -> OrderedDict[str, object]:
+    if not payload.endswith(b"\n") or payload[:-1].find(b"\n") != -1:
+        raise _BootstrapError(f"{label} is invalid")
+
+    def reject_duplicate(pairs: list[tuple[str, object]]) -> OrderedDict[str, object]:
+        value: OrderedDict[str, object] = OrderedDict()
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("duplicate key")
+            value[key] = item
+        return value
+
+    def reject_constant(value: str) -> object:
+        raise ValueError(f"non-finite JSON constant: {value}")
+
     try:
-        value = json.loads(payload.decode("utf-8"), object_pairs_hook=OrderedDict)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        text = payload[:-1].decode("utf-8")
+        value = json.loads(
+            text,
+            object_pairs_hook=reject_duplicate,
+            parse_constant=reject_constant,
+        )
+        canonical = json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
+        if canonical.encode("utf-8") != payload:
+            raise ValueError("non-canonical JSON")
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
         raise _BootstrapError(f"{label} is invalid") from error
     if not isinstance(value, OrderedDict):
         raise _BootstrapError(f"{label} must be an object")
@@ -152,11 +228,11 @@ def _parse_json(payload: bytes, label: str) -> OrderedDict[str, object]:
 
 
 def _validate_ready_record(specdock_fd: int) -> str:
-    payload, _stat = _open_regular(specdock_fd, _RECORD_NAME, maximum=4096)
+    payload, _stat = _open_regular(specdock_fd, _RECORD_NAME, maximum=4096, allowed_modes=frozenset({0o644}))
     record = _parse_json(payload, "installation record")
     if tuple(record.keys()) != _READY_RECORD_KEYS:
         raise _BootstrapError("repository runtime is not ready")
-    if record.get("schema_version") != 1 or record.get("state") != "ready":
+    if type(record.get("schema_version")) is not int or record.get("schema_version") != 1 or record.get("state") != "ready":
         raise _BootstrapError("repository runtime is not ready")
     if record.get("operation") is not None or record.get("version") != _PROTOCOL_VERSION:
         raise _BootstrapError("repository runtime is not ready")
@@ -183,7 +259,12 @@ def _validate_fixed_domains(root_fd: int, candidate_digest: str) -> None:
         try:
             runtime_fd = _open_directory(scripts_fd, ("spec_dock_runtime",))
             _close(runtime_fd)
-            payload, _stat = _open_regular(scripts_fd, "spec-dock", maximum=512 * 1024)
+            payload, _stat = _open_regular(
+                scripts_fd,
+                "spec-dock",
+                maximum=512 * 1024,
+                allowed_modes=frozenset({0o755}),
+            )
             if not payload.startswith(b"#!"):
                 raise _BootstrapError("repository runtime is not ready")
         finally:
@@ -198,12 +279,18 @@ def _validate_fixed_domains(root_fd: int, candidate_digest: str) -> None:
             slot_components = tuple(slot_path.split("/"))[2:]
             slot_fd = _open_directory(agents_fd, slot_components)
             try:
-                payload, _stat = _open_regular(slot_fd, _SLOT_MARKER_NAME, maximum=2048)
+                payload, _stat = _open_regular(
+                    slot_fd,
+                    _SLOT_MARKER_NAME,
+                    maximum=2048,
+                    allowed_modes=frozenset({0o644}),
+                )
                 marker = _parse_json(payload, "provider slot marker")
                 if tuple(marker.keys()) != _MARKER_KEYS:
                     raise _BootstrapError("repository runtime is not ready")
                 if (
-                    marker.get("schema_version") != 1
+                    type(marker.get("schema_version")) is not int
+                    or marker.get("schema_version") != 1
                     or marker.get("slot") != slot_path
                     or marker.get("version") != _PROTOCOL_VERSION
                     or marker.get("candidate_digest") != candidate_digest
@@ -342,6 +429,8 @@ def _consumer_hook(request: object, root_fd: int) -> int:
         _close(root_fd)
         print("error: unsafe worktree binding", file=sys.stderr)
         return 1
+    _close(root_fd)
+    root_fd = -1
     read_fd, write_fd = os.pipe()
     pid = os.fork()
     if pid == 0:
@@ -427,7 +516,9 @@ def main() -> int:
             if kind == "installer-exec":
                 return _installer_exec(terminal, root_fd)
             if kind == "consumer-hook":
-                return _consumer_hook(terminal, root_fd)
+                result = _consumer_hook(terminal, root_fd)
+                root_fd = None
+                return result
             raise _BootstrapError("unknown terminal runtime request")
         _emit(outcome.text)
         _close(root_fd)

@@ -170,8 +170,6 @@ class GitGateway(Protocol):
 
     def worktree_list(self, repo_root: Path) -> list[GitWorktreeRecord]: ...
 
-    def add_worktree_with_new_branch(self, repo_root: Path, *, path: Path, branch: str) -> None: ...
-
     def remove_worktree(
         self,
         repo_root: Path,
@@ -192,6 +190,7 @@ class GitGateway(Protocol):
         *,
         pinned_commit: str,
         closure_paths: tuple[str, ...],
+        branch: str | None = None,
         check_other_worktree: bool = True,
     ) -> GitCapabilityAssessment: ...
 
@@ -224,7 +223,7 @@ class GitGateway(Protocol):
         target_fd: int | None = None,
     ) -> None: ...
 
-    def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str) -> None: ...
+    def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str, target_fd: int) -> None: ...
 
 
 class GitHubCapabilityGateway(Protocol):
@@ -233,8 +232,6 @@ class GitHubCapabilityGateway(Protocol):
 
 class FilesystemGateway(Protocol):
     def path_exists(self, path: Path) -> bool: ...
-
-    def remove_target(self, path: Path) -> None: ...
 
     def path_kind(self, path: Path) -> str: ...
 
@@ -305,7 +302,6 @@ class Ports:
     clock: Clock | None = None
     artifact_writer: ArtifactWriter | None = None
     sync_legacy_runner: SyncLegacyRunner | None = None
-    bootstrap_gateway: object | None = None
     environment_gateway: EnvironmentGateway | None = None
     filesystem_gateway: FilesystemGateway | None = None
     explicit_file_source_guard: ExplicitFileSourceGuard | None = None

@@ -126,6 +126,8 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
                     str(root_stat.st_dev),
                     "--expected-inode",
                     str(root_stat.st_ino),
+                    "--cwd-fd",
+                    str(root_fd),
                     "--",
                     sys.executable,
                     "-c",

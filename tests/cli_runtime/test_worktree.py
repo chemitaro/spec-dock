@@ -1071,96 +1071,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert stable_payload["resolved_target"]["id"] == "dupe"
             assert duplicate.exists()
 
-    def test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            worktree_path = central_root / "repo" / "repo-leftover"
-            repo_root.mkdir()
-            worktree_path.mkdir(parents=True)
-
-            class FakeGitGateway:
-                def __init__(self) -> None:
-                    self.remove_calls: list[tuple[Path, bool]] = []
-
-                def worktree_list(self, repo_root_arg):
-                    return [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
-                    ]
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    self.remove_calls.append((path, force))
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(central_root)
-
-            class FakeFilesystemGateway:
-                def __init__(self, *, fail: bool = False) -> None:
-                    self.fail = fail
-                    self.remove_calls: list[Path] = []
-
-                def path_exists(self, path):
-                    return True
-
-                def remove_target(self, path):
-                    self.remove_calls.append(path)
-                    if self.fail:
-                        raise RuntimeError("cleanup denied")
-
-            filesystem_gateway = FakeFilesystemGateway()
-            git_gateway = FakeGitGateway()
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=filesystem_gateway,
-            )
-
-            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
-
-            assert result.removed_record
-            assert result.removed_directory
-            assert git_gateway.remove_calls == [(worktree_path, True)]
-            assert filesystem_gateway.remove_calls == [worktree_path]
-
-            failing_fs = FakeFilesystemGateway(fail=True)
-            failing_ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=FakeGitGateway(),
-                environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=failing_fs,
-            )
-
-            with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), failing_ports)
-
-            assert raised.value.code == "post_remove_cleanup_failed"
-            assert raised.value.removed_record
-            assert not raised.value.removed_directory
-            assert failing_fs.remove_calls == [worktree_path]
-
     def test_worktree_remove_git_failure_does_not_cleanup_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime_scripts_dir = (
@@ -1197,7 +1107,7 @@ class TestCliWorktree(CliRuntimeHarness):
                         app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
                     ]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append((path, force))
                     raise RuntimeError("git refused")
 
@@ -1205,20 +1115,12 @@ class TestCliWorktree(CliRuntimeHarness):
                 def getenv(self, name):
                     return str(central_root)
 
-            class CleanupMustNotRun:
-                def path_exists(self, path):
-                    raise AssertionError("cleanup existence check must not be called")
-
-                def remove_target(self, path):
-                    raise AssertionError("cleanup must not be called")
-
             git_gateway = FakeGitGateway()
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
                 git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=CleanupMustNotRun(),
             )
 
             with pytest.raises(app_contracts.WorktreeCommandError) as raised:
@@ -1265,19 +1167,13 @@ class TestCliWorktree(CliRuntimeHarness):
                         ),
                     ]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append((path, force))
+                    worktree_path.rmdir()
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(central_root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return False
-
-                def remove_target(self, path):
-                    raise AssertionError("cleanup should not run when path is already gone")
 
             git_gateway = FakeGitGateway()
             ports = app_ports.Ports(
@@ -1285,7 +1181,6 @@ class TestCliWorktree(CliRuntimeHarness):
                 repo_root=repo_root,
                 git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=FakeFilesystemGateway(),
             )
 
             result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="locked"), ports)
@@ -1294,255 +1189,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert result.resolved_target.removable
             assert result.resolved_target.remove_blockers == []
             assert git_gateway.remove_calls == [(worktree_path, True)]
-
-    def test_worktree_remove_uses_target_only_cleanup_for_remaining_directory(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            namespace = central_root / "repo"
-            worktree_path = namespace / "repo-leftover"
-            repo_root.mkdir()
-            worktree_path.mkdir(parents=True)
-            parent_sentinel = worktree_path.parent / "parent-sentinel"
-            root_sentinel = central_root / "root-sentinel"
-            namespace_sentinel = namespace / "namespace-sentinel"
-            for sentinel in (parent_sentinel, root_sentinel, namespace_sentinel):
-                sentinel.write_text("keep\n", encoding="utf-8")
-
-            class FakeGitGateway:
-                def __init__(self) -> None:
-                    self.remove_calls: list[tuple[Path, bool]] = []
-
-                def worktree_list(self, repo_root_arg):
-                    return [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
-                    ]
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    self.remove_calls.append((path, force))
-                    return None
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(central_root)
-
-            class FakeFilesystemGateway:
-                def __init__(self) -> None:
-                    self.remove_calls: list[Path] = []
-
-                def path_exists(self, path):
-                    return True
-
-                def remove_target(self, path):
-                    self.remove_calls.append(path)
-                    shutil.rmtree(path)
-
-            filesystem_gateway = FakeFilesystemGateway()
-            git_gateway = FakeGitGateway()
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=filesystem_gateway,
-            )
-
-            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
-
-            assert result.removed_record
-            assert result.removed_directory
-            assert git_gateway.remove_calls == [(worktree_path, True)]
-            assert filesystem_gateway.remove_calls == [worktree_path]
-            assert not worktree_path.exists()
-            for sentinel in (parent_sentinel, root_sentinel, namespace_sentinel):
-                assert sentinel.exists(), f"sentinel={sentinel.name}"
-
-    def test_worktree_remove_reports_target_cleanup_failures(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            worktree_path = central_root / "repo" / "repo-leftover"
-            repo_root.mkdir()
-            worktree_path.mkdir(parents=True)
-
-            class FakeGitGateway:
-                def worktree_list(self, repo_root_arg):
-                    return [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
-                    ]
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    return None
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(central_root)
-
-            class FailingFilesystemGateway:
-                def __init__(self, mode):
-                    self.mode = mode
-
-                def path_exists(self, path):
-                    if self.mode == "lstat":
-                        raise RuntimeError("failed to inspect target path")
-                    return True
-
-                def remove_target(self, path):
-                    messages = {
-                        "unsupported": "unsupported target path type",
-                        "unlink": "failed to remove target path",
-                        "rmtree": "failed to remove directory tree",
-                        "race": "failed to inspect target path",
-                    }
-                    raise RuntimeError(messages[self.mode])
-
-            for mode in ("unsupported", "lstat", "unlink", "rmtree", "race"):
-                case_label = f"cleanup_mode={mode}"
-                ports = app_ports.Ports(
-                    node_reader=object(),
-                    repo_root=repo_root,
-                    git_gateway=FakeGitGateway(),
-                    environment_gateway=FakeEnvironmentGateway(),
-                    filesystem_gateway=FailingFilesystemGateway(mode),
-                )
-
-                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
-
-                assert raised.value.code == "post_remove_cleanup_failed", case_label
-                assert raised.value.removed_record, case_label
-                assert not raised.value.removed_directory, case_label
-
-    def test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            if not self._can_create_symlink(Path(tmp)):
-                pytest.skip("symlink unavailable")
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.infra import fs_cli
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            base = Path(tmp)
-            target_dir = base / "target-dir"
-            target_dir.mkdir()
-            target_sentinel = target_dir / "sentinel"
-            target_sentinel.write_text("keep\n", encoding="utf-8")
-            symlink_path = base / "target-link"
-            Path(symlink_path).symlink_to(target_dir)
-            broken_symlink = base / "broken-link"
-            Path(broken_symlink).symlink_to(base / "missing-target")
-            regular_file = base / "target-file"
-            regular_file.write_text("remove\n", encoding="utf-8")
-
-            assert fs_cli.path_exists(symlink_path)
-            assert fs_cli.path_exists(broken_symlink)
-            assert fs_cli.path_exists(regular_file)
-
-            fs_cli.remove_target(symlink_path)
-            fs_cli.remove_target(broken_symlink)
-            fs_cli.remove_target(regular_file)
-
-            assert not os.path.lexists(symlink_path)
-            assert not os.path.lexists(broken_symlink)
-            assert not regular_file.exists()
-            assert target_sentinel.exists()
-
-    def test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.infra import fs_cli
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            base = Path(tmp)
-            with pytest.raises(RuntimeError) as missing:
-                fs_cli.remove_target(base / "missing")
-            assert "failed to inspect target path" in str(missing.value)
-
-            regular_file = base / "target-file"
-            regular_file.write_text("remove\n", encoding="utf-8")
-            with (
-                _patch_object(Path, "unlink", side_effect=OSError("denied")),
-                pytest.raises(RuntimeError) as unlink_failed,
-            ):
-                fs_cli.remove_target(regular_file)
-            assert "failed to remove target path" in str(unlink_failed.value)
-
-            target_dir = base / "target-dir"
-            target_dir.mkdir()
-            with (
-                _patch_object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")),
-                pytest.raises(RuntimeError) as rmtree_failed,
-            ):
-                fs_cli.remove_target(target_dir)
-            assert "failed to remove directory tree" in str(rmtree_failed.value)
-
-            if not hasattr(os, "mkfifo"):
-                pytest.skip("mkfifo unavailable")
-            fifo_path = base / "target-fifo"
-            os.mkfifo(fifo_path)
-            try:
-                with pytest.raises(RuntimeError) as unsupported:
-                    fs_cli.remove_target(fifo_path)
-            finally:
-                fifo_path.unlink(missing_ok=True)
-            assert "unsupported target path type" in str(unsupported.value)
 
     def test_worktree_remove_ambiguous_basename_stops_before_git_remove(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1573,19 +1219,13 @@ class TestCliWorktree(CliRuntimeHarness):
                 def __init__(self) -> None:
                     self.remove_calls: list[Path] = []
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(Path(tmp) / "central")
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return True
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             inventory = [
                 app_contracts.WorktreeRecordView(
@@ -1623,7 +1263,6 @@ class TestCliWorktree(CliRuntimeHarness):
                 repo_root=repo_root,
                 git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=FakeFilesystemGateway(),
             )
 
             with (
@@ -1765,19 +1404,13 @@ class TestCliWorktree(CliRuntimeHarness):
                     ]
                     return initial_records if self.calls == 1 else self.refreshed_records
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(central_root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return Path(path).exists()
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             main_record = app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")
             cases = (
@@ -1809,7 +1442,6 @@ class TestCliWorktree(CliRuntimeHarness):
                     repo_root=repo_root,
                     git_gateway=git_gateway,
                     environment_gateway=FakeEnvironmentGateway(),
-                    filesystem_gateway=FakeFilesystemGateway(),
                 )
 
                 with pytest.raises(app_contracts.WorktreeCommandError) as raised:
@@ -1865,19 +1497,13 @@ class TestCliWorktree(CliRuntimeHarness):
                     self.calls += 1
                     return self.records_by_call[index]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(central_root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return Path(path).exists()
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             main_record = app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")
             cases = (
@@ -1920,7 +1546,6 @@ class TestCliWorktree(CliRuntimeHarness):
                         repo_root=repo_for_case,
                         git_gateway=git_gateway,
                         environment_gateway=FakeEnvironmentGateway(),
-                        filesystem_gateway=FakeFilesystemGateway(),
                     )
 
                     with pytest.raises(app_contracts.WorktreeCommandError) as raised:
@@ -1972,8 +1597,9 @@ class TestCliWorktree(CliRuntimeHarness):
                         app_contracts.GitWorktreeRecord(path=manual, head="def", branch="manual"),
                     ]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def __init__(self, value) -> None:
@@ -1981,13 +1607,6 @@ class TestCliWorktree(CliRuntimeHarness):
 
                 def getenv(self, name):
                     return self.value
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return False
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             cases = (
                 (None, "root_missing"),
@@ -1997,13 +1616,13 @@ class TestCliWorktree(CliRuntimeHarness):
             )
             for value, expected_reason in cases:
                 case_label = f"root_value={value!r}"
+                manual.mkdir(exist_ok=True)
                 git_gateway = FakeGitGateway()
                 ports = app_ports.Ports(
                     node_reader=object(),
                     repo_root=repo_root,
                     git_gateway=git_gateway,
                     environment_gateway=FakeEnvironmentGateway(value),
-                    filesystem_gateway=FakeFilesystemGateway(),
                 )
 
                 listed = app_worktree.worktree_list(app_contracts.WorktreeListRequest(), ports)

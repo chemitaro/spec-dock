@@ -59,7 +59,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def _target(path: str) -> Path:
-    return Path(path).expanduser().resolve()
+    return Path(path).expanduser().absolute()
 
 
 def _request(namespace: argparse.Namespace, target: Path) -> LifecycleRequest:
@@ -112,15 +112,8 @@ def main(argv: list[str] | None = None) -> int:
 
     namespace = _parse_args(sys.argv[1:] if argv is None else argv)
     target = _target(namespace.path)
-    json_requested = bool(getattr(namespace, "json", False))
-    if not target.is_dir():
-        if json_requested:
-            print(f'{{"error":"target path is not a directory: {target}"}}')
-        else:
-            print(f"error: target path is not a directory: {target}", file=sys.stderr)
-        return 2
-
     request = _request(namespace, target)
+    json_requested = bool(getattr(namespace, "json", False))
     result = ProviderLifecycleEngine().execute(
         request,
         force=True if namespace.command == "init" and namespace.force else None,

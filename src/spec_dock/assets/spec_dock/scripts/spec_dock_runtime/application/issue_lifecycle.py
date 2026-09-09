@@ -285,9 +285,8 @@ def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
             warnings=warnings,
         )
         pinned_checkout = last_pinned_checkout()
-        verify = getattr(ports.git_gateway, "verify_pinned_checkout", None)
-        if pinned_checkout is not None and callable(verify):
-            verify(
+        if pinned_checkout is not None:
+            ports.git_gateway.verify_pinned_checkout(
                 _resolve_repo_root(ports),
                 checkout=pinned_checkout,
                 closure_paths=(

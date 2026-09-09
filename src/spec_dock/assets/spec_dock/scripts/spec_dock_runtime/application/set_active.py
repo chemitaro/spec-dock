@@ -323,39 +323,23 @@ def checkout_active_target(
         _append_unique(warnings, warning)
 
     ports.git_gateway.require_clean_working_tree(repo_root)
-    current_branch = ports.git_gateway.current_branch_or_none(repo_root)
-
-    pinned_checkout = getattr(ports.git_gateway, "pinned_checkout", None)
-    resolve_commit = getattr(ports.git_gateway, "resolve_commit", None)
-    current_head = getattr(ports.git_gateway, "current_head_or_none", None)
-    if callable(pinned_checkout) and callable(resolve_commit) and callable(current_head):
-        checkout_kind = "existing" if ports.git_gateway.local_branch_exists(repo_root, decision.desired) else "new"
-        pinned_commit = (
-            resolve_commit(repo_root, f"refs/heads/{decision.desired}")
-            if checkout_kind == "existing"
-            else current_head(repo_root)
-        )
-        if not pinned_commit:
-            raise RuntimeError("cannot pin checkout: current HEAD is unavailable")
-        checkout = pinned_checkout(
-            repo_root,
-            branch=decision.desired,
-            pinned_commit=pinned_commit,
-            checkout_kind=checkout_kind,
-            closure_paths=_PROVIDER_CLOSURE_PATHS,
-        )
-        _LAST_PINNED_CHECKOUT = checkout
-        verify = getattr(ports.git_gateway, "verify_pinned_checkout", None)
-        if callable(verify):
-            verify(repo_root, checkout=checkout, closure_paths=_PROVIDER_CLOSURE_PATHS)
-        return decision
-
-    if current_branch != decision.desired:
-        if ports.git_gateway.local_branch_exists(repo_root, decision.desired):
-            _append_unique(warnings, "branch already exists; reusing existing branch; content is not verified")
-            ports.git_gateway.checkout_branch(repo_root, decision.desired)
-        else:
-            ports.git_gateway.create_and_checkout_branch(repo_root, decision.desired)
+    checkout_kind = "existing" if ports.git_gateway.local_branch_exists(repo_root, decision.desired) else "new"
+    pinned_commit = (
+        ports.git_gateway.resolve_commit(repo_root, f"refs/heads/{decision.desired}")
+        if checkout_kind == "existing"
+        else ports.git_gateway.current_head_or_none(repo_root)
+    )
+    if not pinned_commit:
+        raise RuntimeError("cannot pin checkout: current HEAD is unavailable")
+    checkout = ports.git_gateway.pinned_checkout(
+        repo_root,
+        branch=decision.desired,
+        pinned_commit=pinned_commit,
+        checkout_kind=checkout_kind,
+        closure_paths=_PROVIDER_CLOSURE_PATHS,
+    )
+    _LAST_PINNED_CHECKOUT = checkout
+    ports.git_gateway.verify_pinned_checkout(repo_root, checkout=checkout, closure_paths=_PROVIDER_CLOSURE_PATHS)
     return decision
 
 
